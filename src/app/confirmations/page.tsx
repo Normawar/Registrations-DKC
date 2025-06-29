@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { signInAnonymously } from 'firebase/auth';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -35,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
-import { storage } from '@/lib/firebase';
+import { auth, storage } from '@/lib/firebase';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -127,7 +128,7 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            if (!storage) {
+            if (!storage || !auth) {
               toast({
                 variant: "destructive",
                 title: "Configuration Error",
@@ -135,6 +136,11 @@ export default function ConfirmationsPage() {
               });
               setIsUpdating(prev => ({...prev, [conf.id]: false}));
               return;
+            }
+
+            // Ensure user is authenticated anonymously
+            if (!auth.currentUser) {
+              await signInAnonymously(auth);
             }
 
             const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
