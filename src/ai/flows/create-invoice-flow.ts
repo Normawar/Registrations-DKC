@@ -28,6 +28,11 @@ if (process.env.SQUARE_ACCESS_TOKEN) {
 } else {
     console.log('Square Access Token: Not Provided. Please check your .env file.');
 }
+if (process.env.SQUARE_LOCATION_ID) {
+    console.log(`Using Square Location ID: ${process.env.SQUARE_LOCATION_ID}`);
+} else {
+    console.log('Square Location ID: Not Provided. Please check your .env file.');
+}
 
 
 const CreateInvoiceInputSchema = z.object({
@@ -154,6 +159,11 @@ const createInvoiceFlow = ai.defineFlow(
             requestType: 'BALANCE',
             dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
           }],
+          acceptedPaymentMethods: {
+            card: true,
+            squareGiftCard: true,
+            bankAccount: true, // For ACH payments
+          },
           title: `Invoice for ${input.eventName}`,
           description: `Thank you for your registration.`,
         }
@@ -183,7 +193,7 @@ const createInvoiceFlow = ai.defineFlow(
 
     } catch (error) {
       if (error instanceof ApiError) {
-        console.error('Square API Error:', JSON.stringify(error, null, 2));
+        console.error('Square API Error:', JSON.stringify(error.result, null, 2));
         const firstError = error.result.errors?.[0];
         const errorMessage = firstError?.detail ?? JSON.stringify(error.result.errors);
         throw new Error(`Square Error: ${errorMessage}`);
