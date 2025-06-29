@@ -1,4 +1,7 @@
 
+'use client';
+
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -20,77 +23,98 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { districts } from "@/lib/data/districts";
-import { schools } from "@/lib/data/schools";
+import { schoolData } from "@/lib/data/school-data";
 
-const SponsorSignUpForm = () => (
-  <>
-    <CardContent className="grid gap-4">
-      <div className="grid gap-2">
-        <Label htmlFor="sponsor-name">Sponsor Name</Label>
-        <Input id="sponsor-name" placeholder="ACME Inc." required />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="district">District</Label>
-        <Select>
-          <SelectTrigger id="district">
-            <SelectValue placeholder="Select a district" />
-          </SelectTrigger>
-          <SelectContent>
-            {districts.map((district) => (
-              <SelectItem key={district} value={district}>
-                {district}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="school">School</Label>
-        <Select>
-          <SelectTrigger id="school">
-            <SelectValue placeholder="Select a school" />
-          </SelectTrigger>
-          <SelectContent>
-            {schools.map((school) => (
-              <SelectItem key={school} value={school}>
-                {school}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="name@example.com"
-          required
-        />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" required />
-      </div>
-    </CardContent>
-    <CardFooter className="flex flex-col gap-4">
-      <Button type="submit" className="w-full" asChild>
-        <Link href="/dashboard">Create Account</Link>
-      </Button>
-      <div className="text-sm text-center text-muted-foreground">
-        Already have an account?{" "}
-        <Link
-          href="/"
-          className="font-medium text-primary underline-offset-4 hover:underline"
-          prefetch={false}
-        >
-          Sign In
-        </Link>
-      </div>
-    </CardFooter>
-  </>
-);
+const uniqueDistricts = [...new Set(schoolData.map((school) => school.district))].sort();
+
+const SponsorSignUpForm = () => {
+  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+  const [selectedSchool, setSelectedSchool] = useState('');
+
+  const handleDistrictChange = (district: string) => {
+    setSelectedDistrict(district);
+    setSelectedSchool(''); 
+    const filteredSchools = schoolData
+      .filter((school) => school.district === district)
+      .map((school) => school.schoolName)
+      .sort();
+    setSchoolsForDistrict(filteredSchools);
+  };
+  
+  const handleSchoolChange = (school: string) => {
+    setSelectedSchool(school);
+  }
+
+  return (
+    <>
+      <CardContent className="grid gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="sponsor-name">Sponsor Name</Label>
+          <Input id="sponsor-name" placeholder="ACME Inc." required />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="district">District</Label>
+          <Select onValueChange={handleDistrictChange}>
+            <SelectTrigger id="district">
+              <SelectValue placeholder="Select a district" />
+            </SelectTrigger>
+            <SelectContent>
+              {uniqueDistricts.map((district) => (
+                <SelectItem key={district} value={district}>
+                  {district}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="school">School</Label>
+          <Select onValueChange={handleSchoolChange} value={selectedSchool} disabled={!selectedDistrict}>
+            <SelectTrigger id="school">
+              <SelectValue placeholder="Select a school" />
+            </SelectTrigger>
+            <SelectContent>
+              {schoolsForDistrict.map((school) => (
+                <SelectItem key={school} value={school}>
+                  {school}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@example.com"
+            required
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="password">Password</Label>
+          <Input id="password" type="password" required />
+        </div>
+      </CardContent>
+      <CardFooter className="flex flex-col gap-4">
+        <Button type="submit" className="w-full" asChild>
+          <Link href="/dashboard">Create Account</Link>
+        </Button>
+        <div className="text-sm text-center text-muted-foreground">
+          Already have an account?{" "}
+          <Link
+            href="/"
+            className="font-medium text-primary underline-offset-4 hover:underline"
+            prefetch={false}
+          >
+            Sign In
+          </Link>
+        </div>
+      </CardFooter>
+    </>
+  );
+};
 
 const IndividualSignUpForm = () => (
   <>
@@ -171,3 +195,5 @@ export default function SignUpPage() {
     </div>
   );
 }
+
+    

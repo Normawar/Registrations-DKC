@@ -1,22 +1,4 @@
-export const districts = [
-  "Aldine ISD",
-  "Alief ISD",
-  "Channelview ISD",
-  "Conroe ISD",
-  "Cypress-Fairbanks ISD",
-  "Deer Park ISD",
-  "Fort Bend ISD",
-  "Galena Park ISD",
-  "Goose Creek CISD",
-  "Harmony Public Schools",
-  "Houston ISD",
-  "Humble ISD",
-  "Katy ISD",
-  "KIPP Public Schools",
-  "Klein ISD",
-  "La Porte ISD",
-  "Pasadena ISD",
-  "Spring Branch ISD",
-  "Spring ISD",
-  "Tomball ISD",
-];
+
+export const districts: string[] = [];
+
+    
