@@ -45,16 +45,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen">
         <Sidebar>
           <SidebarHeader>
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2.5"
-              prefetch={false}
-            >
-              <KingIcon className="w-8 h-8 text-sidebar-primary" />
-              <span className="font-headline text-2xl font-bold text-sidebar-foreground">
-                ChessMate
-              </span>
-            </Link>
+            <div className="flex items-center gap-3">
+                <Link href="/profile" prefetch={false} aria-label="Sponsor Profile">
+                    <KingIcon className="w-8 h-8 text-sidebar-primary shrink-0" />
+                </Link>
+                <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
+                    <p className="font-headline text-base font-bold text-sidebar-foreground truncate">
+                        Sponsor Name
+                    </p>
+                    <p className="text-xs text-sidebar-foreground/80 truncate">
+                        SHARYLAND PIONEER H S
+                    </p>
+                    <p className="text-xs text-sidebar-foreground/70 truncate">
+                        SHARYLAND ISD
+                    </p>
+                </div>
+            </div>
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
