@@ -38,7 +38,7 @@ import {
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
+import { schoolData, type School } from '@/lib/data/school-data';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -90,15 +90,26 @@ type FeesBreakdown = {
     total: number;
 };
 
+// Hardcoded for prototype. In a real app, this would come from user session.
+const sponsorInfo = {
+  name: 'Sponsor Name',
+  schoolName: 'SHARYLAND PIONEER H S',
+  email: 'sponsor@chessmate.com',
+};
+
 export default function ConfirmationsPage() {
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Confirmation | null>(null);
+  const [sponsorSchool, setSponsorSchool] = useState<School | null>(null);
 
   useEffect(() => {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     setConfirmations(storedConfirmations);
+
+    const school = schoolData.find(s => s.schoolName === sponsorInfo.schoolName);
+    setSponsorSchool(school || null);
   }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
@@ -253,9 +264,17 @@ export default function ConfirmationsPage() {
                     <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
                         <div>
                             <p className="font-semibold text-muted-foreground">BILLED TO</p>
-                            <p>Sponsor Name</p>
-                            <p>SHARYLAND PIONEER H S</p>
-                            <p>sponsor@chessmate.com</p>
+                            <p>{sponsorInfo.name}</p>
+                            {sponsorSchool ? (
+                                <>
+                                    <p>{sponsorSchool.schoolName}</p>
+                                    <p>{sponsorSchool.streetAddress}</p>
+                                    <p>{`${sponsorSchool.city}, ${sponsorSchool.state} ${sponsorSchool.zip}`}</p>
+                                </>
+                            ) : (
+                                <p>{sponsorInfo.schoolName}</p>
+                            )}
+                            <p>{sponsorInfo.email}</p>
                         </div>
                         <div className="text-right">
                              <p className="font-semibold text-muted-foreground">EVENT DETAILS</p>
@@ -347,5 +366,3 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
-
-    
