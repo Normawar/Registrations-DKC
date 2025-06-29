@@ -111,9 +111,16 @@ export default function EventsPage() {
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selections, setSelections] = useState<RegistrationSelections>({});
     const [calculatedFees, setCalculatedFees] = useState(0);
+    const [clientReady, setClientReady] = useState(false);
+
+    useEffect(() => {
+        setClientReady(true);
+    }, []);
 
     const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event): number => {
       let total = 0;
+      if (!clientReady) return 0;
+      
       const eventDate = new Date(event.date);
       const hoursUntilEvent = differenceInHours(eventDate, new Date());
       
@@ -141,7 +148,7 @@ export default function EventsPage() {
         } else {
             setCalculatedFees(0);
         }
-    }, [selections, selectedEvent]);
+    }, [selections, selectedEvent, clientReady]);
 
     const handleRegisterClick = (event: Event) => {
         const status = getEventStatus(event);
@@ -275,12 +282,12 @@ export default function EventsPage() {
     }
 
     const getEventStatus = (event: Event): "Open" | "Upcoming" | "Closed" | "Completed" => {
+      if (!clientReady) return "Upcoming";
       const now = new Date();
       const eventDate = new Date(event.date);
       if (now > eventDate) {
         return "Completed";
       }
-      // You can add more complex logic for "Closed" vs "Open"
       return "Open";
     };
 
@@ -359,6 +366,25 @@ export default function EventsPage() {
     });
 
     const sectionOptions = sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>);
+    
+    // For invoice dialog
+    const uscfActionsCount = Object.values(selections).filter(s => s.uscfStatus === 'new' || s.uscfStatus === 'renewing').length;
+    const registrationCount = Object.keys(selections).length;
+    const uscfFee = 24;
+    let registrationFeePerPlayer = selectedEvent?.regularFee ?? 0;
+    let feeType = "Regular";
+    if (selectedEvent && clientReady) {
+        const eventDate = new Date(selectedEvent.date);
+        const hoursUntilEvent = differenceInHours(eventDate, new Date());
+        if (hoursUntilEvent <= 24) { 
+            registrationFeePerPlayer = selectedEvent.veryLateFee; 
+            feeType = "Very Late";
+        } else if (hoursUntilEvent <= 48) { 
+            registrationFeePerPlayer = selectedEvent.lateFee; 
+            feeType = "Late";
+        }
+    }
+
 
   return (
     <AppLayout>
@@ -389,7 +415,7 @@ export default function EventsPage() {
                   return (
                     <TableRow key={event.id}>
                       <TableCell className="font-medium">{event.name}</TableCell>
-                      <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
+                      <TableCell>{clientReady ? format(new Date(event.date), 'PPP') : ''}</TableCell>
                       <TableCell>{event.location}</TableCell>
                       <TableCell>
                           <div className="flex items-center gap-2">
@@ -432,9 +458,9 @@ export default function EventsPage() {
           <DialogHeader>
             <DialogTitle>
               Register for {selectedEvent?.name}
-              {Object.keys(selections).length > 0 && (
+              {registrationCount > 0 && (
                 <span className="ml-2 font-normal text-muted-foreground">
-                  ({Object.keys(selections).length} player(s) selected)
+                  ({registrationCount} player(s) selected)
                 </span>
               )}
             </DialogTitle>
@@ -564,8 +590,8 @@ export default function EventsPage() {
                 <DialogClose asChild>
                     <Button type="button" variant="ghost">Cancel</Button>
                 </DialogClose>
-                <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections || hasInvalidUscfSelections || hasInvalidDataForUscfAction}>
-                    Review Invoice ({Object.keys(selections).length} Players)
+                <Button type="button" onClick={handleProceedToInvoice} disabled={registrationCount === 0 || hasInvalidSelections || hasInvalidUscfSelections || hasInvalidDataForUscfAction}>
+                    Review Invoice ({registrationCount} Players)
                 </Button>
               </div>
           </DialogFooter>
@@ -577,19 +603,21 @@ export default function EventsPage() {
               <DialogHeader>
                   <DialogTitle>Register and Accept Invoice</DialogTitle>
                   <DialogDescription>
-                      You are about to register {Object.keys(selections).length} player(s) for {selectedEvent?.name}. Please review the summary below.
+                      You are about to register {registrationCount} player(s) for {selectedEvent?.name}. Please review the summary below.
                   </DialogDescription>
               </DialogHeader>
               <div className="py-4 space-y-4">
                 <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Players</span>
-                        <span className="font-medium">{Object.keys(selections).length}</span>
+                        <span className="text-muted-foreground">Registrations ({feeType} Fee)</span>
+                        <span className="font-medium">{registrationCount} &times; ${registrationFeePerPlayer.toFixed(2)}</span>
                     </div>
-                     <div className="flex justify-between">
-                        <span className="text-muted-foreground">New / Renewing USCF Memberships</span>
-                        <span className="font-medium">{Object.values(selections).filter(s => s.uscfStatus === 'new' || s.uscfStatus === 'renewing').length}</span>
-                    </div>
+                    {uscfActionsCount > 0 && (
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">New / Renewing USCF Memberships</span>
+                            <span className="font-medium">{uscfActionsCount} &times; ${uscfFee.toFixed(2)}</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="text-center rounded-lg border border-primary/20 bg-primary/5 py-4">

@@ -72,6 +72,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
 
 const eventFormSchema = z.object({
   id: z.string().optional(),
