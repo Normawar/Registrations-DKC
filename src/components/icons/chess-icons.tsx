@@ -133,3 +133,22 @@ export const PawnIcon = (props: SVGProps<SVGSVGElement>) => (
     <path d="M10 18c0-1.1.9-2 2-2s2 .9 2 2" />
   </svg>
 );
+
+export const DarkKnightIcon = (props: SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 22h-4v-2h4v2zm-2-2v-3h-2a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h1.5a3 3 0 0 1 3 3v2" />
+    <path d="M10 12h.5a2.5 2.5 0 0 0 2.5-2.5V8" />
+    <path d="M12 2a3 3 0 0 1 3 3c0 2.2-2.5 4-4 4" />
+  </svg>
+);

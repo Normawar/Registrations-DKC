@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { KingIcon } from "@/components/icons/chess-icons";
+import { DarkKnightIcon } from "@/components/icons/chess-icons";
 import Link from "next/link";
 import { Chrome } from "lucide-react";
 
@@ -19,11 +19,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="space-y-1 text-center">
           <div className="inline-block rounded-lg bg-primary/10 p-3 mb-4">
-              <KingIcon className="h-10 w-10 text-primary" />
+              <DarkKnightIcon className="h-10 w-10 text-primary" />
           </div>
-          <CardTitle className="text-3xl font-bold font-headline">Welcome Back</CardTitle>
+          <CardTitle className="text-3xl font-bold font-headline">Dark Knights</CardTitle>
           <CardDescription>
-            Enter your credentials to access your ChessMate dashboard.
+            Enter your credentials to access the guild.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
