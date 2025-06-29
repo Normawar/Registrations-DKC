@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { auth, storage } from '@/lib/firebase';
+import { app } from '@/lib/firebase';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -127,6 +127,9 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
+            const auth = getAuth(app);
+            const storage = getStorage(app);
+
             // Ensure user is authenticated anonymously
             if (!auth.currentUser) {
               await signInAnonymously(auth);
