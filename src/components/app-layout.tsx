@@ -23,6 +23,7 @@ import {
   PawnIcon,
   BishopIcon,
   KnightIcon,
+  Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
 import { LogOut, School, ClipboardList, ClipboardCheck } from "lucide-react";
@@ -34,6 +35,7 @@ const menuItems = [
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
   { href: "/players", icon: PawnIcon, label: "Players" },
   { href: "/schools", icon: School, label: "Schools" },
+  { href: "/manage-events", icon: Wrench, label: "Manage Events" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
 ];

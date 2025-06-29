@@ -1,0 +1,381 @@
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { format, isValid, parse } from 'date-fns';
+import { useEvents, type Event } from '@/hooks/use-events';
+import { AppLayout } from "@/components/app-layout";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
+import { 
+  PlusCircle, 
+  MoreHorizontal,
+  CalendarIcon,
+  Trash2,
+  FilePenLine
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+const eventFormSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(3, { message: "Name must be at least 3 characters." }),
+  date: z.date({ required_error: "An event date is required." }),
+  location: z.string().min(3, { message: "Location is required." }),
+  rounds: z.coerce.number().int().min(1, { message: "Must be at least 1 round." }),
+  regularFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
+  lateFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
+  veryLateFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
+  imageUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+  pdfUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+});
+
+type EventFormValues = z.infer<typeof eventFormSchema>;
+
+export default function ManageEventsPage() {
+  const { toast } = useToast();
+  const { events, addEvent, updateEvent, deleteEvent } = useEvents();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
+
+  const form = useForm<EventFormValues>({
+    resolver: zodResolver(eventFormSchema),
+  });
+
+  useEffect(() => {
+    if (isDialogOpen) {
+      if (editingEvent) {
+        form.reset({
+          ...editingEvent,
+          date: new Date(editingEvent.date),
+        });
+      } else {
+        form.reset({
+          name: '',
+          location: '',
+          rounds: 5,
+          regularFee: 20,
+          lateFee: 25,
+          veryLateFee: 30,
+          imageUrl: '',
+          pdfUrl: '',
+        });
+      }
+    }
+  }, [isDialogOpen, editingEvent, form]);
+
+  const handleAddEvent = () => {
+    setEditingEvent(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    setIsDialogOpen(true);
+  };
+  
+  const handleDeleteEvent = (event: Event) => {
+    setEventToDelete(event);
+    setIsAlertOpen(true);
+  };
+  
+  const confirmDelete = () => {
+    if (eventToDelete) {
+      deleteEvent(eventToDelete.id);
+      toast({ title: "Event Deleted", description: `"${eventToDelete.name}" has been removed.` });
+    }
+    setIsAlertOpen(false);
+    setEventToDelete(null);
+  };
+
+  function onSubmit(values: EventFormValues) {
+    const eventData = { ...values, date: values.date.toISOString() };
+    if (editingEvent) {
+      updateEvent(eventData as Event);
+      toast({ title: "Event Updated", description: `"${values.name}" has been successfully updated.` });
+    } else {
+      addEvent({ ...eventData, id: Date.now().toString() });
+      toast({ title: "Event Added", description: `"${values.name}" has been successfully created.` });
+    }
+    setIsDialogOpen(false);
+  }
+
+  const getEventStatus = (event: Event): "Open" | "Completed" => {
+    return new Date(event.date) < new Date() ? "Completed" : "Open";
+  };
+  
+  return (
+    <AppLayout>
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold font-headline">Manage Events</h1>
+            <p className="text-muted-foreground">
+              Create, edit, and manage your tournament events and fees.
+            </p>
+          </div>
+          <Button onClick={handleAddEvent}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add New Event
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Event Name</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Fees (Reg/Late/V.Late)</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {events.map((event) => (
+                  <TableRow key={event.id}>
+                    <TableCell className="font-medium">{event.name}</TableCell>
+                    <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
+                    <TableCell>{event.location}</TableCell>
+                    <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee}`}</TableCell>
+                    <TableCell>
+                      <Badge variant={getEventStatus(event) === 'Open' ? 'default' : 'secondary'} className={cn(getEventStatus(event) === 'Open' ? 'bg-green-600 text-white' : '')}>
+                        {getEventStatus(event)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button aria-haspopup="true" size="icon" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Toggle menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleEditEvent(event)}>
+                            <FilePenLine className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+
+       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editingEvent ? 'Edit Event' : 'Add New Event'}</DialogTitle>
+            <DialogDescription>
+              {editingEvent ? 'Update the event details below.' : 'Fill in the form to create a new event.'}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Name</FormLabel>
+                    <FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="location" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Event Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField control={form.control} name="rounds" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Rounds</FormLabel>
+                    <FormControl><Input type="number" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              
+              <div>
+                <Label>Registration Fees</Label>
+                <Card className="p-4 mt-2 bg-muted/50">
+                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <FormField control={form.control} name="regularFee" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Regular Fee ($)</FormLabel>
+                        <FormControl><Input type="number" placeholder="20" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                     <FormField control={form.control} name="lateFee" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Late Fee (in 48h) ($)</FormLabel>
+                        <FormControl><Input type="number" placeholder="25" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                     <FormField control={form.control} name="veryLateFee" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Very Late Fee (in 24h) ($)</FormLabel>
+                        <FormControl><Input type="number" placeholder="30" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                   </div>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <FormField control={form.control} name="imageUrl" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Image URL (Optional)</FormLabel>
+                    <FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                 <FormField control={form.control} name="pdfUrl" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PDF Flyer URL (Optional)</FormLabel>
+                    <FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost">Cancel</Button>
+                </DialogClose>
+                <Button type="submit">
+                  {editingEvent ? 'Save Changes' : 'Create Event'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the event
+              "{eventToDelete?.name}".
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </AppLayout>
+  );
+}

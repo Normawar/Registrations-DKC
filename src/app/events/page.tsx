@@ -47,18 +47,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
-
-type Event = {
-    id: string;
-    name: string;
-    date: Date;
-    location: string;
-    registered: string;
-    status: "Open" | "Upcoming" | "Closed" | "Completed";
-    imageUrl?: string;
-    pdfUrl?: string;
-    rounds: number;
-};
+import { useEvents, type Event } from '@/hooks/use-events';
 
 type Player = {
   id: string;
@@ -116,85 +105,30 @@ const sectionMaxGrade: { [key: string]: number } = {
 
 export default function EventsPage() {
     const { toast } = useToast();
-    const [events, setEvents] = useState<Event[]>([]);
+    const { events } = useEvents();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selections, setSelections] = useState<RegistrationSelections>({});
     const [calculatedFees, setCalculatedFees] = useState(0);
 
-    useEffect(() => {
-        // This should run only on the client
-        const initialEvents: Event[] = [
-          {
-            id: '1',
-            name: "Spring Open 2024",
-            date: new Date(new Date().setDate(new Date().getDate() + 10)), // Upcoming
-            location: "City Convention Center",
-            registered: "128/150",
-            status: "Open",
-            imageUrl: "https://placehold.co/100x100.png",
-            pdfUrl: "#",
-            rounds: 5,
-          },
-          {
-            id: '2',
-            name: "Summer Championship",
-            date: new Date(new Date().setDate(new Date().getDate() + 40)), // Upcoming
-            location: "Grand Hotel Ballroom",
-            registered: "95/100",
-            status: "Open",
-            rounds: 7,
-          },
-          {
-            id: '3',
-            name: "Autumn Classic",
-            date: new Date("2024-09-10"),
-            location: "Community Chess Club",
-            registered: "40/50",
-            status: "Completed",
-            pdfUrl: "#",
-            rounds: 5,
-          },
-          {
-            id: '4',
-            name: "Winter Scholastic",
-            date: new Date(new Date().setDate(new Date().getDate() + 1)), // 24hr late fee
-            location: "North High School",
-            registered: "0/80",
-            status: "Open",
-            rounds: 4,
-          },
-          {
-            id: '5',
-            name: "New Year Blitz",
-            date: new Date(new Date().setDate(new Date().getDate() + 2)), // 48hr late fee
-            location: "Online",
-            registered: "0/200",
-            status: "Open",
-            imageUrl: "https://placehold.co/100x100.png",
-            rounds: 9,
-          },
-        ];
-        setEvents(initialEvents);
-    }, []);
-
     const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event): number => {
       let total = 0;
-      const hoursUntilEvent = differenceInHours(event.date, new Date());
+      const eventDate = new Date(event.date);
+      const hoursUntilEvent = differenceInHours(eventDate, new Date());
       
-      let registrationFee = 20;
+      let registrationFee = event.regularFee;
       if (hoursUntilEvent <= 24) {
-        registrationFee = 30;
+        registrationFee = event.veryLateFee;
       } else if (hoursUntilEvent <= 48) {
-        registrationFee = 25;
+        registrationFee = event.lateFee;
       }
       
       for (const playerId in currentSelections) {
         total += registrationFee;
         const playerSelection = currentSelections[playerId];
         if (playerSelection.uscfStatus === 'new' || playerSelection.uscfStatus === 'renewing') {
-          total += 24;
+          total += 24; // Standard USCF fee
         }
       }
       return total;
@@ -210,7 +144,8 @@ export default function EventsPage() {
     }, [selections, selectedEvent]);
 
     const handleRegisterClick = (event: Event) => {
-        if (event.status === 'Open' || event.status === 'Upcoming') {
+        const status = getEventStatus(event);
+        if (status === 'Open' || status === 'Upcoming') {
             setSelectedEvent(event);
             setIsDialogOpen(true);
             setSelections({});
@@ -222,7 +157,8 @@ export default function EventsPage() {
             const newSelections = {...prev};
             const player = rosterPlayers.find(p => p.id === playerId);
             if (isSelected && player && selectedEvent) {
-                const isExpired = !player.uscfExpiration || player.uscfExpiration < selectedEvent.date;
+                const eventDate = new Date(selectedEvent.date);
+                const isExpired = !player.uscfExpiration || player.uscfExpiration < eventDate;
                 newSelections[playerId] = { 
                     byes: { round1: 'none', round2: 'none' },
                     section: player.section,
@@ -276,10 +212,11 @@ export default function EventsPage() {
     const handleGenerateInvoice = async () => {
         if (!selectedEvent) return;
         
-        const hoursUntilEvent = differenceInHours(selectedEvent.date, new Date());
-        let registrationFeePerPlayer = 20;
-        if (hoursUntilEvent <= 24) { registrationFeePerPlayer = 30; } 
-        else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = 25; }
+        const eventDate = new Date(selectedEvent.date);
+        const hoursUntilEvent = differenceInHours(eventDate, new Date());
+        let registrationFeePerPlayer = selectedEvent.regularFee;
+        if (hoursUntilEvent <= 24) { registrationFeePerPlayer = selectedEvent.veryLateFee; } 
+        else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = selectedEvent.lateFee; }
         
         const numUscfActions = Object.values(selections).filter(s => s.uscfStatus !== 'current').length;
 
@@ -298,7 +235,7 @@ export default function EventsPage() {
             const newConfirmation = {
                 id: new Date().toISOString(),
                 eventName: selectedEvent.name,
-                eventDate: selectedEvent.date.toISOString(),
+                eventDate: selectedEvent.date,
                 submissionTimestamp: new Date().toISOString(),
                 selections,
                 totalInvoiced: calculatedFees,
@@ -337,7 +274,17 @@ export default function EventsPage() {
         setSelections({});
     }
 
-    const getStatusBadge = (status: Event['status']) => {
+    const getEventStatus = (event: Event): "Open" | "Upcoming" | "Closed" | "Completed" => {
+      const now = new Date();
+      const eventDate = new Date(event.date);
+      if (now > eventDate) {
+        return "Completed";
+      }
+      // You can add more complex logic for "Closed" vs "Open"
+      return "Open";
+    };
+
+    const getStatusBadge = (status: "Open" | "Upcoming" | "Closed" | "Completed") => {
       switch (status) {
         case 'Open': return 'bg-green-600';
         case 'Upcoming': return 'bg-blue-500';
@@ -374,7 +321,7 @@ export default function EventsPage() {
       if (registration.uscfStatus === 'current') {
         if (player.uscfId.toUpperCase() === 'NEW') return false;
         if (!player.uscfExpiration) return false;
-        if (event.date > player.uscfExpiration) return false;
+        if (new Date(event.date) > player.uscfExpiration) return false;
       }
       return true;
     };
@@ -431,48 +378,49 @@ export default function EventsPage() {
                   <TableHead>Event Name</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead>Registered</TableHead>
                   <TableHead>Attachments</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell className="font-medium">{event.name}</TableCell>
-                    <TableCell>{format(event.date, 'PPP')}</TableCell>
-                    <TableCell>{event.location}</TableCell>
-                    <TableCell>{event.registered}</TableCell>
-                    <TableCell>
-                        <div className="flex items-center gap-2">
-                            {event.imageUrl && (
-                                <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title="Event Image"><ImageIcon className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
-                            )}
-                            {event.pdfUrl && (
-                                <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title="Event PDF"><FileText className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
-                            )}
-                            {(!event.imageUrl && !event.pdfUrl) && <span className="text-xs text-muted-foreground">None</span>}
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={"default"}
-                        className={cn("text-white", getStatusBadge(event.status))}
-                      >
-                        {event.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                        <Button 
-                          onClick={() => handleRegisterClick(event)}
-                          disabled={event.status === 'Closed' || event.status === 'Completed'}
-                          >
-                          Register
-                        </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {events.map((event) => {
+                  const status = getEventStatus(event);
+                  return (
+                    <TableRow key={event.id}>
+                      <TableCell className="font-medium">{event.name}</TableCell>
+                      <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
+                      <TableCell>{event.location}</TableCell>
+                      <TableCell>
+                          <div className="flex items-center gap-2">
+                              {event.imageUrl && (
+                                  <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title="Event Image"><ImageIcon className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                              )}
+                              {event.pdfUrl && (
+                                  <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title="Event PDF"><FileText className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                              )}
+                              {(!event.imageUrl && !event.pdfUrl) && <span className="text-xs text-muted-foreground">None</span>}
+                          </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={"default"}
+                          className={cn("text-white", getStatusBadge(status))}
+                        >
+                          {status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                          <Button 
+                            onClick={() => handleRegisterClick(event)}
+                            disabled={status === 'Closed' || status === 'Completed'}
+                            >
+                            Register
+                          </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
