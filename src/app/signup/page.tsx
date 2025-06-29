@@ -99,6 +99,10 @@ const SponsorSignUpForm = () => {
           />
         </div>
         <div className="grid gap-2">
+            <Label htmlFor="phone">Cell Phone Number</Label>
+            <Input id="phone" type="tel" placeholder="(555) 555-5555" required />
+        </div>
+        <div className="grid gap-2">
           <Label htmlFor="password">Password</Label>
           <Input id="password" type="password" required />
         </div>
