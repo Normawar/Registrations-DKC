@@ -3,30 +3,21 @@ import { initializeApp, getApps, type FirebaseOptions } from 'firebase/app';
 import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 
+// Your web app's Firebase configuration
 const firebaseConfig: FirebaseOptions = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyBA-Lc8CKKY59hxQIPgQ_x0agdqEyWuyTA",
+  authDomain: "chessmate-w17oa.firebaseapp.com",
+  projectId: "chessmate-w17oa",
+  storageBucket: "chessmate-w17oa.appspot.com",
+  messagingSenderId: "253736799220",
+  appId: "1:253736799220:web:f66d274ff02d19207387a1"
 };
 
 // Initialize Firebase
 const apps = getApps();
-let app;
+const app = apps.length ? apps[0] : initializeApp(firebaseConfig);
 
-// Check if all required config values are present
-const allConfigPresent = Object.values(firebaseConfig).every(value => !!value);
-
-if (allConfigPresent) {
-  app = apps.length ? apps[0] : initializeApp(firebaseConfig);
-} else {
-  console.warn("Firebase config is incomplete. Firebase app could not be initialized.");
-}
-
-
-const storage = app ? getStorage(app) : null;
-const auth = app ? getAuth(app) : null;
+const storage = getStorage(app);
+const auth = getAuth(app);
 
 export { app, storage, auth };
