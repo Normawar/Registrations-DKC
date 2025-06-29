@@ -2,6 +2,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useRouter } from 'next/navigation';
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,7 +17,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,17 +28,39 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { schoolData } from "@/lib/data/school-data";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const uniqueDistricts = [...new Set(schoolData.map((school) => school.district))].sort();
 
+const sponsorFormSchema = z.object({
+  firstName: z.string().min(1, { message: "First name is required." }),
+  lastName: z.string().min(1, { message: "Last name is required." }),
+  district: z.string({ required_error: "Please select a district."}).min(1, "District is required."),
+  school: z.string({ required_error: "Please select a school."}).min(1, "School is required."),
+  email: z.string().email({ message: "Please enter a valid email." }),
+  phone: z.string().min(10, { message: "Please enter a valid 10-digit phone number." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
+});
+
 const SponsorSignUpForm = () => {
-  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const router = useRouter();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
-  const [selectedSchool, setSelectedSchool] = useState('');
+  
+  const form = useForm<z.infer<typeof sponsorFormSchema>>({
+    resolver: zodResolver(sponsorFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      district: "",
+      school: "",
+      email: "",
+      phone: "",
+      password: "",
+    },
+  });
 
   const handleDistrictChange = (district: string) => {
-    setSelectedDistrict(district);
-    setSelectedSchool(''); 
+    form.setValue('school', ''); 
     const filteredSchools = schoolData
       .filter((school) => school.district === district)
       .map((school) => school.schoolName)
@@ -42,129 +68,258 @@ const SponsorSignUpForm = () => {
     setSchoolsForDistrict(filteredSchools);
   };
   
-  const handleSchoolChange = (school: string) => {
-    setSelectedSchool(school);
+  function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
+    console.log(values);
+    // On successful submission, navigate to dashboard
+    router.push('/dashboard');
   }
 
+  const selectedDistrict = form.watch('district');
+
   return (
-    <>
-      <CardContent className="grid gap-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="first-name">First Name</Label>
-            <Input id="first-name" placeholder="John" required />
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>First Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="last-name">Last Name</Label>
-            <Input id="last-name" placeholder="Doe" required />
-          </div>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="district">District</Label>
-          <Select onValueChange={handleDistrictChange} required>
-            <SelectTrigger id="district">
-              <SelectValue placeholder="Select a district" />
-            </SelectTrigger>
-            <SelectContent>
-              {uniqueDistricts.map((district) => (
-                <SelectItem key={district} value={district}>
-                  {district}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="school">School</Label>
-          <Select onValueChange={handleSchoolChange} value={selectedSchool} disabled={!selectedDistrict} required>
-            <SelectTrigger id="school">
-              <SelectValue placeholder="Select a school" />
-            </SelectTrigger>
-            <SelectContent>
-              {schoolsForDistrict.map((school) => (
-                <SelectItem key={school} value={school}>
-                  {school}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="name@example.com"
-            required
+          <FormField
+            control={form.control}
+            name="district"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>District</FormLabel>
+                <Select onValueChange={(value) => { field.onChange(value); handleDistrictChange(value); }} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a district" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {uniqueDistricts.map((district) => (
+                      <SelectItem key={district} value={district}>
+                        {district}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </div>
-        <div className="grid gap-2">
-            <Label htmlFor="phone">Cell Phone Number</Label>
-            <Input id="phone" type="tel" placeholder="(555) 555-5555" required />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" required />
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-col gap-4">
-        <Button type="submit" className="w-full" asChild>
-          <Link href="/dashboard">Create Account</Link>
-        </Button>
-        <div className="text-sm text-center text-muted-foreground">
-          Already have an account?{" "}
-          <Link
-            href="/"
-            className="font-medium text-primary underline-offset-4 hover:underline"
-            prefetch={false}
-          >
-            Sign In
-          </Link>
-        </div>
-      </CardFooter>
-    </>
+          <FormField
+            control={form.control}
+            name="school"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>School</FormLabel>
+                 <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a school" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {schoolsForDistrict.map((school) => (
+                      <SelectItem key={school} value={school}>
+                        {school}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="name@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cell Phone Number</FormLabel>
+                <FormControl>
+                  <Input type="tel" placeholder="(555) 555-5555" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+        <CardFooter className="flex flex-col gap-4">
+          <Button type="submit" className="w-full">
+            Create Account
+          </Button>
+          <div className="text-sm text-center text-muted-foreground">
+            Already have an account?{" "}
+            <Link
+              href="/"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              prefetch={false}
+            >
+              Sign In
+            </Link>
+          </div>
+        </CardFooter>
+      </form>
+    </Form>
   );
 };
 
-const IndividualSignUpForm = () => (
-  <>
-    <CardContent className="grid gap-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="first-name">First Name</Label>
-          <Input id="first-name" placeholder="Max" required />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="last-name">Last Name</Label>
-          <Input id="last-name" placeholder="Robinson" required />
-        </div>
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" placeholder="name@example.com" required />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" required />
-      </div>
-    </CardContent>
-    <CardFooter className="flex flex-col gap-4">
-      <Button type="submit" className="w-full" asChild>
-        <Link href="/dashboard">Create Account</Link>
-      </Button>
-      <div className="text-sm text-center text-muted-foreground">
-        Already have an account?{" "}
-        <Link
-          href="/"
-          className="font-medium text-primary underline-offset-4 hover:underline"
-          prefetch={false}
-        >
-          Sign In
-        </Link>
-      </div>
-    </CardFooter>
-  </>
-);
+
+const individualFormSchema = z.object({
+  firstName: z.string().min(1, { message: "First name is required." }),
+  lastName: z.string().min(1, { message: "Last name is required." }),
+  email: z.string().email({ message: "Please enter a valid email." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
+});
+
+const IndividualSignUpForm = () => {
+  const router = useRouter();
+  
+  const form = useForm<z.infer<typeof individualFormSchema>>({
+    resolver: zodResolver(individualFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+    },
+  });
+
+  function onSubmit(values: z.infer<typeof individualFormSchema>) {
+    console.log(values);
+    router.push('/dashboard');
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>First Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Max" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Robinson" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="name@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+        <CardFooter className="flex flex-col gap-4">
+          <Button type="submit" className="w-full">
+            Create Account
+          </Button>
+          <div className="text-sm text-center text-muted-foreground">
+            Already have an account?{" "}
+            <Link
+              href="/"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              prefetch={false}
+            >
+              Sign In
+            </Link>
+          </div>
+        </CardFooter>
+      </form>
+    </Form>
+  )
+};
 
 export default function SignUpPage() {
   return (
