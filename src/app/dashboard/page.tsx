@@ -1,3 +1,4 @@
+
 import { AppLayout } from "@/components/app-layout";
 import {
   Card,
@@ -36,6 +37,12 @@ const rosterPlayers = [
     { id: "7", firstName: "Drew", lastName: "Smith", email: 'drew.smith@example.com', rating: 2050 },
 ];
 
+const upcomingEvents = [
+  { id: "1", name: "Spring Open 2024", date: "June 15, 2024" },
+  { id: "2", name: "Summer Championship", date: "July 20, 2024" },
+  { id: "3", name: "Autumn Classic", date: "September 10, 2024" },
+];
+
 
 export default function DashboardPage() {
   return (
@@ -50,17 +57,18 @@ export default function DashboardPage() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Upcoming Events
-              </CardTitle>
-              <RookIcon className="h-4 w-4 text-muted-foreground" />
+            <CardHeader>
+              <CardTitle>Upcoming Events ({upcomingEvents.length})</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">3</div>
-              <p className="text-xs text-muted-foreground">
-                in the next 30 days
-              </p>
+              <div className="space-y-3">
+                {upcomingEvents.map((event) => (
+                  <div key={event.id} className="flex justify-between items-baseline">
+                    <p className="font-medium text-sm">{event.name}</p>
+                    <p className="text-xs text-muted-foreground">{event.date}</p>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
           <Card>
