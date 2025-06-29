@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -26,7 +27,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2 } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -34,6 +35,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
+import { storage } from '@/lib/firebase';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -79,6 +81,7 @@ type Confirmation = {
   teamCode: string;
   poNumber?: string;
   poFileName?: string;
+  poFileUrl?: string;
 };
 
 
@@ -118,14 +121,33 @@ export default function ConfirmationsPage() {
     const poFile = poInputs[conf.id]?.file;
 
     try {
-      let invoiceUpdated = false;
-      // If the team code is missing (for older records), generate a fallback.
+        let poFileName = conf.poFileName;
+        let poFileUrl = conf.poFileUrl;
+        let toastMessage = "Your changes have been saved locally.";
+
+        // Upload new file if there is one
+        if (poFile) {
+            if (!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
+                toast({
+                    variant: "destructive",
+                    title: "Configuration Error",
+                    description: "Firebase Storage is not configured. Please add your Firebase project config to your .env file.",
+                });
+                setIsUpdating(prev => ({...prev, [conf.id]: false}));
+                return;
+            }
+            const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
+            const snapshot = await uploadBytes(storageRef, poFile);
+            poFileUrl = await getDownloadURL(snapshot.ref);
+            poFileName = poFile.name;
+        }
+        
       const teamCode = conf.teamCode || generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
 
       if (poNumber && teamCode) {
         const newTitle = `${teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName} PO: ${poNumber}`;
         await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
-        invoiceUpdated = true;
+        toastMessage = "Purchase Order information has been saved and the invoice has been updated.";
       }
 
       const updatedConfirmations = confirmations.map(c => {
@@ -133,8 +155,9 @@ export default function ConfirmationsPage() {
           return {
             ...c,
             poNumber: poNumber,
-            poFileName: poFile ? poFile.name : c.poFileName,
-            teamCode: teamCode, // Save teamCode back to ensure it exists for future updates
+            poFileName: poFileName,
+            poFileUrl: poFileUrl,
+            teamCode: teamCode,
           };
         }
         return c;
@@ -147,18 +170,11 @@ export default function ConfirmationsPage() {
         ...prev,
         [conf.id]: { number: poNumber, file: null },
       }));
-
-      if (invoiceUpdated) {
-        toast({
+      
+      toast({
           title: "Success",
-          description: "Purchase Order information has been saved and the invoice has been updated.",
-        });
-      } else {
-        toast({
-          title: "PO Information Saved",
-          description: "Your changes have been saved locally. The invoice was not updated because a PO number was not provided.",
-        });
-      }
+          description: toastMessage,
+      });
 
     } catch (error) {
         console.error("Failed to update PO information:", error);
@@ -283,12 +299,20 @@ export default function ConfirmationsPage() {
                                   onChange={(e) => handlePoFileChange(conf.id, e)}
                                   disabled={isUpdating[conf.id]}
                                 />
-                                { (poInputs[conf.id]?.file?.name || conf.poFileName) &&
-                                  <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
-                                    <FileIcon className="h-4 w-4" />
-                                    <span>{poInputs[conf.id]?.file?.name || conf.poFileName}</span>
-                                  </div>
-                                }
+                                {poInputs[conf.id]?.file ? (
+                                    <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
+                                        <FileIcon className="h-4 w-4" />
+                                        <span>Selected: {poInputs[conf.id].file.name}</span>
+                                    </div>
+                                ) : conf.poFileUrl && conf.poFileName ? (
+                                    <div className="pt-1">
+                                        <Button asChild variant="link" className="p-0 h-auto">
+                                            <a href={conf.poFileUrl} target="_blank" rel="noopener noreferrer">
+                                                <Download className="mr-2 h-4 w-4" /> View {conf.poFileName}
+                                            </a>
+                                        </Button>
+                                    </div>
+                                ) : null }
                             </div>
                         </div>
                         <Button 
