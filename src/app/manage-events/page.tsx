@@ -316,14 +316,14 @@ export default function ManageEventsPage() {
                     )} />
                      <FormField control={form.control} name="lateFee" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Late Fee (in 48h) ($)</FormLabel>
+                        <FormLabel>Late Fee (2 days prior) ($)</FormLabel>
                         <FormControl><Input type="number" placeholder="25" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
                      <FormField control={form.control} name="veryLateFee" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Very Late Fee (in 24h) ($)</FormLabel>
+                        <FormLabel>Late Fee (1 day prior) ($)</FormLabel>
                         <FormControl><Input type="number" placeholder="30" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>

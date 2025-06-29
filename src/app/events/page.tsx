@@ -372,16 +372,16 @@ export default function EventsPage() {
     const registrationCount = Object.keys(selections).length;
     const uscfFee = 24;
     let registrationFeePerPlayer = selectedEvent?.regularFee ?? 0;
-    let feeType = "Regular";
+    let feeTypeLabel = "Regular Fee";
     if (selectedEvent && clientReady) {
         const eventDate = new Date(selectedEvent.date);
         const hoursUntilEvent = differenceInHours(eventDate, new Date());
         if (hoursUntilEvent <= 24) { 
             registrationFeePerPlayer = selectedEvent.veryLateFee; 
-            feeType = "Very Late";
+            feeTypeLabel = "Late Fee (1 day prior)";
         } else if (hoursUntilEvent <= 48) { 
             registrationFeePerPlayer = selectedEvent.lateFee; 
-            feeType = "Late";
+            feeTypeLabel = "Late Fee (2 days prior)";
         }
     }
 
@@ -609,7 +609,7 @@ export default function EventsPage() {
               <div className="py-4 space-y-4">
                 <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
-                        <span className="text-muted-foreground">Registrations ({feeType} Fee)</span>
+                        <span className="text-muted-foreground">Registrations ({feeTypeLabel})</span>
                         <span className="font-medium">{registrationCount} &times; ${registrationFeePerPlayer.toFixed(2)}</span>
                     </div>
                     {uscfActionsCount > 0 && (
