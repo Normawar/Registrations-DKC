@@ -257,6 +257,7 @@ export default function EventsPage() {
                 sponsorEmail: 'sponsor@chessmate.com', // Hardcoded for prototype
                 teamCode: teamCode,
                 eventName: selectedEvent.name,
+                eventDate: selectedEvent.date,
                 uscfFee: 24,
                 players: playersToInvoice
             });

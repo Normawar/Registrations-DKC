@@ -11,6 +11,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'zod';
 import { randomUUID } from 'crypto';
 import { Client, Environment, ApiError } from 'square';
+import { format } from 'date-fns';
 
 // Initialize Square client
 const squareClient = new Client({
@@ -46,6 +47,7 @@ const CreateInvoiceInputSchema = z.object({
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
     teamCode: z.string().describe('The team code of the sponsor.'),
     eventName: z.string().describe('The name of the event.'),
+    eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
     uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
     players: z.array(PlayerInvoiceInfoSchema).describe('An array of players to be invoiced.'),
 });
@@ -164,6 +166,7 @@ const createInvoiceFlow = ai.defineFlow(
       // 4. Create an Invoice from the Order
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7); // Invoice due in 7 days
+      const formattedEventDate = format(new Date(input.eventDate), 'MM/dd/yyyy');
 
       console.log(`Creating invoice for order ID: ${orderId}`);
       const createInvoiceResponse = await invoicesApi.createInvoice({
@@ -183,7 +186,7 @@ const createInvoiceFlow = ai.defineFlow(
             squareGiftCard: true,
             bankAccount: true, // For ACH payments
           },
-          title: `${input.teamCode} @ ${input.eventName}`,
+          title: `${input.teamCode} @ ${formattedEventDate} ${input.eventName}`,
           description: `Thank you for your registration.`,
         }
       });
