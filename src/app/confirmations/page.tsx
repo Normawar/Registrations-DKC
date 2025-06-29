@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { format, differenceInHours } from 'date-fns';
+import { format } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -26,19 +26,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, Printer, ExternalLink } from "lucide-react";
+import { ClipboardCheck, ExternalLink } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose
-} from '@/components/ui/dialog';
-import { schoolData, type School } from '@/lib/data/school-data';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -83,83 +73,18 @@ type Confirmation = {
   invoiceUrl: string;
 };
 
-type FeesBreakdown = {
-    registrationFeePerPlayer: number;
-    numPlayers: number;
-    totalRegistrationFees: number;
-    uscfFees: number;
-    numUscfActions: number;
-    total: number;
-};
-
-// Hardcoded for prototype. In a real app, this would come from user session.
-const sponsorInfo = {
-  name: 'Sponsor Name',
-  schoolName: 'SHARYLAND PIONEER H S',
-  email: 'sponsor@chessmate.com',
-};
 
 export default function ConfirmationsPage() {
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
-  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Confirmation | null>(null);
-  const [sponsorSchool, setSponsorSchool] = useState<School | null>(null);
-
+  
   useEffect(() => {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     setConfirmations(storedConfirmations);
-
-    const school = schoolData.find(s => s.schoolName === sponsorInfo.schoolName);
-    setSponsorSchool(school || null);
   }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
 
-  const handleViewInvoice = (confirmation: Confirmation) => {
-    setSelectedInvoice(confirmation);
-    setIsInvoiceOpen(true);
-  }
-
-  const calculateFeesBreakdown = (confirmation: Confirmation): FeesBreakdown => {
-      const { eventDate, submissionTimestamp, selections } = confirmation;
-      const eventDt = new Date(eventDate);
-      const submissionDt = new Date(submissionTimestamp);
-
-      const hoursUntilEvent = differenceInHours(eventDt, submissionDt);
-
-      let registrationFeePerPlayer = 20;
-      if (hoursUntilEvent <= 24) {
-          registrationFeePerPlayer = 30;
-      } else if (hoursUntilEvent <= 48) {
-          registrationFeePerPlayer = 25;
-      }
-
-      let uscfFees = 0;
-      let numUscfActions = 0;
-      let totalRegistrationFees = 0;
-      const numPlayers = Object.keys(selections).length;
-
-      for (const playerId in selections) {
-          totalRegistrationFees += registrationFeePerPlayer;
-          const playerSelection = selections[playerId];
-          if (playerSelection.uscfStatus === 'new' || playerSelection.uscfStatus === 'renewing') {
-              uscfFees += 24;
-              numUscfActions++;
-          }
-      }
-
-      return {
-          registrationFeePerPlayer,
-          numPlayers,
-          totalRegistrationFees,
-          uscfFees,
-          numUscfActions,
-          total: totalRegistrationFees + uscfFees,
-      };
-  };
-
-  const feesBreakdown = selectedInvoice ? calculateFeesBreakdown(selectedInvoice) : null;
 
   return (
     <AppLayout>
@@ -207,8 +132,10 @@ export default function ConfirmationsPage() {
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
                           <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
-                          <Button variant="outline" size="sm" onClick={() => handleViewInvoice(conf)}>
-                            <Printer className="mr-2 h-4 w-4" /> View Invoice
+                          <Button asChild variant="outline" size="sm">
+                            <a href={conf.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="mr-2 h-4 w-4" /> View Invoice on Square
+                            </a>
                           </Button>
                         </div>
                         <Table>
@@ -254,124 +181,6 @@ export default function ConfirmationsPage() {
           </CardContent>
         </Card>
       </div>
-      
-      {selectedInvoice && feesBreakdown && (
-        <Dialog open={isInvoiceOpen} onOpenChange={setIsInvoiceOpen}>
-            <DialogContent className="sm:max-w-3xl printable-invoice p-0">
-                <div className="p-6">
-                    <DialogHeader>
-                        <DialogTitle className="text-3xl font-headline">Invoice</DialogTitle>
-                         <div className="flex justify-between items-center text-sm">
-                            <DialogDescription>Invoice ID: {selectedInvoice.invoiceId}</DialogDescription>
-                            <Button asChild variant="link">
-                                <a href={selectedInvoice.invoiceUrl} target="_blank" rel="noopener noreferrer">
-                                    View on Square <ExternalLink className="ml-2 h-4 w-4" />
-                                </a>
-                            </Button>
-                        </div>
-                    </DialogHeader>
-                    <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
-                        <div>
-                            <p className="font-semibold text-muted-foreground">BILLED TO</p>
-                            <p>{sponsorInfo.name}</p>
-                            {sponsorSchool ? (
-                                <>
-                                    <p>{sponsorSchool.schoolName}</p>
-                                    <p>{sponsorSchool.streetAddress}</p>
-                                    <p>{`${sponsorSchool.city}, ${sponsorSchool.state} ${sponsorSchool.zip}`}</p>
-                                </>
-                            ) : (
-                                <p>{sponsorInfo.schoolName}</p>
-                            )}
-                            <p>{sponsorInfo.email}</p>
-                        </div>
-                        <div className="text-right">
-                             <p className="font-semibold text-muted-foreground">EVENT DETAILS</p>
-                            <p className="font-bold">{selectedInvoice.eventName}</p>
-                            <p>{format(new Date(selectedInvoice.eventDate), 'PPP')}</p>
-                            <p className="mt-2 font-semibold text-muted-foreground">DATE ISSUED</p>
-                            <p>{format(new Date(selectedInvoice.submissionTimestamp), 'PPP')}</p>
-                        </div>
-                    </div>
-
-                    <div className="mt-8">
-                      <h4 className="font-semibold mb-2">Invoice Summary</h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Description</TableHead>
-                            <TableHead className="text-center">Quantity</TableHead>
-                            <TableHead className="text-right">Unit Price</TableHead>
-                            <TableHead className="text-right">Total</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <TableRow>
-                            <TableCell>Event Registration Fee</TableCell>
-                            <TableCell className="text-center">{feesBreakdown.numPlayers}</TableCell>
-                            <TableCell className="text-right">${feesBreakdown.registrationFeePerPlayer.toFixed(2)}</TableCell>
-                            <TableCell className="text-right">${feesBreakdown.totalRegistrationFees.toFixed(2)}</TableCell>
-                          </TableRow>
-                          {feesBreakdown.numUscfActions > 0 && (
-                             <TableRow>
-                                <TableCell>USCF Membership (New/Renewal)</TableCell>
-                                <TableCell className="text-center">{feesBreakdown.numUscfActions}</TableCell>
-                                <TableCell className="text-right">$24.00</TableCell>
-                                <TableCell className="text-right">${feesBreakdown.uscfFees.toFixed(2)}</TableCell>
-                              </TableRow>
-                          )}
-                        </TableBody>
-                        <TableBody className="border-t-2 border-primary">
-                          <TableRow>
-                              <TableCell colSpan={3} className="text-right font-bold text-lg">Total Invoiced</TableCell>
-                              <TableCell className="text-right font-bold text-lg">${selectedInvoice.totalInvoiced.toFixed(2)}</TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    <div className="mt-8">
-                      <h4 className="font-semibold mb-2">Registered Player Details</h4>
-                      <Table>
-                        <TableHeader>
-                            <TableRow>
-                            <TableHead>Player</TableHead>
-                            <TableHead>Section</TableHead>
-                            <TableHead>USCF Status</TableHead>
-                            <TableHead>Byes Requested</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {Object.entries(selectedInvoice.selections).map(([playerId, details]) => {
-                            const player = getPlayerById(playerId);
-                            if (!player) return null;
-                            const byeText = [details.byes.round1, details.byes.round2]
-                                .filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None';
-                            return (
-                                <TableRow key={playerId}>
-                                <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
-                                <TableCell>{details.section}</TableCell>
-                                <TableCell>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</TableCell>
-                                <TableCell>{byeText}</TableCell>
-                                </TableRow>
-                            );
-                            })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                </div>
-                <DialogFooter className="bg-muted p-4 no-print">
-                    <DialogClose asChild>
-                        <Button variant="ghost">Close</Button>
-                    </DialogClose>
-                    <Button onClick={() => window.print()}>
-                        <Printer className="mr-2 h-4 w-4" /> Print Invoice
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-      )}
-
     </AppLayout>
   );
 }

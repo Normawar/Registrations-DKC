@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { format, differenceInHours } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
@@ -311,8 +311,15 @@ export default function EventsPage() {
             localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
             
             toast({
-                title: "Invoice Generated",
-                description: `Invoice ${invoiceId} for ${Object.keys(selections).length} players has been submitted.`
+                title: "Invoice Generated Successfully!",
+                description: (
+                  <p>
+                    Invoice {invoiceId} for {Object.keys(selections).length} players has been submitted.
+                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
+                      View Invoice
+                    </a>
+                  </p>
+                ),
             });
 
         } catch (error) {

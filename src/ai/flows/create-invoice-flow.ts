@@ -18,7 +18,7 @@ const squareClient = new Client({
   environment: Environment.Sandbox, // Use Sandbox for testing
 });
 
-const { locationsApi, customersApi, ordersApi, invoicesApi } = squareClient;
+const { customersApi, ordersApi, invoicesApi } = squareClient;
 
 const CreateInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
@@ -54,17 +54,12 @@ const createInvoiceFlow = ai.defineFlow(
     console.log("Starting Square invoice creation with input:", input);
 
     try {
-      // 1. Get location ID. Use the one from .env or fetch the first available one.
-      let locationId = process.env.SQUARE_LOCATION_ID;
-      if (!locationId || locationId === "REPLACE_WITH_YOUR_SANDBOX_LOCATION_ID") {
-         console.log("Fetching locations from Square...");
-         const { result: { locations } } = await locationsApi.listLocations();
-         if (!locations || locations.length === 0) {
-             throw new Error('No locations found for this Square account. Please configure a location in your Square Dashboard.');
-         }
-         locationId = locations[0].id!;
-         console.log(`Using first available location ID: ${locationId}`);
+      // 1. Get location ID from environment variables.
+      const locationId = process.env.SQUARE_LOCATION_ID;
+      if (!locationId) {
+        throw new Error('Square Location ID is not configured. Please set SQUARE_LOCATION_ID in your .env file.');
       }
+      console.log(`Using location ID: ${locationId}`);
 
       // 2. Find or create a customer
       console.log(`Searching for customer with email: ${input.sponsorEmail}`);
@@ -155,17 +150,25 @@ const createInvoiceFlow = ai.defineFlow(
       });
       
       const invoice = createInvoiceResponse.result.invoice!;
-      console.log("Successfully created invoice:", invoice);
+      console.log("Successfully created DRAFT invoice:", invoice);
+
+      // 5. Publish the invoice to make it active and get a public URL
+      console.log(`Publishing invoice ID: ${invoice.id!}`);
+      const { result: { invoice: publishedInvoice } } = await invoicesApi.publishInvoice(invoice.id!, {
+        version: invoice.version!,
+        idempotencyKey: randomUUID(),
+      });
+      console.log("Successfully published invoice:", publishedInvoice);
 
       return {
-        invoiceId: invoice.id!,
-        status: invoice.status!,
-        invoiceUrl: invoice.publicUrl!,
+        invoiceId: publishedInvoice.id!,
+        status: publishedInvoice.status!,
+        invoiceUrl: publishedInvoice.publicUrl!,
       };
 
     } catch (error) {
       if (error instanceof ApiError) {
-        console.error('Square API Error:', error.result.errors);
+        console.error('Square API Error:', JSON.stringify(error.result.errors, null, 2));
         throw new Error(`Square API Error: ${JSON.stringify(error.result.errors)}`);
       } else {
         console.error('An unexpected error occurred:', error);
