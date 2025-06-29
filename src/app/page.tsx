@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import Image from "next/image";
-import { Chrome } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const LoginForm = () => (
@@ -48,7 +48,30 @@ const LoginForm = () => (
         </div>
       </div>
       <Button variant="outline" className="w-full">
-        <Chrome className="mr-2 h-4 w-4" />
+        <svg
+          aria-hidden="true"
+          className="mr-2 h-4 w-4"
+          width="18"
+          height="18"
+          viewBox="0 0 18 18"
+        >
+          <path
+            d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6c1.52-1.4 2.37-3.47 2.37-6.05 0-.59-.05-1.16-.14-1.72Z"
+            fill="#4285F4"
+          ></path>
+          <path
+            d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-2.7 1.01c-2.12 0-3.92-1.42-4.57-3.33H1.9v2.05A9 9 0 0 0 8.98 17Z"
+            fill="#34A853"
+          ></path>
+          <path
+            d="M4.41 10.1c-.2-.58-.2-1.22-.2-1.82s0-1.24.2-1.82V4.41H1.9a9 9 0 0 0 0 8.18l2.5-2.05Z"
+            fill="#FBBC05"
+          ></path>
+          <path
+            d="M8.98 3.33c1.18 0 2.24.4 3.06 1.2l2.3-2.3A9 9 0 0 0 8.98 1Z"
+            fill="#EA4335"
+          ></path>
+        </svg>
         Google
       </Button>
     </CardContent>
@@ -73,12 +96,11 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="space-y-1 text-center flex flex-col items-center">
           <Image
-            src="https://placehold.co/100x100.png"
+            src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/DK%20Logo%20SVG.png?alt=media&token=23cd3dee-8099-4453-bbc6-8a729424105d"
             width={80}
             height={80}
             alt="Dark Knight Chess Logo"
-            className="mb-4 rounded-lg"
-            data-ai-hint="chess knight logo"
+            className="mb-4"
            />
           <CardTitle className="text-3xl font-bold font-headline">Dark Knight Chess</CardTitle>
           <CardDescription>
