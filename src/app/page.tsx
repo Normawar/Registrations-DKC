@@ -17,7 +17,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="space-y-1 text-center">
+        <CardHeader className="space-y-1 text-center flex flex-col items-center">
           <div className="inline-block rounded-lg bg-card p-3 mb-4">
               <DarkKnightIcon className="h-10 w-10 text-primary" />
           </div>
