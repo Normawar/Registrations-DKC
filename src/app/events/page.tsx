@@ -271,6 +271,7 @@ export default function EventsPage() {
                 totalInvoiced: calculatedFees,
                 invoiceId,
                 invoiceUrl,
+                teamCode: teamCode,
             };
 
             const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');

@@ -26,9 +26,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2 } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -71,11 +75,17 @@ type Confirmation = {
   totalInvoiced: number;
   invoiceId: string;
   invoiceUrl: string;
+  teamCode: string;
+  poNumber?: string;
+  poFileName?: string;
 };
 
 
 export default function ConfirmationsPage() {
+  const { toast } = useToast();
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
+  const [poInputs, setPoInputs] = useState<Record<string, { number: string; file: File | null }>>({});
+  const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -84,6 +94,66 @@ export default function ConfirmationsPage() {
   }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
+
+  const handlePoInputChange = (confId: string, value: string) => {
+    setPoInputs(prev => ({
+      ...prev,
+      [confId]: { ...prev[confId], number: value }
+    }));
+  };
+
+  const handlePoFileChange = (confId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setPoInputs(prev => ({
+      ...prev,
+      [confId]: { ...prev[confId], file }
+    }));
+  };
+
+  const handleSavePo = async (conf: Confirmation) => {
+    setIsUpdating(prev => ({...prev, [conf.id]: true}));
+    
+    const poNumber = poInputs[conf.id]?.number ?? conf.poNumber;
+    const poFile = poInputs[conf.id]?.file;
+
+    try {
+      if (poNumber && conf.teamCode) {
+        const newTitle = `${conf.teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName} PO: ${poNumber}`;
+        await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
+      }
+
+      const updatedConfirmations = confirmations.map(c => {
+        if (c.id === conf.id) {
+          return {
+            ...c,
+            poNumber: poNumber || c.poNumber,
+            poFileName: poFile ? poFile.name : c.poFileName,
+          };
+        }
+        return c;
+      });
+
+      localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+      setConfirmations(updatedConfirmations);
+      setPoInputs(prev => ({ ...prev, [conf.id]: { number: poNumber || '', file: null } }));
+
+      toast({
+        title: "Success",
+        description: "Purchase Order information has been saved and the invoice has been updated.",
+      });
+
+    } catch (error) {
+        console.error("Failed to update PO information:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        toast({
+            variant: "destructive",
+            title: "Update Failed",
+            description: errorMessage,
+        });
+    } finally {
+        setIsUpdating(prev => ({...prev, [conf.id]: false}));
+    }
+  };
 
 
   return (
@@ -173,6 +243,50 @@ export default function ConfirmationsPage() {
                           </TableBody>
                         </Table>
                       </div>
+
+                      <div className="space-y-4 pt-6 mt-6 border-t">
+                        <h4 className="font-semibold">Purchase Order Information</h4>
+                        <div className="grid md:grid-cols-2 gap-4 items-start">
+                            <div className="space-y-2">
+                                <Label htmlFor={`po-number-${conf.id}`}>PO Number</Label>
+                                <Input
+                                    id={`po-number-${conf.id}`}
+                                    placeholder="Enter PO Number"
+                                    defaultValue={conf.poNumber || ''}
+                                    onChange={(e) => handlePoInputChange(conf.id, e.target.value)}
+                                    disabled={isUpdating[conf.id]}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor={`po-file-${conf.id}`}>Upload PO Document</Label>
+                                <Input 
+                                  id={`po-file-${conf.id}`} 
+                                  type="file"
+                                  onChange={(e) => handlePoFileChange(conf.id, e)}
+                                  disabled={isUpdating[conf.id]}
+                                />
+                                { (poInputs[conf.id]?.file?.name || conf.poFileName) &&
+                                  <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
+                                    <FileIcon className="h-4 w-4" />
+                                    <span>{poInputs[conf.id]?.file?.name || conf.poFileName}</span>
+                                  </div>
+                                }
+                            </div>
+                        </div>
+                        <Button 
+                          onClick={() => handleSavePo(conf)} 
+                          disabled={isUpdating[conf.id] || !conf.teamCode}
+                          title={!conf.teamCode ? "Cannot update invoice: Team Code is missing." : ""}
+                        >
+                            {isUpdating[conf.id] ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <UploadCloud className="mr-2 h-4 w-4" />
+                            )}
+                            Save PO & Update Invoice
+                        </Button>
+                      </div>
+
                     </AccordionContent>
                   </AccordionItem>
                 ))}
