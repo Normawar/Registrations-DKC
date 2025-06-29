@@ -224,6 +224,21 @@ export default function RosterPage() {
   };
 
   function onSubmit(values: PlayerFormValues) {
+    // Check for duplicate USCF ID
+    if (values.uscfId.toUpperCase() !== 'NEW') {
+      const existingPlayerWithUscfId = players.find(p => 
+        p.uscfId.toLowerCase() === values.uscfId.toLowerCase() && p.id !== values.id
+      );
+
+      if (existingPlayerWithUscfId) {
+        form.setError("uscfId", { 
+          type: "manual", 
+          message: `USCF ID already assigned to ${existingPlayerWithUscfId.firstName} ${existingPlayerWithUscfId.lastName}.` 
+        });
+        return;
+      }
+    }
+
     // Check for duplicate player by name and DOB
     const isDuplicatePlayer = players.some(p => 
       p.id !== values.id &&
