@@ -402,6 +402,7 @@ export default function EventsPage() {
             }
         }
     }
+    const appliedPenalty = selectedEvent ? registrationFeePerPlayer - selectedEvent.regularFee : 0;
 
 
   return (
@@ -624,25 +625,36 @@ export default function EventsPage() {
                       You are about to register {registrationCount} player(s) for {selectedEvent?.name}. Please review the summary below.
                   </DialogDescription>
               </DialogHeader>
-              <div className="py-4 space-y-4">
-                <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
-                    <div className="flex justify-between">
-                        <span className="text-muted-foreground">Registrations ({feeTypeLabel})</span>
-                        <span className="font-medium">{registrationCount} &times; ${registrationFeePerPlayer.toFixed(2)}</span>
-                    </div>
-                    {uscfActionsCount > 0 && (
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">New / Renewing USCF Memberships</span>
-                            <span className="font-medium">{uscfActionsCount} &times; ${uscfFee.toFixed(2)}</span>
-                        </div>
-                    )}
-                </div>
+              {selectedEvent && (
+                <div className="py-4 space-y-4">
+                  <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                          <span className="text-muted-foreground">Base Registration Fee</span>
+                          <span className="font-medium">{registrationCount} &times; ${selectedEvent.regularFee.toFixed(2)}</span>
+                      </div>
+                      {appliedPenalty > 0 && (
+                          <div className="flex justify-between">
+                              <span className="text-muted-foreground">{feeTypeLabel}</span>
+                              <span className="font-medium">{registrationCount} &times; ${appliedPenalty.toFixed(2)}</span>
+                          </div>
+                      )}
+                      {uscfActionsCount > 0 && (
+                          <div className="flex justify-between">
+                              <span className="text-muted-foreground">New / Renewing USCF Memberships</span>
+                              <span className="font-medium">{uscfActionsCount} &times; ${uscfFee.toFixed(2)}</span>
+                          </div>
+                      )}
+                      <div className="pt-2 border-t mt-2">
+                        <p className="text-xs text-muted-foreground/80">Fee reminder: a late fee is applied within 48 hours of the event.</p>
+                      </div>
+                  </div>
 
-                <div className="text-center rounded-lg border border-primary/20 bg-primary/5 py-4">
-                  <p className="text-sm font-medium text-muted-foreground">TOTAL TO BE INVOICED</p>
-                  <p className="text-3xl font-bold text-primary">${calculatedFees.toFixed(2)}</p>
+                  <div className="text-center rounded-lg border border-primary/20 bg-primary/5 py-4">
+                    <p className="text-sm font-medium text-muted-foreground">TOTAL TO BE INVOICED</p>
+                    <p className="text-3xl font-bold text-primary">${calculatedFees.toFixed(2)}</p>
+                  </div>
                 </div>
-              </div>
+              )}
               <DialogFooter>
                   <Button variant="ghost" onClick={() => {
                       setIsInvoiceDialogOpen(false);
