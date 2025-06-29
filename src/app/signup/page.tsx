@@ -13,6 +13,15 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import Image from "next/image";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { districts } from "@/lib/data/districts";
+import { schools } from "@/lib/data/schools";
 
 const SponsorSignUpForm = () => (
   <>
@@ -22,8 +31,43 @@ const SponsorSignUpForm = () => (
         <Input id="sponsor-name" placeholder="ACME Inc." required />
       </div>
       <div className="grid gap-2">
+        <Label htmlFor="district">District</Label>
+        <Select>
+          <SelectTrigger id="district">
+            <SelectValue placeholder="Select a district" />
+          </SelectTrigger>
+          <SelectContent>
+            {districts.map((district) => (
+              <SelectItem key={district} value={district}>
+                {district}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="school">School</Label>
+        <Select>
+          <SelectTrigger id="school">
+            <SelectValue placeholder="Select a school" />
+          </SelectTrigger>
+          <SelectContent>
+            {schools.map((school) => (
+              <SelectItem key={school} value={school}>
+                {school}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-2">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" placeholder="name@example.com" required />
+        <Input
+          id="email"
+          type="email"
+          placeholder="name@example.com"
+          required
+        />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="password">Password</Label>
