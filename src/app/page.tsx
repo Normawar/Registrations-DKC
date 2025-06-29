@@ -80,11 +80,11 @@ export default function LoginPage() {
             Enter your credentials to access the portal.
           </CardDescription>
         </CardHeader>
-        <Tabs defaultValue="organizer" className="w-full">
+        <Tabs defaultValue="sponsor" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="organizer">Organizer</TabsTrigger>
             <TabsTrigger value="sponsor">Sponsor</TabsTrigger>
             <TabsTrigger value="individual">Individual</TabsTrigger>
+            <TabsTrigger value="organizer">Organizer</TabsTrigger>
           </TabsList>
           <TabsContent value="organizer">
             <LoginForm />
