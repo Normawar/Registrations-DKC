@@ -147,8 +147,10 @@ export const DarkKnightIcon = (props: SVGProps<SVGSVGElement>) => (
     strokeLinejoin="round"
     {...props}
   >
-    <path d="M12 22h-4v-2h4v2zm-2-2v-3h-2a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h1.5a3 3 0 0 1 3 3v2" />
-    <path d="M10 12h.5a2.5 2.5 0 0 0 2.5-2.5V8" />
-    <path d="M12 2a3 3 0 0 1 3 3c0 2.2-2.5 4-4 4" />
+    <path d="M3 3h18v18H3z"/>
+    <path d="m11 18 2-5-4-1 2-5-4-1 3-4"/>
+    <path d="m11.5 12.5 3 2.5"/>
+    <path d="M11 18v2"/>
+    <path d="M13 18v2"/>
   </svg>
 );
