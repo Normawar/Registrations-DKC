@@ -29,7 +29,7 @@ import { LogOut, School, ClipboardList } from "lucide-react";
 
 const menuItems = [
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
-  { href: "/events", icon: RookIcon, label: "Events" },
+  { href: "/events", icon: RookIcon, label: "Register for an event" },
   { href: "/players", icon: PawnIcon, label: "Players" },
   { href: "/roster", icon: ClipboardList, label: "Roster" },
   { href: "/schools", icon: School, label: "Schools" },
