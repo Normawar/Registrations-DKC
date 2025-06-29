@@ -71,7 +71,8 @@ type PlayerRegistration = {
   byes: {
     round1: string;
     round2: string;
-  }
+  };
+  section: string;
 }
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
@@ -131,11 +132,29 @@ const rosterPlayers: Player[] = [
     { id: "1", firstName: "Alex", lastName: "Ray", rating: 1850, grade: "10th Grade", section: 'High School K-12' },
     { id: "2", firstName: "Jordan", lastName: "Lee", rating: 2100, grade: "11th Grade", section: 'Championship' },
     { id: "3", firstName: "Casey", lastName: "Becker", rating: 1500, grade: "9th Grade", section: 'High School K-12' },
-    { id: "4", firstName: "Morgan", lastName: "Taylor", rating: 1720, grade: "10th Grade", section: 'High School K-12' },
+    { id: "4", firstName: "Morgan", lastName: "Taylor", rating: 1000, grade: "5th Grade", section: 'Elementary K-5' },
     { id: "5", firstName: "Riley", lastName: "Quinn", rating: 1980, grade: "11th Grade", section: 'Championship' },
     { id: "6", firstName: "Skyler", lastName: "Jones", rating: 1650, grade: "9th Grade", section: 'High School K-12' },
     { id: "7", firstName: "Drew", lastName: "Smith", rating: 2050, grade: "12th Grade", section: 'Championship' },
 ];
+
+const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
+
+const gradeToNumber: { [key: string]: number } = {
+  'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3,
+  '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7,
+  '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11,
+  '12th Grade': 12,
+};
+
+const sectionMaxGrade: { [key: string]: number } = {
+  'Kinder-1st': 1,
+  'Primary K-3': 3,
+  'Elementary K-5': 5,
+  'Middle School K-8': 8,
+  'High School K-12': 12,
+  'Championship': 12,
+};
 
 
 export default function EventsPage() {
@@ -156,8 +175,12 @@ export default function EventsPage() {
     const handlePlayerSelect = (playerId: string, isSelected: boolean | string) => {
         setSelections(prev => {
             const newSelections = {...prev};
-            if (isSelected) {
-                newSelections[playerId] = { byes: { round1: 'none', round2: 'none' } };
+            const player = rosterPlayers.find(p => p.id === playerId);
+            if (isSelected && player) {
+                newSelections[playerId] = { 
+                    byes: { round1: 'none', round2: 'none' },
+                    section: player.section,
+                };
             } else {
                 delete newSelections[playerId];
             }
@@ -170,10 +193,19 @@ export default function EventsPage() {
           const newSelections = {...prev};
           if(newSelections[playerId]) {
               newSelections[playerId].byes[byeNumber] = value;
-              // If round1 is set to none, also reset round2
               if (byeNumber === 'round1' && value === 'none') {
                   newSelections[playerId].byes.round2 = 'none';
               }
+          }
+          return newSelections;
+      });
+    }
+
+    const handleSectionChange = (playerId: string, section: string) => {
+      setSelections(prev => {
+          const newSelections = {...prev};
+          if(newSelections[playerId]) {
+              newSelections[playerId].section = section;
           }
           return newSelections;
       });
@@ -183,7 +215,7 @@ export default function EventsPage() {
         if (!selectedEvent) return;
         
         console.log("Registering for event:", selectedEvent.name);
-        console.log("Selected players and byes:", selections);
+        console.log("Selected players, sections, and byes:", selections);
 
         toast({
             title: "Registration Submitted",
@@ -214,6 +246,26 @@ export default function EventsPage() {
       }
       return options;
     };
+    
+    const isSectionValid = (player: Player, section: string): boolean => {
+      if (section === 'Championship') return true;
+      
+      const playerGradeLevel = gradeToNumber[player.grade];
+      const sectionMaxLevel = sectionMaxGrade[section];
+
+      if (playerGradeLevel === undefined || sectionMaxLevel === undefined) {
+        return true; 
+      }
+
+      return playerGradeLevel <= sectionMaxLevel;
+    };
+
+    const hasInvalidSelections = Object.entries(selections).some(([playerId, registration]) => {
+        const player = rosterPlayers.find(p => p.id === playerId);
+        return player ? !isSectionValid(player, registration.section) : false;
+    });
+
+    const sectionOptions = sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>);
 
   return (
     <AppLayout>
@@ -282,56 +334,72 @@ export default function EventsPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Register for {selectedEvent?.name}</DialogTitle>
             <DialogDescription>
-              Select players from your roster to register for this event. You can request up to two 1/2 point byes per player.
+              Select players from your roster to register for this event. You can change sections and request up to two 1/2 point byes per player.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <ScrollArea className="h-72 w-full">
+            <ScrollArea className="h-80 w-full">
               <div className="space-y-4 pr-6">
                 {rosterPlayers.map((player) => {
                   const isSelected = !!selections[player.id];
                   const firstBye = selections[player.id]?.byes.round1;
+                  const isSectionInvalid = isSelected && !isSectionValid(player, selections[player.id]!.section);
+
                   return (
-                    <div key={player.id} className="items-center gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr,auto,auto]">
+                    <div key={player.id} className="items-start gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr]">
                         <Checkbox
                           id={`player-${player.id}`}
                           checked={isSelected}
                           onCheckedChange={(checked) => handlePlayerSelect(player.id, checked)}
+                          className="mt-1"
                         />
-                        <div className="grid gap-1.5 leading-none">
+                        <div className="grid gap-2">
                             <Label htmlFor={`player-${player.id}`} className="font-medium cursor-pointer">
                                 {player.firstName} {player.lastName}
                             </Label>
                             <p className="text-sm text-muted-foreground">
-                                Rating: {player.rating || 'N/A'} &bull; Grade: {player.grade} &bull; Section: {player.section}
+                                Rating: {player.rating || 'N/A'} &bull; Grade: {player.grade}
                             </p>
+                            
+                            {isSelected && selectedEvent && (
+                                <div className="grid sm:grid-cols-3 gap-4 mt-2">
+                                    <div className="grid gap-1.5">
+                                      <Label htmlFor={`section-${player.id}`} className="text-xs">Section</Label>
+                                      <Select onValueChange={(value) => handleSectionChange(player.id, value)} value={selections[player.id]?.section}>
+                                        <SelectTrigger id={`section-${player.id}`} className={cn("w-full", isSectionInvalid && "border-destructive ring-1 ring-destructive")}>
+                                          <SelectValue placeholder="Select Section" />
+                                        </SelectTrigger>
+                                        <SelectContent>{sectionOptions}</SelectContent>
+                                      </Select>
+                                      {isSectionInvalid && (
+                                          <p className="text-xs text-destructive">Grade level is too high for this section.</p>
+                                      )}
+                                    </div>
+                                    <div className="grid gap-1.5">
+                                      <Label htmlFor={`bye1-${player.id}`} className="text-xs">Bye 1</Label>
+                                      <Select onValueChange={(value) => handleByeChange(player.id, 'round1', value)} defaultValue="none">
+                                        <SelectTrigger id={`bye1-${player.id}`} className="w-full">
+                                          <SelectValue placeholder="Select Bye" />
+                                        </SelectTrigger>
+                                        <SelectContent>{roundOptions(selectedEvent.rounds)}</SelectContent>
+                                      </Select>
+                                    </div>
+                                     <div className="grid gap-1.5">
+                                      <Label htmlFor={`bye2-${player.id}`} className="text-xs">Bye 2</Label>
+                                      <Select onValueChange={(value) => handleByeChange(player.id, 'round2', value)} value={selections[player.id]?.byes.round2 || 'none'} disabled={!firstBye || firstBye === 'none'}>
+                                        <SelectTrigger id={`bye2-${player.id}`} className="w-full">
+                                          <SelectValue placeholder="Select Bye" />
+                                        </SelectTrigger>
+                                        <SelectContent>{roundOptions(selectedEvent.rounds, firstBye)}</SelectContent>
+                                      </Select>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        {isSelected && selectedEvent && (
-                          <>
-                            <div className="grid gap-1.5">
-                              <Label htmlFor={`bye1-${player.id}`} className="text-xs">Bye 1</Label>
-                              <Select onValueChange={(value) => handleByeChange(player.id, 'round1', value)} defaultValue="none">
-                                <SelectTrigger id={`bye1-${player.id}`} className="w-32">
-                                  <SelectValue placeholder="Select Bye" />
-                                </SelectTrigger>
-                                <SelectContent>{roundOptions(selectedEvent.rounds)}</SelectContent>
-                              </Select>
-                            </div>
-                             <div className="grid gap-1.5">
-                              <Label htmlFor={`bye2-${player.id}`} className="text-xs">Bye 2</Label>
-                              <Select onValueChange={(value) => handleByeChange(player.id, 'round2', value)} value={selections[player.id]?.byes.round2 || 'none'} disabled={!firstBye || firstBye === 'none'}>
-                                <SelectTrigger id={`bye2-${player.id}`} className="w-32">
-                                  <SelectValue placeholder="Select Bye" />
-                                </SelectTrigger>
-                                <SelectContent>{roundOptions(selectedEvent.rounds, firstBye)}</SelectContent>
-                              </Select>
-                            </div>
-                          </>
-                        )}
                     </div>
                   );
                 })}
@@ -342,7 +410,7 @@ export default function EventsPage() {
             <DialogClose asChild>
               <Button type="button" variant="ghost">Cancel</Button>
             </DialogClose>
-            <Button type="button" onClick={handleSubmitRegistration} disabled={Object.keys(selections).length === 0}>
+            <Button type="button" onClick={handleSubmitRegistration} disabled={Object.keys(selections).length === 0 || hasInvalidSelections}>
                 Submit Registration ({Object.keys(selections).length} Players)
             </Button>
           </DialogFooter>
