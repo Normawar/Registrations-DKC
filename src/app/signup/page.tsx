@@ -60,6 +60,7 @@ const SponsorSignUpForm = () => {
   });
 
   const handleDistrictChange = (district: string) => {
+    form.setValue('district', district);
     form.setValue('school', ''); 
     const filteredSchools = schoolData
       .filter((school) => school.district === district)
@@ -114,7 +115,7 @@ const SponsorSignUpForm = () => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>District</FormLabel>
-                <Select onValueChange={(value) => { field.onChange(value); handleDistrictChange(value); }} defaultValue={field.value}>
+                <Select onValueChange={handleDistrictChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a district" />
