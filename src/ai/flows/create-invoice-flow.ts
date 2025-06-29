@@ -34,16 +34,20 @@ if (process.env.SQUARE_LOCATION_ID) {
     console.log('Square Location ID: Not Provided. Please check your .env file.');
 }
 
+const PlayerInvoiceInfoSchema = z.object({
+  playerName: z.string().describe('The full name of the player.'),
+  baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
+  lateFee: z.number().describe('The late fee applied, if any.'),
+  uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
+});
 
 const CreateInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
+    teamCode: z.string().describe('The team code of the sponsor.'),
     eventName: z.string().describe('The name of the event.'),
-    registrationFee: z.number().describe('The per-player registration fee.'),
-    registrationCount: z.number().int().describe('The number of players being registered.'),
     uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
-    uscfCount: z.number().int().describe('The number of new or renewing USCF memberships.'),
-    totalAmount: z.number().describe('The total amount to be invoiced.'),
+    players: z.array(PlayerInvoiceInfoSchema).describe('An array of players to be invoiced.'),
 });
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
 
@@ -108,27 +112,41 @@ const createInvoiceFlow = ai.defineFlow(
       // 3. Create an Order
       const lineItems = [];
 
-      if (input.registrationCount > 0) {
+      input.players.forEach(player => {
+        // Line item for registration
         lineItems.push({
-          name: `Event Registration: ${input.eventName}`,
-          quantity: String(input.registrationCount),
+          name: `Registration: ${player.playerName}`,
+          quantity: '1',
           basePriceMoney: {
-            amount: BigInt(Math.round(input.registrationFee * 100)),
+            amount: BigInt(Math.round(player.baseRegistrationFee * 100)),
             currency: 'USD',
           },
         });
-      }
 
-      if (input.uscfCount > 0) {
-        lineItems.push({
-          name: 'USCF Membership (New/Renewal)',
-          quantity: String(input.uscfCount),
-          basePriceMoney: {
-            amount: BigInt(Math.round(input.uscfFee * 100)),
-            currency: 'USD',
-          },
-        });
-      }
+        // Line item for late fee if applicable
+        if (player.lateFee > 0) {
+            lineItems.push({
+                name: `Late Fee: ${player.playerName}`,
+                quantity: '1',
+                basePriceMoney: {
+                    amount: BigInt(Math.round(player.lateFee * 100)),
+                    currency: 'USD',
+                },
+            });
+        }
+
+        // Line item for USCF membership if applicable
+        if (player.uscfAction) {
+            lineItems.push({
+                name: `USCF Membership: ${player.playerName}`,
+                quantity: '1',
+                basePriceMoney: {
+                    amount: BigInt(Math.round(input.uscfFee * 100)),
+                    currency: 'USD',
+                },
+            });
+        }
+      });
 
       console.log("Creating order with line items:", JSON.stringify(lineItems, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
       const createOrderResponse = await ordersApi.createOrder({
@@ -165,7 +183,7 @@ const createInvoiceFlow = ai.defineFlow(
             squareGiftCard: true,
             bankAccount: true, // For ACH payments
           },
-          title: `Invoice for ${input.eventName}`,
+          title: `${input.teamCode} @ ${input.eventName}`,
           description: `Thank you for your registration.`,
         }
       });

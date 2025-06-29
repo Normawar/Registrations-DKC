@@ -48,6 +48,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { useEvents, type Event } from '@/hooks/use-events';
+import { generateTeamCode } from '@/lib/school-utils';
 
 type Player = {
   id: string;
@@ -237,18 +238,27 @@ export default function EventsPage() {
             }
         }
         
-        const numUscfActions = Object.values(selections).filter(s => s.uscfStatus !== 'current').length;
+        const teamCode = generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
+
+        const playersToInvoice = Object.entries(selections).map(([playerId, registration]) => {
+            const player = rosterPlayers.find(p => p.id === playerId)!;
+            const lateFeeAmount = registrationFeePerPlayer - selectedEvent!.regularFee;
+            return {
+                playerName: `${player.firstName} ${player.lastName}`,
+                baseRegistrationFee: selectedEvent!.regularFee,
+                lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+                uscfAction: registration.uscfStatus !== 'current',
+            };
+        });
 
         try {
             const { invoiceId, invoiceUrl } = await createInvoice({
                 sponsorName: 'Sponsor Name', // Hardcoded for prototype
                 sponsorEmail: 'sponsor@chessmate.com', // Hardcoded for prototype
+                teamCode: teamCode,
                 eventName: selectedEvent.name,
-                registrationFee: registrationFeePerPlayer,
-                registrationCount: Object.keys(selections).length,
                 uscfFee: 24,
-                uscfCount: numUscfActions,
-                totalAmount: calculatedFees,
+                players: playersToInvoice
             });
 
             const newConfirmation = {
