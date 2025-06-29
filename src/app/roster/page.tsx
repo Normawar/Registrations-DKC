@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { format, isValid, parse } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -369,44 +369,156 @@ export default function RosterPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="dob" render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date of Birth</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                            {field.value ? format(field.value, "MM/dd/yyyy") : <span>Pick a date</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                 <FormField control={form.control} name="uscfExpiration" render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>USCF Expiration</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isUscfNew}>
-                            {field.value ? format(field.value, "MM/dd/yyyy") : <span>Pick a date</span>}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  control={form.control}
+                  name="dob"
+                  render={({ field }) => {
+                    const [inputValue, setInputValue] = useState<string>(
+                      field.value ? format(field.value, "MM/dd/yyyy") : ""
+                    );
+                    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+                    useEffect(() => {
+                      if (field.value) {
+                        setInputValue(format(field.value, "MM/dd/yyyy"));
+                      } else {
+                        setInputValue("");
+                      }
+                    }, [field.value]);
+
+                    const handleBlur = () => {
+                      const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                      if (isValid(parsedDate)) {
+                        if (parsedDate <= new Date() && parsedDate >= new Date("1900-01-01")) {
+                          field.onChange(parsedDate);
+                        } else {
+                          setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : "");
+                        }
+                      } else {
+                        if (inputValue === "") {
+                          field.onChange(undefined);
+                        } else {
+                          setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : "");
+                        }
+                      }
+                    };
+
+                    return (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Date of Birth</FormLabel>
+                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                          <div className="relative">
+                            <FormControl>
+                              <Input
+                                placeholder="MM/DD/YYYY"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onBlur={handleBlur}
+                              />
+                            </FormControl>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"ghost"}
+                                className="absolute right-0 top-0 h-full w-10 p-0 font-normal"
+                                aria-label="Open calendar"
+                              >
+                                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </PopoverTrigger>
+                          </div>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={(date) => {
+                                field.onChange(date);
+                                setIsCalendarOpen(false);
+                              }}
+                              disabled={(date) =>
+                                date > new Date() || date < new Date("1900-01-01")
+                              }
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+                 <FormField
+                  control={form.control}
+                  name="uscfExpiration"
+                  render={({ field }) => {
+                    const [inputValue, setInputValue] = useState<string>(
+                      field.value ? format(field.value, "MM/dd/yyyy") : ""
+                    );
+                    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+                    useEffect(() => {
+                      if (field.value) {
+                        setInputValue(format(field.value, "MM/dd/yyyy"));
+                      } else {
+                        setInputValue("");
+                      }
+                    }, [field.value]);
+
+                    const handleBlur = () => {
+                      const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                      if (isValid(parsedDate)) {
+                        field.onChange(parsedDate);
+                      } else {
+                        if (inputValue === "") {
+                          field.onChange(undefined);
+                        } else {
+                           setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : "");
+                        }
+                      }
+                    };
+
+                    return (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>USCF Expiration</FormLabel>
+                         <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                           <div className="relative">
+                            <FormControl>
+                              <Input
+                                placeholder="MM/DD/YYYY"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onBlur={handleBlur}
+                                disabled={isUscfNew}
+                              />
+                            </FormControl>
+                             <PopoverTrigger asChild>
+                              <Button
+                                variant={"ghost"}
+                                className="absolute right-0 top-0 h-full w-10 p-0 font-normal"
+                                aria-label="Open calendar"
+                                disabled={isUscfNew}
+                              >
+                                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </PopoverTrigger>
+                          </div>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={(date) => {
+                                field.onChange(date);
+                                setIsCalendarOpen(false);
+                              }}
+                              initialFocus
+                              disabled={isUscfNew}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
                  <FormField control={form.control} name="grade" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Grade</FormLabel>
@@ -488,4 +600,3 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
-
