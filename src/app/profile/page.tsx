@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,6 +27,9 @@ import {
 import { schoolData } from '@/lib/data/school-data';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { KingIcon, QueenIcon, RookIcon, BishopIcon, KnightIcon, PawnIcon } from '@/components/icons/chess-icons';
 
 const uniqueDistricts = [...new Set(schoolData.map((school) => school.district))].sort();
 
@@ -57,6 +60,17 @@ const currentSponsorData = {
   school: 'SHARYLAND PIONEER H S',
   email: 'sponsor@chessmate.com',
   phone: '(555) 555-5555',
+  avatarType: 'icon',
+  avatarUrl: 'KingIcon', 
+};
+
+const icons: { [key: string]: ElementType } = {
+  KingIcon,
+  QueenIcon,
+  RookIcon,
+  BishopIcon,
+  KnightIcon,
+  PawnIcon,
 };
 
 
@@ -64,6 +78,16 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   
+  const [profileImage, setProfileImage] = useState<string | null>(
+    currentSponsorData.avatarType === 'upload' ? currentSponsorData.avatarUrl : null
+  );
+  const [selectedIconName, setSelectedIconName] = useState<string>(
+     currentSponsorData.avatarType === 'icon' ? currentSponsorData.avatarUrl : 'KingIcon'
+  );
+  const [activeTab, setActiveTab] = useState<'icon' | 'upload'>(currentSponsorData.avatarType as 'icon' | 'upload');
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: currentSponsorData,
@@ -87,6 +111,30 @@ export default function ProfilePage() {
     setSchoolsForDistrict(initialSchools);
   }, []);
 
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setProfileImage(reader.result as string);
+            setSelectedIconName('');
+        };
+        reader.readAsDataURL(file);
+    }
+  };
+
+  const handleIconSelect = (IconName: string) => {
+      setSelectedIconName(IconName);
+      setProfileImage(null);
+  };
+
+  const handleSavePicture = () => {
+    console.log("Saving picture:", { activeTab, profileImage, selectedIconName });
+    toast({
+        title: "Profile Picture Updated",
+        description: "Your new profile picture has been saved.",
+    });
+  }
 
   const handleDistrictChange = (district: string) => {
     profileForm.setValue('district', district);
@@ -116,6 +164,7 @@ export default function ProfilePage() {
   }
 
   const selectedDistrict = profileForm.watch('district');
+  const SelectedIconComponent = selectedIconName ? icons[selectedIconName] : null;
 
   return (
     <AppLayout>
@@ -126,6 +175,62 @@ export default function ProfilePage() {
             View and edit your account information.
           </p>
         </div>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Profile Picture</CardTitle>
+                <CardDescription>Upload a photo or choose an avatar icon.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-3 gap-8 items-start">
+                <div className="flex flex-col items-center gap-4">
+                    <Avatar className="h-32 w-32 border">
+                        {activeTab === 'upload' && profileImage ? (
+                            <AvatarImage src={profileImage} alt="Sponsor Profile" />
+                        ) : activeTab === 'icon' && SelectedIconComponent ? (
+                            <div className="w-full h-full flex items-center justify-center bg-muted rounded-full">
+                                <SelectedIconComponent className="w-20 h-20 text-muted-foreground" />
+                            </div>
+                        ) : (
+                            <AvatarFallback className="text-4xl">
+                                {currentSponsorData.firstName.charAt(0)}{currentSponsorData.lastName.charAt(0)}
+                            </AvatarFallback>
+                        )}
+                    </Avatar>
+                     <Button variant="outline" className="w-full" onClick={handleSavePicture}>Save Picture</Button>
+                </div>
+                <div className="md:col-span-2">
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'icon' | 'upload')}>
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="icon">Choose Icon</TabsTrigger>
+                            <TabsTrigger value="upload">Upload Photo</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="icon" className="pt-4">
+                            <p className="text-sm text-muted-foreground mb-4">Select a chess piece as your avatar.</p>
+                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+                                {Object.entries(icons).map(([name, IconComponent]) => (
+                                    <Button 
+                                        key={name} 
+                                        variant="outline" 
+                                        size="icon" 
+                                        className={`h-16 w-16 ${selectedIconName === name && activeTab === 'icon' ? 'ring-2 ring-primary' : ''}`} 
+                                        onClick={() => handleIconSelect(name)}
+                                    >
+                                        <IconComponent className="h-8 w-8" />
+                                    </Button>
+                                ))}
+                            </div>
+                        </TabsContent>
+                        <TabsContent value="upload" className="pt-4">
+                            <p className="text-sm text-muted-foreground mb-4">For best results, upload a square image.</p>
+                            <div className="flex gap-2">
+                                <Input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>Choose File</Button>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
+                </div>
+            </CardContent>
+        </Card>
 
         <Form {...profileForm}>
             <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-8">
