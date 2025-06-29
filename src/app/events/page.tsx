@@ -212,8 +212,8 @@ export default function EventsPage() {
         setSelections(prev => {
             const newSelections = {...prev};
             const player = rosterPlayers.find(p => p.id === playerId);
-            if (isSelected && player) {
-                const isExpired = !player.uscfExpiration || player.uscfExpiration < new Date();
+            if (isSelected && player && selectedEvent) {
+                const isExpired = !player.uscfExpiration || player.uscfExpiration < selectedEvent.date;
                 newSelections[playerId] = { 
                     byes: { round1: 'none', round2: 'none' },
                     section: player.section,
@@ -349,9 +349,23 @@ export default function EventsPage() {
       return playerGradeLevel <= sectionMaxLevel;
     };
 
+    const isUscfStatusValid = (player: Player, registration: PlayerRegistration, event: Event): boolean => {
+      if (registration.uscfStatus === 'current') {
+        if (player.uscfId.toUpperCase() === 'NEW') return false;
+        if (!player.uscfExpiration) return false;
+        if (event.date > player.uscfExpiration) return false;
+      }
+      return true;
+    };
+
     const hasInvalidSelections = Object.entries(selections).some(([playerId, registration]) => {
         const player = rosterPlayers.find(p => p.id === playerId);
         return player ? !isSectionValid(player, registration.section) : false;
+    });
+
+    const hasInvalidUscfSelections = Object.entries(selections).some(([playerId, registration]) => {
+      const player = rosterPlayers.find(p => p.id === playerId);
+      return player && selectedEvent ? !isUscfStatusValid(player, registration, selectedEvent) : false;
     });
 
     const sectionOptions = sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>);
@@ -438,6 +452,7 @@ export default function EventsPage() {
                   const firstBye = selections[player.id]?.byes.round1;
                   const isSectionInvalid = isSelected && !isSectionValid(player, selections[player.id]!.section);
                   const uscfStatus = selections[player.id]?.uscfStatus;
+                  const isUscfInvalid = isSelected && selectedEvent && uscfStatus === 'current' && !isUscfStatusValid(player, selections[player.id]!, selectedEvent);
 
                   return (
                     <div key={player.id} className="items-start gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr]">
@@ -477,6 +492,11 @@ export default function EventsPage() {
                                           <Label htmlFor={`renewing-${player.id}`} className="font-normal text-sm">Renewing (+$24)</Label>
                                         </div>
                                       </RadioGroup>
+                                      {isUscfInvalid && (
+                                          <p className="text-xs text-destructive">
+                                              Player must have a valid, unexpired USCF membership for this event to be 'Current'.
+                                          </p>
+                                      )}
                                     </div>
                                     <div className="grid gap-1.5">
                                       <Label htmlFor={`section-${player.id}`} className="text-xs">Section</Label>
@@ -525,7 +545,7 @@ export default function EventsPage() {
                 <DialogClose asChild>
                     <Button type="button" variant="ghost">Cancel</Button>
                 </DialogClose>
-                <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections}>
+                <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections || hasInvalidUscfSelections}>
                     Review Invoice ({Object.keys(selections).length} Players)
                 </Button>
               </div>
