@@ -68,6 +68,9 @@ type Player = {
   rating?: number;
   grade: string;
   section: string;
+  email: string;
+  dob?: Date;
+  zipCode?: string;
 };
 
 type PlayerRegistration = {
@@ -133,14 +136,15 @@ const initialEvents: Event[] = [
 ];
 
 const rosterPlayers: Player[] = [
-    { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", uscfExpiration: new Date('2025-12-31'), rating: 1850, grade: "10th Grade", section: 'High School K-12' },
-    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship' },
-    { id: "3", firstName: "Casey", lastName: "Becker", uscfId: "11223344", uscfExpiration: new Date('2025-06-01'), rating: 1500, grade: "9th Grade", section: 'High School K-12' },
-    { id: "4", firstName: "Morgan", lastName: "Taylor", uscfId: "NEW", rating: 1000, grade: "5th Grade", section: 'Elementary K-5' },
-    { id: "5", firstName: "Riley", lastName: "Quinn", uscfId: "55667788", uscfExpiration: new Date('2024-11-30'), rating: 1980, grade: "11th Grade", section: 'Championship' },
-    { id: "6", firstName: "Skyler", lastName: "Jones", uscfId: "99887766", uscfExpiration: new Date('2025-02-28'), rating: 1650, grade: "9th Grade", section: 'High School K-12' },
-    { id: "7", firstName: "Drew", lastName: "Smith", uscfId: "11122233", uscfExpiration: new Date('2023-10-01'), rating: 2050, grade: "12th Grade", section: 'Championship' },
+    { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", uscfExpiration: new Date('2025-12-31'), rating: 1850, grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', dob: new Date('2008-05-10'), zipCode: '78501' },
+    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com' },
+    { id: "3", firstName: "Casey", lastName: "Becker", uscfId: "11223344", uscfExpiration: new Date('2025-06-01'), rating: 1500, grade: "9th Grade", section: 'High School K-12', email: 'casey.becker@example.com', dob: new Date('2009-02-20'), zipCode: '78502' },
+    { id: "4", firstName: "Morgan", lastName: "Taylor", uscfId: "NEW", rating: 1000, grade: "5th Grade", section: 'Elementary K-5', email: 'morgan.taylor@example.com', dob: new Date('2013-08-01'), zipCode: '78503' },
+    { id: "5", firstName: "Riley", lastName: "Quinn", uscfId: "55667788", uscfExpiration: new Date('2024-11-30'), rating: 1980, grade: "11th Grade", section: 'Championship', email: 'riley.quinn@example.com', dob: new Date('2007-11-25'), zipCode: '78504' },
+    { id: "6", firstName: "Skyler", lastName: "Jones", uscfId: "99887766", uscfExpiration: new Date('2025-02-28'), rating: 1650, grade: "9th Grade", section: 'High School K-12', email: 'skyler.jones@example.com', dob: new Date('2009-04-12'), zipCode: '78501' },
+    { id: "7", firstName: "Drew", lastName: "Smith", uscfId: "11122233", uscfExpiration: new Date('2023-10-01'), rating: 2050, grade: "12th Grade", section: 'Championship', email: 'drew.smith@example.com', dob: new Date('2006-12-05') },
 ];
+
 
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
 
@@ -358,6 +362,12 @@ export default function EventsPage() {
       return true;
     };
 
+    const isRenewingDataValid = (player: Player): boolean => {
+      if (player.uscfId.toUpperCase() === 'NEW') return false;
+      if (!player.dob || !player.zipCode || !player.email) return false;
+      return true;
+    };
+
     const hasInvalidSelections = Object.entries(selections).some(([playerId, registration]) => {
         const player = rosterPlayers.find(p => p.id === playerId);
         return player ? !isSectionValid(player, registration.section) : false;
@@ -366,6 +376,14 @@ export default function EventsPage() {
     const hasInvalidUscfSelections = Object.entries(selections).some(([playerId, registration]) => {
       const player = rosterPlayers.find(p => p.id === playerId);
       return player && selectedEvent ? !isUscfStatusValid(player, registration, selectedEvent) : false;
+    });
+
+    const hasInvalidRenewingSelections = Object.entries(selections).some(([playerId, registration]) => {
+      if (registration.uscfStatus === 'renewing') {
+          const player = rosterPlayers.find(p => p.id === playerId);
+          return player ? !isRenewingDataValid(player) : false;
+      }
+      return false;
     });
 
     const sectionOptions = sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>);
@@ -453,6 +471,7 @@ export default function EventsPage() {
                   const isSectionInvalid = isSelected && !isSectionValid(player, selections[player.id]!.section);
                   const uscfStatus = selections[player.id]?.uscfStatus;
                   const isUscfInvalid = isSelected && selectedEvent && uscfStatus === 'current' && !isUscfStatusValid(player, selections[player.id]!, selectedEvent);
+                  const isRenewingInvalid = isSelected && uscfStatus === 'renewing' && !isRenewingDataValid(player);
 
                   return (
                     <div key={player.id} className="items-start gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr]">
@@ -499,6 +518,14 @@ export default function EventsPage() {
                                           <p className="text-xs text-destructive">
                                               Player must have a valid, unexpired USCF membership for this event to be 'Current'.
                                           </p>
+                                      )}
+                                      {isRenewingInvalid && (
+                                          <div className="mt-2 text-xs text-destructive p-2 bg-destructive/10 rounded-md">
+                                              Player data is incomplete for renewal. Please update DOB and Zip Code in the{' '}
+                                              <Link href="/roster" className="underline font-semibold hover:text-destructive/80" target="_blank" rel="noopener noreferrer">
+                                                  Roster Page
+                                              </Link>.
+                                          </div>
                                       )}
                                     </div>
                                     <div className="grid gap-1.5">
@@ -548,7 +575,7 @@ export default function EventsPage() {
                 <DialogClose asChild>
                     <Button type="button" variant="ghost">Cancel</Button>
                 </DialogClose>
-                <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections || hasInvalidUscfSelections}>
+                <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections || hasInvalidUscfSelections || hasInvalidRenewingSelections}>
                     Review Invoice ({Object.keys(selections).length} Players)
                 </Button>
               </div>
