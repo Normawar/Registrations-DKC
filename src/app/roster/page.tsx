@@ -82,6 +82,7 @@ import { cn } from '@/lib/utils';
 type Player = {
   id: string;
   firstName: string;
+  middleName?: string;
   lastName: string;
   uscfId: string;
   uscfExpiration?: Date;
@@ -95,7 +96,7 @@ type Player = {
 };
 
 const initialPlayers: Player[] = [
-  { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", rating: 1850, uscfExpiration: new Date(), grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', dob: new Date('2008-05-10'), zipCode: '78501'},
+  { id: "1", firstName: "Alex", middleName: "Michael", lastName: "Ray", uscfId: "12345678", rating: 1850, uscfExpiration: new Date(), grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', dob: new Date('2008-05-10'), zipCode: '78501'},
   { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", rating: 2100, uscfExpiration: new Date(), grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com', dob: new Date('2007-09-15'), zipCode: '78504'},
 ];
 
@@ -105,6 +106,7 @@ const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School 
 const playerFormSchema = z.object({
   id: z.string().optional(),
   firstName: z.string().min(1, { message: "First Name is required." }),
+  middleName: z.string().optional(),
   lastName: z.string().min(1, { message: "Last Name is required." }),
   uscfId: z.string().min(1, { message: "USCF ID is required." }),
   uscfExpiration: z.date().optional(),
@@ -149,6 +151,7 @@ export default function RosterPage() {
     resolver: zodResolver(playerFormSchema),
     defaultValues: {
       firstName: '',
+      middleName: '',
       lastName: '',
       uscfId: '',
       rating: undefined,
@@ -180,6 +183,7 @@ export default function RosterPage() {
       } else {
         form.reset({
           firstName: '',
+          middleName: '',
           lastName: '',
           uscfId: '',
           rating: undefined,
@@ -296,11 +300,11 @@ export default function RosterPage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
-                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={player.firstName} />
+                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} />
                           <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div>
-                          {player.firstName} {player.lastName}
+                          {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
                            <div className="text-sm text-muted-foreground">{player.email}</div>
                         </div>
                       </div>
@@ -344,11 +348,18 @@ export default function RosterPage() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <FormField control={form.control} name="firstName" render={({ field }) => (
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
                     <FormControl><Input placeholder="John" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                 <FormField control={form.control} name="middleName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Middle Name (Optional)</FormLabel>
+                    <FormControl><Input placeholder="Michael" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -359,6 +370,8 @@ export default function RosterPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="uscfId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>USCF ID</FormLabel>
