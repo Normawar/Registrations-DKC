@@ -127,11 +127,21 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            if (!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
+            const requiredEnvVars = [
+                'NEXT_PUBLIC_FIREBASE_API_KEY',
+                'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+                'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+                'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+                'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+                'NEXT_PUBLIC_FIREBASE_APP_ID',
+            ];
+            const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+
+            if (missingVars.length > 0) {
                 toast({
                     variant: "destructive",
                     title: "Configuration Error",
-                    description: "Firebase Storage is not configured. Please add your Firebase project config to your .env file.",
+                    description: `Firebase is not fully configured. The following variables are missing from your .env file: ${missingVars.join(', ')}. Please check your Firebase project settings.`,
                 });
                 setIsUpdating(prev => ({...prev, [conf.id]: false}));
                 return;
