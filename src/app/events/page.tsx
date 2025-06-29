@@ -469,6 +469,9 @@ export default function EventsPage() {
                             <p className="text-sm text-muted-foreground">
                                 Grade: {player.grade} &bull; Section: {player.section} &bull; Rating: {player.rating || 'N/A'}
                             </p>
+                            <p className="text-sm text-muted-foreground">
+                                USCF ID: {player.uscfId} &bull; Expires: {player.uscfExpiration ? format(player.uscfExpiration, 'MM/dd/yyyy') : 'N/A'}
+                            </p>
                             
                             {isSelected && selectedEvent && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 items-start">
