@@ -159,6 +159,7 @@ const createInvoiceFlow = ai.defineFlow(
             requestType: 'BALANCE',
             dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
           }],
+          deliveryMethod: 'SHARE_MANUALLY',
           acceptedPaymentMethods: {
             card: true,
             squareGiftCard: true,
