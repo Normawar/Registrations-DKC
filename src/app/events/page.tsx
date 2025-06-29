@@ -83,58 +83,6 @@ type PlayerRegistration = {
 };
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
-const initialEvents: Event[] = [
-  {
-    id: '1',
-    name: "Spring Open 2024",
-    date: new Date(new Date().setDate(new Date().getDate() + 10)), // Upcoming
-    location: "City Convention Center",
-    registered: "128/150",
-    status: "Open",
-    imageUrl: "https://placehold.co/100x100.png",
-    pdfUrl: "#",
-    rounds: 5,
-  },
-  {
-    id: '2',
-    name: "Summer Championship",
-    date: new Date(new Date().setDate(new Date().getDate() + 40)), // Upcoming
-    location: "Grand Hotel Ballroom",
-    registered: "95/100",
-    status: "Open",
-    rounds: 7,
-  },
-  {
-    id: '3',
-    name: "Autumn Classic",
-    date: new Date("2024-09-10"),
-    location: "Community Chess Club",
-    registered: "40/50",
-    status: "Completed",
-    pdfUrl: "#",
-    rounds: 5,
-  },
-  {
-    id: '4',
-    name: "Winter Scholastic",
-    date: new Date(new Date().setDate(new Date().getDate() + 1)), // 24hr late fee
-    location: "North High School",
-    registered: "0/80",
-    status: "Open",
-    rounds: 4,
-  },
-  {
-    id: '5',
-    name: "New Year Blitz",
-    date: new Date(new Date().setDate(new Date().getDate() + 2)), // 48hr late fee
-    location: "Online",
-    registered: "0/200",
-    status: "Open",
-    imageUrl: "https://placehold.co/100x100.png",
-    rounds: 9,
-  },
-];
-
 const rosterPlayers: Player[] = [
     { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", uscfExpiration: new Date('2025-12-31'), rating: 1850, grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', dob: new Date('2008-05-10'), zipCode: '78501' },
     { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com' },
@@ -167,12 +115,67 @@ const sectionMaxGrade: { [key: string]: number } = {
 
 export default function EventsPage() {
     const { toast } = useToast();
-    const [events, setEvents] = useState<Event[]>(initialEvents);
+    const [events, setEvents] = useState<Event[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selections, setSelections] = useState<RegistrationSelections>({});
     const [calculatedFees, setCalculatedFees] = useState(0);
+
+    useEffect(() => {
+        const initialEvents: Event[] = [
+          {
+            id: '1',
+            name: "Spring Open 2024",
+            date: new Date(new Date().setDate(new Date().getDate() + 10)), // Upcoming
+            location: "City Convention Center",
+            registered: "128/150",
+            status: "Open",
+            imageUrl: "https://placehold.co/100x100.png",
+            pdfUrl: "#",
+            rounds: 5,
+          },
+          {
+            id: '2',
+            name: "Summer Championship",
+            date: new Date(new Date().setDate(new Date().getDate() + 40)), // Upcoming
+            location: "Grand Hotel Ballroom",
+            registered: "95/100",
+            status: "Open",
+            rounds: 7,
+          },
+          {
+            id: '3',
+            name: "Autumn Classic",
+            date: new Date("2024-09-10"),
+            location: "Community Chess Club",
+            registered: "40/50",
+            status: "Completed",
+            pdfUrl: "#",
+            rounds: 5,
+          },
+          {
+            id: '4',
+            name: "Winter Scholastic",
+            date: new Date(new Date().setDate(new Date().getDate() + 1)), // 24hr late fee
+            location: "North High School",
+            registered: "0/80",
+            status: "Open",
+            rounds: 4,
+          },
+          {
+            id: '5',
+            name: "New Year Blitz",
+            date: new Date(new Date().setDate(new Date().getDate() + 2)), // 48hr late fee
+            location: "Online",
+            registered: "0/200",
+            status: "Open",
+            imageUrl: "https://placehold.co/100x100.png",
+            rounds: 9,
+          },
+        ];
+        setEvents(initialEvents);
+    }, []);
 
     const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event): number => {
       let total = 0;
