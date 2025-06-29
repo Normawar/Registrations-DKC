@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -160,6 +160,16 @@ export default function RosterPage() {
     }
   });
 
+  const sortedPlayers = useMemo(() => {
+    return [...players].sort((a, b) => {
+      const lastNameComparison = a.lastName.localeCompare(b.lastName);
+      if (lastNameComparison !== 0) {
+        return lastNameComparison;
+      }
+      return a.firstName.localeCompare(b.firstName);
+    });
+  }, [players]);
+
   const watchUscfId = form.watch('uscfId');
   const isUscfNew = watchUscfId.toUpperCase() === 'NEW';
 
@@ -281,7 +291,7 @@ export default function RosterPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {players.map((player) => (
+                {sortedPlayers.map((player) => (
                   <TableRow key={player.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-3">
