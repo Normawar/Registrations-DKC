@@ -25,12 +25,13 @@ import {
   KnightIcon,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { LogOut, School } from "lucide-react";
+import { LogOut, School, ClipboardList } from "lucide-react";
 
 const menuItems = [
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/events", icon: RookIcon, label: "Events" },
   { href: "/players", icon: PawnIcon, label: "Players" },
+  { href: "/roster", icon: ClipboardList, label: "Roster" },
   { href: "/schools", icon: School, label: "Schools" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
@@ -77,12 +78,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
                 <AvatarImage src="https://placehold.co/40x40.png" alt="@user" />
-                <AvatarFallback>U</AvatarFallback>
+                <AvatarFallback>S</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden group-data-[collapsible=icon]:hidden">
-                <p className="font-semibold text-sm truncate">Organizer</p>
+                <p className="font-semibold text-sm truncate">Sponsor</p>
                 <p className="text-xs text-sidebar-foreground/70 truncate">
-                  organizer@chessmate.com
+                  sponsor@chessmate.com
                 </p>
               </div>
               <Button
