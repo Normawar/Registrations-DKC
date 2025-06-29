@@ -49,13 +49,19 @@ const SponsorSignUpForm = () => {
   return (
     <>
       <CardContent className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="sponsor-name">Sponsor Name</Label>
-          <Input id="sponsor-name" placeholder="ACME Inc." required />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="first-name">First Name</Label>
+            <Input id="first-name" placeholder="John" required />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="last-name">Last Name</Label>
+            <Input id="last-name" placeholder="Doe" required />
+          </div>
         </div>
         <div className="grid gap-2">
           <Label htmlFor="district">District</Label>
-          <Select onValueChange={handleDistrictChange}>
+          <Select onValueChange={handleDistrictChange} required>
             <SelectTrigger id="district">
               <SelectValue placeholder="Select a district" />
             </SelectTrigger>
@@ -70,7 +76,7 @@ const SponsorSignUpForm = () => {
         </div>
         <div className="grid gap-2">
           <Label htmlFor="school">School</Label>
-          <Select onValueChange={handleSchoolChange} value={selectedSchool} disabled={!selectedDistrict}>
+          <Select onValueChange={handleSchoolChange} value={selectedSchool} disabled={!selectedDistrict} required>
             <SelectTrigger id="school">
               <SelectValue placeholder="Select a school" />
             </SelectTrigger>
@@ -195,5 +201,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-
-    
