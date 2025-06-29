@@ -29,9 +29,9 @@ import { LogOut, School, ClipboardList } from "lucide-react";
 
 const menuItems = [
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
+  { href: "/roster", icon: ClipboardList, label: "Roster" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
   { href: "/players", icon: PawnIcon, label: "Players" },
-  { href: "/roster", icon: ClipboardList, label: "Roster" },
   { href: "/schools", icon: School, label: "Schools" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
