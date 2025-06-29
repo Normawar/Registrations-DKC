@@ -28,6 +28,9 @@ import {
   PlusCircle, 
   MoreHorizontal,
   CalendarIcon,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -177,6 +180,8 @@ const playerFormSchema = z.object({
   });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
+type SortableColumnKey = 'lastName' | 'uscfId' | 'rating' | 'grade' | 'section';
+
 
 export default function RosterPage() {
   const { toast } = useToast();
@@ -185,6 +190,7 @@ export default function RosterPage() {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -203,14 +209,63 @@ export default function RosterPage() {
   });
 
   const sortedPlayers = useMemo(() => {
-    return [...players].sort((a, b) => {
-      const lastNameComparison = a.lastName.localeCompare(b.lastName);
-      if (lastNameComparison !== 0) {
-        return lastNameComparison;
-      }
-      return a.firstName.localeCompare(b.firstName);
-    });
-  }, [players]);
+    const sortablePlayers = [...players];
+    if (sortConfig) {
+      sortablePlayers.sort((a, b) => {
+        const key = sortConfig.key;
+        let aVal: any = a[key];
+        let bVal: any = b[key];
+
+        let result = 0;
+
+        if (key === 'grade') {
+          aVal = gradeToNumber[a.grade] ?? -1;
+          bVal = gradeToNumber[b.grade] ?? -1;
+        } else if (key === 'rating') {
+          aVal = a.rating ?? -Infinity;
+          bVal = b.rating ?? -Infinity;
+        }
+
+        if (aVal < bVal) {
+          result = -1;
+        } else if (aVal > bVal) {
+          result = 1;
+        }
+
+        if (result === 0 && key === 'lastName') {
+            result = a.firstName.localeCompare(b.firstName);
+        }
+
+        return sortConfig.direction === 'ascending' ? result : -result;
+      });
+    } else {
+        sortablePlayers.sort((a, b) => {
+            const lastNameComparison = a.lastName.localeCompare(b.lastName);
+            if (lastNameComparison !== 0) return lastNameComparison;
+            return a.firstName.localeCompare(b.firstName);
+        });
+    }
+    return sortablePlayers;
+  }, [players, sortConfig]);
+
+  const requestSort = (key: SortableColumnKey) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnKey: SortableColumnKey) => {
+    if (!sortConfig || sortConfig.key !== columnKey) {
+      return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    }
+    if (sortConfig.direction === 'ascending') {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    } else {
+      return <ArrowDown className="ml-2 h-4 w-4" />;
+    }
+  };
 
   const watchUscfId = form.watch('uscfId');
   const isUscfNew = watchUscfId.toUpperCase() === 'NEW';
@@ -263,7 +318,6 @@ export default function RosterPage() {
   };
 
   function onSubmit(values: PlayerFormValues) {
-    // Check for duplicate USCF ID
     if (values.uscfId.toUpperCase() !== 'NEW') {
       const existingPlayerWithUscfId = players.find(p => 
         p.uscfId.toLowerCase() === values.uscfId.toLowerCase() && p.id !== values.id
@@ -278,7 +332,6 @@ export default function RosterPage() {
       }
     }
 
-    // Check for duplicate player by name and DOB
     const isDuplicatePlayer = players.some(p => 
       p.id !== values.id &&
       p.firstName.trim().toLowerCase() === values.firstName.trim().toLowerCase() &&
@@ -300,11 +353,9 @@ export default function RosterPage() {
     }
 
     if (editingPlayer) {
-      // Update existing player
       setPlayers(players.map(p => p.id === editingPlayer.id ? { ...p, ...values } : p));
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
     } else {
-      // Add new player
       const newPlayer: Player = { ...values, id: Date.now().toString() };
       setPlayers([...players, newPlayer]);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
@@ -351,12 +402,37 @@ export default function RosterPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Player</TableHead>
-                  <TableHead>USCF ID</TableHead>
-                  <TableHead>Rating</TableHead>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Section</TableHead>
-                   <TableHead>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('lastName')}>
+                      Player
+                      {getSortIcon('lastName')}
+                    </Button>
+                  </TableHead>
+                   <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
+                      USCF ID
+                      {getSortIcon('uscfId')}
+                    </Button>
+                  </TableHead>
+                   <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('rating')}>
+                      Rating
+                      {getSortIcon('rating')}
+                    </Button>
+                  </TableHead>
+                   <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('grade')}>
+                      Grade
+                      {getSortIcon('grade')}
+                    </Button>
+                  </TableHead>
+                   <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('section')}>
+                      Section
+                      {getSortIcon('section')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
