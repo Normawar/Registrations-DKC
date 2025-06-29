@@ -519,6 +519,7 @@ export default function EventsPage() {
                             </p>
                             
                             {isSelected && selectedEvent && (
+                                <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 items-start">
                                     <div className="grid gap-1.5">
                                       <Label className="text-xs">USCF Membership</Label>
@@ -593,6 +594,11 @@ export default function EventsPage() {
                                       </Select>
                                     </div>
                                 </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                    Scholastic - .5 pts bye available<br />
+                                    Open - .5 pt bye available only Rds 1-4
+                                </p>
+                                </>
                             )}
                         </div>
                     </div>
