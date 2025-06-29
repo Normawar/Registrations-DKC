@@ -18,12 +18,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="space-y-1 text-center flex flex-col items-center">
-          <div className="inline-block rounded-lg bg-card p-3 mb-4">
-              <DarkKnightIcon className="h-10 w-10 text-primary" />
+          <div className="inline-block rounded-lg bg-white p-3 mb-4">
+              <DarkKnightIcon className="h-10 w-10 text-black" />
           </div>
-          <CardTitle className="text-3xl font-bold font-headline">Dark Knights</CardTitle>
+          <CardTitle className="text-3xl font-bold font-headline">Dark Knight Chess</CardTitle>
           <CardDescription>
-            Enter your credentials to access the guild.
+            Enter your credentials to access the portal.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
