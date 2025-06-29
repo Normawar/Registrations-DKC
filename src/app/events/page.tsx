@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { format, differenceInHours } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 type Event = {
     id: string;
@@ -62,6 +63,8 @@ type Player = {
   id: string;
   firstName: string;
   lastName: string;
+  uscfId: string;
+  uscfExpiration?: Date;
   rating?: number;
   grade: string;
   section: string;
@@ -73,14 +76,15 @@ type PlayerRegistration = {
     round2: string;
   };
   section: string;
-}
+  uscfStatus: 'current' | 'new' | 'renewing';
+};
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
 const initialEvents: Event[] = [
   {
     id: '1',
     name: "Spring Open 2024",
-    date: new Date("2024-06-15"),
+    date: new Date(new Date().setDate(new Date().getDate() + 10)), // Upcoming
     location: "City Convention Center",
     registered: "128/150",
     status: "Open",
@@ -91,7 +95,7 @@ const initialEvents: Event[] = [
   {
     id: '2',
     name: "Summer Championship",
-    date: new Date("2024-07-20"),
+    date: new Date(new Date().setDate(new Date().getDate() + 40)), // Upcoming
     location: "Grand Hotel Ballroom",
     registered: "95/100",
     status: "Open",
@@ -110,32 +114,32 @@ const initialEvents: Event[] = [
   {
     id: '4',
     name: "Winter Scholastic",
-    date: new Date("2024-12-05"),
+    date: new Date(new Date().setDate(new Date().getDate() + 1)), // 24hr late fee
     location: "North High School",
     registered: "0/80",
-    status: "Upcoming",
+    status: "Open",
     rounds: 4,
   },
   {
     id: '5',
     name: "New Year Blitz",
-    date: new Date("2025-01-01"),
+    date: new Date(new Date().setDate(new Date().getDate() + 2)), // 48hr late fee
     location: "Online",
     registered: "0/200",
-    status: "Upcoming",
+    status: "Open",
     imageUrl: "https://placehold.co/100x100.png",
     rounds: 9,
   },
 ];
 
 const rosterPlayers: Player[] = [
-    { id: "1", firstName: "Alex", lastName: "Ray", rating: 1850, grade: "10th Grade", section: 'High School K-12' },
-    { id: "2", firstName: "Jordan", lastName: "Lee", rating: 2100, grade: "11th Grade", section: 'Championship' },
-    { id: "3", firstName: "Casey", lastName: "Becker", rating: 1500, grade: "9th Grade", section: 'High School K-12' },
-    { id: "4", firstName: "Morgan", lastName: "Taylor", rating: 1000, grade: "5th Grade", section: 'Elementary K-5' },
-    { id: "5", firstName: "Riley", lastName: "Quinn", rating: 1980, grade: "11th Grade", section: 'Championship' },
-    { id: "6", firstName: "Skyler", lastName: "Jones", rating: 1650, grade: "9th Grade", section: 'High School K-12' },
-    { id: "7", firstName: "Drew", lastName: "Smith", rating: 2050, grade: "12th Grade", section: 'Championship' },
+    { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", uscfExpiration: new Date('2025-12-31'), rating: 1850, grade: "10th Grade", section: 'High School K-12' },
+    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship' },
+    { id: "3", firstName: "Casey", lastName: "Becker", uscfId: "11223344", uscfExpiration: new Date('2025-06-01'), rating: 1500, grade: "9th Grade", section: 'High School K-12' },
+    { id: "4", firstName: "Morgan", lastName: "Taylor", uscfId: "NEW", rating: 1000, grade: "5th Grade", section: 'Elementary K-5' },
+    { id: "5", firstName: "Riley", lastName: "Quinn", uscfId: "55667788", uscfExpiration: new Date('2024-11-30'), rating: 1980, grade: "11th Grade", section: 'Championship' },
+    { id: "6", firstName: "Skyler", lastName: "Jones", uscfId: "99887766", uscfExpiration: new Date('2025-02-28'), rating: 1650, grade: "9th Grade", section: 'High School K-12' },
+    { id: "7", firstName: "Drew", lastName: "Smith", uscfId: "11122233", uscfExpiration: new Date('2023-10-01'), rating: 2050, grade: "12th Grade", section: 'Championship' },
 ];
 
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -161,8 +165,40 @@ export default function EventsPage() {
     const { toast } = useToast();
     const [events, setEvents] = useState<Event[]>(initialEvents);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selections, setSelections] = useState<RegistrationSelections>({});
+    const [calculatedFees, setCalculatedFees] = useState(0);
+
+    const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event): number => {
+      let total = 0;
+      const hoursUntilEvent = differenceInHours(event.date, new Date());
+      
+      let registrationFee = 20;
+      if (hoursUntilEvent <= 24) {
+        registrationFee = 30;
+      } else if (hoursUntilEvent <= 48) {
+        registrationFee = 25;
+      }
+      
+      for (const playerId in currentSelections) {
+        total += registrationFee;
+        const playerSelection = currentSelections[playerId];
+        if (playerSelection.uscfStatus === 'new' || playerSelection.uscfStatus === 'renewing') {
+          total += 24;
+        }
+      }
+      return total;
+    }
+
+    useEffect(() => {
+        if (selectedEvent && Object.keys(selections).length > 0) {
+            const total = calculateTotalFee(selections, selectedEvent);
+            setCalculatedFees(total);
+        } else {
+            setCalculatedFees(0);
+        }
+    }, [selections, selectedEvent]);
 
     const handleRegisterClick = (event: Event) => {
         if (event.status === 'Open' || event.status === 'Upcoming') {
@@ -177,9 +213,11 @@ export default function EventsPage() {
             const newSelections = {...prev};
             const player = rosterPlayers.find(p => p.id === playerId);
             if (isSelected && player) {
+                const isExpired = !player.uscfExpiration || player.uscfExpiration < new Date();
                 newSelections[playerId] = { 
                     byes: { round1: 'none', round2: 'none' },
                     section: player.section,
+                    uscfStatus: player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current',
                 };
             } else {
                 delete newSelections[playerId];
@@ -211,17 +249,31 @@ export default function EventsPage() {
       });
     }
 
-    const handleSubmitRegistration = () => {
+    const handleUscfStatusChange = (playerId: string, status: 'current' | 'new' | 'renewing') => {
+        setSelections(prev => {
+            const newSelections = {...prev};
+            if(newSelections[playerId]) {
+                newSelections[playerId].uscfStatus = status;
+            }
+            return newSelections;
+        });
+    }
+
+    const handleProceedToPayment = () => {
+        setIsDialogOpen(false);
+        setIsPaymentDialogOpen(true);
+    }
+
+    const handleFinalizeRegistration = () => {
         if (!selectedEvent) return;
         
-        // In a real application, you would send this data to your backend API.
-        // For this prototype, we'll save it to localStorage to be viewed on the confirmations page.
         const newConfirmation = {
             id: new Date().toISOString(),
             eventName: selectedEvent.name,
             eventDate: selectedEvent.date.toISOString(),
             submissionTimestamp: new Date().toISOString(),
             selections,
+            totalFeePaid: calculatedFees,
         };
 
         try {
@@ -229,9 +281,25 @@ export default function EventsPage() {
             const updatedConfirmations = [...existingConfirmations, newConfirmation];
             localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
             
+            console.log("----- SIMULATED EMAIL CONFIRMATION -----");
+            console.log("To: Sponsor");
+            console.log(`Subject: Registration Confirmation for ${selectedEvent.name}`);
+            console.log(`Timestamp: ${new Date(newConfirmation.submissionTimestamp).toLocaleString()}`);
+            console.log(`Total Players: ${Object.keys(selections).length}`);
+            console.log(`Total Fee Paid: $${newConfirmation.totalFeePaid.toFixed(2)}`);
+            console.log("Registered Players:");
+            Object.entries(selections).forEach(([playerId, details]) => {
+                const player = rosterPlayers.find(p => p.id === playerId);
+                if (player) {
+                    const byeText = [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None';
+                    console.log(`  - ${player.firstName} ${player.lastName} | Section: ${details.section} | Byes: ${byeText} | USCF: ${details.uscfStatus}`);
+                }
+            });
+            console.log("-----------------------------------------");
+            
             toast({
                 title: "Registration Submitted",
-                description: `A confirmation for ${Object.keys(selections).length} players has been saved.`
+                description: `A confirmation for ${Object.keys(selections).length} players has been saved. A confirmation email has been sent.`
             });
 
         } catch (error) {
@@ -243,7 +311,7 @@ export default function EventsPage() {
             });
         }
         
-        setIsDialogOpen(false);
+        setIsPaymentDialogOpen(false);
         setSelectedEvent(null);
         setSelections({});
     }
@@ -359,16 +427,17 @@ export default function EventsPage() {
           <DialogHeader>
             <DialogTitle>Register for {selectedEvent?.name}</DialogTitle>
             <DialogDescription>
-              Select players from your roster to register for this event. You can change sections and request up to two 1/2 point byes per player.
+              Select players, change sections, request byes, and specify USCF membership status.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <ScrollArea className="h-80 w-full">
+            <ScrollArea className="h-96 w-full">
               <div className="space-y-4 pr-6">
                 {rosterPlayers.map((player) => {
                   const isSelected = !!selections[player.id];
                   const firstBye = selections[player.id]?.byes.round1;
                   const isSectionInvalid = isSelected && !isSectionValid(player, selections[player.id]!.section);
+                  const uscfStatus = selections[player.id]?.uscfStatus;
 
                   return (
                     <div key={player.id} className="items-start gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr]">
@@ -383,11 +452,32 @@ export default function EventsPage() {
                                 {player.firstName} {player.lastName}
                             </Label>
                             <p className="text-sm text-muted-foreground">
-                                Rating: {player.rating || 'N/A'} &bull; Grade: {player.grade}
+                                Grade: {player.grade} &bull; Section: {player.section} &bull; Rating: {player.rating || 'N/A'}
                             </p>
                             
                             {isSelected && selectedEvent && (
-                                <div className="grid sm:grid-cols-3 gap-4 mt-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 items-start">
+                                    <div className="grid gap-1.5">
+                                      <Label className="text-xs">USCF Membership</Label>
+                                      <RadioGroup
+                                        value={uscfStatus}
+                                        onValueChange={(value) => handleUscfStatusChange(player.id, value as any)}
+                                        className="mt-1"
+                                      >
+                                        <div className="flex items-center space-x-2">
+                                          <RadioGroupItem value="current" id={`current-${player.id}`} />
+                                          <Label htmlFor={`current-${player.id}`} className="font-normal text-sm">Current</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                          <RadioGroupItem value="new" id={`new-${player.id}`} />
+                                          <Label htmlFor={`new-${player.id}`} className="font-normal text-sm">New (+$24)</Label>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                          <RadioGroupItem value="renewing" id={`renewing-${player.id}`} />
+                                          <Label htmlFor={`renewing-${player.id}`} className="font-normal text-sm">Renewing (+$24)</Label>
+                                        </div>
+                                      </RadioGroup>
+                                    </div>
                                     <div className="grid gap-1.5">
                                       <Label htmlFor={`section-${player.id}`} className="text-xs">Section</Label>
                                       <Select onValueChange={(value) => handleSectionChange(player.id, value)} value={selections[player.id]?.section}>
@@ -397,7 +487,7 @@ export default function EventsPage() {
                                         <SelectContent>{sectionOptions}</SelectContent>
                                       </Select>
                                       {isSectionInvalid && (
-                                          <p className="text-xs text-destructive">Grade level is too high for this section.</p>
+                                          <p className="text-xs text-destructive">Grade level too high for this section.</p>
                                       )}
                                     </div>
                                     <div className="grid gap-1.5">
@@ -427,15 +517,41 @@ export default function EventsPage() {
               </div>
             </ScrollArea>
           </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost">Cancel</Button>
-            </DialogClose>
-            <Button type="button" onClick={handleSubmitRegistration} disabled={Object.keys(selections).length === 0 || hasInvalidSelections}>
-                Submit Registration ({Object.keys(selections).length} Players)
-            </Button>
+          <DialogFooter className="sm:justify-between items-center pt-2 border-t">
+              <div className="font-bold text-lg">
+                Total: ${calculatedFees.toFixed(2)}
+              </div>
+              <div>
+                <DialogClose asChild>
+                    <Button type="button" variant="ghost">Cancel</Button>
+                </DialogClose>
+                <Button type="button" onClick={handleProceedToPayment} disabled={Object.keys(selections).length === 0 || hasInvalidSelections}>
+                    Review & Pay ({Object.keys(selections).length} Players)
+                </Button>
+              </div>
           </DialogFooter>
         </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Finalize Registration</DialogTitle>
+                  <DialogDescription>
+                      You are registering {Object.keys(selections).length} player(s) for the {selectedEvent?.name}.
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <h3 className="text-2xl font-bold text-center">Total Due: ${calculatedFees.toFixed(2)}</h3>
+                  <p className="text-center text-sm text-muted-foreground mt-2">
+                      Click the button below to complete your registration.
+                  </p>
+              </div>
+              <DialogFooter>
+                  <Button variant="ghost" onClick={() => setIsPaymentDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleFinalizeRegistration}>Pay with Square (Simulated)</Button>
+              </DialogFooter>
+          </DialogContent>
       </Dialog>
     </AppLayout>
   );

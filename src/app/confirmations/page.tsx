@@ -27,6 +27,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ClipboardCheck } from "lucide-react";
+import { Badge } from '@/components/ui/badge';
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
 // In a real application, this would likely come from a shared library or API.
@@ -34,25 +35,28 @@ type Player = {
   id: string;
   firstName: string;
   lastName: string;
+  uscfId: string;
+  uscfExpiration?: Date;
   rating?: number;
   grade: string;
   section: string;
 };
 
 const rosterPlayers: Player[] = [
-    { id: "1", firstName: "Alex", lastName: "Ray", rating: 1850, grade: "10th Grade", section: 'High School K-12' },
-    { id: "2", firstName: "Jordan", lastName: "Lee", rating: 2100, grade: "11th Grade", section: 'Championship' },
-    { id: "3", firstName: "Casey", lastName: "Becker", rating: 1500, grade: "9th Grade", section: 'High School K-12' },
-    { id: "4", firstName: "Morgan", lastName: "Taylor", rating: 1000, grade: "5th Grade", section: 'Elementary K-5' },
-    { id: "5", firstName: "Riley", lastName: "Quinn", rating: 1980, grade: "11th Grade", section: 'Championship' },
-    { id: "6", firstName: "Skyler", lastName: "Jones", rating: 1650, grade: "9th Grade", section: 'High School K-12' },
-    { id: "7", firstName: "Drew", lastName: "Smith", rating: 2050, grade: "12th Grade", section: 'Championship' },
+    { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", uscfExpiration: new Date('2025-12-31'), rating: 1850, grade: "10th Grade", section: 'High School K-12' },
+    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship' },
+    { id: "3", firstName: "Casey", lastName: "Becker", uscfId: "11223344", uscfExpiration: new Date('2025-06-01'), rating: 1500, grade: "9th Grade", section: 'High School K-12' },
+    { id: "4", firstName: "Morgan", lastName: "Taylor", uscfId: "NEW", rating: 1000, grade: "5th Grade", section: 'Elementary K-5' },
+    { id: "5", firstName: "Riley", lastName: "Quinn", uscfId: "55667788", uscfExpiration: new Date('2024-11-30'), rating: 1980, grade: "11th Grade", section: 'Championship' },
+    { id: "6", firstName: "Skyler", lastName: "Jones", uscfId: "99887766", uscfExpiration: new Date('2025-02-28'), rating: 1650, grade: "9th Grade", section: 'High School K-12' },
+    { id: "7", firstName: "Drew", lastName: "Smith", uscfId: "11122233", uscfExpiration: new Date('2023-10-01'), rating: 2050, grade: "12th Grade", section: 'Championship' },
 ];
 
 
 type PlayerRegistration = {
   byes: { round1: string; round2: string; };
   section: string;
+  uscfStatus: 'current' | 'new' | 'renewing';
 };
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
@@ -62,6 +66,7 @@ type Confirmation = {
   eventDate: string;
   submissionTimestamp: string;
   selections: RegistrationSelections;
+  totalFeePaid: number;
 };
 
 export default function ConfirmationsPage() {
@@ -103,11 +108,19 @@ export default function ConfirmationsPage() {
                 {confirmations.map((conf) => (
                   <AccordionItem key={conf.id} value={conf.id}>
                     <AccordionTrigger>
-                      <div className="flex flex-col items-start text-left">
-                        <span className="font-semibold">{conf.eventName}</span>
-                        <span className="text-sm text-muted-foreground">
-                          Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')}
-                        </span>
+                      <div className="flex justify-between w-full pr-4">
+                        <div className="flex flex-col items-start text-left">
+                            <span className="font-semibold">{conf.eventName}</span>
+                            <span className="text-sm text-muted-foreground">
+                            Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')}
+                            </span>
+                        </div>
+                        <div className="text-right">
+                            <span className="font-semibold">${conf.totalFeePaid.toFixed(2)}</span>
+                            <span className="text-sm text-muted-foreground block">
+                                {Object.keys(conf.selections).length} Player(s)
+                            </span>
+                        </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
@@ -115,7 +128,7 @@ export default function ConfirmationsPage() {
                         <div>
                           <h4 className="font-semibold">Event Details</h4>
                           <p className="text-sm text-muted-foreground">
-                            Event: {conf.eventName} | Date: {format(new Date(conf.eventDate), 'PPP')}
+                            Event: {conf.eventName} | Date: {format(new Date(conf.eventDate), 'PPP')} | Total Paid: <span className='font-bold'>${conf.totalFeePaid.toFixed(2)}</span>
                           </p>
                         </div>
                         <div>
@@ -125,6 +138,7 @@ export default function ConfirmationsPage() {
                               <TableRow>
                                 <TableHead>Player</TableHead>
                                 <TableHead>Section</TableHead>
+                                <TableHead>USCF Status</TableHead>
                                 <TableHead>Byes Requested</TableHead>
                               </TableRow>
                             </TableHeader>
@@ -142,6 +156,11 @@ export default function ConfirmationsPage() {
                                   <TableRow key={playerId}>
                                     <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
                                     <TableCell>{details.section}</TableCell>
+                                    <TableCell>
+                                        <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>
+                                            {details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}
+                                        </Badge>
+                                    </TableCell>
                                     <TableCell>{byeText}</TableCell>
                                   </TableRow>
                                 );
