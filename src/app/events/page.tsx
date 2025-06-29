@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { createInvoice } from '@/ai/flows/create-invoice-flow';
 
 type Event = {
     id: string;
@@ -123,6 +124,7 @@ export default function EventsPage() {
     const [calculatedFees, setCalculatedFees] = useState(0);
 
     useEffect(() => {
+        // This should run only on the client
         const initialEvents: Event[] = [
           {
             id: '1',
@@ -271,46 +273,50 @@ export default function EventsPage() {
         setIsInvoiceDialogOpen(true);
     }
 
-    const handleGenerateInvoice = () => {
+    const handleGenerateInvoice = async () => {
         if (!selectedEvent) return;
         
-        const newConfirmation = {
-            id: new Date().toISOString(),
-            eventName: selectedEvent.name,
-            eventDate: selectedEvent.date.toISOString(),
-            submissionTimestamp: new Date().toISOString(),
-            selections,
-            totalInvoiced: calculatedFees,
-        };
+        const hoursUntilEvent = differenceInHours(selectedEvent.date, new Date());
+        let registrationFeePerPlayer = 20;
+        if (hoursUntilEvent <= 24) { registrationFeePerPlayer = 30; } 
+        else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = 25; }
+        
+        const numUscfActions = Object.values(selections).filter(s => s.uscfStatus !== 'current').length;
 
         try {
+            const { invoiceId, invoiceUrl } = await createInvoice({
+                sponsorName: 'Sponsor Name', // Hardcoded for prototype
+                sponsorEmail: 'sponsor@chessmate.com', // Hardcoded for prototype
+                eventName: selectedEvent.name,
+                registrationFee: registrationFeePerPlayer,
+                registrationCount: Object.keys(selections).length,
+                uscfFee: 24,
+                uscfCount: numUscfActions,
+                totalAmount: calculatedFees,
+            });
+
+            const newConfirmation = {
+                id: new Date().toISOString(),
+                eventName: selectedEvent.name,
+                eventDate: selectedEvent.date.toISOString(),
+                submissionTimestamp: new Date().toISOString(),
+                selections,
+                totalInvoiced: calculatedFees,
+                invoiceId,
+                invoiceUrl,
+            };
+
             const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
             const updatedConfirmations = [...existingConfirmations, newConfirmation];
             localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
             
-            console.log("----- SIMULATED INVOICE GENERATION -----");
-            console.log("To: Sponsor");
-            console.log(`Subject: Invoice for ${selectedEvent.name} Registration`);
-            console.log(`Timestamp: ${new Date(newConfirmation.submissionTimestamp).toLocaleString()}`);
-            console.log(`Total Players: ${Object.keys(selections).length}`);
-            console.log(`Total Amount Invoiced: $${newConfirmation.totalInvoiced.toFixed(2)}`);
-            console.log("Registered Players:");
-            Object.entries(selections).forEach(([playerId, details]) => {
-                const player = rosterPlayers.find(p => p.id === playerId);
-                if (player) {
-                    const byeText = [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None';
-                    console.log(`  - ${player.firstName} ${player.lastName} | Section: ${details.section} | Byes: ${byeText} | USCF: ${details.uscfStatus}`);
-                }
-            });
-            console.log("-----------------------------------------");
-            
             toast({
                 title: "Invoice Generated",
-                description: `Your registration for ${Object.keys(selections).length} players has been submitted. A confirmation email with the invoice has been sent.`
+                description: `Invoice ${invoiceId} for ${Object.keys(selections).length} players has been submitted.`
             });
 
         } catch (error) {
-            console.error("Failed to save confirmation to localStorage", error);
+            console.error("Failed to create invoice or save confirmation", error);
              toast({
                 variant: "destructive",
                 title: "Submission Error",

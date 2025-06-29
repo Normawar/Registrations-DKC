@@ -26,7 +26,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, Printer } from "lucide-react";
+import { ClipboardCheck, Printer, ExternalLink } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -79,6 +79,8 @@ type Confirmation = {
   submissionTimestamp: string;
   selections: RegistrationSelections;
   totalInvoiced: number;
+  invoiceId: string;
+  invoiceUrl: string;
 };
 
 type FeesBreakdown = {
@@ -259,7 +261,14 @@ export default function ConfirmationsPage() {
                 <div className="p-6">
                     <DialogHeader>
                         <DialogTitle className="text-3xl font-headline">Invoice</DialogTitle>
-                        <DialogDescription>Invoice ID: {selectedInvoice.id}</DialogDescription>
+                         <div className="flex justify-between items-center text-sm">
+                            <DialogDescription>Invoice ID: {selectedInvoice.invoiceId}</DialogDescription>
+                            <Button asChild variant="link">
+                                <a href={selectedInvoice.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                                    View on Square <ExternalLink className="ml-2 h-4 w-4" />
+                                </a>
+                            </Button>
+                        </div>
                     </DialogHeader>
                     <div className="grid grid-cols-2 gap-4 mt-6 text-sm">
                         <div>
