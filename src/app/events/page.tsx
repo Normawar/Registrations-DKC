@@ -63,6 +63,8 @@ type Player = {
   firstName: string;
   lastName: string;
   rating?: number;
+  grade: string;
+  section: string;
 };
 
 type PlayerRegistration = {
@@ -126,13 +128,13 @@ const initialEvents: Event[] = [
 ];
 
 const rosterPlayers: Player[] = [
-    { id: "1", firstName: "Alex", lastName: "Ray", rating: 1850 },
-    { id: "2", firstName: "Jordan", lastName: "Lee", rating: 2100 },
-    { id: "3", firstName: "Casey", lastName: "Becker", rating: 1500 },
-    { id: "4", firstName: "Morgan", lastName: "Taylor", rating: 1720 },
-    { id: "5", firstName: "Riley", lastName: "Quinn", rating: 1980 },
-    { id: "6", firstName: "Skyler", lastName: "Jones", rating: 1650 },
-    { id: "7", firstName: "Drew", lastName: "Smith", rating: 2050 },
+    { id: "1", firstName: "Alex", lastName: "Ray", rating: 1850, grade: "10th Grade", section: 'High School K-12' },
+    { id: "2", firstName: "Jordan", lastName: "Lee", rating: 2100, grade: "11th Grade", section: 'Championship' },
+    { id: "3", firstName: "Casey", lastName: "Becker", rating: 1500, grade: "9th Grade", section: 'High School K-12' },
+    { id: "4", firstName: "Morgan", lastName: "Taylor", rating: 1720, grade: "10th Grade", section: 'High School K-12' },
+    { id: "5", firstName: "Riley", lastName: "Quinn", rating: 1980, grade: "11th Grade", section: 'Championship' },
+    { id: "6", firstName: "Skyler", lastName: "Jones", rating: 1650, grade: "9th Grade", section: 'High School K-12' },
+    { id: "7", firstName: "Drew", lastName: "Smith", rating: 2050, grade: "12th Grade", section: 'Championship' },
 ];
 
 
@@ -304,7 +306,9 @@ export default function EventsPage() {
                             <Label htmlFor={`player-${player.id}`} className="font-medium cursor-pointer">
                                 {player.firstName} {player.lastName}
                             </Label>
-                            <p className="text-sm text-muted-foreground">Rating: {player.rating || 'N/A'}</p>
+                            <p className="text-sm text-muted-foreground">
+                                Rating: {player.rating || 'N/A'} &bull; Grade: {player.grade} &bull; Section: {player.section}
+                            </p>
                         </div>
                         {isSelected && selectedEvent && (
                           <>
