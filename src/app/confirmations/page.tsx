@@ -114,34 +114,7 @@ export default function ConfirmationsPage() {
     }));
   };
   
-  const checkForMissingEnvVars = () => {
-    const requiredEnvVars = [
-      'NEXT_PUBLIC_FIREBASE_API_KEY',
-      'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
-      'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-      'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
-      'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-      'NEXT_PUBLIC_FIREBASE_APP_ID',
-    ];
-
-    const missingVars = requiredEnvVars.filter(v => !process.env[v]);
-    
-    if (missingVars.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "Configuration Error",
-        description: `Firebase is not fully configured. The following variables are missing: ${missingVars.join(', ')}. Please check your .env file and restart the server.`,
-      });
-      return true;
-    }
-    return false;
-  }
-
   const handleSavePo = async (conf: Confirmation) => {
-    if (checkForMissingEnvVars()) {
-        return;
-    }
-    
     setIsUpdating(prev => ({...prev, [conf.id]: true}));
     
     const poNumber = poInputs[conf.id]?.number !== undefined ? poInputs[conf.id].number : conf.poNumber ?? '';
@@ -154,6 +127,16 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
+            if (!storage) {
+              toast({
+                variant: "destructive",
+                title: "Configuration Error",
+                description: "Firebase Storage is not configured. Please check your .env file and restart the server.",
+              });
+              setIsUpdating(prev => ({...prev, [conf.id]: false}));
+              return;
+            }
+
             const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
             const snapshot = await uploadBytes(storageRef, poFile);
             poFileUrl = await getDownloadURL(snapshot.ref);
