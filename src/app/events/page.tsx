@@ -214,12 +214,34 @@ export default function EventsPage() {
     const handleSubmitRegistration = () => {
         if (!selectedEvent) return;
         
-        console.log("Registering for event:", selectedEvent.name);
-        console.log("Selected players, sections, and byes:", selections);
+        // This is a placeholder for where you would integrate an email service.
+        const registeredPlayersSummary = Object.keys(selections).map(playerId => {
+            const player = rosterPlayers.find(p => p.id === playerId);
+            const registrationDetails = selections[playerId];
+            if (!player) return null;
+
+            const byeText = [registrationDetails.byes.round1, registrationDetails.byes.round2]
+                .filter(b => b !== 'none')
+                .map(b => `Round ${b}`)
+                .join(', ') || 'None';
+
+            return `Player: ${player.firstName} ${player.lastName}, Section: ${registrationDetails.section}, Byes: ${byeText}`;
+        }).filter(Boolean).join('\n');
+
+        console.log("---- SIMULATING EMAIL CONFIRMATION ----");
+        console.log("To: sponsor@example.com");
+        console.log(`Subject: Registration Confirmation for ${selectedEvent.name}`);
+        console.log(`\nEvent: ${selectedEvent.name}`);
+        console.log(`Date: ${format(selectedEvent.date, 'PPP')}`);
+        console.log(`\nRegistered Players (${Object.keys(selections).length}):`);
+        console.log(registeredPlayersSummary);
+        console.log("\nTimestamp:", new Date().toISOString());
+        console.log("--------------------------------------");
+
 
         toast({
             title: "Registration Submitted",
-            description: `Your registration for "${selectedEvent.name}" has been submitted for ${Object.keys(selections).length} players.`
+            description: `A confirmation for ${Object.keys(selections).length} players has been sent to your email.`
         });
         
         setIsDialogOpen(false);
