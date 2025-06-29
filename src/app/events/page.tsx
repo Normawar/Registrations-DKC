@@ -645,7 +645,7 @@ export default function EventsPage() {
                           </div>
                       )}
                       <div className="pt-2 border-t mt-2">
-                        <p className="text-xs text-muted-foreground/80">Fee reminder: a late fee is applied within 48 hours of the event.</p>
+                        <p className="text-xs text-muted-foreground/80">Fee reminder: a late fee is applied for registrations made within 48 hours of the event. This fee increases for registrations made within 24 hours or on the day of the event.</p>
                       </div>
                   </div>
 
