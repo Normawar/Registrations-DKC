@@ -1,5 +1,5 @@
 
-import { initializeApp, getApps, type FirebaseOptions } from 'firebase/app';
+import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 
@@ -13,9 +13,8 @@ const firebaseConfig: FirebaseOptions = {
   appId: "1:253736799220:web:f66d274ff02d19207387a1"
 };
 
-// Initialize Firebase
-const apps = getApps();
-const app = apps.length ? apps[0] : initializeApp(firebaseConfig);
+// Initialize Firebase, ensuring it's only done once.
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 const storage = getStorage(app);
 const auth = getAuth(app);
