@@ -95,6 +95,11 @@ const firebaseConfig: FirebaseOptions = {
   appId: "1:253736799220:web:f66d274ff02d19207387a1"
 };
 
+// Initialize Firebase, ensuring it's only done once.
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const storage = getStorage(app);
+
 export default function ConfirmationsPage() {
   const { toast } = useToast();
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
@@ -137,11 +142,6 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            // Initialize Firebase locally to ensure configuration is loaded
-            const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-            const auth = getAuth(app);
-            const storage = getStorage(app);
-
             // Ensure user is authenticated anonymously
             if (!auth.currentUser) {
               await signInAnonymously(auth);
