@@ -79,7 +79,7 @@ const LoginForm = () => (
       <p className="text-muted-foreground">
         Don&apos;t have an account?{" "}
         <Link
-          href="#"
+          href="/signup"
           className="font-medium text-primary underline-offset-4 hover:underline"
           prefetch={false}
         >
@@ -113,13 +113,13 @@ export default function LoginPage() {
             <TabsTrigger value="individual">Individual</TabsTrigger>
             <TabsTrigger value="organizer">Organizer</TabsTrigger>
           </TabsList>
-          <TabsContent value="organizer">
-            <LoginForm />
-          </TabsContent>
           <TabsContent value="sponsor">
             <LoginForm />
           </TabsContent>
           <TabsContent value="individual">
+            <LoginForm />
+          </TabsContent>
+          <TabsContent value="organizer">
             <LoginForm />
           </TabsContent>
         </Tabs>
