@@ -81,7 +81,7 @@ export default function DashboardPage() {
         
         <Card>
           <CardHeader>
-            <CardTitle>My Roster</CardTitle>
+            <CardTitle>My Roster ({rosterPlayers.length})</CardTitle>
             <CardDescription>A quick view of your sponsored players. Scroll to see more.</CardDescription>
           </CardHeader>
           <CardContent>
