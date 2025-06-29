@@ -3,9 +3,9 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, storage } from '@/lib/firebase';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -84,21 +84,6 @@ type Confirmation = {
   poFileName?: string;
   poFileUrl?: string;
 };
-
-// Your web app's Firebase configuration
-const firebaseConfig: FirebaseOptions = {
-  apiKey: "AIzaSyBA-Lc8CKKY59hxQIPgQ_x0agdqEyWuyTA",
-  authDomain: "chessmate-w17oa.firebaseapp.com",
-  projectId: "chessmate-w17oa",
-  storageBucket: "chessmate-w17oa.appspot.com",
-  messagingSenderId: "253736799220",
-  appId: "1:253736799220:web:f66d274ff02d19207387a1"
-};
-
-// Initialize Firebase, ensuring it's only done once.
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const storage = getStorage(app);
 
 export default function ConfirmationsPage() {
   const { toast } = useToast();
