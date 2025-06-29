@@ -83,6 +83,7 @@ const eventFormSchema = z.object({
   regularFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   lateFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   veryLateFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
+  dayOfFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   imageUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   pdfUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
 });
@@ -116,6 +117,7 @@ export default function ManageEventsPage() {
           regularFee: 20,
           lateFee: 25,
           veryLateFee: 30,
+          dayOfFee: 35,
           imageUrl: '',
           pdfUrl: '',
         });
@@ -186,7 +188,7 @@ export default function ManageEventsPage() {
                   <TableHead>Event Name</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead>Fees (Reg/Late/V.Late)</TableHead>
+                  <TableHead>Fees (Reg/Late/V.Late/Day of)</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>
                     <span className="sr-only">Actions</span>
@@ -199,7 +201,7 @@ export default function ManageEventsPage() {
                     <TableCell className="font-medium">{event.name}</TableCell>
                     <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                     <TableCell>{event.location}</TableCell>
-                    <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee}`}</TableCell>
+                    <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
                     <TableCell>
                       <Badge variant={getEventStatus(event) === 'Open' ? 'default' : 'secondary'} className={cn(getEventStatus(event) === 'Open' ? 'bg-green-600 text-white' : '')}>
                         {getEventStatus(event)}
@@ -306,7 +308,7 @@ export default function ManageEventsPage() {
               <div>
                 <Label>Registration Fees</Label>
                 <Card className="p-4 mt-2 bg-muted/50">
-                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="regularFee" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Regular Fee ($)</FormLabel>
@@ -325,6 +327,13 @@ export default function ManageEventsPage() {
                       <FormItem>
                         <FormLabel>Late Fee (1 day prior) ($)</FormLabel>
                         <FormControl><Input type="number" placeholder="30" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                     <FormField control={form.control} name="dayOfFee" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Day of Registration Fee ($)</FormLabel>
+                        <FormControl><Input type="number" placeholder="35" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />

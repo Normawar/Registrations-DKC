@@ -12,6 +12,7 @@ export type Event = {
   regularFee: number;
   lateFee: number;
   veryLateFee: number;
+  dayOfFee: number;
   imageUrl?: string;
   pdfUrl?: string;
 };
@@ -26,6 +27,7 @@ const initialEvents: Event[] = [
         regularFee: 20,
         lateFee: 25,
         veryLateFee: 30,
+        dayOfFee: 35,
         imageUrl: "https://placehold.co/100x100.png",
         pdfUrl: "#",
     },
@@ -38,6 +40,7 @@ const initialEvents: Event[] = [
         regularFee: 25,
         lateFee: 30,
         veryLateFee: 35,
+        dayOfFee: 40,
     },
     {
         id: '3',
@@ -48,6 +51,7 @@ const initialEvents: Event[] = [
         regularFee: 20,
         lateFee: 25,
         veryLateFee: 30,
+        dayOfFee: 35,
         pdfUrl: "#",
     },
     {
@@ -59,6 +63,7 @@ const initialEvents: Event[] = [
         regularFee: 20,
         lateFee: 25,
         veryLateFee: 30,
+        dayOfFee: 35,
     },
     {
         id: '5',
@@ -69,6 +74,7 @@ const initialEvents: Event[] = [
         regularFee: 15,
         lateFee: 20,
         veryLateFee: 25,
+        dayOfFee: 30,
         imageUrl: "https://placehold.co/100x100.png",
     },
 ];

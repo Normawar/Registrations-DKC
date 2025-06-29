@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { format, differenceInHours } from 'date-fns';
+import { format, differenceInHours, isSameDay } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -122,13 +122,18 @@ export default function EventsPage() {
       if (!clientReady) return 0;
       
       const eventDate = new Date(event.date);
-      const hoursUntilEvent = differenceInHours(eventDate, new Date());
+      const now = new Date();
       
       let registrationFee = event.regularFee;
-      if (hoursUntilEvent <= 24) {
-        registrationFee = event.veryLateFee;
-      } else if (hoursUntilEvent <= 48) {
-        registrationFee = event.lateFee;
+      if (isSameDay(eventDate, now)) {
+        registrationFee = event.dayOfFee;
+      } else {
+        const hoursUntilEvent = differenceInHours(eventDate, now);
+        if (hoursUntilEvent <= 24) {
+          registrationFee = event.veryLateFee;
+        } else if (hoursUntilEvent <= 48) {
+          registrationFee = event.lateFee;
+        }
       }
       
       for (const playerId in currentSelections) {
@@ -219,11 +224,18 @@ export default function EventsPage() {
     const handleGenerateInvoice = async () => {
         if (!selectedEvent) return;
         
-        const eventDate = new Date(selectedEvent.date);
-        const hoursUntilEvent = differenceInHours(eventDate, new Date());
         let registrationFeePerPlayer = selectedEvent.regularFee;
-        if (hoursUntilEvent <= 24) { registrationFeePerPlayer = selectedEvent.veryLateFee; } 
-        else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = selectedEvent.lateFee; }
+        if (clientReady) {
+            const eventDate = new Date(selectedEvent.date);
+            const now = new Date();
+            if (isSameDay(eventDate, now)) {
+                registrationFeePerPlayer = selectedEvent.dayOfFee;
+            } else {
+                const hoursUntilEvent = differenceInHours(eventDate, new Date());
+                if (hoursUntilEvent <= 24) { registrationFeePerPlayer = selectedEvent.veryLateFee; } 
+                else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = selectedEvent.lateFee; }
+            }
+        }
         
         const numUscfActions = Object.values(selections).filter(s => s.uscfStatus !== 'current').length;
 
@@ -375,13 +387,19 @@ export default function EventsPage() {
     let feeTypeLabel = "Regular Fee";
     if (selectedEvent && clientReady) {
         const eventDate = new Date(selectedEvent.date);
-        const hoursUntilEvent = differenceInHours(eventDate, new Date());
-        if (hoursUntilEvent <= 24) { 
-            registrationFeePerPlayer = selectedEvent.veryLateFee; 
-            feeTypeLabel = "Late Fee (1 day prior)";
-        } else if (hoursUntilEvent <= 48) { 
-            registrationFeePerPlayer = selectedEvent.lateFee; 
-            feeTypeLabel = "Late Fee (2 days prior)";
+        const now = new Date();
+        if (isSameDay(eventDate, now)) {
+            registrationFeePerPlayer = selectedEvent.dayOfFee;
+            feeTypeLabel = "Day of Registration Fee";
+        } else {
+            const hoursUntilEvent = differenceInHours(eventDate, now);
+            if (hoursUntilEvent <= 24) { 
+                registrationFeePerPlayer = selectedEvent.veryLateFee; 
+                feeTypeLabel = "Late Fee (1 day prior)";
+            } else if (hoursUntilEvent <= 48) { 
+                registrationFeePerPlayer = selectedEvent.lateFee; 
+                feeTypeLabel = "Late Fee (2 days prior)";
+            }
         }
     }
 
