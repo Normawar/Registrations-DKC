@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -24,14 +25,15 @@ import {
   KnightIcon,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, School } from "lucide-react";
 
 const menuItems = [
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/events", icon: RookIcon, label: "Events" },
   { href: "/players", icon: PawnIcon, label: "Players" },
-  { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
+  { href: "/schools", icon: School, label: "Schools" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
+  { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
