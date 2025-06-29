@@ -362,10 +362,13 @@ export default function EventsPage() {
       return true;
     };
 
+    const isPersonalDataComplete = (player: Player): boolean => {
+        return !!(player.dob && player.zipCode && player.email);
+    }
+
     const isRenewingDataValid = (player: Player): boolean => {
       if (player.uscfId.toUpperCase() === 'NEW') return false;
-      if (!player.dob || !player.zipCode || !player.email) return false;
-      return true;
+      return isPersonalDataComplete(player);
     };
 
     const hasInvalidSelections = Object.entries(selections).some(([playerId, registration]) => {
@@ -378,10 +381,15 @@ export default function EventsPage() {
       return player && selectedEvent ? !isUscfStatusValid(player, registration, selectedEvent) : false;
     });
 
-    const hasInvalidRenewingSelections = Object.entries(selections).some(([playerId, registration]) => {
+    const hasInvalidDataForUscfAction = Object.entries(selections).some(([playerId, registration]) => {
+      const player = rosterPlayers.find(p => p.id === playerId);
+      if (!player) return true;
+
       if (registration.uscfStatus === 'renewing') {
-          const player = rosterPlayers.find(p => p.id === playerId);
-          return player ? !isRenewingDataValid(player) : false;
+        return !isRenewingDataValid(player);
+      }
+      if (registration.uscfStatus === 'new') {
+        return !isPersonalDataComplete(player);
       }
       return false;
     });
@@ -479,6 +487,7 @@ export default function EventsPage() {
                   const uscfStatus = selections[player.id]?.uscfStatus;
                   const isUscfInvalid = isSelected && selectedEvent && uscfStatus === 'current' && !isUscfStatusValid(player, selections[player.id]!, selectedEvent);
                   const isRenewingInvalid = isSelected && uscfStatus === 'renewing' && !isRenewingDataValid(player);
+                  const isNewInvalid = isSelected && uscfStatus === 'new' && !isPersonalDataComplete(player);
 
                   return (
                     <div key={player.id} className="items-start gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr]">
@@ -534,6 +543,14 @@ export default function EventsPage() {
                                               </Link>.
                                           </div>
                                       )}
+                                      {isNewInvalid && (
+                                          <div className="mt-2 text-xs text-destructive p-2 bg-destructive/10 rounded-md">
+                                              Player data is incomplete for a new membership. Please update DOB and Zip Code in the{' '}
+                                              <Link href="/roster" className="underline font-semibold hover:text-destructive/80" target="_blank" rel="noopener noreferrer">
+                                                  Roster Page
+                                              </Link>.
+                                          </div>
+                                      )}
                                     </div>
                                     <div className="grid gap-1.5">
                                       <Label htmlFor={`section-${player.id}`} className="text-xs">Section</Label>
@@ -582,7 +599,7 @@ export default function EventsPage() {
                 <DialogClose asChild>
                     <Button type="button" variant="ghost">Cancel</Button>
                 </DialogClose>
-                <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections || hasInvalidUscfSelections || hasInvalidRenewingSelections}>
+                <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections || hasInvalidUscfSelections || hasInvalidDataForUscfAction}>
                     Review Invoice ({Object.keys(selections).length} Players)
                 </Button>
               </div>
