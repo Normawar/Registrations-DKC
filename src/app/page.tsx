@@ -18,7 +18,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="space-y-1 text-center">
-          <div className="inline-block rounded-lg bg-primary/10 p-3 mb-4">
+          <div className="inline-block rounded-lg bg-card p-3 mb-4">
               <DarkKnightIcon className="h-10 w-10 text-primary" />
           </div>
           <CardTitle className="text-3xl font-bold font-headline">Dark Knights</CardTitle>
