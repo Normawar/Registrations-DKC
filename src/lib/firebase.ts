@@ -14,7 +14,7 @@ const firebaseConfig: FirebaseOptions = {
 };
 
 // Initialize Firebase, ensuring it's only done once.
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 const storage = getStorage(app);
 const auth = getAuth(app);
