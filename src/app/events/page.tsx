@@ -457,7 +457,14 @@ export default function EventsPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Register for {selectedEvent?.name}</DialogTitle>
+            <DialogTitle>
+              Register for {selectedEvent?.name}
+              {Object.keys(selections).length > 0 && (
+                <span className="ml-2 font-normal text-muted-foreground">
+                  ({Object.keys(selections).length} player(s) selected)
+                </span>
+              )}
+            </DialogTitle>
             <DialogDescription>
               Select players, change sections, request byes, and specify USCF membership status.
             </DialogDescription>
