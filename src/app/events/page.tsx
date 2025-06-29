@@ -165,7 +165,7 @@ export default function EventsPage() {
     const { toast } = useToast();
     const [events, setEvents] = useState<Event[]>(initialEvents);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+    const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selections, setSelections] = useState<RegistrationSelections>({});
     const [calculatedFees, setCalculatedFees] = useState(0);
@@ -259,12 +259,12 @@ export default function EventsPage() {
         });
     }
 
-    const handleProceedToPayment = () => {
+    const handleProceedToInvoice = () => {
         setIsDialogOpen(false);
-        setIsPaymentDialogOpen(true);
+        setIsInvoiceDialogOpen(true);
     }
 
-    const handleFinalizeRegistration = () => {
+    const handleGenerateInvoice = () => {
         if (!selectedEvent) return;
         
         const newConfirmation = {
@@ -273,7 +273,7 @@ export default function EventsPage() {
             eventDate: selectedEvent.date.toISOString(),
             submissionTimestamp: new Date().toISOString(),
             selections,
-            totalFeePaid: calculatedFees,
+            totalInvoiced: calculatedFees,
         };
 
         try {
@@ -281,12 +281,12 @@ export default function EventsPage() {
             const updatedConfirmations = [...existingConfirmations, newConfirmation];
             localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
             
-            console.log("----- SIMULATED EMAIL CONFIRMATION -----");
+            console.log("----- SIMULATED INVOICE GENERATION -----");
             console.log("To: Sponsor");
-            console.log(`Subject: Registration Confirmation for ${selectedEvent.name}`);
+            console.log(`Subject: Invoice for ${selectedEvent.name} Registration`);
             console.log(`Timestamp: ${new Date(newConfirmation.submissionTimestamp).toLocaleString()}`);
             console.log(`Total Players: ${Object.keys(selections).length}`);
-            console.log(`Total Fee Paid: $${newConfirmation.totalFeePaid.toFixed(2)}`);
+            console.log(`Total Amount Invoiced: $${newConfirmation.totalInvoiced.toFixed(2)}`);
             console.log("Registered Players:");
             Object.entries(selections).forEach(([playerId, details]) => {
                 const player = rosterPlayers.find(p => p.id === playerId);
@@ -298,8 +298,8 @@ export default function EventsPage() {
             console.log("-----------------------------------------");
             
             toast({
-                title: "Registration Submitted",
-                description: `A confirmation for ${Object.keys(selections).length} players has been saved. A confirmation email has been sent.`
+                title: "Invoice Generated",
+                description: `Your registration for ${Object.keys(selections).length} players has been submitted. A confirmation email with the invoice has been sent.`
             });
 
         } catch (error) {
@@ -311,7 +311,7 @@ export default function EventsPage() {
             });
         }
         
-        setIsPaymentDialogOpen(false);
+        setIsInvoiceDialogOpen(false);
         setSelectedEvent(null);
         setSelections({});
     }
@@ -525,31 +525,31 @@ export default function EventsPage() {
                 <DialogClose asChild>
                     <Button type="button" variant="ghost">Cancel</Button>
                 </DialogClose>
-                <Button type="button" onClick={handleProceedToPayment} disabled={Object.keys(selections).length === 0 || hasInvalidSelections}>
-                    Review & Pay ({Object.keys(selections).length} Players)
+                <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections}>
+                    Review & Generate Invoice ({Object.keys(selections).length} Players)
                 </Button>
               </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+      <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
           <DialogContent>
               <DialogHeader>
-                  <DialogTitle>Finalize Registration</DialogTitle>
+                  <DialogTitle>Review and Generate Invoice</DialogTitle>
                   <DialogDescription>
-                      You are registering {Object.keys(selections).length} player(s) for the {selectedEvent?.name}.
+                      You are registering {Object.keys(selections).length} player(s) for the {selectedEvent?.name}. An invoice will be generated.
                   </DialogDescription>
               </DialogHeader>
               <div className="py-4">
-                  <h3 className="text-2xl font-bold text-center">Total Due: ${calculatedFees.toFixed(2)}</h3>
+                  <h3 className="text-2xl font-bold text-center">Total to be Invoiced: ${calculatedFees.toFixed(2)}</h3>
                   <p className="text-center text-sm text-muted-foreground mt-2">
-                      Click the button below to complete your registration.
+                      Click the button below to finalize your registration and generate an invoice.
                   </p>
               </div>
               <DialogFooter>
-                  <Button variant="ghost" onClick={() => setIsPaymentDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleFinalizeRegistration}>Pay with Square (Simulated)</Button>
+                  <Button variant="ghost" onClick={() => setIsInvoiceDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleGenerateInvoice}>Generate Invoice (Simulated)</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>

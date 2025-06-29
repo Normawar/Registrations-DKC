@@ -66,7 +66,7 @@ type Confirmation = {
   eventDate: string;
   submissionTimestamp: string;
   selections: RegistrationSelections;
-  totalFeePaid: number;
+  totalInvoiced: number;
 };
 
 export default function ConfirmationsPage() {
@@ -116,7 +116,7 @@ export default function ConfirmationsPage() {
                             </span>
                         </div>
                         <div className="text-right">
-                            <span className="font-semibold">${conf.totalFeePaid.toFixed(2)}</span>
+                            <span className="font-semibold">${conf.totalInvoiced.toFixed(2)}</span>
                             <span className="text-sm text-muted-foreground block">
                                 {Object.keys(conf.selections).length} Player(s)
                             </span>
@@ -128,7 +128,7 @@ export default function ConfirmationsPage() {
                         <div>
                           <h4 className="font-semibold">Event Details</h4>
                           <p className="text-sm text-muted-foreground">
-                            Event: {conf.eventName} | Date: {format(new Date(conf.eventDate), 'PPP')} | Total Paid: <span className='font-bold'>${conf.totalFeePaid.toFixed(2)}</span>
+                            Event: {conf.eventName} | Date: {format(new Date(conf.eventDate), 'PPP')} | Amount Invoiced: <span className='font-bold'>${conf.totalInvoiced.toFixed(2)}</span>
                           </p>
                         </div>
                         <div>

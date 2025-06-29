@@ -163,7 +163,7 @@ export default function DashboardPage() {
                   </TableCell>
                   <TableCell>Summer Championship</TableCell>
                   <TableCell>
-                    <Badge variant="outline">Paid</Badge>
+                    <Badge variant="outline">Invoiced</Badge>
                   </TableCell>
                   <TableCell className="text-right">2024-05-22</TableCell>
                 </TableRow>
