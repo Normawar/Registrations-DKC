@@ -98,7 +98,7 @@ export default function ConfirmationsPage() {
   const handlePoInputChange = (confId: string, value: string) => {
     setPoInputs(prev => ({
       ...prev,
-      [confId]: { ...prev[confId], number: value }
+      [confId]: { ...(prev[confId] || { file: null }), number: value }
     }));
   };
 
@@ -106,27 +106,29 @@ export default function ConfirmationsPage() {
     const file = e.target.files?.[0] || null;
     setPoInputs(prev => ({
       ...prev,
-      [confId]: { ...prev[confId], file }
+      [confId]: { ...(prev[confId] || { number: '' }), file }
     }));
   };
 
   const handleSavePo = async (conf: Confirmation) => {
     setIsUpdating(prev => ({...prev, [conf.id]: true}));
     
-    const poNumber = poInputs[conf.id]?.number ?? conf.poNumber;
+    const poNumber = poInputs[conf.id]?.number !== undefined ? poInputs[conf.id].number : conf.poNumber ?? '';
     const poFile = poInputs[conf.id]?.file;
 
     try {
+      let invoiceUpdated = false;
       if (poNumber && conf.teamCode) {
         const newTitle = `${conf.teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName} PO: ${poNumber}`;
         await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
+        invoiceUpdated = true;
       }
 
       const updatedConfirmations = confirmations.map(c => {
         if (c.id === conf.id) {
           return {
             ...c,
-            poNumber: poNumber || c.poNumber,
+            poNumber: poNumber,
             poFileName: poFile ? poFile.name : c.poFileName,
           };
         }
@@ -135,12 +137,28 @@ export default function ConfirmationsPage() {
 
       localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
       setConfirmations(updatedConfirmations);
-      setPoInputs(prev => ({ ...prev, [conf.id]: { number: poNumber || '', file: null } }));
+      
+      setPoInputs(prev => ({
+        ...prev,
+        [conf.id]: { number: poNumber, file: null },
+      }));
 
-      toast({
-        title: "Success",
-        description: "Purchase Order information has been saved and the invoice has been updated.",
-      });
+      if (invoiceUpdated) {
+        toast({
+          title: "Success",
+          description: "Purchase Order information has been saved and the invoice has been updated.",
+        });
+      } else if (poNumber && !conf.teamCode) {
+        toast({
+          title: "PO Saved Locally",
+          description: "The invoice on Square was not updated. A team code is required for this record.",
+        });
+      } else {
+        toast({
+          title: "PO Information Saved",
+          description: "Your changes have been saved locally.",
+        });
+      }
 
     } catch (error) {
         console.error("Failed to update PO information:", error);
@@ -252,7 +270,7 @@ export default function ConfirmationsPage() {
                                 <Input
                                     id={`po-number-${conf.id}`}
                                     placeholder="Enter PO Number"
-                                    defaultValue={conf.poNumber || ''}
+                                    value={poInputs[conf.id]?.number ?? conf.poNumber ?? ''}
                                     onChange={(e) => handlePoInputChange(conf.id, e.target.value)}
                                     disabled={isUpdating[conf.id]}
                                 />
@@ -275,8 +293,7 @@ export default function ConfirmationsPage() {
                         </div>
                         <Button 
                           onClick={() => handleSavePo(conf)} 
-                          disabled={isUpdating[conf.id] || !conf.teamCode}
-                          title={!conf.teamCode ? "Cannot update invoice: Team Code is missing." : ""}
+                          disabled={isUpdating[conf.id]}
                         >
                             {isUpdating[conf.id] ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
