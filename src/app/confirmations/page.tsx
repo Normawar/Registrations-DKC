@@ -3,8 +3,9 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { signInAnonymously } from 'firebase/auth';
+import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
+import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -36,7 +37,6 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
-import { auth, storage } from '@/lib/firebase';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -85,6 +85,15 @@ type Confirmation = {
   poFileUrl?: string;
 };
 
+// Your web app's Firebase configuration
+const firebaseConfig: FirebaseOptions = {
+  apiKey: "AIzaSyBA-Lc8CKKY59hxQIPgQ_x0agdqEyWuyTA",
+  authDomain: "chessmate-w17oa.firebaseapp.com",
+  projectId: "chessmate-w17oa",
+  storageBucket: "chessmate-w17oa.appspot.com",
+  messagingSenderId: "253736799220",
+  appId: "1:253736799220:web:f66d274ff02d19207387a1"
+};
 
 export default function ConfirmationsPage() {
   const { toast } = useToast();
@@ -128,15 +137,10 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            if (!storage || !auth) {
-              toast({
-                variant: "destructive",
-                title: "Configuration Error",
-                description: "Firebase Storage is not configured. Please check your .env file and restart the server.",
-              });
-              setIsUpdating(prev => ({...prev, [conf.id]: false}));
-              return;
-            }
+            // Initialize Firebase locally to ensure configuration is loaded
+            const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const storage = getStorage(app);
 
             // Ensure user is authenticated anonymously
             if (!auth.currentUser) {

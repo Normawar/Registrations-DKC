@@ -16,6 +16,8 @@ const firebaseConfig: FirebaseOptions = {
 // Initialize Firebase, ensuring it's only done once.
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
+// Note: These are exported for potential use elsewhere, but the confirmations page now uses its own local instance
+// to bypass a stubborn configuration bug.
 const storage = getStorage(app);
 const auth = getAuth(app);
 
