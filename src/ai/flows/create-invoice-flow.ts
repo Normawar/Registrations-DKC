@@ -20,6 +20,16 @@ const squareClient = new Client({
 
 const { customersApi, ordersApi, invoicesApi } = squareClient;
 
+// Add some diagnostic logging to verify configuration
+console.log(`Square client configured for: Sandbox Environment`);
+if (process.env.SQUARE_ACCESS_TOKEN) {
+    const token = process.env.SQUARE_ACCESS_TOKEN;
+    console.log(`Using Square Access Token: Provided (starts with ${token.substring(0, 8)}..., ends with ${token.substring(token.length - 4)})`);
+} else {
+    console.log('Square Access Token: Not Provided. Please check your .env file.');
+}
+
+
 const CreateInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
@@ -173,7 +183,7 @@ const createInvoiceFlow = ai.defineFlow(
 
     } catch (error) {
       if (error instanceof ApiError) {
-        console.error('Square API Error:', JSON.stringify(error.result.errors, null, 2));
+        console.error('Square API Error:', JSON.stringify(error, null, 2));
         const firstError = error.result.errors?.[0];
         const errorMessage = firstError?.detail ?? JSON.stringify(error.result.errors);
         throw new Error(`Square Error: ${errorMessage}`);
