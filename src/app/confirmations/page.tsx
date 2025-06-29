@@ -33,6 +33,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
+import { generateTeamCode } from '@/lib/school-utils';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -118,8 +119,11 @@ export default function ConfirmationsPage() {
 
     try {
       let invoiceUpdated = false;
-      if (poNumber && conf.teamCode) {
-        const newTitle = `${conf.teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName} PO: ${poNumber}`;
+      // If the team code is missing (for older records), generate a fallback.
+      const teamCode = conf.teamCode || generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
+
+      if (poNumber && teamCode) {
+        const newTitle = `${teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName} PO: ${poNumber}`;
         await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
         invoiceUpdated = true;
       }
@@ -130,6 +134,7 @@ export default function ConfirmationsPage() {
             ...c,
             poNumber: poNumber,
             poFileName: poFile ? poFile.name : c.poFileName,
+            teamCode: teamCode, // Save teamCode back to ensure it exists for future updates
           };
         }
         return c;
@@ -148,15 +153,10 @@ export default function ConfirmationsPage() {
           title: "Success",
           description: "Purchase Order information has been saved and the invoice has been updated.",
         });
-      } else if (poNumber && !conf.teamCode) {
-        toast({
-          title: "PO Saved Locally",
-          description: "The invoice on Square was not updated. A team code is required for this record.",
-        });
       } else {
         toast({
           title: "PO Information Saved",
-          description: "Your changes have been saved locally.",
+          description: "Your changes have been saved locally. The invoice was not updated because a PO number was not provided.",
         });
       }
 
