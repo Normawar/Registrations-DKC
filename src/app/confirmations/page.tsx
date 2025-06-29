@@ -3,9 +3,9 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { app } from '@/lib/firebase';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -37,6 +37,21 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
+
+// --- Firebase Initialization ---
+const firebaseConfig: FirebaseOptions = {
+  apiKey: "AIzaSyBA-Lc8CKKY59hxQIPgQ_x0agdqEyWuyTA",
+  authDomain: "chessmate-w17oa.firebaseapp.com",
+  projectId: "chessmate-w17oa",
+  storageBucket: "chessmate-w17oa.appspot.com",
+  messagingSenderId: "253736799220",
+  appId: "1:253736799220:web:f66d274ff02d19207387a1"
+};
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth = getAuth(app);
+const storage = getStorage(app);
+// --- End Firebase Initialization ---
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -127,9 +142,6 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            const auth = getAuth(app);
-            const storage = getStorage(app);
-
             // Ensure user is authenticated anonymously
             if (!auth.currentUser) {
               await signInAnonymously(auth);
