@@ -324,10 +324,11 @@ export default function EventsPage() {
 
         } catch (error) {
             console.error("Failed to create invoice or save confirmation", error);
-             toast({
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred. Please try again.";
+            toast({
                 variant: "destructive",
                 title: "Submission Error",
-                description: `Could not save your registration confirmation. Please try again.`
+                description: errorMessage,
             });
         }
         

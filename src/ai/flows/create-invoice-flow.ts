@@ -115,7 +115,7 @@ const createInvoiceFlow = ai.defineFlow(
         });
       }
 
-      console.log("Creating order with line items:", lineItems);
+      console.log("Creating order with line items:", JSON.stringify(lineItems, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
       const createOrderResponse = await ordersApi.createOrder({
         idempotencyKey: randomUUID(),
         order: {
@@ -160,6 +160,11 @@ const createInvoiceFlow = ai.defineFlow(
       });
       console.log("Successfully published invoice:", publishedInvoice);
 
+      if (!publishedInvoice.publicUrl) {
+          console.error("Published invoice is missing a publicUrl.");
+          throw new Error("Failed to retrieve public URL for the published invoice.");
+      }
+
       return {
         invoiceId: publishedInvoice.id!,
         status: publishedInvoice.status!,
@@ -169,9 +174,14 @@ const createInvoiceFlow = ai.defineFlow(
     } catch (error) {
       if (error instanceof ApiError) {
         console.error('Square API Error:', JSON.stringify(error.result.errors, null, 2));
-        throw new Error(`Square API Error: ${JSON.stringify(error.result.errors)}`);
+        const firstError = error.result.errors?.[0];
+        const errorMessage = firstError?.detail ?? JSON.stringify(error.result.errors);
+        throw new Error(`Square Error: ${errorMessage}`);
       } else {
-        console.error('An unexpected error occurred:', error);
+        console.error('An unexpected error occurred during invoice creation:', error);
+        if (error instanceof Error) {
+            throw new Error(`An unexpected error occurred: ${error.message}`);
+        }
         throw new Error('An unexpected error occurred during invoice creation.');
       }
     }
