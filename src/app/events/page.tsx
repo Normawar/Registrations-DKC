@@ -214,35 +214,34 @@ export default function EventsPage() {
     const handleSubmitRegistration = () => {
         if (!selectedEvent) return;
         
-        // This is a placeholder for where you would integrate an email service.
-        const registeredPlayersSummary = Object.keys(selections).map(playerId => {
-            const player = rosterPlayers.find(p => p.id === playerId);
-            const registrationDetails = selections[playerId];
-            if (!player) return null;
+        // In a real application, you would send this data to your backend API.
+        // For this prototype, we'll save it to localStorage to be viewed on the confirmations page.
+        const newConfirmation = {
+            id: new Date().toISOString(),
+            eventName: selectedEvent.name,
+            eventDate: selectedEvent.date.toISOString(),
+            submissionTimestamp: new Date().toISOString(),
+            selections,
+        };
 
-            const byeText = [registrationDetails.byes.round1, registrationDetails.byes.round2]
-                .filter(b => b !== 'none')
-                .map(b => `Round ${b}`)
-                .join(', ') || 'None';
+        try {
+            const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+            const updatedConfirmations = [...existingConfirmations, newConfirmation];
+            localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+            
+            toast({
+                title: "Registration Submitted",
+                description: `A confirmation for ${Object.keys(selections).length} players has been saved.`
+            });
 
-            return `Player: ${player.firstName} ${player.lastName}, Section: ${registrationDetails.section}, Byes: ${byeText}`;
-        }).filter(Boolean).join('\n');
-
-        console.log("---- SIMULATING EMAIL CONFIRMATION ----");
-        console.log("To: sponsor@example.com");
-        console.log(`Subject: Registration Confirmation for ${selectedEvent.name}`);
-        console.log(`\nEvent: ${selectedEvent.name}`);
-        console.log(`Date: ${format(selectedEvent.date, 'PPP')}`);
-        console.log(`\nRegistered Players (${Object.keys(selections).length}):`);
-        console.log(registeredPlayersSummary);
-        console.log("\nTimestamp:", new Date().toISOString());
-        console.log("--------------------------------------");
-
-
-        toast({
-            title: "Registration Submitted",
-            description: `A confirmation for ${Object.keys(selections).length} players has been sent to your email.`
-        });
+        } catch (error) {
+            console.error("Failed to save confirmation to localStorage", error);
+             toast({
+                variant: "destructive",
+                title: "Submission Error",
+                description: `Could not save your registration confirmation. Please try again.`
+            });
+        }
         
         setIsDialogOpen(false);
         setSelectedEvent(null);
