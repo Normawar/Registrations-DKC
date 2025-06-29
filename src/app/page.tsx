@@ -9,8 +9,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DarkKnightIcon } from "@/components/icons/chess-icons";
 import Link from "next/link";
+import Image from "next/image";
 import { Chrome } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -72,12 +72,17 @@ export default function LoginPage() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="space-y-1 text-center flex flex-col items-center">
-          <div className="inline-block rounded-lg bg-white p-3 mb-4">
-            <DarkKnightIcon className="h-10 w-10 text-black" />
-          </div>
+          <Image
+            src="https://placehold.co/100x100.png"
+            width={80}
+            height={80}
+            alt="Dark Knight Chess Logo"
+            className="mb-4 rounded-lg"
+            data-ai-hint="chess knight logo"
+           />
           <CardTitle className="text-3xl font-bold font-headline">Dark Knight Chess</CardTitle>
           <CardDescription>
-            Enter your credentials to access the portal.
+            Choose your tab to login to the correct portal
           </CardDescription>
         </CardHeader>
         <Tabs defaultValue="sponsor" className="w-full">
