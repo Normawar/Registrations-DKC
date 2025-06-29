@@ -103,6 +103,23 @@ const initialPlayers: Player[] = [
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
 
+const gradeToNumber: { [key: string]: number } = {
+  'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3,
+  '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7,
+  '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11,
+  '12th Grade': 12,
+};
+
+const sectionMaxGrade: { [key: string]: number } = {
+  'Kinder-1st': 1,
+  'Primary K-3': 3,
+  'Elementary K-5': 5,
+  'Middle School K-8': 8,
+  'High School K-12': 12,
+  'Championship': 12, // Open to all, so max is 12th grade
+};
+
+
 const playerFormSchema = z.object({
   id: z.string().optional(),
   firstName: z.string().min(1, { message: "First Name is required." }),
@@ -135,7 +152,29 @@ const playerFormSchema = z.object({
 }, {
   message: "Rating is required unless USCF ID is NEW.",
   path: ["rating"],
-});
+})
+.refine((data) => {
+    if (!data.grade || !data.section) {
+      return true; // Let other validators handle if these are missing
+    }
+    // Championship section is open to all grades, so it's always valid.
+    if (data.section === 'Championship') {
+      return true;
+    }
+    const playerGradeLevel = gradeToNumber[data.grade];
+    const sectionMaxLevel = sectionMaxGrade[data.section];
+    
+    // This can happen if the dropdown values are not in the map, but they should be.
+    if (playerGradeLevel === undefined || sectionMaxLevel === undefined) {
+      return true; 
+    }
+
+    // A player's grade level must be less than or equal to the section's max grade level.
+    return playerGradeLevel <= sectionMaxLevel;
+  }, {
+    message: "Player's grade is too high for this section.",
+    path: ["section"],
+  });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
