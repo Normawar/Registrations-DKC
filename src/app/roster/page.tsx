@@ -224,6 +224,19 @@ export default function RosterPage() {
   };
 
   function onSubmit(values: PlayerFormValues) {
+    // Check for duplicate player by name and DOB
+    const isDuplicatePlayer = players.some(p => 
+      p.id !== values.id &&
+      p.firstName.trim().toLowerCase() === values.firstName.trim().toLowerCase() &&
+      p.lastName.trim().toLowerCase() === values.lastName.trim().toLowerCase() &&
+      p.dob.getTime() === values.dob.getTime()
+    );
+
+    if (isDuplicatePlayer) {
+      form.setError("firstName", { type: "manual", message: "A player with this name and date of birth already exists." });
+      return;
+    }
+    
     const isEmailUnique = !players.some(p => p.email.toLowerCase() === values.email.toLowerCase() && p.id !== values.id);
 
     if (!isEmailUnique) {
