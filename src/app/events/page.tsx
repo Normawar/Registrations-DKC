@@ -612,14 +612,31 @@ export default function EventsPage() {
               <DialogHeader>
                   <DialogTitle>Register and Accept Invoice</DialogTitle>
                   <DialogDescription>
-                      You are registering {Object.keys(selections).length} player(s) for {selectedEvent?.name}. Review the total amount below. Clicking the button will finalize your registration and generate an invoice.
+                      You are about to register {Object.keys(selections).length} player(s) for {selectedEvent?.name}. Please review the summary below.
                   </DialogDescription>
               </DialogHeader>
-              <div className="py-4">
-                  <h3 className="text-2xl font-bold text-center">Total to be Invoiced: ${calculatedFees.toFixed(2)}</h3>
+              <div className="py-4 space-y-4">
+                <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Players</span>
+                        <span className="font-medium">{Object.keys(selections).length}</span>
+                    </div>
+                     <div className="flex justify-between">
+                        <span className="text-muted-foreground">New / Renewing USCF Memberships</span>
+                        <span className="font-medium">{Object.values(selections).filter(s => s.uscfStatus === 'new' || s.uscfStatus === 'renewing').length}</span>
+                    </div>
+                </div>
+
+                <div className="text-center rounded-lg border border-primary/20 bg-primary/5 py-4">
+                  <p className="text-sm font-medium text-muted-foreground">TOTAL TO BE INVOICED</p>
+                  <p className="text-3xl font-bold text-primary">${calculatedFees.toFixed(2)}</p>
+                </div>
               </div>
               <DialogFooter>
-                  <Button variant="ghost" onClick={() => setIsInvoiceDialogOpen(false)}>Cancel</Button>
+                  <Button variant="ghost" onClick={() => {
+                      setIsInvoiceDialogOpen(false);
+                      setIsDialogOpen(true);
+                  }}>Back</Button>
                   <Button onClick={handleGenerateInvoice}>Register and Accept Invoice</Button>
               </DialogFooter>
           </DialogContent>
