@@ -526,7 +526,7 @@ export default function EventsPage() {
                     <Button type="button" variant="ghost">Cancel</Button>
                 </DialogClose>
                 <Button type="button" onClick={handleProceedToInvoice} disabled={Object.keys(selections).length === 0 || hasInvalidSelections}>
-                    Review & Generate Invoice ({Object.keys(selections).length} Players)
+                    Review Invoice ({Object.keys(selections).length} Players)
                 </Button>
               </div>
           </DialogFooter>
@@ -536,20 +536,17 @@ export default function EventsPage() {
       <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
           <DialogContent>
               <DialogHeader>
-                  <DialogTitle>Review and Generate Invoice</DialogTitle>
+                  <DialogTitle>Register and Accept Invoice</DialogTitle>
                   <DialogDescription>
-                      You are registering {Object.keys(selections).length} player(s) for the {selectedEvent?.name}. An invoice will be generated.
+                      You are registering {Object.keys(selections).length} player(s) for {selectedEvent?.name}. Review the total amount below. Clicking the button will finalize your registration and generate an invoice.
                   </DialogDescription>
               </DialogHeader>
               <div className="py-4">
                   <h3 className="text-2xl font-bold text-center">Total to be Invoiced: ${calculatedFees.toFixed(2)}</h3>
-                  <p className="text-center text-sm text-muted-foreground mt-2">
-                      Click the button below to finalize your registration and generate an invoice.
-                  </p>
               </div>
               <DialogFooter>
                   <Button variant="ghost" onClick={() => setIsInvoiceDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleGenerateInvoice}>Generate Invoice (Simulated)</Button>
+                  <Button onClick={handleGenerateInvoice}>Register and Accept Invoice</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>
