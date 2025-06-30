@@ -41,18 +41,30 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest', 
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at extracting structured player data from a full HTML document.
-The document contains a USCF player search results page. Your task is to find the main results table and parse it.
-The correct table can be identified by its header row (often <tr class="header">) with columns like 'ID', 'Name', 'St', and 'Reg'.
+    prompt: `You are an expert at extracting structured player data from a USCF player search results HTML page.
+Your task is to find the main results table within the HTML and parse EACH player row.
 
-From that table, parse each data row (<tr>) and extract the player information into the format specified by the output schema.
+**RULES:**
+1. Locate the table containing player data. The table can be identified by its header row which contains columns like 'ID', 'Name', 'St', and 'Reg'.
+2. For EACH player row (\`<tr>\`) in that table, extract the required information.
+3. The data is often inside \`<font>\` tags within the table cells (\`<td>\`). You must extract the text content from within these tags.
+4. If the rating value is 'UNR' or the cell is empty, the output for \`rating\` must be null.
+5. If the HTML contains the text "No players found", you MUST return an empty \`players\` array.
+6. The \`fullName\` is typically in "LAST, FIRST MI" format. Extract it as is.
 
-- **uscfId**: The player's 8-digit ID from the 'ID' column.
-- **fullName**: The player's full name from the 'Name' column. The format is typically "LAST, FIRST MI".
-- **rating**: The player's rating from the 'Reg' rating column. If the value is 'UNR' or the cell is empty, the output for rating should be null.
-- **state**: The player's two-letter state abbreviation from the 'St' column.
+**EXAMPLE:**
+Given this HTML snippet of a table row:
+\`\`\`html
+<tr><td><font face=verdana,helvetica,arial size=2>16439198</font></td><td align=left><font face=verdana,helvetica,arial size=2><a href=./MbrDtlMain.php?16439198>GUERRA, KALI ANN</a></font></td><td align=center><font face=verdana,helvetica,arial size=2>TX</font></td><td align=right><font face=verdana,helvetica,arial size=2>1084</font></td></tr>
+\`\`\`
 
-If you cannot find the results table or if the table is empty, you MUST return an empty \`players\` array.
+You would extract:
+- uscfId: "16439198"
+- fullName: "GUERRA, KALI ANN"
+- rating: 1084
+- state: "TX"
+
+Now, parse the full HTML document provided below and return ALL matching players.
 
 HTML document to parse:
 \`\`\`
@@ -141,5 +153,3 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
   }
 );
-
-    

@@ -33,22 +33,31 @@ const lookupPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `You are an expert at extracting structured data from a text block representing a USCF player's record.
-Your ONLY source of information is the text provided below. The data is in a fixed-width format.
+    prompt: `You are an expert at extracting structured data from a text block representing a single USCF player's record.
+Your ONLY source of information is the text provided below.
 
-The data is presented in a block of text. Here is an example of the format:
+**RULES:**
+1. The data is in a fixed-width format.
+2. Extract the player's full name exactly as it appears after "Name :".
+3. Extract the player's rating exactly as it appears after "Rating:".
+4. Extract the expiration date exactly as it appears after "Expires:". The format must be YYYY-MM-DD.
+5. If the input text contains the exact phrase "This player is not in our database", you MUST set the 'error' field in your output to "Player not found with this USCF ID." and leave all other fields empty.
+
+**EXAMPLE:**
+Given this text:
+\`\`\`
 ---------------------------------------------------------------------------------------
 USCF ID : 12345678      Name : DOE, JOHN M                             Address: ANYTOWN, TX 12345
 ---------------------------------------------------------------------------------------
  Birth : 1990-01-01  Sex : M   Federation:      Rating: 1500  Expires: 2025-12-31   Updated: 2024-01-01
 ---------------------------------------------------------------------------------------
+\`\`\`
+You would extract:
+- fullName: "DOE, JOHN M"
+- rating: 1500
+- expirationDate: "2025-12-31"
 
-From the text block provided, extract the following fields:
-- **fullName**: The player's name, as it appears after "Name :".
-- **rating**: The player's regular rating, as it appears after "Rating:".
-- **expirationDate**: The membership expiration date, as it appears after "Expires:". The format must be YYYY-MM-DD.
-
-If the input text contains the exact phrase "This player is not in our database", you must set the 'error' field in your output to "Player not found with this USCF ID." and leave all other fields empty.
+Now, parse the text block provided below.
 
 Text to parse:
 \`\`\`
