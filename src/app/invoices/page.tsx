@@ -67,6 +67,62 @@ const INVOICE_STATUSES = [
     'NO_INVOICE'
 ];
 
+const sampleInvoices: CombinedInvoice[] = [
+  {
+    id: 'sample-1',
+    invoiceId: 'inv-sample-001',
+    invoiceNumber: '0001',
+    description: 'Fall Classic 2024 Registration',
+    submissionTimestamp: new Date('2024-05-15T10:00:00Z').toISOString(),
+    totalInvoiced: 125.00,
+    invoiceUrl: 'https://squareup.com/invoice/inv-sample-001',
+    purchaserName: 'John Doe',
+    invoiceStatus: 'PAID',
+    schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
+    district: 'SHARYLAND ISD',
+  },
+  {
+    id: 'sample-2',
+    invoiceId: 'inv-sample-002',
+    invoiceNumber: '0002',
+    description: 'USCF Membership (Youth)',
+    submissionTimestamp: new Date('2024-05-18T14:30:00Z').toISOString(),
+    totalInvoiced: 24.00,
+    invoiceUrl: 'https://squareup.com/invoice/inv-sample-002',
+    purchaserName: 'Jane Smith',
+    invoiceStatus: 'PUBLISHED',
+    schoolName: 'MCALLEN H S', // Different school
+    district: 'MCALLEN ISD',
+  },
+    {
+    id: 'sample-3',
+    invoiceId: 'inv-sample-003',
+    invoiceNumber: '0003',
+    description: 'Club T-Shirt Order',
+    submissionTimestamp: new Date('2024-05-20T11:00:00Z').toISOString(),
+    totalInvoiced: 250.00,
+    invoiceUrl: 'https://squareup.com/invoice/inv-sample-003',
+    purchaserName: 'Sponsor Name',
+    invoiceStatus: 'UNPAID',
+    schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
+    district: 'SHARYLAND ISD',
+  },
+   {
+    id: 'sample-4',
+    invoiceId: 'inv-sample-004',
+    invoiceNumber: '0004',
+    description: 'Spring Scholastic 2024',
+    submissionTimestamp: new Date('2024-04-10T09:00:00Z').toISOString(),
+    totalInvoiced: 80.00,
+    invoiceUrl: 'https://squareup.com/invoice/inv-sample-004',
+    purchaserName: 'Bob Johnson',
+    invoiceStatus: 'PAID',
+    schoolName: 'EDINBURG H S', // Different school
+    district: 'EDINBURG CISD',
+  },
+];
+
+
 function InvoicesComponent() {
   const { toast } = useToast();
   const { profile } = useSponsorProfile();
@@ -108,7 +164,7 @@ function InvoicesComponent() {
 
   const fetchAllInvoiceStatuses = (invoicesToFetch: CombinedInvoice[]) => {
     invoicesToFetch.forEach(inv => {
-        if (inv.invoiceId) {
+        if (inv.invoiceId && !inv.id.startsWith('sample-')) {
             fetchInvoiceStatus(inv.id, inv.invoiceId, true);
         }
     });
@@ -123,8 +179,17 @@ function InvoicesComponent() {
 
         const allLocalInvoices = [...confirmations, ...membershipInvoices, ...organizerInvoices];
         
-        const normalizedInvoices = allLocalInvoices
-            .map((inv: any): CombinedInvoice => ({
+        const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
+
+        // Add sample invoices first
+        for (const inv of sampleInvoices) {
+            const key = inv.invoiceId || inv.id;
+            uniqueInvoicesMap.set(key, inv);
+        }
+        
+        // Normalize and add local invoices, overwriting samples with the same ID
+        for (const inv of allLocalInvoices) {
+            const normalizedInv: CombinedInvoice = {
                 id: inv.id,
                 description: inv.description || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : 'Unknown Invoice'),
                 submissionTimestamp: inv.submissionTimestamp,
@@ -136,14 +201,9 @@ function InvoicesComponent() {
                 district: inv.district || profile.district,
                 purchaserName: inv.purchaserName || `${profile.firstName} ${profile.lastName}`,
                 invoiceStatus: inv.invoiceStatus || inv.status,
-            }));
-            
-        const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
-        
-        // Add local invoices to the map. These take precedence.
-        for (const inv of normalizedInvoices) {
-            const key = inv.invoiceId || inv.id;
-            uniqueInvoicesMap.set(key, inv);
+            };
+            const key = normalizedInv.invoiceId || normalizedInv.id;
+            uniqueInvoicesMap.set(key, normalizedInv);
         }
         
         const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
@@ -216,7 +276,7 @@ function InvoicesComponent() {
 
     if (statusFilter !== 'ALL') {
       const liveStatusFilter = (inv: CombinedInvoice) => {
-        const currentStatus = statuses[inv.id]?.status?.toUpperCase() || '';
+        const currentStatus = statuses[inv.id]?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
         if (!currentStatus) return false;
         
         if (statusFilter === 'UNPAID' && ['PUBLISHED', 'UNPAID'].includes(currentStatus)) {
@@ -339,13 +399,13 @@ function InvoicesComponent() {
                                     <TableCell>{format(new Date(inv.submissionTimestamp), 'PPP')}</TableCell>
                                     <TableCell>${inv.totalInvoiced.toFixed(2)}</TableCell>
                                     <TableCell>
-                                        <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus?.status))}>
-                                            {isLoading ? 'Loading...' : getStatusDisplayName(currentStatus?.status)}
+                                        <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus?.status || inv.invoiceStatus))}>
+                                            {isLoading ? 'Loading...' : getStatusDisplayName(currentStatus?.status || inv.invoiceStatus)}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId} title="Refresh Status">
+                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId || inv.id.startsWith('sample-')} title="Refresh Status">
                                                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
