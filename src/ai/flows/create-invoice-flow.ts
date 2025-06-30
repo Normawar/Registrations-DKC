@@ -21,28 +21,6 @@ const squareClient = new Client({
 
 const { customersApi, ordersApi, invoicesApi } = squareClient;
 
-// Add some diagnostic logging to verify configuration
-console.log(`Square client configured for: Sandbox Environment`);
-if (process.env.SQUARE_ACCESS_TOKEN) {
-    const token = process.env.SQUARE_ACCESS_TOKEN;
-    if (token.startsWith('YOUR_')) {
-      console.log('Square Access Token: Using placeholder value. Please update your .env file.');
-    } else {
-      console.log(`Using Square Access Token: Provided (starts with ${token.substring(0, 8)}..., ends with ${token.substring(token.length - 4)})`);
-    }
-} else {
-    console.log('Square Access Token: Not Provided. Please check your .env file.');
-}
-if (process.env.SQUARE_LOCATION_ID) {
-    if (process.env.SQUARE_LOCATION_ID.startsWith('YOUR_')) {
-      console.log('Square Location ID: Using placeholder value. Please update your .env file.');
-    } else {
-      console.log(`Using Square Location ID: ${process.env.SQUARE_LOCATION_ID}`);
-    }
-} else {
-    console.log('Square Location ID: Not Provided. Please check your .env file.');
-}
-
 const PlayerInvoiceInfoSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
   baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
@@ -80,18 +58,25 @@ const createInvoiceFlow = ai.defineFlow(
     outputSchema: CreateInvoiceOutputSchema,
   },
   async (input) => {
+    const accessToken = process.env.SQUARE_ACCESS_TOKEN;
+    const locationId = process.env.SQUARE_LOCATION_ID;
+
+    if (!accessToken || accessToken.startsWith('YOUR_') || !locationId || locationId.startsWith('YOUR_')) {
+      const missingVars: string[] = [];
+      if (!accessToken || accessToken.startsWith('YOUR_')) missingVars.push('SQUARE_ACCESS_TOKEN');
+      if (!locationId || locationId.startsWith('YOUR_')) missingVars.push('SQUARE_LOCATION_ID');
+
+      throw new Error(
+        `Square configuration is incomplete. Please set: ${missingVars.join(
+          ', '
+        )} in your .env file. You can find these credentials in your Square Developer Dashboard.`
+      );
+    }
     
     console.log("Starting Square invoice creation with input:", input);
 
     try {
-      // 1. Get location ID from environment variables.
-      const locationId = process.env.SQUARE_LOCATION_ID;
-      if (!locationId || locationId.startsWith('YOUR_')) {
-        throw new Error('Square Location ID is not configured. Please set SQUARE_LOCATION_ID in your .env file.');
-      }
-      console.log(`Using location ID: ${locationId}`);
-
-      // 2. Find or create a customer
+      // Find or create a customer
       console.log(`Searching for customer with email: ${input.sponsorEmail}`);
       const searchCustomersResponse = await customersApi.searchCustomers({
         query: {
@@ -120,7 +105,7 @@ const createInvoiceFlow = ai.defineFlow(
         console.log(`Created new customer with ID: ${customerId}`);
       }
       
-      // 3. Create an Order
+      // Create an Order
       const lineItems = [];
 
       input.players.forEach(player => {
@@ -172,7 +157,7 @@ const createInvoiceFlow = ai.defineFlow(
       const orderId = createOrderResponse.result.order!.id!;
       console.log(`Created order with ID: ${orderId}`);
 
-      // 4. Create an Invoice from the Order
+      // Create an Invoice from the Order
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7); // Invoice due in 7 days
       const formattedEventDate = format(new Date(input.eventDate), 'MM/dd/yyyy');
@@ -203,7 +188,7 @@ const createInvoiceFlow = ai.defineFlow(
       const invoice = createInvoiceResponse.result.invoice!;
       console.log("Successfully created DRAFT invoice:", invoice);
 
-      // 5. Publish the invoice to make it active and get a public URL
+      // Publish the invoice to make it active and get a public URL
       console.log(`Publishing invoice ID: ${invoice.id!}`);
       const { result: { invoice: publishedInvoice } } = await invoicesApi.publishInvoice(invoice.id!, {
         version: invoice.version!,

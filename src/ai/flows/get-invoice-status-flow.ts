@@ -41,6 +41,13 @@ const getInvoiceStatusFlow = ai.defineFlow(
     outputSchema: GetInvoiceStatusOutputSchema,
   },
   async (input) => {
+    const accessToken = process.env.SQUARE_ACCESS_TOKEN;
+    if (!accessToken || accessToken.startsWith('YOUR_')) {
+        throw new Error(
+            `Square configuration is incomplete. Please set SQUARE_ACCESS_TOKEN in your .env file. You can find this in your Square Developer Dashboard.`
+        );
+    }
+      
     try {
       console.log(`Fetching invoice ${input.invoiceId} to get current status...`);
       const { result: { invoice } } = await invoicesApi.getInvoice(input.invoiceId);
