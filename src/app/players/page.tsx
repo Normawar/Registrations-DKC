@@ -36,9 +36,9 @@ export default function PlayersPage() {
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Players</h1>
+            <h1 className="text-3xl font-bold font-headline">All Players</h1>
             <p className="text-muted-foreground">
-              Manage player rosters for your events.
+              Manage player rosters for all events. (Organizer View)
             </p>
           </div>
           <Button>
@@ -67,8 +67,8 @@ export default function PlayersPage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
-                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={player.name} />
-                          <AvatarFallback>{player.name.charAt(0)}</AvatarFallback>
+                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={player.name} data-ai-hint="person face" />
+                          <AvatarFallback>{player.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
                         </Avatar>
                         {player.name}
                       </div>

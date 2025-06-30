@@ -26,17 +26,18 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, School, ClipboardCheck } from "lucide-react";
+import { User, LogOut, School, ClipboardCheck, Users } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 
 const menuItems = [
   { href: "/profile", icon: User, label: "Profile" },
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
-  { href: "/roster", icon: PawnIcon, label: "Players" },
+  { href: "/roster", icon: PawnIcon, label: "Roster" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
   { href: "/schools", icon: School, label: "Schools" },
+  { href: "/players", icon: Users, label: "All Players" },
   { href: "/manage-events", icon: Wrench, label: "Manage Events" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership" },

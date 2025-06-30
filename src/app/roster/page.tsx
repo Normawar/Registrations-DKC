@@ -85,28 +85,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-
-type Player = {
-  id: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  uscfId: string;
-  uscfExpiration?: Date;
-  rating?: number;
-  grade: string;
-  section: string;
-  email: string;
-  phone?: string;
-  dob: Date;
-  zipCode: string;
-  studentType?: 'gt' | 'independent';
-};
-
-const initialPlayers: Player[] = [
-  { id: "1", firstName: "Alex", middleName: "Michael", lastName: "Ray", uscfId: "12345678", rating: 1850, uscfExpiration: new Date(), grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', dob: new Date('2008-05-10'), zipCode: '78501'},
-  { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", rating: 2100, uscfExpiration: new Date(), grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com', dob: new Date('2007-09-15'), zipCode: '78504', studentType: 'independent' },
-];
+import { useRoster, type Player } from '@/hooks/use-roster';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -191,7 +170,7 @@ type SortableColumnKey = 'lastName' | 'uscfId' | 'rating' | 'grade' | 'section';
 
 export default function RosterPage() {
   const { toast } = useToast();
-  const [players, setPlayers] = useState<Player[]>(initialPlayers);
+  const { players, addPlayer, updatePlayer, deletePlayer } = useRoster();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -322,7 +301,7 @@ export default function RosterPage() {
   
   const confirmDelete = () => {
     if (playerToDelete) {
-      setPlayers(players.filter(p => p.id !== playerToDelete.id));
+      deletePlayer(playerToDelete.id);
       toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the roster.` });
     }
     setIsAlertOpen(false);
@@ -365,11 +344,11 @@ export default function RosterPage() {
     }
 
     if (editingPlayer) {
-      setPlayers(players.map(p => p.id === editingPlayer.id ? { ...p, ...values } : p) as Player[]);
+      updatePlayer({ ...editingPlayer, ...values });
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
     } else {
       const newPlayer: Player = { ...(values as Omit<Player, 'id'>), id: Date.now().toString() };
-      setPlayers([...players, newPlayer]);
+      addPlayer(newPlayer);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
     }
     setIsDialogOpen(false);
@@ -382,13 +361,13 @@ export default function RosterPage() {
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Players</h1>
+            <h1 className="text-3xl font-bold font-headline">Roster</h1>
             <p className="text-muted-foreground">
-              Manage your player roster.
+              Manage your school's player roster.
             </p>
           </div>
           <Button onClick={handleAddPlayer}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Player
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Player to Roster
           </Button>
         </div>
 
