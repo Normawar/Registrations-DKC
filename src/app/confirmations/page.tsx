@@ -167,7 +167,7 @@ export default function ConfirmationsPage() {
                 if (error.message.includes('Square configuration is incomplete')) {
                     description = (
                         <span>
-                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:opacity-90">Square Developer Dashboard</a>.
+                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline text-destructive-foreground hover:text-destructive-foreground/80">Square Developer Dashboard</a>.
                         </span>
                     );
                 } else {
@@ -396,7 +396,7 @@ export default function ConfirmationsPage() {
              if (error.message.includes('Square configuration is incomplete')) {
                 description = (
                     <span>
-                        Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:opacity-90">Square Developer Dashboard</a>.
+                        Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline text-destructive-foreground hover:text-destructive-foreground/80">Square Developer Dashboard</a>.
                     </span>
                 );
             } else {
@@ -429,7 +429,7 @@ export default function ConfirmationsPage() {
                     <ol className="list-decimal list-inside mt-2 space-y-1">
                         <li>
                             Get your Sandbox <strong>Access Token</strong> and <strong>Location ID</strong> from the{' '}
-                            <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-primary/80">
+                            <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline text-primary hover:text-primary/80">
                                 Square Developer Dashboard
                             </a>.
                         </li>
