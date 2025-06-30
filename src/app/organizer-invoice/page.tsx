@@ -82,6 +82,7 @@ export default function OrganizerInvoicePage() {
       
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newOrganizerInvoice]));
+      window.dispatchEvent(new Event('storage'));
 
       toast({
         title: 'Invoice Created Successfully!',

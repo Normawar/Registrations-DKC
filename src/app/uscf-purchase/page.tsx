@@ -227,8 +227,8 @@ function UscfPurchaseComponent() {
             
             const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
             localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newMembershipInvoice]));
+            window.dispatchEvent(new Event('storage'));
             
-            // Also update the membership-specific storage for that page
             const existingMembershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
             localStorage.setItem('membershipInvoices', JSON.stringify([...existingMembershipInvoices, newMembershipInvoice]));
 

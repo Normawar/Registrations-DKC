@@ -265,12 +265,12 @@ export default function EventsPage() {
 
             const newConfirmation = {
                 id: invoiceId,
+                invoiceId: invoiceId,
                 eventName: selectedEvent.name,
                 eventDate: selectedEvent.date,
                 submissionTimestamp: new Date().toISOString(),
                 selections,
                 totalInvoiced: calculatedFees,
-                invoiceId,
                 invoiceUrl,
                 invoiceNumber,
                 teamCode: teamCode,
@@ -281,13 +281,11 @@ export default function EventsPage() {
             };
 
             const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-            const updatedInvoices = [...existingInvoices, newConfirmation];
-            localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
+            localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
+            window.dispatchEvent(new Event('storage'));
             
-            // Also update the confirmations-specific storage for that page
             const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            const updatedConfirmations = [...existingConfirmations, newConfirmation];
-            localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+            localStorage.setItem('confirmations', JSON.stringify([...existingConfirmations, newConfirmation]));
             
             toast({
                 title: "Invoice Generated Successfully!",

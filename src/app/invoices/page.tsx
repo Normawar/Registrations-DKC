@@ -129,16 +129,27 @@ function InvoicesComponent() {
   }, []);
   
   useEffect(() => {
+    // Initial load
     loadAndProcessInvoices();
     
-    const handleStorageChange = (event: StorageEvent) => {
+    // Define the handler for storage changes
+    const handleStorageChange = (event: Event) => {
+      // For real storage events from other tabs, check the key.
+      // For our custom dispatched event from the same tab, just reload.
+      if (event instanceof StorageEvent) {
         if (event.key === 'all_invoices') {
             loadAndProcessInvoices();
         }
+      } else {
+        // This handles custom events dispatched from the same tab.
+        loadAndProcessInvoices();
+      }
     };
     
+    // Add the listener
     window.addEventListener('storage', handleStorageChange);
     
+    // Clean up the listener
     return () => {
         window.removeEventListener('storage', handleStorageChange);
     };
@@ -150,7 +161,7 @@ function InvoicesComponent() {
   }, [allInvoices]);
   
   const filteredInvoices = useMemo(() => {
-    // Wait for profile to be loaded before filtering. The parent component will show a skeleton.
+    // Wait for profile to be loaded before filtering.
     if (!profile) {
       return [];
     }
@@ -178,7 +189,7 @@ function InvoicesComponent() {
         
         return true;
     });
-  }, [allInvoices, profile, schoolFilter, statusFilter, statuses]);
+  }, [allInvoices, profile, schoolFilter, statusFilter]);
 
     useEffect(() => {
         const invoicesToFetchStatus = filteredInvoices.filter(inv => {
