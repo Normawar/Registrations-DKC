@@ -44,8 +44,8 @@ import { generateTeamCode } from '@/lib/school-utils';
 const profileFormSchema = z.object({
   firstName: z.string().min(1, { message: 'First name is required.' }),
   lastName: z.string().min(1, { message: 'Last name is required.' }),
-  district: z.string({ required_error: 'Please select a district.' }).min(1, 'District is required.'),
-  school: z.string({ required_error: 'Please select a school.' }).min(1, 'School is required.'),
+  district: z.string().optional(),
+  school: z.string().optional(),
   email: z.string().email({ message: 'Please enter a valid email.' }),
   phone: z.string().min(10, { message: 'Please enter a valid 10-digit phone number.' }),
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
@@ -326,13 +326,13 @@ export default function ProfilePage() {
     <AppLayout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Sponsor Profile</h1>
+          <h1 className="text-3xl font-bold font-headline">Profile</h1>
           <p className="text-muted-foreground">
             View and edit your account information.
           </p>
         </div>
         
-        {profile && (
+        {profile?.role === 'sponsor' && (
             <Card className="bg-secondary/50 border-dashed">
                 <CardHeader>
                     <CardTitle className="text-lg">Team Information</CardTitle>
@@ -427,8 +427,8 @@ export default function ProfilePage() {
             <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Sponsor Information</CardTitle>
-                        <CardDescription>Update your personal, contact, and school details here.</CardDescription>
+                        <CardTitle>Personal Information</CardTitle>
+                        <CardDescription>Update your personal and contact details here.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -487,70 +487,74 @@ export default function ProfilePage() {
                                 )}
                             />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                                control={profileForm.control}
-                                name="district"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>District</FormLabel>
-                                    <Select onValueChange={handleDistrictChange} value={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                        <SelectValue placeholder="Select a district" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {uniqueDistricts.map((district) => (
-                                        <SelectItem key={district} value={district}>
-                                            {district}
-                                        </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
+                        {profile?.role === 'sponsor' && (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField
+                                        control={profileForm.control}
+                                        name="district"
+                                        render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>District</FormLabel>
+                                            <Select onValueChange={handleDistrictChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                <SelectValue placeholder="Select a district" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {uniqueDistricts.map((district) => (
+                                                <SelectItem key={district} value={district}>
+                                                    {district}
+                                                </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={profileForm.control}
+                                        name="school"
+                                        render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>School</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                <SelectValue placeholder="Select a school" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {schoolsForDistrict.map((school) => (
+                                                <SelectItem key={school} value={school}>
+                                                    {school}
+                                                </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )}
+                                    />
+                                </div>
+                                {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                    <FormField
+                                        control={profileForm.control}
+                                        name="gtCoordinatorEmail"
+                                        render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>GT Coordinator Email</FormLabel>
+                                            <FormControl>
+                                            <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )}
+                                    />
                                 )}
-                            />
-                            <FormField
-                                control={profileForm.control}
-                                name="school"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>School</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                        <SelectValue placeholder="Select a school" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {schoolsForDistrict.map((school) => (
-                                        <SelectItem key={school} value={school}>
-                                            {school}
-                                        </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                        </div>
-                        {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                            <FormField
-                                control={profileForm.control}
-                                name="gtCoordinatorEmail"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>GT Coordinator Email</FormLabel>
-                                    <FormControl>
-                                    <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
+                            </>
                         )}
                     </CardContent>
                     <CardFooter className="border-t px-6 py-4">
@@ -616,33 +620,36 @@ export default function ProfilePage() {
             </form>
           </Form>
         </Card>
-
-        <Card>
-            <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
-                <CardDescription>Manage your account role and permissions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-2">
-                    <Label htmlFor="role-select">Account Role</Label>
-                    <Select
-                        value={profile.role}
-                        onValueChange={(value) => updateProfile({ role: value as 'sponsor' | 'organizer' })}
-                    >
-                        <SelectTrigger id="role-select" className="w-full md:w-1/2">
-                            <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="sponsor">Sponsor</SelectItem>
-                            <SelectItem value="organizer">Organizer</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                        Sponsors can manage their own roster and registrations. Organizers have site-wide access to view all invoices and schools.
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
+        
+        {profile?.role !== 'individual' && (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Account Settings</CardTitle>
+                    <CardDescription>Manage your account role and permissions.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-2">
+                        <Label htmlFor="role-select">Account Role</Label>
+                        <Select
+                            value={profile.role}
+                            onValueChange={(value) => updateProfile({ role: value as 'sponsor' | 'organizer' | 'individual' })}
+                        >
+                            <SelectTrigger id="role-select" className="w-full md:w-1/2">
+                                <SelectValue placeholder="Select a role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="sponsor">Sponsor</SelectItem>
+                                <SelectItem value="organizer">Organizer</SelectItem>
+                                <SelectItem value="individual">Individual</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <p className="text-sm text-muted-foreground">
+                            Sponsors can manage their own roster and registrations. Organizers have site-wide access.
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
+        )}
       </div>
     </AppLayout>
   );

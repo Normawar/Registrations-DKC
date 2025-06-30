@@ -50,6 +50,15 @@ const organizerMenuItems = [
   { href: "/organizer-invoice", icon: PlusCircle, label: "Create Invoice" },
 ];
 
+const individualMenuItems = [
+  { href: "/profile", icon: User, label: "Profile" },
+  { href: "/individual-dashboard", icon: QueenIcon, label: "Dashboard" },
+  { href: "/events", icon: RookIcon, label: "Register for event" },
+  { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
+  { href: "/invoices", icon: Receipt, label: "Invoices" },
+  { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+];
+
 const icons: { [key: string]: React.ElementType } = {
   KingIcon,
   QueenIcon,
@@ -63,7 +72,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { profile } = useSponsorProfile();
 
-  const menuItems = profile?.role === 'organizer' ? organizerMenuItems : sponsorMenuItems;
+  const menuItems = 
+    profile?.role === 'organizer' ? organizerMenuItems :
+    profile?.role === 'individual' ? individualMenuItems :
+    sponsorMenuItems;
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -74,10 +86,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-3">
-                <Link href="/profile" prefetch={false} aria-label="Sponsor Profile">
+                <Link href="/profile" prefetch={false} aria-label="Profile">
                     {profile?.avatarType === 'upload' ? (
                         <Avatar className="h-8 w-8">
-                            <AvatarImage src={profile.avatarValue} alt="Sponsor Avatar" />
+                            <AvatarImage src={profile.avatarValue} alt="User Avatar" />
                             <AvatarFallback>{profile.firstName.charAt(0)}</AvatarFallback>
                         </Avatar>
                     ) : AvatarComponent ? (
@@ -88,18 +100,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
                     <p className="font-headline text-base font-bold text-sidebar-foreground truncate">
-                        {profile ? `${profile.firstName} ${profile.lastName}` : 'Sponsor Name'}
+                        {profile ? `${profile.firstName} ${profile.lastName}` : 'User Name'}
                     </p>
-                    <p className="text-xs text-sidebar-foreground/80 truncate">
-                        {profile ? profile.school : 'School Name'}
-                    </p>
-                    <p className="text-xs text-sidebar-foreground/70 truncate">
-                        {profile ? profile.district : 'District Name'}
-                    </p>
-                    {teamCode && profile?.role === 'sponsor' && (
-                      <p className="text-xs font-bold text-sidebar-primary truncate font-mono">
-                        {teamCode}
-                      </p>
+                    {profile?.role === 'sponsor' && (
+                      <>
+                        <p className="text-xs text-sidebar-foreground/80 truncate">
+                            {profile.school || 'School Name'}
+                        </p>
+                        {teamCode && (
+                          <p className="text-xs font-bold text-sidebar-primary truncate font-mono">
+                            {teamCode}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {profile?.role === 'organizer' && (
+                        <p className="text-xs text-sidebar-primary truncate font-semibold">
+                            Organizer
+                        </p>
+                    )}
+                    {profile?.role === 'individual' && (
+                        <p className="text-xs text-sidebar-primary truncate font-semibold">
+                            Individual Player
+                        </p>
                     )}
                 </div>
             </div>
@@ -128,21 +151,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {profile?.avatarType === 'upload' ? (
                   <AvatarImage src={profile.avatarValue} alt="@user" />
                 ) : null }
-                <AvatarFallback>{profile ? profile.firstName.charAt(0) : 'S'}</AvatarFallback>
+                <AvatarFallback>{profile ? profile.firstName.charAt(0) : 'U'}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden group-data-[collapsible=icon]:hidden">
-                <p className="font-semibold text-sm truncate">{profile ? `${profile.firstName} ${profile.lastName}` : 'Sponsor'}</p>
+                <p className="font-semibold text-sm truncate">{profile ? `${profile.firstName} ${profile.lastName}` : 'User'}</p>
                 <p className="text-xs text-sidebar-foreground/70 truncate">
-                  {profile ? profile.email : 'sponsor@chessmate.com'}
+                  {profile ? profile.email : 'user@chessmate.com'}
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="group-data-[collapsible=icon]:w-10"
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
+               <Link href="/" passHref>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="group-data-[collapsible=icon]:w-10"
+                    aria-label="Log out"
+                  >
+                    <LogOut className="h-5 w-5" />
+                  </Button>
+               </Link>
             </div>
           </SidebarFooter>
         </Sidebar>

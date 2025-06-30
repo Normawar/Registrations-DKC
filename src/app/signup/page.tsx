@@ -80,7 +80,7 @@ const SponsorSignUpForm = () => {
   
   function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     console.log(values);
-    // On successful submission, navigate to dashboard
+    localStorage.setItem('user_role', 'sponsor');
     router.push('/dashboard');
   }
 
@@ -249,7 +249,7 @@ const individualFormSchema = z.object({
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
 });
 
-const IndividualSignUpForm = () => {
+const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) => {
   const router = useRouter();
   
   const form = useForm<z.infer<typeof individualFormSchema>>({
@@ -264,7 +264,9 @@ const IndividualSignUpForm = () => {
 
   function onSubmit(values: z.infer<typeof individualFormSchema>) {
     console.log(values);
-    router.push('/dashboard');
+    localStorage.setItem('user_role', role);
+    const path = role === 'individual' ? '/individual-dashboard' : '/dashboard';
+    router.push(path);
   }
 
   return (
@@ -375,10 +377,10 @@ export default function SignUpPage() {
             <SponsorSignUpForm />
           </TabsContent>
           <TabsContent value="individual">
-            <IndividualSignUpForm />
+            <IndividualSignUpForm role="individual" />
           </TabsContent>
           <TabsContent value="organizer">
-            <IndividualSignUpForm />
+            <IndividualSignUpForm role="organizer" />
           </TabsContent>
         </Tabs>
       </Card>

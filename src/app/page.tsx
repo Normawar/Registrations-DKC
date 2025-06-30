@@ -1,20 +1,16 @@
 
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import Link from "next/link";
-import Image from "next/image";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+'use client';
 
-const LoginForm = () => (
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+const LoginForm = ({ onLogin }: { onLogin: () => void }) => (
   <>
     <CardContent className="grid gap-4">
       <div className="grid gap-2">
@@ -34,8 +30,8 @@ const LoginForm = () => (
         </div>
         <Input id="password" type="password" />
       </div>
-      <Button type="submit" className="w-full" asChild>
-        <Link href="/dashboard">Sign In</Link>
+      <Button type="button" className="w-full" onClick={onLogin}>
+        Sign In
       </Button>
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
@@ -91,6 +87,14 @@ const LoginForm = () => (
 );
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  const handleLogin = (role: 'sponsor' | 'organizer' | 'individual') => {
+    localStorage.setItem('user_role', role);
+    const path = role === 'individual' ? '/individual-dashboard' : '/dashboard';
+    router.push(path);
+  };
+
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
@@ -114,13 +118,13 @@ export default function LoginPage() {
             <TabsTrigger value="organizer">Organizer</TabsTrigger>
           </TabsList>
           <TabsContent value="sponsor">
-            <LoginForm />
+            <LoginForm onLogin={() => handleLogin('sponsor')} />
           </TabsContent>
           <TabsContent value="individual">
-            <LoginForm />
+            <LoginForm onLogin={() => handleLogin('individual')} />
           </TabsContent>
           <TabsContent value="organizer">
-            <LoginForm />
+            <LoginForm onLogin={() => handleLogin('organizer')} />
           </TabsContent>
         </Tabs>
       </Card>

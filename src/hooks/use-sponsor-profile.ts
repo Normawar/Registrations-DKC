@@ -13,7 +13,7 @@ export type SponsorProfile = {
   gtCoordinatorEmail?: string;
   avatarType: 'icon' | 'upload';
   avatarValue: string; // Icon name or image URL
-  role: 'sponsor' | 'organizer';
+  role: 'sponsor' | 'organizer' | 'individual';
 };
 
 const defaultSponsorData: SponsorProfile = {
@@ -34,18 +34,19 @@ export function useSponsorProfile() {
 
   const loadProfile = useCallback(() => {
     try {
-        const storedProfile = localStorage.getItem('sponsor_profile');
-        if (storedProfile) {
-            const parsed = JSON.parse(storedProfile);
-            // Ensure role exists, default to 'sponsor' if missing for backward compatibility
-            if (!parsed.role) {
-                parsed.role = 'sponsor';
-            }
-            setProfile(parsed);
-        } else {
-            localStorage.setItem('sponsor_profile', JSON.stringify(defaultSponsorData));
-            setProfile(defaultSponsorData);
+        const storedProfileRaw = localStorage.getItem('sponsor_profile');
+        let profileData: SponsorProfile = storedProfileRaw ? JSON.parse(storedProfileRaw) : defaultSponsorData;
+
+        // The 'user_role' from the session is the source of truth for the current role.
+        const sessionRole = localStorage.getItem('user_role');
+        if (sessionRole && (sessionRole === 'sponsor' || sessionRole === 'organizer' || sessionRole === 'individual')) {
+            profileData.role = sessionRole as 'sponsor' | 'organizer' | 'individual';
+        } else if (!profileData.role) {
+            profileData.role = 'sponsor'; // Fallback for first load
         }
+        
+        setProfile(profileData);
+        
     } catch (error) {
         console.error("Failed to load sponsor profile from localStorage", error);
         setProfile(defaultSponsorData);
@@ -56,7 +57,7 @@ export function useSponsorProfile() {
     loadProfile();
     
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'sponsor_profile') {
+        if (event.key === 'sponsor_profile' || event.key === 'user_role') {
             loadProfile();
         }
     };
@@ -77,6 +78,9 @@ export function useSponsorProfile() {
 
   const updateProfile = useCallback((newProfileData: Partial<SponsorProfile>) => {
     setProfile(prev => {
+        if (newProfileData.role) {
+            localStorage.setItem('user_role', newProfileData.role);
+        }
         const updated = { ...(prev || defaultSponsorData), ...newProfileData };
         try {
             localStorage.setItem('sponsor_profile', JSON.stringify(updated));

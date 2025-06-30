@@ -1,0 +1,136 @@
+
+import { AppLayout } from "@/components/app-layout";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const playerProfile = { id: "p2", firstName: "Olivia", lastName: "Smith", email: 'olivia@example.com', rating: 2100 };
+
+const upcomingEvents = [
+  { id: "1", name: "Spring Open 2024", date: "June 15, 2024", registered: true },
+  { id: "2", name: "Summer Championship", date: "July 20, 2024", registered: true },
+  { id: "3", name: "Autumn Classic", date: "September 10, 2024", registered: false },
+];
+
+export default function IndividualDashboardPage() {
+  return (
+    <AppLayout>
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold font-headline">Player Dashboard</h1>
+          <p className="text-muted-foreground">
+            An overview of your chess activities.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>My Player Profile</CardTitle>
+            </CardHeader>
+            <CardContent>
+               <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarImage src={`https://placehold.co/64x64.png`} alt={`${playerProfile.firstName} ${playerProfile.lastName}`} data-ai-hint="person face" />
+                    <AvatarFallback>{playerProfile.firstName.charAt(0)}{playerProfile.lastName.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="text-xl font-bold">{playerProfile.firstName} {playerProfile.lastName}</div>
+                    <div className="text-sm text-muted-foreground">{playerProfile.email}</div>
+                    <div className="text-sm font-semibold">Rating: {playerProfile.rating}</div>
+                  </div>
+                </div>
+            </CardContent>
+            <CardFooter>
+               <Button asChild variant="outline">
+                  <Link href="/profile">View & Edit Profile</Link>
+                </Button>
+            </CardFooter>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Upcoming Events</CardTitle>
+               <CardDescription>Events you are registered for and upcoming tournaments.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {upcomingEvents.map((event) => (
+                  <div key={event.id} className="flex justify-between items-center">
+                    <div>
+                      <p className="font-medium text-sm">{event.name}</p>
+                      <p className="text-xs text-muted-foreground">{event.date}</p>
+                    </div>
+                    {event.registered ? (
+                       <Badge variant="default" className="bg-green-600">Registered</Badge>
+                    ) : (
+                      <Button asChild variant="secondary" size="sm">
+                        <Link href="/events">
+                          Register Now
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div>
+          <h2 className="text-2xl font-bold font-headline">Recent Activity</h2>
+          <Card className="mt-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Activity</TableHead>
+                  <TableHead className="text-right">Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell>Summer Championship</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">Invoice Paid</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">2024-05-22</TableCell>
+                </TableRow>
+                 <TableRow>
+                  <TableCell>Summer Championship</TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">Registered</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">2024-05-22</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell>Spring Open 2024</TableCell>
+                  <TableCell>
+                    <Badge variant="destructive">Withdrew</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">2024-05-21</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </Card>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
