@@ -121,11 +121,9 @@ function InvoicesComponent() {
         const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
         const organizerInvoices = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
 
-        // Combine ALL invoice sources from local storage
         const allLocalInvoices = [...confirmations, ...membershipInvoices, ...organizerInvoices];
         
-        // Normalize all data into a consistent format
-        let normalizedInvoices = allLocalInvoices
+        const normalizedInvoices = allLocalInvoices
             .map((inv: any): CombinedInvoice => ({
                 id: inv.id,
                 description: inv.description || inv.eventName || `USCF Membership (${inv.membershipType})`,
@@ -140,28 +138,29 @@ function InvoicesComponent() {
                 invoiceStatus: inv.invoiceStatus || inv.status,
             }));
             
-        // De-duplicate the list
-        const uniqueInvoicesMap = new Map<string, any>();
+        // De-duplicate by creating a map and letting newer items (from local storage) overwrite older (sample) ones.
+        const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
+        
+        // Add local invoices to the map. These take precedence.
         for (const inv of normalizedInvoices) {
             const key = inv.invoiceId || inv.id;
             uniqueInvoicesMap.set(key, inv);
         }
+        
         const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
             
-        // Filter based on role
+        let filteredInvoices = allUniqueInvoices;
         if (profile.role === 'sponsor') {
-            normalizedInvoices = allUniqueInvoices.filter(inv => inv.schoolName === profile.school);
-        } else {
-            normalizedInvoices = allUniqueInvoices;
+            filteredInvoices = allUniqueInvoices.filter(inv => inv.schoolName === profile.school);
         }
         
-        normalizedInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+        filteredInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
         
-        setAllInvoices(normalizedInvoices);
+        setAllInvoices(filteredInvoices);
 
         // Initialize status display for each invoice
         const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
-        for (const inv of normalizedInvoices) {
+        for (const inv of filteredInvoices) {
             if (inv.invoiceId) {
                 initialStatuses[inv.id] = { status: inv.invoiceStatus || 'LOADING', isLoading: !inv.invoiceStatus };
             } else {
@@ -171,7 +170,7 @@ function InvoicesComponent() {
         setStatuses(initialStatuses);
         
         // Fetch live statuses for real invoices that aren't in a final state
-        const invoicesToFetch = normalizedInvoices.filter(inv => {
+        const invoicesToFetch = filteredInvoices.filter(inv => {
             const currentStatus = initialStatuses[inv.id]?.status?.toUpperCase();
             const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NO_INVOICE', 'NOT_FOUND'].includes(currentStatus || '');
             return inv.invoiceId && !isFinalState;
@@ -378,5 +377,3 @@ export default function InvoicesPage() {
         </Suspense>
     )
 }
-
-    
