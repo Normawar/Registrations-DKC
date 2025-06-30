@@ -160,10 +160,11 @@ function InvoicesComponent() {
                 district: inv.district,
             }));
 
-            const sponsorCreatedInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices];
+            const allLocalStorageInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices];
+            const sponsorSchoolInvoices = allLocalStorageInvoices.filter(inv => inv.schoolName === profile.school);
             const organizerCreatedInvoices = mockOrganizerInvoices.filter(inv => inv.schoolName === profile.school);
             
-            const allPossibleInvoices = [...sponsorCreatedInvoices, ...organizerCreatedInvoices];
+            const allPossibleInvoices = [...sponsorSchoolInvoices, ...organizerCreatedInvoices];
             
             const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
             for (const inv of allPossibleInvoices) {
