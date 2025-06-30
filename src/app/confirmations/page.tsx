@@ -96,25 +96,7 @@ export default function ConfirmationsPage() {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     setConfirmations(storedConfirmations);
-
-    // Sign in user anonymously when the component mounts
-    const authenticate = async () => {
-      if (auth && !auth.currentUser) {
-        try {
-          await signInAnonymously(auth);
-        } catch (error) {
-          // The console.error is removed to prevent the Next.js error overlay.
-          // The toast notification provides a better user experience.
-          toast({
-            variant: 'destructive',
-            title: 'Authentication Failed',
-            description: 'Could not sign in anonymously. File uploads might not work. Please ensure anonymous sign-in is enabled in your Firebase project.',
-          });
-        }
-      }
-    };
-    authenticate();
-  }, [toast]);
+  }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
 
@@ -146,16 +128,32 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            if (!auth || !storage || !auth.currentUser) {
+            if (!auth || !storage) {
                  toast({
                     variant: 'destructive',
                     title: 'Upload Failed',
-                    description: 'Firebase is not available or you are not authenticated. Please refresh and try again.',
+                    description: 'Firebase is not available. Please check your .env configuration.',
                  });
                  setIsUpdating(prev => ({...prev, [conf.id]: false}));
                  return;
             }
 
+            // Ensure user is signed in before uploading
+            if (!auth.currentUser) {
+                try {
+                    await signInAnonymously(auth);
+                } catch (error) {
+                    console.error("Anonymous sign-in failed:", error);
+                    toast({
+                        variant: 'destructive',
+                        title: 'Authentication Failed',
+                        description: 'Could not sign in to upload file. Please ensure anonymous sign-in is enabled in your Firebase project.',
+                    });
+                    setIsUpdating(prev => ({...prev, [conf.id]: false}));
+                    return;
+                }
+            }
+            
             const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
             const snapshot = await uploadBytes(storageRef, poFile);
             poFileUrl = await getDownloadURL(snapshot.ref);
