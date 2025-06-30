@@ -26,7 +26,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { LogOut, School, ClipboardList, ClipboardCheck } from "lucide-react";
+import { User, LogOut, School, ClipboardList, ClipboardCheck } from "lucide-react";
 
 const menuItems = [
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
@@ -38,6 +38,7 @@ const menuItems = [
   { href: "/manage-events", icon: Wrench, label: "Manage Events" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
+  { href: "/profile", icon: User, label: "Profile" },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
