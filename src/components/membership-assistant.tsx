@@ -263,9 +263,11 @@ export function MembershipAssistant() {
               </div>
             </CardContent>
              <CardFooter>
-              <Button variant="link" className="p-0 h-auto">
-                Learn more or purchase this membership &rarr;
-              </Button>
+                <Button asChild variant="link" className="p-0 h-auto">
+                  <a href="https://new.uschess.org/join-us-chess" target="_blank" rel="noopener noreferrer">
+                    Learn more or purchase this membership &rarr;
+                  </a>
+                </Button>
             </CardFooter>
           </Card>
         )}
