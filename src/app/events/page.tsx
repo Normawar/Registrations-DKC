@@ -23,6 +23,7 @@ import {
     FileText, 
     ImageIcon,
     Info,
+    Loader2,
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -53,6 +54,8 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import { createMembershipInvoice } from '@/ai/flows/create-membership-invoice-flow';
 
 type PlayerRegistration = {
   byes: {
@@ -93,16 +96,19 @@ export default function EventsPage() {
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selections, setSelections] = useState<RegistrationSelections>({});
-    const [calculatedFees, setCalculatedFees] = useState(0);
+    const [calculatedFees, setCalculatedFees] = useState({ total: 0, registration: 0, uscf: 0 });
     const [clientReady, setClientReady] = useState(false);
+    const [separateUscfInvoice, setSeparateUscfInvoice] = useState(false);
+    const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
 
     useEffect(() => {
         setClientReady(true);
     }, []);
 
-    const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event): number => {
-      let total = 0;
-      if (!clientReady) return 0;
+    const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event) => {
+      let registrationTotal = 0;
+      let uscfTotal = 0;
+      if (!clientReady) return { total: 0, registration: 0, uscf: 0 };
       
       const eventDate = new Date(event.date);
       const now = new Date();
@@ -120,21 +126,21 @@ export default function EventsPage() {
       }
       
       for (const playerId in currentSelections) {
-        total += registrationFee;
+        registrationTotal += registrationFee;
         const playerSelection = currentSelections[playerId];
         if (playerSelection.uscfStatus === 'new' || playerSelection.uscfStatus === 'renewing') {
-          total += 24; // Standard USCF fee
+          uscfTotal += 24; // Standard USCF fee
         }
       }
-      return total;
+      return { total: registrationTotal + uscfTotal, registration: registrationTotal, uscf: uscfTotal };
     }
 
     useEffect(() => {
         if (selectedEvent && Object.keys(selections).length > 0) {
-            const total = calculateTotalFee(selections, selectedEvent);
-            setCalculatedFees(total);
+            const fees = calculateTotalFee(selections, selectedEvent);
+            setCalculatedFees(fees);
         } else {
-            setCalculatedFees(0);
+            setCalculatedFees({ total: 0, registration: 0, uscf: 0 });
         }
     }, [selections, selectedEvent, clientReady]);
 
@@ -217,101 +223,121 @@ export default function EventsPage() {
 
     const handleGenerateInvoice = async () => {
         if (!selectedEvent || !sponsorProfile) return;
+        setIsCreatingInvoice(true);
         
-        let registrationFeePerPlayer = selectedEvent.regularFee;
-        if (clientReady) {
-            const eventDate = new Date(selectedEvent.date);
-            const now = new Date();
-            if (isSameDay(eventDate, now)) {
-                registrationFeePerPlayer = selectedEvent.dayOfFee;
-            } else {
-                const hoursUntilEvent = differenceInHours(eventDate, new Date());
-                if (hoursUntilEvent <= 24) { registrationFeePerPlayer = selectedEvent.veryLateFee; } 
-                else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = selectedEvent.lateFee; }
-            }
-        }
-
-        const isPsja = sponsorProfile.district === 'PHARR-SAN JUAN-ALAMO ISD';
-        const allIndependent = isPsja && Object.values(selections).length > 0 && Object.values(selections).every(s => s.studentType === 'independent');
-        
-        const teamCode = generateTeamCode({ 
-            schoolName: sponsorProfile.school, 
-            district: sponsorProfile.district,
-            studentType: allIndependent ? 'independent' : undefined
-        });
-
-        const playersToInvoice = Object.entries(selections).map(([playerId, registration]) => {
-            const player = rosterPlayers.find(p => p.id === playerId)!;
-            const lateFeeAmount = registrationFeePerPlayer - selectedEvent!.regularFee;
-            return {
-                playerName: `${player.firstName} ${player.lastName}`,
-                baseRegistrationFee: selectedEvent!.regularFee,
-                lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-                uscfAction: registration.uscfStatus !== 'current',
-            };
-        });
+        const playersWithUscfAction = Object.entries(selections).filter(
+            ([_, r]) => r.uscfStatus === 'new' || r.uscfStatus === 'renewing'
+        );
 
         try {
-            const { invoiceId, invoiceUrl, status, invoiceNumber } = await createInvoice({
-                sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
-                sponsorEmail: sponsorProfile.email,
-                schoolName: sponsorProfile.school,
-                teamCode: teamCode,
-                eventName: selectedEvent.name,
-                eventDate: selectedEvent.date,
-                uscfFee: 24,
-                players: playersToInvoice
-            });
+            if (separateUscfInvoice && playersWithUscfAction.length > 0) {
+                // SEPARATE INVOICES
+                // 1. Create Registration Invoice
+                const isPsja = sponsorProfile.district === 'PHARR-SAN JUAN-ALAMO ISD';
+                const allIndependent = isPsja && Object.values(selections).length > 0 && Object.values(selections).every(s => s.studentType === 'independent');
+                const teamCode = generateTeamCode({ schoolName: sponsorProfile.school, district: sponsorProfile.district, studentType: allIndependent ? 'independent' : undefined });
+                
+                let registrationFeePerPlayer = selectedEvent.regularFee;
+                if (clientReady) {
+                    const eventDate = new Date(selectedEvent.date);
+                    const now = new Date();
+                    if (isSameDay(eventDate, now)) { registrationFeePerPlayer = selectedEvent.dayOfFee; }
+                    else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = selectedEvent.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = selectedEvent.lateFee; } }
+                }
 
-            const newConfirmation = {
-                id: invoiceId,
-                invoiceId: invoiceId,
-                eventName: selectedEvent.name,
-                eventDate: selectedEvent.date,
-                submissionTimestamp: new Date().toISOString(),
-                selections,
-                totalInvoiced: calculatedFees,
-                invoiceUrl,
-                invoiceNumber,
-                teamCode: teamCode,
-                invoiceStatus: status,
-                purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
-                schoolName: sponsorProfile.school,
-                district: sponsorProfile.district,
-            };
+                const registrationPlayers = Object.entries(selections).map(([playerId]) => {
+                    const player = rosterPlayers.find(p => p.id === playerId)!;
+                    const lateFeeAmount = registrationFeePerPlayer - selectedEvent!.regularFee;
+                    return { playerName: `${player.firstName} ${player.lastName}`, baseRegistrationFee: selectedEvent!.regularFee, lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0, uscfAction: false, };
+                });
 
-            const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            localStorage.setItem('confirmations', JSON.stringify([...existingConfirmations, newConfirmation]));
-            
-            const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-            localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
+                const regResult = await createInvoice({
+                    sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, sponsorEmail: sponsorProfile.email, schoolName: sponsorProfile.school,
+                    teamCode: teamCode, eventName: selectedEvent.name, eventDate: selectedEvent.date, uscfFee: 24, players: registrationPlayers
+                });
+                
+                const regConfirmation = {
+                    id: regResult.invoiceId, invoiceId: regResult.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(),
+                    selections, totalInvoiced: calculatedFees.registration, invoiceUrl: regResult.invoiceUrl, invoiceNumber: regResult.invoiceNumber, teamCode: teamCode,
+                    invoiceStatus: regResult.status, purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, schoolName: sponsorProfile.school, district: sponsorProfile.district,
+                };
+
+                const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+                localStorage.setItem('confirmations', JSON.stringify([...existingConfirmations, regConfirmation]));
+                let existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+                localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, regConfirmation]));
+                
+                toast({ title: "Event Invoice Generated!", description: <p>Invoice {regResult.invoiceNumber} for event registration is ready. <a href={regResult.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">View</a></p> });
+
+                // 2. Create USCF Invoice
+                const uscfPlayers = playersWithUscfAction.map(([playerId]) => {
+                    const player = rosterPlayers.find(p => p.id === playerId)!;
+                    return { firstName: player.firstName, middleName: player.middleName, lastName: player.lastName, email: player.email, phone: player.phone, dob: player.dob.toISOString(), zipCode: player.zipCode, };
+                });
+                const uscfResult = await createMembershipInvoice({
+                    purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, purchaserEmail: sponsorProfile.email, schoolName: sponsorProfile.school,
+                    membershipType: "USCF Membership (New/Renew)", fee: 24, players: uscfPlayers,
+                });
+                const uscfInvoiceData = {
+                    id: uscfResult.invoiceId, invoiceId: uscfResult.invoiceId, invoiceTitle: `USCF Membership for ${uscfPlayers.length} players`, submissionTimestamp: new Date().toISOString(), totalInvoiced: calculatedFees.uscf,
+                    invoiceUrl: uscfResult.invoiceUrl, invoiceNumber: uscfResult.invoiceNumber, purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, invoiceStatus: uscfResult.status,
+                    schoolName: sponsorProfile.school, district: sponsorProfile.district, membershipType: "USCF Membership (New/Renew)",
+                };
+                existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+                localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, uscfInvoiceData]));
+
+                toast({ title: "USCF Invoice Generated!", description: <p>Invoice {uscfResult.invoiceNumber} for USCF fees is ready. <a href={uscfResult.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">View</a></p> });
+
+            } else {
+                // COMBINED INVOICE (original logic)
+                let registrationFeePerPlayer = selectedEvent.regularFee;
+                if (clientReady) {
+                    const eventDate = new Date(selectedEvent.date);
+                    const now = new Date();
+                    if (isSameDay(eventDate, now)) { registrationFeePerPlayer = selectedEvent.dayOfFee; } 
+                    else { const hoursUntilEvent = differenceInHours(eventDate, new Date()); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = selectedEvent.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = selectedEvent.lateFee; } }
+                }
+                const isPsja = sponsorProfile.district === 'PHARR-SAN JUAN-ALAMO ISD';
+                const allIndependent = isPsja && Object.values(selections).length > 0 && Object.values(selections).every(s => s.studentType === 'independent');
+                const teamCode = generateTeamCode({ schoolName: sponsorProfile.school, district: sponsorProfile.district, studentType: allIndependent ? 'independent' : undefined });
+
+                const playersToInvoice = Object.entries(selections).map(([playerId, registration]) => {
+                    const player = rosterPlayers.find(p => p.id === playerId)!;
+                    const lateFeeAmount = registrationFeePerPlayer - selectedEvent!.regularFee;
+                    return { playerName: `${player.firstName} ${player.lastName}`, baseRegistrationFee: selectedEvent!.regularFee, lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0, uscfAction: registration.uscfStatus !== 'current', };
+                });
+
+                const result = await createInvoice({
+                    sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, sponsorEmail: sponsorProfile.email, schoolName: sponsorProfile.school, teamCode: teamCode,
+                    eventName: selectedEvent.name, eventDate: selectedEvent.date, uscfFee: 24, players: playersToInvoice
+                });
+
+                const newConfirmation = {
+                    id: result.invoiceId, invoiceId: result.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(), selections,
+                    totalInvoiced: calculatedFees.total, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: teamCode, invoiceStatus: result.status,
+                    purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, schoolName: sponsorProfile.school, district: sponsorProfile.district,
+                };
+
+                const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+                localStorage.setItem('confirmations', JSON.stringify([...existingConfirmations, newConfirmation]));
+                const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+                localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
+                
+                toast({ title: "Invoice Generated Successfully!", description: <p>Invoice {result.invoiceNumber || result.invoiceId} for {Object.keys(selections).length} players has been submitted. <a href={result.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">View Invoice</a></p> });
+            }
+            window.dispatchEvent(new Event('all_invoices_updated'));
             window.dispatchEvent(new Event('storage'));
-            
-            toast({
-                title: "Invoice Generated Successfully!",
-                description: (
-                  <p>
-                    Invoice {invoiceNumber || invoiceId} for {Object.keys(selections).length} players has been submitted.
-                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
-                      View Invoice
-                    </a>
-                  </p>
-                ),
-            });
-
         } catch (error) {
-            console.error("Failed to create invoice or save confirmation", error);
+            console.error("Failed to create invoice(s) or save confirmation", error);
             const description = error instanceof Error ? error.message : "An unknown error occurred. Please try again.";
-            toast({
-                variant: "destructive",
-                title: "Submission Error",
-                description: description,
-            });
+            toast({ variant: "destructive", title: "Submission Error", description });
+        } finally {
+            setIsCreatingInvoice(false);
+            setIsInvoiceDialogOpen(false);
+            setSelectedEvent(null);
+            setSelections({});
+            setSeparateUscfInvoice(false);
         }
-        
-        setIsInvoiceDialogOpen(false);
-        setSelectedEvent(null);
-        setSelections({});
     }
 
     const getEventStatus = (event: Event): "Open" | "Upcoming" | "Closed" | "Completed" => {
@@ -435,6 +461,14 @@ export default function EventsPage() {
             Browse upcoming tournaments and register your players.
           </p>
         </div>
+
+        <Alert variant="destructive">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Square Not Configured</AlertTitle>
+          <AlertDescription>
+            The system is running in demo mode. No real invoices will be created. To enable Square integration, please add your credentials to the `.env` file.
+          </AlertDescription>
+        </Alert>
 
         <Card>
           <CardContent className="pt-6">
@@ -643,7 +677,7 @@ export default function EventsPage() {
           </div>
           <DialogFooter className="sm:justify-between items-center pt-2 border-t">
               <div className="font-bold text-lg">
-                Total: ${calculatedFees.toFixed(2)}
+                Total: ${calculatedFees.total.toFixed(2)}
               </div>
               <div>
                 <DialogClose asChild>
@@ -667,31 +701,75 @@ export default function EventsPage() {
               </DialogHeader>
               {selectedEvent && (
                 <div className="py-4 space-y-4">
-                  <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                          <span className="text-muted-foreground">Base Registration Fee</span>
-                          <span className="font-medium">{registrationCount} &times; ${selectedEvent.regularFee.toFixed(2)}</span>
-                      </div>
-                      {appliedPenalty > 0 && (
+                  {uscfActionsCount > 0 && (
+                    <div className="flex items-center space-x-2 my-4 p-4 border rounded-md bg-muted/50">
+                        <Switch id="separate-invoice"
+                            checked={separateUscfInvoice}
+                            onCheckedChange={setSeparateUscfInvoice}
+                        />
+                        <Label htmlFor="separate-invoice" className="cursor-pointer">Create separate invoice for USCF fees</Label>
+                    </div>
+                  )}
+
+                  {separateUscfInvoice && uscfActionsCount > 0 ? (
+                    <>
+                      <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
+                          <p className="font-semibold text-base">Invoice 1: Event Registration</p>
                           <div className="flex justify-between">
-                              <span className="text-muted-foreground">{feeTypeLabel}</span>
-                              <span className="font-medium">{registrationCount} &times; ${appliedPenalty.toFixed(2)}</span>
+                              <span className="text-muted-foreground">Base Registration Fee</span>
+                              <span className="font-medium">{registrationCount} &times; ${selectedEvent.regularFee.toFixed(2)}</span>
                           </div>
-                      )}
-                      {uscfActionsCount > 0 && (
+                          {appliedPenalty > 0 && (
+                              <div className="flex justify-between">
+                                  <span className="text-muted-foreground">{feeTypeLabel}</span>
+                                  <span className="font-medium">{registrationCount} &times; ${appliedPenalty.toFixed(2)}</span>
+                              </div>
+                          )}
+                          <div className="flex justify-between font-bold pt-2 border-t">
+                            <span>Subtotal</span>
+                            <span>${calculatedFees.registration.toFixed(2)}</span>
+                          </div>
+                      </div>
+
+                      <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
+                          <p className="font-semibold text-base">Invoice 2: USCF Memberships</p>
                           <div className="flex justify-between">
                               <span className="text-muted-foreground">New / Renewing USCF Memberships</span>
                               <span className="font-medium">{uscfActionsCount} &times; ${uscfFee.toFixed(2)}</span>
                           </div>
-                      )}
-                      <div className="pt-2 border-t mt-2">
-                        <p className="text-xs text-muted-foreground/80">Fee reminder: a late fee is applied for registrations made within 48 hours of the event. This fee increases for registrations made within 24 hours or on the day of the event.</p>
+                          <div className="flex justify-between font-bold pt-2 border-t">
+                            <span>Subtotal</span>
+                            <span>${calculatedFees.uscf.toFixed(2)}</span>
+                          </div>
                       </div>
-                  </div>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Base Registration Fee</span>
+                            <span className="font-medium">{registrationCount} &times; ${selectedEvent.regularFee.toFixed(2)}</span>
+                        </div>
+                        {appliedPenalty > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">{feeTypeLabel}</span>
+                                <span className="font-medium">{registrationCount} &times; ${appliedPenalty.toFixed(2)}</span>
+                            </div>
+                        )}
+                        {uscfActionsCount > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">New / Renewing USCF Memberships</span>
+                                <span className="font-medium">{uscfActionsCount} &times; ${uscfFee.toFixed(2)}</span>
+                            </div>
+                        )}
+                        <div className="pt-2 border-t mt-2">
+                          <p className="text-xs text-muted-foreground/80">Fee reminder: a late fee is applied for registrations made within 48 hours of the event. This fee increases for registrations made within 24 hours or on the day of the event.</p>
+                        </div>
+                    </div>
+                  )}
 
                   <div className="text-center rounded-lg border border-primary/20 bg-primary/5 py-4">
                     <p className="text-sm font-medium text-muted-foreground">TOTAL TO BE INVOICED</p>
-                    <p className="text-3xl font-bold text-primary">${calculatedFees.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-primary">${calculatedFees.total.toFixed(2)}</p>
                   </div>
                 </div>
               )}
@@ -700,7 +778,10 @@ export default function EventsPage() {
                       setIsInvoiceDialogOpen(false);
                       setIsDialogOpen(true);
                   }}>Back</Button>
-                  <Button onClick={handleGenerateInvoice}>Register and Accept Invoice</Button>
+                  <Button onClick={handleGenerateInvoice} disabled={isCreatingInvoice}>
+                      {isCreatingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Register and Accept Invoice(s)
+                  </Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>
