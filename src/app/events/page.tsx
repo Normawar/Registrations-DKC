@@ -280,6 +280,11 @@ export default function EventsPage() {
                 district: sponsorProfile.district,
             };
 
+            const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+            const updatedInvoices = [...existingInvoices, newConfirmation];
+            localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
+            
+            // Also update the confirmations-specific storage for that page
             const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
             const updatedConfirmations = [...existingConfirmations, newConfirmation];
             localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));

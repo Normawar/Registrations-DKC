@@ -225,8 +225,13 @@ function UscfPurchaseComponent() {
             setInvoice(newMembershipInvoice);
             setInvoiceStatus(result.status);
             
-            const existingInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
-            localStorage.setItem('membershipInvoices', JSON.stringify([...existingInvoices, newMembershipInvoice]));
+            const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+            localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newMembershipInvoice]));
+            
+            // Also update the membership-specific storage for that page
+            const existingMembershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
+            localStorage.setItem('membershipInvoices', JSON.stringify([...existingMembershipInvoices, newMembershipInvoice]));
+
 
             toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {

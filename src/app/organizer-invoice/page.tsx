@@ -68,7 +68,7 @@ export default function OrganizerInvoicePage() {
       
       const newOrganizerInvoice = {
         id: result.invoiceId, // Use invoiceId as the unique ID
-        description: values.invoiceTitle,
+        invoiceTitle: values.invoiceTitle,
         submissionTimestamp: new Date().toISOString(),
         totalInvoiced: values.lineItems.reduce((acc, item) => acc + item.amount, 0),
         invoiceId: result.invoiceId,
@@ -80,8 +80,8 @@ export default function OrganizerInvoicePage() {
         district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
       };
       
-      const existingInvoices = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
-      localStorage.setItem('organizerInvoices', JSON.stringify([...existingInvoices, newOrganizerInvoice]));
+      const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newOrganizerInvoice]));
 
       toast({
         title: 'Invoice Created Successfully!',

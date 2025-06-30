@@ -102,13 +102,11 @@ function InvoicesComponent() {
   useEffect(() => {
     if (!profile) return;
     try {
-        const confirmationsData = JSON.parse(localStorage.getItem('confirmations') || '[]');
-        const membershipInvoicesData = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
-        const organizerInvoicesData = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
+        const allInvoicesData = JSON.parse(localStorage.getItem('all_invoices') || '[]');
 
-        const normalizedConfirmations: CombinedInvoice[] = confirmationsData.map((inv: any) => ({
-            id: inv.id,
-            description: inv.eventName || 'Event Registration',
+        const normalizedInvoices: CombinedInvoice[] = allInvoicesData.map((inv: any) => ({
+            id: inv.invoiceId || inv.id,
+            description: inv.invoiceTitle || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : 'Invoice'),
             submissionTimestamp: inv.submissionTimestamp,
             totalInvoiced: inv.totalInvoiced || 0,
             invoiceId: inv.invoiceId,
@@ -116,50 +114,18 @@ function InvoicesComponent() {
             invoiceNumber: inv.invoiceNumber,
             schoolName: inv.schoolName,
             district: inv.district,
-            purchaserName: inv.purchaserName,
+            purchaserName: inv.purchaserName || inv.sponsorName,
             invoiceStatus: inv.invoiceStatus || inv.status,
         }));
-
-        const normalizedMembershipInvoices: CombinedInvoice[] = membershipInvoicesData.map((inv: any) => ({
-            id: inv.id,
-            description: inv.membershipType ? `USCF Membership (${inv.membershipType})` : 'USCF Membership',
-            submissionTimestamp: inv.submissionTimestamp,
-            totalInvoiced: inv.totalInvoiced || 0,
-            invoiceId: inv.invoiceId,
-            invoiceUrl: inv.invoiceUrl,
-            invoiceNumber: inv.invoiceNumber,
-            schoolName: inv.schoolName,
-            district: inv.district,
-            purchaserName: inv.purchaserName,
-            invoiceStatus: inv.invoiceStatus || inv.status,
-        }));
-        
-        const normalizedOrganizerInvoices: CombinedInvoice[] = organizerInvoicesData.map((inv: any) => ({
-            id: inv.id,
-            description: inv.invoiceTitle || inv.description || 'Custom Invoice',
-            submissionTimestamp: inv.submissionTimestamp,
-            totalInvoiced: inv.totalInvoiced || 0,
-            invoiceId: inv.invoiceId,
-            invoiceUrl: inv.invoiceUrl,
-            invoiceNumber: inv.invoiceNumber,
-            schoolName: inv.schoolName,
-            district: inv.district,
-            purchaserName: inv.purchaserName,
-            invoiceStatus: inv.invoiceStatus || inv.status,
-        }));
-
-        const allLocalInvoices = [...normalizedConfirmations, ...normalizedMembershipInvoices, ...normalizedOrganizerInvoices];
         
         const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
-        
-        for (const inv of allLocalInvoices) {
-             if (!inv.invoiceId && !inv.id) continue;
-            const key = inv.invoiceId || inv.id;
-            // Ensure totalInvoiced is a number
-            if(typeof inv.totalInvoiced !== 'number') {
-              inv.totalInvoiced = parseFloat(String(inv.totalInvoiced)) || 0;
+        for (const inv of normalizedInvoices) {
+            if (inv.invoiceId) {
+                if(typeof inv.totalInvoiced !== 'number') {
+                    inv.totalInvoiced = parseFloat(String(inv.totalInvoiced)) || 0;
+                }
+                uniqueInvoicesMap.set(inv.invoiceId, inv);
             }
-            uniqueInvoicesMap.set(key, inv);
         }
         
         const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
@@ -173,10 +139,11 @@ function InvoicesComponent() {
         
         setAllInvoices(filteredInvoices);
 
-        const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
+        const initialStatuses: Record<string, { status?: string; isLoading: boolean }>> = {};
         for (const inv of filteredInvoices) {
             if (inv.invoiceId) {
-                initialStatuses[inv.id] = { status: inv.invoiceStatus || 'LOADING', isLoading: !inv.invoiceStatus };
+                const status = inv.invoiceStatus?.toUpperCase() || 'LOADING';
+                initialStatuses[inv.id] = { status: status, isLoading: status === 'LOADING' };
             } else {
                 initialStatuses[inv.id] = { status: 'NO_INVOICE', isLoading: false };
             }
