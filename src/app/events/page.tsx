@@ -53,6 +53,7 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 type PlayerRegistration = {
   byes: {
@@ -95,6 +96,11 @@ export default function EventsPage() {
     const [selections, setSelections] = useState<RegistrationSelections>({});
     const [calculatedFees, setCalculatedFees] = useState(0);
     const [clientReady, setClientReady] = useState(false);
+    const [isSquareConfigured, setIsSquareConfigured] = useState(true);
+
+    useEffect(() => {
+        checkSquareConfig().then(({ isConfigured }) => setIsSquareConfigured(isConfigured));
+    }, []);
 
     useEffect(() => {
         setClientReady(true);
@@ -667,6 +673,15 @@ export default function EventsPage() {
               </DialogHeader>
               {selectedEvent && (
                 <div className="py-4 space-y-4">
+                  {!isSquareConfigured && (
+                    <Alert variant="destructive">
+                      <Info className="h-4 w-4" />
+                      <AlertTitle>Square Not Configured</AlertTitle>
+                      <AlertDescription>
+                        Payment processing is disabled. Please add your Square credentials to your .env file to create invoices.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   <div className="rounded-lg border bg-muted p-4 space-y-2 text-sm">
                       <div className="flex justify-between">
                           <span className="text-muted-foreground">Base Registration Fee</span>
@@ -700,7 +715,7 @@ export default function EventsPage() {
                       setIsInvoiceDialogOpen(false);
                       setIsDialogOpen(true);
                   }}>Back</Button>
-                  <Button onClick={handleGenerateInvoice}>Register and Accept Invoice</Button>
+                  <Button onClick={handleGenerateInvoice} disabled={!isSquareConfigured}>Register and Accept Invoice</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>

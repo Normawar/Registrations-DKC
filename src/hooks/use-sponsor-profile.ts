@@ -36,7 +36,12 @@ export function useSponsorProfile() {
     try {
         const storedProfile = localStorage.getItem('sponsor_profile');
         if (storedProfile) {
-            setProfile(JSON.parse(storedProfile));
+            const parsed = JSON.parse(storedProfile);
+            // Ensure role exists, default to 'sponsor' if missing for backward compatibility
+            if (!parsed.role) {
+                parsed.role = 'sponsor';
+            }
+            setProfile(parsed);
         } else {
             localStorage.setItem('sponsor_profile', JSON.stringify(defaultSponsorData));
             setProfile(defaultSponsorData);

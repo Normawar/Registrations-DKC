@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,7 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { schoolData } from '@/lib/data/school-data';
 import { createOrganizerInvoice } from '@/ai/flows/create-organizer-invoice-flow';
-import { Loader2, PlusCircle, Trash2, ExternalLink } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, ExternalLink, Info } from 'lucide-react';
+import { checkSquareConfig } from '@/lib/actions/check-config';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 const lineItemSchema = z.object({
   name: z.string().min(1, 'Item name is required.'),
@@ -39,6 +41,11 @@ export default function OrganizerInvoicePage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSquareConfigured, setIsSquareConfigured] = useState(true);
+
+  useEffect(() => {
+    checkSquareConfig().then(({ isConfigured }) => setIsSquareConfigured(isConfigured));
+  }, []);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
@@ -118,6 +125,17 @@ export default function OrganizerInvoicePage() {
             Generate a custom invoice for a school.
           </p>
         </div>
+        
+        {!isSquareConfigured && (
+          <Alert variant="destructive">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Square Not Configured</AlertTitle>
+            <AlertDescription>
+              Payment processing is disabled. Please add your Square credentials to your .env file to create invoices. Invoice creation will fail.
+            </AlertDescription>
+          </Alert>
+        )}
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <Card>
@@ -252,7 +270,7 @@ export default function OrganizerInvoicePage() {
                 </Button>
               </CardContent>
               <CardFooter>
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading || !isSquareConfigured}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Generate Invoice
                 </Button>
