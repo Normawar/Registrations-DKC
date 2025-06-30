@@ -69,6 +69,32 @@ const INVOICE_STATUSES = [
 
 const sampleInvoices: CombinedInvoice[] = [
   {
+    id: 'sample-new-organizer-1',
+    invoiceId: 'inv-sample-new-org-1',
+    invoiceNumber: 'SAMP-005',
+    description: 'New Organizer Invoice (Test)',
+    submissionTimestamp: new Date().toISOString(),
+    totalInvoiced: 175.50,
+    invoiceUrl: 'https://squareup.com/invoice/inv-sample-new-org-1',
+    purchaserName: 'Sponsor Name',
+    invoiceStatus: 'PUBLISHED',
+    schoolName: 'SHARYLAND PIONEER H S',
+    district: 'SHARYLAND ISD',
+  },
+  {
+    id: 'sample-new-uscf-1',
+    invoiceId: 'inv-sample-new-uscf-1',
+    invoiceNumber: 'SAMP-006',
+    description: 'New USCF Membership Invoice (Test)',
+    submissionTimestamp: new Date().toISOString(),
+    totalInvoiced: 48.00,
+    invoiceUrl: 'https://squareup.com/invoice/inv-sample-new-uscf-1',
+    purchaserName: 'Sponsor Name',
+    invoiceStatus: 'PAID',
+    schoolName: 'SHARYLAND PIONEER H S',
+    district: 'SHARYLAND ISD',
+  },
+  {
     id: 'sample-1',
     invoiceId: 'inv-sample-001',
     invoiceNumber: '0001',
@@ -181,7 +207,7 @@ function InvoicesComponent() {
         
         const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
 
-        // Add sample invoices first
+        // Add sample invoices first, so they can be overwritten by real ones.
         for (const inv of sampleInvoices) {
             const key = inv.invoiceId || inv.id;
             uniqueInvoicesMap.set(key, inv);
@@ -191,7 +217,7 @@ function InvoicesComponent() {
         for (const inv of allLocalInvoices) {
             const normalizedInv: CombinedInvoice = {
                 id: inv.id,
-                description: inv.description || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : 'Unknown Invoice'),
+                description: inv.description || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : inv.invoiceTitle || 'Unknown Invoice'),
                 submissionTimestamp: inv.submissionTimestamp,
                 totalInvoiced: inv.totalInvoiced || 0,
                 invoiceId: inv.invoiceId,
@@ -281,6 +307,9 @@ function InvoicesComponent() {
         
         if (statusFilter === 'UNPAID' && ['PUBLISHED', 'UNPAID'].includes(currentStatus)) {
             return true;
+        }
+        if (statusFilter === 'NO_INVOICE' && currentStatus === 'NO_INVOICE') {
+          return true;
         }
         return currentStatus === statusFilter;
       };
