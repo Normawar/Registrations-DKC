@@ -72,12 +72,17 @@ const SponsorSignUpForm = () => {
 
   const handleDistrictChange = (district: string) => {
     form.setValue('district', district);
-    form.setValue('school', ''); 
-    const filteredSchools = schoolData
-      .filter((school) => school.district === district)
-      .map((school) => school.schoolName)
-      .sort();
-    setSchoolsForDistrict(filteredSchools);
+    if (district === 'None') {
+      form.setValue('school', 'Independent');
+      setSchoolsForDistrict(['Independent']);
+    } else {
+      form.setValue('school', '');
+      const filteredSchools = schoolData
+        .filter((school) => school.district === district)
+        .map((school) => school.schoolName)
+        .sort();
+      setSchoolsForDistrict(filteredSchools);
+    }
   };
   
   function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
@@ -174,7 +179,7 @@ const SponsorSignUpForm = () => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>School</FormLabel>
-                 <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
+                 <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict || selectedDistrict === 'None'}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a school" />

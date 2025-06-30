@@ -284,12 +284,17 @@ export default function ProfilePage() {
 
   const handleDistrictChange = (district: string) => {
     profileForm.setValue('district', district);
-    profileForm.setValue('school', ''); 
-    const filteredSchools = schoolData
-      .filter((school) => school.district === district)
-      .map((school) => school.schoolName)
-      .sort();
-    setSchoolsForDistrict(filteredSchools);
+    if (district === 'None') {
+        profileForm.setValue('school', 'Independent');
+        setSchoolsForDistrict(['Independent']);
+    } else {
+        profileForm.setValue('school', '');
+        const filteredSchools = schoolData
+        .filter((school) => school.district === district)
+        .map((school) => school.schoolName)
+        .sort();
+        setSchoolsForDistrict(filteredSchools);
+    }
   };
   
   function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
@@ -520,7 +525,7 @@ export default function ProfilePage() {
                                         render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>School</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
+                                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict || selectedDistrict === 'None'}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                 <SelectValue placeholder="Select a school" />

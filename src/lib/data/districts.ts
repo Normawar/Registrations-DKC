@@ -1,5 +1,6 @@
 
 export const districts: string[] = [
+  'None',
   'BRILLANTE ACADEMY',
   'BROWNSVILLE ISD',
   'DONNA ISD',
