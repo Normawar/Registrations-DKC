@@ -142,8 +142,8 @@ function InvoicesComponent() {
                 invoiceNumber: conf.invoiceNumber,
                 purchaserName: `${profile.firstName} ${profile.lastName}`,
                 invoiceStatus: conf.invoiceStatus,
-                schoolName: profile.school,
-                district: profile.district,
+                schoolName: conf.schoolName,
+                district: conf.district,
             }));
 
             const mappedMembershipInvoices: CombinedInvoice[] = membershipInvoices.map((inv: any) => ({
@@ -156,8 +156,8 @@ function InvoicesComponent() {
                 invoiceNumber: inv.invoiceNumber,
                 purchaserName: inv.purchaserName,
                 invoiceStatus: inv.status,
-                schoolName: profile.school,
-                district: profile.district,
+                schoolName: inv.schoolName,
+                district: inv.district,
             }));
             
             const allPossibleInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices, ...mockOrganizerInvoices];

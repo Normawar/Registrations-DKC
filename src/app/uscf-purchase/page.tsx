@@ -84,6 +84,8 @@ type InvoiceState = CreateMembershipInvoiceOutput & {
     totalInvoiced: number;
     purchaserName: string;
     purchaserEmail: string;
+    schoolName: string;
+    district: string;
 };
 
 
@@ -211,6 +213,8 @@ function UscfPurchaseComponent() {
                 totalInvoiced: price * values.players.length,
                 purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 purchaserEmail: sponsorProfile.email,
+                schoolName: sponsorProfile.school,
+                district: sponsorProfile.district,
             };
 
             setInvoice(newMembershipInvoice);
