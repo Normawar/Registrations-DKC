@@ -151,18 +151,13 @@ export default function ConfirmationsPage() {
             }
 
             if (!auth.currentUser) {
-              try {
-                await signInAnonymously(auth);
-              } catch (error) {
-                 console.error("Anonymous sign-in failed during save:", error);
-                 toast({
-                    variant: 'destructive',
-                    title: 'Authentication Failed',
-                    description: 'Could not authenticate with Firebase. Please check your credentials and network connection.',
-                 });
-                 setIsUpdating(prev => ({...prev, [conf.id]: false}));
-                 return;
-              }
+                toast({
+                   variant: 'destructive',
+                   title: 'Authentication Not Ready',
+                   description: 'Please wait a moment and try again. Authentication is initializing.',
+                });
+                setIsUpdating(prev => ({...prev, [conf.id]: false}));
+                return;
             }
 
             const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
@@ -368,5 +363,3 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
-
-    
