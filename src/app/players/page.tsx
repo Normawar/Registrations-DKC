@@ -1,6 +1,10 @@
+
 'use client';
 
 import { useState, useMemo } from "react";
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,15 +38,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
+import { districts as allDistricts } from '@/lib/data/districts';
+import { schoolData } from '@/lib/data/school-data';
 
-const allPlayers = [
-  { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", rating: 1850, team: "Solo", events: 2, eventIds: ['e2'] },
-  { id: "p2", firstName: "Olivia", middleName: "K", lastName: "Smith", uscfId: "87654321", rating: 2100, team: "City Chess Club", events: 3, eventIds: ['e1', 'e3'] },
-  { id: "p3", firstName: "Noah", middleName: "L", lastName: "Williams", uscfId: "11223344", rating: 1600, team: "Scholastic Stars", events: 1, eventIds: ['e1'] },
-  { id: "p4", firstName: "Emma", middleName: "M", lastName: "Brown", uscfId: "44332211", rating: 1950, team: "Solo", events: 1, eventIds: ['e2'] },
-  { id: "p5", firstName: "James", middleName: "N", lastName: "Jones", uscfId: "55667788", rating: 2200, team: "Grandmasters Inc.", events: 4, eventIds: ['e1', 'e2', 'e3'] },
-  { id: "p6", firstName: "Alex", middleName: "S", lastName: "Ray", uscfId: "98765432", rating: 1750, team: "Sharyland Pioneer HS", events: 2, eventIds: ['e1'] },
-  { id: "p7", firstName: "Jordan", middleName: "T", lastName: "Lee", uscfId: "23456789", rating: 2050, team: "Sharyland Pioneer HS", events: 3, eventIds: ['e1', 'e2'] },
+const initialPlayersData = [
+  { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", rating: 1850, school: "Independent", district: "None", events: 2, eventIds: ['e2'] },
+  { id: "p2", firstName: "Olivia", middleName: "K", lastName: "Smith", uscfId: "87654321", rating: 2100, school: "City Chess Club", district: "None", events: 3, eventIds: ['e1', 'e3'] },
+  { id: "p3", firstName: "Noah", middleName: "L", lastName: "Williams", uscfId: "11223344", rating: 1600, school: "Scholastic Stars", district: "None", events: 1, eventIds: ['e1'] },
+  { id: "p4", firstName: "Emma", middleName: "M", lastName: "Brown", uscfId: "44332211", rating: 1950, school: "Independent", district: "None", events: 1, eventIds: ['e2'] },
+  { id: "p5", firstName: "James", middleName: "N", lastName: "Jones", uscfId: "55667788", rating: 2200, school: "Grandmasters Inc.", district: "None", events: 4, eventIds: ['e1', 'e2', 'e3'] },
+  { id: "p6", firstName: "Alex", middleName: "S", lastName: "Ray", uscfId: "98765432", rating: 1750, school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 2, eventIds: ['e1'] },
+  { id: "p7", firstName: "Jordan", middleName: "T", lastName: "Lee", uscfId: "23456789", rating: 2050, school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 3, eventIds: ['e1', 'e2'] },
 ];
 
 const allEvents = [
@@ -51,15 +69,83 @@ const allEvents = [
   { id: 'e3', name: 'Autumn Classic' },
 ];
 
-type Player = typeof allPlayers[0];
-type SortableColumnKey = keyof Omit<Player, 'id' | 'eventIds' | 'middleName' | 'firstName'> | 'name';
+type Player = typeof initialPlayersData[0];
+type SortableColumnKey = 'name' | 'uscfId' | 'rating' | 'school' | 'district' | 'events';
+
+const playerFormSchema = z.object({
+  id: z.string().optional(),
+  firstName: z.string().min(1, "First Name is required."),
+  middleName: z.string().optional(),
+  lastName: z.string().min(1, "Last Name is required."),
+  district: z.string().min(1, "District is required."),
+  school: z.string().min(1, "School is required."),
+  uscfId: z.string().min(1, "USCF ID is required."),
+  rating: z.coerce.number().optional(),
+});
+type PlayerFormValues = z.infer<typeof playerFormSchema>;
+
 
 export default function PlayersPage() {
-  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
+  const { toast } = useToast();
+  const [players, setPlayers] = useState<Player[]>(initialPlayersData);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
 
+  const form = useForm<PlayerFormValues>({
+    resolver: zodResolver(playerFormSchema),
+    defaultValues: {
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      district: '',
+      school: '',
+      uscfId: '',
+      rating: undefined,
+    },
+  });
+
+  const handleAddPlayer = () => {
+    form.reset();
+    setIsDialogOpen(true);
+  };
+  
+  const handleDistrictChange = (district: string) => {
+    form.setValue('district', district);
+    form.setValue('school', '');
+    if (district === 'None') {
+        setSchoolsForDistrict(['Independent']);
+        form.setValue('school', 'Independent');
+    } else {
+        const filteredSchools = schoolData
+        .filter((school) => school.district === district)
+        .map((school) => school.schoolName)
+        .sort();
+        setSchoolsForDistrict(filteredSchools);
+    }
+  };
+
+  function onSubmit(values: PlayerFormValues) {
+    const newPlayer: Player = {
+      id: `p-${Date.now()}`,
+      firstName: values.firstName,
+      middleName: values.middleName,
+      lastName: values.lastName,
+      uscfId: values.uscfId,
+      rating: values.rating || 0,
+      district: values.district,
+      school: values.school,
+      events: 0,
+      eventIds: [],
+    };
+    setPlayers(prev => [...prev, newPlayer]);
+    toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added.`});
+    setIsDialogOpen(false);
+  }
+
   const filteredAndSortedPlayers = useMemo(() => {
-    let sortablePlayers = [...allPlayers];
+    let sortablePlayers = [...players];
     
     if (selectedEvent !== 'all') {
       sortablePlayers = sortablePlayers.filter(p => p.eventIds.includes(selectedEvent));
@@ -95,7 +181,7 @@ export default function PlayersPage() {
         });
     }
     return sortablePlayers;
-  }, [sortConfig, selectedEvent]);
+  }, [sortConfig, selectedEvent, players]);
   
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -115,6 +201,8 @@ export default function PlayersPage() {
       return <ArrowDown className="ml-2 h-4 w-4" />;
     }
   };
+  
+  const selectedDistrict = form.watch('district');
 
   return (
     <AppLayout>
@@ -126,7 +214,7 @@ export default function PlayersPage() {
               Manage player rosters for all events. (Organizer View)
             </p>
           </div>
-          <Button>
+          <Button onClick={handleAddPlayer}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add New Player
           </Button>
         </div>
@@ -171,8 +259,13 @@ export default function PlayersPage() {
                       </Button>
                   </TableHead>
                   <TableHead className="p-0">
-                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('team')}>
-                          Team / Sponsor {getSortIcon('team')}
+                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('school')}>
+                          School {getSortIcon('school')}
+                      </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('district')}>
+                          District {getSortIcon('district')}
                       </Button>
                   </TableHead>
                    <TableHead className="p-0">
@@ -199,7 +292,8 @@ export default function PlayersPage() {
                     </TableCell>
                     <TableCell>{player.uscfId}</TableCell>
                     <TableCell>{player.rating}</TableCell>
-                    <TableCell>{player.team}</TableCell>
+                    <TableCell>{player.school}</TableCell>
+                    <TableCell>{player.district}</TableCell>
                     <TableCell>{player.events}</TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -226,6 +320,67 @@ export default function PlayersPage() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New Player</DialogTitle>
+            <DialogDescription>Fill out the details for the new player.</DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Opt.)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="district"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>District</FormLabel>
+                      <Select onValueChange={handleDistrictChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {allDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="school"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>School</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="12345678 or NEW" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                 <FormField control={form.control} name="rating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+              </div>
+              <DialogFooter className="pt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="ghost">Cancel</Button>
+                </DialogClose>
+                <Button type="submit">Add Player</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
