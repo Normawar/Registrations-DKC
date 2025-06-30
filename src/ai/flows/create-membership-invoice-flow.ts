@@ -45,6 +45,10 @@ const createMembershipInvoiceFlow = ai.defineFlow(
     outputSchema: CreateMembershipInvoiceOutputSchema,
   },
   async (input) => {
+    if (input.membershipType.toLowerCase().includes('error') || input.membershipType.toLowerCase().includes('invalid')) {
+        throw new Error(`Invalid membership type provided: "${input.membershipType}". Please return to the previous page and get a valid membership suggestion.`);
+    }
+
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
