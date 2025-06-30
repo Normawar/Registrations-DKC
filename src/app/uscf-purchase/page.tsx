@@ -207,7 +207,7 @@ function UscfPurchaseComponent() {
                 if (error.message.includes('Square configuration is incomplete')) {
                     description = (
                         <span>
-                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">Square Developer Dashboard</a>.
+                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline">Square Developer Dashboard</a>.
                         </span>
                     );
                 } else {
@@ -310,7 +310,7 @@ function UscfPurchaseComponent() {
                 if (error.message.includes('Square configuration is incomplete')) {
                     description = (
                         <span>
-                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">Square Developer Dashboard</a>.
+                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline">Square Developer Dashboard</a>.
                         </span>
                     );
                 } else {
