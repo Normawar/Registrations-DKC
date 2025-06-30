@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -42,6 +41,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -113,8 +113,24 @@ export default function ConfirmationsPage() {
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
   const [confInputs, setConfInputs] = useState<Record<string, Partial<ConfirmationInputs>>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
+  const [authError, setAuthError] = useState<string | null>(null);
   
   useEffect(() => {
+    // Attempt anonymous auth on load, but don't block UI
+    const authenticate = async () => {
+      if (auth && !auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (error) {
+          console.error("Anonymous sign-in failed on page load:", error);
+          if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
+            setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console. Please contact your administrator.");
+          }
+        }
+      }
+    };
+    authenticate();
+
     // Load confirmations from local storage
     try {
       const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -165,37 +181,33 @@ export default function ConfirmationsPage() {
     const paymentMethod = inputs.paymentMethod || 'po';
 
     try {
-        // Step 1: Ensure authentication for file uploads if needed
-        if (inputs.file) {
-            if (!auth) {
-                toast({ variant: 'destructive', title: 'Upload Failed', description: 'Firebase is not available. Please check your .env configuration.' });
-                setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
-                return;
-            }
-            if (!auth.currentUser) {
-                try {
-                    await signInAnonymously(auth);
-                } catch (error) {
-                    console.error("Anonymous sign-in failed:", error);
-                    toast({ variant: 'destructive', title: 'Authentication Failed', description: 'Could not sign in to upload file. Please enable anonymous sign-in in your Firebase project.' });
-                    setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
-                    return;
-                }
-            }
-        }
-        
         let paymentFileName = conf.paymentFileName;
         let paymentFileUrl = conf.paymentFileUrl;
 
-        // Step 2: Upload new file if there is one
-        if (inputs.file && storage) {
+        // Step 1: Handle file upload if a file is present
+        if (inputs.file) {
+            // Check for auth readiness
+            if (!auth || !auth.currentUser) {
+                // This will use the error from page load, or a generic one.
+                const message = authError || "Authentication is not ready. Cannot upload files.";
+                toast({ variant: 'destructive', title: 'Upload Failed', description: message });
+                setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
+                return;
+            }
+            if (!storage) {
+                toast({ variant: 'destructive', title: 'Upload Failed', description: 'Firebase Storage is not configured. Please check your .env file.' });
+                setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
+                return;
+            }
+            
+            // Upload new file
             const storageRef = ref(storage, `payment-proofs/${conf.id}/${inputs.file.name}`);
             const snapshot = await uploadBytes(storageRef, inputs.file);
             paymentFileUrl = await getDownloadURL(snapshot.ref);
             paymentFileName = inputs.file.name;
         }
         
-        // Step 3: Update Square Invoice Title
+        // Step 2: Update Square Invoice Title
         const teamCode = conf.teamCode || generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
         let newTitle = `${teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName}`;
         let toastMessage = "Payment information has been saved.";
@@ -219,7 +231,7 @@ export default function ConfirmationsPage() {
         await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
         toastMessage = "Payment information has been saved and the invoice has been updated.";
 
-        // Step 4: Update local state and localStorage
+        // Step 3: Update local state and localStorage
         const updatedConfirmations = confirmations.map(c => {
             if (c.id === conf.id) {
                 return {
@@ -241,9 +253,15 @@ export default function ConfirmationsPage() {
         setConfirmations(updatedConfirmations);
       
         // Update the inputs state to reflect saved data and clear the file
-        handleInputChange(conf.id, 'file', null);
-        handleInputChange(conf.id, 'paymentFileName', paymentFileName);
-        handleInputChange(conf.id, 'paymentFileUrl', paymentFileUrl);
+        setConfInputs(prev => ({
+            ...prev,
+            [conf.id]: {
+                ...prev[conf.id],
+                file: null,
+                paymentFileName: paymentFileName,
+                paymentFileUrl: paymentFileUrl,
+            }
+        }));
         
         toast({ title: "Success", description: toastMessage });
 
@@ -266,6 +284,13 @@ export default function ConfirmationsPage() {
             A history of all your event registration submissions.
           </p>
         </div>
+
+        {authError && (
+          <Alert variant="destructive">
+            <AlertTitle>Uploads Disabled</AlertTitle>
+            <AlertDescription>{authError}</AlertDescription>
+          </Alert>
+        )}
 
         <Card>
           <CardHeader>
@@ -460,7 +485,7 @@ export default function ConfirmationsPage() {
                                         <p className="text-sm text-muted-foreground">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p>
                                         <p className="font-bold text-lg mt-1">956-289-3418</p>
                                     </div>
-                                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=db417b36-48ff-426c-b1a8-1e6cdaddba01" alt="Zelle QR Code" width={100} height={100} className="rounded-md" data-ai-hint="QR code" />
+                                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md" data-ai-hint="QR code" />
                                </div>
                                <div className="grid md:grid-cols-2 gap-4 items-start">
                                     <div className="space-y-2">
