@@ -26,7 +26,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 
@@ -47,6 +47,7 @@ const organizerMenuItems = [
   { href: "/players", icon: PawnIcon, label: "All Players" },
   { href: "/manage-events", icon: FolderKanban, label: "Manage Events" },
   { href: "/schools", icon: School, label: "Schools & Districts" },
+  { href: "/organizer-invoice", icon: PlusCircle, label: "Create Invoice" },
 ];
 
 const icons: { [key: string]: React.ElementType } = {

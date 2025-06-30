@@ -1,0 +1,247 @@
+
+'use client';
+
+import { useState, useMemo } from 'react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { useRouter } from 'next/navigation';
+
+import { AppLayout } from "@/components/app-layout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { schoolData } from '@/lib/data/school-data';
+import { createOrganizerInvoice } from '@/ai/flows/create-organizer-invoice-flow';
+import { Loader2, PlusCircle, Trash2, ExternalLink } from 'lucide-react';
+
+const lineItemSchema = z.object({
+  name: z.string().min(1, 'Item name is required.'),
+  amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
+  note: z.string().optional(),
+});
+
+const invoiceFormSchema = z.object({
+  schoolName: z.string().min(1, 'Please select a school.'),
+  sponsorName: z.string().min(1, 'Sponsor name is required.'),
+  sponsorEmail: z.string().email('Please enter a valid email.'),
+  invoiceTitle: z.string().min(3, 'Invoice title is required.'),
+  lineItems: z.array(lineItemSchema).min(1, 'At least one line item is required.'),
+});
+
+type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
+
+export default function OrganizerInvoicePage() {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const form = useForm<InvoiceFormValues>({
+    resolver: zodResolver(invoiceFormSchema),
+    defaultValues: {
+      schoolName: '',
+      sponsorName: '',
+      sponsorEmail: '',
+      invoiceTitle: '',
+      lineItems: [{ name: '', amount: 0, note: '' }],
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'lineItems',
+  });
+
+  const uniqueSchools = useMemo(() => {
+    const schoolNames = schoolData.map(s => s.schoolName);
+    return [...new Set(schoolNames)].sort();
+  }, []);
+
+  async function onSubmit(values: InvoiceFormValues) {
+    setIsLoading(true);
+    try {
+      const result = await createOrganizerInvoice(values);
+      toast({
+        title: 'Invoice Created Successfully!',
+        description: (
+            <p>
+              Invoice {result.invoiceNumber || result.invoiceId} has been created and sent.
+              <a href={result.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
+                View Invoice
+              </a>
+            </p>
+        ),
+      });
+      router.push('/invoices');
+    } catch (error) {
+      console.error('Failed to create invoice:', error);
+      const description = error instanceof Error ? error.message : 'An unknown error occurred.';
+      toast({
+        variant: 'destructive',
+        title: 'Invoice Creation Failed',
+        description,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <AppLayout>
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold font-headline">Create Invoice</h1>
+          <p className="text-muted-foreground">
+            Generate a custom invoice for a school.
+          </p>
+        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recipient Details</CardTitle>
+                <CardDescription>Select the school and enter the contact information for the invoice.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="schoolName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>School</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a school" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {uniqueSchools.map((school) => (
+                                <SelectItem key={school} value={school}>
+                                  {school}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="invoiceTitle"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Invoice Title</FormLabel>
+                            <FormControl><Input placeholder="e.g., Fall Chess Club Dues" {...field} /></FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                </div>
+                 <div className="grid md:grid-cols-2 gap-4">
+                    <FormField
+                    control={form.control}
+                    name="sponsorName"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Recipient Name</FormLabel>
+                        <FormControl><Input placeholder="Jane Doe" {...field} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="sponsorEmail"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Recipient Email</FormLabel>
+                        <FormControl><Input type="email" placeholder="jane.doe@example.com" {...field} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Line Items</CardTitle>
+                <CardDescription>Add one or more items to be included in the invoice.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {fields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1fr,1fr,auto,auto] gap-4 items-start border p-4 rounded-lg">
+                    <FormField
+                      control={form.control}
+                      name={`lineItems.${index}.name`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Item Name</FormLabel>
+                          <FormControl><Input placeholder="e.g., Team T-Shirt" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`lineItems.${index}.amount`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Amount ($)</FormLabel>
+                          <FormControl><Input type="number" step="0.01" placeholder="25.00" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="col-span-full md:col-span-1">
+                        <FormField
+                            control={form.control}
+                            name={`lineItems.${index}.note`}
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Notes (Optional)</FormLabel>
+                                <FormControl><Textarea placeholder="Additional details..." {...field} /></FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                     <div className="flex items-end h-full">
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 1}
+                            className="w-full md:w-auto"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Remove Item</span>
+                        </Button>
+                     </div>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" onClick={() => append({ name: '', amount: 0, note: '' })}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Line Item
+                </Button>
+              </CardContent>
+              <CardFooter>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Generate Invoice
+                </Button>
+              </CardFooter>
+            </Card>
+          </form>
+        </Form>
+      </div>
+    </AppLayout>
+  );
+}
