@@ -96,7 +96,14 @@ const searchUscfPlayersFlow = ai.defineFlow(
     const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}&state=${encodeURIComponent(stateParam)}&ratingmin=&ratingmax=&order=N&rating=R&mode=Find&_cacheBust=${Date.now()}`;
     
     try {
-      const response = await fetch(url, { cache: 'no-store' });
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      });
       if (!response.ok) {
         return { players: [], error: `Failed to fetch from USCF website. Status: ${response.status}` };
       }

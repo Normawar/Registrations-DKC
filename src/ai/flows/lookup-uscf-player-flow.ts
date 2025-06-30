@@ -59,7 +59,14 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     const url = `http://msa.uschess.org/thin3.php?${uscfId}&_cacheBust=${Date.now()}`;
     
     try {
-      const response = await fetch(url, { cache: 'no-store' });
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
+      });
       if (!response.ok) {
         return { error: `Failed to fetch from USCF website. Status: ${response.status}` };
       }
