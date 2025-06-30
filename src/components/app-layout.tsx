@@ -37,7 +37,6 @@ const menuItems = [
   { href: "/events", icon: RookIcon, label: "Register for event" },
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
   { href: "/schools", icon: School, label: "Schools" },
-  { href: "/players", icon: Users, label: "All Players" },
   { href: "/manage-events", icon: Wrench, label: "Manage Events" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
