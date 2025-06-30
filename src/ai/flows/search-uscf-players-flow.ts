@@ -42,14 +42,14 @@ const searchPrompt = ai.definePrompt({
     output: { schema: SearchUscfPlayersOutputSchema },
     prompt: `You are an expert at parsing HTML tables. Your task is to extract player data from the provided HTML content of a USCF player search results page.
 
-1.  Locate the \`<table>\` that contains a row with the class "header" (\`<tr class="header">\`). This header row contains column titles like "ID", "Reg", "Qk", "Name", etc.
+1.  Locate the \`<table>\` that contains a row with the class "header" (\`<tr class="header">\`). This header row contains column titles like "ID", "Reg", "Name", etc.
 2.  Ignore the header row itself.
 3.  Process all subsequent \`<tr>\` elements within that table's body. Each \`<tr>\` represents a player.
 4.  For each player row, extract the following data from its child \`<td>\` elements:
-    - **uscfId**: Found in the first \`<td>\`. Extract the 8-digit number from the link's \`href\` attribute (e.g., from \`MbrDtlMain.php?12345678\`).
-    - **rating**: Found in the second \`<td>\`. This is the regular rating. If it contains a slash (e.g., "1234/5"), use the number before the slash. If it is "Unrated" or not a number, omit the rating field.
-    - **state**: Found in the sixth \`<td>\`. This is the two-letter state abbreviation.
-    - **fullName**: Found in the seventh \`<td>\`. Extract the name text, which might be inside an \`<a>\` tag.
+    - **uscfId**: Found in the first \`<td>\`. Extract the 8-digit number from the link's \`href\` attribute (e.g., from \`./MbrDtlMain.php?12345678\`).
+    - **rating**: Found in the second \`<td>\`. This is the regular rating. If it contains a slash (e.g., "1234/5"), use the number before the slash. If it is "Unrated" or "unr", omit the rating field.
+    - **state**: Found in the fifth \`<td>\`. This is the two-letter state abbreviation.
+    - **fullName**: Found in the sixth \`<td>\`. Extract the name text, which is typically in "LAST, FIRST" format.
 5.  If the HTML contains the text "No players found", return an empty \`players\` array.
 6.  Return the data as a JSON object matching the provided output schema. Do not include players that do not have a USCF ID.
 
