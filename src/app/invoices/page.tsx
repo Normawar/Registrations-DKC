@@ -61,7 +61,7 @@ const INVOICE_STATUSES = [
     'DRAFT',
     'CANCELED',
     'VOIDED',
-    'REFUNDED',
+  'REFUNDED',
     'PARTIALLY_REFUNDED',
     'FAILED',
     'NO_INVOICE'
@@ -69,13 +69,13 @@ const INVOICE_STATUSES = [
 
 // Mock data now has placeholder URLs so the "View Invoice" button is always active.
 const mockOrganizerInvoices: any[] = [
-    { id: 'org_inv_1', invoiceId: 'inv:mock-id-1', invoiceUrl: '#', invoiceNumber: '0001', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-20').toISOString(), totalInvoiced: 120.00, invoiceStatus: 'PAID' },
-    { id: 'org_inv_2', invoiceId: 'inv:mock-id-2', invoiceUrl: '#', invoiceNumber: '0002', purchaserName: 'John Smith', schoolName: 'MCALLEN H S', district: 'MCALLEN ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-22').toISOString(), totalInvoiced: 250.00, invoiceStatus: 'UNPAID' },
-    { id: 'org_inv_3', invoiceId: 'inv:mock-id-3', invoiceUrl: '#', invoiceNumber: '0003', purchaserName: 'Sponsor Name', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: `USCF Membership (Youth)`, submissionTimestamp: new Date('2024-05-21').toISOString(), totalInvoiced: 24.00, invoiceStatus: 'PAID' },
-    { id: 'org_inv_4', invoiceId: 'inv:mock-id-4', invoiceUrl: '#', invoiceNumber: '0004', purchaserName: 'Another Sponsor', schoolName: 'LA JOYA H S', district: 'LA JOYA ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-19').toISOString(), totalInvoiced: 80.00, invoiceStatus: 'CANCELED' },
-    { id: 'org_inv_5', invoiceId: 'inv:mock-id-5', invoiceUrl: '#', invoiceNumber: '0005', purchaserName: 'Test Sponsor', schoolName: 'EDINBURG H S', district: 'EDINBURG CISD', description: 'Autumn Classic', submissionTimestamp: new Date('2024-05-25').toISOString(), totalInvoiced: 150.00, invoiceStatus: 'PUBLISHED' },
-    { id: 'org_inv_6', invoiceId: 'inv:mock-id-6', invoiceUrl: '#', invoiceNumber: '0006', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-28').toISOString(), totalInvoiced: 200.00, invoiceStatus: 'PAYMENT_PENDING' },
-    { id: 'org_inv_7', invoiceId: 'inv:mock-id-7', invoiceUrl: '#', invoiceNumber: '0007', purchaserName: 'Arnold Sponsor', schoolName: 'ALLEN & WILLIAM ARNOLD EL', district: 'PHARR-SAN JUAN-ALAMO ISD', description: 'Team T-Shirts', submissionTimestamp: new Date('2024-05-29').toISOString(), totalInvoiced: 300.00, invoiceStatus: 'PUBLISHED' },
+    { id: 'org_inv_1', invoiceId: 'inv:mock-id-1', invoiceUrl: 'https://example.com/invoice/1', invoiceNumber: '0001', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-20').toISOString(), totalInvoiced: 120.00, invoiceStatus: 'PAID' },
+    { id: 'org_inv_2', invoiceId: 'inv:mock-id-2', invoiceUrl: 'https://example.com/invoice/2', invoiceNumber: '0002', purchaserName: 'John Smith', schoolName: 'MCALLEN H S', district: 'MCALLEN ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-22').toISOString(), totalInvoiced: 250.00, invoiceStatus: 'UNPAID' },
+    { id: 'org_inv_3', invoiceId: 'inv:mock-id-3', invoiceUrl: 'https://example.com/invoice/3', invoiceNumber: '0003', purchaserName: 'Sponsor Name', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: `USCF Membership (Youth)`, submissionTimestamp: new Date('2024-05-21').toISOString(), totalInvoiced: 24.00, invoiceStatus: 'PAID' },
+    { id: 'org_inv_4', invoiceId: 'inv:mock-id-4', invoiceUrl: 'https://example.com/invoice/4', invoiceNumber: '0004', purchaserName: 'Another Sponsor', schoolName: 'LA JOYA H S', district: 'LA JOYA ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-19').toISOString(), totalInvoiced: 80.00, invoiceStatus: 'CANCELED' },
+    { id: 'org_inv_5', invoiceId: 'inv:mock-id-5', invoiceUrl: 'https://example.com/invoice/5', invoiceNumber: '0005', purchaserName: 'Test Sponsor', schoolName: 'EDINBURG H S', district: 'EDINBURG CISD', description: 'Autumn Classic', submissionTimestamp: new Date('2024-05-25').toISOString(), totalInvoiced: 150.00, invoiceStatus: 'PUBLISHED' },
+    { id: 'org_inv_6', invoiceId: 'inv:mock-id-6', invoiceUrl: 'https://example.com/invoice/6', invoiceNumber: '0006', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-28').toISOString(), totalInvoiced: 200.00, invoiceStatus: 'PAYMENT_PENDING' },
+    { id: 'org_inv_7', invoiceId: 'inv:mock-id-7', invoiceUrl: 'https://example.com/invoice/7', invoiceNumber: '0007', purchaserName: 'Arnold Sponsor', schoolName: 'ALLEN & WILLIAM ARNOLD EL', district: 'PHARR-SAN JUAN-ALAMO ISD', description: 'Team T-Shirts', submissionTimestamp: new Date('2024-05-29').toISOString(), totalInvoiced: 300.00, invoiceStatus: 'PUBLISHED' },
 ];
 
 function InvoicesComponent() {
@@ -134,7 +134,15 @@ function InvoicesComponent() {
 
         // Combine ALL invoice sources into one master list
         const allLocalInvoices = [...confirmations, ...membershipInvoices, ...organizerInvoices];
-        const combinedSource = [...mockOrganizerInvoices, ...allLocalInvoices];
+        
+        // Assume locally stored invoices belong to the current user's school if schoolName is missing
+        const localInvoicesWithSchool = allLocalInvoices.map(inv => ({
+            ...inv,
+            schoolName: inv.schoolName || profile.school,
+            district: inv.district || profile.district,
+        }));
+
+        const combinedSource = [...mockOrganizerInvoices, ...localInvoicesWithSchool];
 
         // De-duplicate the master list, prioritizing real data over mock data
         const uniqueInvoicesMap = new Map<string, any>();
@@ -157,8 +165,8 @@ function InvoicesComponent() {
                 invoiceId: inv.invoiceId,
                 invoiceUrl: inv.invoiceUrl,
                 invoiceNumber: inv.invoiceNumber,
-                schoolName: inv.schoolName || (inv.id?.startsWith('org_inv_') ? undefined : profile.school),
-                district: inv.district || (inv.id?.startsWith('org_inv_') ? undefined : profile.district),
+                schoolName: inv.schoolName,
+                district: inv.district,
                 purchaserName: inv.purchaserName || `${profile.firstName} ${profile.lastName}`,
                 invoiceStatus: inv.invoiceStatus || inv.status,
             }));
