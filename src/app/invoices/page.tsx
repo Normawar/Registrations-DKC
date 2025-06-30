@@ -112,7 +112,7 @@ function InvoicesComponent() {
           setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
-          if (error instanceof Error && error.message.includes('404')) {
+          if (error instanceof Error && (error.message.includes('404') || error.message.includes("Not Found"))) {
               setStatuses(prev => ({ ...prev, [confId]: { status: 'NOT_FOUND', isLoading: false } }));
           } else {
               setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
@@ -131,50 +131,54 @@ function InvoicesComponent() {
   useEffect(() => {
     if (!profile) return;
     try {
-        let invoicesToDisplay: CombinedInvoice[] = [];
+        let finalInvoices: CombinedInvoice[] = [];
 
         if (profile.role === 'organizer') {
-            invoicesToDisplay = mockOrganizerInvoices;
+            finalInvoices = mockOrganizerInvoices;
         } else { // Sponsor role
-            // Step 1: Gather all invoices from all sources
+            // First, get all invoices created by this sponsor from localStorage
             const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            const allEventInvoices: CombinedInvoice[] = eventConfirmations.map((conf: any) => ({
-                id: conf.id,
-                description: conf.eventName,
-                submissionTimestamp: conf.submissionTimestamp,
-                totalInvoiced: conf.totalInvoiced,
-                invoiceId: conf.invoiceId,
-                invoiceUrl: conf.invoiceUrl,
-                invoiceNumber: conf.invoiceNumber,
-                purchaserName: conf.purchaserName || `${profile.firstName} ${profile.lastName}`,
-                invoiceStatus: conf.invoiceStatus,
-                schoolName: conf.schoolName,
-                district: conf.district,
-            }));
-
             const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
-            const allMembershipInvoices: CombinedInvoice[] = membershipInvoices.map((inv: any) => ({
-                id: inv.invoiceId, // Use invoiceId as the unique key
-                description: `USCF Membership (${inv.membershipType})`,
-                submissionTimestamp: inv.submissionTimestamp,
-                totalInvoiced: inv.totalInvoiced,
-                invoiceId: inv.invoiceId,
-                invoiceUrl: inv.invoiceUrl,
-                invoiceNumber: inv.invoiceNumber,
-                purchaserName: inv.purchaserName,
-                invoiceStatus: inv.status,
-                schoolName: inv.schoolName,
-                district: inv.district,
-            }));
-            
-            // Step 2: Combine all sources into a single master list
-            const allPossibleInvoices = [
-                ...mockOrganizerInvoices,
-                ...allEventInvoices,
-                ...allMembershipInvoices
+
+            const sponsorCreatedInvoices: CombinedInvoice[] = [
+                ...eventConfirmations.map((conf: any) => ({
+                    id: conf.id,
+                    description: conf.eventName,
+                    submissionTimestamp: conf.submissionTimestamp,
+                    totalInvoiced: conf.totalInvoiced,
+                    invoiceId: conf.invoiceId,
+                    invoiceUrl: conf.invoiceUrl,
+                    invoiceNumber: conf.invoiceNumber,
+                    purchaserName: conf.purchaserName || `${profile.firstName} ${profile.lastName}`,
+                    invoiceStatus: conf.invoiceStatus,
+                    schoolName: conf.schoolName || profile.school, // Fallback for old data
+                    district: conf.district || profile.district, // Fallback for old data
+                })),
+                ...membershipInvoices.map((inv: any) => ({
+                    id: inv.invoiceId,
+                    description: `USCF Membership (${inv.membershipType})`,
+                    submissionTimestamp: inv.submissionTimestamp,
+                    totalInvoiced: inv.totalInvoiced,
+                    invoiceId: inv.invoiceId,
+                    invoiceUrl: inv.invoiceUrl,
+                    invoiceNumber: inv.invoiceNumber,
+                    purchaserName: inv.purchaserName,
+                    invoiceStatus: inv.status,
+                    schoolName: inv.schoolName || profile.school, // Fallback for old data
+                    district: inv.district || profile.district, // Fallback for old data
+                }))
             ];
             
-            // Step 3: De-duplicate the combined list
+            // Second, get all invoices from the mock/organizer data that are for this sponsor's school
+            const organizerInvoicesForSchool = mockOrganizerInvoices.filter(inv => inv.schoolName === profile.school);
+
+            // Third, combine them all
+            const allPossibleInvoices = [
+                ...sponsorCreatedInvoices,
+                ...organizerInvoicesForSchool
+            ];
+            
+            // Fourth, de-duplicate the combined list
             const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
             for (const inv of allPossibleInvoices) {
                 const key = inv.invoiceId || inv.id;
@@ -182,25 +186,22 @@ function InvoicesComponent() {
                     uniqueInvoicesMap.set(key, inv);
                 }
             }
-            const uniqueInvoices = Array.from(uniqueInvoicesMap.values());
-
-            // Step 4: Filter the de-duplicated list by the sponsor's school
-            invoicesToDisplay = uniqueInvoices.filter(inv => inv.schoolName === profile.school);
+            finalInvoices = Array.from(uniqueInvoicesMap.values());
         }
 
-        invoicesToDisplay.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+        finalInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
         
-        setAllInvoices(invoicesToDisplay);
+        setAllInvoices(finalInvoices);
 
         const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
-        for (const inv of invoicesToDisplay) {
+        for (const inv of finalInvoices) {
             if (inv.invoiceId) {
                 initialStatuses[inv.id] = { status: inv.invoiceStatus || 'LOADING', isLoading: true };
             }
         }
         setStatuses(initialStatuses);
         
-        fetchAllInvoiceStatuses(invoicesToDisplay);
+        fetchAllInvoiceStatuses(finalInvoices);
 
     } catch (error) {
         console.error("Failed to load invoices", error);
