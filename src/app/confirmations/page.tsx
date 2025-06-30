@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
-import { auth, storage, isFirebaseConfigured } from '@/lib/firebase';
+import { auth, storage } from '@/lib/firebase';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -93,12 +93,13 @@ export default function ConfirmationsPage() {
   
   useEffect(() => {
     const ensureAnonymousAuth = async () => {
-      if (isFirebaseConfigured && auth && !auth.currentUser) {
+      // If auth service exists but there's no user, sign in.
+      if (auth && !auth.currentUser) {
         try {
           await signInAnonymously(auth);
         } catch (error) {
           console.error("Anonymous sign-in failed on page load:", error);
-          // The error will be handled gracefully when the user tries to upload.
+          // This error will be handled gracefully when the user tries to upload.
         }
       }
     };
@@ -141,7 +142,8 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            if (!isFirebaseConfigured || !auth || !storage) {
+            // Check if Firebase services are available
+            if (!auth || !storage) {
               toast({
                 variant: 'destructive',
                 title: 'Firebase Not Configured',
@@ -329,9 +331,9 @@ export default function ConfirmationsPage() {
                                   id={`po-file-${conf.id}`} 
                                   type="file"
                                   onChange={(e) => handlePoFileChange(conf.id, e)}
-                                  disabled={isUpdating[conf.id] || !isFirebaseConfigured}
+                                  disabled={isUpdating[conf.id] || !storage}
                                 />
-                                {!isFirebaseConfigured && (
+                                {!storage && (
                                   <p className="text-xs text-muted-foreground pt-1">
                                     To enable uploads, add your Firebase credentials to the <code>.env</code> file and restart the server.
                                   </p>

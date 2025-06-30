@@ -15,24 +15,25 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let storage: FirebaseStorage | null = null;
 
-// This check prevents Firebase from trying to initialize with placeholder values
-const isFirebaseConfigured = !!firebaseConfig.apiKey;
+const isConfigValid = firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY';
 
-if (isFirebaseConfigured) {
+if (isConfigValid) {
     try {
         app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
         auth = getAuth(app);
         storage = getStorage(app);
     } catch (e) {
         console.error("Failed to initialize Firebase", e);
-        // If it fails here, services will remain null
+        // Ensure services are null if initialization fails
+        app = null;
+        auth = null;
+        storage = null;
     }
 } else {
-    // This is a warning for the developer, not a crash.
     if (typeof window !== 'undefined') {
         console.warn("Firebase configuration is missing or incomplete. Please add your credentials to the .env file and restart the server. Firebase features will be disabled.");
     }
 }
 
 
-export { app, auth, storage, isFirebaseConfigured };
+export { app, auth, storage };
