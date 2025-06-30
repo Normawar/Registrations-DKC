@@ -135,39 +135,38 @@ function InvoicesComponent() {
         const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
         const organizerInvoices = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
 
+        // Assume locally stored invoices belong to the current user's school if not specified.
         const allLocalStorageInvoices = [
             ...confirmations.map((inv: any) => ({ ...inv, schoolName: inv.schoolName || profile.school, district: inv.district || profile.district })),
             ...membershipInvoices.map((inv: any) => ({ ...inv, schoolName: inv.schoolName || profile.school, district: inv.district || profile.district })),
             ...organizerInvoices.map((inv: any) => ({ ...inv, schoolName: inv.schoolName || profile.school, district: inv.district || profile.district })),
         ];
+        
+        // Combine ALL sources into one master list
+        const combinedSource = [...mockOrganizerInvoices, ...allLocalStorageInvoices];
 
-        let finalInvoicesSource: CombinedInvoice[] = [];
-
-        if (profile.role === 'sponsor') {
-            const sponsorSchoolInvoices = mockOrganizerInvoices.filter(
-                (inv) => inv.schoolName === profile.school
-            );
-            finalInvoicesSource = [
-                ...sponsorSchoolInvoices,
-                ...allLocalStorageInvoices,
-            ];
-        } else { // Organizer role
-            finalInvoicesSource = [
-                ...mockOrganizerInvoices,
-                ...allLocalStorageInvoices,
-            ];
-        }
-
+        // De-duplicate the master list, prioritizing real data over mock data
         const uniqueInvoicesMap = new Map<string, any>();
-        for (const inv of finalInvoicesSource) {
+        for (const inv of combinedSource) {
             const key = inv.invoiceId || inv.id;
-            // Prioritize non-mock data if keys conflict
+            // Prioritize non-mock data (from localStorage) over mock data
             if (!uniqueInvoicesMap.has(key) || !inv.id?.startsWith('org_inv_')) {
                 uniqueInvoicesMap.set(key, inv);
             }
         }
         
-        const normalizedInvoices = Array.from(uniqueInvoicesMap.values()).map((inv: any): CombinedInvoice => ({
+        const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
+
+        // Now, filter the de-duplicated list based on role
+        let finalInvoicesSource: any[];
+        if (profile.role === 'sponsor') {
+            finalInvoicesSource = allUniqueInvoices.filter(inv => inv.schoolName === profile.school);
+        } else {
+            // Organizer sees all (will be filtered by dropdown later)
+            finalInvoicesSource = allUniqueInvoices;
+        }
+
+        const normalizedInvoices = finalInvoicesSource.map((inv: any): CombinedInvoice => ({
             id: inv.id,
             description: inv.description || inv.eventName || `USCF Membership (${inv.membershipType})`,
             submissionTimestamp: inv.submissionTimestamp,
@@ -370,7 +369,7 @@ function InvoicesComponent() {
                                                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
-                                            <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl}>
+                                            <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl || inv.invoiceUrl === '#'}>
                                                 <a href={inv.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!inv.invoiceUrl && 'pointer-events-none')}>
                                                 <ExternalLink className="mr-2 h-4 w-4" /> View
                                                 </a>
