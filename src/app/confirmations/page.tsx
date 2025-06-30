@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
-import { signInAnonymously } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { signInAnonymously, getAuth } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL, getStorage } from 'firebase/storage';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
-import { auth, storage } from '@/lib/firebase';
+import { firebaseApp } from '@/lib/firebase';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -91,6 +91,9 @@ export default function ConfirmationsPage() {
   const [poInputs, setPoInputs] = useState<Record<string, { number: string; file: File | null }>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   
+  const auth = useMemo(() => getAuth(firebaseApp), []);
+  const storage = useMemo(() => getStorage(firebaseApp), []);
+  
   useEffect(() => {
     const ensureAnonymousAuth = async () => {
       if (!auth.currentUser) {
@@ -107,7 +110,7 @@ export default function ConfirmationsPage() {
       }
     };
     ensureAnonymousAuth();
-  }, [toast]);
+  }, [auth, toast]);
 
   useEffect(() => {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
