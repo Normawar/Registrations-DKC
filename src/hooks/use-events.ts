@@ -29,7 +29,7 @@ const initialEvents: Event[] = [
         veryLateFee: 30,
         dayOfFee: 35,
         imageUrl: "https://placehold.co/100x100.png",
-        pdfUrl: "#",
+        pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
     },
     {
         id: '2',
@@ -52,7 +52,7 @@ const initialEvents: Event[] = [
         lateFee: 25,
         veryLateFee: 30,
         dayOfFee: 35,
-        pdfUrl: "#",
+        pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
     },
     {
         id: '4',

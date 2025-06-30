@@ -56,6 +56,7 @@ import { useRoster, type Player } from '@/hooks/use-roster';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { createMembershipInvoice } from '@/ai/flows/create-membership-invoice-flow';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 type PlayerRegistration = {
   byes: {
@@ -100,9 +101,13 @@ export default function EventsPage() {
     const [clientReady, setClientReady] = useState(false);
     const [separateUscfInvoice, setSeparateUscfInvoice] = useState(false);
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+    const [isSquareConfigured, setIsSquareConfigured] = useState(true);
 
     useEffect(() => {
         setClientReady(true);
+        checkSquareConfig().then(({ isConfigured }) => {
+            setIsSquareConfigured(isConfigured);
+        });
     }, []);
 
     const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event) => {
@@ -462,13 +467,15 @@ export default function EventsPage() {
           </p>
         </div>
 
-        <Alert variant="destructive">
-          <Info className="h-4 w-4" />
-          <AlertTitle>Square Not Configured</AlertTitle>
-          <AlertDescription>
-            The system is running in demo mode. No real invoices will be created. To enable Square integration, please add your credentials to the `.env` file.
-          </AlertDescription>
-        </Alert>
+        {!isSquareConfigured && (
+          <Alert variant="destructive">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Square Not Configured</AlertTitle>
+            <AlertDescription>
+              The system is running in demo mode. No real invoices will be created. To enable Square integration, please add your credentials to the `.env` file.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card>
           <CardContent className="pt-6">
@@ -496,10 +503,10 @@ export default function EventsPage() {
                               {event.imageUrl && (
                                   <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title="Event Image"><ImageIcon className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
                               )}
-                              {event.pdfUrl && (
+                              {event.pdfUrl && event.pdfUrl !== '#' && (
                                   <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title="Event PDF"><FileText className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
                               )}
-                              {(!event.imageUrl && !event.pdfUrl) && <span className="text-xs text-muted-foreground">None</span>}
+                              {(!event.imageUrl && (!event.pdfUrl || event.pdfUrl === '#')) && <span className="text-xs text-muted-foreground">None</span>}
                           </div>
                       </TableCell>
                       <TableCell>
