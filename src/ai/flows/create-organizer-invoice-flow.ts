@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Creates a general-purpose invoice with the Square API.
@@ -87,6 +88,7 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
           familyName: lastNameParts.join(' '),
           emailAddress: input.sponsorEmail,
           companyName: input.schoolName,
+          note: `School: ${input.schoolName}`,
         });
         customerId = createCustomerResponse.result.customer!.id!;
         console.log(`Created new customer with ID: ${customerId}`);
@@ -132,10 +134,10 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
             requestType: 'BALANCE',
             dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
           }],
-          deliveryMethod: 'EMAIL',
+          deliveryMethod: 'SHARE_MANUALLY',
           acceptedPaymentMethods: {
             card: true,
-            squareGiftCard: false,
+            squareGiftCard: true,
             bankAccount: true, // For ACH payments
           },
           title: input.invoiceTitle,
