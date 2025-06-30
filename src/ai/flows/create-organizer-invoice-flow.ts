@@ -148,24 +148,29 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
       const invoice = createInvoiceResponse.result.invoice!;
       console.log("Successfully created DRAFT invoice:", invoice);
 
-      // Publish the invoice to make it active and get a public URL
+      // Publish the invoice to make it active
       console.log(`Publishing invoice ID: ${invoice.id!}`);
-      const { result: { invoice: publishedInvoice } } = await invoicesApi.publishInvoice(invoice.id!, {
+      await invoicesApi.publishInvoice(invoice.id!, {
         version: invoice.version!,
         idempotencyKey: randomUUID(),
       });
-      console.log("Successfully published invoice:", publishedInvoice);
+      
+      // Retrieve the final published invoice to get the public URL
+      console.log(`Retrieving final published invoice: ${invoice.id!}`);
+      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(invoice.id!);
 
-      if (!publishedInvoice.publicUrl) {
+      console.log("Successfully published and retrieved invoice:", finalInvoice);
+
+      if (!finalInvoice || !finalInvoice.publicUrl) {
           console.error("Published invoice is missing a publicUrl.");
           throw new Error("Failed to retrieve public URL for the published invoice.");
       }
 
       return {
-        invoiceId: publishedInvoice.id!,
-        invoiceNumber: publishedInvoice.invoiceNumber,
-        status: publishedInvoice.status!,
-        invoiceUrl: publishedInvoice.publicUrl!,
+        invoiceId: finalInvoice.id!,
+        invoiceNumber: finalInvoice.invoiceNumber,
+        status: finalInvoice.status!,
+        invoiceUrl: finalInvoice.publicUrl!,
       };
 
     } catch (error) {
