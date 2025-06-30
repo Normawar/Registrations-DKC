@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -73,11 +73,9 @@ function InvoicesComponent() {
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
-  
-  const fetchInvoiceStatus = useCallback(async (confId: string, invoiceId: string, silent = false) => {
-      if (!silent) {
-          setStatuses(prev => ({ ...prev, [confId]: { ...prev[confId], isLoading: true } }));
-      }
+
+  const fetchInvoiceStatus = useCallback(async (confId: string, invoiceId: string) => {
+    setStatuses(prev => ({ ...prev, [confId]: { ...(prev[confId] || {}), isLoading: true } }));
       try {
           const { status } = await getInvoiceStatus({ invoiceId });
           setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
@@ -91,23 +89,24 @@ function InvoicesComponent() {
       }
   }, []);
   
-  const loadInvoices = useCallback(() => {
-    let allInvoicesData: any[] = [];
+  const loadAndProcessInvoices = useCallback(() => {
+    let storedData: any[] = [];
     try {
-        const storedInvoices = localStorage.getItem('all_invoices');
-        if (storedInvoices) {
-            allInvoicesData = JSON.parse(storedInvoices);
+        const rawData = localStorage.getItem('all_invoices');
+        if (rawData) {
+            storedData = JSON.parse(rawData);
         }
-    } catch (error) {
-        console.error("Failed to parse invoices from localStorage", error);
-        allInvoicesData = [];
+    } catch (e) {
+        console.error("Failed to parse all_invoices from localStorage", e);
+        setAllInvoices([]);
+        return;
     }
 
-    const normalizedInvoices: CombinedInvoice[] = allInvoicesData.map((inv: any) => ({
+    const normalizedInvoices: CombinedInvoice[] = storedData.map((inv: any) => ({
         id: inv.invoiceId || inv.id,
         description: inv.invoiceTitle || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : 'Invoice'),
         submissionTimestamp: inv.submissionTimestamp,
-        totalInvoiced: inv.totalInvoiced || 0,
+        totalInvoiced: parseFloat(String(inv.totalInvoiced)) || 0,
         invoiceId: inv.invoiceId,
         invoiceUrl: inv.invoiceUrl,
         invoiceNumber: inv.invoiceNumber,
@@ -115,53 +114,49 @@ function InvoicesComponent() {
         district: inv.district,
         purchaserName: inv.purchaserName || inv.sponsorName,
         invoiceStatus: inv.invoiceStatus || inv.status,
-    }));
-    
+    })).filter(inv => inv.invoiceId);
+
     const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
     for (const inv of normalizedInvoices) {
-        if (inv.invoiceId) {
-            if(typeof inv.totalInvoiced !== 'number') {
-                inv.totalInvoiced = parseFloat(String(inv.totalInvoiced)) || 0;
-            }
-            uniqueInvoicesMap.set(inv.invoiceId, inv);
+        if (!uniqueInvoicesMap.has(inv.invoiceId!) || new Date(inv.submissionTimestamp) > new Date(uniqueInvoicesMap.get(inv.invoiceId!)!.submissionTimestamp)) {
+            uniqueInvoicesMap.set(inv.invoiceId!, inv);
         }
     }
-    
-    const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
-    allUniqueInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
-    
+    const allUniqueInvoices = Array.from(uniqueInvoicesMap.values())
+        .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+
     setAllInvoices(allUniqueInvoices);
 
     const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
+    const invoicesToFetchStatus: CombinedInvoice[] = [];
+
     for (const inv of allUniqueInvoices) {
+        const currentStatus = inv.invoiceStatus?.toUpperCase();
+        const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND'].includes(currentStatus || '');
+        
         if (inv.invoiceId) {
-            const status = inv.invoiceStatus?.toUpperCase() || 'LOADING';
-            initialStatuses[inv.id] = { status: status, isLoading: status === 'LOADING' };
-        } else {
-            initialStatuses[inv.id] = { status: 'NO_INVOICE', isLoading: false };
+            initialStatuses[inv.id] = { status: currentStatus || 'LOADING', isLoading: !currentStatus };
+            if (!isFinalState) {
+                invoicesToFetchStatus.push(inv);
+            }
         }
     }
     setStatuses(initialStatuses);
     
-    const invoicesToFetch = allUniqueInvoices.filter(inv => {
-        const currentStatus = initialStatuses[inv.id]?.status?.toUpperCase();
-        const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NO_INVOICE', 'NOT_FOUND'].includes(currentStatus || '');
-        return inv.invoiceId && !isFinalState;
-    });
-    
-    invoicesToFetch.forEach(inv => {
+    invoicesToFetchStatus.forEach(inv => {
         if (inv.invoiceId) {
-            fetchInvoiceStatus(inv.id, inv.invoiceId, true);
+            fetchInvoiceStatus(inv.id, inv.invoiceId);
         }
     });
   }, [fetchInvoiceStatus]);
 
+
   useEffect(() => {
-    loadInvoices();
+    loadAndProcessInvoices();
     
     const handleStorageChange = (event: StorageEvent) => {
         if (event.key === 'all_invoices') {
-            loadInvoices();
+            loadAndProcessInvoices();
         }
     };
     
@@ -170,46 +165,42 @@ function InvoicesComponent() {
     return () => {
         window.removeEventListener('storage', handleStorageChange);
     };
-  }, [loadInvoices]);
+  }, [loadAndProcessInvoices]);
   
   const uniqueSchools = useMemo(() => {
-    const schools = new Set(allInvoices.map(inv => inv.schoolName || ''));
-    return ['ALL', ...Array.from(schools).filter(Boolean).sort()];
+    const schools = new Set(allInvoices.map(inv => inv.schoolName).filter(Boolean) as string[]);
+    return ['ALL', ...Array.from(schools).sort()];
   }, [allInvoices]);
   
-
   const filteredInvoices = useMemo(() => {
     if (!profile) {
       return [];
     }
+    return allInvoices.filter(inv => {
+        if (profile.role === 'sponsor') {
+            if (inv.schoolName?.trim().toUpperCase() !== profile.school?.trim().toUpperCase()) {
+                return false;
+            }
+        } else if (profile.role === 'organizer' && schoolFilter !== 'ALL') {
+            if (inv.schoolName !== schoolFilter) {
+                return false;
+            }
+        }
 
-    let invoices = [...allInvoices];
-
-    if (profile.role === 'sponsor') {
-      invoices = invoices.filter(inv => inv.schoolName?.trim().toUpperCase() === profile.school?.trim().toUpperCase());
-    } else if (profile.role === 'organizer' && schoolFilter !== 'ALL') {
-      invoices = invoices.filter(inv => inv.schoolName === schoolFilter);
-    }
-
-    if (statusFilter !== 'ALL') {
-      const liveStatusFilter = (inv: CombinedInvoice) => {
-        const currentStatus = statuses[inv.id]?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
-        if (!currentStatus) return false;
+        if (statusFilter !== 'ALL') {
+            const currentStatus = statuses[inv.id]?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
+            if (statusFilter === 'UNPAID') {
+                return ['PUBLISHED', 'UNPAID', 'DRAFT'].includes(currentStatus);
+            }
+            if (statusFilter === 'NO_INVOICE' && currentStatus === 'NO_INVOICE') {
+                return true;
+            }
+            return currentStatus === statusFilter;
+        }
         
-        if (statusFilter === 'UNPAID' && ['PUBLISHED', 'UNPAID'].includes(currentStatus)) {
-            return true;
-        }
-        if (statusFilter === 'NO_INVOICE' && currentStatus === 'NO_INVOICE') {
-          return true;
-        }
-        return currentStatus === statusFilter;
-      };
-      
-      invoices = invoices.filter(liveStatusFilter);
-    }
-
-    return invoices;
-  }, [allInvoices, statuses, statusFilter, schoolFilter, profile]);
+        return true;
+    });
+  }, [allInvoices, profile, schoolFilter, statusFilter, statuses]);
   
   if (!profile) {
     return (
@@ -244,6 +235,7 @@ function InvoicesComponent() {
         case 'LOADING': return 'bg-muted text-muted-foreground animate-pulse';
         case 'NO_INVOICE': return 'bg-slate-400 text-white';
         case 'NOT_FOUND': return 'bg-destructive/80 text-white';
+        case 'ERROR': return 'bg-destructive text-white';
         default: return 'bg-muted text-muted-foreground';
     }
   };
@@ -376,8 +368,6 @@ function InvoicesComponent() {
 
 export default function InvoicesPage() {
     return (
-        <Suspense fallback={<AppLayout><div>Loading...</div></AppLayout>}>
-            <InvoicesComponent />
-        </Suspense>
+        <InvoicesComponent />
     )
 }
