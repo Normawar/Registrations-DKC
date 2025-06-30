@@ -441,6 +441,7 @@ export default function RosterPage() {
                       {getSortIcon('lastName')}
                     </Button>
                   </TableHead>
+                  <TableHead>Team Code</TableHead>
                    <TableHead className="p-0">
                     <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
                       USCF ID
@@ -485,6 +486,7 @@ export default function RosterPage() {
                         </div>
                       </div>
                     </TableCell>
+                    <TableCell className="font-mono">{teamCode}</TableCell>
                     <TableCell>{player.uscfId}</TableCell>
                     <TableCell>{player.rating || 'N/A'}</TableCell>
                     <TableCell>{player.grade}</TableCell>
