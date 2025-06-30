@@ -136,57 +136,37 @@ function InvoicesComponent() {
         if (profile.role === 'organizer') {
             finalInvoices = mockOrganizerInvoices;
         } else { // Sponsor role
-            // First, get all invoices created by this sponsor from localStorage
-            const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
-
-            const sponsorCreatedInvoices: CombinedInvoice[] = [
-                ...eventConfirmations.map((conf: any) => ({
-                    id: conf.id,
-                    description: conf.eventName,
-                    submissionTimestamp: conf.submissionTimestamp,
-                    totalInvoiced: conf.totalInvoiced,
-                    invoiceId: conf.invoiceId,
-                    invoiceUrl: conf.invoiceUrl,
-                    invoiceNumber: conf.invoiceNumber,
-                    purchaserName: conf.purchaserName || `${profile.firstName} ${profile.lastName}`,
-                    invoiceStatus: conf.invoiceStatus,
+            // First, gather all invoices from all sources into a master list.
+            const allPossibleInvoices: CombinedInvoice[] = [
+                ...mockOrganizerInvoices,
+                ...JSON.parse(localStorage.getItem('confirmations') || '[]').map((conf: any) => ({
+                    ...conf,
                     schoolName: conf.schoolName || profile.school, // Fallback for old data
                     district: conf.district || profile.district, // Fallback for old data
                 })),
-                ...membershipInvoices.map((inv: any) => ({
-                    id: inv.invoiceId,
+                ...JSON.parse(localStorage.getItem('membershipInvoices') || '[]').map((inv: any) => ({
+                    id: inv.id || inv.invoiceId, // Handle old data without an 'id' field
                     description: `USCF Membership (${inv.membershipType})`,
-                    submissionTimestamp: inv.submissionTimestamp,
-                    totalInvoiced: inv.totalInvoiced,
-                    invoiceId: inv.invoiceId,
-                    invoiceUrl: inv.invoiceUrl,
-                    invoiceNumber: inv.invoiceNumber,
-                    purchaserName: inv.purchaserName,
-                    invoiceStatus: inv.status,
+                    invoiceStatus: inv.status || inv.invoiceStatus, // Handle old data with 'status'
+                    ...inv,
                     schoolName: inv.schoolName || profile.school, // Fallback for old data
                     district: inv.district || profile.district, // Fallback for old data
                 }))
             ];
-            
-            // Second, get all invoices from the mock/organizer data that are for this sponsor's school
-            const organizerInvoicesForSchool = mockOrganizerInvoices.filter(inv => inv.schoolName === profile.school);
 
-            // Third, combine them all
-            const allPossibleInvoices = [
-                ...sponsorCreatedInvoices,
-                ...organizerInvoicesForSchool
-            ];
-            
-            // Fourth, de-duplicate the combined list
+            // De-duplicate based on invoiceId, preferring non-mock entries
             const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
             for (const inv of allPossibleInvoices) {
                 const key = inv.invoiceId || inv.id;
-                if (!uniqueInvoicesMap.has(key)) {
+                if (!uniqueInvoicesMap.has(key) || !inv.id.startsWith('org_inv_')) {
                     uniqueInvoicesMap.set(key, inv);
                 }
             }
-            finalInvoices = Array.from(uniqueInvoicesMap.values());
+
+            // Filter the de-duplicated list by the sponsor's school
+            finalInvoices = Array.from(uniqueInvoicesMap.values()).filter(
+                inv => inv.schoolName === profile.school
+            );
         }
 
         finalInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
@@ -195,8 +175,11 @@ function InvoicesComponent() {
 
         const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
         for (const inv of finalInvoices) {
-            if (inv.invoiceId) {
+            const isMock = inv.id.startsWith('org_inv_');
+            if (inv.invoiceId && !isMock) {
                 initialStatuses[inv.id] = { status: inv.invoiceStatus || 'LOADING', isLoading: true };
+            } else {
+                 initialStatuses[inv.id] = { status: inv.invoiceStatus, isLoading: false };
             }
         }
         setStatuses(initialStatuses);

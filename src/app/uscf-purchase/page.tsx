@@ -78,6 +78,7 @@ type PaymentInputs = {
 };
 
 type InvoiceState = CreateMembershipInvoiceOutput & { 
+    id: string; // Add id field
     playerCount: number;
     membershipType: string;
     submissionTimestamp: string;
@@ -86,6 +87,7 @@ type InvoiceState = CreateMembershipInvoiceOutput & {
     purchaserEmail: string;
     schoolName: string;
     district: string;
+    invoiceStatus: string; // Use invoiceStatus instead of status
 };
 
 
@@ -208,6 +210,8 @@ function UscfPurchaseComponent() {
 
             const newMembershipInvoice: InvoiceState = {
                 ...result,
+                id: result.invoiceId, // Use invoiceId as the stable ID
+                invoiceStatus: result.status, // Use the correct property name
                 playerCount: values.players.length,
                 membershipType: membershipType,
                 submissionTimestamp: new Date().toISOString(),
