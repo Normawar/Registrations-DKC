@@ -41,20 +41,20 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest', 
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at extracting structured player data from an HTML table.
-The provided HTML is a string containing a single \`<table>\` of USCF player search results.
-The table has a header row (e.g., <tr class="header">) with columns including 'ID', 'Name', 'St', and 'Reg'.
+    prompt: `You are an expert at extracting structured player data from a full HTML document.
+The document contains a USCF player search results page. Your task is to find the main results table and parse it.
+The correct table can be identified by its header row (often <tr class="header">) with columns like 'ID', 'Name', 'St', and 'Reg'.
 
-Your task is to parse each data row (<tr>) following the header and extract the player information into the format specified by the output schema.
+From that table, parse each data row (<tr>) and extract the player information into the format specified by the output schema.
 
 - **uscfId**: The player's 8-digit ID from the 'ID' column.
 - **fullName**: The player's full name from the 'Name' column. The format is typically "LAST, FIRST MI".
 - **rating**: The player's rating from the 'Reg' rating column. If the value is 'UNR' or the cell is empty, the output for rating should be null.
 - **state**: The player's two-letter state abbreviation from the 'St' column.
 
-If there are no data rows in the table, you MUST return an empty \`players\` array.
+If you cannot find the results table or if the table is empty, you MUST return an empty \`players\` array.
 
-HTML table to parse:
+HTML document to parse:
 \`\`\`
 {{{_input}}}
 \`\`\`
@@ -104,18 +104,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
           return { players: [] };
       }
       
-      // Extract the main results table to reduce noise for the AI
-      const tableRegex = /<table[^>]*>[\s\S]*?<tr[^>]*class\s*=\s*['"]?header['"]?>[\s\S]*?<\/table>/i;
-      const match = html.match(tableRegex);
-      
-      if (!match) {
-          console.error("Could not find player data table in the response from the USCF website.");
-          return { players: [], error: "Could not find player data table in the response from the USCF website." };
-      }
-      
-      const tableHtml = match[0];
-      
-      const { output } = await searchPrompt(tableHtml);
+      const { output } = await searchPrompt(html);
       
       if (!output) {
           return { players: [], error: "AI model failed to parse the player data." };
@@ -152,3 +141,5 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
   }
 );
+
+    
