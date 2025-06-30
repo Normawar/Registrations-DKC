@@ -227,11 +227,7 @@ function UscfPurchaseComponent() {
             
             const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
             localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newMembershipInvoice]));
-            window.dispatchEvent(new Event('storage'));
-            
-            const existingMembershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
-            localStorage.setItem('membershipInvoices', JSON.stringify([...existingMembershipInvoices, newMembershipInvoice]));
-
+            window.dispatchEvent(new Event('all_invoices_updated'));
 
             toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {
