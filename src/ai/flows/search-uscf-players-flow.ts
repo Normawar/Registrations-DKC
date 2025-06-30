@@ -44,39 +44,48 @@ const searchPrompt = ai.definePrompt({
 The provided text is the HTML content of a USCF player search results page.
 Your task is to extract the details for each player listed in the results table.
 
-Here are the rules for parsing:
-1.  Find the main table which is located after a '<h3>Player Search Results</h3>' tag.
-2.  Skip the header row. The header row is a \`<tr>\` with \`class="header"\`.
-3.  Player data is located in subsequent \`<tr>\` elements, which often have a \`bgcolor\` attribute.
-4.  For each player row, extract the following information from the \`<td>\` (table cell) elements:
-    - **uscfId**: The 8-digit number from the first \`<td>\`. It's within an \`<a>\` tag.
-    - **fullName**: The player's name from the second \`<td>\`. It is in "LAST, FIRST" format.
-    - **rating**: The rating number from the third \`<td>\`. If the content is 'UNR', '0', or not a number, the value should be \`undefined\`.
-    - **state**: The two-letter state abbreviation from the fourth \`<td>\`.
-5.  Format the output as a JSON object matching the schema. Do not invent players or data. If no players are found in the table, return an empty \`players\` array.
+Here is the structure of the HTML table:
+- The table follows a \`<h3>Player Search Results</h3>\` heading.
+- The header row has a \`class="header"\`.
+- Data rows (\`<tr>\`) often have a \`bgcolor\` attribute.
+- **Crucially, each data row can contain information for one OR two players.**
+- A block of data for a single player consists of 7 \`<td>\` cells: ID, Name, Rating, St, Expires, Mbr, Tot.
+- If a \`<tr>\` contains 14 \`<td>\` cells, it represents two players. The first 7 cells are for the first player, and the next 7 are for the second player.
 
-Example Input HTML Snippet:
+Your parsing rules:
+1.  Iterate through each \`<tr>\` in the results table (skip the header).
+2.  For each \`<tr>\`, check the number of \`<td>\` cells.
+3.  **If there are 14 \`<td>\` cells:**
+    - Parse the first player from cells 1-7.
+    - Parse the second player from cells 8-14.
+4.  **If there are 7 \`<td>\` cells:**
+    - Parse the single player from those cells.
+5.  For each player found, extract the following:
+    - **uscfId**: The 8-digit number from the first \`<td>\` of their block. It's inside an \`<a>\` tag.
+    - **fullName**: The player's name from the second \`<td>\` of their block (e.g., "GUERRA, ANTHONY J").
+    - **rating**: The number from the third \`<td>\` of their block. If 'UNR' or not a number, the value should be \`undefined\`.
+    - **state**: The two-letter state abbreviation from the fourth \`<td>\` of their block.
+6.  Collect all found players into the \`players\` array. Do not invent players. If no players are found, return an empty array.
+
+Example Input HTML Snippet with two players in one row:
 \`\`\`html
-...
-<tr class="header">
-  <td><b>ID</b></td>
-  <td><b>Name</b></td>
-  <td><b>Rating</b></td>
-  <td><b>St</b></td>
-  <td><b>Expires</b></td>
-</tr>
-<tr bgcolor="#E6E6E6">
-  <td><a href="/msa/thin3.php?14828139">14828139</a></td>
-  <td>GUERRA, ANTHONY J</td>
-  <td align="right">1596</td>
-  <td>TX</td>
-  <td>2024-11-30</td>
-</tr>
-...
+<TR bgcolor="#E6E6E6">
+<TD><A href="/msa/thin3.php?12722825">12722825</A></TD>
+<TD>GUERRA, ANTHONY</TD>
+<TD align=right>1502</TD>
+<TD>TX</TD>
+<TD>2024-09-30</TD>
+<TD>REG</TD>
+<TD align=right> 594.0</TD>
+<TD><A href="/msa/thin3.php?12815593">12815593</A></TD>
+<TD>GUERRA, ANTHONY J</TD>
+<TD align=right>1661</TD>
+<TD>TX</TD>
+<TD>2024-11-30</TD>
+<TD>REG</TD>
+<TD align=right> 268.0</TD>
+</TR>
 \`\`\`
-Example JSON data to extract for the snippet above:
-\`{ "uscfId": "14828139", "fullName": "GUERRA, ANTHONY J", "rating": 1596, "state": "TX" }\`
-
 
 Here is the HTML content to parse:
 {{{_input}}}`
