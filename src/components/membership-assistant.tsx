@@ -69,10 +69,14 @@ export function MembershipAssistant() {
       setSuggestion(result);
     } catch (error) {
       console.error("Error getting membership suggestion:", error);
+      const description =
+        error instanceof Error
+          ? error.message
+          : "Could not get a suggestion. Please try again.";
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Could not get a suggestion. Please try again.",
+        title: "Invalid Information",
+        description: description,
       });
     } finally {
       setIsLoading(false);

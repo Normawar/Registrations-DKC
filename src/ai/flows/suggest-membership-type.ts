@@ -69,6 +69,12 @@ const suggestMembershipTypeFlow = ai.defineFlow(
     if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
         age--;
     }
+
+    if (age < 3 && input.hasPlayedBefore) {
+      throw new Error(
+        'A player this young is unlikely to have a pre-existing USCF membership. Please check the date of birth and if they have played before.'
+      );
+    }
     
     const {output} = await prompt({
         age: age,
