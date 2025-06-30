@@ -5,6 +5,8 @@ import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { signInAnonymously } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { AppLayout } from '@/components/app-layout';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { KingIcon, QueenIcon, RookIcon, BishopIcon, KnightIcon, PawnIcon } from '@/components/icons/chess-icons';
+import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { auth, storage } from '@/lib/firebase';
+import { Loader2 } from 'lucide-react';
 
 const uniqueDistricts = [...new Set(schoolData.map((school) => school.district))].sort();
 
@@ -52,18 +57,6 @@ const passwordFormSchema = z.object({
 });
 
 
-// Placeholder data for the current sponsor
-const currentSponsorData = {
-  firstName: 'Sponsor',
-  lastName: 'Name',
-  district: 'SHARYLAND ISD',
-  school: 'SHARYLAND PIONEER H S',
-  email: 'sponsor@chessmate.com',
-  phone: '(555) 555-5555',
-  avatarType: 'icon',
-  avatarUrl: 'KingIcon', 
-};
-
 const icons: { [key: string]: ElementType } = {
   KingIcon,
   QueenIcon,
@@ -76,21 +69,20 @@ const icons: { [key: string]: ElementType } = {
 
 export default function ProfilePage() {
   const { toast } = useToast();
+  const { profile, updateProfile } = useSponsorProfile();
+  
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   
-  const [profileImage, setProfileImage] = useState<string | null>(
-    currentSponsorData.avatarType === 'upload' ? currentSponsorData.avatarUrl : null
-  );
-  const [selectedIconName, setSelectedIconName] = useState<string>(
-     currentSponsorData.avatarType === 'icon' ? currentSponsorData.avatarUrl : 'KingIcon'
-  );
-  const [activeTab, setActiveTab] = useState<'icon' | 'upload'>(currentSponsorData.avatarType as 'icon' | 'upload');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedIconName, setSelectedIconName] = useState<string>('KingIcon');
+  const [activeTab, setActiveTab] = useState<'icon' | 'upload'>('icon');
+  const [isSavingPicture, setIsSavingPicture] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const profileForm = useForm<z.infer<typeof profileFormSchema>>({
     resolver: zodResolver(profileFormSchema),
-    defaultValues: currentSponsorData,
   });
   
   const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
@@ -103,38 +95,98 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    // Pre-populate schools for the default district
-    const initialSchools = schoolData
-      .filter((school) => school.district === currentSponsorData.district)
-      .map((school) => school.schoolName)
-      .sort();
-    setSchoolsForDistrict(initialSchools);
+    const authenticate = async () => {
+      if (auth && !auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (error) {
+          console.error("Anonymous sign-in failed on page load:", error);
+        }
+      }
+    };
+    authenticate();
   }, []);
+
+  useEffect(() => {
+    if (profile) {
+      profileForm.reset({
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        district: profile.district,
+        school: profile.school,
+        email: profile.email,
+        phone: profile.phone,
+      });
+
+      const initialSchools = schoolData
+        .filter((school) => school.district === profile.district)
+        .map((school) => school.schoolName)
+        .sort();
+      setSchoolsForDistrict(initialSchools);
+      
+      setActiveTab(profile.avatarType);
+      if (profile.avatarType === 'icon') {
+        setSelectedIconName(profile.avatarValue);
+        setImagePreview(null);
+      } else {
+        setImagePreview(profile.avatarValue);
+        setSelectedIconName('');
+      }
+    }
+  }, [profile, profileForm]);
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+        setImageFile(file);
         const reader = new FileReader();
         reader.onloadend = () => {
-            setProfileImage(reader.result as string);
+            setImagePreview(reader.result as string);
             setSelectedIconName('');
         };
-        reader.readAsDataURL(file);
+        reader.readDataURL(file);
     }
   };
 
   const handleIconSelect = (IconName: string) => {
       setSelectedIconName(IconName);
-      setProfileImage(null);
+      setImagePreview(null);
+      setImageFile(null);
   };
 
-  const handleSavePicture = () => {
-    console.log("Saving picture:", { activeTab, profileImage, selectedIconName });
-    toast({
+  const handleSavePicture = async () => {
+    setIsSavingPicture(true);
+    try {
+      if (activeTab === 'upload' && imageFile) {
+        if (!auth || !auth.currentUser) {
+          toast({ variant: 'destructive', title: 'Authentication Error', description: "Cannot upload file. Please refresh and try again." });
+          return;
+        }
+        if (!storage) {
+          toast({ variant: 'destructive', title: 'Storage Error', description: 'Firebase Storage is not configured.' });
+          return;
+        }
+
+        const storageRef = ref(storage, `avatars/sponsor_profile`);
+        await uploadBytes(storageRef, imageFile);
+        const downloadUrl = await getDownloadURL(storageRef);
+
+        updateProfile({ avatarType: 'upload', avatarValue: downloadUrl });
+        setImageFile(null);
+      } else if (activeTab === 'icon') {
+        updateProfile({ avatarType: 'icon', avatarValue: selectedIconName });
+      }
+      toast({
         title: "Profile Picture Updated",
         description: "Your new profile picture has been saved.",
-    });
-  }
+      });
+    } catch (error) {
+      console.error("Failed to save picture:", error);
+      toast({ variant: 'destructive', title: "Save Failed", description: "Could not save your profile picture." });
+    } finally {
+      setIsSavingPicture(false);
+    }
+  };
 
   const handleDistrictChange = (district: string) => {
     profileForm.setValue('district', district);
@@ -147,7 +199,7 @@ export default function ProfilePage() {
   };
   
   function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
-    console.log("Profile updated:", values);
+    updateProfile(values);
     toast({
       title: 'Profile Updated',
       description: 'Your information has been successfully saved.',
@@ -184,19 +236,22 @@ export default function ProfilePage() {
             <CardContent className="grid md:grid-cols-3 gap-8 items-start">
                 <div className="flex flex-col items-center gap-4">
                     <Avatar className="h-32 w-32 border">
-                        {activeTab === 'upload' && profileImage ? (
-                            <AvatarImage src={profileImage} alt="Sponsor Profile" />
+                        {activeTab === 'upload' && imagePreview ? (
+                            <AvatarImage src={imagePreview} alt="Sponsor Profile" />
                         ) : activeTab === 'icon' && SelectedIconComponent ? (
                             <div className="w-full h-full flex items-center justify-center bg-muted rounded-full">
                                 <SelectedIconComponent className="w-20 h-20 text-muted-foreground" />
                             </div>
                         ) : (
                             <AvatarFallback className="text-4xl">
-                                {currentSponsorData.firstName.charAt(0)}{currentSponsorData.lastName.charAt(0)}
+                                {profile ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}` : 'S'}
                             </AvatarFallback>
                         )}
                     </Avatar>
-                     <Button variant="outline" className="w-full" onClick={handleSavePicture}>Save Picture</Button>
+                     <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavingPicture}>
+                        {isSavingPicture ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Save Picture
+                     </Button>
                 </div>
                 <div className="md:col-span-2">
                     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'icon' | 'upload')}>
@@ -303,7 +358,7 @@ export default function ProfilePage() {
                                 render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>District</FormLabel>
-                                    <Select onValueChange={handleDistrictChange} defaultValue={field.value}>
+                                    <Select onValueChange={handleDistrictChange} value={field.value}>
                                     <FormControl>
                                         <SelectTrigger>
                                         <SelectValue placeholder="Select a district" />

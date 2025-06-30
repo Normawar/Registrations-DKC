@@ -27,6 +27,7 @@ import {
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
 import { User, LogOut, School, ClipboardList, ClipboardCheck } from "lucide-react";
+import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 
 const menuItems = [
   { href: "/profile", icon: User, label: "Profile" },
@@ -41,8 +42,20 @@ const menuItems = [
   { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
 ];
 
+const icons: { [key: string]: React.ElementType } = {
+  KingIcon,
+  QueenIcon,
+  RookIcon,
+  BishopIcon,
+  KnightIcon,
+  PawnIcon,
+};
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { profile } = useSponsorProfile();
+
+  const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
 
   return (
     <SidebarProvider>
@@ -51,17 +64,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarHeader>
             <div className="flex items-center gap-3">
                 <Link href="/profile" prefetch={false} aria-label="Sponsor Profile">
-                    <KingIcon className="w-8 h-8 text-sidebar-primary shrink-0" />
+                    {profile?.avatarType === 'upload' ? (
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={profile.avatarValue} alt="Sponsor Avatar" />
+                            <AvatarFallback>{profile.firstName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                    ) : AvatarComponent ? (
+                        <AvatarComponent className="w-8 h-8 text-sidebar-primary shrink-0" />
+                    ) : (
+                        <KingIcon className="w-8 h-8 text-sidebar-primary shrink-0" />
+                    )}
                 </Link>
                 <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
                     <p className="font-headline text-base font-bold text-sidebar-foreground truncate">
-                        Sponsor Name
+                        {profile ? `${profile.firstName} ${profile.lastName}` : 'Sponsor Name'}
                     </p>
                     <p className="text-xs text-sidebar-foreground/80 truncate">
-                        SHARYLAND PIONEER H S
+                        {profile ? profile.school : 'School Name'}
                     </p>
                     <p className="text-xs text-sidebar-foreground/70 truncate">
-                        SHARYLAND ISD
+                        {profile ? profile.district : 'District Name'}
                     </p>
                 </div>
             </div>
@@ -87,13 +109,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarFooter>
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10">
-                <AvatarImage src="https://placehold.co/40x40.png" alt="@user" />
-                <AvatarFallback>S</AvatarFallback>
+                {profile?.avatarType === 'upload' ? (
+                  <AvatarImage src={profile.avatarValue} alt="@user" />
+                ) : null }
+                <AvatarFallback>{profile ? profile.firstName.charAt(0) : 'S'}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden group-data-[collapsible=icon]:hidden">
-                <p className="font-semibold text-sm truncate">Sponsor</p>
+                <p className="font-semibold text-sm truncate">{profile ? `${profile.firstName} ${profile.lastName}` : 'Sponsor'}</p>
                 <p className="text-xs text-sidebar-foreground/70 truncate">
-                  sponsor@chessmate.com
+                  {profile ? profile.email : 'sponsor@chessmate.com'}
                 </p>
               </div>
               <Button
