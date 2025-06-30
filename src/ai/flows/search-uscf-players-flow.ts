@@ -42,16 +42,16 @@ const searchPrompt = ai.definePrompt({
     output: { schema: SearchUscfPlayersOutputSchema },
     prompt: `You are an expert at parsing HTML tables. Your task is to extract player data from the provided HTML content of a USCF player search results page.
 
-1.  First, locate the table containing the player data. The correct table has a header row that starts with "ID", "Reg", "Qk", etc. and ends with "Name".
-2.  Ignore this header row.
-3.  Process all subsequent \`<tr>\` elements within that table. Each \`<tr>\` represents a player.
-4.  For each player row, extract the following data from the \`<td>\` elements:
-    - **uscfId**: The 8-digit number from the link in the first \`<td>\`. The link will be in the format \`MbrDtlMain.php?12345678\`.
-    - **rating**: The regular rating from the second \`<td>\`. If it's provisional (e.g., "417/5"), use the number before the slash. If it's "Unrated" or not a number, omit the rating field.
-    - **state**: The two-letter state abbreviation from the eighth \`<td>\`.
-    - **fullName**: The player's name from the tenth \`<td>\`. This name may be inside an \`<a>\` tag. Extract only the text of the name.
-5.  If the HTML contains "No players found", return an empty \`players\` array.
-6.  Return the data as a JSON object matching the provided output schema.
+1.  Locate the \`<table>\` that contains a row with the class "header" (\`<tr class="header">\`). This header row contains column titles like "ID", "Reg", "Qk", "Name", etc.
+2.  Ignore the header row itself.
+3.  Process all subsequent \`<tr>\` elements within that table's body. Each \`<tr>\` represents a player.
+4.  For each player row, extract the following data from its child \`<td>\` elements:
+    - **uscfId**: Found in the first \`<td>\`. Extract the 8-digit number from the link's \`href\` attribute (e.g., from \`MbrDtlMain.php?12345678\`).
+    - **rating**: Found in the second \`<td>\`. This is the regular rating. If it contains a slash (e.g., "1234/5"), use the number before the slash. If it is "Unrated" or not a number, omit the rating field.
+    - **state**: Found in the sixth \`<td>\`. This is the two-letter state abbreviation.
+    - **fullName**: Found in the seventh \`<td>\`. Extract the name text, which might be inside an \`<a>\` tag.
+5.  If the HTML contains the text "No players found", return an empty \`players\` array.
+6.  Return the data as a JSON object matching the provided output schema. Do not include players that do not have a USCF ID.
 
 HTML to parse:
 {{{_input}}}`

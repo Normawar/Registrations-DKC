@@ -32,16 +32,14 @@ const lookupPrompt = ai.definePrompt({
     name: 'lookupUscfPlayerPrompt',
     input: { schema: z.string() },
     output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `You are an expert at parsing structured text.
-The provided text is from a USCF player lookup page.
-Your task is to extract the player's full name, their regular rating, and their membership expiration date.
+    prompt: `You are an expert at parsing structured text from a \`<pre>\` block. Your task is to extract a chess player's details.
 
-The input will be the text content inside a \`<pre>\` tag. Parse this text according to the following rules:
-1.  Find the line that starts with "Name:". The player's full name follows this label, in "LASTNAME, FIRSTNAME" format.
-2.  Find the line that contains the word "regular". The rating is the number immediately following "Rate:". Extract only the number.
-3.  On the same line as the rating, find "Exp:". The membership expiration date follows this label in "YYYY-MM-DD" format.
-4.  If the input text contains "This player is not in our database", it means the player was not found. In this case, set the 'error' field in your output to "Player not found with this USCF ID." and leave other fields empty.
-5.  If you cannot find a specific field, leave it undefined in the output.
+The input text will be from the USCF player lookup page. Parse this text according to the following rules:
+1.  **Full Name**: The name is on the first line, immediately following the 8-digit USCF ID. It will be in "LASTNAME, FIRSTNAME" format.
+2.  **Rating**: Find the line containing "Rate:". The player's regular rating is the number immediately following this label. Extract only the number. If it says "Unrated", leave the rating field undefined.
+3.  **Expiration Date**: Find the line containing "Exp:". The membership expiration date follows this label in "YYYY-MM-DD" format.
+4.  **Error Handling**: If the input text contains "This player is not in our database", it means the player was not found. In this case, set the 'error' field in your output to "Player not found with this USCF ID." and leave other fields empty.
+5.  If you cannot find a specific field for any other reason, leave it undefined in the output.
 
 Here is the text content to parse:
 {{{_input}}}`
@@ -95,7 +93,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       // Re-format name from "LAST, FIRST" to "FIRST LAST" for display
       if (output.fullName) {
           const nameParts = output.fullName.split(',').map(p => p.trim());
-          if (nameParts.length === 2) {
+          if (nameParts.length >= 2) {
               output.fullName = `${nameParts[1]} ${nameParts[0]}`;
           }
       }
