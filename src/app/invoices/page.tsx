@@ -79,6 +79,7 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PUBLISHED',
     schoolName: 'SHARYLAND PIONEER H S',
     district: 'SHARYLAND ISD',
+    invoiceUrl: '#',
   },
   {
     id: 'sample-new-uscf-1',
@@ -91,6 +92,7 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PAID',
     schoolName: 'SHARYLAND PIONEER H S',
     district: 'SHARYLAND ISD',
+    invoiceUrl: '#',
   },
   {
     id: 'sample-1',
@@ -103,6 +105,7 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PAID',
     schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
     district: 'SHARYLAND ISD',
+    invoiceUrl: '#',
   },
   {
     id: 'sample-2',
@@ -115,6 +118,7 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PUBLISHED',
     schoolName: 'MCALLEN H S', // Different school
     district: 'MCALLEN ISD',
+    invoiceUrl: '#',
   },
     {
     id: 'sample-3',
@@ -127,6 +131,7 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'UNPAID',
     schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
     district: 'SHARYLAND ISD',
+    invoiceUrl: '#',
   },
    {
     id: 'sample-4',
@@ -139,6 +144,7 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PAID',
     schoolName: 'EDINBURG H S', // Different school
     district: 'EDINBURG CISD',
+    invoiceUrl: '#',
   },
 ];
 
@@ -413,6 +419,7 @@ function InvoicesComponent() {
                         {filteredInvoices.map((inv) => {
                             const currentStatus = statuses[inv.id];
                             const isLoading = currentStatus?.isLoading;
+                            const isSample = inv.id.startsWith('sample-');
                             
                             return (
                                 <TableRow key={inv.id}>
@@ -428,15 +435,30 @@ function InvoicesComponent() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId || inv.id.startsWith('sample-')} title="Refresh Status">
+                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId || isSample} title="Refresh Status">
                                                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
-                                            <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl}>
-                                                <a href={inv.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!inv.invoiceUrl && 'pointer-events-none opacity-50')}>
-                                                  <ExternalLink className="mr-2 h-4 w-4" /> View
-                                                </a>
-                                            </Button>
+                                            {isSample ? (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        toast({
+                                                            title: "Sample Invoice",
+                                                            description: "This is a sample invoice. Links for invoices you create will lead to the real Square invoice page.",
+                                                        });
+                                                    }}
+                                                >
+                                                    <ExternalLink className="mr-2 h-4 w-4" /> View
+                                                </Button>
+                                            ) : (
+                                                <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl}>
+                                                    <a href={inv.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!inv.invoiceUrl && 'pointer-events-none opacity-50')}>
+                                                      <ExternalLink className="mr-2 h-4 w-4" /> View
+                                                    </a>
+                                                </Button>
+                                            )}
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -459,5 +481,7 @@ export default function InvoicesPage() {
         </Suspense>
     )
 }
+
+    
 
     
