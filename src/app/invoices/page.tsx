@@ -61,21 +61,10 @@ const INVOICE_STATUSES = [
     'DRAFT',
     'CANCELED',
     'VOIDED',
-  'REFUNDED',
+    'REFUNDED',
     'PARTIALLY_REFUNDED',
     'FAILED',
     'NO_INVOICE'
-];
-
-// Mock data now has placeholder URLs so the "View Invoice" button is always active.
-const mockOrganizerInvoices: any[] = [
-    { id: 'org_inv_1', invoiceId: 'inv:mock-id-1', invoiceUrl: 'https://example.com/invoice/1', invoiceNumber: '0001', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-20').toISOString(), totalInvoiced: 120.00, invoiceStatus: 'PAID' },
-    { id: 'org_inv_2', invoiceId: 'inv:mock-id-2', invoiceUrl: 'https://example.com/invoice/2', invoiceNumber: '0002', purchaserName: 'John Smith', schoolName: 'MCALLEN H S', district: 'MCALLEN ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-22').toISOString(), totalInvoiced: 250.00, invoiceStatus: 'UNPAID' },
-    { id: 'org_inv_3', invoiceId: 'inv:mock-id-3', invoiceUrl: 'https://example.com/invoice/3', invoiceNumber: '0003', purchaserName: 'Sponsor Name', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: `USCF Membership (Youth)`, submissionTimestamp: new Date('2024-05-21').toISOString(), totalInvoiced: 24.00, invoiceStatus: 'PAID' },
-    { id: 'org_inv_4', invoiceId: 'inv:mock-id-4', invoiceUrl: 'https://example.com/invoice/4', invoiceNumber: '0004', purchaserName: 'Another Sponsor', schoolName: 'LA JOYA H S', district: 'LA JOYA ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-19').toISOString(), totalInvoiced: 80.00, invoiceStatus: 'CANCELED' },
-    { id: 'org_inv_5', invoiceId: 'inv:mock-id-5', invoiceUrl: 'https://example.com/invoice/5', invoiceNumber: '0005', purchaserName: 'Test Sponsor', schoolName: 'EDINBURG H S', district: 'EDINBURG CISD', description: 'Autumn Classic', submissionTimestamp: new Date('2024-05-25').toISOString(), totalInvoiced: 150.00, invoiceStatus: 'PUBLISHED' },
-    { id: 'org_inv_6', invoiceId: 'inv:mock-id-6', invoiceUrl: 'https://example.com/invoice/6', invoiceNumber: '0006', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-28').toISOString(), totalInvoiced: 200.00, invoiceStatus: 'PAYMENT_PENDING' },
-    { id: 'org_inv_7', invoiceId: 'inv:mock-id-7', invoiceUrl: 'https://example.com/invoice/7', invoiceNumber: '0007', purchaserName: 'Arnold Sponsor', schoolName: 'ALLEN & WILLIAM ARNOLD EL', district: 'PHARR-SAN JUAN-ALAMO ISD', description: 'Team T-Shirts', submissionTimestamp: new Date('2024-05-29').toISOString(), totalInvoiced: 300.00, invoiceStatus: 'PUBLISHED' },
 ];
 
 function InvoicesComponent() {
@@ -88,9 +77,9 @@ function InvoicesComponent() {
   const [schoolFilter, setSchoolFilter] = useState('ALL');
 
   const uniqueSchools = useMemo(() => {
-    const schools = new Set(mockOrganizerInvoices.map(inv => inv.schoolName || ''));
+    const schools = new Set(allInvoices.map(inv => inv.schoolName || ''));
     return ['ALL', ...Array.from(schools).filter(Boolean).sort()];
-  }, []);
+  }, [allInvoices]);
   
   const fetchInvoiceStatus = async (confId: string, invoiceId: string, silent = false) => {
       if (!silent) {
@@ -132,31 +121,11 @@ function InvoicesComponent() {
         const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
         const organizerInvoices = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
 
-        // Combine ALL invoice sources into one master list
+        // Combine ALL invoice sources from local storage
         const allLocalInvoices = [...confirmations, ...membershipInvoices, ...organizerInvoices];
         
-        // Assume locally stored invoices belong to the current user's school if schoolName is missing
-        const localInvoicesWithSchool = allLocalInvoices.map(inv => ({
-            ...inv,
-            schoolName: inv.schoolName || profile.school,
-            district: inv.district || profile.district,
-        }));
-
-        const combinedSource = [...mockOrganizerInvoices, ...localInvoicesWithSchool];
-
-        // De-duplicate the master list, prioritizing real data over mock data
-        const uniqueInvoicesMap = new Map<string, any>();
-        for (const inv of combinedSource) {
-            const key = inv.invoiceId || inv.id;
-            if (!uniqueInvoicesMap.has(key) || !inv.id?.startsWith('org_inv_')) {
-                uniqueInvoicesMap.set(key, inv);
-            }
-        }
-        
-        const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
-
         // Normalize all data into a consistent format
-        let normalizedInvoices = allUniqueInvoices
+        let normalizedInvoices = allLocalInvoices
             .map((inv: any): CombinedInvoice => ({
                 id: inv.id,
                 description: inv.description || inv.eventName || `USCF Membership (${inv.membershipType})`,
@@ -165,15 +134,25 @@ function InvoicesComponent() {
                 invoiceId: inv.invoiceId,
                 invoiceUrl: inv.invoiceUrl,
                 invoiceNumber: inv.invoiceNumber,
-                schoolName: inv.schoolName,
-                district: inv.district,
+                schoolName: inv.schoolName || profile.school, // Assume ownership
+                district: inv.district || profile.district,
                 purchaserName: inv.purchaserName || `${profile.firstName} ${profile.lastName}`,
                 invoiceStatus: inv.invoiceStatus || inv.status,
             }));
             
+        // De-duplicate the list
+        const uniqueInvoicesMap = new Map<string, any>();
+        for (const inv of normalizedInvoices) {
+            const key = inv.invoiceId || inv.id;
+            uniqueInvoicesMap.set(key, inv);
+        }
+        const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
+            
         // Filter based on role
         if (profile.role === 'sponsor') {
-            normalizedInvoices = normalizedInvoices.filter(inv => inv.schoolName === profile.school);
+            normalizedInvoices = allUniqueInvoices.filter(inv => inv.schoolName === profile.school);
+        } else {
+            normalizedInvoices = allUniqueInvoices;
         }
         
         normalizedInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
@@ -193,10 +172,9 @@ function InvoicesComponent() {
         
         // Fetch live statuses for real invoices that aren't in a final state
         const invoicesToFetch = normalizedInvoices.filter(inv => {
-            const isMock = inv.id.startsWith('org_inv_');
             const currentStatus = initialStatuses[inv.id]?.status?.toUpperCase();
             const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NO_INVOICE', 'NOT_FOUND'].includes(currentStatus || '');
-            return inv.invoiceId && !isMock && !isFinalState;
+            return inv.invoiceId && !isFinalState;
         });
         fetchAllInvoiceStatuses(invoicesToFetch);
 
@@ -243,7 +221,7 @@ function InvoicesComponent() {
         const currentStatus = statuses[inv.id]?.status?.toUpperCase() || '';
         if (!currentStatus) return false;
         
-        if (statusFilter === 'UNPAID' && currentStatus === 'PUBLISHED') {
+        if (statusFilter === 'UNPAID' && ['PUBLISHED', 'UNPAID'].includes(currentStatus)) {
             return true;
         }
         return currentStatus === statusFilter;
@@ -369,7 +347,7 @@ function InvoicesComponent() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId || inv.id.startsWith('org_inv_')} title="Refresh Status">
+                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId} title="Refresh Status">
                                                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
@@ -400,3 +378,5 @@ export default function InvoicesPage() {
         </Suspense>
     )
 }
+
+    
