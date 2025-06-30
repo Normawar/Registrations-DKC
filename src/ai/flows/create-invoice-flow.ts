@@ -181,13 +181,13 @@ const createInvoiceFlow = ai.defineFlow(
       const invoice = createInvoiceResponse.result.invoice!;
       console.log("Successfully created DRAFT invoice:", invoice);
 
-      // Publish the invoice to make it active and get the final invoice data
+      // Publish the invoice to make it active
       console.log(`Publishing invoice ID: ${invoice.id!}`);
       const { result: { invoice: publishedInvoice } } = await invoicesApi.publishInvoice(invoice.id!, {
         version: invoice.version!,
         idempotencyKey: randomUUID(),
       });
-
+      
       console.log("Successfully published invoice:", publishedInvoice);
 
       if (!publishedInvoice || !publishedInvoice.publicUrl) {
