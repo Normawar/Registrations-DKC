@@ -372,9 +372,9 @@ function UscfPurchaseComponent() {
                     </Alert>
                 )}
 
-                <Alert variant="default" className="bg-primary/5 border-primary/20">
-                    <Info className="h-4 w-4 text-primary" />
-                    <AlertTitle className="text-primary">Membership Only</AlertTitle>
+                <Alert variant="destructive">
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Membership Only</AlertTitle>
                     <AlertDescription>
                         Please note: This purchase is for a USCF membership only and does not register the player for any events.
                     </AlertDescription>
