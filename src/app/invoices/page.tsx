@@ -66,10 +66,10 @@ const INVOICE_STATUSES = [
     'FAILED',
 ];
 
-const mockOrganizerInvoices: CombinedInvoice[] = [
+const mockOrganizerInvoices: any[] = [
     { id: 'org_inv_1', invoiceId: 'inv:0-ChAIs...', invoiceNumber: '0001', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-20').toISOString(), totalInvoiced: 120.00, invoiceStatus: 'PAID', invoiceUrl: '#' },
     { id: 'org_inv_2', invoiceId: 'inv:0-ChAIt...', invoiceNumber: '0002', purchaserName: 'John Smith', schoolName: 'MCALLEN H S', district: 'MCALLEN ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-22').toISOString(), totalInvoiced: 250.00, invoiceStatus: 'UNPAID', invoiceUrl: '#' },
-    { id: 'org_inv_3', invoiceId: 'inv:0-ChAIu...', invoiceNumber: '0003', purchaserName: 'Sponsor Name', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'USCF Membership (Youth)', submissionTimestamp: new Date('2024-05-21').toISOString(), totalInvoiced: 24.00, invoiceStatus: 'PAID', invoiceUrl: '#' },
+    { id: 'org_inv_3', invoiceId: 'inv:0-ChAIu...', invoiceNumber: '0003', purchaserName: 'Sponsor Name', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', membershipType: 'Youth', playerCount: 1, submissionTimestamp: new Date('2024-05-21').toISOString(), totalInvoiced: 24.00, invoiceStatus: 'PAID', invoiceUrl: '#' },
     { id: 'org_inv_4', invoiceId: 'inv:0-ChAIv...', invoiceNumber: '0004', purchaserName: 'Another Sponsor', schoolName: 'LA JOYA H S', district: 'LA JOYA ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-19').toISOString(), totalInvoiced: 80.00, invoiceStatus: 'CANCELED', invoiceUrl: '#' },
     { id: 'org_inv_5', invoiceId: 'inv:0-ChAIw...', invoiceNumber: '0005', purchaserName: 'Test Sponsor', schoolName: 'EDINBURG H S', district: 'EDINBURG CISD', description: 'Autumn Classic', submissionTimestamp: new Date('2024-05-25').toISOString(), totalInvoiced: 150.00, invoiceStatus: 'PUBLISHED', invoiceUrl: '#' },
     { id: 'org_inv_6', invoiceId: 'inv:0-ChAIx...', invoiceNumber: '0006', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-28').toISOString(), totalInvoiced: 200.00, invoiceStatus: 'PAYMENT_PENDING', invoiceUrl: '#' },
@@ -133,40 +133,43 @@ function InvoicesComponent() {
     try {
         let finalInvoices: CombinedInvoice[] = [];
 
-        if (profile.role === 'organizer') {
-            finalInvoices = mockOrganizerInvoices;
-        } else { // Sponsor role
-            // First, gather all invoices from all sources into a master list.
-            const allPossibleInvoices: CombinedInvoice[] = [
+        if (profile.role === 'sponsor') {
+            const allSources = [
                 ...mockOrganizerInvoices,
-                ...JSON.parse(localStorage.getItem('confirmations') || '[]').map((conf: any) => ({
-                    ...conf,
-                    schoolName: conf.schoolName || profile.school, // Fallback for old data
-                    district: conf.district || profile.district, // Fallback for old data
-                })),
-                ...JSON.parse(localStorage.getItem('membershipInvoices') || '[]').map((inv: any) => ({
-                    id: inv.id || inv.invoiceId, // Handle old data without an 'id' field
-                    description: `USCF Membership (${inv.membershipType})`,
-                    invoiceStatus: inv.status || inv.invoiceStatus, // Handle old data with 'status'
-                    ...inv,
-                    schoolName: inv.schoolName || profile.school, // Fallback for old data
-                    district: inv.district || profile.district, // Fallback for old data
-                }))
+                ...JSON.parse(localStorage.getItem('confirmations') || '[]'),
+                ...JSON.parse(localStorage.getItem('membershipInvoices') || '[]'),
             ];
 
-            // De-duplicate based on invoiceId, preferring non-mock entries
-            const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
-            for (const inv of allPossibleInvoices) {
+            const uniqueInvoicesMap = new Map<string, any>();
+            for (const inv of allSources) {
                 const key = inv.invoiceId || inv.id;
-                if (!uniqueInvoicesMap.has(key) || !inv.id.startsWith('org_inv_')) {
+                if (!uniqueInvoicesMap.has(key) || !inv.id?.startsWith('org_inv_')) {
                     uniqueInvoicesMap.set(key, inv);
                 }
             }
 
-            // Filter the de-duplicated list by the sponsor's school
-            finalInvoices = Array.from(uniqueInvoicesMap.values()).filter(
+            const normalizedInvoices = Array.from(uniqueInvoicesMap.values()).map((inv: any): CombinedInvoice => ({
+                id: inv.id,
+                description: inv.description || inv.eventName || `USCF Membership (${inv.membershipType})`,
+                submissionTimestamp: inv.submissionTimestamp,
+                totalInvoiced: inv.totalInvoiced,
+                invoiceId: inv.invoiceId,
+                invoiceUrl: inv.invoiceUrl,
+                invoiceNumber: inv.invoiceNumber,
+                purchaserName: inv.purchaserName || `${profile.firstName} ${profile.lastName}`,
+                invoiceStatus: inv.invoiceStatus || inv.status,
+                schoolName: inv.schoolName || profile.school,
+                district: inv.district || profile.district,
+            }));
+
+            finalInvoices = normalizedInvoices.filter(
                 inv => inv.schoolName === profile.school
             );
+        } else { // Organizer role
+            finalInvoices = mockOrganizerInvoices.map((inv: any): CombinedInvoice => ({
+                ...inv,
+                description: inv.description || inv.eventName || `USCF Membership (${inv.membershipType})`,
+            }));
         }
 
         finalInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());

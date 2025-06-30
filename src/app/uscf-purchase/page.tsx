@@ -210,8 +210,8 @@ function UscfPurchaseComponent() {
 
             const newMembershipInvoice: InvoiceState = {
                 ...result,
-                id: result.invoiceId, // Use invoiceId as the stable ID
-                invoiceStatus: result.status, // Use the correct property name
+                id: result.invoiceId,
+                invoiceStatus: result.status,
                 playerCount: values.players.length,
                 membershipType: membershipType,
                 submissionTimestamp: new Date().toISOString(),
