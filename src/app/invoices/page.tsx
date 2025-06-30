@@ -34,7 +34,7 @@ import { ExternalLink, RefreshCw, Receipt } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// This combines data from event confirmations and membership purchases
+// This combines data from event registrations and membership purchases
 type CombinedInvoice = {
   id: string; // confirmation ID or invoice ID
   description: string; // event name or membership type
@@ -66,7 +66,7 @@ const INVOICE_STATUSES = [
     'NO_INVOICE'
 ];
 
-function InvoicesComponent() {
+export default function InvoicesPage() {
   const { profile } = useSponsorProfile();
 
   const [allInvoices, setAllInvoices] = useState<CombinedInvoice[]>([]);
@@ -129,27 +129,20 @@ function InvoicesComponent() {
   }, []);
   
   useEffect(() => {
-    // Initial load
     loadAndProcessInvoices();
     
-    // Define the handler for storage changes
     const handleStorageChange = (event: Event) => {
-      // For real storage events from other tabs, check the key.
-      // For our custom dispatched event from the same tab, just reload.
       if (event instanceof StorageEvent) {
         if (event.key === 'all_invoices') {
             loadAndProcessInvoices();
         }
       } else {
-        // This handles custom events dispatched from the same tab.
         loadAndProcessInvoices();
       }
     };
     
-    // Add the listener
     window.addEventListener('storage', handleStorageChange);
     
-    // Clean up the listener
     return () => {
         window.removeEventListener('storage', handleStorageChange);
     };
@@ -161,7 +154,6 @@ function InvoicesComponent() {
   }, [allInvoices]);
   
   const filteredInvoices = useMemo(() => {
-    // Wait for profile to be loaded before filtering.
     if (!profile) {
       return [];
     }
@@ -189,7 +181,7 @@ function InvoicesComponent() {
         
         return true;
     });
-  }, [allInvoices, profile, schoolFilter, statusFilter]);
+  }, [allInvoices, profile, schoolFilter, statusFilter, statuses]);
 
     useEffect(() => {
         const invoicesToFetchStatus = filteredInvoices.filter(inv => {
@@ -367,10 +359,4 @@ function InvoicesComponent() {
       </div>
     </AppLayout>
   );
-}
-
-export default function InvoicesPage() {
-    return (
-        <InvoicesComponent />
-    )
 }
