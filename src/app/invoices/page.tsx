@@ -264,7 +264,17 @@ export default function InvoicesPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <CardTitle>All Invoices</CardTitle>
-                    <CardDescription>Filter invoices by their current payment status.</CardDescription>
+                    <CardDescription>
+                        Filter invoices by their current payment status.
+                         <div className="mt-2 text-xs text-muted-foreground p-2 border rounded-md bg-background/50">
+                            <p className="font-bold">Diagnostics:</p>
+                            <p>Profile Loaded: <span className="font-mono">{profile ? 'Yes' : 'No'}</span></p>
+                            <p>Role: <span className="font-mono">{profile?.role || 'N/A'}</span></p>
+                            <p>School: <span className="font-mono">{profile?.school || 'N/A'}</span></p>
+                            <p>Total Invoices in Storage: <span className="font-mono">{allInvoices.length}</span></p>
+                            <p>Visible Invoices (after filters): <span className="font-mono">{filteredInvoices.length}</span></p>
+                        </div>
+                    </CardDescription>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     {profile.role === 'organizer' && (
