@@ -238,7 +238,7 @@ export default function ProfilePage() {
       }
       
       if (activeTab === 'upload' && imageFile) {
-        const storageRef = ref(storage, `avatars/${Date.now()}-${imageFile.name}`);
+        const storageRef = ref(storage, `payment-proofs/avatars/${Date.now()}-${imageFile.name}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
