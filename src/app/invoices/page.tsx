@@ -129,7 +129,6 @@ function InvoicesComponent() {
         if (profile.role === 'organizer') {
             invoicesToDisplay = mockOrganizerInvoices;
         } else { // Sponsor role
-             // Invoices created by this sponsor (from their browser's local storage)
             const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
             const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
 
@@ -161,15 +160,18 @@ function InvoicesComponent() {
                 district: inv.district,
             }));
 
-            // Invoices created by an organizer for this sponsor's school (from mock data)
-            const organizerInvoicesForSchool = mockOrganizerInvoices.filter(inv => inv.schoolName === profile.school);
+            const allPossibleInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices, ...mockOrganizerInvoices];
             
-            // Combine all invoice sources
-            const allSponsorInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices, ...organizerInvoicesForSchool];
-
-            // De-duplicate based on invoiceId to avoid showing the same invoice twice if it's in multiple sources.
-            const uniqueInvoices = Array.from(new Map(allSponsorInvoices.map(inv => [inv.invoiceId || inv.id, inv])).values());
-            invoicesToDisplay = uniqueInvoices;
+            const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
+            for (const inv of allPossibleInvoices) {
+                const key = inv.invoiceId || inv.id;
+                if (!uniqueInvoicesMap.has(key)) {
+                    uniqueInvoicesMap.set(key, inv);
+                }
+            }
+            const uniqueInvoices = Array.from(uniqueInvoicesMap.values());
+            
+            invoicesToDisplay = uniqueInvoices.filter(inv => inv.schoolName === profile.school);
         }
 
         invoicesToDisplay.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
@@ -369,3 +371,5 @@ export default function InvoicesPage() {
         </Suspense>
     )
 }
+
+    
