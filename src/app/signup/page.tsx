@@ -39,6 +39,15 @@ const sponsorFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
   phone: z.string().min(10, { message: "Please enter a valid 10-digit phone number." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
+  gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+}).refine(data => {
+    if (data.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+        return data.gtCoordinatorEmail && data.gtCoordinatorEmail.length > 0;
+    }
+    return true;
+}, {
+    message: "GT Coordinator Email is required for this district.",
+    path: ["gtCoordinatorEmail"],
 });
 
 const SponsorSignUpForm = () => {
@@ -55,6 +64,7 @@ const SponsorSignUpForm = () => {
       email: "",
       phone: "",
       password: "",
+      gtCoordinatorEmail: "",
     },
   });
 
@@ -156,6 +166,21 @@ const SponsorSignUpForm = () => {
               </FormItem>
             )}
           />
+          {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+              <FormField
+                  control={form.control}
+                  name="gtCoordinatorEmail"
+                  render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>GT Coordinator Email</FormLabel>
+                      <FormControl>
+                      <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                  </FormItem>
+                  )}
+              />
+          )}
           <FormField
             control={form.control}
             name="email"

@@ -47,6 +47,15 @@ const profileFormSchema = z.object({
   school: z.string({ required_error: 'Please select a school.' }).min(1, 'School is required.'),
   email: z.string().email({ message: 'Please enter a valid email.' }),
   phone: z.string().min(10, { message: 'Please enter a valid 10-digit phone number.' }),
+  gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+}).refine(data => {
+    if (data.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+        return data.gtCoordinatorEmail && data.gtCoordinatorEmail.length > 0;
+    }
+    return true;
+}, {
+    message: "GT Coordinator Email is required for this district.",
+    path: ["gtCoordinatorEmail"],
 });
 
 const passwordFormSchema = z.object({
@@ -142,6 +151,7 @@ export default function ProfilePage() {
       school: '',
       email: '',
       phone: '',
+      gtCoordinatorEmail: '',
     },
   });
   
@@ -188,6 +198,7 @@ export default function ProfilePage() {
         school: profile.school,
         email: profile.email,
         phone: profile.phone,
+        gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
       });
 
       const initialSchools = schoolData
@@ -525,6 +536,21 @@ export default function ProfilePage() {
                                 )}
                             />
                         </div>
+                        {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                            <FormField
+                                control={profileForm.control}
+                                name="gtCoordinatorEmail"
+                                render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>GT Coordinator Email</FormLabel>
+                                    <FormControl>
+                                    <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                        )}
                     </CardContent>
                     <CardFooter className="border-t px-6 py-4">
                         <Button type="submit">Save Changes</Button>

@@ -10,6 +10,7 @@ export type SponsorProfile = {
   school: string;
   email: string;
   phone: string;
+  gtCoordinatorEmail?: string;
   avatarType: 'icon' | 'upload';
   avatarValue: string; // Icon name or image URL
 };
@@ -21,6 +22,7 @@ const defaultSponsorData: SponsorProfile = {
   school: 'SHARYLAND PIONEER H S',
   email: 'sponsor@chessmate.com',
   phone: '(555) 555-5555',
+  gtCoordinatorEmail: '',
   avatarType: 'icon',
   avatarValue: 'KingIcon', 
 };
