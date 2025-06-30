@@ -94,12 +94,18 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
       
       // Clean up names which might have extra whitespace
-      output.players = output.players.map(player => ({
+      let players = output.players.map(player => ({
         ...player,
         fullName: player.fullName.trim()
       }));
 
-      return output;
+      // If a state was specified in the search, filter the results to only include players from that state.
+      // This is a safeguard in case the website returns players from other states or the AI includes them.
+      if (state) {
+        players = players.filter(player => player.state?.toUpperCase() === state.toUpperCase());
+      }
+
+      return { players };
 
     } catch (error) {
       console.error("Error in searchUscfPlayersFlow:", error);
