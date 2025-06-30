@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
-import { auth, storage } from '@/lib/firebase';
+import { auth, storage, isFirebaseConfigured } from '@/lib/firebase';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -93,16 +93,7 @@ export default function ConfirmationsPage() {
   
   useEffect(() => {
     const ensureAnonymousAuth = async () => {
-      // Don't try to sign in if keys are obviously placeholders
-      if (
-          !process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
-          process.env.NEXT_PUBLIC_FIREBASE_API_KEY.includes("YOUR_API_KEY")
-      ) {
-          console.warn("Firebase config is missing or incomplete. File uploads will be disabled until configured.");
-          return;
-      }
-        
-      if (!auth.currentUser) {
+      if (isFirebaseConfigured && auth && !auth.currentUser) {
         try {
           await signInAnonymously(auth);
         } catch (error) {
@@ -150,11 +141,7 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            // Configuration check
-            if (
-              !process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
-              process.env.NEXT_PUBLIC_FIREBASE_API_KEY.includes("YOUR_API_KEY")
-            ) {
+            if (!isFirebaseConfigured || !auth || !storage) {
               toast({
                 variant: 'destructive',
                 title: 'Firebase Not Configured',
@@ -342,7 +329,7 @@ export default function ConfirmationsPage() {
                                   id={`po-file-${conf.id}`} 
                                   type="file"
                                   onChange={(e) => handlePoFileChange(conf.id, e)}
-                                  disabled={isUpdating[conf.id]}
+                                  disabled={isUpdating[conf.id] || !isFirebaseConfigured}
                                 />
                                 {poInputs[conf.id]?.file ? (
                                     <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">

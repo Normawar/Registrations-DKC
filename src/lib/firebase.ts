@@ -1,6 +1,6 @@
 import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getStorage } from "firebase/storage";
+import { getAuth, type Auth } from "firebase/auth";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,10 +11,28 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase for client side using a singleton pattern
-const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let storage: FirebaseStorage | null = null;
 
-const auth = getAuth(app);
-const storage = getStorage(app);
+// This check prevents Firebase from trying to initialize with placeholder values
+const isFirebaseConfigured = firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("YOUR_API_KEY");
 
-export { app, auth, storage };
+if (isFirebaseConfigured) {
+    try {
+        app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+        auth = getAuth(app);
+        storage = getStorage(app);
+    } catch (e) {
+        console.error("Failed to initialize Firebase", e);
+        // If it fails here, services will remain null
+    }
+} else {
+    // This is a warning for the developer, not a crash.
+    if (typeof window !== 'undefined') {
+        console.warn("Firebase configuration is missing or incomplete. Please add your credentials to the .env file and restart the server. Firebase features will be disabled.");
+    }
+}
+
+
+export { app, auth, storage, isFirebaseConfigured };
