@@ -126,19 +126,18 @@ function InvoicesComponent() {
         const normalizedInvoices = allLocalInvoices
             .map((inv: any): CombinedInvoice => ({
                 id: inv.id,
-                description: inv.description || inv.eventName || `USCF Membership (${inv.membershipType})`,
+                description: inv.description || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : 'Unknown Invoice'),
                 submissionTimestamp: inv.submissionTimestamp,
                 totalInvoiced: inv.totalInvoiced || 0,
                 invoiceId: inv.invoiceId,
                 invoiceUrl: inv.invoiceUrl,
                 invoiceNumber: inv.invoiceNumber,
-                schoolName: inv.schoolName || profile.school, // Assume ownership
+                schoolName: inv.schoolName || profile.school,
                 district: inv.district || profile.district,
                 purchaserName: inv.purchaserName || `${profile.firstName} ${profile.lastName}`,
                 invoiceStatus: inv.invoiceStatus || inv.status,
             }));
             
-        // De-duplicate by creating a map and letting newer items (from local storage) overwrite older (sample) ones.
         const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
         
         // Add local invoices to the map. These take precedence.
