@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Looks up a USCF player by their ID from the USCF MSA website.
@@ -35,11 +36,11 @@ const lookupPrompt = ai.definePrompt({
 The provided text is from a USCF player lookup page.
 Your task is to extract the player's full name, their regular rating, and their membership expiration date.
 
-Here are the rules for parsing:
-1.  The player's full name follows "Name:". It will be in LASTNAME, FIRSTNAME format.
-2.  The regular rating is on a line that contains the word "regular". The format is typically "Rate: XXXX regular". Extract only the number XXXX.
-3.  The membership expiration date is on the same line, following "Exp:". The format is YYYY-MM-DD. Extract this date as a string.
-4.  If the text contains "This player is not in our database" or similar, it means the player was not found. In this case, set the 'error' field in your output to "Player not found with this USCF ID." and leave other fields empty.
+The input will be the text content inside a \`<pre>\` tag. Parse this text according to the following rules:
+1.  Find the line that starts with "Name:". The player's full name follows this label, in "LASTNAME, FIRSTNAME" format.
+2.  Find the line that contains the word "regular". The rating is the number immediately following "Rate:". Extract only the number.
+3.  On the same line as the rating, find "Exp:". The membership expiration date follows this label in "YYYY-MM-DD" format.
+4.  If the input text contains "This player is not in our database", it means the player was not found. In this case, set the 'error' field in your output to "Player not found with this USCF ID." and leave other fields empty.
 5.  If you cannot find a specific field, leave it undefined in the output.
 
 Here is the text content to parse:

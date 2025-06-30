@@ -40,48 +40,18 @@ const searchPrompt = ai.definePrompt({
     name: 'searchUscfPlayersPrompt',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing structured HTML into JSON.
-The provided text is the HTML content of a USCF player search results page.
-Your task is to find the table of players and extract the details for each player into a JSON object matching the provided schema.
+    prompt: `You are an expert at parsing HTML tables. Your task is to extract player data from the provided HTML content of a USCF player search results page.
 
-The table to parse is the one that immediately follows a \`<h3>Player Search Results</h3>\` heading.
-The player data is contained within plain \`<tr>\` elements. The header row (\`<tr class="header">\`) should be ignored.
-
-For each data row, extract the text content from its \`<td>\` children, ignoring any inner tags like \`<font>\` or \`<a>\`:
-- **uscfId**: The 8-digit number from the link in the first \`<td>\`. The link will be in the format \`MbrDtlMain.php?12345678\`.
-- **rating**: The regular rating from the second \`<td>\`. If it's provisional (e.g., "417/5"), use the number before the slash. If it's "Unrated", not a number, or blank, the rating field should be omitted or set to \`undefined\`.
-- **state**: The two-letter state abbreviation from the eighth \`<td>\`.
-- **fullName**: The player's name from the tenth \`<td>\`. This name may be inside an \`<a>\` tag. Extract only the text of the name.
-
-Here is an example of how to map a single HTML row to the desired JSON output:
-
-**Example HTML:**
-\`\`\`html
-<tr>
-    <td><font size=-1><a href="MbrDtlMain.php?12345678">12345678</a></font></td>
-    <td align="center"><font size=-1>1500</font></td>
-    <td align="center"><font size=-1>1450</font></td>
-    <td align="center"><font size=-1></font></td>
-    <td align="center"><font size=-1></font></td>
-    <td align="center"><font size=-1></font></td>
-    <td align="center"><font size=-1></font></td>
-    <td align="center"><font size=-1>TX</font></td>
-    <td align="center"><font size=-1>2025-12-31</font></td>
-    <td><font size=-1><a href="MbrDtlMain.php?12345678">DOE, JOHN</a></font></td>
-</tr>
-\`\`\`
-
-**Corresponding JSON entry for the \`players\` array:**
-\`\`\`json
-{
-  "uscfId": "12345678",
-  "fullName": "DOE, JOHN",
-  "rating": 1500,
-  "state": "TX"
-}
-\`\`\`
-
-Now, parse the following HTML and provide the full JSON output. Do not invent players. If the HTML indicates "No players found", you must return an empty \`players\` array.
+1.  First, locate the table containing the player data. The correct table has a header row that starts with "ID", "Reg", "Qk", etc. and ends with "Name".
+2.  Ignore this header row.
+3.  Process all subsequent \`<tr>\` elements within that table. Each \`<tr>\` represents a player.
+4.  For each player row, extract the following data from the \`<td>\` elements:
+    - **uscfId**: The 8-digit number from the link in the first \`<td>\`. The link will be in the format \`MbrDtlMain.php?12345678\`.
+    - **rating**: The regular rating from the second \`<td>\`. If it's provisional (e.g., "417/5"), use the number before the slash. If it's "Unrated" or not a number, omit the rating field.
+    - **state**: The two-letter state abbreviation from the eighth \`<td>\`.
+    - **fullName**: The player's name from the tenth \`<td>\`. This name may be inside an \`<a>\` tag. Extract only the text of the name.
+5.  If the HTML contains "No players found", return an empty \`players\` array.
+6.  Return the data as a JSON object matching the provided output schema.
 
 HTML to parse:
 {{{_input}}}`
