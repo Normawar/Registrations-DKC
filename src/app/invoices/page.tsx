@@ -66,82 +66,6 @@ const INVOICE_STATUSES = [
     'NO_INVOICE'
 ];
 
-const sampleInvoices: CombinedInvoice[] = [
-  {
-    id: 'sample-new-organizer-1',
-    invoiceId: 'inv-sample-new-org-1',
-    invoiceNumber: 'SAMP-005',
-    description: 'New Organizer Invoice (Test)',
-    submissionTimestamp: new Date().toISOString(),
-    totalInvoiced: 175.50,
-    purchaserName: 'Sponsor Name',
-    invoiceStatus: 'PUBLISHED',
-    schoolName: 'SHARYLAND PIONEER H S',
-    district: 'SHARYLAND ISD',
-  },
-  {
-    id: 'sample-new-uscf-1',
-    invoiceId: 'inv-sample-new-uscf-1',
-    invoiceNumber: 'SAMP-006',
-    description: 'New USCF Membership Invoice (Test)',
-    submissionTimestamp: new Date().toISOString(),
-    totalInvoiced: 48.00,
-    purchaserName: 'Sponsor Name',
-    invoiceStatus: 'PAID',
-    schoolName: 'SHARYLAND PIONEER H S',
-    district: 'SHARYLAND ISD',
-  },
-  {
-    id: 'sample-1',
-    invoiceId: 'inv-sample-001',
-    invoiceNumber: '0001',
-    description: 'Fall Classic 2024 Registration',
-    submissionTimestamp: new Date('2024-05-15T10:00:00Z').toISOString(),
-    totalInvoiced: 125.00,
-    purchaserName: 'John Doe',
-    invoiceStatus: 'PAID',
-    schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
-    district: 'SHARYLAND ISD',
-  },
-  {
-    id: 'sample-2',
-    invoiceId: 'inv-sample-002',
-    invoiceNumber: '0002',
-    description: 'USCF Membership (Youth)',
-    submissionTimestamp: new Date('2024-05-18T14:30:00Z').toISOString(),
-    totalInvoiced: 24.00,
-    purchaserName: 'Jane Smith',
-    invoiceStatus: 'PUBLISHED',
-    schoolName: 'MCALLEN H S', // Different school
-    district: 'MCALLEN ISD',
-  },
-    {
-    id: 'sample-3',
-    invoiceId: 'inv-sample-003',
-    invoiceNumber: '0003',
-    description: 'Club T-Shirt Order',
-    submissionTimestamp: new Date('2024-05-20T11:00:00Z').toISOString(),
-    totalInvoiced: 250.00,
-    purchaserName: 'Sponsor Name',
-    invoiceStatus: 'UNPAID',
-    schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
-    district: 'SHARYLAND ISD',
-  },
-   {
-    id: 'sample-4',
-    invoiceId: 'inv-sample-004',
-    invoiceNumber: '0004',
-    description: 'Spring Scholastic 2024',
-    submissionTimestamp: new Date('2024-04-10T09:00:00Z').toISOString(),
-    totalInvoiced: 80.00,
-    purchaserName: 'Bob Johnson',
-    invoiceStatus: 'PAID',
-    schoolName: 'EDINBURG H S', // Different school
-    district: 'EDINBURG CISD',
-  },
-];
-
-
 function InvoicesComponent() {
   const { profile } = useSponsorProfile();
 
@@ -169,7 +93,7 @@ function InvoicesComponent() {
 
   const fetchAllInvoiceStatuses = (invoicesToFetch: CombinedInvoice[]) => {
     invoicesToFetch.forEach(inv => {
-        if (inv.invoiceId && !inv.id.startsWith('sample-')) {
+        if (inv.invoiceId) {
             fetchInvoiceStatus(inv.id, inv.invoiceId, true);
         }
     });
@@ -185,11 +109,6 @@ function InvoicesComponent() {
         const allLocalInvoices = [...confirmations, ...membershipInvoices, ...organizerInvoices];
         
         const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
-
-        for (const inv of sampleInvoices) {
-            const key = inv.invoiceId || inv.id;
-            uniqueInvoicesMap.set(key, inv);
-        }
         
         for (const inv of allLocalInvoices) {
             const normalizedInv: CombinedInvoice = {
@@ -400,7 +319,6 @@ function InvoicesComponent() {
                         {filteredInvoices.map((inv) => {
                             const currentStatus = statuses[inv.id];
                             const isLoading = currentStatus?.isLoading;
-                            const isSample = inv.id.startsWith('sample-');
                             
                             return (
                                 <TableRow key={inv.id}>
@@ -416,12 +334,12 @@ function InvoicesComponent() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId || isSample} title="Refresh Status">
+                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId} title="Refresh Status">
                                                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
-                                            <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl || isSample}>
-                                                <a href={inv.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!inv.invoiceUrl || isSample, 'pointer-events-none opacity-50')}>
+                                            <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl}>
+                                                <a href={inv.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!inv.invoiceUrl && 'pointer-events-none opacity-50')}>
                                                     <ExternalLink className="mr-2 h-4 w-4" /> View
                                                 </a>
                                             </Button>
