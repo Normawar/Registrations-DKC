@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { format, differenceInHours, isSameDay } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
@@ -292,11 +292,22 @@ export default function EventsPage() {
 
         } catch (error) {
             console.error("Failed to create invoice or save confirmation", error);
-            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred. Please try again.";
+            let description: ReactNode = "An unknown error occurred. Please try again.";
+            if (error instanceof Error) {
+                if (error.message.includes('Square configuration is incomplete')) {
+                    description = (
+                        <span>
+                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">Square Developer Dashboard</a>.
+                        </span>
+                    );
+                } else {
+                    description = error.message;
+                }
+            }
             toast({
                 variant: "destructive",
                 title: "Submission Error",
-                description: errorMessage,
+                description: description,
             });
         }
         

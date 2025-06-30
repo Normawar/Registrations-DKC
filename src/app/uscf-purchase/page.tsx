@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -193,8 +193,19 @@ function UscfPurchaseComponent() {
             setInvoiceStatus(result.status);
             toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-            toast({ variant: 'destructive', title: 'Invoice Creation Failed', description: errorMessage });
+            let description: ReactNode = "An unknown error occurred.";
+            if (error instanceof Error) {
+                if (error.message.includes('Square configuration is incomplete')) {
+                    description = (
+                        <span>
+                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">Square Developer Dashboard</a>.
+                        </span>
+                    );
+                } else {
+                    description = error.message;
+                }
+            }
+            toast({ variant: 'destructive', title: 'Invoice Creation Failed', description });
         } finally {
             setIsCreatingInvoice(false);
         }
@@ -285,8 +296,19 @@ function UscfPurchaseComponent() {
 
         } catch (error) {
             console.error("Failed to update payment information:", error);
-            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-            toast({ variant: "destructive", title: "Update Failed", description: errorMessage });
+            let description: ReactNode = "An unknown error occurred.";
+            if (error instanceof Error) {
+                if (error.message.includes('Square configuration is incomplete')) {
+                    description = (
+                        <span>
+                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline">Square Developer Dashboard</a>.
+                        </span>
+                    );
+                } else {
+                    description = error.message;
+                }
+            }
+            toast({ variant: "destructive", title: "Update Failed", description });
         } finally {
             setIsUpdatingPayment(false);
         }
