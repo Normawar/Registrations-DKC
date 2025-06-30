@@ -178,20 +178,18 @@ const createInvoiceFlow = ai.defineFlow(
         }
       });
       
-      const invoice = createInvoiceResponse.result.invoice!;
-      console.log("Successfully created DRAFT invoice:", invoice);
+      const draftInvoice = createInvoiceResponse.result.invoice!;
+      console.log("Successfully created DRAFT invoice:", draftInvoice);
 
       // Publish the invoice to make it active
-      console.log(`Publishing invoice ID: ${invoice.id!}`);
-      const { result: { invoice: publishedInvoiceStub } } = await invoicesApi.publishInvoice(invoice.id!, {
-        version: invoice.version!,
+      console.log(`Publishing invoice ID: ${draftInvoice.id!}`);
+      await invoicesApi.publishInvoice(draftInvoice.id!, {
+        version: draftInvoice.version!,
         idempotencyKey: randomUUID(),
       });
       
-      console.log(`Published invoice ID: ${publishedInvoiceStub.id!}. Fetching final details...`);
-
-      // Fetch the final invoice to ensure the publicUrl is available
-      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(publishedInvoiceStub.id!);
+      // Fetch the final invoice to ensure the publicUrl is available and stable
+      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(draftInvoice.id!);
 
       console.log("Successfully retrieved final invoice:", finalInvoice);
       

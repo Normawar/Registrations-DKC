@@ -115,7 +115,7 @@ function InvoicesComponent() {
                 id: inv.id,
                 description: inv.description || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : inv.invoiceTitle || 'Unknown Invoice'),
                 submissionTimestamp: inv.submissionTimestamp,
-                totalInvoiced: inv.totalInvoiced || 0,
+                totalInvoiced: inv.totalInvoiced || inv.fee || 0, // Fallback for different data structures
                 invoiceId: inv.invoiceId,
                 invoiceUrl: inv.invoiceUrl,
                 invoiceNumber: inv.invoiceNumber,
@@ -124,8 +124,16 @@ function InvoicesComponent() {
                 purchaserName: inv.purchaserName || `${profile.firstName} ${profile.lastName}`,
                 invoiceStatus: inv.invoiceStatus || inv.status,
             };
+
+            // Ensure totalInvoiced is a number
+            if(typeof normalizedInv.totalInvoiced !== 'number') {
+              normalizedInv.totalInvoiced = parseFloat(String(normalizedInv.totalInvoiced)) || 0;
+            }
+
             const key = normalizedInv.invoiceId || normalizedInv.id;
-            uniqueInvoicesMap.set(key, normalizedInv);
+            if(key) {
+               uniqueInvoicesMap.set(key, normalizedInv);
+            }
         }
         
         const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
