@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, ReactNode, useMemo } from 'react';
 import { format, differenceInHours, isSameDay } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
@@ -24,6 +24,9 @@ import {
     ImageIcon,
     Info,
     Loader2,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -87,6 +90,7 @@ const sectionMaxGrade: { [key: string]: number } = {
   'Championship': 12,
 };
 
+type SortableColumnKey = 'name' | 'date' | 'location' | 'status';
 
 export default function EventsPage() {
     const { toast } = useToast();
@@ -102,6 +106,7 @@ export default function EventsPage() {
     const [separateUscfInvoice, setSeparateUscfInvoice] = useState(false);
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
     const [isSquareConfigured, setIsSquareConfigured] = useState(true);
+    const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
 
     useEffect(() => {
         setClientReady(true);
@@ -109,6 +114,65 @@ export default function EventsPage() {
             setIsSquareConfigured(isConfigured);
         });
     }, []);
+
+    const getEventStatus = (event: Event): "Open" | "Upcoming" | "Closed" | "Completed" => {
+      if (!clientReady) return "Upcoming";
+      const now = new Date();
+      const eventDate = new Date(event.date);
+      if (now > eventDate) {
+        return "Completed";
+      }
+      return "Open";
+    };
+
+    const sortedEvents = useMemo(() => {
+        const sortableEvents = [...events];
+        if (sortConfig) {
+            sortableEvents.sort((a, b) => {
+                let aValue: string | number | Date;
+                let bValue: string | number | Date;
+
+                if (sortConfig.key === 'status') {
+                    aValue = getEventStatus(a);
+                    bValue = getEventStatus(b);
+                } else if (sortConfig.key === 'date') {
+                    aValue = new Date(a.date);
+                    bValue = new Date(b.date);
+                } else {
+                    aValue = a[sortConfig.key];
+                    bValue = b[sortConfig.key];
+                }
+
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableEvents;
+    }, [events, sortConfig, clientReady]);
+
+    const requestSort = (key: SortableColumnKey) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (columnKey: SortableColumnKey) => {
+        if (!sortConfig || sortConfig.key !== columnKey) {
+            return <ArrowUpDown className="ml-2 h-4 w-4" />;
+        }
+        if (sortConfig.direction === 'ascending') {
+            return <ArrowUp className="ml-2 h-4 w-4" />;
+        }
+        return <ArrowDown className="ml-2 h-4 w-4" />;
+    };
+
 
     const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event) => {
       let registrationTotal = 0;
@@ -345,16 +409,6 @@ export default function EventsPage() {
         }
     }
 
-    const getEventStatus = (event: Event): "Open" | "Upcoming" | "Closed" | "Completed" => {
-      if (!clientReady) return "Upcoming";
-      const now = new Date();
-      const eventDate = new Date(event.date);
-      if (now > eventDate) {
-        return "Completed";
-      }
-      return "Open";
-    };
-
     const getStatusBadge = (status: "Open" | "Upcoming" | "Closed" | "Completed") => {
       switch (status) {
         case 'Open': return 'bg-green-600';
@@ -482,16 +536,32 @@ export default function EventsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Event Name</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Attachments</TableHead>
-                  <TableHead>Status</TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>
+                            Event Name {getSortIcon('name')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('date')}>
+                            Date {getSortIcon('date')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('location')}>
+                            Location {getSortIcon('location')}
+                        </Button>
+                    </TableHead>
+                    <TableHead>Attachments</TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('status')}>
+                            Status {getSortIcon('status')}
+                        </Button>
+                    </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((event) => {
+                {sortedEvents.map((event) => {
                   const status = getEventStatus(event);
                   return (
                     <TableRow key={event.id}>

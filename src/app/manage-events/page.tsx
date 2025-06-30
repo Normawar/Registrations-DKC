@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -29,7 +29,10 @@ import {
   MoreHorizontal,
   CalendarIcon,
   Trash2,
-  FilePenLine
+  FilePenLine,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -89,6 +92,7 @@ const eventFormSchema = z.object({
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
+type SortableColumnKey = 'name' | 'date' | 'location' | 'regularFee' | 'status';
 
 export default function ManageEventsPage() {
   const { toast } = useToast();
@@ -97,11 +101,13 @@ export default function ManageEventsPage() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
     defaultValues: {
       name: '',
+      date: new Date(),
       location: '',
       rounds: 5,
       regularFee: 20,
@@ -113,6 +119,58 @@ export default function ManageEventsPage() {
     },
   });
 
+  const getEventStatus = (event: Event): "Open" | "Completed" => {
+    return new Date(event.date) < new Date() ? "Completed" : "Open";
+  };
+
+  const sortedEvents = useMemo(() => {
+    const sortableEvents = [...events];
+    if (sortConfig !== null) {
+      sortableEvents.sort((a, b) => {
+        let aValue: string | number | Date;
+        let bValue: string | number | Date;
+
+        if (sortConfig.key === 'status') {
+            aValue = getEventStatus(a);
+            bValue = getEventStatus(b);
+        } else if (sortConfig.key === 'date') {
+            aValue = new Date(a.date);
+            bValue = new Date(b.date);
+        } else {
+            aValue = a[sortConfig.key];
+            bValue = b[sortConfig.key];
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableEvents;
+  }, [events, sortConfig]);
+
+  const requestSort = (key: SortableColumnKey) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnKey: SortableColumnKey) => {
+    if (!sortConfig || sortConfig.key !== columnKey) {
+      return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    }
+    if (sortConfig.direction === 'ascending') {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
+
   useEffect(() => {
     if (isDialogOpen) {
       if (editingEvent) {
@@ -123,6 +181,7 @@ export default function ManageEventsPage() {
       } else {
         form.reset({
           name: '',
+          date: new Date(),
           location: '',
           rounds: 5,
           regularFee: 20,
@@ -172,10 +231,6 @@ export default function ManageEventsPage() {
     setIsDialogOpen(false);
   }
 
-  const getEventStatus = (event: Event): "Open" | "Completed" => {
-    return new Date(event.date) < new Date() ? "Completed" : "Open";
-  };
-  
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -196,18 +251,38 @@ export default function ManageEventsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Event Name</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Fees (Reg/Late/V.Late/Day of)</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>
+                        Event Name {getSortIcon('name')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('date')}>
+                        Date {getSortIcon('date')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('location')}>
+                        Location {getSortIcon('location')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>
+                        Fees (Reg/Late/V.Late/Day of) {getSortIcon('regularFee')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('status')}>
+                        Status {getSortIcon('status')}
+                    </Button>
+                  </TableHead>
                   <TableHead>
                     <span className="sr-only">Actions</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {events.map((event) => (
+                {sortedEvents.map((event) => (
                   <TableRow key={event.id}>
                     <TableCell className="font-medium">{event.name}</TableCell>
                     <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
