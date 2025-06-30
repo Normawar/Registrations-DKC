@@ -4,12 +4,6 @@
  *
  * - createInvoice - A function that handles the invoice creation process.
  * - CreateInvoiceInput - The input type for the createInvoice function.
- * - CreateInvoiceOutput - The return type for the createInvoice in'use server';
-/**
- * @fileOverview Creates an invoice with the Square API.
- *
- * - createInvoice - A function that handles the invoice creation process.
- * - CreateInvoiceInput - The input type for the createInvoice function.
  * - CreateInvoiceOutput - The return type for the createInvoice function.
  */
 
@@ -69,6 +63,7 @@ export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
 
 const CreateInvoiceOutputSchema = z.object({
   invoiceId: z.string().describe('The unique ID for the generated invoice.'),
+  invoiceNumber: z.string().optional().describe('The user-facing invoice number.'),
   status: z.string().describe('The status of the invoice (e.g., DRAFT, PUBLISHED).'),
   invoiceUrl: z.string().url().describe('The URL to view the invoice online.'),
 });
@@ -223,6 +218,7 @@ const createInvoiceFlow = ai.defineFlow(
 
       return {
         invoiceId: publishedInvoice.id!,
+        invoiceNumber: publishedInvoice.invoiceNumber,
         status: publishedInvoice.status!,
         invoiceUrl: publishedInvoice.publicUrl!,
       };

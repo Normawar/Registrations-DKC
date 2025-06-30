@@ -252,7 +252,7 @@ export default function EventsPage() {
         });
 
         try {
-            const { invoiceId, invoiceUrl, status } = await createInvoice({
+            const { invoiceId, invoiceUrl, status, invoiceNumber } = await createInvoice({
                 sponsorName: 'Sponsor Name', // Hardcoded for prototype
                 sponsorEmail: 'sponsor@chessmate.com', // Hardcoded for prototype
                 teamCode: teamCode,
@@ -271,6 +271,7 @@ export default function EventsPage() {
                 totalInvoiced: calculatedFees,
                 invoiceId,
                 invoiceUrl,
+                invoiceNumber,
                 teamCode: teamCode,
                 invoiceStatus: status,
             };
@@ -283,7 +284,7 @@ export default function EventsPage() {
                 title: "Invoice Generated Successfully!",
                 description: (
                   <p>
-                    Invoice {invoiceId} for {Object.keys(selections).length} players has been submitted.
+                    Invoice {invoiceNumber || invoiceId} for {Object.keys(selections).length} players has been submitted.
                     <a href={invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
                       View Invoice
                     </a>

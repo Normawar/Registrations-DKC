@@ -88,6 +88,7 @@ type Confirmation = {
   totalInvoiced: number;
   invoiceId?: string;
   invoiceUrl?: string;
+  invoiceNumber?: string;
   teamCode: string;
   paymentMethod?: PaymentMethod;
   poNumber?: string;
@@ -390,9 +391,9 @@ export default function ConfirmationsPage() {
                       <div className="flex justify-between items-center w-full pr-4">
                         <div className="flex flex-col items-start text-left">
                             <span className="font-semibold">{conf.eventName}</span>
-                            {conf.invoiceId && (
+                            {conf.invoiceNumber && (
                                 <span className="text-xs text-muted-foreground">
-                                    Invoice ID: {conf.invoiceId}
+                                    Invoice #: {conf.invoiceNumber}
                                 </span>
                             )}
                             <span className="text-sm text-muted-foreground">
@@ -623,4 +624,3 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
-
