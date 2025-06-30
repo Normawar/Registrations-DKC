@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
@@ -5,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { format, isValid, parse } from 'date-fns';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
@@ -29,6 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useRoster } from '@/hooks/use-roster';
 import { auth, storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { createMembershipInvoice, type CreateMembershipInvoiceOutput } from '@/ai/flows/create-membership-invoice-flow';
@@ -48,13 +50,18 @@ import {
     PlusCircle
 } from 'lucide-react';
 
+const playerSchema = z.object({
+    firstName: z.string().min(1, { message: 'First name is required.' }),
+    middleName: z.string().optional(),
+    lastName: z.string().min(1, { message: 'Last name is required.' }),
+    email: z.string().email({ message: 'A valid email is required.' }),
+    phone: z.string().optional(),
+    dob: z.date({ required_error: "Date of birth is required."}),
+    zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
+});
 
 const playerInfoSchema = z.object({
-    players: z.array(
-        z.object({
-            name: z.string().min(1, { message: 'Player name is required.' }),
-        })
-    ).min(1, 'At least one player is required.'),
+    players: z.array(playerSchema).min(1, 'At least one player is required.'),
 });
 
 type PaymentMethod = 'po' | 'check' | 'cashapp' | 'zelle';
@@ -74,6 +81,7 @@ function UscfPurchaseComponent() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const { profile: sponsorProfile } = useSponsorProfile();
+    const { players: rosterPlayers } = useRoster();
 
     const membershipType = searchParams.get('type') || 'Unknown Membership';
     const justification = searchParams.get('justification') || 'No justification provided.';
@@ -99,7 +107,15 @@ function UscfPurchaseComponent() {
     const form = useForm<z.infer<typeof playerInfoSchema>>({
         resolver: zodResolver(playerInfoSchema),
         defaultValues: {
-            players: [{ name: '' }],
+            players: [{ 
+                firstName: '',
+                middleName: '',
+                lastName: '',
+                email: '',
+                phone: '',
+                dob: undefined,
+                zipCode: '',
+            }],
         },
     });
 
@@ -137,8 +153,35 @@ function UscfPurchaseComponent() {
             setIsCreatingInvoice(false);
             return;
         }
+        
+        let hasError = false;
+        const emailsInForm = values.players.map(p => p.email.toLowerCase());
+        const emailCounts = emailsInForm.reduce((acc, email) => {
+            acc[email] = (acc[email] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        values.players.forEach((player, index) => {
+            const email = player.email.toLowerCase();
+            if (emailCounts[email] > 1) {
+                form.setError(`players.${index}.email`, { type: 'manual', message: 'This email is used more than once in this form.' });
+                hasError = true;
+            }
+            const existingPlayer = rosterPlayers.find(rp => rp.email.toLowerCase() === email);
+            if (existingPlayer) {
+                form.setError(`players.${index}.email`, { type: 'manual', message: `Email is already assigned to ${existingPlayer.firstName} ${existingPlayer.lastName}.` });
+                hasError = true;
+            }
+        });
+
+        if (hasError) {
+            toast({ variant: 'destructive', title: 'Validation Error', description: 'Please fix the errors before proceeding.' });
+            setIsCreatingInvoice(false);
+            return;
+        }
+
         try {
-            const playersToInvoice = values.players.map(p => ({ playerName: p.name }));
+            const playersToInvoice = values.players.map(p => ({ playerName: `${p.firstName} ${p.middleName || ''} ${p.lastName}`.replace(/\s+/g, ' ').trim() }));
             const result = await createMembershipInvoice({
                 purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 purchaserEmail: sponsorProfile.email,
@@ -309,47 +352,69 @@ function UscfPurchaseComponent() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Player Information</CardTitle>
-                            <CardDescription>Enter the name of each player this membership is for.</CardDescription>
+                            <CardDescription>Enter the details for each player this membership is for.</CardDescription>
                         </CardHeader>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(handleCreateInvoice)}>
-                                <CardContent className="space-y-4">
+                                <CardContent className="space-y-6">
                                     {fields.map((field, index) => (
-                                        <div key={field.id} className="flex items-end gap-2">
-                                            <FormField
-                                                control={form.control}
-                                                name={`players.${index}.name`}
-                                                render={({ field }) => (
-                                                    <FormItem className="flex-grow">
-                                                        <FormLabel className={cn(index !== 0 && "sr-only")}>
-                                                          Player Full Name
-                                                        </FormLabel>
-                                                        <FormControl>
-                                                            <Input placeholder={`Player ${index + 1} Name`} {...field} />
-                                                        </FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
+                                        <div key={field.id} className="border rounded-lg p-4 space-y-4 relative">
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="font-semibold text-lg pt-1">Player {index + 1}</h3>
+                                                {fields.length > 1 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => remove(index)}
+                                                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
                                                 )}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="destructive"
-                                                size="icon"
-                                                onClick={() => remove(index)}
-                                                disabled={fields.length <= 1}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <FormField control={form.control} name={`players.${index}.firstName`} render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.middleName`} render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input placeholder="Michael" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.lastName`} render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                            </div>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={form.control} name={`players.${index}.email`} render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                             </div>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={form.control} name={`players.${index}.dob`} render={({ field }) => {
+                                                    const [inputValue, setInputValue] = useState<string>( field.value ? format(field.value, "MM/dd/yyyy") : "" );
+                                                    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+                                                    useEffect(() => { field.value ? setInputValue(format(field.value, "MM/dd/yyyy")) : setInputValue(""); }, [field.value]);
+                                                    const handleBlur = () => {
+                                                        const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                                                        if (isValid(parsedDate)) {
+                                                            if (parsedDate <= new Date() && parsedDate >= new Date("1900-01-01")) { field.onChange(parsedDate); } 
+                                                            else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                                        } else {
+                                                            if (inputValue === "") { field.onChange(undefined); } 
+                                                            else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                                        }
+                                                    };
+                                                    return (
+                                                        <FormItem><FormLabel>Date of Birth</FormLabel>
+                                                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                                            <div className="relative">
+                                                            <FormControl><Input placeholder="MM/DD/YYYY" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onBlur={handleBlur} /></FormControl>
+                                                            <PopoverTrigger asChild><Button variant={"ghost"} className="absolute right-0 top-0 h-full w-10 p-0 font-normal" aria-label="Open calendar"><CalendarIcon className="h-4 w-4 text-muted-foreground" /></Button></PopoverTrigger>
+                                                            </div>
+                                                            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsCalendarOpen(false); }} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent>
+                                                        </Popover><FormMessage /></FormItem>
+                                                    );
+                                                }} />
+                                                <FormField control={form.control} name={`players.${index}.zipCode`} render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                             </div>
                                         </div>
                                     ))}
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => append({ name: "" })}
-                                    >
+                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: undefined, zipCode: '' })}>
                                         <PlusCircle className="mr-2 h-4 w-4" />
-                                        Add Another Player
+                                        Add Another Membership
                                     </Button>
                                 </CardContent>
                                 <CardFooter>
