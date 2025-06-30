@@ -10,16 +10,9 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { Client, Environment, ApiError } from 'square';
+import { ApiError } from 'square';
 import { format } from 'date-fns';
-
-// Initialize Square client
-const squareClient = new Client({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
-  environment: Environment.Sandbox, // Use Sandbox for testing
-});
-
-const { customersApi, ordersApi, invoicesApi } = squareClient;
+import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 
 const PlayerInvoiceInfoSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
@@ -58,24 +51,9 @@ const createInvoiceFlow = ai.defineFlow(
     outputSchema: CreateInvoiceOutputSchema,
   },
   async (input) => {
-    const accessToken = process.env.SQUARE_ACCESS_TOKEN;
-    const locationId = process.env.SQUARE_LOCATION_ID;
-
-    if (!accessToken || accessToken.startsWith('YOUR_') || !locationId || locationId.startsWith('YOUR_')) {
-      const missingVars: string[] = [];
-      if (!accessToken || accessToken.startsWith('YOUR_')) missingVars.push('SQUARE_ACCESS_TOKEN');
-      if (!locationId || locationId.startsWith('YOUR_')) missingVars.push('SQUARE_LOCATION_ID');
-      
-      console.error(`SQUARE_CONFIG_ERROR: Missing Square credentials: ${missingVars.join(
-          ', '
-        )}. Please set them in your .env file.`);
-
-      throw new Error(
-        `Square configuration is incomplete. Please set: ${missingVars.join(
-          ', '
-        )} in your .env file. You can find these credentials in your Square Developer Dashboard.`
-      );
-    }
+    const squareClient = getSquareClient();
+    const locationId = getSquareLocationId();
+    const { customersApi, ordersApi, invoicesApi } = squareClient;
     
     console.log("Starting Square invoice creation with input:", input);
 
@@ -221,7 +199,7 @@ const createInvoiceFlow = ai.defineFlow(
       } else {
         console.error('An unexpected error occurred during invoice creation:', error);
         if (error instanceof Error) {
-            throw new Error(`An unexpected error occurred: ${error.message}`);
+            throw new Error(`${error.message}`);
         }
         throw new Error('An unexpected error occurred during invoice creation.');
       }

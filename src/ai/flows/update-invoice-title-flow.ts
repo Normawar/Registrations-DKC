@@ -9,16 +9,9 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { Client, Environment, ApiError } from 'square';
+import { ApiError } from 'square';
 import { randomUUID } from 'crypto';
-
-// Initialize Square client
-const squareClient = new Client({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
-  environment: Environment.Sandbox, // Use Sandbox for testing
-});
-
-const { invoicesApi } = squareClient;
+import { getSquareClient } from '@/lib/square-client';
 
 const UpdateInvoiceTitleInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to update.'),
@@ -44,13 +37,8 @@ const updateInvoiceTitleFlow = ai.defineFlow(
     outputSchema: UpdateInvoiceTitleOutputSchema,
   },
   async (input) => {
-    const accessToken = process.env.SQUARE_ACCESS_TOKEN;
-    if (!accessToken || accessToken.startsWith('YOUR_')) {
-      console.error(`SQUARE_CONFIG_ERROR: Missing Square credentials: SQUARE_ACCESS_TOKEN. Please set it in your .env file.`);
-      throw new Error(
-        `Square configuration is incomplete. Please set SQUARE_ACCESS_TOKEN in your .env file. You can find this in your Square Developer Dashboard.`
-      );
-    }
+    const squareClient = getSquareClient();
+    const { invoicesApi } = squareClient;
       
     try {
       console.log(`Fetching invoice ${input.invoiceId} to get current version...`);
@@ -86,7 +74,7 @@ const updateInvoiceTitleFlow = ai.defineFlow(
       } else {
         console.error('An unexpected error occurred during invoice update:', error);
         if (error instanceof Error) {
-            throw new Error(`An unexpected error occurred: ${error.message}`);
+            throw new Error(`${error.message}`);
         }
         throw new Error('An unexpected error occurred during invoice update.');
       }
