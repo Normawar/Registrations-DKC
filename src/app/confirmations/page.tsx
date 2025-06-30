@@ -167,7 +167,7 @@ export default function ConfirmationsPage() {
                 if (error.message.includes('Square configuration is incomplete')) {
                     description = (
                         <span>
-                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer">Square Developer Dashboard</a>.
+                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:opacity-90">Square Developer Dashboard</a>.
                         </span>
                     );
                 } else {
@@ -396,7 +396,7 @@ export default function ConfirmationsPage() {
              if (error.message.includes('Square configuration is incomplete')) {
                 description = (
                     <span>
-                        Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer">Square Developer Dashboard</a>.
+                        Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:opacity-90">Square Developer Dashboard</a>.
                     </span>
                 );
             } else {
