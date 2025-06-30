@@ -44,6 +44,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -57,11 +58,12 @@ type Player = {
   rating?: number;
   grade: string;
   section: string;
+  studentType?: 'gt' | 'independent';
 };
 
 const rosterPlayers: Player[] = [
     { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", uscfExpiration: new Date('2025-12-31'), rating: 1850, grade: "10th Grade", section: 'High School K-12' },
-    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship' },
+    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship', studentType: 'independent' },
     { id: "3", firstName: "Casey", lastName: "Becker", uscfId: "11223344", uscfExpiration: new Date('2025-06-01'), rating: 1500, grade: "9th Grade", section: 'High School K-12' },
     { id: "4", firstName: "Morgan", lastName: "Taylor", uscfId: "NEW", rating: 1000, grade: "5th Grade", section: 'Elementary K-5' },
     { id: "5", firstName: "Riley", lastName: "Quinn", uscfId: "55667788", uscfExpiration: new Date('2024-11-30'), rating: 1980, grade: "11th Grade", section: 'Championship' },
@@ -115,6 +117,7 @@ type ConfirmationInputs = {
 
 export default function ConfirmationsPage() {
   const { toast } = useToast();
+  const { profile: sponsorProfile } = useSponsorProfile();
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
   const [confInputs, setConfInputs] = useState<Record<string, Partial<ConfirmationInputs>>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
@@ -303,7 +306,7 @@ export default function ConfirmationsPage() {
         }
         
         // Step 2: Update Square Invoice Title if invoice exists
-        const teamCode = conf.teamCode || generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
+        const teamCode = conf.teamCode || (sponsorProfile ? generateTeamCode({ schoolName: sponsorProfile.school, district: sponsorProfile.district }) : '');
         let newTitle = `${teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName}`;
         let toastMessage = "Payment information has been saved.";
 
@@ -409,7 +412,7 @@ export default function ConfirmationsPage() {
                   const selectedMethod = currentInputs.paymentMethod || 'po';
                   const currentStatus = statuses[conf.id];
                   const isLoading = isUpdating[conf.id] || !isAuthReady;
-                  const showStudentTypeColumn = Object.values(conf.selections).some(s => s.studentType);
+                  const showStudentTypeColumn = sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
@@ -461,6 +464,7 @@ export default function ConfirmationsPage() {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Player</TableHead>
+                              <TableHead>Team Code</TableHead>
                               <TableHead>Section</TableHead>
                               <TableHead>USCF Status</TableHead>
                               {showStudentTypeColumn && <TableHead>Student Type</TableHead>}
@@ -480,6 +484,13 @@ export default function ConfirmationsPage() {
                               return (
                                 <TableRow key={playerId}>
                                   <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
+                                  <TableCell className="font-mono">
+                                    {sponsorProfile ? generateTeamCode({
+                                      schoolName: sponsorProfile.school,
+                                      district: sponsorProfile.district,
+                                      studentType: details.studentType
+                                    }) : '...'}
+                                  </TableCell>
                                   <TableCell>{details.section}</TableCell>
                                   <TableCell>
                                       <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>

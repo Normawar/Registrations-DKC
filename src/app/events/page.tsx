@@ -63,6 +63,7 @@ type Player = {
   email: string;
   dob?: Date;
   zipCode?: string;
+  studentType?: 'gt' | 'independent';
 };
 
 type PlayerRegistration = {
@@ -78,7 +79,7 @@ type RegistrationSelections = Record<string, PlayerRegistration>;
 
 const rosterPlayers: Player[] = [
     { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", uscfExpiration: new Date('2025-12-31'), rating: 1850, grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', dob: new Date('2008-05-10'), zipCode: '78501' },
-    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com' },
+    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), rating: 2100, grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com', studentType: 'independent' },
     { id: "3", firstName: "Casey", lastName: "Becker", uscfId: "11223344", uscfExpiration: new Date('2025-06-01'), rating: 1500, grade: "9th Grade", section: 'High School K-12', email: 'casey.becker@example.com', dob: new Date('2009-02-20'), zipCode: '78502' },
     { id: "4", firstName: "Morgan", lastName: "Taylor", uscfId: "NEW", rating: 1000, grade: "5th Grade", section: 'Elementary K-5', email: 'morgan.taylor@example.com', dob: new Date('2013-08-01'), zipCode: '78503' },
     { id: "5", firstName: "Riley", lastName: "Quinn", uscfId: "55667788", uscfExpiration: new Date('2024-11-30'), rating: 1980, grade: "11th Grade", section: 'Championship', email: 'riley.quinn@example.com', dob: new Date('2007-11-25'), zipCode: '78504' },
@@ -179,6 +180,7 @@ export default function EventsPage() {
                     byes: { round1: 'none', round2: 'none' },
                     section: player.section,
                     uscfStatus: player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current',
+                    studentType: player.studentType,
                 };
             } else {
                 delete newSelections[playerId];
@@ -236,7 +238,7 @@ export default function EventsPage() {
     }
 
     const handleGenerateInvoice = async () => {
-        if (!selectedEvent) return;
+        if (!selectedEvent || !sponsorProfile) return;
         
         let registrationFeePerPlayer = selectedEvent.regularFee;
         if (clientReady) {
@@ -250,8 +252,15 @@ export default function EventsPage() {
                 else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = selectedEvent.lateFee; }
             }
         }
+
+        const isPsja = sponsorProfile.district === 'PHARR-SAN-JUAN-ALAMO ISD';
+        const allIndependent = isPsja && Object.values(selections).length > 0 && Object.values(selections).every(s => s.studentType === 'independent');
         
-        const teamCode = generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
+        const teamCode = generateTeamCode({ 
+            schoolName: sponsorProfile.school, 
+            district: sponsorProfile.district,
+            studentType: allIndependent ? 'independent' : undefined
+        });
 
         const playersToInvoice = Object.entries(selections).map(([playerId, registration]) => {
             const player = rosterPlayers.find(p => p.id === playerId)!;
@@ -266,8 +275,8 @@ export default function EventsPage() {
 
         try {
             const { invoiceId, invoiceUrl, status, invoiceNumber } = await createInvoice({
-                sponsorName: 'Sponsor Name', // Hardcoded for prototype
-                sponsorEmail: 'sponsor@chessmate.com', // Hardcoded for prototype
+                sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
+                sponsorEmail: sponsorProfile.email,
                 teamCode: teamCode,
                 eventName: selectedEvent.name,
                 eventDate: selectedEvent.date,

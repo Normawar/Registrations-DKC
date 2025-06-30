@@ -84,6 +84,7 @@ import { cn } from '@/lib/utils';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 type Player = {
   id: string;
@@ -99,11 +100,12 @@ type Player = {
   phone?: string;
   dob: Date;
   zipCode: string;
+  studentType?: 'gt' | 'independent';
 };
 
 const initialPlayers: Player[] = [
   { id: "1", firstName: "Alex", middleName: "Michael", lastName: "Ray", uscfId: "12345678", rating: 1850, uscfExpiration: new Date(), grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', dob: new Date('2008-05-10'), zipCode: '78501'},
-  { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", rating: 2100, uscfExpiration: new Date(), grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com', dob: new Date('2007-09-15'), zipCode: '78504'},
+  { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", rating: 2100, uscfExpiration: new Date(), grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com', dob: new Date('2007-09-15'), zipCode: '78504', studentType: 'independent' },
 ];
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
@@ -140,6 +142,7 @@ const playerFormSchema = z.object({
   phone: z.string().optional(),
   dob: z.date({ required_error: "Date of birth is required."}),
   zipCode: z.string().min(5, { message: "Please enter a valid 5-digit zip code." }),
+  studentType: z.string().optional(),
 })
 .refine(data => {
   if (data.uscfId.toUpperCase() !== 'NEW') {
@@ -211,6 +214,7 @@ export default function RosterPage() {
       email: '',
       phone: '',
       zipCode: '',
+      studentType: undefined,
     }
   });
 
@@ -294,6 +298,7 @@ export default function RosterPage() {
           email: '',
           phone: '',
           zipCode: '',
+          studentType: undefined,
         });
       }
     }
@@ -359,10 +364,10 @@ export default function RosterPage() {
     }
 
     if (editingPlayer) {
-      setPlayers(players.map(p => p.id === editingPlayer.id ? { ...p, ...values } : p));
+      setPlayers(players.map(p => p.id === editingPlayer.id ? { ...p, ...values } : p) as Player[]);
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
     } else {
-      const newPlayer: Player = { ...values, id: Date.now().toString() };
+      const newPlayer: Player = { ...(values as Omit<Player, 'id'>), id: Date.now().toString() };
       setPlayers([...players, newPlayer]);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
     }
@@ -477,7 +482,7 @@ export default function RosterPage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
-                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} />
+                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
                           <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div>
@@ -486,7 +491,13 @@ export default function RosterPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono">{teamCode}</TableCell>
+                    <TableCell className="font-mono">
+                      {profile ? generateTeamCode({
+                        schoolName: profile.school,
+                        district: profile.district,
+                        studentType: player.studentType
+                      }) : '...'}
+                    </TableCell>
                     <TableCell>{player.uscfId}</TableCell>
                     <TableCell>{player.rating || 'N/A'}</TableCell>
                     <TableCell>{player.grade}</TableCell>
@@ -769,6 +780,39 @@ export default function RosterPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
+
+                {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                  <FormField
+                    control={form.control}
+                    name="studentType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Student Type (PSJA Only)</FormLabel>
+                        <FormControl>
+                          <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex items-center gap-4 pt-2"
+                          >
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <RadioGroupItem value="gt" id={`gt-radio-${editingPlayer?.id || 'new'}`} />
+                              </FormControl>
+                              <FormLabel htmlFor={`gt-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">GT Student</FormLabel>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-2">
+                              <FormControl>
+                                <RadioGroupItem value="independent" id={`ind-radio-${editingPlayer?.id || 'new'}`} />
+                              </FormControl>
+                              <FormLabel htmlFor={`ind-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">Independent</FormLabel>
+                            </FormItem>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
               <DialogFooter>
                 <DialogClose asChild>
