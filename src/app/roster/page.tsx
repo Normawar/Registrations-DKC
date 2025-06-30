@@ -30,7 +30,8 @@ import {
   CalendarIcon,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -86,6 +87,7 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRoster, type Player } from '@/hooks/use-roster';
+import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -176,6 +178,7 @@ export default function RosterPage() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
+  const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -320,6 +323,51 @@ export default function RosterPage() {
     }
     setIsAlertOpen(false);
     setPlayerToDelete(null);
+  };
+
+  const handleUscfLookup = async () => {
+    const uscfId = form.getValues('uscfId');
+    if (!uscfId || uscfId.toUpperCase() === 'NEW') {
+        toast({
+            variant: "destructive",
+            title: "Invalid USCF ID",
+            description: "Please enter a valid USCF ID to look up.",
+        });
+        return;
+    }
+
+    setIsLookingUpUscfId(true);
+    try {
+        const result = await lookupUscfPlayer({ uscfId });
+        if (result.error) {
+            toast({ variant: "destructive", title: "Lookup Failed", description: result.error });
+        } else {
+            if (result.rating !== undefined) {
+                form.setValue('rating', result.rating, { shouldValidate: true });
+            }
+            if (result.expirationDate) {
+                const expDate = new Date(result.expirationDate);
+                const adjustedDate = new Date(expDate.getTime() + expDate.getTimezoneOffset() * 60000);
+                form.setValue('uscfExpiration', adjustedDate, { shouldValidate: true });
+            }
+            
+            const currentFirstName = form.getValues('firstName');
+            if (result.fullName && !currentFirstName) {
+                const nameParts = result.fullName.split(' ');
+                const firstName = nameParts.slice(0, -1).join(' ');
+                const lastName = nameParts.slice(-1).join(' ');
+                if (firstName) form.setValue('firstName', firstName);
+                if (lastName) form.setValue('lastName', lastName);
+            }
+
+            toast({ title: "Lookup Successful", description: `Updated details for ${result.fullName || 'player'}.` });
+        }
+    } catch (error) {
+        const description = error instanceof Error ? error.message : "An unknown error occurred.";
+        toast({ variant: "destructive", title: "Lookup Failed", description });
+    } finally {
+        setIsLookingUpUscfId(false);
+    }
   };
 
   function onSubmit(values: PlayerFormValues) {
@@ -563,10 +611,22 @@ export default function RosterPage() {
                 <FormField control={form.control} name="uscfId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>USCF ID</FormLabel>
-                    <FormControl><Input placeholder="12345678 or NEW" {...field} /></FormControl>
+                    <div className="flex items-center gap-2">
+                        <FormControl>
+                            <Input placeholder="12345678 or NEW" {...field} />
+                        </FormControl>
+                        <Button 
+                            type="button" 
+                            variant="outline"
+                            onClick={handleUscfLookup} 
+                            disabled={isLookingUpUscfId || isUscfNew || !watchUscfId}
+                        >
+                            {isLookingUpUscfId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lookup"}
+                        </Button>
+                    </div>
                     <FormDescription>
-                      Students without a USCF ID can be added with &quot;NEW&quot;. 
-                      <Link href="https://new.uschess.org/civicrm/player-search" target="_blank" className="ml-1 text-primary underline">
+                      Students without a USCF ID can be added with &quot;NEW&quot;.
+                      <Link href="http://msa.uschess.org/thin3.php" target="_blank" className="ml-1 text-primary underline">
                         Find USCF Number
                       </Link>
                     </FormDescription>
