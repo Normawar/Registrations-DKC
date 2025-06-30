@@ -165,7 +165,7 @@ const playerFormSchema = z.object({
   });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
-type SortableColumnKey = 'lastName' | 'uscfId' | 'rating' | 'grade' | 'section';
+type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'rating' | 'grade' | 'section';
 
 
 export default function RosterPage() {
@@ -203,23 +203,37 @@ export default function RosterPage() {
     if (sortConfig) {
       sortablePlayers.sort((a, b) => {
         const key = sortConfig.key;
-        let aVal: any = a[key];
-        let bVal: any = b[key];
-
+        let aVal: any;
+        let bVal: any;
         let result = 0;
 
-        if (key === 'grade') {
-          aVal = gradeToNumber[a.grade] ?? -1;
-          bVal = gradeToNumber[b.grade] ?? -1;
-        } else if (key === 'rating') {
-          aVal = a.rating ?? -Infinity;
-          bVal = b.rating ?? -Infinity;
-        }
+        if (key === 'teamCode') {
+            if (!profile) return 0;
+            const codeA = generateTeamCode({ schoolName: profile.school, district: profile.district, studentType: a.studentType });
+            const codeB = generateTeamCode({ schoolName: profile.school, district: profile.district, studentType: b.studentType });
+            if (codeA < codeB) result = -1;
+            if (codeA > codeB) result = 1;
+        } else {
+            aVal = a[key as keyof Player];
+            bVal = b[key as keyof Player];
 
-        if (aVal < bVal) {
-          result = -1;
-        } else if (aVal > bVal) {
-          result = 1;
+            if (key === 'grade') {
+              aVal = gradeToNumber[a.grade] ?? -1;
+              bVal = gradeToNumber[b.grade] ?? -1;
+            } else if (key === 'rating') {
+              aVal = a.rating ?? -Infinity;
+              bVal = b.rating ?? -Infinity;
+            } else if (key === 'lastName') {
+                aVal = a.lastName;
+                bVal = b.lastName;
+            }
+
+            if (typeof aVal === 'string' && typeof bVal === 'string') {
+                result = aVal.localeCompare(bVal);
+            } else {
+                if (aVal < bVal) result = -1;
+                if (aVal > bVal) result = 1;
+            }
         }
 
         if (result === 0 && key === 'lastName') {
@@ -236,7 +250,7 @@ export default function RosterPage() {
         });
     }
     return sortablePlayers;
-  }, [players, sortConfig]);
+  }, [players, sortConfig, profile]);
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -426,7 +440,12 @@ export default function RosterPage() {
                       {getSortIcon('lastName')}
                     </Button>
                   </TableHead>
-                  <TableHead>Team Code</TableHead>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('teamCode')}>
+                        Team Code
+                        {getSortIcon('teamCode')}
+                    </Button>
+                  </TableHead>
                    <TableHead className="p-0">
                     <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
                       USCF ID
