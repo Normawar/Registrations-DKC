@@ -390,6 +390,11 @@ export default function ConfirmationsPage() {
                       <div className="flex justify-between items-center w-full pr-4">
                         <div className="flex flex-col items-start text-left">
                             <span className="font-semibold">{conf.eventName}</span>
+                            {conf.invoiceId && (
+                                <span className="text-xs text-muted-foreground">
+                                    Invoice ID: {conf.invoiceId}
+                                </span>
+                            )}
                             <span className="text-sm text-muted-foreground">
                             Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')}
                             </span>
