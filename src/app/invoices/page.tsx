@@ -73,6 +73,7 @@ const mockOrganizerInvoices: CombinedInvoice[] = [
     { id: 'org_inv_4', invoiceId: 'inv:0-ChAIv...', invoiceNumber: '0004', purchaserName: 'Another Sponsor', schoolName: 'LA JOYA H S', district: 'LA JOYA ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-19').toISOString(), totalInvoiced: 80.00, invoiceStatus: 'CANCELED', invoiceUrl: '#' },
     { id: 'org_inv_5', invoiceId: 'inv:0-ChAIw...', invoiceNumber: '0005', purchaserName: 'Test Sponsor', schoolName: 'EDINBURG H S', district: 'EDINBURG CISD', description: 'Autumn Classic', submissionTimestamp: new Date('2024-05-25').toISOString(), totalInvoiced: 150.00, invoiceStatus: 'PUBLISHED', invoiceUrl: '#' },
     { id: 'org_inv_6', invoiceId: 'inv:0-ChAIx...', invoiceNumber: '0006', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-28').toISOString(), totalInvoiced: 200.00, invoiceStatus: 'PAYMENT_PENDING', invoiceUrl: '#' },
+    { id: 'org_inv_7', invoiceId: 'inv:0-ChAIy...', invoiceNumber: '0007', purchaserName: 'Arnold Sponsor', schoolName: 'ALLEN & WILLIAM ARNOLD EL', district: 'PHARR-SAN JUAN-ALAMO ISD', description: 'Team T-Shirts', submissionTimestamp: new Date('2024-05-29').toISOString(), totalInvoiced: 300.00, invoiceStatus: 'PUBLISHED', invoiceUrl: '#' },
 ];
 
 function InvoicesComponent() {
