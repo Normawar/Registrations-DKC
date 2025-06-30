@@ -40,20 +40,43 @@ const searchPrompt = ai.definePrompt({
     name: 'searchUscfPlayersPrompt',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing structured HTML tables.
+    prompt: `You are an expert at parsing structured HTML.
 The provided text is the HTML content of a USCF player search results page.
-Your task is to extract the details for each player listed in the table.
+Your task is to extract the details for each player listed in the results table.
 
 Here are the rules for parsing:
-1.  Find the main table containing the player data. It usually comes after a '<h3>Player Search Results</h3>'.
-2.  Each player is in a '<tr>' (table row). Skip the header row.
-3.  Extract the following information from the '<td>' (table cell) elements for each player:
-    - USCF ID: This is the 8-digit number, typically in the first column.
-    - Full Name: This is the player's name, usually in the second column.
-    - Rating: This is the regular rating number. If it's 'UNR' (unrated) or '0', treat it as an undefined or null value for the number field.
-    - State: The two-letter state abbreviation.
-4.  If the text contains "No players found", return an empty array for 'players'.
-5.  If you encounter any other issues, set the 'error' field in the output.
+1.  Find the main table which is located after a '<h3>Player Search Results</h3>' tag.
+2.  Skip the header row. The header row is a \`<tr>\` with \`class="header"\`.
+3.  Player data is located in subsequent \`<tr>\` elements, which often have a \`bgcolor\` attribute.
+4.  For each player row, extract the following information from the \`<td>\` (table cell) elements:
+    - **uscfId**: The 8-digit number from the first \`<td>\`. It's within an \`<a>\` tag.
+    - **fullName**: The player's name from the second \`<td>\`. It is in "LAST, FIRST" format.
+    - **rating**: The rating number from the third \`<td>\`. If the content is 'UNR', '0', or not a number, the value should be \`undefined\`.
+    - **state**: The two-letter state abbreviation from the fourth \`<td>\`.
+5.  Format the output as a JSON object matching the schema. Do not invent players or data. If no players are found in the table, return an empty \`players\` array.
+
+Example Input HTML Snippet:
+\`\`\`html
+...
+<tr class="header">
+  <td><b>ID</b></td>
+  <td><b>Name</b></td>
+  <td><b>Rating</b></td>
+  <td><b>St</b></td>
+  <td><b>Expires</b></td>
+</tr>
+<tr bgcolor="#E6E6E6">
+  <td><a href="/msa/thin3.php?14828139">14828139</a></td>
+  <td>GUERRA, ANTHONY J</td>
+  <td align="right">1596</td>
+  <td>TX</td>
+  <td>2024-11-30</td>
+</tr>
+...
+\`\`\`
+Example JSON data to extract for the snippet above:
+\`{ "uscfId": "14828139", "fullName": "GUERRA, ANTHONY J", "rating": 1596, "state": "TX" }\`
+
 
 Here is the HTML content to parse:
 {{{_input}}}`
@@ -71,7 +94,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player name cannot be empty.' };
     }
     let url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}`;
-    if (state) {
+    if (state && state !== "ALL") {
         url += `&state=${encodeURIComponent(state)}`;
     }
     
@@ -93,15 +116,23 @@ const searchUscfPlayersFlow = ai.defineFlow(
           return { players: [], error: "AI model failed to parse the player data." };
       }
       
-      // Clean up names which might have extra whitespace
-      let players = output.players.map(player => ({
-        ...player,
-        fullName: player.fullName.trim()
-      }));
+      // Post-process players: reformat names and trim whitespace.
+      let players = output.players.map(player => {
+        let reformattedName = player.fullName.trim();
+        // Re-format name from "LAST, FIRST" to "FIRST LAST" for display
+        const nameParts = reformattedName.split(',').map(p => p.trim());
+        if (nameParts.length === 2) {
+          reformattedName = `${nameParts[1]} ${nameParts[0]}`;
+        }
+        return {
+          ...player,
+          fullName: reformattedName,
+        };
+      });
 
       // If a state was specified in the search, filter the results to only include players from that state.
       // This is a safeguard in case the website returns players from other states or the AI includes them.
-      if (state) {
+      if (state && state !== "ALL") {
         players = players.filter(player => player.state?.toUpperCase() === state.toUpperCase());
       }
 
