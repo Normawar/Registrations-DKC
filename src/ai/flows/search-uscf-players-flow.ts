@@ -41,19 +41,20 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest', 
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at extracting structured player data from raw HTML.
-Your task is to parse the provided HTML content. First, find the main data table which contains table headers (using <th> or <td> tags in a header row) for 'ID', 'Name', and 'St'. The header row might have a class like 'header'.
-Then, for each data row (<tr>) in that table, extract the player search results into the format specified by the output schema.
+    prompt: `You are an expert at extracting structured player data from an HTML table.
+The provided HTML is a string containing a single \`<table>\` of USCF player search results.
+The table has a header row (e.g., <tr class="header">) with columns including 'ID', 'Name', 'St', and 'Reg'.
 
-- **uscfId**: The player's 8-digit ID. This is in the first column.
-- **fullName**: The player's full name, from the 'Name' column. This will be in the format "LAST, FIRST MI".
-- **rating**: The player's rating. This is from the 'Reg' rating column. If the value is 'UNR', the output for rating should be null.
-- **state**: The player's two-letter state abbreviation, from the 'St' column.
+Your task is to parse each data row (<tr>) following the header and extract the player information into the format specified by the output schema.
 
-If the HTML contains the phrase "No players found", you MUST return an empty \`players\` array.
-If you cannot find the data table with the specified headers, you must also return an empty \`players\` array.
+- **uscfId**: The player's 8-digit ID from the 'ID' column.
+- **fullName**: The player's full name from the 'Name' column. The format is typically "LAST, FIRST MI".
+- **rating**: The player's rating from the 'Reg' rating column. If the value is 'UNR' or the cell is empty, the output for rating should be null.
+- **state**: The player's two-letter state abbreviation from the 'St' column.
 
-HTML to parse:
+If there are no data rows in the table, you MUST return an empty \`players\` array.
+
+HTML table to parse:
 \`\`\`
 {{{_input}}}
 \`\`\`
@@ -103,7 +104,18 @@ const searchUscfPlayersFlow = ai.defineFlow(
           return { players: [] };
       }
       
-      const { output } = await searchPrompt(html);
+      // Extract the main results table to reduce noise for the AI
+      const tableRegex = /<table[^>]*>[\s\S]*?<tr class=header>[\s\S]*?<\/table>/i;
+      const match = html.match(tableRegex);
+      
+      if (!match) {
+          console.error("Could not find player data table in the response from the USCF website.");
+          return { players: [], error: "Could not find player data table in the response from the USCF website." };
+      }
+      
+      const tableHtml = match[0];
+      
+      const { output } = await searchPrompt(tableHtml);
       
       if (!output) {
           return { players: [], error: "AI model failed to parse the player data." };
