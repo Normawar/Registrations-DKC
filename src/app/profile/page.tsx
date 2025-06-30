@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { AppLayout } from '@/components/app-layout';
@@ -124,7 +124,8 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'icon' | 'upload'>('icon');
   const [isSavingPicture, setIsSavingPicture] = useState(false);
 
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -152,13 +153,13 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!auth) {
-        setIsAuthReady(false);
+        setIsAuthLoading(false);
         setAuthError("Firebase is not configured correctly. Please check your .env file.");
         return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
         if (user) {
-            setIsAuthReady(true);
+            setCurrentUser(user);
             setAuthError(null);
         } else {
             signInAnonymously(auth).catch((error) => {
@@ -168,9 +169,9 @@ export default function ProfilePage() {
                 } else {
                     setAuthError("An authentication error occurred. File uploads are disabled.");
                 }
-                setIsAuthReady(false);
             });
         }
+        setIsAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -225,7 +226,7 @@ export default function ProfilePage() {
   const handleSavePicture = async () => {
     setIsSavingPicture(true);
     try {
-      if (!isAuthReady) {
+      if (!currentUser) {
           const message = authError || "Authentication is not ready. Cannot upload files.";
           toast({ variant: 'destructive', title: 'Upload Failed', description: message });
           setIsSavingPicture(false);
@@ -238,8 +239,8 @@ export default function ProfilePage() {
       }
       
       if (activeTab === 'upload' && imageFile) {
-        const uploadId = new Date().toISOString(); // Use ISO string as a unique folder name
-        const storageRef = ref(storage, `payment-proofs/${uploadId}/${imageFile.name}`);
+        const sanitizedFileName = imageFile.name.replace(/\s+/g, '_');
+        const storageRef = ref(storage, `payment-proofs/${currentUser.uid}/${sanitizedFileName}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
@@ -296,7 +297,7 @@ export default function ProfilePage() {
   const selectedDistrict = profileForm.watch('district');
   const SelectedIconComponent = selectedIconName ? icons[selectedIconName] : null;
 
-  if (!profile || !isAuthReady) {
+  if (isAuthLoading || !profile) {
     return (
         <AppLayout>
             <ProfilePageSkeleton />
@@ -304,7 +305,7 @@ export default function ProfilePage() {
     );
   }
   
-  const isSavePictureDisabled = isSavingPicture || !isAuthReady;
+  const isSavePictureDisabled = isSavingPicture || !currentUser;
 
   return (
     <AppLayout>
@@ -354,7 +355,7 @@ export default function ProfilePage() {
                     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'icon' | 'upload')}>
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="icon">Choose Icon</TabsTrigger>
-                            <TabsTrigger value="upload" disabled={!isAuthReady}>Upload Photo</TabsTrigger>
+                            <TabsTrigger value="upload" disabled={!currentUser}>Upload Photo</TabsTrigger>
                         </TabsList>
                         <TabsContent value="icon" className="pt-4">
                             <p className="text-sm text-muted-foreground mb-4">Select a chess piece as your avatar.</p>
@@ -376,7 +377,7 @@ export default function ProfilePage() {
                             <p className="text-sm text-muted-foreground mb-4">For best results, upload a square image.</p>
                             <div className="flex gap-2">
                                 <Input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!isAuthReady}>Choose File</Button>
+                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!currentUser}>Choose File</Button>
                             </div>
                         </TabsContent>
                     </Tabs>
@@ -566,5 +567,3 @@ export default function ProfilePage() {
     </AppLayout>
   );
 }
-
-    
