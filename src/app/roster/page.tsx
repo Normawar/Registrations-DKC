@@ -712,7 +712,16 @@ export default function RosterPage() {
                 <TableBody>
                   {searchResults.map((player) => (
                     <TableRow key={player.uscfId}>
-                      <TableCell className="font-medium">{player.fullName}</TableCell>
+                      <TableCell className="font-medium">
+                        <a
+                            href={`http://msa.uschess.org/thin3.php?${player.uscfId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                        >
+                            {player.fullName}
+                        </a>
+                      </TableCell>
                       <TableCell>{player.uscfId}</TableCell>
                       <TableCell>{player.rating || 'UNR'}</TableCell>
                       <TableCell>{player.state}</TableCell>
