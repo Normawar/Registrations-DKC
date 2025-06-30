@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { format } from "date-fns";
 import {
   Card,
   CardHeader,
@@ -20,8 +21,6 @@ import {
   FormControl,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -29,13 +28,15 @@ import {
   type SuggestMembershipTypeOutput,
 } from "@/ai/flows/suggest-membership-type";
 import { BishopIcon } from "./icons/chess-icons";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, CalendarIcon } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
-  age: z.coerce.number().min(1, { message: "Age is required." }),
-  tournamentExperience: z
-    .string()
-    .min(10, { message: "Please provide some details about your experience." }),
+  dob: z.date({ required_error: "Date of birth is required." }),
+  hasPlayedBefore: z.enum(['yes', 'no'], { required_error: "Please select an option." }),
 });
 
 export function MembershipAssistant() {
@@ -47,16 +48,21 @@ export function MembershipAssistant() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      age: undefined,
-      tournamentExperience: "",
+      dob: undefined,
+      hasPlayedBefore: undefined,
     },
   });
+
+  const hasPlayed = form.watch("hasPlayedBefore");
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     setSuggestion(null);
     try {
-      const result = await suggestMembershipType(values);
+      const result = await suggestMembershipType({
+        dob: values.dob.toISOString(),
+        hasPlayedBefore: values.hasPlayedBefore === 'yes',
+      });
       setSuggestion(result);
     } catch (error) {
       console.error("Error getting membership suggestion:", error);
@@ -87,34 +93,92 @@ export function MembershipAssistant() {
             <CardContent className="space-y-4">
               <FormField
                 control={form.control}
-                name="age"
+                name="dob"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Your Age</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="e.g., 25" {...field} />
-                    </FormControl>
+                    <FormLabel>Your Date of Birth</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            date > new Date() || date < new Date("1900-01-01")
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="tournamentExperience"
+                name="hasPlayedBefore"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tournament Experience</FormLabel>
+                  <FormItem className="space-y-3">
+                    <FormLabel>Have you played in a USCF-rated tournament before?</FormLabel>
                     <FormControl>
-                      <Textarea
-                        placeholder="e.g., 'I am a new player and have never played in a USCF tournament.' or 'I play 3-4 tournaments a year, my current rating is 1650.'"
-                        {...field}
-                        rows={4}
-                      />
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex flex-col space-y-1"
+                      >
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="yes" />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer">
+                            Yes
+                          </FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="no" />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer">
+                            No
+                          </FormLabel>
+                        </FormItem>
+                      </RadioGroup>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              {hasPlayed === 'yes' && (
+                  <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg border">
+                      <p>
+                          Welcome back! You will likely need to renew your membership. You can find your USCF ID and check your membership status using the official player search tool.
+                      </p>
+                      <Button asChild variant="link" className="p-0 h-auto mt-1">
+                          <a href="https://new.uschess.org/civicrm/player-search" target="_blank" rel="noopener noreferrer">
+                              Find your USCF ID &rarr;
+                          </a>
+                      </Button>
+                  </div>
+              )}
             </CardContent>
             <CardFooter>
               <Button type="submit" disabled={isLoading}>

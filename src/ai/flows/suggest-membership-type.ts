@@ -12,12 +12,8 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const SuggestMembershipTypeInputSchema = z.object({
-  age: z.number().describe('The age of the user.'),
-  tournamentExperience: z
-    .string()
-    .describe(
-      'The tournament experience of the user, including the number of tournaments played and their rating history.'
-    ),
+  dob: z.string().describe('The date of birth of the user in ISO 8601 format.'),
+  hasPlayedBefore: z.boolean().describe('Whether the user has played in a USCF tournament before.'),
 });
 export type SuggestMembershipTypeInput = z.infer<typeof SuggestMembershipTypeInputSchema>;
 
@@ -37,20 +33,26 @@ export async function suggestMembershipType(
   return suggestMembershipTypeFlow(input);
 }
 
+const SuggestMembershipTypePromptSchema = z.object({
+    age: z.number(),
+    hasPlayedBefore: z.boolean(),
+});
+
 const prompt = ai.definePrompt({
   name: 'suggestMembershipTypePrompt',
-  input: {schema: SuggestMembershipTypeInputSchema},
+  input: {schema: SuggestMembershipTypePromptSchema},
   output: {schema: SuggestMembershipTypeOutputSchema},
   prompt: `You are an expert USCF membership advisor.
 
-You will use the user's age and tournament experience to suggest the most appropriate USCF membership type for them.
+You will use the user's age and whether they have played before to suggest the most appropriate USCF membership type.
 
-Consider factors such as age restrictions, tournament eligibility, and cost-effectiveness.
+If they have played before, they will need to renew their membership. If not, they will need a new one.
+Consider factors such as age restrictions (e.g., Youth, Young Adult, Adult), tournament eligibility, and cost-effectiveness.
 
 Age: {{{age}}}
-Tournament Experience: {{{tournamentExperience}}}
+Has played in a USCF tournament before: {{{hasPlayedBefore}}}
 
-Suggest the most appropriate USCF membership type and justify your suggestion.`,
+Suggest the most appropriate USCF membership type (e.g., 'Adult Membership Renewal', 'Youth Membership - New') and justify your suggestion.`,
 });
 
 const suggestMembershipTypeFlow = ai.defineFlow(
@@ -59,8 +61,19 @@ const suggestMembershipTypeFlow = ai.defineFlow(
     inputSchema: SuggestMembershipTypeInputSchema,
     outputSchema: SuggestMembershipTypeOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
+  async (input) => {
+    const today = new Date();
+    const birthDate = new Date(input.dob);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const m = today.getMonth() - birthDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    
+    const {output} = await prompt({
+        age: age,
+        hasPlayedBefore: input.hasPlayedBefore,
+    });
     return output!;
   }
 );
