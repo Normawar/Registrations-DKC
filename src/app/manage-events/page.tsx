@@ -100,6 +100,17 @@ export default function ManageEventsPage() {
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
+    defaultValues: {
+      name: '',
+      location: '',
+      rounds: 5,
+      regularFee: 20,
+      lateFee: 25,
+      veryLateFee: 30,
+      dayOfFee: 35,
+      imageUrl: '',
+      pdfUrl: '',
+    },
   });
 
   useEffect(() => {
