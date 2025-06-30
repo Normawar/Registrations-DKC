@@ -130,7 +130,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         let reformattedName = player.fullName.trim();
         // Re-format name from "LAST, FIRST" to "FIRST LAST" for display
         const nameParts = reformattedName.split(',').map(p => p.trim());
-        if (nameParts.length === 2) {
+        if (nameParts.length >= 2) {
           reformattedName = `${nameParts[1]} ${nameParts[0]}`;
         }
         return {
