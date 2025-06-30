@@ -26,9 +26,11 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle } from "lucide-react";
+import { Bell, User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
+import { requestsData } from "@/lib/data/requests-data";
+import { Badge } from "@/components/ui/badge";
 
 const sponsorMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
@@ -82,6 +84,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
+
+  const pendingRequestsCount = profile?.role === 'organizer' 
+    ? requestsData.filter(r => r.status === 'Pending').length
+    : 0;
 
   return (
     <SidebarProvider>
@@ -176,7 +182,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarFooter>
         </Sidebar>
         <SidebarInset>
-          <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+          <div className="flex flex-col h-full">
+            <header className="flex h-16 shrink-0 items-center justify-end gap-4 border-b bg-background px-4 sm:px-6 lg:px-8">
+              {profile?.role === 'organizer' && (
+                  <Link href="/requests" className="relative" aria-label={`View ${pendingRequestsCount} pending requests`}>
+                      <Button variant="ghost" size="icon">
+                          <Bell className="h-5 w-5" />
+                          <span className="sr-only">View Requests</span>
+                      </Button>
+                      {pendingRequestsCount > 0 && (
+                      <Badge variant="destructive" className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full p-0 text-xs">
+                          {pendingRequestsCount}
+                      </Badge>
+                      )}
+                  </Link>
+              )}
+            </header>
+            <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+              {children}
+            </main>
+          </div>
         </SidebarInset>
       </div>
     </SidebarProvider>
