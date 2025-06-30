@@ -409,7 +409,7 @@ export default function ConfirmationsPage() {
                           <div className="flex items-baseline gap-2">
                             <span className="font-semibold">{conf.eventName}</span>
                             {conf.invoiceNumber && (
-                              <span className="text-sm font-normal text-muted-foreground">(#{conf.invoiceNumber})</span>
+                              <span className="text-sm font-normal text-muted-foreground">(Inv. {conf.invoiceNumber})</span>
                             )}
                           </div>
                           <span className="text-sm text-muted-foreground">
