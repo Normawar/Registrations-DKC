@@ -28,10 +28,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
 import { cn } from '@/lib/utils';
-import { ExternalLink, RefreshCw, Receipt } from 'lucide-react';
+import { ExternalLink, RefreshCw, Receipt, Info } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -44,7 +52,7 @@ type CombinedInvoice = {
   invoiceId?: string;
   invoiceUrl?: string;
   invoiceNumber?: string;
-  purchaserName?: string; 
+  purchaserName?: string;
   invoiceStatus?: string;
   schoolName?: string;
   district?: string;
@@ -79,7 +87,6 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PUBLISHED',
     schoolName: 'SHARYLAND PIONEER H S',
     district: 'SHARYLAND ISD',
-    invoiceUrl: '#',
   },
   {
     id: 'sample-new-uscf-1',
@@ -92,7 +99,6 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PAID',
     schoolName: 'SHARYLAND PIONEER H S',
     district: 'SHARYLAND ISD',
-    invoiceUrl: '#',
   },
   {
     id: 'sample-1',
@@ -105,7 +111,6 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PAID',
     schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
     district: 'SHARYLAND ISD',
-    invoiceUrl: '#',
   },
   {
     id: 'sample-2',
@@ -118,7 +123,6 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PUBLISHED',
     schoolName: 'MCALLEN H S', // Different school
     district: 'MCALLEN ISD',
-    invoiceUrl: '#',
   },
     {
     id: 'sample-3',
@@ -131,7 +135,6 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'UNPAID',
     schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
     district: 'SHARYLAND ISD',
-    invoiceUrl: '#',
   },
    {
     id: 'sample-4',
@@ -144,24 +147,18 @@ const sampleInvoices: CombinedInvoice[] = [
     invoiceStatus: 'PAID',
     schoolName: 'EDINBURG H S', // Different school
     district: 'EDINBURG CISD',
-    invoiceUrl: '#',
   },
 ];
 
 
 function InvoicesComponent() {
-  const { toast } = useToast();
   const { profile } = useSponsorProfile();
 
   const [allInvoices, setAllInvoices] = useState<CombinedInvoice[]>([]);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
-
-  const uniqueSchools = useMemo(() => {
-    const schools = new Set(allInvoices.map(inv => inv.schoolName || ''));
-    return ['ALL', ...Array.from(schools).filter(Boolean).sort()];
-  }, [allInvoices]);
+  const [selectedSampleInvoice, setSelectedSampleInvoice] = useState<CombinedInvoice | null>(null);
   
   const fetchInvoiceStatus = async (confId: string, invoiceId: string, silent = false) => {
       if (!silent) {
@@ -176,14 +173,6 @@ function InvoicesComponent() {
               setStatuses(prev => ({ ...prev, [confId]: { status: 'NOT_FOUND', isLoading: false } }));
           } else {
               setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
-          }
-          if (!silent) {
-            const description = error instanceof Error ? error.message : "Failed to get the latest invoice status from Square.";
-            toast({
-                variant: "destructive",
-                title: "Could not refresh status",
-                description: description
-            });
           }
       }
   };
@@ -202,18 +191,16 @@ function InvoicesComponent() {
         const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
         const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
         const organizerInvoices = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
-
+        
         const allLocalInvoices = [...confirmations, ...membershipInvoices, ...organizerInvoices];
         
         const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
 
-        // Add sample invoices first, so they can be overwritten by real ones.
         for (const inv of sampleInvoices) {
             const key = inv.invoiceId || inv.id;
             uniqueInvoicesMap.set(key, inv);
         }
         
-        // Normalize and add local invoices, overwriting samples with the same ID
         for (const inv of allLocalInvoices) {
             const normalizedInv: CombinedInvoice = {
                 id: inv.id,
@@ -243,7 +230,6 @@ function InvoicesComponent() {
         
         setAllInvoices(filteredInvoices);
 
-        // Initialize status display for each invoice
         const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
         for (const inv of filteredInvoices) {
             if (inv.invoiceId) {
@@ -254,7 +240,6 @@ function InvoicesComponent() {
         }
         setStatuses(initialStatuses);
         
-        // Fetch live statuses for real invoices that aren't in a final state
         const invoicesToFetch = filteredInvoices.filter(inv => {
             const currentStatus = initialStatuses[inv.id]?.status?.toUpperCase();
             const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NO_INVOICE', 'NOT_FOUND'].includes(currentStatus || '');
@@ -267,6 +252,12 @@ function InvoicesComponent() {
         setAllInvoices([]);
     }
   }, [profile]);
+  
+  const uniqueSchools = useMemo(() => {
+    const schools = new Set(allInvoices.map(inv => inv.schoolName || ''));
+    return ['ALL', ...Array.from(schools).filter(Boolean).sort()];
+  }, [allInvoices]);
+  
 
   const getStatusBadgeVariant = (status?: string): string => {
     if (!status) return 'bg-gray-400';
@@ -440,16 +431,7 @@ function InvoicesComponent() {
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
                                             {isSample ? (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                        toast({
-                                                            title: "Sample Invoice",
-                                                            description: "This is a sample invoice. Links for invoices you create will lead to the real Square invoice page.",
-                                                        });
-                                                    }}
-                                                >
+                                                <Button variant="outline" size="sm" onClick={() => setSelectedSampleInvoice(inv)}>
                                                     <ExternalLink className="mr-2 h-4 w-4" /> View
                                                 </Button>
                                             ) : (
@@ -470,6 +452,55 @@ function InvoicesComponent() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!selectedSampleInvoice} onOpenChange={(isOpen) => !isOpen && setSelectedSampleInvoice(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sample Invoice</DialogTitle>
+            <DialogDescription>
+                This is a preview of what an invoice looks like.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedSampleInvoice && (
+            <div className="space-y-4">
+                <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>This is a Sample</AlertTitle>
+                    <AlertDescription>
+                        Links for invoices you create yourself will lead to a real page on Square.
+                    </AlertDescription>
+                </Alert>
+                <div className="space-y-2 rounded-lg border bg-background p-4">
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Invoice #</span>
+                        <span className="font-mono font-medium">{selectedSampleInvoice.invoiceNumber}</span>
+                    </div>
+                     <div className="flex justify-between">
+                        <span className="text-muted-foreground">Description</span>
+                        <span className="font-medium text-right">{selectedSampleInvoice.description}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">School</span>
+                        <span className="font-medium">{selectedSampleInvoice.schoolName}</span>
+                    </div>
+                     <div className="flex justify-between">
+                        <span className="text-muted-foreground">Status</span>
+                        <Badge variant="default" className={cn('capitalize', getStatusBadgeVariant(selectedSampleInvoice.invoiceStatus))}>
+                            {getStatusDisplayName(selectedSampleInvoice.invoiceStatus)}
+                        </Badge>
+                    </div>
+                    <div className="flex justify-between items-baseline pt-2 border-t">
+                        <span className="text-lg font-bold">Total</span>
+                        <span className="text-lg font-bold">${selectedSampleInvoice.totalInvoiced.toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setSelectedSampleInvoice(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
@@ -481,7 +512,3 @@ export default function InvoicesPage() {
         </Suspense>
     )
 }
-
-    
-
-    
