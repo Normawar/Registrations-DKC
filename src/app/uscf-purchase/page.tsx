@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
@@ -43,13 +43,18 @@ import {
     Download,
     CalendarIcon,
     ExternalLink,
-    RefreshCw
+    RefreshCw,
+    Trash2,
+    PlusCircle
 } from 'lucide-react';
 
 
 const playerInfoSchema = z.object({
-    playerName: z.string().min(1, { message: 'Player name is required.' }),
-    playerEmail: z.string().email({ message: 'A valid player email is required.' }),
+    players: z.array(
+        z.object({
+            name: z.string().min(1, { message: 'Player name is required.' }),
+        })
+    ).min(1, 'At least one player is required.'),
 });
 
 type PaymentMethod = 'po' | 'check' | 'cashapp' | 'zelle';
@@ -74,7 +79,7 @@ function UscfPurchaseComponent() {
     const justification = searchParams.get('justification') || 'No justification provided.';
     const price = parseFloat(searchParams.get('price') || '0');
     
-    const [invoice, setInvoice] = useState<(CreateMembershipInvoiceOutput & { playerName: string }) | null>(null);
+    const [invoice, setInvoice] = useState<(CreateMembershipInvoiceOutput & { playerCount: number, membershipType: string }) | null>(null);
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
 
     const [paymentInputs, setPaymentInputs] = useState<Partial<PaymentInputs>>({
@@ -94,9 +99,13 @@ function UscfPurchaseComponent() {
     const form = useForm<z.infer<typeof playerInfoSchema>>({
         resolver: zodResolver(playerInfoSchema),
         defaultValues: {
-            playerName: '',
-            playerEmail: '',
+            players: [{ name: '' }],
         },
+    });
+
+    const { fields, append, remove } = useFieldArray({
+        control: form.control,
+        name: "players"
     });
 
     useEffect(() => {
@@ -129,16 +138,17 @@ function UscfPurchaseComponent() {
             return;
         }
         try {
+            const playersToInvoice = values.players.map(p => ({ playerName: p.name }));
             const result = await createMembershipInvoice({
                 purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 purchaserEmail: sponsorProfile.email,
-                playerName: values.playerName,
                 membershipType: membershipType,
-                fee: price
+                fee: price,
+                players: playersToInvoice
             });
-            setInvoice({...result, playerName: values.playerName });
+            setInvoice({...result, playerCount: values.players.length, membershipType: membershipType });
             setInvoiceStatus(result.status);
-            toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.playerName} has been created.` });
+            toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
             toast({ variant: 'destructive', title: 'Invoice Creation Failed', description: errorMessage });
@@ -198,7 +208,7 @@ function UscfPurchaseComponent() {
                 paymentFileName = file.name;
             }
             
-            let newTitle = `USCF Membership for ${invoice.playerName}`;
+            let newTitle = invoice.playerCount > 1 ? `USCF Membership for ${invoice.playerCount} players` : `USCF Membership (${invoice.membershipType})`;
             let toastMessage = "Payment information has been saved.";
 
             switch (paymentMethod) {
@@ -289,7 +299,7 @@ function UscfPurchaseComponent() {
                             <p>{justification}</p>
                         </div>
                          <div>
-                            <Label className="text-sm text-muted-foreground">Price</Label>
+                            <Label className="text-sm text-muted-foreground">Price per Player</Label>
                             <p className="text-lg font-bold">${price.toFixed(2)}</p>
                         </div>
                     </CardContent>
@@ -299,44 +309,53 @@ function UscfPurchaseComponent() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Player Information</CardTitle>
-                            <CardDescription>Enter the name and email of the player this membership is for.</CardDescription>
+                            <CardDescription>Enter the name of each player this membership is for.</CardDescription>
                         </CardHeader>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(handleCreateInvoice)}>
                                 <CardContent className="space-y-4">
-                                    <div className="grid md:grid-cols-2 gap-4">
-                                        <FormField
-                                            control={form.control}
-                                            name="playerName"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Player Full Name</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="e.g., Alex Ray" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="playerEmail"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Player Email</FormLabel>
-                                                    <FormControl>
-                                                        <Input placeholder="player@example.com" {...field} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </div>
+                                    {fields.map((field, index) => (
+                                        <div key={field.id} className="flex items-end gap-2">
+                                            <FormField
+                                                control={form.control}
+                                                name={`players.${index}.name`}
+                                                render={({ field }) => (
+                                                    <FormItem className="flex-grow">
+                                                        <FormLabel className={cn(index !== 0 && "sr-only")}>
+                                                          Player Full Name
+                                                        </FormLabel>
+                                                        <FormControl>
+                                                            <Input placeholder={`Player ${index + 1} Name`} {...field} />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="icon"
+                                                onClick={() => remove(index)}
+                                                disabled={fields.length <= 1}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => append({ name: "" })}
+                                    >
+                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                        Add Another Player
+                                    </Button>
                                 </CardContent>
                                 <CardFooter>
                                     <Button type="submit" disabled={isCreatingInvoice}>
                                         {isCreatingInvoice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Create Invoice
+                                        Create Invoice for {fields.length} Player(s)
                                     </Button>
                                 </CardFooter>
                             </form>
@@ -375,29 +394,29 @@ function UscfPurchaseComponent() {
                             )}
 
                              <RadioGroup value={selectedMethod} onValueChange={(value) => handleInputChange('paymentMethod', value as PaymentMethod)} className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={isLoading}>
-                                <div><RadioGroupItem value="po" id={`po-${invoice.id}`} className="peer sr-only" />
-                                    <Label htmlFor={`po-${invoice.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                <div><RadioGroupItem value="po" id={`po-${invoice.invoiceId}`} className="peer sr-only" />
+                                    <Label htmlFor={`po-${invoice.invoiceId}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
                                     Purchase Order</Label></div>
-                                <div><RadioGroupItem value="check" id={`check-${invoice.id}`} className="peer sr-only" />
-                                    <Label htmlFor={`check-${invoice.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                <div><RadioGroupItem value="check" id={`check-${invoice.invoiceId}`} className="peer sr-only" />
+                                    <Label htmlFor={`check-${invoice.invoiceId}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
                                     Pay with Check</Label></div>
-                                <div><RadioGroupItem value="cashapp" id={`cashapp-${invoice.id}`} className="peer sr-only" />
-                                    <Label htmlFor={`cashapp-${invoice.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                <div><RadioGroupItem value="cashapp" id={`cashapp-${invoice.invoiceId}`} className="peer sr-only" />
+                                    <Label htmlFor={`cashapp-${invoice.invoiceId}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
                                     Cash App</Label></div>
-                                <div><RadioGroupItem value="zelle" id={`zelle-${invoice.id}`} className="peer sr-only" />
-                                    <Label htmlFor={`zelle-${invoice.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                <div><RadioGroupItem value="zelle" id={`zelle-${invoice.invoiceId}`} className="peer sr-only" />
+                                    <Label htmlFor={`zelle-${invoice.invoiceId}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
                                     Zelle</Label></div>
                              </RadioGroup>
                              
                              {selectedMethod === 'po' && (
                                 <div className="grid md:grid-cols-2 gap-4 items-start">
                                     <div className="space-y-2">
-                                        <Label htmlFor={`po-number-${invoice.id}`}>PO Number</Label>
-                                        <Input id={`po-number-${invoice.id}`} placeholder="Enter PO Number" value={paymentInputs.poNumber || ''} onChange={(e) => handleInputChange('poNumber', e.target.value)} disabled={isLoading} />
+                                        <Label htmlFor={`po-number-${invoice.invoiceId}`}>PO Number</Label>
+                                        <Input id={`po-number-${invoice.invoiceId}`} placeholder="Enter PO Number" value={paymentInputs.poNumber || ''} onChange={(e) => handleInputChange('poNumber', e.target.value)} disabled={isLoading} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor={`po-file-${invoice.id}`}>Upload PO Document</Label>
-                                        <Input id={`po-file-${invoice.id}`} type="file" onChange={handleFileChange} disabled={isLoading} />
+                                        <Label htmlFor={`po-file-${invoice.invoiceId}`}>Upload PO Document</Label>
+                                        <Input id={`po-file-${invoice.invoiceId}`} type="file" onChange={handleFileChange} disabled={isLoading} />
                                         {paymentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {paymentInputs.file.name}</span></div>
                                         ) : paymentInputs.paymentFileUrl && paymentInputs.paymentMethod === 'po' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={paymentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {paymentInputs.paymentFileName}</a></Button></div>
                                         ) : null }
@@ -408,12 +427,12 @@ function UscfPurchaseComponent() {
                             {selectedMethod === 'check' && (
                                 <div className="grid md:grid-cols-3 gap-4 items-start">
                                     <div className="space-y-2">
-                                        <Label htmlFor={`check-number-${invoice.id}`}>Check Number</Label>
-                                        <Input id={`check-number-${invoice.id}`} placeholder="Enter Check Number" value={paymentInputs.checkNumber || ''} onChange={(e) => handleInputChange('checkNumber', e.target.value)} disabled={isLoading} />
+                                        <Label htmlFor={`check-number-${invoice.invoiceId}`}>Check Number</Label>
+                                        <Input id={`check-number-${invoice.invoiceId}`} placeholder="Enter Check Number" value={paymentInputs.checkNumber || ''} onChange={(e) => handleInputChange('checkNumber', e.target.value)} disabled={isLoading} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor={`check-amount-${invoice.id}`}>Check Amount</Label>
-                                        <Input id={`check-amount-${invoice.id}`} type="number" placeholder={price.toFixed(2)} value={paymentInputs.amountPaid || ''} onChange={(e) => handleInputChange('amountPaid', e.target.value)} disabled={isLoading} />
+                                        <Label htmlFor={`check-amount-${invoice.invoiceId}`}>Check Amount</Label>
+                                        <Input id={`check-amount-${invoice.invoiceId}`} type="number" placeholder={(price * invoice.playerCount).toFixed(2)} value={paymentInputs.amountPaid || ''} onChange={(e) => handleInputChange('amountPaid', e.target.value)} disabled={isLoading} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Check Date</Label>
@@ -450,12 +469,12 @@ function UscfPurchaseComponent() {
                                 </div>
                                 <div className="grid md:grid-cols-2 gap-4 items-start">
                                         <div className="space-y-2">
-                                            <Label htmlFor={`cashapp-amount-${invoice.id}`}>Amount Paid</Label>
-                                            <Input id={`cashapp-amount-${invoice.id}`} type="number" placeholder={price.toFixed(2)} value={paymentInputs.amountPaid || ''} onChange={(e) => handleInputChange('amountPaid', e.target.value)} disabled={isLoading} />
+                                            <Label htmlFor={`cashapp-amount-${invoice.invoiceId}`}>Amount Paid</Label>
+                                            <Input id={`cashapp-amount-${invoice.invoiceId}`} type="number" placeholder={(price * invoice.playerCount).toFixed(2)} value={paymentInputs.amountPaid || ''} onChange={(e) => handleInputChange('amountPaid', e.target.value)} disabled={isLoading} />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor={`cashapp-file-${invoice.id}`}>Upload Confirmation Screenshot</Label>
-                                            <Input id={`cashapp-file-${invoice.id}`} type="file" accept="image/*" onChange={handleFileChange} disabled={isLoading} />
+                                            <Label htmlFor={`cashapp-file-${invoice.invoiceId}`}>Upload Confirmation Screenshot</Label>
+                                            <Input id={`cashapp-file-${invoice.invoiceId}`} type="file" accept="image/*" onChange={handleFileChange} disabled={isLoading} />
                                             {paymentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {paymentInputs.file.name}</span></div>
                                             ) : paymentInputs.paymentFileUrl && paymentInputs.paymentMethod === 'cashapp' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={paymentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {paymentInputs.paymentFileName}</a></Button></div>
                                             ) : null }
@@ -478,12 +497,12 @@ function UscfPurchaseComponent() {
                                 </div>
                                 <div className="grid md:grid-cols-2 gap-4 items-start">
                                         <div className="space-y-2">
-                                            <Label htmlFor={`zelle-amount-${invoice.id}`}>Amount Paid</Label>
-                                            <Input id={`zelle-amount-${invoice.id}`} type="number" placeholder={price.toFixed(2)} value={paymentInputs.amountPaid || ''} onChange={(e) => handleInputChange('amountPaid', e.target.value)} disabled={isLoading} />
+                                            <Label htmlFor={`zelle-amount-${invoice.invoiceId}`}>Amount Paid</Label>
+                                            <Input id={`zelle-amount-${invoice.invoiceId}`} type="number" placeholder={(price * invoice.playerCount).toFixed(2)} value={paymentInputs.amountPaid || ''} onChange={(e) => handleInputChange('amountPaid', e.target.value)} disabled={isLoading} />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor={`zelle-file-${invoice.id}`}>Upload Confirmation Screenshot</Label>
-                                            <Input id={`zelle-file-${invoice.id}`} type="file" accept="image/*" onChange={handleFileChange} disabled={isLoading} />
+                                            <Label htmlFor={`zelle-file-${invoice.invoiceId}`}>Upload Confirmation Screenshot</Label>
+                                            <Input id={`zelle-file-${invoice.invoiceId}`} type="file" accept="image/*" onChange={handleFileChange} disabled={isLoading} />
                                             {paymentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {paymentInputs.file.name}</span></div>
                                             ) : paymentInputs.paymentFileUrl && paymentInputs.paymentMethod === 'zelle' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={paymentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {paymentInputs.paymentFileName}</a></Button></div>
                                             ) : null }

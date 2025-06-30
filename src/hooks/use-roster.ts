@@ -15,7 +15,7 @@ export type Player = {
   grade: string;
   section: string;
   email: string;
-  phone: string;
+  phone?: string;
   dob: Date;
   zipCode: string;
   studentType?: 'gt' | 'independent';

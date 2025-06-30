@@ -358,7 +358,7 @@ export default function EventsPage() {
     };
 
     const isPersonalDataComplete = (player: Player): boolean => {
-        return !!(player.dob && player.zipCode && player.email && player.phone);
+        return !!(player.dob && player.zipCode && player.email);
     }
 
     const isRenewingDataValid = (player: Player): boolean => {
@@ -558,17 +558,9 @@ export default function EventsPage() {
                                               Player must have a valid, unexpired USCF membership for this event to be 'Current'.
                                           </p>
                                       )}
-                                      {isRenewingInvalid && (
+                                      {(isRenewingInvalid || isNewInvalid) && (
                                           <div className="mt-2 text-xs text-destructive p-2 bg-destructive/10 rounded-md">
-                                              Player data is incomplete for renewal. Please update DOB, Zip, and Phone in the{' '}
-                                              <Link href="/roster" className="underline font-semibold hover:text-destructive/80" target="_blank" rel="noopener noreferrer">
-                                                  Roster Page
-                                              </Link>.
-                                          </div>
-                                      )}
-                                      {isNewInvalid && (
-                                          <div className="mt-2 text-xs text-destructive p-2 bg-destructive/10 rounded-md">
-                                              Player data is incomplete for a new membership. Please update DOB, Zip, and Phone in the{' '}
+                                              Player data is incomplete for this action. Please update DOB, Zip, and Email in the{' '}
                                               <Link href="/roster" className="underline font-semibold hover:text-destructive/80" target="_blank" rel="noopener noreferrer">
                                                   Roster Page
                                               </Link>.

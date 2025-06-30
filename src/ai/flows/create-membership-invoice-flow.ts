@@ -20,12 +20,16 @@ const squareClient = new Client({
 
 const { customersApi, ordersApi, invoicesApi } = squareClient;
 
+const PlayerInfoSchema = z.object({
+  playerName: z.string().describe('The full name of the player receiving the membership.'),
+});
+
 const CreateMembershipInvoiceInputSchema = z.object({
     purchaserName: z.string().describe('The name of the person paying for the membership.'),
     purchaserEmail: z.string().email().describe('The email of the person paying for the membership.'),
-    playerName: z.string().describe('The name of the player receiving the membership.'),
     membershipType: z.string().describe('The type of USCF membership being purchased.'),
     fee: z.number().describe('The cost of the membership.'),
+    players: z.array(PlayerInfoSchema).describe('An array of players receiving the membership.'),
 });
 export type CreateMembershipInvoiceInput = z.infer<typeof CreateMembershipInvoiceInputSchema>;
 
@@ -89,14 +93,14 @@ const createMembershipInvoiceFlow = ai.defineFlow(
       }
       
       // 3. Create an Order
-      const lineItems = [{
-        name: `USCF Membership (${input.membershipType}) for ${input.playerName}`,
+      const lineItems = input.players.map(player => ({
+        name: `USCF Membership (${input.membershipType}) for ${player.playerName}`,
         quantity: '1',
         basePriceMoney: {
           amount: BigInt(Math.round(input.fee * 100)),
           currency: 'USD',
         },
-      }];
+      }));
 
       console.log("Creating order with line items:", JSON.stringify(lineItems, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
       const createOrderResponse = await ordersApi.createOrder({
@@ -114,6 +118,10 @@ const createMembershipInvoiceFlow = ai.defineFlow(
       // 4. Create an Invoice from the Order
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7); // Invoice due in 7 days
+
+      const title = input.players.length > 1
+        ? `USCF Membership for ${input.players.length} players`
+        : `USCF Membership for ${input.players[0].playerName}`;
 
       console.log(`Creating invoice for order ID: ${orderId}`);
       const createInvoiceResponse = await invoicesApi.createInvoice({
@@ -133,8 +141,8 @@ const createMembershipInvoiceFlow = ai.defineFlow(
             squareGiftCard: true,
             bankAccount: true, // For ACH payments
           },
-          title: `USCF Membership for ${input.playerName}`,
-          description: `Invoice for ${input.membershipType} USCF Membership. This purchase does not register the player for any events.`,
+          title: title,
+          description: `Invoice for ${input.membershipType} USCF Membership. This purchase does not register any players for events.`,
         }
       });
       
