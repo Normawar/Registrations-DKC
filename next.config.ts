@@ -3,6 +3,11 @@ import 'dotenv/config';
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
+  devServer: {
+    allowedDevOrigins: [
+      'https://*.cluster-f4iwdviaqvc2ct6pgytzw4xqy4.cloudworkstations.dev',
+    ],
+  },
   typescript: {
     ignoreBuildErrors: true,
   },
