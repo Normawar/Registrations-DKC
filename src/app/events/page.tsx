@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { 
     FileText, 
     ImageIcon,
+    Info,
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -237,7 +238,7 @@ export default function EventsPage() {
             }
         }
 
-        const isPsja = sponsorProfile.district === 'PHARR-SAN-JUAN-ALAMO ISD';
+        const isPsja = sponsorProfile.district === 'PHARR-SAN JUAN-ALAMO ISD';
         const allIndependent = isPsja && Object.values(selections).length > 0 && Object.values(selections).every(s => s.studentType === 'independent');
         
         const teamCode = generateTeamCode({ 
@@ -447,13 +448,22 @@ export default function EventsPage() {
         </div>
 
         {!isSquareConfigured && (
-            <Alert variant="destructive">
-                <AlertTitle>Square Configuration Required</AlertTitle>
+            <Alert variant="default">
+                <Info className="h-4 w-4" />
+                <AlertTitle>Next Step: Configure Square Payments</AlertTitle>
                 <AlertDescription>
-                    Your Square integration is not configured, so invoice creation is disabled. Please set the <code>SQUARE_ACCESS_TOKEN</code> and <code>SQUARE_LOCATION_ID</code> in your <code>.env</code> file. You can find these credentials in the{' '}
-                    <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-destructive/80">
-                        Square Developer Dashboard
-                    </a>. Remember to restart the server after updating.
+                    To enable invoice creation, please add your Square credentials.
+                    <ol className="list-decimal list-inside mt-2 space-y-1">
+                        <li>
+                            Get your Sandbox <strong>Access Token</strong> and <strong>Location ID</strong> from the{' '}
+                            <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-primary/80">
+                                Square Developer Dashboard
+                            </a>.
+                        </li>
+                        <li>Open the <code>.env</code> file in the file explorer on the left.</li>
+                        <li>Paste your credentials into the corresponding variables.</li>
+                        <li>The server will restart automatically to apply the changes.</li>
+                    </ol>
                 </AlertDescription>
             </Alert>
         )}

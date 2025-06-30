@@ -352,13 +352,22 @@ function UscfPurchaseComponent() {
                 </div>
 
                 {!isSquareConfigured && (
-                    <Alert variant="destructive">
-                        <AlertTitle>Square Configuration Required</AlertTitle>
+                    <Alert variant="default">
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>Next Step: Configure Square Payments</AlertTitle>
                         <AlertDescription>
-                            Your Square integration is not configured, so invoice creation is disabled. Please set your credentials in the <code>.env</code> file. You can find them in the{' '}
-                            <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-destructive/80">
-                                Square Developer Dashboard
-                            </a>. Remember to restart the server after updating.
+                            To enable invoice creation, please add your Square credentials.
+                            <ol className="list-decimal list-inside mt-2 space-y-1">
+                                <li>
+                                    Get your Sandbox <strong>Access Token</strong> and <strong>Location ID</strong> from the{' '}
+                                    <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-primary/80">
+                                        Square Developer Dashboard
+                                    </a>.
+                                </li>
+                                <li>Open the <code>.env</code> file in the file explorer on the left.</li>
+                                <li>Paste your credentials into the corresponding variables.</li>
+                                <li>The server will restart automatically to apply the changes.</li>
+                            </ol>
                         </AlertDescription>
                     </Alert>
                 )}
