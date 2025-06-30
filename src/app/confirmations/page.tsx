@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -92,10 +91,29 @@ export default function ConfirmationsPage() {
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
+    // Load confirmations from local storage
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     setConfirmations(storedConfirmations);
-  }, []);
+
+    // Sign in user anonymously when the component mounts
+    const authenticate = async () => {
+      if (auth && !auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (error) {
+          console.error("Anonymous sign-in failed on page load:", error);
+          // Optionally, inform the user that some features might not work
+          toast({
+            variant: 'destructive',
+            title: 'Authentication Failed',
+            description: 'Could not sign in anonymously. File uploads might not work. Please ensure anonymous sign-in is enabled in your Firebase project.',
+          });
+        }
+      }
+    };
+    authenticate();
+  }, [toast]);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
 
@@ -127,34 +145,16 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            // Ensure auth and storage services are available. This check is a safeguard.
-            if (!auth || !storage) {
+            if (!auth || !storage || !auth.currentUser) {
                  toast({
                     variant: 'destructive',
-                    title: 'Authentication Service Not Ready',
-                    description: 'The Firebase service is not available. Please refresh the page and try again.',
+                    title: 'Upload Failed',
+                    description: 'Firebase is not available or you are not authenticated. Please refresh and try again.',
                  });
                  setIsUpdating(prev => ({...prev, [conf.id]: false}));
                  return;
             }
 
-            // Ensure user is authenticated before upload
-            if (!auth.currentUser) {
-                try {
-                    await signInAnonymously(auth);
-                } catch (error) {
-                    console.error("Anonymous sign-in failed during PO save:", error);
-                    toast({
-                        variant: 'destructive',
-                        title: 'Upload Failed',
-                        description: 'Could not authenticate to upload the file. Please check your internet connection and try again.',
-                    });
-                    setIsUpdating(prev => ({...prev, [conf.id]: false}));
-                    return;
-                }
-            }
-
-            // At this point, auth.currentUser should be available
             const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
             const snapshot = await uploadBytes(storageRef, poFile);
             poFileUrl = await getDownloadURL(snapshot.ref);
