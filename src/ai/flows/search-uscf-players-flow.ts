@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF website.
@@ -68,7 +69,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
     if (!name) {
       return { players: [], error: 'Player name cannot be empty.' };
     }
-    const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}&state=TX&ratingmin=&ratingmax=&order=N&rating=R&mode=Find`;
+    const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}`;
     
     try {
       const response = await fetch(url);
