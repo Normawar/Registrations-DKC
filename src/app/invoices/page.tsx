@@ -131,20 +131,16 @@ export default function InvoicesPage() {
   useEffect(() => {
     loadAndProcessInvoices();
     
-    const handleStorageChange = (event: Event) => {
-      if (event instanceof StorageEvent) {
-        if (event.key === 'all_invoices') {
-            loadAndProcessInvoices();
-        }
-      } else {
+    const handleStorageChange = () => {
         loadAndProcessInvoices();
-      }
     };
     
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('all_invoices_updated', handleStorageChange);
     
     return () => {
         window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('all_invoices_updated', handleStorageChange);
     };
   }, [loadAndProcessInvoices]);
   
@@ -158,8 +154,8 @@ export default function InvoicesPage() {
       return [];
     }
     return allInvoices.filter(inv => {
-        if (profile.role === 'sponsor') {
-            if (inv.schoolName?.trim().toUpperCase() !== profile.school?.trim().toUpperCase()) {
+        if (profile.role === 'sponsor' && inv.schoolName && profile.school) {
+            if (inv.schoolName.trim().toUpperCase() !== profile.school.trim().toUpperCase()) {
                 return false;
             }
         } else if (profile.role === 'organizer' && schoolFilter !== 'ALL') {
@@ -185,9 +181,15 @@ export default function InvoicesPage() {
 
     useEffect(() => {
         const invoicesToFetchStatus = filteredInvoices.filter(inv => {
-            const currentStatus = statuses[inv.id]?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
-            const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND'].includes(currentStatus);
-            return inv.invoiceId && !isFinalState && !statuses[inv.id]?.isLoading;
+            if (!inv.invoiceId) return false;
+            const currentStatusInfo = statuses[inv.id];
+            
+            if (!currentStatusInfo || !currentStatusInfo.isLoading) {
+                const status = currentStatusInfo?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
+                const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND'].includes(status);
+                return !isFinalState;
+            }
+            return false;
         });
 
         if (invoicesToFetchStatus.length > 0) {
@@ -241,6 +243,8 @@ export default function InvoicesPage() {
     if (status.toUpperCase() === 'NO_INVOICE') return 'No Invoice';
     return status.replace(/_/g, ' ').toLowerCase();
   };
+
+  const hasInvoicesButFilterHidesThem = allInvoices.length > 0 && filteredInvoices.length === 0;
 
   return (
     <AppLayout>
@@ -302,8 +306,15 @@ export default function InvoicesPage() {
             {filteredInvoices.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-4 text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
                 <Receipt className="h-12 w-12" />
-                <p className="font-semibold">No Invoices Found</p>
-                <p className="text-sm">There are no invoices matching the selected filter, or no invoices have been created yet.</p>
+                <p className="font-semibold">
+                    {hasInvoicesButFilterHidesThem ? "No Invoices Match Filter" : "No Invoices Found"}
+                </p>
+                <p className="text-sm">
+                    {hasInvoicesButFilterHidesThem
+                        ? "There are invoices, but none match your current filter selections."
+                        : "There are no invoices to display. Create one from the Events, USCF, or Organizer pages."
+                    }
+                </p>
               </div>
             ) : (
                 <Table>
