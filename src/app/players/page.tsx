@@ -572,7 +572,7 @@ export default function PlayersPage() {
                     <TableRow key={player.uscfId}>
                       <TableCell className="font-medium">
                         <a
-                            href={`http://msa.uschess.org/thin3.php?${player.uscfId}`}
+                            href={`https://www.uschess.org/msa/MbrDtlMain.php?${player.uscfId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-primary hover:underline"
