@@ -91,7 +91,12 @@ export default function LoginPage() {
 
   const handleLogin = (role: 'sponsor' | 'organizer' | 'individual') => {
     localStorage.setItem('user_role', role);
-    const path = role === 'individual' ? '/individual-dashboard' : '/dashboard';
+    let path = '/dashboard';
+    if (role === 'individual') {
+      path = '/individual-dashboard';
+    } else if (role === 'organizer') {
+      path = '/manage-events';
+    }
     router.push(path);
   };
 

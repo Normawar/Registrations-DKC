@@ -43,11 +43,14 @@ const sponsorMenuItems = [
 
 const organizerMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
-  { href: "/invoices", icon: Receipt, label: "All Invoices" },
-  { href: "/players", icon: PawnIcon, label: "All Players" },
   { href: "/manage-events", icon: FolderKanban, label: "Manage Events" },
+  { href: "/players", icon: PawnIcon, label: "All Players" },
   { href: "/schools", icon: School, label: "Schools & Districts" },
-  { href: "/organizer-invoice", icon: PlusCircle, label: "Create Invoice" },
+  { href: "/invoices", icon: Receipt, label: "All Invoices" },
+  { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
+  { href: "/events", icon: RookIcon, label: "Register for Event" },
+  { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
+  { href: "/requests", icon: KnightIcon, label: "Change Requests" },
 ];
 
 const individualMenuItems = [
