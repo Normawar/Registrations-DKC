@@ -192,9 +192,14 @@ const createInvoiceFlow = ai.defineFlow(
 
     } catch (error) {
       if (error instanceof ApiError) {
-        console.error('Square API Error:', JSON.stringify(error.result, null, 2));
-        const firstError = error.result.errors?.[0];
-        const errorMessage = firstError?.detail ?? JSON.stringify(error.result.errors);
+        console.error('Square API Error in createInvoiceFlow:', JSON.stringify(error.result, null, 2));
+        let errorMessage: string;
+        if (error.result.errors && error.result.errors.length > 0) {
+            const firstError = error.result.errors[0];
+            errorMessage = firstError.detail || `Category: ${firstError.category}, Code: ${firstError.code}`;
+        } else {
+            errorMessage = JSON.stringify(error.result);
+        }
         throw new Error(`Square Error: ${errorMessage}`);
       } else {
         console.error('An unexpected error occurred during invoice creation:', error);

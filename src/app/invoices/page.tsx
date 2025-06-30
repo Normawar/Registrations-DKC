@@ -129,8 +129,39 @@ function InvoicesComponent() {
         if (profile.role === 'organizer') {
             invoicesToDisplay = mockOrganizerInvoices;
         } else { // Sponsor role
-            // Sponsors see all invoices for their school
-            invoicesToDisplay = mockOrganizerInvoices.filter(inv => inv.schoolName === profile.school);
+            const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+            const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
+            
+            const mappedEventInvoices: CombinedInvoice[] = eventConfirmations.map((conf: any) => ({
+                id: conf.id,
+                description: conf.eventName,
+                submissionTimestamp: conf.submissionTimestamp,
+                totalInvoiced: conf.totalInvoiced,
+                invoiceId: conf.invoiceId,
+                invoiceUrl: conf.invoiceUrl,
+                invoiceNumber: conf.invoiceNumber,
+                purchaserName: `${profile.firstName} ${profile.lastName}`,
+                invoiceStatus: conf.invoiceStatus,
+                schoolName: profile.school,
+                district: profile.district,
+            }));
+
+            const mappedMembershipInvoices: CombinedInvoice[] = membershipInvoices.map((inv: any) => ({
+                id: inv.invoiceId,
+                description: `USCF Membership (${inv.membershipType})`,
+                submissionTimestamp: inv.submissionTimestamp,
+                totalInvoiced: inv.totalInvoiced,
+                invoiceId: inv.invoiceId,
+                invoiceUrl: inv.invoiceUrl,
+                invoiceNumber: inv.invoiceNumber,
+                purchaserName: inv.purchaserName,
+                invoiceStatus: inv.status,
+                schoolName: profile.school,
+                district: profile.district,
+            }));
+            
+            const allMyInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices];
+            invoicesToDisplay = allMyInvoices.filter(inv => inv.schoolName === profile.school);
         }
 
         invoicesToDisplay.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
