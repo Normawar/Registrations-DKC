@@ -50,7 +50,7 @@ const organizerMenuItems = [
   { href: "/schools", icon: School, label: "Schools & Districts" },
   { href: "/invoices", icon: Receipt, label: "All Invoices" },
   { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
-  { href: "/events", icon: RookIcon, label: "Register for Event" },
+  { href: "/events", icon: RookIcon, label: "Upcoming Events" },
   { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
 ];
