@@ -167,14 +167,17 @@ export default function ProfilePage() {
       if (activeTab === 'upload' && imageFile) {
         if (!auth || !auth.currentUser) {
           toast({ variant: 'destructive', title: 'Authentication Error', description: "Cannot upload file. Please refresh and try again." });
+          setIsSavingPicture(false);
           return;
         }
         if (!storage) {
           toast({ variant: 'destructive', title: 'Storage Error', description: 'Firebase Storage is not configured.' });
+          setIsSavingPicture(false);
           return;
         }
 
-        const storageRef = ref(storage, `avatars/sponsor_profile`);
+        const userId = auth.currentUser.uid;
+        const storageRef = ref(storage, `avatars/${userId}/profile`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
@@ -189,7 +192,7 @@ export default function ProfilePage() {
       });
     } catch (error) {
       console.error("Failed to save picture:", error);
-      toast({ variant: 'destructive', title: "Save Failed", description: "Could not save your profile picture." });
+      toast({ variant: 'destructive', title: "Save Failed", description: "Could not save your profile picture. You may not have permission to perform this action." });
     } finally {
       setIsSavingPicture(false);
     }
