@@ -1,4 +1,6 @@
-import { initializeApp, getApp, type FirebaseApp } from "firebase/app";
+import { initializeApp, getApp, getApps, type FirebaseApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -10,12 +12,10 @@ const firebaseConfig = {
   appId: "1:253736799220:web:f66d274ff02d19207387a1"
 };
 
-// Initialize Firebase
-let app: FirebaseApp;
-try {
-  app = getApp();
-} catch (e) {
-  app = initializeApp(firebaseConfig);
-}
+// Initialize Firebase for client side
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-export const firebaseApp = app;
+const auth = getAuth(app);
+const storage = getStorage(app);
+
+export { app, auth, storage };
