@@ -73,21 +73,6 @@ function InvoicesComponent() {
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
-
-  const fetchInvoiceStatus = useCallback(async (confId: string, invoiceId: string) => {
-    setStatuses(prev => ({ ...prev, [confId]: { ...(prev[confId] || {}), isLoading: true } }));
-      try {
-          const { status } = await getInvoiceStatus({ invoiceId });
-          setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
-      } catch (error) {
-          console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
-          if (error instanceof Error && (error.message.includes('404') || error.message.includes("Not Found"))) {
-              setStatuses(prev => ({ ...prev, [confId]: { status: 'NOT_FOUND', isLoading: false } }));
-          } else {
-              setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
-          }
-      }
-  }, []);
   
   const loadAndProcessInvoices = useCallback(() => {
     let storedData: any[] = [];
@@ -126,31 +111,23 @@ function InvoicesComponent() {
         .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
 
     setAllInvoices(allUniqueInvoices);
+  }, []);
 
-    const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
-    const invoicesToFetchStatus: CombinedInvoice[] = [];
-
-    for (const inv of allUniqueInvoices) {
-        const currentStatus = inv.invoiceStatus?.toUpperCase();
-        const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND'].includes(currentStatus || '');
-        
-        if (inv.invoiceId) {
-            initialStatuses[inv.id] = { status: currentStatus || 'LOADING', isLoading: !currentStatus };
-            if (!isFinalState) {
-                invoicesToFetchStatus.push(inv);
-            }
-        }
-    }
-    setStatuses(initialStatuses);
-    
-    invoicesToFetchStatus.forEach(inv => {
-        if (inv.invoiceId) {
-            fetchInvoiceStatus(inv.id, inv.invoiceId);
-        }
-    });
-  }, [fetchInvoiceStatus]);
-
-
+  const fetchInvoiceStatus = useCallback(async (confId: string, invoiceId: string) => {
+    setStatuses(prev => ({ ...prev, [confId]: { ...(prev[confId] || {}), isLoading: true } }));
+      try {
+          const { status } = await getInvoiceStatus({ invoiceId });
+          setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
+      } catch (error) {
+          console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
+          if (error instanceof Error && (error.message.includes('404') || error.message.includes("Not Found"))) {
+              setStatuses(prev => ({ ...prev, [confId]: { status: 'NOT_FOUND', isLoading: false } }));
+          } else {
+              setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
+          }
+      }
+  }, []);
+  
   useEffect(() => {
     loadAndProcessInvoices();
     
@@ -173,6 +150,7 @@ function InvoicesComponent() {
   }, [allInvoices]);
   
   const filteredInvoices = useMemo(() => {
+    // Wait for profile to be loaded before filtering. The parent component will show a skeleton.
     if (!profile) {
       return [];
     }
@@ -201,6 +179,20 @@ function InvoicesComponent() {
         return true;
     });
   }, [allInvoices, profile, schoolFilter, statusFilter, statuses]);
+
+    useEffect(() => {
+        const invoicesToFetchStatus = filteredInvoices.filter(inv => {
+            const currentStatus = statuses[inv.id]?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
+            const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND'].includes(currentStatus);
+            return inv.invoiceId && !isFinalState && !statuses[inv.id]?.isLoading;
+        });
+
+        if (invoicesToFetchStatus.length > 0) {
+            invoicesToFetchStatus.forEach(inv => {
+                fetchInvoiceStatus(inv.id, inv.invoiceId!);
+            });
+        }
+    }, [filteredInvoices, statuses, fetchInvoiceStatus]);
   
   if (!profile) {
     return (
