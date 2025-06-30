@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
-import { getFirebaseInstances } from '@/lib/firebase';
+import { auth, storage } from '@/lib/firebase';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -127,7 +127,6 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            const { auth, storage } = getFirebaseInstances();
             // Ensure user is authenticated anonymously
             if (!auth.currentUser) {
               await signInAnonymously(auth);
