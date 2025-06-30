@@ -85,8 +85,8 @@ type Confirmation = {
   submissionTimestamp: string;
   selections: RegistrationSelections;
   totalInvoiced: number;
-  invoiceId: string;
-  invoiceUrl: string;
+  invoiceId?: string;
+  invoiceUrl?: string;
   teamCode: string;
   paymentMethod?: PaymentMethod;
   poNumber?: string;
@@ -181,11 +181,15 @@ export default function ConfirmationsPage() {
               paymentFileName: conf.paymentFileName,
               paymentFileUrl: conf.paymentFileUrl,
           };
-          initialStatuses[conf.id] = { status: conf.invoiceStatus || 'LOADING', isLoading: true };
+          if (conf.invoiceId) {
+            initialStatuses[conf.id] = { status: conf.invoiceStatus || 'LOADING', isLoading: true };
+          } else {
+            initialStatuses[conf.id] = { status: 'NO_SQ_INV', isLoading: false };
+          }
       }
       setConfInputs(initialInputs);
       setStatuses(initialStatuses);
-      fetchAllInvoiceStatuses(storedConfirmations);
+      fetchAllInvoiceStatuses(storedConfirmations.filter(c => c.invoiceId));
     } catch (error) {
         console.error("Failed to load or parse confirmations from localStorage", error);
         setConfirmations([]);
@@ -217,6 +221,8 @@ export default function ConfirmationsPage() {
             return 'bg-indigo-500 text-white';
         case 'LOADING':
             return 'bg-muted text-muted-foreground animate-pulse';
+        case 'NO_SQ_INV':
+            return 'bg-gray-400 text-white';
         default:
             return 'bg-muted text-muted-foreground';
     }
@@ -270,7 +276,7 @@ export default function ConfirmationsPage() {
             paymentFileName = inputs.file.name;
         }
         
-        // Step 2: Update Square Invoice Title
+        // Step 2: Update Square Invoice Title if invoice exists
         const teamCode = conf.teamCode || generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
         let newTitle = `${teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName}`;
         let toastMessage = "Payment information has been saved.";
@@ -291,9 +297,11 @@ export default function ConfirmationsPage() {
                 break;
         }
 
-        await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
-        toastMessage = "Payment information has been saved and the invoice has been updated.";
-        fetchInvoiceStatus(conf.id, conf.invoiceId); // Refresh status after update
+        if (conf.invoiceId) {
+            await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
+            toastMessage = "Payment information has been saved and the invoice has been updated.";
+            fetchInvoiceStatus(conf.id, conf.invoiceId); // Refresh status after update
+        }
 
         // Step 3: Update local state and localStorage
         const updatedConfirmations = confirmations.map(c => {
@@ -405,12 +413,12 @@ export default function ConfirmationsPage() {
                         <div className="flex justify-between items-center">
                             <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
                             <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId)} disabled={currentStatus?.isLoading}>
+                                <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId}>
                                     <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} />
                                     Refresh Status
                                 </Button>
-                                <Button asChild variant="outline" size="sm">
-                                    <a href={conf.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                                <Button asChild variant="outline" size="sm" disabled={!conf.invoiceUrl}>
+                                    <a href={conf.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!conf.invoiceUrl && 'pointer-events-none')}>
                                     <ExternalLink className="mr-2 h-4 w-4" /> View Invoice
                                     </a>
                                 </Button>
