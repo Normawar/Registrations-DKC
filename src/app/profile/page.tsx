@@ -36,6 +36,7 @@ import { KingIcon, QueenIcon, RookIcon, BishopIcon, KnightIcon, PawnIcon } from 
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { auth, storage } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, { message: 'First name is required.' }),
@@ -79,6 +80,7 @@ export default function ProfilePage() {
   const [isSavingPicture, setIsSavingPicture] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -106,6 +108,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!auth) {
       setIsAuthReady(false);
+      setAuthError("Firebase is not configured. File uploads are disabled.");
       return;
     }
 
@@ -113,17 +116,22 @@ export default function ProfilePage() {
       if (user) {
         setCurrentUser(user);
         setIsAuthReady(true);
+        setAuthError(null);
       } else {
         signInAnonymously(auth).catch((error) => {
           console.error("Anonymous sign-in failed:", error);
-          toast({ variant: 'destructive', title: 'Authentication Failed', description: 'Could not sign in. File uploads will be disabled.' });
+          if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
+              setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console. Please contact your administrator.");
+          } else {
+              setAuthError("Authentication failed. File uploads are disabled.");
+          }
           setIsAuthReady(false);
         });
       }
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, []);
 
 
   useEffect(() => {
@@ -178,7 +186,8 @@ export default function ProfilePage() {
     try {
       if (activeTab === 'upload' && imageFile) {
         if (!isAuthReady || !currentUser) {
-          toast({ variant: 'destructive', title: 'Authentication Error', description: "Cannot upload file. Please refresh and try again." });
+          const message = authError || "Authentication is not ready. Cannot upload file.";
+          toast({ variant: 'destructive', title: 'Upload Failed', description: message });
           setIsSavingPicture(false);
           return;
         }
@@ -204,7 +213,13 @@ export default function ProfilePage() {
       });
     } catch (error) {
       console.error("Failed to save picture:", error);
-      toast({ variant: 'destructive', title: "Save Failed", description: "Could not save your profile picture. You may not have permission to perform this action." });
+      let description = "Could not save your profile picture.";
+       if (error instanceof Error && (error as any).code === 'storage/unauthorized') {
+          description = "You do not have permission to upload this file. Ensure you are signed in with a full account or check Firebase Storage security rules.";
+      } else if (error instanceof Error) {
+          description = error.message;
+      }
+      toast({ variant: 'destructive', title: "Save Failed", description: description });
     } finally {
       setIsSavingPicture(false);
     }
@@ -249,6 +264,13 @@ export default function ProfilePage() {
             View and edit your account information.
           </p>
         </div>
+        
+        {authError && (
+          <Alert variant="destructive">
+            <AlertTitle>Uploads Disabled</AlertTitle>
+            <AlertDescription>{authError}</AlertDescription>
+          </Alert>
+        )}
 
         <Card>
             <CardHeader>
@@ -271,8 +293,8 @@ export default function ProfilePage() {
                         )}
                     </Avatar>
                      <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavingPicture || !isAuthReady}>
-                        {isSavingPicture ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {isAuthReady ? 'Save Picture' : 'Authenticating...'}
+                        {isSavingPicture || !isAuthReady ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isSavingPicture ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Picture'}
                      </Button>
                 </div>
                 <div className="md:col-span-2">
@@ -301,7 +323,7 @@ export default function ProfilePage() {
                             <p className="text-sm text-muted-foreground mb-4">For best results, upload a square image.</p>
                             <div className="flex gap-2">
                                 <Input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()}>Choose File</Button>
+                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!isAuthReady}>Choose File</Button>
                             </div>
                         </TabsContent>
                     </Tabs>
