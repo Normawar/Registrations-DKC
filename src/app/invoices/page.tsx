@@ -92,7 +92,10 @@ function InvoicesComponent() {
 
   const fetchAllInvoiceStatuses = (invoicesToFetch: CombinedInvoice[]) => {
     invoicesToFetch.forEach(inv => {
-        if (inv.invoiceId && inv.invoiceStatus !== 'PAID' && inv.invoiceStatus !== 'CANCELED' && inv.invoiceStatus !== 'VOIDED' && inv.invoiceStatus !== 'REFUNDED') {
+        const isMock = inv.id.startsWith('org_inv_');
+        const isTerminal = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED'].includes(inv.invoiceStatus?.toUpperCase() || '');
+
+        if (inv.invoiceId && !isMock && !isTerminal) {
             fetchInvoiceStatus(inv.id, inv.invoiceId, true);
         } else {
             setStatuses(prev => ({...prev, [inv.id]: { status: inv.invoiceStatus, isLoading: false }}))
@@ -129,45 +132,56 @@ function InvoicesComponent() {
         if (profile.role === 'organizer') {
             invoicesToDisplay = mockOrganizerInvoices;
         } else { // Sponsor role
-            const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
-
-            const mappedEventInvoices: CombinedInvoice[] = eventConfirmations.map((conf: any) => ({
-                id: conf.id,
-                description: conf.eventName,
-                submissionTimestamp: conf.submissionTimestamp,
-                totalInvoiced: conf.totalInvoiced,
-                invoiceId: conf.invoiceId,
-                invoiceUrl: conf.invoiceUrl,
-                invoiceNumber: conf.invoiceNumber,
-                purchaserName: conf.purchaserName || `${profile.firstName} ${profile.lastName}`,
-                invoiceStatus: conf.invoiceStatus,
-                schoolName: conf.schoolName,
-                district: conf.district,
-            }));
-
-            const mappedMembershipInvoices: CombinedInvoice[] = membershipInvoices.map((inv: any) => ({
-                id: inv.invoiceId,
-                description: `USCF Membership (${inv.membershipType})`,
-                submissionTimestamp: inv.submissionTimestamp,
-                totalInvoiced: inv.totalInvoiced,
-                invoiceId: inv.invoiceId,
-                invoiceUrl: inv.invoiceUrl,
-                invoiceNumber: inv.invoiceNumber,
-                purchaserName: inv.purchaserName,
-                invoiceStatus: inv.status,
-                schoolName: inv.schoolName,
-                district: inv.district,
-            }));
-
-            const allLocalStorageInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices];
-            const sponsorSchoolInvoices = allLocalStorageInvoices.filter(inv => inv.schoolName === profile.school);
-            const organizerCreatedInvoices = mockOrganizerInvoices.filter(inv => inv.schoolName === profile.school);
+            // 1. Organizer-created invoices for this sponsor's school
+            const organizerCreatedForSponsor = mockOrganizerInvoices.filter(
+                inv => inv.schoolName === profile.school
+            );
             
-            const allPossibleInvoices = [...sponsorSchoolInvoices, ...organizerCreatedInvoices];
+            // 2. Event registration invoices from local storage
+            const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+            const sponsorEventInvoices: CombinedInvoice[] = eventConfirmations
+                .filter((conf: any) => conf.schoolName === profile.school)
+                .map((conf: any) => ({
+                    id: conf.id,
+                    description: conf.eventName,
+                    submissionTimestamp: conf.submissionTimestamp,
+                    totalInvoiced: conf.totalInvoiced,
+                    invoiceId: conf.invoiceId,
+                    invoiceUrl: conf.invoiceUrl,
+                    invoiceNumber: conf.invoiceNumber,
+                    purchaserName: conf.purchaserName || `${profile.firstName} ${profile.lastName}`,
+                    invoiceStatus: conf.invoiceStatus,
+                    schoolName: conf.schoolName,
+                    district: conf.district,
+                }));
+
+            // 3. USCF Membership invoices from local storage
+            const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
+            const sponsorMembershipInvoices: CombinedInvoice[] = membershipInvoices
+                .filter((inv: any) => inv.schoolName === profile.school)
+                .map((inv: any) => ({
+                    id: inv.invoiceId, // Use invoiceId as the unique key
+                    description: `USCF Membership (${inv.membershipType})`,
+                    submissionTimestamp: inv.submissionTimestamp,
+                    totalInvoiced: inv.totalInvoiced,
+                    invoiceId: inv.invoiceId,
+                    invoiceUrl: inv.invoiceUrl,
+                    invoiceNumber: inv.invoiceNumber,
+                    purchaserName: inv.purchaserName,
+                    invoiceStatus: inv.status,
+                    schoolName: inv.schoolName,
+                    district: inv.district,
+                }));
+            
+            const allPossibleInvoices = [
+                ...organizerCreatedForSponsor,
+                ...sponsorEventInvoices,
+                ...sponsorMembershipInvoices
+            ];
             
             const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
             for (const inv of allPossibleInvoices) {
+                // Use invoiceId for uniqueness if available, otherwise the local id
                 const key = inv.invoiceId || inv.id;
                 if (!uniqueInvoicesMap.has(key)) {
                     uniqueInvoicesMap.set(key, inv);
@@ -342,7 +356,7 @@ function InvoicesComponent() {
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId} title="Refresh Status">
+                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId || inv.id.startsWith('org_inv_')} title="Refresh Status">
                                                 <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
