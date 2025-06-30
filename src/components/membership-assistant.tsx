@@ -1,10 +1,11 @@
+
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, isValid, parse } from "date-fns";
 import {
   Card,
   CardHeader,
@@ -33,6 +34,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 const formSchema = z.object({
   dob: z.date({ required_error: "Date of birth is required." }),
@@ -94,43 +96,79 @@ export function MembershipAssistant() {
               <FormField
                 control={form.control}
                 name="dob"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Date of Birth</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          disabled={(date) =>
-                            date > new Date() || date < new Date("1900-01-01")
-                          }
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const [inputValue, setInputValue] = useState<string>(
+                    field.value ? format(field.value, "MM/dd/yyyy") : ""
+                  );
+                  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+                  useEffect(() => {
+                    if (field.value) {
+                      setInputValue(format(field.value, "MM/dd/yyyy"));
+                    } else {
+                      setInputValue("");
+                    }
+                  }, [field.value]);
+
+                  const handleBlur = () => {
+                    const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                    if (isValid(parsedDate)) {
+                      if (parsedDate <= new Date() && parsedDate >= new Date("1900-01-01")) {
+                        field.onChange(parsedDate);
+                      } else {
+                        setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : "");
+                      }
+                    } else {
+                      if (inputValue === "") {
+                        field.onChange(undefined);
+                      } else {
+                        setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : "");
+                      }
+                    }
+                  };
+                  
+                  return (
+                    <FormItem>
+                      <FormLabel>Your Date of Birth</FormLabel>
+                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <div className="relative">
+                          <FormControl>
+                            <Input
+                              placeholder="MM/DD/YYYY"
+                              value={inputValue}
+                              onChange={(e) => setInputValue(e.target.value)}
+                              onBlur={handleBlur}
+                            />
+                          </FormControl>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant={"ghost"}
+                              className="absolute right-0 top-0 h-full w-10 p-0 font-normal"
+                              aria-label="Open calendar"
+                            >
+                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </PopoverTrigger>
+                        </div>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={field.value}
+                            onSelect={(date) => {
+                              field.onChange(date);
+                              setIsCalendarOpen(false);
+                            }}
+                            disabled={(date) =>
+                              date > new Date() || date < new Date("1900-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               <FormField
                 control={form.control}

@@ -36,7 +36,7 @@ const menuItems = [
   { href: "/events", icon: RookIcon, label: "Register for event" },
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
-  { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
+  { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
 ];
 
 const icons: { [key: string]: React.ElementType } = {
