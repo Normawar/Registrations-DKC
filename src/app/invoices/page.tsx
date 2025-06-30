@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
@@ -73,6 +72,7 @@ function InvoicesComponent() {
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
+  const [isLoading, setIsLoading] = useState(true);
   
   const fetchInvoiceStatus = useCallback(async (confId: string, invoiceId: string, silent = false) => {
       if (!silent) {
@@ -100,6 +100,7 @@ function InvoicesComponent() {
   }, [fetchInvoiceStatus]);
 
   const loadInvoices = useCallback(() => {
+    setIsLoading(true);
     let allInvoicesData: any[] = [];
     try {
         const storedInvoices = localStorage.getItem('all_invoices');
@@ -158,6 +159,7 @@ function InvoicesComponent() {
     });
     
     fetchAllInvoiceStatuses(invoicesToFetch);
+    setIsLoading(false);
 
   }, [fetchAllInvoiceStatuses]);
 
@@ -241,7 +243,7 @@ function InvoicesComponent() {
     return invoices;
   }, [allInvoices, statuses, statusFilter, schoolFilter, profile]);
   
-  if (!profile) {
+  if (isLoading || !profile) {
     return (
         <AppLayout>
             <div className="space-y-4">
@@ -339,7 +341,7 @@ function InvoicesComponent() {
                     <TableBody>
                         {filteredInvoices.map((inv) => {
                             const currentStatus = statuses[inv.id];
-                            const isLoading = currentStatus?.isLoading;
+                            const isStatusLoading = currentStatus?.isLoading;
                             
                             return (
                                 <TableRow key={inv.id}>
@@ -350,13 +352,13 @@ function InvoicesComponent() {
                                     <TableCell>${inv.totalInvoiced.toFixed(2)}</TableCell>
                                     <TableCell>
                                         <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus?.status || inv.invoiceStatus))}>
-                                            {isLoading ? 'Loading...' : getStatusDisplayName(currentStatus?.status || inv.invoiceStatus)}
+                                            {isStatusLoading ? 'Loading...' : getStatusDisplayName(currentStatus?.status || inv.invoiceStatus)}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId} title="Refresh Status">
-                                                <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isStatusLoading || !inv.invoiceId} title="Refresh Status">
+                                                <RefreshCw className={cn("h-4 w-4", isStatusLoading && "animate-spin")} />
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
                                             <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl}>
@@ -386,3 +388,5 @@ export default function InvoicesPage() {
         </Suspense>
     )
 }
+
+    
