@@ -3,7 +3,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   SidebarProvider,
   Sidebar,
@@ -75,7 +75,14 @@ const icons: { [key: string]: React.ElementType } = {
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { profile } = useSponsorProfile();
+
+  const handleLogout = () => {
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('sponsor_profile');
+    router.push('/');
+  };
 
   const menuItems = 
     profile?.role === 'organizer' ? organizerMenuItems :
@@ -173,16 +180,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   {profile ? profile.email : 'user@chessmate.com'}
                 </p>
               </div>
-               <Link href="/" passHref>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="group-data-[collapsible=icon]:w-10"
                     aria-label="Log out"
+                    onClick={handleLogout}
                   >
                     <LogOut className="h-5 w-5" />
                   </Button>
-               </Link>
             </div>
           </SidebarFooter>
         </Sidebar>
