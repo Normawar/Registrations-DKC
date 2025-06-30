@@ -112,7 +112,11 @@ function InvoicesComponent() {
           setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
-          setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
+          if (error instanceof Error && error.message.includes('404')) {
+              setStatuses(prev => ({ ...prev, [confId]: { status: 'NOT_FOUND', isLoading: false } }));
+          } else {
+              setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
+          }
           if (!silent) {
             const description = error instanceof Error ? error.message : "Failed to get the latest invoice status from Square.";
             toast({
@@ -221,6 +225,7 @@ function InvoicesComponent() {
         case 'PAYMENT_PENDING': return 'bg-purple-500 text-white';
         case 'REFUNDED': case 'PARTIALLY_REFUNDED': return 'bg-indigo-500 text-white';
         case 'LOADING': return 'bg-muted text-muted-foreground animate-pulse';
+        case 'NOT_FOUND': return 'bg-destructive/80 text-white';
         default: return 'bg-muted text-muted-foreground';
     }
   };
