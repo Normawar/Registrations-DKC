@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Looks up a USCF player by their ID from the USCF MSA website.
@@ -32,13 +33,20 @@ const lookupPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `You are an expert at extracting structured data from a single line of text representing a USCF player's record.
-Your ONLY source of information is the text provided below.
+    prompt: `You are an expert at extracting structured data from a text block representing a USCF player's record.
+Your ONLY source of information is the text provided below. The data is in a fixed-width format.
 
-Extract the following fields:
-- **fullName**: The player's name.
-- **rating**: The player's regular rating.
-- **expirationDate**: The membership expiration date in YYYY-MM-DD format.
+The data is presented in a block of text. Here is an example of the format:
+---------------------------------------------------------------------------------------
+USCF ID : 12345678      Name : DOE, JOHN M                             Address: ANYTOWN, TX 12345
+---------------------------------------------------------------------------------------
+ Birth : 1990-01-01  Sex : M   Federation:      Rating: 1500  Expires: 2025-12-31   Updated: 2024-01-01
+---------------------------------------------------------------------------------------
+
+From the text block provided, extract the following fields:
+- **fullName**: The player's name, as it appears after "Name :".
+- **rating**: The player's regular rating, as it appears after "Rating:".
+- **expirationDate**: The membership expiration date, as it appears after "Expires:". The format must be YYYY-MM-DD.
 
 If the input text contains the exact phrase "This player is not in our database", you must set the 'error' field in your output to "Player not found with this USCF ID." and leave all other fields empty.
 

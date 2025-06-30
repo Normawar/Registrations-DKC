@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF website.
@@ -37,20 +38,20 @@ export async function searchUscfPlayers(input: SearchUscfPlayersInput): Promise<
 
 const searchPrompt = ai.definePrompt({
     name: 'searchUscfPlayersPrompt',
-    // Use a more powerful model for this specific, difficult parsing task.
     model: 'googleai/gemini-1.5-pro-latest', 
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
     prompt: `You are an expert at extracting structured player data from raw HTML.
-Your task is to parse the provided HTML content and extract all player search results into the format specified by the output schema.
+Your task is to parse the provided HTML content. First, find the main data table which contains table headers (using <th> or <td> tags in a header row) for 'ID', 'Name', and 'St'. The header row might have a class like 'header'.
+Then, for each data row (<tr>) in that table, extract the player search results into the format specified by the output schema.
 
-- The data is in a <table>.
-- **uscfId**: The player's 8-digit ID.
-- **fullName**: The player's full name.
-- **rating**: The player's rating. If 'UNR', the value should be null.
-- **state**: The player's state abbreviation.
+- **uscfId**: The player's 8-digit ID. This is in the first column.
+- **fullName**: The player's full name, from the 'Name' column. This will be in the format "LAST, FIRST MI".
+- **rating**: The player's rating. This is from the 'Reg' rating column. If the value is 'UNR', the output for rating should be null.
+- **state**: The player's two-letter state abbreviation, from the 'St' column.
 
 If the HTML contains the phrase "No players found", you MUST return an empty \`players\` array.
+If you cannot find the data table with the specified headers, you must also return an empty \`players\` array.
 
 HTML to parse:
 \`\`\`
