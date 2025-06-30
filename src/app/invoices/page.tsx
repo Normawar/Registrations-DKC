@@ -75,7 +75,6 @@ const sampleInvoices: CombinedInvoice[] = [
     description: 'New Organizer Invoice (Test)',
     submissionTimestamp: new Date().toISOString(),
     totalInvoiced: 175.50,
-    invoiceUrl: 'https://squareup.com/dashboard/invoices',
     purchaserName: 'Sponsor Name',
     invoiceStatus: 'PUBLISHED',
     schoolName: 'SHARYLAND PIONEER H S',
@@ -88,7 +87,6 @@ const sampleInvoices: CombinedInvoice[] = [
     description: 'New USCF Membership Invoice (Test)',
     submissionTimestamp: new Date().toISOString(),
     totalInvoiced: 48.00,
-    invoiceUrl: 'https://squareup.com/dashboard/invoices',
     purchaserName: 'Sponsor Name',
     invoiceStatus: 'PAID',
     schoolName: 'SHARYLAND PIONEER H S',
@@ -101,7 +99,6 @@ const sampleInvoices: CombinedInvoice[] = [
     description: 'Fall Classic 2024 Registration',
     submissionTimestamp: new Date('2024-05-15T10:00:00Z').toISOString(),
     totalInvoiced: 125.00,
-    invoiceUrl: 'https://squareup.com/dashboard/invoices',
     purchaserName: 'John Doe',
     invoiceStatus: 'PAID',
     schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
@@ -114,7 +111,6 @@ const sampleInvoices: CombinedInvoice[] = [
     description: 'USCF Membership (Youth)',
     submissionTimestamp: new Date('2024-05-18T14:30:00Z').toISOString(),
     totalInvoiced: 24.00,
-    invoiceUrl: 'https://squareup.com/dashboard/invoices',
     purchaserName: 'Jane Smith',
     invoiceStatus: 'PUBLISHED',
     schoolName: 'MCALLEN H S', // Different school
@@ -127,7 +123,6 @@ const sampleInvoices: CombinedInvoice[] = [
     description: 'Club T-Shirt Order',
     submissionTimestamp: new Date('2024-05-20T11:00:00Z').toISOString(),
     totalInvoiced: 250.00,
-    invoiceUrl: 'https://squareup.com/dashboard/invoices',
     purchaserName: 'Sponsor Name',
     invoiceStatus: 'UNPAID',
     schoolName: 'SHARYLAND PIONEER H S', // Match sponsor's school
@@ -140,7 +135,6 @@ const sampleInvoices: CombinedInvoice[] = [
     description: 'Spring Scholastic 2024',
     submissionTimestamp: new Date('2024-04-10T09:00:00Z').toISOString(),
     totalInvoiced: 80.00,
-    invoiceUrl: 'https://squareup.com/dashboard/invoices',
     purchaserName: 'Bob Johnson',
     invoiceStatus: 'PAID',
     schoolName: 'EDINBURG H S', // Different school
