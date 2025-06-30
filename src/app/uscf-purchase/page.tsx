@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, Suspense, ReactNode } from 'react';
@@ -181,7 +180,10 @@ function UscfPurchaseComponent() {
         }
 
         try {
-            const playersToInvoice = values.players.map(p => ({ playerName: `${p.firstName} ${p.middleName || ''} ${p.lastName}`.replace(/\s+/g, ' ').trim() }));
+            const playersToInvoice = values.players.map(p => ({
+                ...p,
+                dob: p.dob.toISOString(),
+            }));
             const result = await createMembershipInvoice({
                 purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 purchaserEmail: sponsorProfile.email,

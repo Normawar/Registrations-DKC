@@ -12,9 +12,16 @@ import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError } from 'square';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
+import { format } from 'date-fns';
 
 const PlayerInfoSchema = z.object({
-  playerName: z.string().describe('The full name of the player receiving the membership.'),
+  firstName: z.string().describe('The first name of the player.'),
+  middleName: z.string().optional().describe('The middle name of the player.'),
+  lastName: z.string().describe('The last name of the player.'),
+  email: z.string().email().describe('The email of the player.'),
+  phone: z.string().optional().describe('The phone number of the player.'),
+  dob: z.string().describe("The player's date of birth in ISO 8601 format."),
+  zipCode: z.string().describe("The player's zip code."),
 });
 
 const CreateMembershipInvoiceInputSchema = z.object({
@@ -86,14 +93,28 @@ const createMembershipInvoiceFlow = ai.defineFlow(
       }
       
       // Create an Order
-      const lineItems = input.players.map(player => ({
-        name: `USCF Membership (${input.membershipType}) for ${player.playerName}`,
-        quantity: '1',
-        basePriceMoney: {
-          amount: BigInt(Math.round(input.fee * 100)),
-          currency: 'USD',
-        },
-      }));
+      const lineItems = input.players.map(player => {
+        const playerName = `${player.firstName} ${player.middleName || ''} ${player.lastName}`.replace(/\s+/g, ' ').trim();
+        
+        const noteParts = [
+            `Email: ${player.email}`,
+            `DOB: ${format(new Date(player.dob), 'MM/dd/yyyy')}`,
+            `ZIP: ${player.zipCode}`,
+        ];
+        if (player.phone) {
+            noteParts.push(`Phone: ${player.phone}`);
+        }
+
+        return {
+          name: `USCF Membership (${input.membershipType}) for ${playerName}`,
+          quantity: '1',
+          basePriceMoney: {
+            amount: BigInt(Math.round(input.fee * 100)),
+            currency: 'USD',
+          },
+          note: noteParts.join(' | '),
+        };
+      });
 
       console.log("Creating order with line items:", JSON.stringify(lineItems, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
       const createOrderResponse = await ordersApi.createOrder({
@@ -112,9 +133,10 @@ const createMembershipInvoiceFlow = ai.defineFlow(
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 7); // Invoice due in 7 days
 
+      const firstPlayerName = `${input.players[0].firstName} ${input.players[0].middleName || ''} ${input.players[0].lastName}`.replace(/\s+/g, ' ').trim();
       const title = input.players.length > 1
         ? `USCF Membership for ${input.players.length} players`
-        : `USCF Membership for ${input.players[0].playerName}`;
+        : `USCF Membership for ${firstPlayerName}`;
 
       console.log(`Creating invoice for order ID: ${orderId}`);
       const createInvoiceResponse = await invoicesApi.createInvoice({
