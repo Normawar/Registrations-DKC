@@ -27,6 +27,7 @@ const PlayerInfoSchema = z.object({
 const CreateMembershipInvoiceInputSchema = z.object({
     purchaserName: z.string().describe('The name of the person paying for the membership.'),
     purchaserEmail: z.string().email().describe('The email of the person paying for the membership.'),
+    schoolName: z.string().describe('The name of the school associated with the purchaser.'),
     membershipType: z.string().describe('The type of USCF membership being purchased.'),
     fee: z.number().describe('The cost of the membership.'),
     players: z.array(PlayerInfoSchema).describe('An array of players receiving the membership.'),
@@ -87,6 +88,7 @@ const createMembershipInvoiceFlow = ai.defineFlow(
           givenName: firstName,
           familyName: lastNameParts.join(' '),
           emailAddress: input.purchaserEmail,
+          note: input.schoolName,
         });
         customerId = createCustomerResponse.result.customer!.id!;
         console.log(`Created new customer with ID: ${customerId}`);

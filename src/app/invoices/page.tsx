@@ -140,7 +140,7 @@ function InvoicesComponent() {
                 invoiceId: conf.invoiceId,
                 invoiceUrl: conf.invoiceUrl,
                 invoiceNumber: conf.invoiceNumber,
-                purchaserName: `${profile.firstName} ${profile.lastName}`,
+                purchaserName: conf.purchaserName || `${profile.firstName} ${profile.lastName}`,
                 invoiceStatus: conf.invoiceStatus,
                 schoolName: conf.schoolName,
                 district: conf.district,

@@ -200,6 +200,7 @@ function UscfPurchaseComponent() {
             const result = await createMembershipInvoice({
                 purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 purchaserEmail: sponsorProfile.email,
+                schoolName: sponsorProfile.school,
                 membershipType: membershipType,
                 fee: price,
                 players: playersToInvoice

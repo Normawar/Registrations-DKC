@@ -24,6 +24,7 @@ const PlayerInvoiceInfoSchema = z.object({
 const CreateInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
+    schoolName: z.string().describe('The name of the school associated with the sponsor.'),
     teamCode: z.string().describe('The team code of the sponsor.'),
     eventName: z.string().describe('The name of the event.'),
     eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
@@ -82,6 +83,7 @@ const createInvoiceFlow = ai.defineFlow(
           givenName: firstName,
           familyName: lastNameParts.join(' '),
           emailAddress: input.sponsorEmail,
+          note: input.schoolName,
         });
         customerId = createCustomerResponse.result.customer!.id!;
         console.log(`Created new customer with ID: ${customerId}`);

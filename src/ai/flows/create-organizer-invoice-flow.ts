@@ -78,6 +78,7 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
           givenName: firstName,
           familyName: lastNameParts.join(' '),
           emailAddress: input.sponsorEmail,
+          note: input.schoolName,
         });
         customerId = createCustomerResponse.result.customer!.id!;
         console.log(`Created new customer with ID: ${customerId}`);

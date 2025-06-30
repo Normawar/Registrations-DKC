@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, ReactNode } from 'react';
@@ -255,6 +254,7 @@ export default function EventsPage() {
             const { invoiceId, invoiceUrl, status, invoiceNumber } = await createInvoice({
                 sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 sponsorEmail: sponsorProfile.email,
+                schoolName: sponsorProfile.school,
                 teamCode: teamCode,
                 eventName: selectedEvent.name,
                 eventDate: selectedEvent.date,
@@ -274,7 +274,7 @@ export default function EventsPage() {
                 invoiceNumber,
                 teamCode: teamCode,
                 invoiceStatus: status,
-                sponsorEmail: sponsorProfile.email,
+                purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 schoolName: sponsorProfile.school,
                 district: sponsorProfile.district,
             };
