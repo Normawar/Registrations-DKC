@@ -331,6 +331,11 @@ export default function ConfirmationsPage() {
                                   onChange={(e) => handlePoFileChange(conf.id, e)}
                                   disabled={isUpdating[conf.id] || !isFirebaseConfigured}
                                 />
+                                {!isFirebaseConfigured && (
+                                  <p className="text-xs text-muted-foreground pt-1">
+                                    To enable uploads, add your Firebase credentials to the <code>.env</code> file and restart the server.
+                                  </p>
+                                )}
                                 {poInputs[conf.id]?.file ? (
                                     <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
                                         <FileIcon className="h-4 w-4" />
