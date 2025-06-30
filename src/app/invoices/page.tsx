@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, Suspense, useCallback } from 'react';
@@ -72,7 +73,6 @@ function InvoicesComponent() {
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
-  const [isLoading, setIsLoading] = useState(true);
   
   const fetchInvoiceStatus = useCallback(async (confId: string, invoiceId: string, silent = false) => {
       if (!silent) {
@@ -91,16 +91,7 @@ function InvoicesComponent() {
       }
   }, []);
   
-  const fetchAllInvoiceStatuses = useCallback((invoicesToFetch: CombinedInvoice[]) => {
-      invoicesToFetch.forEach(inv => {
-          if (inv.invoiceId) {
-              fetchInvoiceStatus(inv.id, inv.invoiceId, true);
-          }
-      });
-  }, [fetchInvoiceStatus]);
-
   const loadInvoices = useCallback(() => {
-    setIsLoading(true);
     let allInvoicesData: any[] = [];
     try {
         const storedInvoices = localStorage.getItem('all_invoices');
@@ -158,10 +149,12 @@ function InvoicesComponent() {
         return inv.invoiceId && !isFinalState;
     });
     
-    fetchAllInvoiceStatuses(invoicesToFetch);
-    setIsLoading(false);
-
-  }, [fetchAllInvoiceStatuses]);
+    invoicesToFetch.forEach(inv => {
+        if (inv.invoiceId) {
+            fetchInvoiceStatus(inv.id, inv.invoiceId, true);
+        }
+    });
+  }, [fetchInvoiceStatus]);
 
   useEffect(() => {
     loadInvoices();
@@ -184,31 +177,6 @@ function InvoicesComponent() {
     return ['ALL', ...Array.from(schools).filter(Boolean).sort()];
   }, [allInvoices]);
   
-
-  const getStatusBadgeVariant = (status?: string): string => {
-    if (!status) return 'bg-gray-400';
-    switch (status.toUpperCase()) {
-        case 'PAID': return 'bg-green-600 text-white';
-        case 'DRAFT': return 'bg-gray-500';
-        case 'PUBLISHED':
-        case 'UNPAID': 
-        case 'PARTIALLY_PAID': return 'bg-yellow-500 text-black';
-        case 'CANCELED': case 'VOIDED': case 'FAILED': return 'bg-red-600 text-white';
-        case 'PAYMENT_PENDING': return 'bg-purple-500 text-white';
-        case 'REFUNDED': case 'PARTIALLY_REFUNDED': return 'bg-indigo-500 text-white';
-        case 'LOADING': return 'bg-muted text-muted-foreground animate-pulse';
-        case 'NO_INVOICE': return 'bg-slate-400 text-white';
-        case 'NOT_FOUND': return 'bg-destructive/80 text-white';
-        default: return 'bg-muted text-muted-foreground';
-    }
-  };
-
-  const getStatusDisplayName = (status?: string): string => {
-    if (!status) return 'Unknown';
-    if (status.toUpperCase() === 'PUBLISHED') return 'unpaid';
-    if (status.toUpperCase() === 'NO_INVOICE') return 'No Invoice';
-    return status.replace(/_/g, ' ').toLowerCase();
-  };
 
   const filteredInvoices = useMemo(() => {
     if (!profile) {
@@ -243,7 +211,7 @@ function InvoicesComponent() {
     return invoices;
   }, [allInvoices, statuses, statusFilter, schoolFilter, profile]);
   
-  if (isLoading || !profile) {
+  if (!profile) {
     return (
         <AppLayout>
             <div className="space-y-4">
@@ -261,6 +229,31 @@ function InvoicesComponent() {
         </AppLayout>
     )
   }
+
+  const getStatusBadgeVariant = (status?: string): string => {
+    if (!status) return 'bg-gray-400';
+    switch (status.toUpperCase()) {
+        case 'PAID': return 'bg-green-600 text-white';
+        case 'DRAFT': return 'bg-gray-500';
+        case 'PUBLISHED':
+        case 'UNPAID': 
+        case 'PARTIALLY_PAID': return 'bg-yellow-500 text-black';
+        case 'CANCELED': case 'VOIDED': case 'FAILED': return 'bg-red-600 text-white';
+        case 'PAYMENT_PENDING': return 'bg-purple-500 text-white';
+        case 'REFUNDED': case 'PARTIALLY_REFUNDED': return 'bg-indigo-500 text-white';
+        case 'LOADING': return 'bg-muted text-muted-foreground animate-pulse';
+        case 'NO_INVOICE': return 'bg-slate-400 text-white';
+        case 'NOT_FOUND': return 'bg-destructive/80 text-white';
+        default: return 'bg-muted text-muted-foreground';
+    }
+  };
+
+  const getStatusDisplayName = (status?: string): string => {
+    if (!status) return 'Unknown';
+    if (status.toUpperCase() === 'PUBLISHED') return 'unpaid';
+    if (status.toUpperCase() === 'NO_INVOICE') return 'No Invoice';
+    return status.replace(/_/g, ' ').toLowerCase();
+  };
 
   return (
     <AppLayout>
@@ -388,5 +381,3 @@ export default function InvoicesPage() {
         </Suspense>
     )
 }
-
-    
