@@ -40,27 +40,50 @@ const searchPrompt = ai.definePrompt({
     name: 'searchUscfPlayersPrompt',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing structured HTML.
+    prompt: `You are an expert at parsing structured HTML into JSON.
 The provided text is the HTML content of a USCF player search results page.
-Your task is to extract the details for each player listed in the results table.
+Your task is to find the table of players and extract the details for each player into a JSON object matching the provided schema.
 
-The table to parse follows a \`<h3>Player Search Results</h3>\` heading.
-The table's header row has a \`class="header"\` attribute and these 10 columns in order: USCF ID, Rating, Q Rtg, BL Rtg, OL R, OL Q, OL BL, State, Exp Date, Name.
-Each data row (\`<tr>\`) after the header represents a single player.
+The table to parse is the one that immediately follows a \`<h3>Player Search Results</h3>\` heading.
+The player data is contained within \`<tr>\` elements. The header row (\`<tr class="header">\`) should be ignored.
 
-Your parsing rules:
-1.  Iterate through each \`<tr>\` in the results table, skipping the header row.
-2.  For each player row, extract the following information from the \`<td>\` cells:
-    - **uscfId**: From the first cell. This is the 8-digit number inside the \`<a>\` tag's href attribute.
-    - **rating**: From the second cell. This is the player's regular rating.
-        - If the value is a number (e.g., "1111"), use that number.
-        - If the value is a provisional rating (e.g., "417/5"), extract the number before the slash (e.g., 417).
-        - If the value is "Unrated" or not a number, the rating should be \`undefined\`. Do not use 0 for unrated.
-    - **state**: From the eighth cell. This is the two-letter state abbreviation.
-    - **fullName**: From the tenth cell. This is the player's name, which will be in "LAST, FIRST" format.
-3.  Collect all found players into the \`players\` array. Do not invent players. If the text indicates "No players found", you must return an empty \`players\` array.
+For each data row, extract the following information:
+- **uscfId**: The 8-digit number from the link in the first \`<td>\`.
+- **rating**: The regular rating from the second \`<td>\`. If it's provisional (e.g., "417/5"), use the number before the slash. If it's "Unrated" or not a number, the rating should be \`undefined\`.
+- **state**: The two-letter state abbreviation from the eighth \`<td>\`.
+- **fullName**: The player's name from the tenth \`<td>\`.
 
-Here is the HTML content to parse:
+Here is an example of how to map a single HTML row to the desired JSON output:
+
+**Example HTML:**
+\`\`\`html
+<tr class="section">
+    <td><a href="MbrDtlMain.php?12345678">12345678</a></td>
+    <td align="center">1500</td>
+    <td align="center">1450</td>
+    <td align="center"></td>
+    <td align="center"></td>
+    <td align="center"></td>
+    <td align="center"></td>
+    <td align="center">TX</td>
+    <td align="center">2025-12-31</td>
+    <td>DOE, JOHN</td>
+</tr>
+\`\`\`
+
+**Corresponding JSON entry for the \`players\` array:**
+\`\`\`json
+{
+  "uscfId": "12345678",
+  "fullName": "DOE, JOHN",
+  "rating": 1500,
+  "state": "TX"
+}
+\`\`\`
+
+Now, parse the following HTML and provide the full JSON output. Do not invent players. If the HTML indicates "No players found", you must return an empty \`players\` array.
+
+HTML to parse:
 {{{_input}}}`
 });
 
