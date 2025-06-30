@@ -5,9 +5,8 @@ import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { onAuthStateChanged, type User } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
 import { Button } from '@/components/ui/button';
@@ -114,7 +113,6 @@ const ProfilePageSkeleton = () => (
 
 
 export default function ProfilePage() {
-  const router = useRouter();
   const { toast } = useToast();
   const { profile, updateProfile } = useSponsorProfile();
   
@@ -126,9 +124,8 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'icon' | 'upload'>('icon');
   const [isSavingPicture, setIsSavingPicture] = useState(false);
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -155,25 +152,28 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!auth) {
-      setAuthError("Firebase is not configured. File uploads are disabled.");
-      setIsLoading(false);
-      return;
+        setIsAuthReady(false);
+        setAuthError("Firebase is not configured correctly. Please check your .env file.");
+        return;
     }
-
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(user);
-        setIsLoading(false);
-        setAuthError(null);
-      } else {
-        // User is not logged in, redirect to the login page.
-        router.push('/');
-      }
+        if (user) {
+            setIsAuthReady(true);
+            setAuthError(null);
+        } else {
+            signInAnonymously(auth).catch((error) => {
+                console.error("Anonymous sign-in failed:", error);
+                 if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
+                    setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console.");
+                } else {
+                    setAuthError("An authentication error occurred. File uploads are disabled.");
+                }
+                setIsAuthReady(false);
+            });
+        }
     });
-
     return () => unsubscribe();
-  }, [router]);
-
+  }, []);
 
   useEffect(() => {
     if (profile) {
@@ -225,8 +225,9 @@ export default function ProfilePage() {
   const handleSavePicture = async () => {
     setIsSavingPicture(true);
     try {
-      if (!currentUser) {
-          toast({ variant: 'destructive', title: 'Authentication Error', description: "You must be logged in to save changes." });
+      if (!isAuthReady) {
+          const message = authError || "Authentication is not ready. Cannot upload files.";
+          toast({ variant: 'destructive', title: 'Upload Failed', description: message });
           setIsSavingPicture(false);
           return;
       }
@@ -237,8 +238,7 @@ export default function ProfilePage() {
       }
       
       if (activeTab === 'upload' && imageFile) {
-        const userId = currentUser.uid;
-        const storageRef = ref(storage, `avatars/${userId}/profile`);
+        const storageRef = ref(storage, `avatars/${Date.now()}-${imageFile.name}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
@@ -295,13 +295,15 @@ export default function ProfilePage() {
   const selectedDistrict = profileForm.watch('district');
   const SelectedIconComponent = selectedIconName ? icons[selectedIconName] : null;
 
-  if (isLoading) {
+  if (!isAuthReady) {
     return (
         <AppLayout>
             <ProfilePageSkeleton />
         </AppLayout>
     );
   }
+  
+  const isSavePictureDisabled = isSavingPicture || !isAuthReady;
 
   return (
     <AppLayout>
@@ -340,7 +342,7 @@ export default function ProfilePage() {
                             </AvatarFallback>
                         )}
                     </Avatar>
-                     <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavingPicture || !currentUser}>
+                     <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavePictureDisabled}>
                         {isSavingPicture ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         {isSavingPicture ? 'Saving...' : 'Save Picture'}
                      </Button>
@@ -349,7 +351,7 @@ export default function ProfilePage() {
                     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'icon' | 'upload')}>
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="icon">Choose Icon</TabsTrigger>
-                            <TabsTrigger value="upload" disabled={!currentUser}>Upload Photo</TabsTrigger>
+                            <TabsTrigger value="upload" disabled={!isAuthReady}>Upload Photo</TabsTrigger>
                         </TabsList>
                         <TabsContent value="icon" className="pt-4">
                             <p className="text-sm text-muted-foreground mb-4">Select a chess piece as your avatar.</p>
@@ -371,7 +373,7 @@ export default function ProfilePage() {
                             <p className="text-sm text-muted-foreground mb-4">For best results, upload a square image.</p>
                             <div className="flex gap-2">
                                 <Input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!currentUser}>Choose File</Button>
+                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!isAuthReady}>Choose File</Button>
                             </div>
                         </TabsContent>
                     </Tabs>
