@@ -16,7 +16,7 @@ let auth: Auth | null = null;
 let storage: FirebaseStorage | null = null;
 
 // This check prevents Firebase from trying to initialize with placeholder values
-const isFirebaseConfigured = firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("YOUR_API_KEY");
+const isFirebaseConfigured = firebaseConfig.apiKey && !firebaseConfig.apiKey.includes("AIza");
 
 if (isFirebaseConfigured) {
     try {
