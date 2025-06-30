@@ -29,19 +29,18 @@ export async function lookupUscfPlayer(input: LookupUscfPlayerInput): Promise<Lo
 
 const lookupPrompt = ai.definePrompt({
     name: 'lookupUscfPlayerPrompt',
+    model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `You are an expert at extracting structured data from a single line of text.
-Parse the following text content, which represents a USCF player's record.
+    prompt: `You are an expert at extracting structured data from a single line of text representing a USCF player's record.
+Your ONLY source of information is the text provided below.
 
-The text is structured like this: <8-digit-ID><spaces><LASTNAME, FIRSTNAME><spaces><STATE> Exp:<YYYY-MM-DD>     Regular Rating:  <RATING>
+From the text, extract the following fields:
+- **fullName**: The player's name, which is typically in "LASTNAME, FIRSTNAME" format.
+- **rating**: The number immediately following the text "Regular Rating:". It must be a number.
+- **expirationDate**: The date in YYYY-MM-DD format that immediately follows "Exp:".
 
-From the text, extract:
-- **fullName**: The player's name, located between the ID and the state abbreviation.
-- **rating**: The number that follows "Regular Rating:".
-- **expirationDate**: The date in YYYY-MM-DD format that follows "Exp:".
-
-If the input text contains the phrase "This player is not in our database", you must set the 'error' field in your output to "Player not found with this USCF ID." and leave the other fields empty.
+If the input text contains the exact phrase "This player is not in our database", you must set the 'error' field in your output to "Player not found with this USCF ID." and leave all other fields empty. Do not parse any other data if this phrase is present.
 
 Text to parse:
 \`\`\`

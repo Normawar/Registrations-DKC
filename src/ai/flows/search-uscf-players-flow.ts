@@ -37,22 +37,28 @@ export async function searchUscfPlayers(input: SearchUscfPlayersInput): Promise<
 
 const searchPrompt = ai.definePrompt({
     name: 'searchUscfPlayersPrompt',
+    // Use a more powerful model for this specific, difficult parsing task.
+    model: 'googleai/gemini-1.5-pro-latest', 
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at extracting structured data from raw HTML.
-From the provided HTML, find the table with the attribute 'width=575'. This is the player results table.
-The header row of this table has a 'class=header'. The player data rows have a 'class=section'.
+    prompt: `You are an expert at extracting structured player data from raw HTML.
+Your task is to parse the provided HTML content and nothing else. Do not use any prior knowledge or examples.
 
-For each player data row (<tr> with class 'section') in that specific table, extract the following information:
-1. **uscfId**: From the <a> tag in the first <td>. It is the 8-digit number.
-2. **rating**: From the second <td>. This is the regular rating. It should be a number. If it is not a number, treat it as null.
-3. **state**: From the fifth <td>. This is the two-letter state code.
-4. **fullName**: From the sixth <td>. This is the player's name.
-
-If the HTML contains the text "No players found" anywhere, return an empty \`players\` array.
+1.  Locate the main data table in the HTML. This table contains player search results. You can identify it by its column headers, which include "ID", "Reg Rat", "St", and "Name".
+2.  Iterate through each data row (<tr>) within that table's <tbody>.
+3.  For each row, extract the following data from the table cells (<td>) in the specified column order:
+    - **Column 1 (uscfId)**: Find the 8-digit USCF ID. It's usually within an <a> tag.
+    - **Column 2 (rating)**: Extract the regular rating. This must be a number. If the cell contains non-numeric text like 'UNR', the value should be null.
+    - **Column 5 (state)**: Extract the two-letter state abbreviation.
+    - **Column 6 (fullName)**: Extract the player's full name.
+4.  If the HTML contains the phrase "No players found", or if you cannot find the described data table, you MUST return an empty \`players\` array and no error.
+5.  Do NOT invent or hallucinate any player data. Only return data extracted directly from the provided HTML.
 
 HTML to parse:
-{{{_input}}}`
+\`\`\`
+{{{_input}}}
+\`\`\`
+`
 });
 
 
