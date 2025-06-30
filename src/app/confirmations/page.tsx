@@ -29,7 +29,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -39,6 +39,9 @@ import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { auth, storage } from '@/lib/firebase';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -87,6 +90,7 @@ type Confirmation = {
   paymentMethod?: PaymentMethod;
   poNumber?: string;
   checkNumber?: string;
+  checkDate?: string;
   amountPaid?: string;
   paymentFileName?: string;
   paymentFileUrl?: string;
@@ -96,6 +100,7 @@ type ConfirmationInputs = {
   paymentMethod: PaymentMethod;
   poNumber: string;
   checkNumber: string;
+  checkDate?: Date;
   amountPaid: string;
   file: File | null;
   paymentFileName?: string;
@@ -123,6 +128,7 @@ export default function ConfirmationsPage() {
               poNumber: conf.poNumber || '',
               checkNumber: conf.checkNumber || '',
               amountPaid: conf.amountPaid || '',
+              checkDate: conf.checkDate ? new Date(conf.checkDate) : undefined,
               file: null,
               paymentFileName: conf.paymentFileName,
               paymentFileUrl: conf.paymentFileUrl,
@@ -200,6 +206,7 @@ export default function ConfirmationsPage() {
                 break;
             case 'check':
                 if (inputs.checkNumber) newTitle += ` via Check #${inputs.checkNumber}`;
+                if (inputs.checkDate) newTitle += ` dated ${format(inputs.checkDate, 'MM/dd/yy')}`;
                 break;
             case 'cashapp':
                 newTitle += ` via CashApp`;
@@ -221,6 +228,7 @@ export default function ConfirmationsPage() {
                     paymentMethod,
                     poNumber: inputs.poNumber,
                     checkNumber: inputs.checkNumber,
+                    checkDate: inputs.checkDate ? inputs.checkDate.toISOString() : undefined,
                     amountPaid: inputs.amountPaid,
                     paymentFileName,
                     paymentFileUrl,
@@ -380,9 +388,41 @@ export default function ConfirmationsPage() {
                         )}
 
                         {selectedMethod === 'check' && (
-                            <div className="space-y-2">
-                                <Label htmlFor={`check-number-${conf.id}`}>Check Number</Label>
-                                <Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isUpdating[conf.id]} />
+                            <div className="grid md:grid-cols-3 gap-4 items-start">
+                                <div className="space-y-2">
+                                    <Label htmlFor={`check-number-${conf.id}`}>Check Number</Label>
+                                    <Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isUpdating[conf.id]} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor={`check-amount-${conf.id}`}>Check Amount</Label>
+                                    <Input id={`check-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isUpdating[conf.id]} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Check Date</Label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                            "w-full justify-start text-left font-normal",
+                                            !currentInputs.checkDate && "text-muted-foreground"
+                                            )}
+                                            disabled={isUpdating[conf.id]}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {currentInputs.checkDate ? format(currentInputs.checkDate, "PPP") : <span>Pick a date</span>}
+                                        </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={currentInputs.checkDate}
+                                            onSelect={(date) => handleInputChange(conf.id, 'checkDate', date)}
+                                            initialFocus
+                                        />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
                             </div>
                         )}
 
