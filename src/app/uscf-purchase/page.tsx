@@ -49,7 +49,6 @@ import {
     Trash2,
     PlusCircle
 } from 'lucide-react';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const playerSchema = z.object({
     firstName: z.string().min(1, { message: 'First name is required.' }),
@@ -104,7 +103,6 @@ function UscfPurchaseComponent() {
     const [authError, setAuthError] = useState<string | null>(null);
     const [invoiceStatus, setInvoiceStatus] = useState<string | null>(null);
     const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
-    const [isSquareConfigured, setIsSquareConfigured] = useState(true);
 
     const form = useForm<z.infer<typeof playerInfoSchema>>({
         resolver: zodResolver(playerInfoSchema),
@@ -127,13 +125,6 @@ function UscfPurchaseComponent() {
     });
 
     useEffect(() => {
-        // Check Square config
-        async function verifyConfig() {
-            const { isConfigured } = await checkSquareConfig();
-            setIsSquareConfigured(isConfigured);
-        }
-        verifyConfig();
-
         if (!auth) {
             setIsAuthReady(false);
             return;
@@ -202,18 +193,7 @@ function UscfPurchaseComponent() {
             setInvoiceStatus(result.status);
             toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {
-            let description: ReactNode = "An unknown error occurred.";
-            if (error instanceof Error) {
-                if (error.message.includes('Square configuration is incomplete')) {
-                    description = (
-                        <span>
-                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline text-destructive-foreground hover:text-destructive-foreground/80">Square Developer Dashboard</a>.
-                        </span>
-                    );
-                } else {
-                    description = error.message;
-                }
-            }
+            const description = error instanceof Error ? error.message : "An unknown error occurred.";
             toast({ variant: 'destructive', title: 'Invoice Creation Failed', description });
         } finally {
             setIsCreatingInvoice(false);
@@ -305,18 +285,7 @@ function UscfPurchaseComponent() {
 
         } catch (error) {
             console.error("Failed to update payment information:", error);
-            let description: ReactNode = "An unknown error occurred.";
-            if (error instanceof Error) {
-                if (error.message.includes('Square configuration is incomplete')) {
-                    description = (
-                        <span>
-                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline text-destructive-foreground hover:text-destructive-foreground/80">Square Developer Dashboard</a>.
-                        </span>
-                    );
-                } else {
-                    description = error.message;
-                }
-            }
+            const description = error instanceof Error ? error.message : "An unknown error occurred.";
             toast({ variant: "destructive", title: "Update Failed", description });
         } finally {
             setIsUpdatingPayment(false);
@@ -350,27 +319,6 @@ function UscfPurchaseComponent() {
                         Complete the form below to generate an invoice for a USCF membership.
                     </p>
                 </div>
-
-                {!isSquareConfigured && (
-                    <Alert variant="default">
-                        <Info className="h-4 w-4" />
-                        <AlertTitle>Next Step: Configure Square Payments</AlertTitle>
-                        <AlertDescription>
-                            To enable invoice creation, please add your Square credentials.
-                            <ol className="list-decimal list-inside mt-2 space-y-1">
-                                <li>
-                                    Get your Sandbox <strong>Access Token</strong> and <strong>Location ID</strong> from the{' '}
-                                    <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline text-primary hover:text-primary/80">
-                                        Square Developer Dashboard
-                                    </a>.
-                                </li>
-                                <li>Open the <code>.env</code> file in the file explorer on the left.</li>
-                                <li>Paste your credentials into the corresponding variables.</li>
-                                <li>The server will restart automatically to apply the changes.</li>
-                            </ol>
-                        </AlertDescription>
-                    </Alert>
-                )}
 
                 <Alert variant="destructive">
                     <Info className="h-4 w-4" />

@@ -45,7 +45,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -125,7 +124,6 @@ export default function ConfirmationsPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [isSquareConfigured, setIsSquareConfigured] = useState(true);
   
   const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
     confirmationsToFetch.forEach(conf => {
@@ -162,18 +160,7 @@ export default function ConfirmationsPage() {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
           setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
           if (!silent) {
-            let description: ReactNode = "Failed to get the latest invoice status from Square.";
-            if (error instanceof Error) {
-                if (error.message.includes('Square configuration is incomplete')) {
-                    description = (
-                        <span>
-                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline text-destructive-foreground hover:text-destructive-foreground/80">Square Developer Dashboard</a>.
-                        </span>
-                    );
-                } else {
-                    description = error.message;
-                }
-            }
+            const description = error instanceof Error ? error.message : "Failed to get the latest invoice status from Square.";
             toast({
                 variant: "destructive",
                 title: "Could not refresh status",
@@ -206,13 +193,6 @@ export default function ConfirmationsPage() {
   }, []);
 
   useEffect(() => {
-    // Check Square config
-    async function verifyConfig() {
-        const { isConfigured } = await checkSquareConfig();
-        setIsSquareConfigured(isConfigured);
-    }
-    verifyConfig();
-
     // Load confirmations from local storage
     try {
       const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -240,14 +220,14 @@ export default function ConfirmationsPage() {
       }
       setConfInputs(initialInputs);
       setStatuses(initialStatuses);
-      if (isSquareConfigured) {
-          fetchAllInvoiceStatuses(storedConfirmations.filter(c => c.invoiceId));
-      }
+      
+      fetchAllInvoiceStatuses(storedConfirmations.filter((c: Confirmation) => c.invoiceId));
+
     } catch (error) {
         console.error("Failed to load or parse confirmations from localStorage", error);
         setConfirmations([]);
     }
-  }, [isSquareConfigured]);
+  }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
 
@@ -391,18 +371,7 @@ export default function ConfirmationsPage() {
 
     } catch (error) {
         console.error("Failed to update payment information:", error);
-        let description: ReactNode = "An unknown error occurred.";
-        if (error instanceof Error) {
-             if (error.message.includes('Square configuration is incomplete')) {
-                description = (
-                    <span>
-                        Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline text-destructive-foreground hover:text-destructive-foreground/80">Square Developer Dashboard</a>.
-                    </span>
-                );
-            } else {
-                description = error.message;
-            }
-        }
+        const description = error instanceof Error ? error.message : "An unknown error occurred.";
         toast({ variant: "destructive", title: "Update Failed", description });
     } finally {
         setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
@@ -419,27 +388,6 @@ export default function ConfirmationsPage() {
             A history of all your event registration submissions.
           </p>
         </div>
-
-        {!isSquareConfigured && (
-            <Alert variant="default">
-                <Info className="h-4 w-4" />
-                <AlertTitle>Next Step: Configure Square Payments</AlertTitle>
-                <AlertDescription>
-                    To enable invoice status updates and payment submissions, please add your Square credentials.
-                    <ol className="list-decimal list-inside mt-2 space-y-1">
-                        <li>
-                            Get your Sandbox <strong>Access Token</strong> and <strong>Location ID</strong> from the{' '}
-                            <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline text-primary hover:text-primary/80">
-                                Square Developer Dashboard
-                            </a>.
-                        </li>
-                        <li>Open the <code>.env</code> file in the file explorer on the left.</li>
-                        <li>Paste your credentials into the corresponding variables.</li>
-                        <li>The server will restart automatically to apply the changes.</li>
-                    </ol>
-                </AlertDescription>
-            </Alert>
-        )}
 
         {authError && (
           <Alert variant="destructive">

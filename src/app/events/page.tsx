@@ -53,7 +53,6 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 type PlayerRegistration = {
   byes: {
@@ -96,15 +95,9 @@ export default function EventsPage() {
     const [selections, setSelections] = useState<RegistrationSelections>({});
     const [calculatedFees, setCalculatedFees] = useState(0);
     const [clientReady, setClientReady] = useState(false);
-    const [isSquareConfigured, setIsSquareConfigured] = useState(true);
 
     useEffect(() => {
         setClientReady(true);
-        async function verifyConfig() {
-            const { isConfigured } = await checkSquareConfig();
-            setIsSquareConfigured(isConfigured);
-        }
-        verifyConfig();
     }, []);
 
     const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event): number => {
@@ -301,18 +294,7 @@ export default function EventsPage() {
 
         } catch (error) {
             console.error("Failed to create invoice or save confirmation", error);
-            let description: ReactNode = "An unknown error occurred. Please try again.";
-            if (error instanceof Error) {
-                if (error.message.includes('Square configuration is incomplete')) {
-                    description = (
-                        <span>
-                            Your Square configuration is incomplete. Please set the required credentials in your <code>.env</code> file. You can find them in the <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-bold underline text-destructive-foreground hover:text-destructive-foreground/80">Square Developer Dashboard</a>.
-                        </span>
-                    );
-                } else {
-                    description = error.message;
-                }
-            }
+            const description = error instanceof Error ? error.message : "An unknown error occurred. Please try again.";
             toast({
                 variant: "destructive",
                 title: "Submission Error",
@@ -446,27 +428,6 @@ export default function EventsPage() {
             Browse upcoming tournaments and register your players.
           </p>
         </div>
-
-        {!isSquareConfigured && (
-            <Alert variant="default">
-                <Info className="h-4 w-4" />
-                <AlertTitle>Next Step: Configure Square Payments</AlertTitle>
-                <AlertDescription>
-                    To enable invoice creation, please add your Square credentials.
-                    <ol className="list-decimal list-inside mt-2 space-y-1">
-                        <li>
-                            Get your Sandbox <strong>Access Token</strong> and <strong>Location ID</strong> from the{' '}
-                            <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline text-primary hover:text-primary/80">
-                                Square Developer Dashboard
-                            </a>.
-                        </li>
-                        <li>Open the <code>.env</code> file in the file explorer on the left.</li>
-                        <li>Paste your credentials into the corresponding variables.</li>
-                        <li>The server will restart automatically to apply the changes.</li>
-                    </ol>
-                </AlertDescription>
-            </Alert>
-        )}
 
         <Card>
           <CardContent className="pt-6">
