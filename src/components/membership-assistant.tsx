@@ -35,6 +35,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import Link from 'next/link';
 
 const formSchema = z.object({
   dob: z.date({ required_error: "Date of birth is required." }),
@@ -263,10 +264,17 @@ export function MembershipAssistant() {
               </div>
             </CardContent>
              <CardFooter>
-                <Button asChild variant="link" className="p-0 h-auto">
-                  <a href="https://new.uschess.org/join-us-chess" target="_blank" rel="noopener noreferrer">
-                    Learn more or purchase this membership &rarr;
-                  </a>
+                <Button asChild variant="default">
+                  <Link href={{
+                      pathname: '/uscf-purchase',
+                      query: { 
+                          type: suggestion.membershipType,
+                          justification: suggestion.justification,
+                          price: '24'
+                      }
+                  }}>
+                    Purchase This Membership &rarr;
+                  </Link>
                 </Button>
             </CardFooter>
           </Card>
