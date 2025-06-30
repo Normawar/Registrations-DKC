@@ -1,4 +1,6 @@
 
+'use client';
+
 import { AppLayout } from "@/components/app-layout";
 import {
   Card,
@@ -20,16 +22,25 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useEvents } from "@/hooks/use-events";
+import { useMemo } from "react";
+import { format } from "date-fns";
+import { FileText, ImageIcon } from "lucide-react";
+
 
 const playerProfile = { id: "p2", firstName: "Olivia", lastName: "Smith", email: 'olivia@example.com', rating: 2100 };
 
-const upcomingEvents = [
-  { id: "1", name: "Spring Open 2024", date: "June 15, 2024", registered: true },
-  { id: "2", name: "Summer Championship", date: "July 20, 2024", registered: true },
-  { id: "3", name: "Autumn Classic", date: "September 10, 2024", registered: false },
-];
-
 export default function IndividualDashboardPage() {
+  const { events } = useEvents();
+
+  const upcomingEvents = useMemo(() => {
+    return events
+      .filter(event => new Date(event.date) >= new Date())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      // mock registration status
+      .map((event, index) => ({...event, registered: [true, true, false, false, true][index % 5] || false })); 
+  }, [events]);
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -73,9 +84,19 @@ export default function IndividualDashboardPage() {
               <div className="space-y-3">
                 {upcomingEvents.map((event) => (
                   <div key={event.id} className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-sm">{event.name}</p>
-                      <p className="text-xs text-muted-foreground">{event.date}</p>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            {event.imageUrl && (
+                                <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title="Event Image"><ImageIcon className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                            )}
+                            {event.pdfUrl && event.pdfUrl !== '#' && (
+                                <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title="Event PDF"><FileText className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                            )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{event.name}</p>
+                          <p className="text-xs text-muted-foreground">{format(new Date(event.date), 'PPP')}</p>
+                        </div>
                     </div>
                     {event.registered ? (
                        <Badge variant="default" className="bg-green-600">Registered</Badge>

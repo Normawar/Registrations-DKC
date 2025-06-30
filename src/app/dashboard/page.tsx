@@ -1,4 +1,6 @@
 
+'use client';
+
 import { AppLayout } from "@/components/app-layout";
 import {
   Card,
@@ -25,6 +27,10 @@ import {
 } from "@/components/icons/chess-icons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEvents } from "@/hooks/use-events";
+import { useMemo } from "react";
+import { format } from "date-fns";
+import { FileText, ImageIcon } from "lucide-react";
 
 const rosterPlayers = [
     { id: "1", firstName: "Alex", lastName: "Ray", email: 'alex.ray@example.com', rating: 1850 },
@@ -36,14 +42,16 @@ const rosterPlayers = [
     { id: "7", firstName: "Drew", lastName: "Smith", email: 'drew.smith@example.com', rating: 2050 },
 ];
 
-const upcomingEvents = [
-  { id: "1", name: "Spring Open 2024", date: "June 15, 2024", pendingRequests: 2 },
-  { id: "2", name: "Summer Championship", date: "July 20, 2024", pendingRequests: 3 },
-  { id: "3", name: "Autumn Classic", date: "September 10, 2024", pendingRequests: 0 },
-];
-
-
 export default function DashboardPage() {
+  const { events } = useEvents();
+
+  const upcomingEvents = useMemo(() => {
+    return events
+      .filter(event => new Date(event.date) >= new Date())
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  }, [events]);
+
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -63,19 +71,21 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 {upcomingEvents.map((event) => (
                   <div key={event.id} className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-sm">{event.name}</p>
-                      <p className="text-xs text-muted-foreground">{event.date}</p>
+                     <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            {event.imageUrl && (
+                                <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title="Event Image"><ImageIcon className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                            )}
+                            {event.pdfUrl && event.pdfUrl !== '#' && (
+                                <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title="Event PDF"><FileText className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                            )}
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm">{event.name}</p>
+                          <p className="text-xs text-muted-foreground">{format(new Date(event.date), 'PPP')}</p>
+                        </div>
                     </div>
-                    {event.pendingRequests > 0 ? (
-                      <Button asChild variant="link" className="p-0 h-auto text-primary">
-                        <Link href="/requests">
-                          {event.pendingRequests} pending request{event.pendingRequests !== 1 ? 's' : ''}
-                        </Link>
-                      </Button>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No pending requests</p>
-                    )}
+                    <p className="text-sm text-muted-foreground">No pending requests</p>
                   </div>
                 ))}
               </div>
