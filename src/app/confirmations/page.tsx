@@ -92,21 +92,6 @@ export default function ConfirmationsPage() {
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
-    const ensureAnonymousAuth = async () => {
-      // If auth service exists but there's no user, sign in.
-      if (auth && !auth.currentUser) {
-        try {
-          await signInAnonymously(auth);
-        } catch (error) {
-          console.error("Anonymous sign-in failed on page load:", error);
-          // This error will be handled gracefully when the user tries to upload.
-        }
-      }
-    };
-    ensureAnonymousAuth();
-  }, []);
-
-  useEffect(() => {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     setConfirmations(storedConfirmations);
@@ -142,12 +127,12 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            // Check if Firebase services are available
+            // Check if Firebase services are available right before using them.
             if (!auth || !storage) {
               toast({
                 variant: 'destructive',
                 title: 'Firebase Not Configured',
-                description: "Please add your Firebase credentials to the .env file and restart the server to enable file uploads.",
+                description: "To enable uploads, add your Firebase credentials to the .env file and restart the server.",
                 duration: 9000,
               });
               setIsUpdating(prev => ({...prev, [conf.id]: false}));
@@ -331,7 +316,7 @@ export default function ConfirmationsPage() {
                                   id={`po-file-${conf.id}`} 
                                   type="file"
                                   onChange={(e) => handlePoFileChange(conf.id, e)}
-                                  disabled={isUpdating[conf.id] || !storage}
+                                  disabled={isUpdating[conf.id]}
                                 />
                                 {!storage && (
                                   <p className="text-xs text-muted-foreground pt-1">
