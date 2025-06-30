@@ -5,8 +5,9 @@ import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { signInAnonymously, onAuthStateChanged, type User } from 'firebase/auth';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
 import { Button } from '@/components/ui/button';
@@ -26,8 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { schoolData } from '@/lib/data/school-data';
 import { districts as uniqueDistricts } from '@/lib/data/districts';
+import { schoolData } from '@/lib/data/school-data';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -37,6 +38,7 @@ import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-prof
 import { auth, storage } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, { message: 'First name is required.' }),
@@ -66,8 +68,53 @@ const icons: { [key: string]: ElementType } = {
   PawnIcon,
 };
 
+const ProfilePageSkeleton = () => (
+    <div className="space-y-8 animate-pulse">
+        <div>
+            <Skeleton className="h-9 w-1/3" />
+            <Skeleton className="h-4 w-1/2 mt-2" />
+        </div>
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-6 w-1/4" />
+                <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-3 gap-8 items-start">
+                <div className="flex flex-col items-center gap-4">
+                    <Skeleton className="h-32 w-32 rounded-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                <div className="md:col-span-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-24 w-full mt-4" />
+                </div>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader>
+                <Skeleton className="h-6 w-1/4" />
+                <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+            </CardContent>
+             <CardFooter className="border-t px-6 py-4">
+                <Skeleton className="h-10 w-24" />
+            </CardFooter>
+        </Card>
+    </div>
+);
+
 
 export default function ProfilePage() {
+  const router = useRouter();
   const { toast } = useToast();
   const { profile, updateProfile } = useSponsorProfile();
   
@@ -78,9 +125,10 @@ export default function ProfilePage() {
   const [selectedIconName, setSelectedIconName] = useState<string>('KingIcon');
   const [activeTab, setActiveTab] = useState<'icon' | 'upload'>('icon');
   const [isSavingPicture, setIsSavingPicture] = useState(false);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -107,31 +155,24 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!auth) {
-      setIsAuthReady(false);
       setAuthError("Firebase is not configured. File uploads are disabled.");
+      setIsLoading(false);
       return;
     }
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setCurrentUser(user);
-        setIsAuthReady(true);
+        setIsLoading(false);
         setAuthError(null);
       } else {
-        signInAnonymously(auth).catch((error) => {
-          console.error("Anonymous sign-in failed:", error);
-          if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
-              setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console. Please contact your administrator.");
-          } else {
-              setAuthError("Authentication failed. File uploads are disabled.");
-          }
-          setIsAuthReady(false);
-        });
+        // User is not logged in, redirect to the login page.
+        router.push('/');
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
 
   useEffect(() => {
@@ -184,19 +225,18 @@ export default function ProfilePage() {
   const handleSavePicture = async () => {
     setIsSavingPicture(true);
     try {
+      if (!currentUser) {
+          toast({ variant: 'destructive', title: 'Authentication Error', description: "You must be logged in to save changes." });
+          setIsSavingPicture(false);
+          return;
+      }
+      if (!storage) {
+        toast({ variant: 'destructive', title: 'Storage Error', description: 'Firebase Storage is not configured.' });
+        setIsSavingPicture(false);
+        return;
+      }
+      
       if (activeTab === 'upload' && imageFile) {
-        if (!isAuthReady || !currentUser) {
-          const message = authError || "Authentication is not ready. Cannot upload file.";
-          toast({ variant: 'destructive', title: 'Upload Failed', description: message });
-          setIsSavingPicture(false);
-          return;
-        }
-        if (!storage) {
-          toast({ variant: 'destructive', title: 'Storage Error', description: 'Firebase Storage is not configured.' });
-          setIsSavingPicture(false);
-          return;
-        }
-
         const userId = currentUser.uid;
         const storageRef = ref(storage, `avatars/${userId}/profile`);
         await uploadBytes(storageRef, imageFile);
@@ -215,7 +255,7 @@ export default function ProfilePage() {
       console.error("Failed to save picture:", error);
       let description = "Could not save your profile picture.";
        if (error instanceof Error && (error as any).code === 'storage/unauthorized') {
-          description = "You do not have permission to upload this file. Ensure you are signed in with a full account or check Firebase Storage security rules.";
+          description = "You do not have permission to upload this file. Check your Firebase Storage security rules.";
       } else if (error instanceof Error) {
           description = error.message;
       }
@@ -255,6 +295,14 @@ export default function ProfilePage() {
   const selectedDistrict = profileForm.watch('district');
   const SelectedIconComponent = selectedIconName ? icons[selectedIconName] : null;
 
+  if (isLoading) {
+    return (
+        <AppLayout>
+            <ProfilePageSkeleton />
+        </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -267,7 +315,7 @@ export default function ProfilePage() {
         
         {authError && (
           <Alert variant="destructive">
-            <AlertTitle>Uploads Disabled</AlertTitle>
+            <AlertTitle>Authentication Error</AlertTitle>
             <AlertDescription>{authError}</AlertDescription>
           </Alert>
         )}
@@ -292,16 +340,16 @@ export default function ProfilePage() {
                             </AvatarFallback>
                         )}
                     </Avatar>
-                     <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavingPicture || !isAuthReady}>
-                        {isSavingPicture || !isAuthReady ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {isSavingPicture ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Picture'}
+                     <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavingPicture || !currentUser}>
+                        {isSavingPicture ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isSavingPicture ? 'Saving...' : 'Save Picture'}
                      </Button>
                 </div>
                 <div className="md:col-span-2">
                     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'icon' | 'upload')}>
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="icon">Choose Icon</TabsTrigger>
-                            <TabsTrigger value="upload">Upload Photo</TabsTrigger>
+                            <TabsTrigger value="upload" disabled={!currentUser}>Upload Photo</TabsTrigger>
                         </TabsList>
                         <TabsContent value="icon" className="pt-4">
                             <p className="text-sm text-muted-foreground mb-4">Select a chess piece as your avatar.</p>
@@ -323,7 +371,7 @@ export default function ProfilePage() {
                             <p className="text-sm text-muted-foreground mb-4">For best results, upload a square image.</p>
                             <div className="flex gap-2">
                                 <Input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!isAuthReady}>Choose File</Button>
+                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!currentUser}>Choose File</Button>
                             </div>
                         </TabsContent>
                     </Tabs>
