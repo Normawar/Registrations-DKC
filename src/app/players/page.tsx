@@ -214,10 +214,12 @@ export default function PlayersPage() {
         return;
     }
 
-    const headers = ['LastName', 'FirstName', 'MiddleName', 'USCF_ID', 'Rating', 'School', 'District', 'EventsCount'];
+    const headers = ['FullName', 'LastName', 'FirstName', 'MiddleName', 'USCF_ID', 'Rating', 'School', 'District', 'EventsCount'];
 
     const csvRows = filteredAndSortedPlayers.map(player => {
+        const fullName = `${player.lastName}, ${player.firstName}`;
         const row = [
+            fullName,
             player.lastName,
             player.firstName,
             player.middleName || '',
