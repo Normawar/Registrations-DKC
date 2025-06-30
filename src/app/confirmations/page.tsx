@@ -92,6 +92,24 @@ export default function ConfirmationsPage() {
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
+    const ensureAnonymousAuth = async () => {
+      if (!auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (error) {
+          console.error("Anonymous sign-in failed:", error);
+          toast({
+            variant: "destructive",
+            title: "Authentication Error",
+            description: "Could not connect to the server for file uploads. Please refresh and try again.",
+          });
+        }
+      }
+    };
+    ensureAnonymousAuth();
+  }, [toast]);
+
+  useEffect(() => {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     setConfirmations(storedConfirmations);
@@ -127,9 +145,15 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            // Ensure user is authenticated anonymously
+            // Auth check guard clause
             if (!auth.currentUser) {
-              await signInAnonymously(auth);
+              toast({
+                variant: 'destructive',
+                title: 'Upload Failed',
+                description: 'Authentication is not ready. Please wait a moment and try again.',
+              });
+              setIsUpdating(prev => ({...prev, [conf.id]: false}));
+              return;
             }
 
             const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
