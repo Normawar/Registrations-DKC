@@ -457,7 +457,7 @@ export default function ConfirmationsPage() {
                   const currentInputs = confInputs[conf.id] || {};
                   const selectedMethod = currentInputs.paymentMethod || 'po';
                   const currentStatus = statuses[conf.id];
-                  const isLoading = isUpdating[conf.id] || !isAuthReady || !isSquareConfigured;
+                  const isLoading = isUpdating[conf.id] || !isAuthReady;
                   const showStudentTypeColumn = sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
 
                   return (
@@ -495,7 +495,7 @@ export default function ConfirmationsPage() {
                         <div className="flex justify-between items-center">
                             <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
                             <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId || !isSquareConfigured}>
+                                <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId}>
                                     <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} />
                                     Refresh Status
                                 </Button>

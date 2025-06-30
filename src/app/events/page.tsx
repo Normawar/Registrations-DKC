@@ -501,7 +501,7 @@ export default function EventsPage() {
                       <TableCell className="text-right">
                           <Button 
                             onClick={() => handleRegisterClick(event)}
-                            disabled={status === 'Closed' || status === 'Completed' || !isSquareConfigured}
+                            disabled={status === 'Closed' || status === 'Completed'}
                             >
                             Register
                           </Button>

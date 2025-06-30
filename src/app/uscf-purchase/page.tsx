@@ -338,7 +338,7 @@ function UscfPurchaseComponent() {
     };
     
     const selectedMethod = paymentInputs.paymentMethod || 'po';
-    const isLoading = isUpdatingPayment || !isAuthReady || !isSquareConfigured;
+    const isLoading = isUpdatingPayment || !isAuthReady;
 
 
     return (
@@ -461,7 +461,7 @@ function UscfPurchaseComponent() {
                                     </Button>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button type="submit" disabled={isCreatingInvoice || !isSquareConfigured}>
+                                    <Button type="submit" disabled={isCreatingInvoice}>
                                         {isCreatingInvoice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Create Invoice for {fields.length} Player(s)
                                     </Button>
