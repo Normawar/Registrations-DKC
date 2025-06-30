@@ -13,6 +13,7 @@ export type SponsorProfile = {
   gtCoordinatorEmail?: string;
   avatarType: 'icon' | 'upload';
   avatarValue: string; // Icon name or image URL
+  role: 'sponsor' | 'organizer';
 };
 
 const defaultSponsorData: SponsorProfile = {
@@ -25,6 +26,7 @@ const defaultSponsorData: SponsorProfile = {
   gtCoordinatorEmail: '',
   avatarType: 'icon',
   avatarValue: 'KingIcon', 
+  role: 'sponsor',
 };
 
 export function useSponsorProfile() {

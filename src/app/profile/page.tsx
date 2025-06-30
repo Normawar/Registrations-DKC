@@ -615,6 +615,33 @@ export default function ProfilePage() {
             </form>
           </Form>
         </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Account Settings</CardTitle>
+                <CardDescription>Manage your account role and permissions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-2">
+                    <Label htmlFor="role-select">Account Role</Label>
+                    <Select
+                        value={profile.role}
+                        onValueChange={(value) => updateProfile({ role: value as 'sponsor' | 'organizer' })}
+                    >
+                        <SelectTrigger id="role-select" className="w-full md:w-1/2">
+                            <SelectValue placeholder="Select a role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="sponsor">Sponsor</SelectItem>
+                            <SelectItem value="organizer">Organizer</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">
+                        Sponsors can manage their own roster and registrations. Organizers have site-wide access to view all invoices and schools.
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );

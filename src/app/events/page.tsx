@@ -274,6 +274,7 @@ export default function EventsPage() {
                 invoiceNumber,
                 teamCode: teamCode,
                 invoiceStatus: status,
+                sponsorEmail: sponsorProfile.email,
             };
 
             const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');

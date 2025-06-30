@@ -23,13 +23,14 @@ import {
   PawnIcon,
   BishopIcon,
   KnightIcon,
+  Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 
-const menuItems = [
+const sponsorMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/roster", icon: PawnIcon, label: "Roster" },
@@ -38,6 +39,14 @@ const menuItems = [
   { href: "/invoices", icon: Receipt, label: "Invoices" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+];
+
+const organizerMenuItems = [
+  { href: "/profile", icon: User, label: "Profile" },
+  { href: "/invoices", icon: Receipt, label: "All Invoices" },
+  { href: "/players", icon: PawnIcon, label: "All Players" },
+  { href: "/manage-events", icon: FolderKanban, label: "Manage Events" },
+  { href: "/schools", icon: School, label: "Schools & Districts" },
 ];
 
 const icons: { [key: string]: React.ElementType } = {
@@ -52,6 +61,8 @@ const icons: { [key: string]: React.ElementType } = {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { profile } = useSponsorProfile();
+
+  const menuItems = profile?.role === 'organizer' ? organizerMenuItems : sponsorMenuItems;
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -84,7 +95,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <p className="text-xs text-sidebar-foreground/70 truncate">
                         {profile ? profile.district : 'District Name'}
                     </p>
-                    {teamCode && (
+                    {teamCode && profile?.role === 'sponsor' && (
                       <p className="text-xs font-bold text-sidebar-primary truncate font-mono">
                         {teamCode}
                       </p>

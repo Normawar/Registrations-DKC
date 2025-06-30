@@ -31,8 +31,9 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
 import { cn } from '@/lib/utils';
-import { ExternalLink, RefreshCw, ClipboardList, Receipt } from 'lucide-react';
+import { ExternalLink, RefreshCw, Receipt } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // This combines data from event confirmations and membership purchases
 type CombinedInvoice = {
@@ -45,6 +46,8 @@ type CombinedInvoice = {
   invoiceNumber?: string;
   purchaserName?: string; 
   invoiceStatus?: string;
+  schoolName?: string;
+  district?: string;
 };
 
 
@@ -63,18 +66,35 @@ const INVOICE_STATUSES = [
     'FAILED',
 ];
 
+const mockOrganizerInvoices: CombinedInvoice[] = [
+    { id: 'org_inv_1', invoiceNumber: '0001', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-20').toISOString(), totalInvoiced: 120.00, invoiceStatus: 'PAID', invoiceUrl: '#' },
+    { id: 'org_inv_2', invoiceNumber: '0002', purchaserName: 'John Smith', schoolName: 'MCALLEN H S', district: 'MCALLEN ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-22').toISOString(), totalInvoiced: 250.00, invoiceStatus: 'UNPAID', invoiceUrl: '#' },
+    { id: 'org_inv_3', invoiceNumber: '0003', purchaserName: 'Sponsor Name', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'USCF Membership (Youth)', submissionTimestamp: new Date('2024-05-21').toISOString(), totalInvoiced: 24.00, invoiceStatus: 'PAID', invoiceUrl: '#' },
+    { id: 'org_inv_4', invoiceNumber: '0004', purchaserName: 'Another Sponsor', schoolName: 'LA JOYA H S', district: 'LA JOYA ISD', description: 'Spring Open 2024', submissionTimestamp: new Date('2024-05-19').toISOString(), totalInvoiced: 80.00, invoiceStatus: 'CANCELED', invoiceUrl: '#' },
+    { id: 'org_inv_5', invoiceNumber: '0005', purchaserName: 'Test Sponsor', schoolName: 'EDINBURG H S', district: 'EDINBURG CISD', description: 'Autumn Classic', submissionTimestamp: new Date('2024-05-25').toISOString(), totalInvoiced: 150.00, invoiceStatus: 'PUBLISHED', invoiceUrl: '#' },
+    { id: 'org_inv_6', invoiceNumber: '0006', purchaserName: 'Jane Doe', schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD', description: 'Summer Championship', submissionTimestamp: new Date('2024-05-28').toISOString(), totalInvoiced: 200.00, invoiceStatus: 'PAYMENT_PENDING', invoiceUrl: '#' },
+];
+
 function InvoicesComponent() {
   const { toast } = useToast();
-  const { profile: sponsorProfile } = useSponsorProfile();
+  const { profile } = useSponsorProfile();
 
   const [allInvoices, setAllInvoices] = useState<CombinedInvoice[]>([]);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [schoolFilter, setSchoolFilter] = useState('ALL');
+
+  const uniqueSchools = useMemo(() => {
+    const schools = new Set(mockOrganizerInvoices.map(inv => inv.schoolName || ''));
+    return ['ALL', ...Array.from(schools).filter(Boolean).sort()];
+  }, []);
 
   const fetchAllInvoiceStatuses = (invoicesToFetch: CombinedInvoice[]) => {
     invoicesToFetch.forEach(inv => {
-        if (inv.invoiceId) {
+        if (inv.invoiceId && inv.invoiceStatus !== 'PAID' && inv.invoiceStatus !== 'CANCELED' && inv.invoiceStatus !== 'VOIDED' && inv.invoiceStatus !== 'REFUNDED') {
             fetchInvoiceStatus(inv.id, inv.invoiceId, true);
+        } else {
+            setStatuses(prev => ({...prev, [inv.id]: { status: inv.invoiceStatus, isLoading: false }}))
         }
     });
   };
@@ -101,58 +121,76 @@ function InvoicesComponent() {
   };
   
   useEffect(() => {
+    if (!profile) return;
     try {
-      const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
+        if (profile.role === 'organizer') {
+            const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
+            for (const inv of mockOrganizerInvoices) {
+                initialStatuses[inv.id] = { status: inv.invoiceStatus, isLoading: false };
+            }
+            setAllInvoices(mockOrganizerInvoices);
+            setStatuses(initialStatuses);
+            return;
+        }
 
-      const combined = [
-        ...eventConfirmations
-          .filter((c: any) => c.invoiceId)
-          .map((c: any) => ({
-            id: c.id,
-            description: c.eventName,
-            submissionTimestamp: c.submissionTimestamp,
-            totalInvoiced: c.totalInvoiced,
-            invoiceId: c.invoiceId,
-            invoiceUrl: c.invoiceUrl,
-            invoiceNumber: c.invoiceNumber,
-            purchaserName: `${sponsorProfile?.firstName || 'Sponsor'} ${sponsorProfile?.lastName || ''}`.trim(),
-            invoiceStatus: c.invoiceStatus,
-          })),
-        ...membershipInvoices
-          .filter((i: any) => i.invoiceId)
-          .map((i: any) => ({
-            id: i.invoiceId,
-            description: `USCF Membership (${i.membershipType})`,
-            submissionTimestamp: i.submissionTimestamp,
-            totalInvoiced: i.totalInvoiced,
-            invoiceId: i.invoiceId,
-            invoiceUrl: i.invoiceUrl,
-            invoiceNumber: i.invoiceNumber,
-            purchaserName: i.purchaserName,
-            invoiceStatus: i.status,
-          }))
-      ];
-      
-      combined.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
-      
-      setAllInvoices(combined);
+        // Sponsor view
+        const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
 
-      const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
-      for (const inv of combined) {
-          if (inv.invoiceId) {
-            initialStatuses[inv.id] = { status: inv.invoiceStatus || 'LOADING', isLoading: true };
-          }
-      }
-      setStatuses(initialStatuses);
-      
-      fetchAllInvoiceStatuses(combined);
+        const sponsorEmail = profile.email;
+
+        const combined: CombinedInvoice[] = [
+            ...eventConfirmations
+            .filter((c: any) => c.invoiceId && c.sponsorEmail === sponsorEmail)
+            .map((c: any) => ({
+                id: c.id,
+                description: c.eventName,
+                submissionTimestamp: c.submissionTimestamp,
+                totalInvoiced: c.totalInvoiced,
+                invoiceId: c.invoiceId,
+                invoiceUrl: c.invoiceUrl,
+                invoiceNumber: c.invoiceNumber,
+                purchaserName: `${profile?.firstName || 'Sponsor'} ${profile?.lastName || ''}`.trim(),
+                invoiceStatus: c.invoiceStatus,
+                schoolName: profile.school,
+                district: profile.district,
+            })),
+            ...membershipInvoices
+            .filter((i: any) => i.invoiceId && i.purchaserEmail === sponsorEmail)
+            .map((i: any) => ({
+                id: i.invoiceId,
+                description: `USCF Membership (${i.membershipType})`,
+                submissionTimestamp: i.submissionTimestamp,
+                totalInvoiced: i.totalInvoiced,
+                invoiceId: i.invoiceId,
+                invoiceUrl: i.invoiceUrl,
+                invoiceNumber: i.invoiceNumber,
+                purchaserName: i.purchaserName,
+                invoiceStatus: i.status,
+                schoolName: profile.school,
+                district: profile.district,
+            }))
+        ];
+        
+        combined.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+        
+        setAllInvoices(combined);
+
+        const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
+        for (const inv of combined) {
+            if (inv.invoiceId) {
+                initialStatuses[inv.id] = { status: inv.invoiceStatus || 'LOADING', isLoading: true };
+            }
+        }
+        setStatuses(initialStatuses);
+        
+        fetchAllInvoiceStatuses(combined);
 
     } catch (error) {
         console.error("Failed to load invoices from localStorage", error);
         setAllInvoices([]);
     }
-  }, [sponsorProfile]);
+  }, [profile]);
 
   const getStatusBadgeVariant = (status?: string): string => {
     if (!status) return 'bg-gray-400';
@@ -170,19 +208,51 @@ function InvoicesComponent() {
   };
 
   const filteredInvoices = useMemo(() => {
-    if (statusFilter === 'ALL') {
-      return allInvoices;
+    let invoices = [...allInvoices];
+
+    if (profile?.role === 'organizer' && schoolFilter !== 'ALL') {
+      invoices = invoices.filter(inv => inv.schoolName === schoolFilter);
     }
-    return allInvoices.filter(inv => statuses[inv.id]?.status?.toUpperCase() === statusFilter);
-  }, [allInvoices, statuses, statusFilter]);
+
+    if (statusFilter !== 'ALL') {
+      const liveStatusFilter = (inv: CombinedInvoice) => statuses[inv.id]?.status?.toUpperCase() === statusFilter;
+      const mockStatusFilter = (inv: CombinedInvoice) => inv.invoiceStatus?.toUpperCase() === statusFilter;
+      
+      invoices = invoices.filter(profile?.role === 'organizer' ? mockStatusFilter : liveStatusFilter);
+    }
+
+    return invoices;
+  }, [allInvoices, statuses, statusFilter, schoolFilter, profile]);
   
+  if (!profile) {
+    return (
+        <AppLayout>
+            <div className="space-y-4">
+                <Skeleton className="h-8 w-1/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-8 w-full" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-40 w-full" />
+                    </CardContent>
+                </Card>
+            </div>
+        </AppLayout>
+    )
+  }
+
   return (
     <AppLayout>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold font-headline">Invoices</h1>
           <p className="text-muted-foreground">
-            A comprehensive list of all generated invoices for your events and memberships.
+            {profile.role === 'organizer' 
+                ? 'A comprehensive list of all invoices across all schools.'
+                : 'A comprehensive list of all generated invoices for your events and memberships.'
+            }
           </p>
         </div>
         
@@ -193,19 +263,37 @@ function InvoicesComponent() {
                     <CardTitle>All Invoices</CardTitle>
                     <CardDescription>Filter invoices by their current payment status.</CardDescription>
                 </div>
-                <div className="w-full sm:w-auto">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-full sm:w-[200px]">
-                            <SelectValue placeholder="Filter by status..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {INVOICE_STATUSES.map(status => (
-                                <SelectItem key={status} value={status}>
-                                    {status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, ' ')}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                    {profile.role === 'organizer' && (
+                        <div className="w-full sm:w-auto">
+                            <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+                                <SelectTrigger className="w-full sm:w-[240px]">
+                                    <SelectValue placeholder="Filter by school..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {uniqueSchools.map(school => (
+                                        <SelectItem key={school} value={school}>
+                                            {school === 'ALL' ? 'All Schools' : school}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    <div className="w-full sm:w-auto">
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-full sm:w-[200px]">
+                                <SelectValue placeholder="Filter by status..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {INVOICE_STATUSES.map(status => (
+                                    <SelectItem key={status} value={status}>
+                                        {status.charAt(0) + status.slice(1).toLowerCase().replace(/_/g, ' ')}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </div>
           </CardHeader>
@@ -222,7 +310,7 @@ function InvoicesComponent() {
                         <TableRow>
                             <TableHead>Invoice #</TableHead>
                             <TableHead>Description</TableHead>
-                            <TableHead>Purchaser</TableHead>
+                            <TableHead>{profile.role === 'organizer' ? 'School' : 'Purchaser'}</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead>Amount</TableHead>
                             <TableHead>Status</TableHead>
@@ -231,25 +319,29 @@ function InvoicesComponent() {
                     </TableHeader>
                     <TableBody>
                         {filteredInvoices.map((inv) => {
-                            const currentStatus = statuses[inv.id];
+                            const currentStatus = profile.role === 'sponsor' ? statuses[inv.id] : { status: inv.invoiceStatus, isLoading: false };
+                            const isLoading = profile.role === 'sponsor' && currentStatus?.isLoading;
+                            
                             return (
                                 <TableRow key={inv.id}>
                                     <TableCell className="font-mono">{inv.invoiceNumber || 'N/A'}</TableCell>
                                     <TableCell className="font-medium">{inv.description}</TableCell>
-                                    <TableCell>{inv.purchaserName}</TableCell>
+                                    <TableCell>{profile.role === 'organizer' ? inv.schoolName : inv.purchaserName}</TableCell>
                                     <TableCell>{format(new Date(inv.submissionTimestamp), 'PPP')}</TableCell>
                                     <TableCell>${inv.totalInvoiced.toFixed(2)}</TableCell>
                                     <TableCell>
                                         <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus?.status))}>
-                                            {currentStatus?.isLoading ? 'Loading...' : currentStatus?.status?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
+                                            {isLoading ? 'Loading...' : currentStatus?.status?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={currentStatus?.isLoading || !inv.invoiceId} title="Refresh Status">
-                                                <RefreshCw className={cn("h-4 w-4", currentStatus?.isLoading && "animate-spin")} />
-                                                <span className="sr-only">Refresh Status</span>
-                                            </Button>
+                                            {profile.role === 'sponsor' && (
+                                                <Button variant="ghost" size="icon" onClick={() => fetchInvoiceStatus(inv.id, inv.invoiceId!)} disabled={isLoading || !inv.invoiceId} title="Refresh Status">
+                                                    <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+                                                    <span className="sr-only">Refresh Status</span>
+                                                </Button>
+                                            )}
                                             <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl}>
                                                 <a href={inv.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!inv.invoiceUrl && 'pointer-events-none')}>
                                                 <ExternalLink className="mr-2 h-4 w-4" /> View
