@@ -91,24 +91,18 @@ function InvoicesComponent() {
       }
   }, []);
 
-  const fetchAllInvoiceStatuses = useCallback((invoicesToFetch: CombinedInvoice[]) => {
-    invoicesToFetch.forEach(inv => {
-        if (inv.invoiceId) {
-            fetchInvoiceStatus(inv.id, inv.invoiceId, true);
-        }
-    });
-  }, [fetchInvoiceStatus]);
-  
-  useEffect(() => {
+  const loadInvoices = useCallback(() => {
     if (!profile) return;
     
     let allInvoicesData: any[] = [];
     try {
-        allInvoicesData = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+        const storedInvoices = localStorage.getItem('all_invoices');
+        if (storedInvoices) {
+            allInvoicesData = JSON.parse(storedInvoices);
+        }
     } catch (error) {
         console.error("Failed to parse invoices from localStorage", error);
-        setAllInvoices([]);
-        return;
+        allInvoicesData = [];
     }
 
     const normalizedInvoices: CombinedInvoice[] = allInvoicesData.map((inv: any) => ({
@@ -139,7 +133,7 @@ function InvoicesComponent() {
         
     let filteredInvoices = allUniqueInvoices;
     if (profile.role === 'sponsor') {
-        filteredInvoices = allUniqueInvoices.filter(inv => inv.schoolName === profile.school);
+        filteredInvoices = allUniqueInvoices.filter(inv => inv.schoolName?.trim().toUpperCase() === profile.school?.trim().toUpperCase());
     }
     
     filteredInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
@@ -162,9 +156,32 @@ function InvoicesComponent() {
         const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NO_INVOICE', 'NOT_FOUND'].includes(currentStatus || '');
         return inv.invoiceId && !isFinalState;
     });
-    fetchAllInvoiceStatuses(invoicesToFetch);
+    
+    invoicesToFetch.forEach(inv => {
+        if (inv.invoiceId) {
+            fetchInvoiceStatus(inv.id, inv.invoiceId, true);
+        }
+    });
 
-  }, [profile, fetchAllInvoiceStatuses]);
+  }, [profile, fetchInvoiceStatus]);
+
+  useEffect(() => {
+    loadInvoices();
+  }, [loadInvoices]);
+  
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+        if (event.key === 'all_invoices') {
+            loadInvoices();
+        }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [loadInvoices]);
   
   const uniqueSchools = useMemo(() => {
     const schools = new Set(allInvoices.map(inv => inv.schoolName || ''));
