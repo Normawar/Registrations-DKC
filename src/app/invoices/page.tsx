@@ -136,15 +136,14 @@ function InvoicesComponent() {
         if (profile.role === 'organizer') {
             invoicesToDisplay = mockOrganizerInvoices;
         } else { // Sponsor role
-            // 1. Organizer-created invoices for this sponsor's school
+            // 1. Get organizer-created invoices for this sponsor's school
             const organizerCreatedForSponsor = mockOrganizerInvoices.filter(
                 inv => inv.schoolName === profile.school
             );
             
-            // 2. Event registration invoices from local storage
+            // 2. Get event registration invoices from local storage
             const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
             const sponsorEventInvoices: CombinedInvoice[] = eventConfirmations
-                .filter((conf: any) => conf.schoolName === profile.school)
                 .map((conf: any) => ({
                     id: conf.id,
                     description: conf.eventName,
@@ -159,10 +158,9 @@ function InvoicesComponent() {
                     district: conf.district,
                 }));
 
-            // 3. USCF Membership invoices from local storage
+            // 3. Get USCF Membership invoices from local storage
             const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
             const sponsorMembershipInvoices: CombinedInvoice[] = membershipInvoices
-                .filter((inv: any) => inv.schoolName === profile.school)
                 .map((inv: any) => ({
                     id: inv.invoiceId, // Use invoiceId as the unique key
                     description: `USCF Membership (${inv.membershipType})`,
@@ -177,12 +175,14 @@ function InvoicesComponent() {
                     district: inv.district,
                 }));
             
+            // 4. Combine all sources and filter by school
             const allPossibleInvoices = [
                 ...organizerCreatedForSponsor,
                 ...sponsorEventInvoices,
                 ...sponsorMembershipInvoices
-            ];
+            ].filter(inv => inv.schoolName === profile.school);
             
+            // 5. De-duplicate the final list
             const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
             for (const inv of allPossibleInvoices) {
                 // Use invoiceId for uniqueness if available, otherwise the local id
