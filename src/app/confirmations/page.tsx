@@ -133,8 +133,24 @@ export default function ConfirmationsPage() {
           setStatuses(prev => ({ ...prev, [confId]: { ...prev[confId], isLoading: true } }));
       }
       try {
-          const { status } = await getInvoiceStatus({ invoiceId });
+          const { status, invoiceNumber } = await getInvoiceStatus({ invoiceId });
           setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
+
+          // Update the invoice number in the main confirmations state and localStorage
+          setConfirmations(prevConfirmations => {
+              const newConfirmations = prevConfirmations.map(conf => {
+                  if (conf.id === confId && conf.invoiceNumber !== invoiceNumber) {
+                      return { ...conf, invoiceNumber: invoiceNumber ?? undefined };
+                  }
+                  return conf;
+              });
+              // Only update localStorage if there was a change
+              if (JSON.stringify(newConfirmations) !== JSON.stringify(prevConfirmations)) {
+                  localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
+              }
+              return newConfirmations;
+          });
+
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
           setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));

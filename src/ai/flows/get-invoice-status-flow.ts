@@ -26,6 +26,7 @@ export type GetInvoiceStatusInput = z.infer<typeof GetInvoiceStatusInputSchema>;
 
 const GetInvoiceStatusOutputSchema = z.object({
   status: z.string(),
+  invoiceNumber: z.string().optional(),
 });
 export type GetInvoiceStatusOutput = z.infer<typeof GetInvoiceStatusOutputSchema>;
 
@@ -50,6 +51,7 @@ const getInvoiceStatusFlow = ai.defineFlow(
       
       return {
         status: invoice.status,
+        invoiceNumber: invoice.invoiceNumber,
       };
     } catch (error) {
       if (error instanceof ApiError) {
