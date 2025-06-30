@@ -143,7 +143,7 @@ export default function ProfilePage() {
             setImagePreview(reader.result as string);
             setSelectedIconName('');
         };
-        reader.readDataURL(file);
+        reader.readAsDataURL(file);
     }
   };
 
@@ -291,7 +291,7 @@ export default function ProfilePage() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Sponsor Information</CardTitle>
-                        <CardDescription>Update your personal, contact, and sponsorship details here.</CardDescription>
+                        <CardDescription>Update your personal, contact, and school details here.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
