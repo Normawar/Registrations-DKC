@@ -240,7 +240,7 @@ export default function ProfilePage() {
       
       if (activeTab === 'upload' && imageFile) {
         const sanitizedFileName = imageFile.name.replace(/\s+/g, '_');
-        const storageRef = ref(storage, `payment-proofs/${currentUser.uid}/${sanitizedFileName}`);
+        const storageRef = ref(storage, `purchase-orders/${new Date().toISOString()}/${sanitizedFileName}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 

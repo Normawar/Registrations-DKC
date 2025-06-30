@@ -295,7 +295,7 @@ export default function ConfirmationsPage() {
             }
             
             // Upload new file
-            const storageRef = ref(storage, `payment-proofs/${conf.id}/${inputs.file.name}`);
+            const storageRef = ref(storage, `purchase-orders/${conf.id}/${inputs.file.name}`);
             const snapshot = await uploadBytes(storageRef, inputs.file);
             paymentFileUrl = await getDownloadURL(snapshot.ref);
             paymentFileName = inputs.file.name;
