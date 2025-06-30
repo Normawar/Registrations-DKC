@@ -22,7 +22,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -204,6 +204,61 @@ export default function PlayersPage() {
   
   const selectedDistrict = form.watch('district');
 
+  const handleExportCsv = () => {
+    if (filteredAndSortedPlayers.length === 0) {
+        toast({
+            variant: "destructive",
+            title: "No Players to Export",
+            description: "There are no players in the current view to export."
+        });
+        return;
+    }
+
+    const headers = ['LastName', 'FirstName', 'MiddleName', 'USCF_ID', 'Rating', 'School', 'District', 'EventsCount'];
+
+    const csvRows = filteredAndSortedPlayers.map(player => {
+        const row = [
+            player.lastName,
+            player.firstName,
+            player.middleName || '',
+            player.uscfId,
+            player.rating,
+            player.school,
+            player.district,
+            player.events,
+        ];
+        return row.map(value => {
+            const stringValue = String(value ?? '').replace(/"/g, '""'); // Escape double quotes
+            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                return `"${stringValue}"`;
+            }
+            return stringValue;
+        }).join(',');
+    });
+
+    const csvContent = [headers.join(','), ...csvRows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+
+    const eventName = selectedEvent === 'all' 
+        ? 'all_players' 
+        : allEvents.find(e => e.id === selectedEvent)?.name.replace(/\s+/g, '_').toLowerCase() || 'event_players';
+    const fileName = `${eventName}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.setAttribute('download', fileName);
+    
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+        title: "Export Successful",
+        description: `${fileName} has been downloaded.`
+    });
+  };
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -214,9 +269,15 @@ export default function PlayersPage() {
               Manage player rosters for all events. (Organizer View)
             </p>
           </div>
-          <Button onClick={handleAddPlayer}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Player
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleExportCsv}>
+                <Download className="mr-2 h-4 w-4" />
+                Export to CSV
+            </Button>
+            <Button onClick={handleAddPlayer}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Player
+            </Button>
+          </div>
         </div>
 
         <Card>
