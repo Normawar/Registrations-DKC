@@ -30,6 +30,7 @@ import {
 import { schoolData } from "@/lib/data/school-data";
 import { districts as uniqueDistricts } from '@/lib/data/districts';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -52,6 +53,7 @@ const sponsorFormSchema = z.object({
 
 const SponsorSignUpForm = () => {
   const router = useRouter();
+  const { updateProfile } = useSponsorProfile();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   
   const form = useForm<z.infer<typeof sponsorFormSchema>>({
@@ -79,7 +81,31 @@ const SponsorSignUpForm = () => {
   };
   
   function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
-    console.log(values);
+    const usersRaw = localStorage.getItem('users');
+    const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
+    
+    const existingUser = users.find(user => user.email.toLowerCase() === values.email.toLowerCase());
+
+    if (existingUser) {
+        form.setError('email', {
+            type: 'manual',
+            message: `This email is already registered as an ${existingUser.role}. Please sign in or use a different email.`,
+        });
+        return;
+    }
+
+    // Add new user to the simulated user list
+    users.push({ email: values.email, role: 'sponsor' });
+    localStorage.setItem('users', JSON.stringify(users));
+
+    // Update the main profile object for the app to use
+    updateProfile({
+      ...values,
+      role: 'sponsor',
+      avatarType: 'icon',
+      avatarValue: 'KingIcon',
+    });
+
     localStorage.setItem('user_role', 'sponsor');
     router.push('/dashboard');
   }
@@ -251,6 +277,7 @@ const individualFormSchema = z.object({
 
 const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) => {
   const router = useRouter();
+  const { updateProfile } = useSponsorProfile();
   
   const form = useForm<z.infer<typeof individualFormSchema>>({
     resolver: zodResolver(individualFormSchema),
@@ -263,9 +290,44 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
   });
 
   function onSubmit(values: z.infer<typeof individualFormSchema>) {
-    console.log(values);
+    const usersRaw = localStorage.getItem('users');
+    const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
+
+    const existingUser = users.find(user => user.email.toLowerCase() === values.email.toLowerCase());
+
+    if (existingUser) {
+        form.setError('email', {
+            type: 'manual',
+            message: `This email is already registered as an ${existingUser.role}. Please sign in or use a different email.`,
+        });
+        return;
+    }
+
+    // Add new user to the simulated user list
+    users.push({ email: values.email, role });
+    localStorage.setItem('users', JSON.stringify(users));
+
+    // Update the main profile object for the app to use
+    updateProfile({
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        phone: '',
+        district: '',
+        school: '',
+        gtCoordinatorEmail: '',
+        role: role,
+        avatarType: 'icon',
+        avatarValue: 'PawnIcon',
+    });
+
     localStorage.setItem('user_role', role);
-    const path = role === 'individual' ? '/individual-dashboard' : '/dashboard';
+    let path = '/dashboard';
+    if (role === 'individual') {
+      path = '/individual-dashboard';
+    } else if (role === 'organizer') {
+      path = '/manage-events';
+    }
     router.push(path);
   }
 
