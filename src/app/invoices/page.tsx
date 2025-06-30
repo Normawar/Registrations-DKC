@@ -160,8 +160,12 @@ function InvoicesComponent() {
                 district: profile.district,
             }));
             
-            const allMyInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices];
-            invoicesToDisplay = allMyInvoices.filter(inv => inv.schoolName === profile.school);
+            const allPossibleInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices, ...mockOrganizerInvoices];
+            const schoolInvoices = allPossibleInvoices.filter(inv => inv.schoolName === profile.school);
+
+            // De-duplicate based on invoiceId to avoid showing the same invoice twice if it's in multiple sources.
+            const uniqueInvoices = Array.from(new Map(schoolInvoices.map(inv => [inv.invoiceId || inv.id, inv])).values());
+            invoicesToDisplay = uniqueInvoices;
         }
 
         invoicesToDisplay.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
