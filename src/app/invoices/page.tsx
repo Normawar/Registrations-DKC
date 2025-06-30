@@ -160,7 +160,10 @@ function InvoicesComponent() {
                 district: inv.district,
             }));
 
-            const allPossibleInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices, ...mockOrganizerInvoices];
+            const sponsorCreatedInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices];
+            const organizerCreatedInvoices = mockOrganizerInvoices.filter(inv => inv.schoolName === profile.school);
+            
+            const allPossibleInvoices = [...sponsorCreatedInvoices, ...organizerCreatedInvoices];
             
             const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
             for (const inv of allPossibleInvoices) {
@@ -169,9 +172,7 @@ function InvoicesComponent() {
                     uniqueInvoicesMap.set(key, inv);
                 }
             }
-            const uniqueInvoices = Array.from(uniqueInvoicesMap.values());
-            
-            invoicesToDisplay = uniqueInvoices.filter(inv => inv.schoolName === profile.school);
+            invoicesToDisplay = Array.from(uniqueInvoicesMap.values());
         }
 
         invoicesToDisplay.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
@@ -371,5 +372,3 @@ export default function InvoicesPage() {
         </Suspense>
     )
 }
-
-    
