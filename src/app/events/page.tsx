@@ -252,7 +252,7 @@ export default function EventsPage() {
         });
 
         try {
-            const { invoiceId, invoiceUrl } = await createInvoice({
+            const { invoiceId, invoiceUrl, status } = await createInvoice({
                 sponsorName: 'Sponsor Name', // Hardcoded for prototype
                 sponsorEmail: 'sponsor@chessmate.com', // Hardcoded for prototype
                 teamCode: teamCode,
@@ -272,6 +272,7 @@ export default function EventsPage() {
                 invoiceId,
                 invoiceUrl,
                 teamCode: teamCode,
+                invoiceStatus: status,
             };
 
             const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');

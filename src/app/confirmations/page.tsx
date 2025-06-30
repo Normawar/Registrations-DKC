@@ -28,13 +28,14 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
+import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { auth, storage } from '@/lib/firebase';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -94,6 +95,7 @@ type Confirmation = {
   amountPaid?: string;
   paymentFileName?: string;
   paymentFileUrl?: string;
+  invoiceStatus?: string;
 };
 
 type ConfirmationInputs = {
@@ -114,7 +116,36 @@ export default function ConfirmationsPage() {
   const [confInputs, setConfInputs] = useState<Record<string, Partial<ConfirmationInputs>>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   const [authError, setAuthError] = useState<string | null>(null);
+  const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   
+  const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
+    confirmationsToFetch.forEach(conf => {
+        if (conf.invoiceId) {
+            fetchInvoiceStatus(conf.id, conf.invoiceId, true);
+        }
+    });
+  };
+
+  const fetchInvoiceStatus = async (confId: string, invoiceId: string, silent = false) => {
+      if (!silent) {
+          setStatuses(prev => ({ ...prev, [confId]: { ...prev[confId], isLoading: true } }));
+      }
+      try {
+          const { status } = await getInvoiceStatus({ invoiceId });
+          setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
+      } catch (error) {
+          console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
+          setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
+          if (!silent) {
+            toast({
+                variant: "destructive",
+                title: "Could not refresh status",
+                description: "Failed to get the latest invoice status from Square."
+            });
+          }
+      }
+  };
+
   useEffect(() => {
     // Attempt anonymous auth on load, but don't block UI
     const authenticate = async () => {
@@ -138,6 +169,7 @@ export default function ConfirmationsPage() {
       setConfirmations(storedConfirmations);
 
       const initialInputs: Record<string, Partial<ConfirmationInputs>> = {};
+      const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
       for (const conf of storedConfirmations) {
           initialInputs[conf.id] = {
               paymentMethod: conf.paymentMethod || 'po',
@@ -149,8 +181,11 @@ export default function ConfirmationsPage() {
               paymentFileName: conf.paymentFileName,
               paymentFileUrl: conf.paymentFileUrl,
           };
+          initialStatuses[conf.id] = { status: conf.invoiceStatus || 'LOADING', isLoading: true };
       }
       setConfInputs(initialInputs);
+      setStatuses(initialStatuses);
+      fetchAllInvoiceStatuses(storedConfirmations);
     } catch (error) {
         console.error("Failed to load or parse confirmations from localStorage", error);
         setConfirmations([]);
@@ -158,6 +193,34 @@ export default function ConfirmationsPage() {
   }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
+
+  const getStatusBadgeVariant = (status?: string): string => {
+    if (!status) return 'bg-gray-400';
+    switch (status.toUpperCase()) {
+        case 'PAID':
+            return 'bg-green-600 text-white';
+        case 'DRAFT':
+            return 'bg-gray-500';
+        case 'PUBLISHED':
+            return 'bg-blue-500 text-white';
+        case 'UNPAID':
+        case 'PARTIALLY_PAID':
+            return 'bg-yellow-500 text-black';
+        case 'CANCELED':
+        case 'VOIDED':
+        case 'FAILED':
+            return 'bg-red-600 text-white';
+        case 'PAYMENT_PENDING':
+            return 'bg-purple-500 text-white';
+        case 'REFUNDED':
+        case 'PARTIALLY_REFUNDED':
+            return 'bg-indigo-500 text-white';
+        case 'LOADING':
+            return 'bg-muted text-muted-foreground animate-pulse';
+        default:
+            return 'bg-muted text-muted-foreground';
+    }
+  };
 
   const handleInputChange = (confId: string, field: keyof ConfirmationInputs, value: any) => {
     setConfInputs(prev => ({
@@ -230,6 +293,7 @@ export default function ConfirmationsPage() {
 
         await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
         toastMessage = "Payment information has been saved and the invoice has been updated.";
+        fetchInvoiceStatus(conf.id, conf.invoiceId); // Refresh status after update
 
         // Step 3: Update local state and localStorage
         const updatedConfirmations = confirmations.map(c => {
@@ -309,34 +373,48 @@ export default function ConfirmationsPage() {
                 {confirmations.map((conf) => {
                   const currentInputs = confInputs[conf.id] || {};
                   const selectedMethod = currentInputs.paymentMethod || 'po';
+                  const currentStatus = statuses[conf.id];
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
                     <AccordionTrigger>
-                      <div className="flex justify-between w-full pr-4">
+                      <div className="flex justify-between items-center w-full pr-4">
                         <div className="flex flex-col items-start text-left">
                             <span className="font-semibold">{conf.eventName}</span>
                             <span className="text-sm text-muted-foreground">
                             Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')}
                             </span>
                         </div>
-                        <div className="text-right">
-                            <span className="font-semibold">${conf.totalInvoiced.toFixed(2)}</span>
-                            <span className="text-sm text-muted-foreground block">
-                                {Object.keys(conf.selections).length} Player(s)
-                            </span>
+                        <div className="flex items-center gap-4">
+                            {currentStatus && (
+                                <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus.status))}>
+                                    {currentStatus.isLoading && currentStatus.status === 'LOADING' ? 'Loading...' : currentStatus.status?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
+                                </Badge>
+                            )}
+                            <div className="text-right">
+                                <span className="font-semibold">${conf.totalInvoiced.toFixed(2)}</span>
+                                <span className="text-sm text-muted-foreground block">
+                                    {Object.keys(conf.selections).length} Player(s)
+                                </span>
+                            </div>
                         </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                          <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
-                          <Button asChild variant="outline" size="sm">
-                            <a href={conf.invoiceUrl} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="mr-2 h-4 w-4" /> View Invoice on Square
-                            </a>
-                          </Button>
+                            <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
+                            <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId)} disabled={currentStatus?.isLoading}>
+                                    <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} />
+                                    Refresh Status
+                                </Button>
+                                <Button asChild variant="outline" size="sm">
+                                    <a href={conf.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="mr-2 h-4 w-4" /> View Invoice
+                                    </a>
+                                </Button>
+                            </div>
                         </div>
                         <Table>
                           <TableHeader>
