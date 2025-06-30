@@ -19,7 +19,7 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
   const handleLogin = () => {
     setError('');
     if (!email) {
-      // Don't check on empty email, let browser validation handle it if needed
+      // Let browser validation handle it if needed
       return;
     }
 
@@ -28,15 +28,17 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
     
     const existingUser = users.find(user => user.email.toLowerCase() === email.toLowerCase());
 
-    // If a user is found, check their role matches the login tab.
-    if (existingUser && existingUser.role !== role) {
-      setError(`This email is for an ${existingUser.role}. Please use the correct tab.`);
+    if (!existingUser) {
+        setError('This email is not registered. Please sign up.');
+        return;
+    }
+
+    if (existingUser.role !== role) {
+      setError(`This email is registered as an ${existingUser.role}. Please use the correct tab to sign in.`);
       return;
     }
     
-    // In this prototype, we don't have real authentication.
-    // The main goal is to prevent cross-role login attempts.
-    
+    // Role matches, proceed with login
     localStorage.setItem('user_role', role);
 
     let path = '/dashboard';
