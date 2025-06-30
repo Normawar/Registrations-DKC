@@ -71,7 +71,7 @@ Example Input HTML Snippet:
 <td><a href="MbrDtlMain.php?14922025">14922025</a></td><td align="right">1111</td><td align="right">1112</td><td align="right">644</td><td align="right">Unrated</td><td align="right">Unrated</td><td align="right">Unrated</td><td>TX</td><td>2025-11-30</td><td>GUERRA, ZEFERINO ANTONIO</td>
 </tr>
 <tr>
-<td><a href="MbrDtlMain.php?16595724">16595724</a></td><td align="right">417/5</td><td align="right">420/5</td><td align="right">Unrated</td><td align="right">Unrated</td><td align="right">TX</td><td>2019-01-31</td><td>GUTIERREZ, ZEFERINO</td>
+<td><a href="MbrDtlMain.php?16595724">16595724</a></td><td align="right">417/5</td><td align="right">420/5</td><td align="right">Unrated</td><td align="right">Unrated</td><td>TX</td><td>2019-01-31</td><td>GUTIERREZ, ZEFERINO</td>
 </tr>
 </table>
 \`\`\`
@@ -93,7 +93,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
     
     const stateParam = (state && state !== 'ALL') ? state : '';
-    const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}&state=${encodeURIComponent(stateParam)}&ratingmin=&ratingmax=&order=N&rating=R&mode=Find`;
+    const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}&state=${encodeURIComponent(stateParam)}&ratingmin=&ratingmax=&order=N&rating=R&mode=Find&_cacheBust=${Date.now()}`;
     
     try {
       const response = await fetch(url, { cache: 'no-store' });
