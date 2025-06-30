@@ -136,7 +136,7 @@ export default function ProfilePage() {
   const [isSavingPicture, setIsSavingPicture] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -166,14 +166,15 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    if (!auth) {
-        setIsAuthLoading(false);
-        setAuthError("Firebase is not configured correctly. Please check your .env file.");
+    if (!auth || !storage) {
+        setIsAuthReady(false);
+        setAuthError("Firebase is not configured, so file uploads are disabled. Please check your .env file.");
         return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
         if (user) {
             setCurrentUser(user);
+            setIsAuthReady(true);
             setAuthError(null);
         } else {
             signInAnonymously(auth).catch((error) => {
@@ -183,9 +184,9 @@ export default function ProfilePage() {
                 } else {
                     setAuthError("An authentication error occurred. File uploads are disabled.");
                 }
+                setIsAuthReady(false);
             });
         }
-        setIsAuthLoading(false);
     });
     return () => unsubscribe();
   }, []);
@@ -241,7 +242,7 @@ export default function ProfilePage() {
   const handleSavePicture = async () => {
     setIsSavingPicture(true);
     try {
-      if (!currentUser) {
+      if (!isAuthReady) {
           const message = authError || "Authentication is not ready. Cannot upload files.";
           toast({ variant: 'destructive', title: 'Upload Failed', description: message });
           setIsSavingPicture(false);
@@ -255,7 +256,7 @@ export default function ProfilePage() {
       
       if (activeTab === 'upload' && imageFile) {
         const sanitizedFileName = imageFile.name.replace(/\s+/g, '_');
-        const storageRef = ref(storage, `purchase-orders/${currentUser.uid}/${sanitizedFileName}`);
+        const storageRef = ref(storage, `avatars/${currentUser!.uid}/${sanitizedFileName}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
@@ -317,7 +318,7 @@ export default function ProfilePage() {
   const selectedDistrict = profileForm.watch('district');
   const SelectedIconComponent = selectedIconName ? icons[selectedIconName] : null;
 
-  if (isAuthLoading || !profile) {
+  if (!profile) {
     return (
         <AppLayout>
             <ProfilePageSkeleton />
@@ -325,7 +326,7 @@ export default function ProfilePage() {
     );
   }
   
-  const isSavePictureDisabled = isSavingPicture || !currentUser;
+  const isSavePictureDisabled = isSavingPicture || !isAuthReady;
 
   return (
     <AppLayout>
@@ -362,7 +363,7 @@ export default function ProfilePage() {
 
         {authError && (
           <Alert variant="destructive">
-            <AlertTitle>Authentication Error</AlertTitle>
+            <AlertTitle>File Uploads Disabled</AlertTitle>
             <AlertDescription>{authError}</AlertDescription>
           </Alert>
         )}
@@ -390,15 +391,15 @@ export default function ProfilePage() {
                         )}
                     </Avatar>
                      <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavePictureDisabled}>
-                        {isSavingPicture ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {isSavingPicture ? 'Saving...' : 'Save Picture'}
+                        {isSavingPicture || !isAuthReady ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isSavingPicture ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Picture'}
                      </Button>
                 </div>
                 <div className="md:col-span-2">
                     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'icon' | 'upload')}>
                         <TabsList className="grid w-full grid-cols-2">
                             <TabsTrigger value="icon">Choose Icon</TabsTrigger>
-                            <TabsTrigger value="upload" disabled={!currentUser}>Upload Photo</TabsTrigger>
+                            <TabsTrigger value="upload" disabled={!isAuthReady}>Upload Photo</TabsTrigger>
                         </TabsList>
                         <TabsContent value="icon" className="pt-4">
                             <p className="text-sm text-muted-foreground mb-4">Select a chess piece as your avatar.</p>
@@ -420,7 +421,7 @@ export default function ProfilePage() {
                             <p className="text-sm text-muted-foreground mb-4">For best results, upload a square image.</p>
                             <div className="flex gap-2">
                                 <Input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!currentUser}>Choose File</Button>
+                                <Button type="button" variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={!isAuthReady}>Choose File</Button>
                             </div>
                         </TabsContent>
                     </Tabs>

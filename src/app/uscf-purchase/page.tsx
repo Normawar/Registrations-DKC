@@ -139,8 +139,9 @@ function UscfPurchaseComponent() {
     });
 
     useEffect(() => {
-        if (!auth) {
+        if (!auth || !storage) {
             setIsAuthReady(false);
+            setAuthError("Firebase is not configured, so file uploads are disabled. Please check your .env file.");
             return;
         }
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -227,7 +228,7 @@ function UscfPurchaseComponent() {
             
             const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
             localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newMembershipInvoice]));
-            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new Event('all_invoices_updated'));
 
             toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {
@@ -491,7 +492,7 @@ function UscfPurchaseComponent() {
                         <CardContent className="space-y-6 pt-6">
                             {authError && (
                               <Alert variant="destructive">
-                                <AlertTitle>Uploads Disabled</AlertTitle>
+                                <AlertTitle>File Uploads Disabled</AlertTitle>
                                 <AlertDescription>{authError}</AlertDescription>
                               </Alert>
                             )}

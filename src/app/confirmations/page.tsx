@@ -171,8 +171,9 @@ export default function ConfirmationsPage() {
   };
 
   useEffect(() => {
-    if (!auth) {
+    if (!auth || !storage) {
         setIsAuthReady(false);
+        setAuthError("Firebase is not configured, so file uploads are disabled. Please check your .env file.");
         return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -391,7 +392,7 @@ export default function ConfirmationsPage() {
 
         {authError && (
           <Alert variant="destructive">
-            <AlertTitle>Uploads Disabled</AlertTitle>
+            <AlertTitle>File Uploads Disabled</AlertTitle>
             <AlertDescription>{authError}</AlertDescription>
           </Alert>
         )}
@@ -651,14 +652,12 @@ export default function ConfirmationsPage() {
                           onClick={() => handleSavePayment(conf)} 
                           disabled={isLoading}
                         >
-                            {isUpdating[conf.id] ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : !isAuthReady ? (
+                            {isLoading ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
                                 <UploadCloud className="mr-2 h-4 w-4" />
                             )}
-                            {isUpdating[conf.id] ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Payment & Update Invoice'}
+                            {isLoading ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Payment & Update Invoice'}
                         </Button>
                       </div>
 
