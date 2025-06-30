@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { Client, Environment, ApiError } from 'square';
 import { format } from 'date-fns';

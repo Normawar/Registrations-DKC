@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import {z} from 'genkit';
 import { Client, Environment, ApiError } from 'square';
 
 // Initialize Square client
