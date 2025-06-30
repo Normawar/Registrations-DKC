@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, Suspense, ReactNode } from 'react';
@@ -76,6 +77,16 @@ type PaymentInputs = {
   paymentFileUrl?: string;
 };
 
+type InvoiceState = CreateMembershipInvoiceOutput & { 
+    playerCount: number;
+    membershipType: string;
+    submissionTimestamp: string;
+    totalInvoiced: number;
+    purchaserName: string;
+    purchaserEmail: string;
+};
+
+
 function UscfPurchaseComponent() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
@@ -86,7 +97,7 @@ function UscfPurchaseComponent() {
     const justification = searchParams.get('justification') || 'No justification provided.';
     const price = parseFloat(searchParams.get('price') || '0');
     
-    const [invoice, setInvoice] = useState<(CreateMembershipInvoiceOutput & { playerCount: number, membershipType: string }) | null>(null);
+    const [invoice, setInvoice] = useState<InvoiceState | null>(null);
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
 
     const [paymentInputs, setPaymentInputs] = useState<Partial<PaymentInputs>>({
@@ -191,8 +202,23 @@ function UscfPurchaseComponent() {
                 fee: price,
                 players: playersToInvoice
             });
-            setInvoice({...result, playerCount: values.players.length, membershipType: membershipType });
+
+            const newMembershipInvoice: InvoiceState = {
+                ...result,
+                playerCount: values.players.length,
+                membershipType: membershipType,
+                submissionTimestamp: new Date().toISOString(),
+                totalInvoiced: price * values.players.length,
+                purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
+                purchaserEmail: sponsorProfile.email,
+            };
+
+            setInvoice(newMembershipInvoice);
             setInvoiceStatus(result.status);
+            
+            const existingInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
+            localStorage.setItem('membershipInvoices', JSON.stringify([...existingInvoices, newMembershipInvoice]));
+
             toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {
             const description = error instanceof Error ? error.message : "An unknown error occurred.";

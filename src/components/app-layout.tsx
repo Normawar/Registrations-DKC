@@ -25,7 +25,7 @@ import {
   KnightIcon,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 
@@ -35,6 +35,7 @@ const menuItems = [
   { href: "/roster", icon: PawnIcon, label: "Roster" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
+  { href: "/invoices", icon: Receipt, label: "Invoices" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
 ];
