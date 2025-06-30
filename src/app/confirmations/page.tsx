@@ -95,6 +95,18 @@ export default function ConfirmationsPage() {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     setConfirmations(storedConfirmations);
+
+    const ensureAnonymousAuth = async () => {
+      if (auth && !auth.currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (error) {
+          console.error("Anonymous sign-in failed on page load:", error);
+        }
+      }
+    };
+
+    ensureAnonymousAuth();
   }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
@@ -127,19 +139,17 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            // Check if Firebase services are available right before using them.
+            // Ensure auth and storage services are available. This check is a safeguard.
             if (!auth || !storage) {
-              toast({
-                variant: 'destructive',
-                title: 'Firebase Not Configured',
-                description: "To enable uploads, add your Firebase credentials to the .env file and restart the server.",
-                duration: 9000,
-              });
-              setIsUpdating(prev => ({...prev, [conf.id]: false}));
-              return;
+                 toast({
+                    variant: 'destructive',
+                    title: 'Authentication Service Not Ready',
+                    description: 'The Firebase service is not available. Please refresh the page and try again.',
+                 });
+                 setIsUpdating(prev => ({...prev, [conf.id]: false}));
+                 return;
             }
 
-            // Auth check guard clause
             if (!auth.currentUser) {
               try {
                 await signInAnonymously(auth);
@@ -318,11 +328,6 @@ export default function ConfirmationsPage() {
                                   onChange={(e) => handlePoFileChange(conf.id, e)}
                                   disabled={isUpdating[conf.id]}
                                 />
-                                {!storage && (
-                                  <p className="text-xs text-muted-foreground pt-1">
-                                    To enable uploads, add your Firebase credentials to the <code>.env</code> file and restart the server.
-                                  </p>
-                                )}
                                 {poInputs[conf.id]?.file ? (
                                     <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
                                         <FileIcon className="h-4 w-4" />
@@ -363,3 +368,5 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
+
+    
