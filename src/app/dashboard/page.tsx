@@ -21,35 +21,31 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import {
-  RookIcon,
-  PawnIcon,
-} from "@/components/icons/chess-icons";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
 import { useMemo } from "react";
 import { format } from "date-fns";
-import { FileText, ImageIcon } from "lucide-react";
+import { FileText, ImageIcon, Info } from "lucide-react";
+import { useRoster } from "@/hooks/use-roster";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
-const rosterPlayers = [
-    { id: "1", firstName: "Alex", lastName: "Ray", email: 'alex.ray@example.com', rating: 1850 },
-    { id: "2", firstName: "Jordan", lastName: "Lee", email: 'jordan.lee@example.com', rating: 2100 },
-    { id: "3", firstName: "Casey", lastName: "Becker", email: 'casey.becker@example.com', rating: 1500 },
-    { id: "4", firstName: "Morgan", lastName: "Taylor", email: 'morgan.taylor@example.com', rating: 1720 },
-    { id: "5", firstName: "Riley", lastName: "Quinn", email: 'riley.quinn@example.com', rating: 1980 },
-    { id: "6", firstName: "Skyler", lastName: "Jones", email: 'skyler.jones@example.com', rating: 1650 },
-    { id: "7", firstName: "Drew", lastName: "Smith", email: 'drew.smith@example.com', rating: 2050 },
-];
 
 export default function DashboardPage() {
   const { events } = useEvents();
+  const { players: rosterPlayers } = useRoster();
 
   const upcomingEvents = useMemo(() => {
     return events
       .filter(event => new Date(event.date) >= new Date())
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [events]);
+
+  const playersWithMissingInfo = useMemo(() => {
+    return rosterPlayers.filter(player => {
+      return !player.uscfId || !player.grade || !player.section || !player.email || !player.dob || !player.zipCode;
+    });
+  }, [rosterPlayers]);
 
 
   return (
@@ -61,6 +57,17 @@ export default function DashboardPage() {
             An overview of your sponsored activities.
           </p>
         </div>
+
+        {playersWithMissingInfo.length > 0 && (
+          <Alert variant="destructive">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Incomplete Player Information</AlertTitle>
+            <AlertDescription>
+              The following players on your roster have missing details: {playersWithMissingInfo.map(p => `${p.firstName} ${p.lastName}`).join(', ')}. 
+              Please <Link href="/roster" className="font-bold underline">update their profiles</Link> to ensure they can be registered for events.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="grid gap-4">
           <Card>
@@ -113,7 +120,7 @@ export default function DashboardPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9">
-                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} />
+                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
                             <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
                           </Avatar>
                           <div>
@@ -124,7 +131,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">{player.rating}</TableCell>
+                      <TableCell className="text-right">{player.rating || 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
