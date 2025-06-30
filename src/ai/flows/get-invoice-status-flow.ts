@@ -43,6 +43,7 @@ const getInvoiceStatusFlow = ai.defineFlow(
   async (input) => {
     const accessToken = process.env.SQUARE_ACCESS_TOKEN;
     if (!accessToken || accessToken.startsWith('YOUR_')) {
+        console.error(`SQUARE_CONFIG_ERROR: Missing Square credentials: SQUARE_ACCESS_TOKEN. Please set it in your .env file.`);
         throw new Error(
             `Square configuration is incomplete. Please set SQUARE_ACCESS_TOKEN in your .env file. You can find this in your Square Developer Dashboard.`
         );

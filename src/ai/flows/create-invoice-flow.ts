@@ -65,6 +65,10 @@ const createInvoiceFlow = ai.defineFlow(
       const missingVars: string[] = [];
       if (!accessToken || accessToken.startsWith('YOUR_')) missingVars.push('SQUARE_ACCESS_TOKEN');
       if (!locationId || locationId.startsWith('YOUR_')) missingVars.push('SQUARE_LOCATION_ID');
+      
+      console.error(`SQUARE_CONFIG_ERROR: Missing Square credentials: ${missingVars.join(
+          ', '
+        )}. Please set them in your .env file.`);
 
       throw new Error(
         `Square configuration is incomplete. Please set: ${missingVars.join(
