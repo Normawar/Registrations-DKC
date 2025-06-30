@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { signInAnonymously } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import Image from 'next/image';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -37,6 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { auth, storage } from '@/lib/firebase';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -70,6 +72,8 @@ type PlayerRegistration = {
 };
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
+type PaymentMethod = 'po' | 'check' | 'cashapp' | 'zelle';
+
 type Confirmation = {
   id: string;
   eventName: string;
@@ -80,130 +84,167 @@ type Confirmation = {
   invoiceId: string;
   invoiceUrl: string;
   teamCode: string;
+  paymentMethod?: PaymentMethod;
   poNumber?: string;
-  poFileName?: string;
-  poFileUrl?: string;
+  checkNumber?: string;
+  amountPaid?: string;
+  paymentFileName?: string;
+  paymentFileUrl?: string;
 };
+
+type ConfirmationInputs = {
+  paymentMethod: PaymentMethod;
+  poNumber: string;
+  checkNumber: string;
+  amountPaid: string;
+  file: File | null;
+  paymentFileName?: string;
+  paymentFileUrl?: string;
+};
+
 
 export default function ConfirmationsPage() {
   const { toast } = useToast();
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
-  const [poInputs, setPoInputs] = useState<Record<string, { number: string; file: File | null }>>({});
+  const [confInputs, setConfInputs] = useState<Record<string, Partial<ConfirmationInputs>>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
     // Load confirmations from local storage
-    const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-    storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
-    setConfirmations(storedConfirmations);
+    try {
+      const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+      storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+      setConfirmations(storedConfirmations);
+
+      const initialInputs: Record<string, Partial<ConfirmationInputs>> = {};
+      for (const conf of storedConfirmations) {
+          initialInputs[conf.id] = {
+              paymentMethod: conf.paymentMethod || 'po',
+              poNumber: conf.poNumber || '',
+              checkNumber: conf.checkNumber || '',
+              amountPaid: conf.amountPaid || '',
+              file: null,
+              paymentFileName: conf.paymentFileName,
+              paymentFileUrl: conf.paymentFileUrl,
+          };
+      }
+      setConfInputs(initialInputs);
+    } catch (error) {
+        console.error("Failed to load or parse confirmations from localStorage", error);
+        setConfirmations([]);
+    }
   }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
 
-  const handlePoInputChange = (confId: string, value: string) => {
-    setPoInputs(prev => ({
-      ...prev,
-      [confId]: { ...(prev[confId] || { file: null }), number: value }
+  const handleInputChange = (confId: string, field: keyof ConfirmationInputs, value: any) => {
+    setConfInputs(prev => ({
+        ...prev,
+        [confId]: {
+            ...prev[confId],
+            [field]: value,
+        },
     }));
   };
 
-  const handlePoFileChange = (confId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setPoInputs(prev => ({
-      ...prev,
-      [confId]: { ...(prev[confId] || { number: '' }), file }
-    }));
+  const handleFileChange = (confId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0] || null;
+      handleInputChange(confId, 'file', file);
   };
   
-  const handleSavePo = async (conf: Confirmation) => {
-    setIsUpdating(prev => ({...prev, [conf.id]: true}));
+  const handleSavePayment = async (conf: Confirmation) => {
+    setIsUpdating(prev => ({ ...prev, [conf.id]: true }));
     
-    const poNumber = poInputs[conf.id]?.number !== undefined ? poInputs[conf.id].number : conf.poNumber ?? '';
-    const poFile = poInputs[conf.id]?.file;
+    const inputs = confInputs[conf.id] || {};
+    const paymentMethod = inputs.paymentMethod || 'po';
 
     try {
-        let poFileName = conf.poFileName;
-        let poFileUrl = conf.poFileUrl;
-        let toastMessage = "Your changes have been saved locally.";
-
-        // Upload new file if there is one
-        if (poFile) {
-            if (!auth || !storage) {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Upload Failed',
-                    description: 'Firebase is not available. Please check your .env configuration.',
-                 });
-                 setIsUpdating(prev => ({...prev, [conf.id]: false}));
-                 return;
+        // Step 1: Ensure authentication for file uploads if needed
+        if (inputs.file) {
+            if (!auth) {
+                toast({ variant: 'destructive', title: 'Upload Failed', description: 'Firebase is not available. Please check your .env configuration.' });
+                setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
+                return;
             }
-
-            // Ensure user is signed in before uploading
             if (!auth.currentUser) {
                 try {
                     await signInAnonymously(auth);
                 } catch (error) {
                     console.error("Anonymous sign-in failed:", error);
-                    toast({
-                        variant: 'destructive',
-                        title: 'Authentication Failed',
-                        description: 'Could not sign in to upload file. Please ensure anonymous sign-in is enabled in your Firebase project.',
-                    });
-                    setIsUpdating(prev => ({...prev, [conf.id]: false}));
+                    toast({ variant: 'destructive', title: 'Authentication Failed', description: 'Could not sign in to upload file. Please enable anonymous sign-in in your Firebase project.' });
+                    setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
                     return;
                 }
             }
-            
-            const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
-            const snapshot = await uploadBytes(storageRef, poFile);
-            poFileUrl = await getDownloadURL(snapshot.ref);
-            poFileName = poFile.name;
         }
         
-      const teamCode = conf.teamCode || generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
+        let paymentFileName = conf.paymentFileName;
+        let paymentFileUrl = conf.paymentFileUrl;
 
-      if (poNumber && teamCode) {
-        const newTitle = `${teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName} PO: ${poNumber}`;
-        await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
-        toastMessage = "Purchase Order information has been saved and the invoice has been updated.";
-      }
-
-      const updatedConfirmations = confirmations.map(c => {
-        if (c.id === conf.id) {
-          return {
-            ...c,
-            poNumber: poNumber,
-            poFileName: poFileName,
-            poFileUrl: poFileUrl,
-            teamCode: teamCode,
-          };
+        // Step 2: Upload new file if there is one
+        if (inputs.file && storage) {
+            const storageRef = ref(storage, `payment-proofs/${conf.id}/${inputs.file.name}`);
+            const snapshot = await uploadBytes(storageRef, inputs.file);
+            paymentFileUrl = await getDownloadURL(snapshot.ref);
+            paymentFileName = inputs.file.name;
         }
-        return c;
-      });
+        
+        // Step 3: Update Square Invoice Title
+        const teamCode = conf.teamCode || generateTeamCode({ schoolName: 'SHARYLAND PIONEER H S', district: 'SHARYLAND ISD' });
+        let newTitle = `${teamCode} @ ${format(new Date(conf.eventDate), 'MM/dd/yyyy')} ${conf.eventName}`;
+        let toastMessage = "Payment information has been saved.";
 
-      localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-      setConfirmations(updatedConfirmations);
+        switch (paymentMethod) {
+            case 'po':
+                if (inputs.poNumber) newTitle += ` PO: ${inputs.poNumber}`;
+                break;
+            case 'check':
+                if (inputs.checkNumber) newTitle += ` via Check #${inputs.checkNumber}`;
+                break;
+            case 'cashapp':
+                newTitle += ` via CashApp`;
+                break;
+            case 'zelle':
+                newTitle += ` via Zelle`;
+                break;
+        }
+
+        await updateInvoiceTitle({ invoiceId: conf.invoiceId, title: newTitle });
+        toastMessage = "Payment information has been saved and the invoice has been updated.";
+
+        // Step 4: Update local state and localStorage
+        const updatedConfirmations = confirmations.map(c => {
+            if (c.id === conf.id) {
+                return {
+                    ...c,
+                    teamCode,
+                    paymentMethod,
+                    poNumber: inputs.poNumber,
+                    checkNumber: inputs.checkNumber,
+                    amountPaid: inputs.amountPaid,
+                    paymentFileName,
+                    paymentFileUrl,
+                };
+            }
+            return c;
+        });
+
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+        setConfirmations(updatedConfirmations);
       
-      setPoInputs(prev => ({
-        ...prev,
-        [conf.id]: { number: poNumber, file: null },
-      }));
-      
-      toast({
-          title: "Success",
-          description: toastMessage,
-      });
+        // Update the inputs state to reflect saved data and clear the file
+        handleInputChange(conf.id, 'file', null);
+        handleInputChange(conf.id, 'paymentFileName', paymentFileName);
+        handleInputChange(conf.id, 'paymentFileUrl', paymentFileUrl);
+        
+        toast({ title: "Success", description: toastMessage });
 
     } catch (error) {
-        console.error("Failed to update PO information:", error);
+        console.error("Failed to update payment information:", error);
         const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-        toast({
-            variant: "destructive",
-            title: "Update Failed",
-            description: errorMessage,
-        });
+        toast({ variant: "destructive", title: "Update Failed", description: errorMessage });
     } finally {
-        setIsUpdating(prev => ({...prev, [conf.id]: false}));
+        setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
     }
   };
 
@@ -232,7 +273,11 @@ export default function ConfirmationsPage() {
               </div>
             ) : (
               <Accordion type="single" collapsible className="w-full">
-                {confirmations.map((conf) => (
+                {confirmations.map((conf) => {
+                  const currentInputs = confInputs[conf.id] || {};
+                  const selectedMethod = currentInputs.paymentMethod || 'po';
+
+                  return (
                   <AccordionItem key={conf.id} value={conf.id}>
                     <AccordionTrigger>
                       <div className="flex justify-between w-full pr-4">
@@ -296,45 +341,105 @@ export default function ConfirmationsPage() {
                         </Table>
                       </div>
 
-                      <div className="space-y-4 pt-6 mt-6 border-t">
-                        <h4 className="font-semibold">Purchase Order Information</h4>
-                        <div className="grid md:grid-cols-2 gap-4 items-start">
+                      <div className="space-y-6 pt-6 mt-6 border-t">
+                        <h4 className="font-semibold">Payment Information</h4>
+                        
+                        <RadioGroup
+                            value={selectedMethod}
+                            onValueChange={(value) => handleInputChange(conf.id, 'paymentMethod', value as PaymentMethod)}
+                            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                        >
+                            <div><RadioGroupItem value="po" id={`po-${conf.id}`} className="peer sr-only" />
+                                <Label htmlFor={`po-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                Purchase Order</Label></div>
+                            <div><RadioGroupItem value="check" id={`check-${conf.id}`} className="peer sr-only" />
+                                <Label htmlFor={`check-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                Pay with Check</Label></div>
+                            <div><RadioGroupItem value="cashapp" id={`cashapp-${conf.id}`} className="peer sr-only" />
+                                <Label htmlFor={`cashapp-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                Cash App</Label></div>
+                            <div><RadioGroupItem value="zelle" id={`zelle-${conf.id}`} className="peer sr-only" />
+                                <Label htmlFor={`zelle-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                Zelle</Label></div>
+                        </RadioGroup>
+
+                        {selectedMethod === 'po' && (
+                          <div className="grid md:grid-cols-2 gap-4 items-start">
                             <div className="space-y-2">
                                 <Label htmlFor={`po-number-${conf.id}`}>PO Number</Label>
-                                <Input
-                                    id={`po-number-${conf.id}`}
-                                    placeholder="Enter PO Number"
-                                    value={poInputs[conf.id]?.number ?? conf.poNumber ?? ''}
-                                    onChange={(e) => handlePoInputChange(conf.id, e.target.value)}
-                                    disabled={isUpdating[conf.id]}
-                                />
+                                <Input id={`po-number-${conf.id}`} placeholder="Enter PO Number" value={currentInputs.poNumber || ''} onChange={(e) => handleInputChange(conf.id, 'poNumber', e.target.value)} disabled={isUpdating[conf.id]} />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor={`po-file-${conf.id}`}>Upload PO Document</Label>
-                                <Input 
-                                  id={`po-file-${conf.id}`} 
-                                  type="file"
-                                  onChange={(e) => handlePoFileChange(conf.id, e)}
-                                  disabled={isUpdating[conf.id]}
-                                />
-                                {poInputs[conf.id]?.file ? (
-                                    <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1">
-                                        <FileIcon className="h-4 w-4" />
-                                        <span>Selected: {poInputs[conf.id].file.name}</span>
-                                    </div>
-                                ) : conf.poFileUrl && conf.poFileName ? (
-                                    <div className="pt-1">
-                                        <Button asChild variant="link" className="p-0 h-auto">
-                                            <a href={conf.poFileUrl} target="_blank" rel="noopener noreferrer">
-                                                <Download className="mr-2 h-4 w-4" /> View {conf.poFileName}
-                                            </a>
-                                        </Button>
-                                    </div>
+                                <Input id={`po-file-${conf.id}`} type="file" onChange={(e) => handleFileChange(conf.id, e)} disabled={isUpdating[conf.id]} />
+                                {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
+                                ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'po' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
                                 ) : null }
                             </div>
-                        </div>
+                          </div>
+                        )}
+
+                        {selectedMethod === 'check' && (
+                            <div className="space-y-2">
+                                <Label htmlFor={`check-number-${conf.id}`}>Check Number</Label>
+                                <Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isUpdating[conf.id]} />
+                            </div>
+                        )}
+
+                        {selectedMethod === 'cashapp' && (
+                            <div className="p-4 rounded-md border bg-muted/50 space-y-4">
+                               <div className="flex flex-col sm:flex-row gap-4 items-center">
+                                    <div>
+                                        <p className="font-semibold">Pay via Cash App</p>
+                                        <p className="text-sm text-muted-foreground">Scan the QR code and enter the total amount due. Upload a screenshot of the confirmation.</p>
+                                        <p className="font-bold text-lg mt-1">$DKChess</p>
+                                    </div>
+                                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md" data-ai-hint="QR code" />
+                               </div>
+                               <div className="grid md:grid-cols-2 gap-4 items-start">
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`cashapp-amount-${conf.id}`}>Amount Paid</Label>
+                                        <Input id={`cashapp-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isUpdating[conf.id]} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`cashapp-file-${conf.id}`}>Upload Confirmation Screenshot</Label>
+                                        <Input id={`cashapp-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isUpdating[conf.id]} />
+                                        {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
+                                        ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'cashapp' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
+                                        ) : null }
+                                    </div>
+                               </div>
+                            </div>
+                        )}
+                        
+                        {selectedMethod === 'zelle' && (
+                            <div className="p-4 rounded-md border bg-muted/50 space-y-4">
+                               <div className="flex flex-col sm:flex-row gap-4 items-center">
+                                    <div>
+                                        <p className="font-semibold">Pay via Zelle</p>
+                                        <p className="text-sm text-muted-foreground">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p>
+                                        <p className="font-bold text-lg mt-1">956-289-3418</p>
+                                    </div>
+                                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=db417b36-48ff-426c-b1a8-1e6cdaddba01" alt="Zelle QR Code" width={100} height={100} className="rounded-md" data-ai-hint="QR code" />
+                               </div>
+                               <div className="grid md:grid-cols-2 gap-4 items-start">
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`zelle-amount-${conf.id}`}>Amount Paid</Label>
+                                        <Input id={`zelle-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isUpdating[conf.id]} />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor={`zelle-file-${conf.id}`}>Upload Confirmation Screenshot</Label>
+                                        <Input id={`zelle-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isUpdating[conf.id]} />
+                                        {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
+                                        ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'zelle' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
+                                        ) : null }
+                                    </div>
+                               </div>
+                            </div>
+                        )}
+
                         <Button 
-                          onClick={() => handleSavePo(conf)} 
+                          onClick={() => handleSavePayment(conf)} 
                           disabled={isUpdating[conf.id]}
                         >
                             {isUpdating[conf.id] ? (
@@ -342,13 +447,13 @@ export default function ConfirmationsPage() {
                             ) : (
                                 <UploadCloud className="mr-2 h-4 w-4" />
                             )}
-                            Save PO & Update Invoice
+                            Save Payment & Update Invoice
                         </Button>
                       </div>
 
                     </AccordionContent>
                   </AccordionItem>
-                ))}
+                )})}
               </Accordion>
             )}
           </CardContent>
