@@ -111,6 +111,27 @@ const sectionMaxGrade: { [key: string]: number } = {
   'Championship': 12, // Open to all, so max is 12th grade
 };
 
+const usStates = [
+    { value: "", label: "All States" },
+    { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" }, { value: "AZ", label: "Arizona" },
+    { value: "AR", label: "Arkansas" }, { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
+    { value: "CT", label: "Connecticut" }, { value: "DE", label: "Delaware" }, { value: "FL", label: "Florida" },
+    { value: "GA", label: "Georgia" }, { value: "HI", label: "Hawaii" }, { value: "ID", label: "Idaho" },
+    { value: "IL", label: "Illinois" }, { value: "IN", label: "Indiana" }, { value: "IA", label: "Iowa" },
+    { value: "KS", label: "Kansas" }, { value: "KY", label: "Kentucky" }, { value: "LA", label: "Louisiana" },
+    { value: "ME", label: "Maine" }, { value: "MD", label: "Maryland" }, { value: "MA", label: "Massachusetts" },
+    { value: "MI", label: "Michigan" }, { value: "MN", label: "Minnesota" }, { value: "MS", label: "Mississippi" },
+    { value: "MO", label: "Missouri" }, { value: "MT", label: "Montana" }, { value: "NE", label: "Nebraska" },
+    { value: "NV", label: "Nevada" }, { value: "NH", label: "New Hampshire" }, { value: "NJ", label: "New Jersey" },
+    { value: "NM", label: "New Mexico" }, { value: "NY", label: "New York" }, { value: "NC", label: "North Carolina" },
+    { value: "ND", label: "North Dakota" }, { value: "OH", label: "Ohio" }, { value: "OK", label: "Oklahoma" },
+    { value: "OR", label: "Oregon" }, { value: "PA", "label": "Pennsylvania" }, { value: "RI", label: "Rhode Island" },
+    { value: "SC", label: "South Carolina" }, { value: "SD", label: "South Dakota" }, { value: "TN", label: "Tennessee" },
+    { value: "TX", label: "Texas" }, { value: "UT", label: "Utah" }, { value: "VT", label: "Vermont" },
+    { value: "VA", label: "Virginia" }, { value: "WA", label: "Washington" }, { value: "WV", label: "West Virginia" },
+    { value: "WI", label: "Wisconsin" }, { value: "WY", label: "Wyoming" },
+];
+
 
 const playerFormSchema = z.object({
   id: z.string().optional(),
@@ -184,6 +205,7 @@ export default function RosterPage() {
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [searchName, setSearchName] = useState('');
+  const [searchState, setSearchState] = useState('TX');
   const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
@@ -199,6 +221,7 @@ export default function RosterPage() {
       uscfId: '',
       rating: undefined,
       uscfExpiration: undefined,
+      dob: undefined,
       grade: '',
       section: '',
       email: '',
@@ -435,7 +458,7 @@ export default function RosterPage() {
       setIsSearching(true);
       setSearchResults([]);
       try {
-          const result = await searchUscfPlayers({ name: searchName });
+          const result = await searchUscfPlayers({ name: searchName, state: searchState });
           if (result.error) {
               toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
           } else {
@@ -645,16 +668,25 @@ export default function RosterPage() {
           <DialogHeader>
             <DialogTitle>Search USCF Player Database</DialogTitle>
             <DialogDescription>
-              Search for a player by name to add them to your roster.
+              Search for a player by name and state to add them to your roster.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2">
             <Input
+              className="flex-grow"
               placeholder="Enter player name..."
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
             />
+            <Select value={searchState} onValueChange={setSearchState}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select State" />
+                </SelectTrigger>
+                <SelectContent>
+                    {usStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+            </Select>
             <Button onClick={handleSearch} disabled={isSearching}>
               {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
               Search

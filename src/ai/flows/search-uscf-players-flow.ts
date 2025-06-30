@@ -13,6 +13,7 @@ import { z } from 'genkit';
 
 const SearchUscfPlayersInputSchema = z.object({
   name: z.string().describe('The name of the player to search for.'),
+  state: z.string().optional().describe("The player's two-letter state abbreviation. e.g., TX"),
 });
 export type SearchUscfPlayersInput = z.infer<typeof SearchUscfPlayersInputSchema>;
 
@@ -65,11 +66,14 @@ const searchUscfPlayersFlow = ai.defineFlow(
     inputSchema: SearchUscfPlayersInputSchema,
     outputSchema: SearchUscfPlayersOutputSchema,
   },
-  async ({ name }) => {
+  async ({ name, state }) => {
     if (!name) {
       return { players: [], error: 'Player name cannot be empty.' };
     }
-    const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}`;
+    let url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}`;
+    if (state) {
+        url += `&state=${encodeURIComponent(state)}`;
+    }
     
     try {
       const response = await fetch(url);
