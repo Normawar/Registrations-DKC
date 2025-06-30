@@ -102,4 +102,12 @@ body {
   }
 }
 
+.destructive a {
+  font-weight: bold;
+  text-decoration: underline;
+  color: hsl(var(--destructive-foreground));
+}
+.destructive a:hover {
+  opacity: 0.9;
+}
     
