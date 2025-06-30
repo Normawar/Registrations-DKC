@@ -89,7 +89,7 @@ const SponsorSignUpForm = () => {
     if (existingUser) {
         form.setError('email', {
             type: 'manual',
-            message: `This email is already registered as an ${existingUser.role}. Please sign in or use a different email.`,
+            message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
         });
         return;
     }
@@ -298,7 +298,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     if (existingUser) {
         form.setError('email', {
             type: 'manual',
-            message: `This email is already registered as an ${existingUser.role}. Please sign in or use a different email.`,
+            message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
         });
         return;
     }
