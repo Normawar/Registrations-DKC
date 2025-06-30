@@ -390,15 +390,15 @@ export default function ConfirmationsPage() {
                     <AccordionTrigger>
                       <div className="flex justify-between items-center w-full pr-4">
                         <div className="flex flex-col items-start text-left">
+                          <div className="flex items-baseline gap-2">
                             <span className="font-semibold">{conf.eventName}</span>
                             {conf.invoiceNumber && (
-                                <span className="text-xs text-muted-foreground">
-                                    Invoice #: {conf.invoiceNumber}
-                                </span>
+                              <span className="text-sm font-normal text-muted-foreground">(#{conf.invoiceNumber})</span>
                             )}
-                            <span className="text-sm text-muted-foreground">
-                            Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')}
-                            </span>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                          Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')}
+                          </span>
                         </div>
                         <div className="flex items-center gap-4">
                             {currentStatus && (
