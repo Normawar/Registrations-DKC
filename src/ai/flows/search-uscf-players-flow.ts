@@ -105,7 +105,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
       
       // Extract the main results table to reduce noise for the AI
-      const tableRegex = /<table[^>]*>[\s\S]*?<tr class=header>[\s\S]*?<\/table>/i;
+      const tableRegex = /<table[^>]*>[\s\S]*?<tr[^>]*class\s*=\s*['"]?header['"]?>[\s\S]*?<\/table>/i;
       const match = html.match(tableRegex);
       
       if (!match) {
