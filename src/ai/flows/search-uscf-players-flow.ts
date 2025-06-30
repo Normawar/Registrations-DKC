@@ -99,8 +99,17 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player name cannot be empty.' };
     }
     
+    // Reformat name from "First Last" to "Last, First" for the USCF search engine.
+    let searchName = name.trim();
+    const nameParts = searchName.split(' ').filter(p => p);
+    if (nameParts.length > 1 && !searchName.includes(',')) {
+        const lastName = nameParts.pop();
+        const firstName = nameParts.join(' ');
+        searchName = `${lastName}, ${firstName}`;
+    }
+
     const stateParam = (state && state !== 'ALL') ? state : '';
-    const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(name)}&state=${encodeURIComponent(stateParam)}&ratingmin=&ratingmax=&order=N&rating=R&mode=Find&_cacheBust=${Date.now()}`;
+    const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(searchName)}&state=${encodeURIComponent(stateParam)}&ratingmin=&ratingmax=&order=N&rating=R&mode=Find&_cacheBust=${Date.now()}`;
     
     try {
       const response = await fetch(url, {
