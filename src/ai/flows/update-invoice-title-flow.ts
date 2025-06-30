@@ -20,6 +20,19 @@ const squareClient = new Client({
 
 const { invoicesApi } = squareClient;
 
+// Add some diagnostic logging to verify configuration
+console.log(`Square client configured for: Sandbox Environment`);
+if (process.env.SQUARE_ACCESS_TOKEN) {
+    const token = process.env.SQUARE_ACCESS_TOKEN;
+    if (token.startsWith('YOUR_')) {
+      console.log('Square Access Token: Using placeholder value. Please update your .env file.');
+    } else {
+      console.log(`Using Square Access Token: Provided (starts with ${token.substring(0, 8)}..., ends with ${token.substring(token.length - 4)})`);
+    }
+} else {
+    console.log('Square Access Token: Not Provided. Please check your .env file.');
+}
+
 const UpdateInvoiceTitleInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to update.'),
   title: z.string().describe('The new title for the invoice.'),

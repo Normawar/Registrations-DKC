@@ -4,6 +4,12 @@
  *
  * - createInvoice - A function that handles the invoice creation process.
  * - CreateInvoiceInput - The input type for the createInvoice function.
+ * - CreateInvoiceOutput - The return type for the createInvoice in'use server';
+/**
+ * @fileOverview Creates an invoice with the Square API.
+ *
+ * - createInvoice - A function that handles the invoice creation process.
+ * - CreateInvoiceInput - The input type for the createInvoice function.
  * - CreateInvoiceOutput - The return type for the createInvoice function.
  */
 
@@ -25,12 +31,20 @@ const { customersApi, ordersApi, invoicesApi } = squareClient;
 console.log(`Square client configured for: Sandbox Environment`);
 if (process.env.SQUARE_ACCESS_TOKEN) {
     const token = process.env.SQUARE_ACCESS_TOKEN;
-    console.log(`Using Square Access Token: Provided (starts with ${token.substring(0, 8)}..., ends with ${token.substring(token.length - 4)})`);
+    if (token.startsWith('YOUR_')) {
+      console.log('Square Access Token: Using placeholder value. Please update your .env file.');
+    } else {
+      console.log(`Using Square Access Token: Provided (starts with ${token.substring(0, 8)}..., ends with ${token.substring(token.length - 4)})`);
+    }
 } else {
     console.log('Square Access Token: Not Provided. Please check your .env file.');
 }
 if (process.env.SQUARE_LOCATION_ID) {
-    console.log(`Using Square Location ID: ${process.env.SQUARE_LOCATION_ID}`);
+    if (process.env.SQUARE_LOCATION_ID.startsWith('YOUR_')) {
+      console.log('Square Location ID: Using placeholder value. Please update your .env file.');
+    } else {
+      console.log(`Using Square Location ID: ${process.env.SQUARE_LOCATION_ID}`);
+    }
 } else {
     console.log('Square Location ID: Not Provided. Please check your .env file.');
 }
@@ -77,7 +91,7 @@ const createInvoiceFlow = ai.defineFlow(
     try {
       // 1. Get location ID from environment variables.
       const locationId = process.env.SQUARE_LOCATION_ID;
-      if (!locationId) {
+      if (!locationId || locationId.startsWith('YOUR_')) {
         throw new Error('Square Location ID is not configured. Please set SQUARE_LOCATION_ID in your .env file.');
       }
       console.log(`Using location ID: ${locationId}`);
