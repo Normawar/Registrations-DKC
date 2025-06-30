@@ -156,6 +156,7 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
       });
       
       // Fetch the final invoice to ensure the publicUrl is available and stable
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
       const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(draftInvoice.id!);
       
       console.log("Successfully retrieved final invoice:", finalInvoice);

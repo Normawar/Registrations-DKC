@@ -102,38 +102,64 @@ function InvoicesComponent() {
   useEffect(() => {
     if (!profile) return;
     try {
-        const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-        const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
-        const organizerInvoices = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
+        const confirmationsData = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const membershipInvoicesData = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
+        const organizerInvoicesData = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
+
+        const normalizedConfirmations: CombinedInvoice[] = confirmationsData.map((inv: any) => ({
+            id: inv.id,
+            description: inv.eventName || 'Event Registration',
+            submissionTimestamp: inv.submissionTimestamp,
+            totalInvoiced: inv.totalInvoiced || 0,
+            invoiceId: inv.invoiceId,
+            invoiceUrl: inv.invoiceUrl,
+            invoiceNumber: inv.invoiceNumber,
+            schoolName: inv.schoolName,
+            district: inv.district,
+            purchaserName: inv.purchaserName,
+            invoiceStatus: inv.invoiceStatus || inv.status,
+        }));
+
+        const normalizedMembershipInvoices: CombinedInvoice[] = membershipInvoicesData.map((inv: any) => ({
+            id: inv.id,
+            description: inv.membershipType ? `USCF Membership (${inv.membershipType})` : 'USCF Membership',
+            submissionTimestamp: inv.submissionTimestamp,
+            totalInvoiced: inv.totalInvoiced || 0,
+            invoiceId: inv.invoiceId,
+            invoiceUrl: inv.invoiceUrl,
+            invoiceNumber: inv.invoiceNumber,
+            schoolName: inv.schoolName,
+            district: inv.district,
+            purchaserName: inv.purchaserName,
+            invoiceStatus: inv.invoiceStatus || inv.status,
+        }));
         
-        const allLocalInvoices = [...confirmations, ...membershipInvoices, ...organizerInvoices];
+        const normalizedOrganizerInvoices: CombinedInvoice[] = organizerInvoicesData.map((inv: any) => ({
+            id: inv.id,
+            description: inv.invoiceTitle || inv.description || 'Custom Invoice',
+            submissionTimestamp: inv.submissionTimestamp,
+            totalInvoiced: inv.totalInvoiced || 0,
+            invoiceId: inv.invoiceId,
+            invoiceUrl: inv.invoiceUrl,
+            invoiceNumber: inv.invoiceNumber,
+            schoolName: inv.schoolName,
+            district: inv.district,
+            purchaserName: inv.purchaserName,
+            invoiceStatus: inv.invoiceStatus || inv.status,
+        }));
+
+        const allLocalInvoices = [...normalizedConfirmations, ...normalizedMembershipInvoices, ...normalizedOrganizerInvoices];
         
         const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
         
         for (const inv of allLocalInvoices) {
-            const normalizedInv: CombinedInvoice = {
-                id: inv.id,
-                description: inv.description || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : inv.invoiceTitle || 'Unknown Invoice'),
-                submissionTimestamp: inv.submissionTimestamp,
-                totalInvoiced: inv.totalInvoiced || inv.fee || 0, // Fallback for different data structures
-                invoiceId: inv.invoiceId,
-                invoiceUrl: inv.invoiceUrl,
-                invoiceNumber: inv.invoiceNumber,
-                schoolName: inv.schoolName || profile.school,
-                district: inv.district || profile.district,
-                purchaserName: inv.purchaserName || `${profile.firstName} ${profile.lastName}`,
-                invoiceStatus: inv.invoiceStatus || inv.status,
-            };
-
+             if (!inv.invoiceId && !inv.id) continue;
+            const key = inv.invoiceId || inv.id;
             // Ensure totalInvoiced is a number
-            if(typeof normalizedInv.totalInvoiced !== 'number') {
-              normalizedInv.totalInvoiced = parseFloat(String(normalizedInv.totalInvoiced)) || 0;
+            if(typeof inv.totalInvoiced !== 'number') {
+              inv.totalInvoiced = parseFloat(String(inv.totalInvoiced)) || 0;
             }
-
-            const key = normalizedInv.invoiceId || normalizedInv.id;
-            if(key) {
-               uniqueInvoicesMap.set(key, normalizedInv);
-            }
+            uniqueInvoicesMap.set(key, inv);
         }
         
         const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());

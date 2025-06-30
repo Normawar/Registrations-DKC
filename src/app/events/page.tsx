@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, ReactNode } from 'react';
@@ -263,7 +264,7 @@ export default function EventsPage() {
             });
 
             const newConfirmation = {
-                id: new Date().toISOString(),
+                id: invoiceId,
                 eventName: selectedEvent.name,
                 eventDate: selectedEvent.date,
                 submissionTimestamp: new Date().toISOString(),
