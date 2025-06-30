@@ -35,12 +35,12 @@ const lookupPrompt = ai.definePrompt({
     prompt: `You are an expert at extracting structured data from a single line of text representing a USCF player's record.
 Your ONLY source of information is the text provided below.
 
-From the text, extract the following fields:
-- **fullName**: The player's name, which is typically in "LASTNAME, FIRSTNAME" format.
-- **rating**: The number immediately following the text "Regular Rating:". It must be a number.
-- **expirationDate**: The date in YYYY-MM-DD format that immediately follows "Exp:".
+Extract the following fields:
+- **fullName**: The player's name.
+- **rating**: The player's regular rating.
+- **expirationDate**: The membership expiration date in YYYY-MM-DD format.
 
-If the input text contains the exact phrase "This player is not in our database", you must set the 'error' field in your output to "Player not found with this USCF ID." and leave all other fields empty. Do not parse any other data if this phrase is present.
+If the input text contains the exact phrase "This player is not in our database", you must set the 'error' field in your output to "Player not found with this USCF ID." and leave all other fields empty.
 
 Text to parse:
 \`\`\`

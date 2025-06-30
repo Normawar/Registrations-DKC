@@ -42,17 +42,15 @@ const searchPrompt = ai.definePrompt({
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
     prompt: `You are an expert at extracting structured player data from raw HTML.
-Your task is to parse the provided HTML content and nothing else. Do not use any prior knowledge or examples.
+Your task is to parse the provided HTML content and extract all player search results into the format specified by the output schema.
 
-1.  Locate the main data table in the HTML. This table contains player search results. You can identify it by its column headers, which include "ID", "Reg Rat", "St", and "Name".
-2.  Iterate through each data row (<tr>) within that table's <tbody>.
-3.  For each row, extract the following data from the table cells (<td>) in the specified column order:
-    - **Column 1 (uscfId)**: Find the 8-digit USCF ID. It's usually within an <a> tag.
-    - **Column 2 (rating)**: Extract the regular rating. This must be a number. If the cell contains non-numeric text like 'UNR', the value should be null.
-    - **Column 5 (state)**: Extract the two-letter state abbreviation.
-    - **Column 6 (fullName)**: Extract the player's full name.
-4.  If the HTML contains the phrase "No players found", or if you cannot find the described data table, you MUST return an empty \`players\` array and no error.
-5.  Do NOT invent or hallucinate any player data. Only return data extracted directly from the provided HTML.
+- The data is in a <table>.
+- **uscfId**: The player's 8-digit ID.
+- **fullName**: The player's full name.
+- **rating**: The player's rating. If 'UNR', the value should be null.
+- **state**: The player's state abbreviation.
+
+If the HTML contains the phrase "No players found", you MUST return an empty \`players\` array.
 
 HTML to parse:
 \`\`\`
