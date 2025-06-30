@@ -68,8 +68,16 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
 
       let customerId: string;
       if (searchCustomersResponse.result.customers && searchCustomersResponse.result.customers.length > 0) {
-        customerId = searchCustomersResponse.result.customers[0].id!;
+        const customer = searchCustomersResponse.result.customers[0];
+        customerId = customer.id!;
         console.log(`Found existing customer with ID: ${customerId}`);
+        // If the customer exists but doesn't have the school name, update them.
+        if (customer.companyName !== input.schoolName) {
+            console.log(`Updating customer ${customerId} with company name: ${input.schoolName}`);
+            await customersApi.updateCustomer(customerId, {
+                companyName: input.schoolName,
+            });
+        }
       } else {
         console.log("Customer not found, creating a new one...");
         const [firstName, ...lastNameParts] = input.sponsorName.split(' ');
@@ -78,7 +86,7 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
           givenName: firstName,
           familyName: lastNameParts.join(' '),
           emailAddress: input.sponsorEmail,
-          note: input.schoolName,
+          companyName: input.schoolName,
         });
         customerId = createCustomerResponse.result.customer!.id!;
         console.log(`Created new customer with ID: ${customerId}`);

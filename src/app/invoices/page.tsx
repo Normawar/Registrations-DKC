@@ -129,9 +129,10 @@ function InvoicesComponent() {
         if (profile.role === 'organizer') {
             invoicesToDisplay = mockOrganizerInvoices;
         } else { // Sponsor role
+             // Invoices created by this sponsor (from their browser's local storage)
             const eventConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
             const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
-            
+
             const mappedEventInvoices: CombinedInvoice[] = eventConfirmations.map((conf: any) => ({
                 id: conf.id,
                 description: conf.eventName,
@@ -159,12 +160,15 @@ function InvoicesComponent() {
                 schoolName: inv.schoolName,
                 district: inv.district,
             }));
+
+            // Invoices created by an organizer for this sponsor's school (from mock data)
+            const organizerInvoicesForSchool = mockOrganizerInvoices.filter(inv => inv.schoolName === profile.school);
             
-            const allPossibleInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices, ...mockOrganizerInvoices];
-            const schoolInvoices = allPossibleInvoices.filter(inv => inv.schoolName === profile.school);
+            // Combine all invoice sources
+            const allSponsorInvoices = [...mappedEventInvoices, ...mappedMembershipInvoices, ...organizerInvoicesForSchool];
 
             // De-duplicate based on invoiceId to avoid showing the same invoice twice if it's in multiple sources.
-            const uniqueInvoices = Array.from(new Map(schoolInvoices.map(inv => [inv.invoiceId || inv.id, inv])).values());
+            const uniqueInvoices = Array.from(new Map(allSponsorInvoices.map(inv => [inv.invoiceId || inv.id, inv])).values());
             invoicesToDisplay = uniqueInvoices;
         }
 
