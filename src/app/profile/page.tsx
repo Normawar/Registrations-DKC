@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { AppLayout } from '@/components/app-layout';
@@ -238,7 +238,8 @@ export default function ProfilePage() {
       }
       
       if (activeTab === 'upload' && imageFile) {
-        const storageRef = ref(storage, `payment-proofs/${Date.now()}/${imageFile.name}`);
+        const uploadId = new Date().toISOString(); // Use ISO string as a unique folder name
+        const storageRef = ref(storage, `payment-proofs/${uploadId}/${imageFile.name}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
@@ -303,7 +304,7 @@ export default function ProfilePage() {
     );
   }
   
-  const isSavePictureDisabled = isSavingPicture;
+  const isSavePictureDisabled = isSavingPicture || !isAuthReady;
 
   return (
     <AppLayout>
@@ -565,3 +566,5 @@ export default function ProfilePage() {
     </AppLayout>
   );
 }
+
+    
