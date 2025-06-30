@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -25,7 +26,7 @@ const defaultSponsorData: SponsorProfile = {
 };
 
 export function useSponsorProfile() {
-  const [profile, setProfile] = useState<SponsorProfile>(defaultSponsorData);
+  const [profile, setProfile] = useState<SponsorProfile | null>(null);
 
   const loadProfile = useCallback(() => {
     try {
@@ -67,11 +68,11 @@ export function useSponsorProfile() {
 
   const updateProfile = useCallback((newProfileData: Partial<SponsorProfile>) => {
     setProfile(prev => {
-        const updated = { ...prev, ...newProfileData };
+        const updated = { ...(prev || defaultSponsorData), ...newProfileData };
         try {
             localStorage.setItem('sponsor_profile', JSON.stringify(updated));
-            // Dispatch a custom event to notify other components/tabs
-            window.dispatchEvent(new Event('profileUpdate'));
+            // Defer dispatch to avoid illegal cross-component updates during render.
+            setTimeout(() => window.dispatchEvent(new Event('profileUpdate')), 0);
         } catch (error) {
             console.error("Failed to save sponsor profile to localStorage", error);
         }
