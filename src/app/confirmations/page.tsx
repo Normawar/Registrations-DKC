@@ -95,18 +95,6 @@ export default function ConfirmationsPage() {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     setConfirmations(storedConfirmations);
-
-    const ensureAnonymousAuth = async () => {
-      if (auth && !auth.currentUser) {
-        try {
-          await signInAnonymously(auth);
-        } catch (error) {
-          console.error("Anonymous sign-in failed on page load:", error);
-        }
-      }
-    };
-
-    ensureAnonymousAuth();
   }, []);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
@@ -150,16 +138,23 @@ export default function ConfirmationsPage() {
                  return;
             }
 
+            // Ensure user is authenticated before upload
             if (!auth.currentUser) {
-                toast({
-                   variant: 'destructive',
-                   title: 'Authentication Not Ready',
-                   description: 'Please wait a moment and try again. Authentication is initializing.',
-                });
-                setIsUpdating(prev => ({...prev, [conf.id]: false}));
-                return;
+                try {
+                    await signInAnonymously(auth);
+                } catch (error) {
+                    console.error("Anonymous sign-in failed during PO save:", error);
+                    toast({
+                        variant: 'destructive',
+                        title: 'Upload Failed',
+                        description: 'Could not authenticate to upload the file. Please check your internet connection and try again.',
+                    });
+                    setIsUpdating(prev => ({...prev, [conf.id]: false}));
+                    return;
+                }
             }
 
+            // At this point, auth.currentUser should be available
             const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
             const snapshot = await uploadBytes(storageRef, poFile);
             poFileUrl = await getDownloadURL(snapshot.ref);
