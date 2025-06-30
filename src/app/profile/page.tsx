@@ -77,6 +77,7 @@ export default function ProfilePage() {
   const [selectedIconName, setSelectedIconName] = useState<string>('KingIcon');
   const [activeTab, setActiveTab] = useState<'icon' | 'upload'>('icon');
   const [isSavingPicture, setIsSavingPicture] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,16 +104,20 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const authenticate = async () => {
-      if (auth && !auth.currentUser) {
-        try {
-          await signInAnonymously(auth);
-        } catch (error) {
-          console.error("Anonymous sign-in failed on page load:", error);
+      if (auth) {
+        if (!auth.currentUser) {
+          try {
+            await signInAnonymously(auth);
+          } catch (error) {
+            console.error("Anonymous sign-in failed on page load:", error);
+            toast({ variant: 'destructive', title: 'Authentication Failed', description: 'Could not sign in anonymously. File uploads will be disabled.' });
+          }
         }
+        setIsAuthReady(true);
       }
     };
     authenticate();
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (profile) {
@@ -162,6 +167,10 @@ export default function ProfilePage() {
   };
 
   const handleSavePicture = async () => {
+    if (!isAuthReady) {
+      toast({ variant: 'destructive', title: 'Authentication Not Ready', description: "Please wait a moment and try again." });
+      return;
+    }
     setIsSavingPicture(true);
     try {
       if (activeTab === 'upload' && imageFile) {
@@ -258,7 +267,7 @@ export default function ProfilePage() {
                             </AvatarFallback>
                         )}
                     </Avatar>
-                     <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavingPicture}>
+                     <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavingPicture || !isAuthReady}>
                         {isSavingPicture ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Save Picture
                      </Button>
