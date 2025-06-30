@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -545,7 +546,9 @@ export default function ConfirmationsPage() {
                                         <p className="text-sm text-muted-foreground">Scan the QR code and enter the total amount due. Upload a screenshot of the confirmation.</p>
                                         <p className="font-bold text-lg mt-1">$DKChess</p>
                                     </div>
-                                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md" data-ai-hint="QR code" />
+                                    <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer">
+                                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md hover:opacity-80 transition-opacity" data-ai-hint="QR code" />
+                                    </a>
                                </div>
                                <div className="grid md:grid-cols-2 gap-4 items-start">
                                     <div className="space-y-2">
@@ -571,7 +574,9 @@ export default function ConfirmationsPage() {
                                         <p className="text-sm text-muted-foreground">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p>
                                         <p className="font-bold text-lg mt-1">956-289-3418</p>
                                     </div>
-                                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md" data-ai-hint="QR code" />
+                                    <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer">
+                                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md hover:opacity-80 transition-opacity" data-ai-hint="QR code" />
+                                    </a>
                                </div>
                                <div className="grid md:grid-cols-2 gap-4 items-start">
                                     <div className="space-y-2">
@@ -613,3 +618,4 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
+
