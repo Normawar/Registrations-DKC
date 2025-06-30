@@ -90,10 +90,16 @@ function InvoicesComponent() {
           }
       }
   }, []);
+  
+  const fetchAllInvoiceStatuses = useCallback((invoicesToFetch: CombinedInvoice[]) => {
+      invoicesToFetch.forEach(inv => {
+          if (inv.invoiceId) {
+              fetchInvoiceStatus(inv.id, inv.invoiceId, true);
+          }
+      });
+  }, [fetchInvoiceStatus]);
 
   const loadInvoices = useCallback(() => {
-    if (!profile) return;
-    
     let allInvoicesData: any[] = [];
     try {
         const storedInvoices = localStorage.getItem('all_invoices');
@@ -130,18 +136,12 @@ function InvoicesComponent() {
     }
     
     const allUniqueInvoices = Array.from(uniqueInvoicesMap.values());
-        
-    let filteredInvoices = allUniqueInvoices;
-    if (profile.role === 'sponsor') {
-        filteredInvoices = allUniqueInvoices.filter(inv => inv.schoolName?.trim().toUpperCase() === profile.school?.trim().toUpperCase());
-    }
+    allUniqueInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
     
-    filteredInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
-    
-    setAllInvoices(filteredInvoices);
+    setAllInvoices(allUniqueInvoices);
 
     const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
-    for (const inv of filteredInvoices) {
+    for (const inv of allUniqueInvoices) {
         if (inv.invoiceId) {
             const status = inv.invoiceStatus?.toUpperCase() || 'LOADING';
             initialStatuses[inv.id] = { status: status, isLoading: status === 'LOADING' };
@@ -151,25 +151,19 @@ function InvoicesComponent() {
     }
     setStatuses(initialStatuses);
     
-    const invoicesToFetch = filteredInvoices.filter(inv => {
+    const invoicesToFetch = allUniqueInvoices.filter(inv => {
         const currentStatus = initialStatuses[inv.id]?.status?.toUpperCase();
         const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NO_INVOICE', 'NOT_FOUND'].includes(currentStatus || '');
         return inv.invoiceId && !isFinalState;
     });
     
-    invoicesToFetch.forEach(inv => {
-        if (inv.invoiceId) {
-            fetchInvoiceStatus(inv.id, inv.invoiceId, true);
-        }
-    });
+    fetchAllInvoiceStatuses(invoicesToFetch);
 
-  }, [profile, fetchInvoiceStatus]);
+  }, [fetchAllInvoiceStatuses]);
 
   useEffect(() => {
     loadInvoices();
-  }, [loadInvoices]);
-  
-  useEffect(() => {
+    
     const handleStorageChange = (event: StorageEvent) => {
         if (event.key === 'all_invoices') {
             loadInvoices();
@@ -215,9 +209,15 @@ function InvoicesComponent() {
   };
 
   const filteredInvoices = useMemo(() => {
+    if (!profile) {
+      return [];
+    }
+
     let invoices = [...allInvoices];
 
-    if (profile?.role === 'organizer' && schoolFilter !== 'ALL') {
+    if (profile.role === 'sponsor') {
+      invoices = invoices.filter(inv => inv.schoolName?.trim().toUpperCase() === profile.school?.trim().toUpperCase());
+    } else if (profile.role === 'organizer' && schoolFilter !== 'ALL') {
       invoices = invoices.filter(inv => inv.schoolName === schoolFilter);
     }
 
