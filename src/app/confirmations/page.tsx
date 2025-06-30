@@ -93,21 +93,26 @@ export default function ConfirmationsPage() {
   
   useEffect(() => {
     const ensureAnonymousAuth = async () => {
+      // Don't try to sign in if keys are obviously placeholders
+      if (
+          !process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+          process.env.NEXT_PUBLIC_FIREBASE_API_KEY.includes("YOUR_API_KEY")
+      ) {
+          console.warn("Firebase config is missing or incomplete. File uploads will be disabled until configured.");
+          return;
+      }
+        
       if (!auth.currentUser) {
         try {
           await signInAnonymously(auth);
         } catch (error) {
-          console.error("Anonymous sign-in failed:", error);
-          toast({
-            variant: "destructive",
-            title: "Authentication Error",
-            description: "Could not connect to the server for file uploads. Please refresh and try again.",
-          });
+          console.error("Anonymous sign-in failed on page load:", error);
+          // The error will be handled gracefully when the user tries to upload.
         }
       }
     };
     ensureAnonymousAuth();
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -145,15 +150,35 @@ export default function ConfirmationsPage() {
 
         // Upload new file if there is one
         if (poFile) {
-            // Auth check guard clause
-            if (!auth.currentUser) {
+            // Configuration check
+            if (
+              !process.env.NEXT_PUBLIC_FIREBASE_API_KEY ||
+              process.env.NEXT_PUBLIC_FIREBASE_API_KEY.includes("YOUR_API_KEY")
+            ) {
               toast({
                 variant: 'destructive',
-                title: 'Upload Failed',
-                description: 'Authentication is not ready. Please wait a moment and try again.',
+                title: 'Firebase Not Configured',
+                description: "Please add your Firebase credentials to the .env file and restart the server to enable file uploads.",
+                duration: 9000,
               });
               setIsUpdating(prev => ({...prev, [conf.id]: false}));
               return;
+            }
+
+            // Auth check guard clause
+            if (!auth.currentUser) {
+              try {
+                await signInAnonymously(auth);
+              } catch (error) {
+                 console.error("Anonymous sign-in failed during save:", error);
+                 toast({
+                    variant: 'destructive',
+                    title: 'Authentication Failed',
+                    description: 'Could not authenticate with Firebase. Please check your credentials and network connection.',
+                 });
+                 setIsUpdating(prev => ({...prev, [conf.id]: false}));
+                 return;
+              }
             }
 
             const storageRef = ref(storage, `purchase-orders/${conf.id}/${poFile.name}`);
