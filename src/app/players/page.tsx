@@ -22,7 +22,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
+import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download, Search, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -52,6 +52,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { districts as allDistricts } from '@/lib/data/districts';
 import { schoolData } from '@/lib/data/school-data';
+import { searchUscfPlayers, type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
 
 const initialPlayersData = [
   { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", rating: 1850, school: "Independent", district: "None", events: 2, eventIds: ['e2'] },
@@ -67,6 +68,27 @@ const allEvents = [
   { id: 'e1', name: 'Spring Open 2024' },
   { id: 'e2', name: 'Summer Championship' },
   { id: 'e3', name: 'Autumn Classic' },
+];
+
+const usStates = [
+    { value: "ALL", label: "All States" },
+    { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" }, { value: "AZ", label: "Arizona" },
+    { value: "AR", label: "Arkansas" }, { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
+    { value: "CT", label: "Connecticut" }, { value: "DE", label: "Delaware" }, { value: "FL", label: "Florida" },
+    { value: "GA", label: "Georgia" }, { value: "HI", label: "Hawaii" }, { value: "ID", label: "Idaho" },
+    { value: "IL", label: "Illinois" }, { value: "IN", label: "Indiana" }, { value: "IA", label: "Iowa" },
+    { value: "KS", label: "Kansas" }, { value: "KY", label: "Kentucky" }, { value: "LA", label: "Louisiana" },
+    { value: "ME", label: "Maine" }, { value: "MD", label: "Maryland" }, { value: "MA", label: "Massachusetts" },
+    { value: "MI", label: "Michigan" }, { value: "MN", label: "Minnesota" }, { value: "MS", label: "Mississippi" },
+    { value: "MO", label: "Missouri" }, { value: "MT", label: "Montana" }, { value: "NE", label: "Nebraska" },
+    { value: "NV", label: "Nevada" }, { value: "NH", label: "New Hampshire" }, { value: "NJ", label: "New Jersey" },
+    { value: "NM", label: "New Mexico" }, { value: "NY", label: "New York" }, { value: "NC", label: "North Carolina" },
+    { value: "ND", label: "North Dakota" }, { value: "OH", label: "Ohio" }, { value: "OK", label: "Oklahoma" },
+    { value: "OR", label: "Oregon" }, { value: "PA", "label": "Pennsylvania" }, { value: "RI", label: "Rhode Island" },
+    { value: "SC", label: "South Carolina" }, { value: "SD", label: "South Dakota" }, { value: "TN", label: "Tennessee" },
+    { value: "TX", label: "Texas" }, { value: "UT", label: "Utah" }, { value: "VT", label: "Vermont" },
+    { value: "VA", label: "Virginia" }, { value: "WA", label: "Washington" }, { value: "WV", label: "West Virginia" },
+    { value: "WI", label: "Wisconsin" }, { value: "WY", label: "Wyoming" },
 ];
 
 type Player = typeof initialPlayersData[0];
@@ -92,6 +114,11 @@ export default function PlayersPage() {
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [searchName, setSearchName] = useState('');
+  const [searchState, setSearchState] = useState('TX');
+  const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -261,6 +288,53 @@ export default function PlayersPage() {
     });
   };
 
+  const handleSearch = async () => {
+      if (!searchName.trim()) {
+          toast({
+              variant: 'destructive',
+              title: 'Search name cannot be empty',
+          });
+          return;
+      }
+      setIsSearching(true);
+      setSearchResults([]);
+      try {
+          const stateToSearch = searchState === 'ALL' ? '' : searchState;
+          const result = await searchUscfPlayers({ name: searchName, state: stateToSearch });
+          if (result.error) {
+              toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
+          } else {
+              setSearchResults(result.players);
+              if (result.players.length === 0) {
+                toast({ title: 'No Players Found', description: 'Your search did not return any players.' });
+              }
+          }
+      } catch (e) {
+          const error = e as Error;
+          toast({ variant: 'destructive', title: 'Search Error', description: error.message });
+      } finally {
+          setIsSearching(false);
+      }
+  };
+
+  const handleAddFromSearch = (player: PlayerSearchResult) => {
+      form.reset(); 
+
+      const nameParts = player.fullName.split(' ');
+      const lastName = nameParts.pop() || '';
+      const firstName = nameParts.join(' ');
+      
+      form.setValue('firstName', firstName);
+      form.setValue('lastName', lastName);
+      form.setValue('uscfId', player.uscfId);
+      if (player.rating) {
+        form.setValue('rating', player.rating);
+      }
+
+      setIsSearchDialogOpen(false);
+      setIsDialogOpen(true);
+  };
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -272,6 +346,9 @@ export default function PlayersPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsSearchDialogOpen(true)}>
+                <Search className="mr-2 h-4 w-4" /> Search USCF Database
+            </Button>
             <Button onClick={handleExportCsv}>
                 <Download className="mr-2 h-4 w-4" />
                 Export to CSV
@@ -442,6 +519,83 @@ export default function PlayersPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Search USCF Player Database</DialogTitle>
+            <DialogDescription>
+              Search for a player by name and state to add them to the system.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex w-full items-center gap-2">
+            <Input
+              className="flex-grow"
+              placeholder="Enter player name..."
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+            />
+            <Select value={searchState} onValueChange={setSearchState}>
+                <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select State" />
+                </SelectTrigger>
+                <SelectContent>
+                    {usStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                </SelectContent>
+            </Select>
+            <Button onClick={handleSearch} disabled={isSearching}>
+              {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+              Search
+            </Button>
+          </div>
+          <div className="h-96 w-full overflow-y-auto border rounded-md mt-4">
+            {isSearching ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...
+              </div>
+            ) : searchResults.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>USCF ID</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>State</TableHead>
+                    <TableHead><span className="sr-only">Actions</span></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {searchResults.map((player) => (
+                    <TableRow key={player.uscfId}>
+                      <TableCell className="font-medium">
+                        <a
+                            href={`http://msa.uschess.org/thin3.php?${player.uscfId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                        >
+                            {player.fullName}
+                        </a>
+                      </TableCell>
+                      <TableCell>{player.uscfId}</TableCell>
+                      <TableCell>{player.rating || 'UNR'}</TableCell>
+                      <TableCell>{player.state}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" onClick={() => handleAddFromSearch(player)}>Add to Roster</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <p>No search results. Enter a name to begin.</p>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </AppLayout>
