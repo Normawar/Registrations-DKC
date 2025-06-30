@@ -209,6 +209,7 @@ export default function RosterPage() {
       lastName: '',
       uscfId: '',
       rating: undefined,
+      uscfExpiration: undefined,
       grade: '',
       section: '',
       email: '',
@@ -381,13 +382,13 @@ export default function RosterPage() {
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Roster</h1>
+            <h1 className="text-3xl font-bold font-headline">Players</h1>
             <p className="text-muted-foreground">
-              Manage your sponsored player roster.
+              Manage your player roster.
             </p>
           </div>
           <Button onClick={handleAddPlayer}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Player to Roster
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Player
           </Button>
         </div>
 
@@ -832,7 +833,7 @@ export default function RosterPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently remove {playerToDelete?.firstName} {playerToDelete?.lastName} from your roster.
+              This will permanently remove {playerToDelete?.firstName} {playerToDelete?.lastName} from your roster.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
