@@ -238,7 +238,7 @@ export default function ProfilePage() {
       }
       
       if (activeTab === 'upload' && imageFile) {
-        const storageRef = ref(storage, `payment-proofs/avatars/${Date.now()}-${imageFile.name}`);
+        const storageRef = ref(storage, `payment-proofs/profile-pictures/${Date.now()}-${imageFile.name}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
@@ -295,7 +295,7 @@ export default function ProfilePage() {
   const selectedDistrict = profileForm.watch('district');
   const SelectedIconComponent = selectedIconName ? icons[selectedIconName] : null;
 
-  if (!isAuthReady) {
+  if (!profile) {
     return (
         <AppLayout>
             <ProfilePageSkeleton />
