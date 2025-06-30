@@ -49,6 +49,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { generateTeamCode } from '@/lib/school-utils';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 
 type Player = {
   id: string;
@@ -71,6 +72,7 @@ type PlayerRegistration = {
   };
   section: string;
   uscfStatus: 'current' | 'new' | 'renewing';
+  studentType?: 'gt' | 'independent';
 };
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
@@ -107,6 +109,7 @@ const sectionMaxGrade: { [key: string]: number } = {
 export default function EventsPage() {
     const { toast } = useToast();
     const { events } = useEvents();
+    const { profile: sponsorProfile } = useSponsorProfile();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -215,6 +218,16 @@ export default function EventsPage() {
             }
             return newSelections;
         });
+    }
+
+    const handleStudentTypeChange = (playerId: string, studentType: 'gt' | 'independent') => {
+      setSelections(prev => {
+          const newSelections = {...prev};
+          if(newSelections[playerId]) {
+              newSelections[playerId].studentType = studentType;
+          }
+          return newSelections;
+      });
     }
 
     const handleProceedToInvoice = () => {
@@ -608,6 +621,27 @@ export default function EventsPage() {
                                       </Select>
                                     </div>
                                 </div>
+
+                                {sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                    <div className="grid gap-1.5 mt-4">
+                                        <Label className="text-xs">Student Type (PSJA Only)</Label>
+                                        <RadioGroup
+                                            value={selections[player.id]?.studentType}
+                                            onValueChange={(value) => handleStudentTypeChange(player.id, value as any)}
+                                            className="flex items-center gap-4"
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="gt" id={`gt-${player.id}`} />
+                                                <Label htmlFor={`gt-${player.id}`} className="font-normal text-sm cursor-pointer">GT Student</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                                <RadioGroupItem value="independent" id={`independent-${player.id}`} />
+                                                <Label htmlFor={`independent-${player.id}`} className="font-normal text-sm cursor-pointer">Independent</Label>
+                                            </div>
+                                        </RadioGroup>
+                                    </div>
+                                )}
+                                
                                 <p className="text-xs text-muted-foreground mt-2">
                                     Scholastic - .5 pts bye available<br />
                                     Open - .5 pt bye available only Rds 1-4

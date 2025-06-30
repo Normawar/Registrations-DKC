@@ -74,6 +74,7 @@ type PlayerRegistration = {
   byes: { round1: string; round2: string; };
   section: string;
   uscfStatus: 'current' | 'new' | 'renewing';
+  studentType?: 'gt' | 'independent';
 };
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
@@ -408,6 +409,7 @@ export default function ConfirmationsPage() {
                   const selectedMethod = currentInputs.paymentMethod || 'po';
                   const currentStatus = statuses[conf.id];
                   const isLoading = isUpdating[conf.id] || !isAuthReady;
+                  const showStudentTypeColumn = Object.values(conf.selections).some(s => s.studentType);
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
@@ -461,6 +463,7 @@ export default function ConfirmationsPage() {
                               <TableHead>Player</TableHead>
                               <TableHead>Section</TableHead>
                               <TableHead>USCF Status</TableHead>
+                              {showStudentTypeColumn && <TableHead>Student Type</TableHead>}
                               <TableHead>Byes Requested</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -483,6 +486,11 @@ export default function ConfirmationsPage() {
                                           {details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}
                                       </Badge>
                                   </TableCell>
+                                  {showStudentTypeColumn && (
+                                    <TableCell>
+                                        {details.studentType === 'gt' ? 'GT Student' : details.studentType === 'independent' ? 'Independent' : <span className="text-muted-foreground">N/A</span>}
+                                    </TableCell>
+                                  )}
                                   <TableCell>{byeText}</TableCell>
                                 </TableRow>
                               );
