@@ -31,7 +31,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Loader2
+  Loader2,
+  Search,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -88,6 +89,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
+import { searchUscfPlayers, type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
+
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -179,6 +182,10 @@ export default function RosterPage() {
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [searchName, setSearchName] = useState('');
+  const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -417,6 +424,60 @@ export default function RosterPage() {
     setEditingPlayer(null);
   }
 
+  const handleSearch = async () => {
+      if (!searchName.trim()) {
+          toast({
+              variant: 'destructive',
+              title: 'Search name cannot be empty',
+          });
+          return;
+      }
+      setIsSearching(true);
+      setSearchResults([]);
+      try {
+          const result = await searchUscfPlayers({ name: searchName });
+          if (result.error) {
+              toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
+          } else {
+              setSearchResults(result.players);
+              if (result.players.length === 0) {
+                toast({ title: 'No Players Found', description: 'Your search did not return any players.' });
+              }
+          }
+      } catch (e) {
+          const error = e as Error;
+          toast({ variant: 'destructive', title: 'Search Error', description: error.message });
+      } finally {
+          setIsSearching(false);
+      }
+  };
+
+  const handleAddFromSearch = (player: PlayerSearchResult) => {
+      setEditingPlayer(null);
+      
+      const nameParts = player.fullName.split(' ');
+      const lastName = nameParts.pop() || '';
+      const firstName = nameParts.join(' ');
+
+      form.reset({
+          ...form.getValues(),
+          firstName: firstName,
+          lastName: lastName,
+          uscfId: player.uscfId,
+          rating: player.rating,
+          uscfExpiration: undefined,
+          dob: undefined,
+          grade: '',
+          section: '',
+          email: '',
+          phone: '',
+          zipCode: '',
+          studentType: undefined,
+      });
+      setIsSearchDialogOpen(false);
+      setIsDialogOpen(true);
+  };
+
 
   return (
     <AppLayout>
@@ -428,9 +489,14 @@ export default function RosterPage() {
               Manage your school's player roster.
             </p>
           </div>
-          <Button onClick={handleAddPlayer}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Player to Roster
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setIsSearchDialogOpen(true)}>
+                <Search className="mr-2 h-4 w-4" /> Search USCF Database
+            </Button>
+            <Button onClick={handleAddPlayer}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Player to Roster
+            </Button>
+          </div>
         </div>
 
         {profile ? (
@@ -573,6 +639,65 @@ export default function RosterPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isSearchDialogOpen} onOpenChange={setIsSearchDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Search USCF Player Database</DialogTitle>
+            <DialogDescription>
+              Search for a player by name to add them to your roster.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Enter player name..."
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+            />
+            <Button onClick={handleSearch} disabled={isSearching}>
+              {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+              Search
+            </Button>
+          </div>
+          <div className="h-96 w-full overflow-y-auto border rounded-md mt-4">
+            {isSearching ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching...
+              </div>
+            ) : searchResults.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>USCF ID</TableHead>
+                    <TableHead>Rating</TableHead>
+                    <TableHead>State</TableHead>
+                    <TableHead><span className="sr-only">Actions</span></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {searchResults.map((player) => (
+                    <TableRow key={player.uscfId}>
+                      <TableCell className="font-medium">{player.fullName}</TableCell>
+                      <TableCell>{player.uscfId}</TableCell>
+                      <TableCell>{player.rating || 'UNR'}</TableCell>
+                      <TableCell>{player.state}</TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" onClick={() => handleAddFromSearch(player)}>Add to Roster</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <p>No search results. Enter a name to begin.</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
