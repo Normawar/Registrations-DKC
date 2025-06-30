@@ -238,7 +238,7 @@ export default function ProfilePage() {
       }
       
       if (activeTab === 'upload' && imageFile) {
-        const storageRef = ref(storage, `payment-proofs/profile-pictures/${Date.now()}-${imageFile.name}`);
+        const storageRef = ref(storage, `payment-proofs/${Date.now()}/${imageFile.name}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
@@ -295,7 +295,7 @@ export default function ProfilePage() {
   const selectedDistrict = profileForm.watch('district');
   const SelectedIconComponent = selectedIconName ? icons[selectedIconName] : null;
 
-  if (!profile) {
+  if (!profile || !isAuthReady) {
     return (
         <AppLayout>
             <ProfilePageSkeleton />
@@ -303,7 +303,7 @@ export default function ProfilePage() {
     );
   }
   
-  const isSavePictureDisabled = isSavingPicture || !isAuthReady;
+  const isSavePictureDisabled = isSavingPicture;
 
   return (
     <AppLayout>
@@ -336,6 +336,8 @@ export default function ProfilePage() {
                             <div className="w-full h-full flex items-center justify-center bg-muted rounded-full">
                                 <SelectedIconComponent className="w-20 h-20 text-muted-foreground" />
                             </div>
+                        ) : profile.avatarType === 'upload' ? (
+                            <AvatarImage src={profile.avatarValue} alt="Sponsor Profile" />
                         ) : (
                             <AvatarFallback className="text-4xl">
                                 {profile ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}` : 'S'}
