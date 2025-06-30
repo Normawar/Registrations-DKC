@@ -46,45 +46,34 @@ Your task is to extract the details for each player listed in the results table.
 
 Here is the structure of the HTML table:
 - The table follows a \`<h3>Player Search Results</h3>\` heading.
-- The header row has a \`class="header"\`.
-- Data rows (\`<tr>\`) often have a \`bgcolor\` attribute.
-- **Crucially, each data row can contain information for one OR two players.**
-- A block of data for a single player consists of 7 \`<td>\` cells: ID, Name, Rating, St, Expires, Mbr, Tot.
-- If a \`<tr>\` contains 14 \`<td>\` cells, it represents two players. The first 7 cells are for the first player, and the next 7 are for the second player.
+- The header row has a \`class="header"\` and 10 columns: USCF ID, Rating, Q Rtg, BL Rtg, OL R, OL Q, OL BL, State, Exp Date, Name.
+- Each data row (\`<tr>\`) represents a single player.
 
 Your parsing rules:
-1.  Iterate through each \`<tr>\` in the results table (skip the header).
-2.  For each \`<tr>\`, check the number of \`<td>\` cells.
-3.  **If there are 14 \`<td>\` cells:**
-    - Parse the first player from cells 1-7.
-    - Parse the second player from cells 8-14.
-4.  **If there are 7 \`<td>\` cells:**
-    - Parse the single player from those cells.
-5.  For each player found, extract the following:
-    - **uscfId**: The 8-digit number from the first \`<td>\` of their block. It's inside an \`<a>\` tag.
-    - **fullName**: The player's name from the second \`<td>\` of their block (e.g., "GUERRA, ANTHONY J").
-    - **rating**: The number from the third \`<td>\` of their block. If 'UNR' or not a number, the value should be \`undefined\`.
-    - **state**: The two-letter state abbreviation from the fourth \`<td>\` of their block.
-6.  Collect all found players into the \`players\` array. Do not invent players. If no players are found, return an empty array.
+1.  Iterate through each \`<tr>\` in the results table, skipping the header row.
+2.  For each player row, extract the following information from the \`<td>\` cells:
+    - **uscfId**: From cell 1. This is the 8-digit number inside the \`<a>\` tag.
+    - **rating**: From cell 2. This is the player's regular rating.
+        - If the value is a number (e.g., "1111"), use that number.
+        - If the value is a provisional rating (e.g., "417/5"), extract the number before the slash (e.g., 417).
+        - If the value is "Unrated" or not a number, the rating should be \`undefined\`.
+    - **state**: From cell 8. This is the two-letter state abbreviation.
+    - **fullName**: From cell 10. This is the player's name (e.g., "GUERRA, ZEFERINO ANTONIO").
+3.  Collect all found players into the \`players\` array. Do not invent players. If the text indicates "No players found", return an empty array.
 
-Example Input HTML Snippet with two players in one row:
+Example Input HTML Snippet:
 \`\`\`html
-<TR bgcolor="#E6E6E6">
-<TD><A href="/msa/thin3.php?12722825">12722825</A></TD>
-<TD>GUERRA, ANTHONY</TD>
-<TD align=right>1502</TD>
-<TD>TX</TD>
-<TD>2024-09-30</TD>
-<TD>REG</TD>
-<TD align=right> 594.0</TD>
-<TD><A href="/msa/thin3.php?12815593">12815593</A></TD>
-<TD>GUERRA, ANTHONY J</TD>
-<TD align=right>1661</TD>
-<TD>TX</TD>
-<TD>2024-11-30</TD>
-<TD>REG</TD>
-<TD align=right> 268.0</TD>
-</TR>
+<table border="1" cellpadding="2" cellspacing="0" width="100%">
+<tr class="header">
+<td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td>
+</tr>
+<tr>
+<td><a href="MbrDtlMain.php?14922025">14922025</a></td><td align="right">1111</td><td align="right">1112</td><td align="right">644</td><td align="right">Unrated</td><td align="right">Unrated</td><td align="right">Unrated</td><td>TX</td><td>2025-11-30</td><td>GUERRA, ZEFERINO ANTONIO</td>
+</tr>
+<tr>
+<td><a href="MbrDtlMain.php?16595724">16595724</a></td><td align="right">417/5</td><td align="right">420/5</td><td align="right">Unrated</td><td align="right">Unrated</td><td align="right">Unrated</td><td align="right">Unrated</td><td>TX</td><td>2019-01-31</td><td>GUTIERREZ, ZEFERINO</td>
+</tr>
+</table>
 \`\`\`
 
 Here is the HTML content to parse:
