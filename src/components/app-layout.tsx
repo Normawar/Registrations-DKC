@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { User, LogOut, School, ClipboardList, ClipboardCheck } from "lucide-react";
 
 const menuItems = [
+  { href: "/profile", icon: User, label: "Profile" },
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/roster", icon: ClipboardList, label: "Roster" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
@@ -38,7 +39,6 @@ const menuItems = [
   { href: "/manage-events", icon: Wrench, label: "Manage Events" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership" },
-  { href: "/profile", icon: User, label: "Profile" },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
