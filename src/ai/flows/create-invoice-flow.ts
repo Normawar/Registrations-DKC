@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto';
 import { ApiError } from 'square';
 import { format } from 'date-fns';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const PlayerInvoiceInfoSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
@@ -53,6 +54,18 @@ const createInvoiceFlow = ai.defineFlow(
     outputSchema: CreateInvoiceOutputSchema,
   },
   async (input) => {
+    const { isConfigured } = await checkSquareConfig();
+    if (!isConfigured) {
+      console.log("Square not configured. Returning mock invoice for createInvoiceFlow.");
+      const mockInvoiceId = `MOCK_INV_${randomUUID()}`;
+      return {
+        invoiceId: mockInvoiceId,
+        invoiceNumber: mockInvoiceId.substring(0, 8),
+        status: 'DRAFT',
+        invoiceUrl: `/#mock-invoice/${mockInvoiceId}`,
+      };
+    }
+
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;

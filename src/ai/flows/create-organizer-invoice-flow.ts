@@ -13,6 +13,7 @@ import {z} from 'genkit';
 import { randomUUID } from 'crypto';
 import { ApiError } from 'square';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const LineItemSchema = z.object({
   name: z.string().describe('The name or description of the line item.'),
@@ -48,6 +49,18 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
     outputSchema: CreateOrganizerInvoiceOutputSchema,
   },
   async (input) => {
+    const { isConfigured } = await checkSquareConfig();
+    if (!isConfigured) {
+        console.log("Square not configured. Returning mock invoice for createOrganizerInvoiceFlow.");
+        const mockInvoiceId = `MOCK_ORGANIZER_${randomUUID()}`;
+        return {
+            invoiceId: mockInvoiceId,
+            invoiceNumber: mockInvoiceId.substring(0, 8),
+            status: 'DRAFT',
+            invoiceUrl: `/#mock-invoice/${mockInvoiceId}`,
+        };
+    }
+    
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;

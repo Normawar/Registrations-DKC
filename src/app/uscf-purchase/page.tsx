@@ -49,7 +49,6 @@ import {
     Trash2,
     PlusCircle
 } from 'lucide-react';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const playerSchema = z.object({
     firstName: z.string().min(1, { message: 'First name is required.' }),
@@ -104,7 +103,6 @@ function UscfPurchaseComponent() {
     
     const [invoice, setInvoice] = useState<InvoiceState | null>(null);
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
-    const [isSquareConfigured, setIsSquareConfigured] = useState(true);
 
     const [paymentInputs, setPaymentInputs] = useState<Partial<PaymentInputs>>({
         paymentMethod: 'po',
@@ -119,10 +117,6 @@ function UscfPurchaseComponent() {
     const [authError, setAuthError] = useState<string | null>(null);
     const [invoiceStatus, setInvoiceStatus] = useState<string | null>(null);
     const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
-
-    useEffect(() => {
-      checkSquareConfig().then(({ isConfigured }) => setIsSquareConfigured(isConfigured));
-    }, []);
 
     const form = useForm<z.infer<typeof playerInfoSchema>>({
         resolver: zodResolver(playerInfoSchema),
@@ -233,7 +227,7 @@ function UscfPurchaseComponent() {
             
             const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
             localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newMembershipInvoice]));
-            window.dispatchEvent(new Event('all_invoices_updated'));
+            window.dispatchEvent(new Event('storage'));
 
             toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {
@@ -401,15 +395,6 @@ function UscfPurchaseComponent() {
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(handleCreateInvoice)}>
                                 <CardContent className="space-y-6">
-                                    {!isSquareConfigured && (
-                                      <Alert variant="destructive">
-                                        <Info className="h-4 w-4" />
-                                        <AlertTitle>Square Not Configured</AlertTitle>
-                                        <AlertDescription>
-                                          Payment processing is disabled. Please add your Square credentials to your .env file to create invoices.
-                                        </AlertDescription>
-                                      </Alert>
-                                    )}
                                     {fields.map((field, index) => (
                                         <div key={field.id} className="border rounded-lg p-4 space-y-4 relative">
                                             <div className="flex justify-between items-start">
@@ -471,7 +456,7 @@ function UscfPurchaseComponent() {
                                     </Button>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button type="submit" disabled={isCreatingInvoice || !isSquareConfigured}>
+                                    <Button type="submit" disabled={isCreatingInvoice}>
                                         {isCreatingInvoice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Create Invoice for {fields.length} Player(s)
                                     </Button>

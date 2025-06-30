@@ -14,6 +14,7 @@ import { randomUUID } from 'crypto';
 import { ApiError } from 'square';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { format } from 'date-fns';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const PlayerInfoSchema = z.object({
   firstName: z.string().describe('The first name of the player.'),
@@ -56,6 +57,18 @@ const createMembershipInvoiceFlow = ai.defineFlow(
   async (input) => {
     if (input.membershipType.toLowerCase().includes('error') || input.membershipType.toLowerCase().includes('invalid')) {
         throw new Error(`Invalid membership type provided: "${input.membershipType}". Please return to the previous page and get a valid membership suggestion.`);
+    }
+    
+    const { isConfigured } = await checkSquareConfig();
+    if (!isConfigured) {
+        console.log("Square not configured. Returning mock invoice for createMembershipInvoiceFlow.");
+        const mockInvoiceId = `MOCK_MEMBERSHIP_${randomUUID()}`;
+        return {
+            invoiceId: mockInvoiceId,
+            invoiceNumber: mockInvoiceId.substring(0, 8),
+            status: 'DRAFT',
+            invoiceUrl: `/#mock-invoice/${mockInvoiceId}`,
+        };
     }
 
     const squareClient = await getSquareClient();
