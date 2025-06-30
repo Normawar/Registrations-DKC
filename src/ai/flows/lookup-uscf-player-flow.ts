@@ -32,14 +32,9 @@ const lookupPrompt = ai.definePrompt({
     name: 'lookupUscfPlayerPrompt',
     input: { schema: z.string() },
     output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `You are an expert at parsing structured text from a \`<pre>\` block. Your task is to extract a chess player's details.
+    prompt: `You are an expert at extracting structured data. Parse the following text content from the USCF player lookup page and extract the player's details according to the provided output schema.
 
-The input text will be from the USCF player lookup page. Parse this text according to the following rules:
-1.  **Full Name**: The name is on the first line, immediately following the 8-digit USCF ID. It will be in "LASTNAME, FIRSTNAME" format.
-2.  **Rating**: Find the line containing "Rate:". The player's regular rating is the number immediately following this label. Extract only the number. If it says "Unrated", leave the rating field undefined.
-3.  **Expiration Date**: Find the line containing "Exp:". The membership expiration date follows this label in "YYYY-MM-DD" format.
-4.  **Error Handling**: If the input text contains "This player is not in our database", it means the player was not found. In this case, set the 'error' field in your output to "Player not found with this USCF ID." and leave other fields empty.
-5.  If you cannot find a specific field for any other reason, leave it undefined in the output.
+If the input text contains "This player is not in our database", it means the player was not found. In this case, set the 'error' field in your output to "Player not found with this USCF ID." and leave other fields empty.
 
 Here is the text content to parse:
 {{{_input}}}`
