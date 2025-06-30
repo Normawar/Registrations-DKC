@@ -118,7 +118,7 @@ const playerFormSchema = z.object({
   grade: z.string().min(1, { message: "Please select a grade." }),
   section: z.string().min(1, { message: "Please select a section." }),
   email: z.string().email({ message: "Please enter a valid email." }),
-  phone: z.string().optional(),
+  phone: z.string().min(10, { message: "Please enter a valid phone number." }),
   dob: z.date({ required_error: "Date of birth is required."}),
   zipCode: z.string().min(5, { message: "Please enter a valid 5-digit zip code." }),
   studentType: z.string().optional(),
@@ -767,7 +767,7 @@ export default function RosterPage() {
                   )} />
                  <FormField control={form.control} name="phone" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Player Phone Number (Optional)</FormLabel>
+                      <FormLabel>Player Phone Number</FormLabel>
                       <FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
