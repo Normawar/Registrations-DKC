@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Looks up a USCF player by their ID from the USCF MSA website.
@@ -32,12 +31,23 @@ const lookupPrompt = ai.definePrompt({
     name: 'lookupUscfPlayerPrompt',
     input: { schema: z.string() },
     output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `You are an expert at extracting structured data. Parse the following text content from the USCF player lookup page and extract the player's details according to the provided output schema.
+    prompt: `You are an expert at extracting structured data from a single line of text.
+Parse the following text content, which represents a USCF player's record.
 
-If the input text contains "This player is not in our database", it means the player was not found. In this case, set the 'error' field in your output to "Player not found with this USCF ID." and leave other fields empty.
+The text is structured like this: <8-digit-ID><spaces><LASTNAME, FIRSTNAME><spaces><STATE> Exp:<YYYY-MM-DD>     Regular Rating:  <RATING>
 
-Here is the text content to parse:
-{{{_input}}}`
+From the text, extract:
+- **fullName**: The player's name, located between the ID and the state abbreviation.
+- **rating**: The number that follows "Regular Rating:".
+- **expirationDate**: The date in YYYY-MM-DD format that follows "Exp:".
+
+If the input text contains the phrase "This player is not in our database", you must set the 'error' field in your output to "Player not found with this USCF ID." and leave the other fields empty.
+
+Text to parse:
+\`\`\`
+{{{_input}}}
+\`\`\`
+`
 });
 
 const lookupUscfPlayerFlow = ai.defineFlow(

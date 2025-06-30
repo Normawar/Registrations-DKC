@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF website.
@@ -40,13 +39,17 @@ const searchPrompt = ai.definePrompt({
     name: 'searchUscfPlayersPrompt',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at extracting structured data from HTML. Extract all player data from the following HTML content, which is a search results page from the USCF website. Adhere strictly to the provided output JSON schema.
+    prompt: `You are an expert at extracting structured data from raw HTML.
+From the provided HTML, find the table with the attribute 'width=575'. This is the player results table.
+The header row of this table has a 'class=header'. The player data rows have a 'class=section'.
 
-- Extract the 8-digit USCF ID from the link in the first column.
-- The regular rating is in the second column.
-- The state is in the fifth column.
-- The player's full name is in the sixth column.
-- If the HTML contains the text "No players found", return an empty \`players\` array.
+For each player data row (<tr> with class 'section') in that specific table, extract the following information:
+1. **uscfId**: From the <a> tag in the first <td>. It is the 8-digit number.
+2. **rating**: From the second <td>. This is the regular rating. It should be a number. If it is not a number, treat it as null.
+3. **state**: From the fifth <td>. This is the two-letter state code.
+4. **fullName**: From the sixth <td>. This is the player's name.
+
+If the HTML contains the text "No players found" anywhere, return an empty \`players\` array.
 
 HTML to parse:
 {{{_input}}}`
