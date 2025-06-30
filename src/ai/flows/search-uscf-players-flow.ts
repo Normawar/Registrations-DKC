@@ -45,19 +45,19 @@ The provided text is the HTML content of a USCF player search results page.
 Your task is to find the table of players and extract the details for each player into a JSON object matching the provided schema.
 
 The table to parse is the one that immediately follows a \`<h3>Player Search Results</h3>\` heading.
-The player data is contained within \`<tr>\` elements. The header row (\`<tr class="header">\`) should be ignored.
+The player data is contained within plain \`<tr>\` elements. The header row (\`<tr class="header">\`) should be ignored.
 
-For each data row, extract the following information:
-- **uscfId**: The 8-digit number from the link in the first \`<td>\`.
-- **rating**: The regular rating from the second \`<td>\`. If it's provisional (e.g., "417/5"), use the number before the slash. If it's "Unrated" or not a number, the rating should be \`undefined\`.
+For each data row, extract the following information from its \`<td>\` children:
+- **uscfId**: The 8-digit number from the link in the first \`<td>\`. The link will be in the format \`MbrDtlMain.php?12345678\`.
+- **rating**: The regular rating from the second \`<td>\`. If it's provisional (e.g., "417/5"), use the number before the slash. If it's "Unrated" or not a number, the rating field should be omitted or set to \`undefined\`.
 - **state**: The two-letter state abbreviation from the eighth \`<td>\`.
-- **fullName**: The player's name from the tenth \`<td>\`.
+- **fullName**: The player's name from the tenth \`<td>\`. This name may be inside an \`<a>\` tag. Extract only the text of the name.
 
 Here is an example of how to map a single HTML row to the desired JSON output:
 
 **Example HTML:**
 \`\`\`html
-<tr class="section">
+<tr>
     <td><a href="MbrDtlMain.php?12345678">12345678</a></td>
     <td align="center">1500</td>
     <td align="center">1450</td>
@@ -67,7 +67,7 @@ Here is an example of how to map a single HTML row to the desired JSON output:
     <td align="center"></td>
     <td align="center">TX</td>
     <td align="center">2025-12-31</td>
-    <td>DOE, JOHN</td>
+    <td><a href="MbrDtlMain.php?12345678">DOE, JOHN</a></td>
 </tr>
 \`\`\`
 
