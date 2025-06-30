@@ -3,8 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { getAuth, signInAnonymously } from 'firebase/auth';
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { signInAnonymously } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { generateTeamCode } from '@/lib/school-utils';
-import { app as firebaseApp } from '@/lib/firebase';
+import { auth, storage } from '@/lib/firebase';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -90,10 +90,6 @@ export default function ConfirmationsPage() {
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
   const [poInputs, setPoInputs] = useState<Record<string, { number: string; file: File | null }>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
-  
-  // Get Firebase services from the initialized app instance
-  const auth = getAuth(firebaseApp);
-  const storage = getStorage(firebaseApp);
   
   useEffect(() => {
     const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');

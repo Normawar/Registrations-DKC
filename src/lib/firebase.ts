@@ -1,8 +1,10 @@
 // Import the functions you need from the SDKs you need
-import { initializeApp, getApps, getApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
+import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
-const firebaseConfig: FirebaseOptions = {
+const firebaseConfig = {
   apiKey: "AIzaSyBA-Lc8CKKY59hxQIPgQ_x0agdqEyWuyTA",
   authDomain: "chessmate-w17oa.firebaseapp.com",
   projectId: "chessmate-w17oa",
@@ -13,5 +15,7 @@ const firebaseConfig: FirebaseOptions = {
 
 // Initialize Firebase for client-side
 const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth = getAuth(app);
+const storage = getStorage(app);
 
-export { app };
+export { app, auth, storage };
