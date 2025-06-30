@@ -51,6 +51,8 @@ import { useEvents, type Event } from '@/hooks/use-events';
 import { generateTeamCode } from '@/lib/school-utils';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useRoster, type Player } from '@/hooks/use-roster';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 type PlayerRegistration = {
   byes: {
@@ -93,9 +95,15 @@ export default function EventsPage() {
     const [selections, setSelections] = useState<RegistrationSelections>({});
     const [calculatedFees, setCalculatedFees] = useState(0);
     const [clientReady, setClientReady] = useState(false);
+    const [isSquareConfigured, setIsSquareConfigured] = useState(true);
 
     useEffect(() => {
         setClientReady(true);
+        async function verifyConfig() {
+            const { isConfigured } = await checkSquareConfig();
+            setIsSquareConfigured(isConfigured);
+        }
+        verifyConfig();
     }, []);
 
     const calculateTotalFee = (currentSelections: RegistrationSelections, event: Event): number => {
@@ -438,6 +446,18 @@ export default function EventsPage() {
           </p>
         </div>
 
+        {!isSquareConfigured && (
+            <Alert variant="destructive">
+                <AlertTitle>Square Configuration Required</AlertTitle>
+                <AlertDescription>
+                    Your Square integration is not configured, so invoice creation is disabled. Please set the <code>SQUARE_ACCESS_TOKEN</code> and <code>SQUARE_LOCATION_ID</code> in your <code>.env</code> file. You can find these credentials in the{' '}
+                    <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-destructive/80">
+                        Square Developer Dashboard
+                    </a>. Remember to restart the server after updating.
+                </AlertDescription>
+            </Alert>
+        )}
+
         <Card>
           <CardContent className="pt-6">
             <Table>
@@ -481,7 +501,7 @@ export default function EventsPage() {
                       <TableCell className="text-right">
                           <Button 
                             onClick={() => handleRegisterClick(event)}
-                            disabled={status === 'Closed' || status === 'Completed'}
+                            disabled={status === 'Closed' || status === 'Completed' || !isSquareConfigured}
                             >
                             Register
                           </Button>

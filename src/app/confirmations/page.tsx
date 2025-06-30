@@ -45,6 +45,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -124,6 +125,7 @@ export default function ConfirmationsPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isSquareConfigured, setIsSquareConfigured] = useState(true);
   
   const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
     confirmationsToFetch.forEach(conf => {
@@ -204,6 +206,13 @@ export default function ConfirmationsPage() {
   }, []);
 
   useEffect(() => {
+    // Check Square config
+    async function verifyConfig() {
+        const { isConfigured } = await checkSquareConfig();
+        setIsSquareConfigured(isConfigured);
+    }
+    verifyConfig();
+
     // Load confirmations from local storage
     try {
       const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -231,12 +240,14 @@ export default function ConfirmationsPage() {
       }
       setConfInputs(initialInputs);
       setStatuses(initialStatuses);
-      fetchAllInvoiceStatuses(storedConfirmations.filter(c => c.invoiceId));
+      if (isSquareConfigured) {
+          fetchAllInvoiceStatuses(storedConfirmations.filter(c => c.invoiceId));
+      }
     } catch (error) {
         console.error("Failed to load or parse confirmations from localStorage", error);
         setConfirmations([]);
     }
-  }, []);
+  }, [isSquareConfigured]);
 
   const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
 
@@ -409,6 +420,18 @@ export default function ConfirmationsPage() {
           </p>
         </div>
 
+        {!isSquareConfigured && (
+            <Alert variant="destructive">
+                <AlertTitle>Square Configuration Required</AlertTitle>
+                <AlertDescription>
+                    Your Square integration is not configured. Features on this page like status updates and payment submissions are disabled. Please set your credentials in the <code>.env</code> file. You can find them in the{' '}
+                    <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-destructive/80">
+                        Square Developer Dashboard
+                    </a>. Remember to restart the server after updating.
+                </AlertDescription>
+            </Alert>
+        )}
+
         {authError && (
           <Alert variant="destructive">
             <AlertTitle>Uploads Disabled</AlertTitle>
@@ -434,7 +457,7 @@ export default function ConfirmationsPage() {
                   const currentInputs = confInputs[conf.id] || {};
                   const selectedMethod = currentInputs.paymentMethod || 'po';
                   const currentStatus = statuses[conf.id];
-                  const isLoading = isUpdating[conf.id] || !isAuthReady;
+                  const isLoading = isUpdating[conf.id] || !isAuthReady || !isSquareConfigured;
                   const showStudentTypeColumn = sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
 
                   return (
@@ -472,7 +495,7 @@ export default function ConfirmationsPage() {
                         <div className="flex justify-between items-center">
                             <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
                             <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId}>
+                                <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId || !isSquareConfigured}>
                                     <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} />
                                     Refresh Status
                                 </Button>

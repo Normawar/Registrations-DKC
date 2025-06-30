@@ -49,6 +49,7 @@ import {
     Trash2,
     PlusCircle
 } from 'lucide-react';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const playerSchema = z.object({
     firstName: z.string().min(1, { message: 'First name is required.' }),
@@ -103,6 +104,7 @@ function UscfPurchaseComponent() {
     const [authError, setAuthError] = useState<string | null>(null);
     const [invoiceStatus, setInvoiceStatus] = useState<string | null>(null);
     const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+    const [isSquareConfigured, setIsSquareConfigured] = useState(true);
 
     const form = useForm<z.infer<typeof playerInfoSchema>>({
         resolver: zodResolver(playerInfoSchema),
@@ -125,6 +127,13 @@ function UscfPurchaseComponent() {
     });
 
     useEffect(() => {
+        // Check Square config
+        async function verifyConfig() {
+            const { isConfigured } = await checkSquareConfig();
+            setIsSquareConfigured(isConfigured);
+        }
+        verifyConfig();
+
         if (!auth) {
             setIsAuthReady(false);
             return;
@@ -329,7 +338,7 @@ function UscfPurchaseComponent() {
     };
     
     const selectedMethod = paymentInputs.paymentMethod || 'po';
-    const isLoading = isUpdatingPayment || !isAuthReady;
+    const isLoading = isUpdatingPayment || !isAuthReady || !isSquareConfigured;
 
 
     return (
@@ -341,6 +350,18 @@ function UscfPurchaseComponent() {
                         Complete the form below to generate an invoice for a USCF membership.
                     </p>
                 </div>
+
+                {!isSquareConfigured && (
+                    <Alert variant="destructive">
+                        <AlertTitle>Square Configuration Required</AlertTitle>
+                        <AlertDescription>
+                            Your Square integration is not configured, so invoice creation is disabled. Please set your credentials in the <code>.env</code> file. You can find them in the{' '}
+                            <a href="https://developer.squareup.com/apps" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:text-destructive/80">
+                                Square Developer Dashboard
+                            </a>. Remember to restart the server after updating.
+                        </AlertDescription>
+                    </Alert>
+                )}
 
                 <Alert variant="default" className="bg-primary/5 border-primary/20">
                     <Info className="h-4 w-4 text-primary" />
@@ -440,7 +461,7 @@ function UscfPurchaseComponent() {
                                     </Button>
                                 </CardContent>
                                 <CardFooter>
-                                    <Button type="submit" disabled={isCreatingInvoice}>
+                                    <Button type="submit" disabled={isCreatingInvoice || !isSquareConfigured}>
                                         {isCreatingInvoice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Create Invoice for {fields.length} Player(s)
                                     </Button>
