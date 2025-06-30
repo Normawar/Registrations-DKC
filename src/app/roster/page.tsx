@@ -81,6 +81,9 @@ import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { generateTeamCode } from '@/lib/school-utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Player = {
   id: string;
@@ -191,6 +194,9 @@ export default function RosterPage() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
+  
+  const { profile } = useSponsorProfile();
+  const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -380,22 +386,49 @@ export default function RosterPage() {
           </Button>
         </div>
 
-        <Card className="bg-secondary/50 border-dashed">
-            <CardHeader>
-                <CardTitle className="text-lg">Sponsor Information</CardTitle>
-                <CardDescription>This district and school will be associated with all players added to this roster.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid sm:grid-cols-2 gap-4">
-                <div>
-                    <p className="text-sm font-medium text-muted-foreground">District</p>
-                    <p className="font-semibold">SHARYLAND ISD</p>
-                </div>
-                 <div>
-                    <p className="text-sm font-medium text-muted-foreground">School</p>
-                    <p className="font-semibold">SHARYLAND PIONEER H S</p>
-                </div>
-            </CardContent>
-        </Card>
+        {profile ? (
+          <Card className="bg-secondary/50 border-dashed">
+              <CardHeader>
+                  <CardTitle className="text-lg">Sponsor Information</CardTitle>
+                  <CardDescription>This district and school will be associated with all players added to this roster.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-3 gap-4">
+                  <div>
+                      <p className="text-sm font-medium text-muted-foreground">District</p>
+                      <p className="font-semibold">{profile.district}</p>
+                  </div>
+                  <div>
+                      <p className="text-sm font-medium text-muted-foreground">School</p>
+                      <p className="font-semibold">{profile.school}</p>
+                  </div>
+                  <div>
+                      <p className="text-sm font-medium text-muted-foreground">Team Code</p>
+                      <p className="font-semibold font-mono">{teamCode}</p>
+                  </div>
+              </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-secondary/50 border-dashed animate-pulse">
+              <CardHeader>
+                  <Skeleton className="h-6 w-1/4" />
+                  <Skeleton className="h-4 w-2/3 mt-1" />
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-5 w-2/3" />
+                  </div>
+                  <div className="space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-5 w-3/4" />
+                  </div>
+                  <div className="space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-5 w-1/2" />
+                  </div>
+              </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardContent className="pt-6">

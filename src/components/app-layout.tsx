@@ -28,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { User, LogOut, School, ClipboardList, ClipboardCheck } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
+import { generateTeamCode } from "@/lib/school-utils";
 
 const menuItems = [
   { href: "/profile", icon: User, label: "Profile" },
@@ -56,6 +57,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile } = useSponsorProfile();
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
+  const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
   return (
     <SidebarProvider>
@@ -85,6 +87,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <p className="text-xs text-sidebar-foreground/70 truncate">
                         {profile ? profile.district : 'District Name'}
                     </p>
+                    {teamCode && (
+                      <p className="text-xs font-bold text-sidebar-primary truncate font-mono">
+                        {teamCode}
+                      </p>
+                    )}
                 </div>
             </div>
           </SidebarHeader>

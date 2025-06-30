@@ -38,6 +38,7 @@ import { auth, storage } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+import { generateTeamCode } from '@/lib/school-utils';
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, { message: 'First name is required.' }),
@@ -127,6 +128,8 @@ export default function ProfilePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -240,7 +243,7 @@ export default function ProfilePage() {
       
       if (activeTab === 'upload' && imageFile) {
         const sanitizedFileName = imageFile.name.replace(/\s+/g, '_');
-        const storageRef = ref(storage, `purchase-orders/${new Date().toISOString()}/${sanitizedFileName}`);
+        const storageRef = ref(storage, `purchase-orders/${currentUser.uid}/${sanitizedFileName}`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
 
@@ -317,6 +320,29 @@ export default function ProfilePage() {
           </p>
         </div>
         
+        {profile && (
+            <Card className="bg-secondary/50 border-dashed">
+                <CardHeader>
+                    <CardTitle className="text-lg">Team Information</CardTitle>
+                    <CardDescription>Your school's district, name, and auto-generated team code.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid sm:grid-cols-3 gap-4">
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground">District</p>
+                        <p className="font-semibold">{profile.district}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground">School</p>
+                        <p className="font-semibold">{profile.school}</p>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground">Team Code</p>
+                        <p className="font-semibold font-mono">{teamCode}</p>
+                    </div>
+                </CardContent>
+            </Card>
+        )}
+
         {authError && (
           <Alert variant="destructive">
             <AlertTitle>Authentication Error</AlertTitle>
