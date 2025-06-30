@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { signInAnonymously } from 'firebase/auth';
+import { signInAnonymously, onAuthStateChanged, type User } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { AppLayout } from '@/components/app-layout';
@@ -78,6 +78,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'icon' | 'upload'>('icon');
   const [isSavingPicture, setIsSavingPicture] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,21 +104,27 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    const authenticate = async () => {
-      if (auth) {
-        if (!auth.currentUser) {
-          try {
-            await signInAnonymously(auth);
-          } catch (error) {
-            console.error("Anonymous sign-in failed on page load:", error);
-            toast({ variant: 'destructive', title: 'Authentication Failed', description: 'Could not sign in anonymously. File uploads will be disabled.' });
-          }
-        }
+    if (!auth) {
+      setIsAuthReady(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUser(user);
         setIsAuthReady(true);
+      } else {
+        signInAnonymously(auth).catch((error) => {
+          console.error("Anonymous sign-in failed:", error);
+          toast({ variant: 'destructive', title: 'Authentication Failed', description: 'Could not sign in. File uploads will be disabled.' });
+          setIsAuthReady(false);
+        });
       }
-    };
-    authenticate();
+    });
+
+    return () => unsubscribe();
   }, [toast]);
+
 
   useEffect(() => {
     if (profile) {
@@ -167,14 +174,10 @@ export default function ProfilePage() {
   };
 
   const handleSavePicture = async () => {
-    if (!isAuthReady) {
-      toast({ variant: 'destructive', title: 'Authentication Not Ready', description: "Please wait a moment and try again." });
-      return;
-    }
     setIsSavingPicture(true);
     try {
       if (activeTab === 'upload' && imageFile) {
-        if (!auth || !auth.currentUser) {
+        if (!isAuthReady || !currentUser) {
           toast({ variant: 'destructive', title: 'Authentication Error', description: "Cannot upload file. Please refresh and try again." });
           setIsSavingPicture(false);
           return;
@@ -185,7 +188,7 @@ export default function ProfilePage() {
           return;
         }
 
-        const userId = auth.currentUser.uid;
+        const userId = currentUser.uid;
         const storageRef = ref(storage, `avatars/${userId}/profile`);
         await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(storageRef);
@@ -269,7 +272,7 @@ export default function ProfilePage() {
                     </Avatar>
                      <Button variant="outline" className="w-full" onClick={handleSavePicture} disabled={isSavingPicture || !isAuthReady}>
                         {isSavingPicture ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Save Picture
+                        {isAuthReady ? 'Save Picture' : 'Authenticating...'}
                      </Button>
                 </div>
                 <div className="md:col-span-2">

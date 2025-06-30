@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { signInAnonymously } from 'firebase/auth';
+import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
 
@@ -119,6 +119,7 @@ export default function ConfirmationsPage() {
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   const [authError, setAuthError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
+  const [isAuthReady, setIsAuthReady] = useState(false);
   
   const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
     confirmationsToFetch.forEach(conf => {
@@ -165,21 +166,28 @@ export default function ConfirmationsPage() {
   };
 
   useEffect(() => {
-    // Attempt anonymous auth on load, but don't block UI
-    const authenticate = async () => {
-      if (auth && !auth.currentUser) {
-        try {
-          await signInAnonymously(auth);
-        } catch (error) {
-          console.error("Anonymous sign-in failed on page load:", error);
-          if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
-            setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console. Please contact your administrator.");
-          }
+    if (!auth) {
+        setIsAuthReady(false);
+        return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+            setIsAuthReady(true);
+            setAuthError(null);
+        } else {
+            signInAnonymously(auth).catch((error) => {
+                console.error("Anonymous sign-in failed:", error);
+                if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
+                    setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console. Please contact your administrator.");
+                }
+                setIsAuthReady(false);
+            });
         }
-      }
-    };
-    authenticate();
+    });
+    return () => unsubscribe();
+  }, []);
 
+  useEffect(() => {
     // Load confirmations from local storage
     try {
       const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -274,8 +282,7 @@ export default function ConfirmationsPage() {
         // Step 1: Handle file upload if a file is present
         if (inputs.file) {
             // Check for auth readiness
-            if (!auth || !auth.currentUser) {
-                // This will use the error from page load, or a generic one.
+            if (!isAuthReady) {
                 const message = authError || "Authentication is not ready. Cannot upload files.";
                 toast({ variant: 'destructive', title: 'Upload Failed', description: message });
                 setIsUpdating(prev => ({ ...prev, [conf.id]: false }));
@@ -400,6 +407,7 @@ export default function ConfirmationsPage() {
                   const currentInputs = confInputs[conf.id] || {};
                   const selectedMethod = currentInputs.paymentMethod || 'po';
                   const currentStatus = statuses[conf.id];
+                  const isLoading = isUpdating[conf.id] || !isAuthReady;
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
@@ -490,6 +498,7 @@ export default function ConfirmationsPage() {
                             value={selectedMethod}
                             onValueChange={(value) => handleInputChange(conf.id, 'paymentMethod', value as PaymentMethod)}
                             className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                            disabled={isLoading}
                         >
                             <div><RadioGroupItem value="po" id={`po-${conf.id}`} className="peer sr-only" />
                                 <Label htmlFor={`po-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
@@ -509,11 +518,11 @@ export default function ConfirmationsPage() {
                           <div className="grid md:grid-cols-2 gap-4 items-start">
                             <div className="space-y-2">
                                 <Label htmlFor={`po-number-${conf.id}`}>PO Number</Label>
-                                <Input id={`po-number-${conf.id}`} placeholder="Enter PO Number" value={currentInputs.poNumber || ''} onChange={(e) => handleInputChange(conf.id, 'poNumber', e.target.value)} disabled={isUpdating[conf.id]} />
+                                <Input id={`po-number-${conf.id}`} placeholder="Enter PO Number" value={currentInputs.poNumber || ''} onChange={(e) => handleInputChange(conf.id, 'poNumber', e.target.value)} disabled={isLoading} />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor={`po-file-${conf.id}`}>Upload PO Document</Label>
-                                <Input id={`po-file-${conf.id}`} type="file" onChange={(e) => handleFileChange(conf.id, e)} disabled={isUpdating[conf.id]} />
+                                <Input id={`po-file-${conf.id}`} type="file" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
                                 {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
                                 ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'po' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
                                 ) : null }
@@ -525,11 +534,11 @@ export default function ConfirmationsPage() {
                             <div className="grid md:grid-cols-3 gap-4 items-start">
                                 <div className="space-y-2">
                                     <Label htmlFor={`check-number-${conf.id}`}>Check Number</Label>
-                                    <Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isUpdating[conf.id]} />
+                                    <Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isLoading} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor={`check-amount-${conf.id}`}>Check Amount</Label>
-                                    <Input id={`check-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isUpdating[conf.id]} />
+                                    <Input id={`check-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Check Date</Label>
@@ -541,7 +550,7 @@ export default function ConfirmationsPage() {
                                             "w-full justify-start text-left font-normal",
                                             !currentInputs.checkDate && "text-muted-foreground"
                                             )}
-                                            disabled={isUpdating[conf.id]}
+                                            disabled={isLoading}
                                         >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
                                             {currentInputs.checkDate ? format(currentInputs.checkDate, "PPP") : <span>Pick a date</span>}
@@ -575,11 +584,11 @@ export default function ConfirmationsPage() {
                                <div className="grid md:grid-cols-2 gap-4 items-start">
                                     <div className="space-y-2">
                                         <Label htmlFor={`cashapp-amount-${conf.id}`}>Amount Paid</Label>
-                                        <Input id={`cashapp-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isUpdating[conf.id]} />
+                                        <Input id={`cashapp-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor={`cashapp-file-${conf.id}`}>Upload Confirmation Screenshot</Label>
-                                        <Input id={`cashapp-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isUpdating[conf.id]} />
+                                        <Input id={`cashapp-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
                                         {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
                                         ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'cashapp' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
                                         ) : null }
@@ -603,11 +612,11 @@ export default function ConfirmationsPage() {
                                <div className="grid md:grid-cols-2 gap-4 items-start">
                                     <div className="space-y-2">
                                         <Label htmlFor={`zelle-amount-${conf.id}`}>Amount Paid</Label>
-                                        <Input id={`zelle-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isUpdating[conf.id]} />
+                                        <Input id={`zelle-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor={`zelle-file-${conf.id}`}>Upload Confirmation Screenshot</Label>
-                                        <Input id={`zelle-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isUpdating[conf.id]} />
+                                        <Input id={`zelle-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
                                         {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
                                         ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'zelle' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
                                         ) : null }
@@ -618,14 +627,16 @@ export default function ConfirmationsPage() {
 
                         <Button 
                           onClick={() => handleSavePayment(conf)} 
-                          disabled={isUpdating[conf.id]}
+                          disabled={isLoading}
                         >
                             {isUpdating[conf.id] ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : !isAuthReady ? (
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
                                 <UploadCloud className="mr-2 h-4 w-4" />
                             )}
-                            Save Payment & Update Invoice
+                            {isUpdating[conf.id] ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Payment & Update Invoice'}
                         </Button>
                       </div>
 
