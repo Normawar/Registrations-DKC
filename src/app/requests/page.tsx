@@ -1,5 +1,4 @@
 import { AppLayout } from "@/components/app-layout";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -13,7 +12,6 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Check, X } from "lucide-react";
 
 const requests = [
   { player: "Noah Williams", event: "Spring Open 2024", type: "Withdrawal", submitted: "2024-05-21", status: "Pending" },
@@ -30,7 +28,7 @@ export default function RequestsPage() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Change Requests</h1>
           <p className="text-muted-foreground">
-            Approve or deny player-submitted requests.
+            View the status of player-submitted requests.
           </p>
         </div>
 
@@ -42,9 +40,9 @@ export default function RequestsPage() {
                   <TableHead>Player</TableHead>
                   <TableHead>Event</TableHead>
                   <TableHead>Request Type</TableHead>
+                  <TableHead>Details</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -53,29 +51,19 @@ export default function RequestsPage() {
                     <TableCell className="font-medium">{request.player}</TableCell>
                     <TableCell>{request.event}</TableCell>
                     <TableCell>{request.type}</TableCell>
+                    <TableCell>{request.details || '—'}</TableCell>
                     <TableCell>{request.submitted}</TableCell>
                     <TableCell>
                       <Badge
                         variant={
-                          request.status === "Pending" ? "destructive" :
-                          request.status === "Approved" ? "default" : "secondary"
+                          request.status === "Pending" ? "secondary" :
+                          request.status === "Approved" ? "default" :
+                          request.status === "Denied" ? "destructive" : "secondary"
                         }
-                         className={request.status === 'Approved' ? 'bg-green-600' : ''}
+                         className={request.status === 'Approved' ? 'bg-green-600 text-white' : ''}
                       >
                         {request.status}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {request.status === "Pending" && (
-                        <div className="flex gap-2 justify-end">
-                          <Button size="icon" variant="outline" className="h-8 w-8 bg-green-100 hover:bg-green-200 text-green-700 border-green-300">
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="outline" className="h-8 w-8 bg-red-100 hover:bg-red-200 text-red-700 border-red-300">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
                     </TableCell>
                   </TableRow>
                 ))}
