@@ -51,8 +51,8 @@ const createInvoiceFlow = ai.defineFlow(
     outputSchema: CreateInvoiceOutputSchema,
   },
   async (input) => {
-    const squareClient = getSquareClient();
-    const locationId = getSquareLocationId();
+    const squareClient = await getSquareClient();
+    const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
     
     console.log("Starting Square invoice creation with input:", input);

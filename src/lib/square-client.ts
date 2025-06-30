@@ -1,5 +1,3 @@
-'use server';
-
 import { Client, Environment } from 'square';
 
 /**
@@ -26,9 +24,9 @@ function checkSquareCredentials() {
 /**
  * Returns an initialized Square client.
  * Throws an error if credentials are not configured.
- * @returns {Client} The initialized Square client.
+ * @returns {Promise<Client>} The initialized Square client.
  */
-export function getSquareClient(): Client {
+export async function getSquareClient(): Promise<Client> {
   checkSquareCredentials();
   return new Client({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
@@ -39,9 +37,9 @@ export function getSquareClient(): Client {
 /**
  * Returns the configured Square Location ID.
  * Throws an error if not configured.
- * @returns {string} The Square Location ID.
+ * @returns {Promise<string>} The Square Location ID.
  */
-export function getSquareLocationId(): string {
+export async function getSquareLocationId(): Promise<string> {
   checkSquareCredentials();
   return process.env.SQUARE_LOCATION_ID!;
 }

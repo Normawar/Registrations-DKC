@@ -45,8 +45,8 @@ const createMembershipInvoiceFlow = ai.defineFlow(
     outputSchema: CreateMembershipInvoiceOutputSchema,
   },
   async (input) => {
-    const squareClient = getSquareClient();
-    const locationId = getSquareLocationId();
+    const squareClient = await getSquareClient();
+    const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
     console.log("Starting Square membership invoice creation with input:", input);

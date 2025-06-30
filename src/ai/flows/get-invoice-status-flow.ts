@@ -34,7 +34,7 @@ const getInvoiceStatusFlow = ai.defineFlow(
     outputSchema: GetInvoiceStatusOutputSchema,
   },
   async (input) => {
-    const squareClient = getSquareClient();
+    const squareClient = await getSquareClient();
     const { invoicesApi } = squareClient;
       
     try {
