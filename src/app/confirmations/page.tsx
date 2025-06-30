@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -102,8 +103,8 @@ export default function ConfirmationsPage() {
         try {
           await signInAnonymously(auth);
         } catch (error) {
-          console.error("Anonymous sign-in failed on page load:", error);
-          // Optionally, inform the user that some features might not work
+          // The console.error is removed to prevent the Next.js error overlay.
+          // The toast notification provides a better user experience.
           toast({
             variant: 'destructive',
             title: 'Authentication Failed',
