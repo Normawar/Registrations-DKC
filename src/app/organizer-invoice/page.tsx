@@ -65,11 +65,29 @@ export default function OrganizerInvoicePage() {
     setIsLoading(true);
     try {
       const result = await createOrganizerInvoice(values);
+      
+      const newOrganizerInvoice = {
+        id: result.invoiceId, // Use invoiceId as the unique ID
+        description: values.invoiceTitle,
+        submissionTimestamp: new Date().toISOString(),
+        totalInvoiced: values.lineItems.reduce((acc, item) => acc + item.amount, 0),
+        invoiceId: result.invoiceId,
+        invoiceUrl: result.invoiceUrl,
+        invoiceNumber: result.invoiceNumber,
+        purchaserName: values.sponsorName,
+        invoiceStatus: result.status,
+        schoolName: values.schoolName,
+        district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
+      };
+      
+      const existingInvoices = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
+      localStorage.setItem('organizerInvoices', JSON.stringify([...existingInvoices, newOrganizerInvoice]));
+
       toast({
         title: 'Invoice Created Successfully!',
         description: (
             <p>
-              Invoice {result.invoiceNumber || result.invoiceId} has been created and sent.
+              Invoice {result.invoiceNumber || result.invoiceId} has been created.
               <a href={result.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
                 View Invoice
               </a>

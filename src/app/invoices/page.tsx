@@ -133,15 +133,33 @@ function InvoicesComponent() {
     try {
         const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
         const membershipInvoices = JSON.parse(localStorage.getItem('membershipInvoices') || '[]');
+        const organizerInvoices = JSON.parse(localStorage.getItem('organizerInvoices') || '[]');
 
-        const allSources = [
-            ...mockOrganizerInvoices,
-            ...confirmations,
-            ...membershipInvoices,
+        const allLocalStorageInvoices = [
+            ...confirmations.map((inv: any) => ({ ...inv, schoolName: inv.schoolName || profile.school, district: inv.district || profile.district })),
+            ...membershipInvoices.map((inv: any) => ({ ...inv, schoolName: inv.schoolName || profile.school, district: inv.district || profile.district })),
+            ...organizerInvoices.map((inv: any) => ({ ...inv, schoolName: inv.schoolName || profile.school, district: inv.district || profile.district })),
         ];
 
+        let finalInvoicesSource: CombinedInvoice[] = [];
+
+        if (profile.role === 'sponsor') {
+            const sponsorSchoolInvoices = mockOrganizerInvoices.filter(
+                (inv) => inv.schoolName === profile.school
+            );
+            finalInvoicesSource = [
+                ...sponsorSchoolInvoices,
+                ...allLocalStorageInvoices,
+            ];
+        } else { // Organizer role
+            finalInvoicesSource = [
+                ...mockOrganizerInvoices,
+                ...allLocalStorageInvoices,
+            ];
+        }
+
         const uniqueInvoicesMap = new Map<string, any>();
-        for (const inv of allSources) {
+        for (const inv of finalInvoicesSource) {
             const key = inv.invoiceId || inv.id;
             // Prioritize non-mock data if keys conflict
             if (!uniqueInvoicesMap.has(key) || !inv.id?.startsWith('org_inv_')) {
@@ -157,29 +175,18 @@ function InvoicesComponent() {
             invoiceId: inv.invoiceId,
             invoiceUrl: inv.invoiceUrl,
             invoiceNumber: inv.invoiceNumber,
-            // Assume invoices from local storage belong to the current user
             purchaserName: inv.purchaserName || `${profile.firstName} ${profile.lastName}`,
             invoiceStatus: inv.invoiceStatus || inv.status,
             schoolName: inv.schoolName || profile.school,
             district: inv.district || profile.district,
         }));
         
-        let finalInvoices: CombinedInvoice[] = [];
-
-        if (profile.role === 'sponsor') {
-            finalInvoices = normalizedInvoices.filter(
-                inv => inv.schoolName === profile.school
-            );
-        } else { // Organizer role
-            finalInvoices = normalizedInvoices;
-        }
-
-        finalInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+        normalizedInvoices.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
         
-        setAllInvoices(finalInvoices);
+        setAllInvoices(normalizedInvoices);
 
         const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
-        for (const inv of finalInvoices) {
+        for (const inv of normalizedInvoices) {
             const isMock = inv.id.startsWith('org_inv_');
             if (inv.invoiceId && !isMock) {
                 initialStatuses[inv.id] = { status: inv.invoiceStatus || 'LOADING', isLoading: true };
@@ -189,7 +196,7 @@ function InvoicesComponent() {
         }
         setStatuses(initialStatuses);
         
-        fetchAllInvoiceStatuses(finalInvoices.filter(inv => inv.invoiceId && !inv.id.startsWith('org_inv_')));
+        fetchAllInvoiceStatuses(normalizedInvoices.filter(inv => inv.invoiceId && !inv.id.startsWith('org_inv_')));
 
     } catch (error) {
         console.error("Failed to load invoices", error);
