@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { schoolData } from '@/lib/data/school-data';
+import { districts as uniqueDistricts } from '@/lib/data/districts';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,8 +36,6 @@ import { KingIcon, QueenIcon, RookIcon, BishopIcon, KnightIcon, PawnIcon } from 
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { auth, storage } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
-
-const uniqueDistricts = [...new Set(schoolData.map((school) => school.district))].sort();
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, { message: 'First name is required.' }),

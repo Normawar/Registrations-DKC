@@ -28,9 +28,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { schoolData } from "@/lib/data/school-data";
+import { districts as uniqueDistricts } from '@/lib/data/districts';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-
-const uniqueDistricts = [...new Set(schoolData.map((school) => school.district))].sort();
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
