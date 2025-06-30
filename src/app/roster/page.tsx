@@ -112,7 +112,7 @@ const sectionMaxGrade: { [key: string]: number } = {
 };
 
 const usStates = [
-    { value: "", label: "All States" },
+    { value: "ALL", label: "All States" },
     { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" }, { value: "AZ", label: "Arizona" },
     { value: "AR", label: "Arkansas" }, { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
     { value: "CT", label: "Connecticut" }, { value: "DE", label: "Delaware" }, { value: "FL", label: "Florida" },
@@ -458,7 +458,8 @@ export default function RosterPage() {
       setIsSearching(true);
       setSearchResults([]);
       try {
-          const result = await searchUscfPlayers({ name: searchName, state: searchState });
+          const stateToSearch = searchState === 'ALL' ? '' : searchState;
+          const result = await searchUscfPlayers({ name: searchName, state: stateToSearch });
           if (result.error) {
               toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
           } else {
