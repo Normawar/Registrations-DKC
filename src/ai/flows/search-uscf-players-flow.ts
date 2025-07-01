@@ -93,27 +93,28 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       for (const row of playerRows) {
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+        
+        const nameCellIndex = cells.findIndex(cell => cell.includes('MbrDtlMain.php?'));
 
-        // Find the cell containing the player detail link, which we assume contains the name.
-        const nameCellContent = cells.find(cell => cell.includes('MbrDtlMain.php?'));
-
-        if (!nameCellContent) {
-            console.warn("USCF Search: Found a row that looked like a player row, but the link was not in any cell. Skipping.", row);
+        if (nameCellIndex === -1) {
+            console.warn("USCF Search: Found a player row, but no cell contained the link. Skipping.", row);
             continue;
         }
         
+        const nameCellContent = cells[nameCellIndex];
         const idMatch = nameCellContent.match(/MbrDtlMain\.php\?([^"&']+)/);
+
         if (!idMatch || !idMatch[1]) {
             console.warn("USCF Search: Could not extract an ID from the name cell even after finding the link. Skipping.", nameCellContent);
             continue; 
         }
         const uscfId = idMatch[1];
         
-        // The USCF results page has a consistent column order: Name, Rating, State, Expires
-        const ratingStr = stripTags(cells[1] || '');
-        const stateAbbr = stripTags(cells[2] || '');
-        const expirationDateRaw = stripTags(cells[3] || '');
         const fullNameRaw = stripTags(nameCellContent);
+        // The column order is assumed to be Name, Rating, State, Expires, but now we find them relative to the name column.
+        const ratingStr = (nameCellIndex + 1 < cells.length) ? stripTags(cells[nameCellIndex + 1]) : '';
+        const stateAbbr = (nameCellIndex + 2 < cells.length) ? stripTags(cells[nameCellIndex + 2]) : '';
+        const expirationDateRaw = (nameCellIndex + 3 < cells.length) ? stripTags(cells[nameCellIndex + 3]) : '';
 
         let parsedFirstName, parsedMiddleName, parsedLastName;
         const nameParts = fullNameRaw.split(','); // Format: LAST, FIRST MIDDLE
