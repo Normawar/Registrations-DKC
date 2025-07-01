@@ -90,51 +90,58 @@ const searchUscfPlayersFlow = ai.defineFlow(
       // Isolate the form containing the results to avoid parsing the whole page.
       const formMatch = html.match(/<FORM ACTION='.\/player-search.php' METHOD='GET'>([\s\S]*?)<\/FORM>/i);
       if (!formMatch || !formMatch[1]) {
-          if (html.includes("No players found")) return { players: [] };
           console.error("USCF Search: Could not find the results form. The website layout may have changed.");
           return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
       }
-      const resultsHtml = formMatch[1];
+      const formHtml = formMatch[1];
       
-      // Split the form content into rows
-      const htmlRows = resultsHtml.split(/<tr[^>]*>/i);
-      let headerFound = false;
+      // Find the header row to reliably identify the start of the data.
+      const headerRowPattern = /<tr><td>USCF ID<\/td><td>Rating<\/td>.*?<\/tr>/i;
+      const headerMatch = formHtml.match(headerRowPattern);
+
+      if (!headerMatch || typeof headerMatch.index === 'undefined') {
+          console.error("USCF Search: Could not find the header row in the results. The website layout may have changed.");
+          return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
+      }
+      
+      // Get the HTML content that comes *after* the header row.
+      const contentAfterHeader = formHtml.substring(headerMatch.index + headerMatch[0].length);
+
+      // Split the remaining content into rows. This is safer as it avoids parsing the whole document.
+      const htmlRows = contentAfterHeader.split(/<tr[^>]*>/i);
 
       for (const row of htmlRows) {
-        if (!headerFound) {
-            // Wait until we find the header row to start processing player data.
-            if (row.includes('<td>USCF ID</td>') && row.includes('<td>Name</td>')) {
-                headerFound = true;
-            }
-            continue;
+        // Stop if we hit the footer content of the table.
+        if (row.includes("Search Again") || !row.includes("<td")) {
+            break;
         }
 
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
 
-        // Player data rows have 10 columns. The final rows have fewer.
+        // Player data rows have 10 columns.
         if (cells.length < 10) {
-          break; // Stop processing once we're past the player data.
+          continue; // Skip any malformed or non-player data rows.
         }
 
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
-        // Data extraction based on the correct column order from the provided HTML.
+        // Data extraction based on the correct column order.
         const uscfIdCell = cells[0];
         const ratingStr = stripTags(cells[1]);
         const stateAbbr = stripTags(cells[7]);
         const expirationDateRaw = stripTags(cells[8]);
-        const nameCellContent = cells[9]; // Name and link are in the 10th column.
+        const nameCellContent = cells[9];
 
         const idMatch = uscfIdCell.match(/\d{8}/);
         if (!idMatch) {
-            continue; // Not a valid player row if the first cell isn't an ID.
+            continue; // Not a valid player row if there's no USCF ID.
         }
         const uscfId = idMatch[0];
 
         const fullNameRaw = stripTags(nameCellContent);
         
         let parsedFirstName, parsedMiddleName, parsedLastName;
-        const nameParts = fullNameRaw.split(',');
+        const nameParts = fullNameRaw.split(','); // Format: LAST, FIRST MIDDLE
         if (nameParts.length > 1) {
             parsedLastName = nameParts.shift()!.trim();
             const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
@@ -161,7 +168,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
 
       if (players.length === 0 && !html.includes("No players found")) {
-        console.error("USCF Search: Found no players, but did not see 'No players found' message. The website layout may have changed.");
+        console.error("USCF Search: Found no players, but did not see 'No players found' message. Parsing likely failed.");
         return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
       }
       
