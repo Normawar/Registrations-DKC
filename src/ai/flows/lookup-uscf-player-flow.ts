@@ -38,55 +38,47 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     if (!uscfId || !/^\d{8}$/.test(uscfId)) {
       return { error: 'Invalid USCF ID format. It must be an 8-digit number.' };
     }
-    const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
+    const url = `http://msa.uschess.org/thin3.php?${uscfId}`;
     
     try {
-      const response = await fetch(url, {
-        cache: 'no-store',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        },
-      });
+      const response = await fetch(url, { cache: 'no-store' });
+
       if (!response.ok) {
         return { error: `Failed to fetch from USCF website. Status: ${response.status}` };
       }
       
-      const html = await response.text();
+      const text = await response.text();
       
-      if (html.includes("This player is not in our database")) {
+      if (text.includes("This player is not in our database")) {
         return { error: "Player not found with this USCF ID." };
       }
-      
-      const text = html;
       
       const output: LookupUscfPlayerOutput = {};
       
       const nameMatch = text.match(/Name\s*:\s*(.*)/);
       if (nameMatch && nameMatch[1]) {
         const rawName = nameMatch[1].trim();
-        const nameParts = rawName.split(',').map(p => p.trim());
-        if (nameParts.length >= 2) {
-            const lastName = nameParts[0];
-            const firstNameAndMiddle = nameParts.slice(1).join(' ');
-            output.fullName = `${firstNameAndMiddle} ${lastName}`.trim();
+        const nameParts = rawName.split(',');
+        if (nameParts.length > 1) {
+            const lastName = nameParts.shift()!.trim();
+            const firstName = nameParts.join(',').trim();
+            output.fullName = `${firstName} ${lastName}`;
         } else {
             output.fullName = rawName;
         }
       }
       
-      const ratingMatch = text.match(/(?:Reg|R):\s*(\d+)/);
+      const ratingMatch = text.match(/Regular:\s*(\d+)/);
       if (ratingMatch && ratingMatch[1]) {
         output.rating = parseInt(ratingMatch[1], 10);
       }
       
-      const expiresMatch = text.match(/Expires:\s*(\d{4}-\d{2}-\d{2})/);
+      const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
       if (expiresMatch && expiresMatch[1]) {
         output.expirationDate = expiresMatch[1];
       }
       
       if (!output.fullName) {
-          console.error("USCF Lookup Response (Name not found):", html.substring(0, 500));
           return { error: "Could not parse player name from the page." };
       }
       

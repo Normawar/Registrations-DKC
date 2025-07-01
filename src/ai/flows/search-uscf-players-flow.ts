@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Searches for USCF players by name from the USCF website.
+ * @fileOverview Searches for USCF players by name from the USCF MSA website.
  *
  * - searchUscfPlayers - A function that handles the player search process.
  * - SearchUscfPlayersInput - The input type for the searchUscfPlayers function.
@@ -49,31 +49,19 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player last name cannot be empty.' };
     }
     
-    const baseUrl = 'https://www.uschess.org/datapage/player-search.php';
+    const baseUrl = 'http://msa.uschess.org/MbrLst.php';
     
     const searchParams = new URLSearchParams({
-        name: lastName,
-        f_name: firstName || '',
-        state: state === 'ALL' ? '' : state || '',
-        rating_op: '>',
-        rating: '0',
-        gender: 'B',
-        rating_type: 'R',
-        rep: 'N',
-        sort: 'N'
+        // FNM (First Name), FLNM (Last Name), ST (State)
+        FLNM: lastName,
+        FNM: firstName || '',
+        ST: state === 'ALL' ? '' : state || '',
     });
     
+    const url = `${baseUrl}?${searchParams.toString()}`;
+
     try {
-      const response = await fetch(baseUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Origin': 'https://www.uschess.org',
-            'Referer': 'https://www.uschess.org/datapage/player-search.php',
-        },
-        body: searchParams.toString(),
+      const response = await fetch(url, {
         cache: 'no-store',
       });
 
@@ -81,79 +69,63 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [], error: `Failed to fetch from USCF website. Status: ${response.status}` };
       }
       
-      const html = await response.text();
+      const text = await response.text();
       
-      if (html.includes("more than 100 members that match")) {
-        return { players: [], error: "Your search is too broad and returned more than 100 players. Please be more specific by adding a first name or state." };
-      }
-      if (html.includes("no members that match")) {
+      if (text.includes("no members that match this criteria")) {
         return { players: [] };
       }
-      
-      const rowMatches = [...html.matchAll(/<tr.*?>([\s\S]*?)<\/tr>/gi)];
-      
-      let allPlayers: PlayerSearchResult[] = [];
 
-      for (const rowMatch of rowMatches) {
-        const rowHtml = rowMatch[1];
-        const cellMatches = [...rowHtml.matchAll(/<td.*?>([\s\S]*?)<\/td>/gi)];
-        
-        if (cellMatches.length < 4) continue; // Skip rows that don't look like player data
+      if (text.includes("more than 100 members that match")) {
+        return { players: [], error: "Your search is too broad and returned more than 100 players. Please be more specific by adding a first name or state." };
+      }
+
+      const lines = text.split('\n');
+      const players: PlayerSearchResult[] = [];
+      
+      const headerIndex = lines.findIndex(line => line.includes("ID   | Name"));
+      if (headerIndex === -1) {
+          return { players: [], error: "Could not find player data block in the response. The USCF website may have changed its format." };
+      }
+
+      // Data starts 2 lines after the header
+      for (let i = headerIndex + 2; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.trim().length < 10) continue; // Skip empty or short lines
 
         try {
-            const idAndNameHtml = cellMatches[0][1];
-            const linkMatch = idAndNameHtml.match(/<a href="[^"]*?(\d{8})">([\s\S]*?)<\/a>/i);
-            
-            // This is the key check: if a row doesn't contain a valid player link, skip it.
-            if (!linkMatch) continue;
-            
-            const uscfId = linkMatch[1].trim();
-            const rawName = linkMatch[2].replace(/<.*?>/g, '').trim();
-            
+            const uscfId = line.substring(1, 9).trim();
+            if (!/^\d{8}$/.test(uscfId)) continue;
+
+            const rawName = line.substring(12, 46).trim();
+            const stateAbbr = line.substring(48, 51).trim();
+            const expDateStr = line.substring(53, 63).trim();
+            const ratingStr = line.substring(65).trim();
+
             let fullName = rawName;
-            if (rawName.includes(',')) {
-                const nameParts = rawName.split(',').map(p => p.trim());
-                if (nameParts.length >= 2) {
-                    const lastNamePart = nameParts[0];
-                    const firstNameAndMiddle = nameParts.slice(1).join(' ');
-                    fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
-                }
+            const nameParts = rawName.split(',');
+            if (nameParts.length > 1) {
+                const lastNamePart = nameParts.shift()!.trim();
+                const firstNameAndMiddle = nameParts.join(',').trim();
+                fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
             }
 
-            const ratingStr = cellMatches[1][1].trim();
             const rating = parseInt(ratingStr, 10);
-
-            const expDateStr = cellMatches[2][1].trim();
-            let expirationDate: string | undefined;
-            if (expDateStr && expDateStr !== '9999-12-31') {
-                const dateParts = expDateStr.split('/');
-                if (dateParts.length === 3) {
-                    expirationDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
-                }
-            }
             
-            const stateAbbr = cellMatches[3][1].trim();
-            
-            allPlayers.push({
+            players.push({
                 uscfId,
                 fullName,
                 state: stateAbbr,
                 rating: !isNaN(rating) ? rating : undefined,
-                expirationDate,
+                expirationDate: expDateStr || undefined,
             });
 
         } catch (parseError) {
-          console.error(`Failed to parse row: "${rowHtml}"`, parseError);
-          continue;
+            console.error(`Failed to parse player line: "${line}"`, parseError);
+            continue;
         }
       }
 
-      if (allPlayers.length === 0) {
-        console.error("USCF Search Response (No players parsed):", html.substring(0, 1000));
-        return { players: [], error: "Could not find any players in the response. The USCF website may have changed its format."};
-      }
-      
-      return { players: allPlayers };
+      return { players };
 
     } catch (error) {
       console.error("Error in searchUscfPlayersFlow:", error);
