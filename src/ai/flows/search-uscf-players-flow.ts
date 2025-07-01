@@ -97,34 +97,25 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
       }
 
-      // Assume column order based on observation: 0: Name/ID, 1: Rating, 2: State, 3: Expires
-      const NAME_ID_COL = 0;
-      const RATING_COL = 1;
-      const STATE_COL = 2;
-      const EXPIRES_COL = 3;
-
       for (const row of playerRows) {
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
 
-        // Defensively check if the row has enough columns to be a player.
-        if (cells.length < 4) {
-            console.warn("USCF Search: Found a potential player row with fewer than 4 columns. Skipping.", row);
+        const nameCellContent = cells[0];
+        if (!nameCellContent) {
+            console.warn("USCF Search: Found a potential player row with no cells. Skipping.", row);
             continue;
         }
         
-        const nameCellContent = cells[NAME_ID_COL];
         const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
-
-        // If the first cell doesn't have the player link, this row is invalid.
         if (!idMatch || !idMatch[1]) {
             console.warn("USCF Search: Found a row that looked like a player row but couldn't extract an ID. Skipping.", nameCellContent);
             continue; 
         }
         const uscfId = idMatch[1];
         
-        const ratingStr = stripTags(cells[RATING_COL] || '');
-        const stateAbbr = stripTags(cells[STATE_COL] || '');
-        const expirationDateRaw = stripTags(cells[EXPIRES_COL] || '');
+        const ratingStr = stripTags(cells[1] || '');
+        const stateAbbr = stripTags(cells[2] || '');
+        const expirationDateRaw = stripTags(cells[3] || '');
         const fullNameRaw = stripTags(nameCellContent);
 
         let parsedFirstName, parsedMiddleName, parsedLastName;
