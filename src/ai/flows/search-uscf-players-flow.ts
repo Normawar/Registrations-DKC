@@ -61,6 +61,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest', // Tells the server we want a data response (JSON)
         },
         body: searchParams.toString(),
         cache: 'no-store',
