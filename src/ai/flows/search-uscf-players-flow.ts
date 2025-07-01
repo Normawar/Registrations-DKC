@@ -87,67 +87,71 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       const lines = text.split('\n');
       const players: PlayerSearchResult[] = [];
+      let foundTable = false;
       
-      // Make header check more robust to spacing changes by searching the entire page.
-      const headerIndex = lines.findIndex(line => line.includes("ID") && line.includes("Name") && line.includes("St"));
-      if (headerIndex === -1) {
-          console.error("USCF Search response did not contain expected header. Full response:", text.substring(0, 1000));
-          return { players: [], error: "Could not find the player data table in the response. The USCF website format may have changed." };
-      }
-
-      // Data starts 2 lines after the header
-      for (let i = headerIndex + 2; i < lines.length; i++) {
-        const line = lines[i];
+      // Iterate over all lines and try to parse any that look like player data.
+      // This is more robust than looking for a specific header line which might change.
+      for (const line of lines) {
         if (line.trim().length < 10) continue; // Skip empty or short lines
 
         try {
-            // More robust parsing logic that does not depend on fixed-width columns.
+            // A valid player line should start with an 8-digit USCF ID.
             const uscfId = line.substring(0, 8).trim();
-            if (!/^\d{8}$/.test(uscfId)) continue;
+            if (/^\d{8}$/.test(uscfId)) {
+                foundTable = true;
     
-            let restOfLine = line.substring(8).trim();
-            
-            let rating: number | undefined;
-            const ratingMatch = restOfLine.match(/(\d{3,4})$/);
-            if (ratingMatch) {
-                rating = parseInt(ratingMatch[1], 10);
-                restOfLine = restOfLine.substring(0, restOfLine.length - ratingMatch[1].length).trim();
+                let restOfLine = line.substring(8).trim();
+                
+                let rating: number | undefined;
+                // Rating is typically the last number on the line.
+                const ratingMatch = restOfLine.match(/(\d{3,4})$/);
+                if (ratingMatch) {
+                    rating = parseInt(ratingMatch[1], 10);
+                    restOfLine = restOfLine.substring(0, restOfLine.length - ratingMatch[1].length).trim();
+                }
+        
+                let expirationDate: string | undefined;
+                // Expiration date is in YYYY-MM-DD format before the rating.
+                const dateMatch = restOfLine.match(/(\d{4}-\d{2}-\d{2})$/);
+                if (dateMatch) {
+                    expirationDate = dateMatch[1];
+                    restOfLine = restOfLine.substring(0, restOfLine.length - dateMatch[1].length).trim();
+                }
+        
+                let stateAbbr: string | undefined;
+                // State is a two-letter code before the date.
+                const stateMatch = restOfLine.match(/([A-Z]{2})$/);
+                if (stateMatch) {
+                    stateAbbr = stateMatch[1];
+                    restOfLine = restOfLine.substring(0, restOfLine.length - stateMatch[1].length).trim();
+                }
+        
+                // The rest is the name, usually in "LAST, FIRST" format.
+                let fullName = restOfLine;
+                const nameParts = fullName.split(',');
+                if (nameParts.length > 1) {
+                    const lastNamePart = nameParts.shift()!.trim();
+                    const firstNameAndMiddle = nameParts.join(',').trim();
+                    fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
+                }
+                
+                players.push({
+                    uscfId,
+                    fullName,
+                    state: stateAbbr,
+                    rating: !isNaN(rating as number) ? rating : undefined,
+                    expirationDate,
+                });
             }
-    
-            let expirationDate: string | undefined;
-            const dateMatch = restOfLine.match(/(\d{4}-\d{2}-\d{2})$/);
-            if (dateMatch) {
-                expirationDate = dateMatch[1];
-                restOfLine = restOfLine.substring(0, restOfLine.length - dateMatch[1].length).trim();
-            }
-    
-            let stateAbbr: string | undefined;
-            const stateMatch = restOfLine.match(/([A-Z]{2})$/);
-            if (stateMatch) {
-                stateAbbr = stateMatch[1];
-                restOfLine = restOfLine.substring(0, restOfLine.length - stateMatch[1].length).trim();
-            }
-    
-            let fullName = restOfLine;
-            const nameParts = fullName.split(',');
-            if (nameParts.length > 1) {
-                const lastNamePart = nameParts.shift()!.trim();
-                const firstNameAndMiddle = nameParts.join(',').trim();
-                fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
-            }
-            
-            players.push({
-                uscfId,
-                fullName,
-                state: stateAbbr,
-                rating: !isNaN(rating as number) ? rating : undefined,
-                expirationDate,
-            });
-
         } catch (parseError) {
             console.error(`Failed to parse player line: "${line}"`, parseError);
             continue;
         }
+      }
+
+      if (!foundTable) {
+          console.error("USCF Search response did not contain any parsable player data. Full response:", text.substring(0, 1000));
+          return { players: [], error: "Could not find the player data table in the response. The USCF website format may have changed." };
       }
 
       return { players };
