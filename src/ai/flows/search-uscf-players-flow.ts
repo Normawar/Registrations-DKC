@@ -85,24 +85,34 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Isolate the form containing the results table to avoid parsing the whole page.
-      const formContentMatch = html.match(/<form[^>]*action[^>]*player-search\.php[^>]*>([\s\S]*?)<\/form>/i);
-      const searchArea = formContentMatch ? formContentMatch[1] : html;
-
-      const rows = searchArea.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const players: PlayerSearchResult[] = [];
+      // Split the HTML content by the table row tag to process each row.
+      const htmlRows = html.split(/<tr[^>]*>/i);
+      let processingStarted = false;
 
-      for (const row of rows) {
+      for (const row of htmlRows) {
+        // The header row marks the beginning of the player data table.
+        // We start processing rows only after we find this specific header.
+        if (!processingStarted && row.includes('<td>USCF ID</td>') && row.includes('<td>Name</td>')) {
+          processingStarted = true;
+          continue; // Skip the header row itself.
+        }
+
+        if (!processingStarted) {
+          continue; // Ignore all content before the player data table.
+        }
+
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-        
-        // A valid player row from player-search.php has at least 10 columns.
+
+        // Player data rows have at least 10 columns. Footer rows have fewer.
+        // This check stops us from parsing irrelevant rows at the end of the table.
         if (cells.length < 10) {
-          continue;
+          break;
         }
 
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
-        // The last cell (index 9) contains the name and the link to the player's profile.
+        // The name and the unique player link are in the last column.
         const nameCellContent = cells[9];
         const idLinkMatch = nameCellContent.match(/MbrDtlMain\.php\?(\d{8})/);
         
@@ -133,7 +143,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
         
         const rating = ratingStr && !isNaN(parseInt(ratingStr)) ? parseInt(ratingStr, 10) : undefined;
         
-        // The date format is YYYY-MM-DD
         const expiresMatch = expirationDateRaw.match(/(\d{4}-\d{2}-\d{2})/);
         const expirationDate = expiresMatch ? expiresMatch[1] : undefined;
 
