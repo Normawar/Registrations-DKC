@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF website.
@@ -38,31 +37,34 @@ export async function searchUscfPlayers(input: SearchUscfPlayersInput): Promise<
 
 const searchPrompt = ai.definePrompt({
     name: 'searchUscfPlayersPrompt',
-    model: 'googleai/gemini-1.5-pro-latest', 
+    model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
     prompt: `You are an expert at extracting structured player data from a USCF player search results HTML page.
-Your task is to find the main results table within the HTML and parse EACH player row.
+Your task is to find the main results table within the provided HTML and parse EACH player row.
 
 **RULES:**
-1. Locate the table containing player data. The table can be identified by its header row which contains columns like 'ID', 'Name', 'St', and 'Reg'.
-2. For EACH player row (\`<tr>\`) in that table, extract the required information.
-3. The data is often inside \`<font>\` tags within the table cells (\`<td>\`). You must extract the text content from within these tags.
-4. If the rating value is 'UNR' or the cell is empty, the output for \`rating\` must be null.
-5. If the HTML contains the text "No players found", you MUST return an empty \`players\` array.
-6. The \`fullName\` is typically in "LAST, FIRST MI" format. Extract it as is.
+1.  Locate the table containing player data. The table can be identified by its header row which contains columns like 'ID', 'Name', 'St', and 'Reg'.
+2.  For EACH player row (\`<tr>\`) in that table, extract the required information from the table cells (\`<td>\`).
+3.  The data is often inside other HTML tags like \`<font>\` or \`<a>\`. You must extract the visible text content from within these tags.
+4.  If a player's rating is 'UNR' or the cell is empty, the output for the \`rating\` field must be \`null\`.
+5.  If the HTML contains the text "No players found", you MUST return an empty \`players\` array.
+6.  The \`fullName\` is typically in "LAST, FIRST MI" format. Extract it exactly as it appears.
 
-**EXAMPLE:**
-Given this HTML snippet of a table row:
+**EXAMPLE HTML of a table row:**
 \`\`\`html
 <tr><td><font face=verdana,helvetica,arial size=2>16439198</font></td><td align=left><font face=verdana,helvetica,arial size=2><a href=./MbrDtlMain.php?16439198>GUERRA, KALI ANN</a></font></td><td align=center><font face=verdana,helvetica,arial size=2>TX</font></td><td align=right><font face=verdana,helvetica,arial size=2>1084</font></td></tr>
 \`\`\`
 
-You would extract:
-- uscfId: "16439198"
-- fullName: "GUERRA, KALI ANN"
-- rating: 1084
-- state: "TX"
+**EXAMPLE OUTPUT for that row:**
+\`\`\`json
+{
+  "uscfId": "16439198",
+  "fullName": "GUERRA, KALI ANN",
+  "rating": 1084,
+  "state": "TX"
+}
+\`\`\`
 
 Now, parse the full HTML document provided below and return ALL matching players.
 
@@ -115,16 +117,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
       if (html.includes("No players found")) {
           return { players: [] };
       }
-      
-      // Use a robust regex to find the player results table.
-      // This isolates the relevant data for the AI, reducing confusion.
-      const tableRegex = /(\<table[\s\S]*?\<tr class=["']?header["']?[\s\S]*?\<\/table\>)/i;
-      const tableMatch = html.match(tableRegex);
 
-      // If we found the table, parse it. Otherwise, parse the whole page as a fallback.
-      const contentToParse = tableMatch ? tableMatch[0] : html;
-
-      const { output } = await searchPrompt(contentToParse);
+      const { output } = await searchPrompt(html);
       
       if (!output) {
           return { players: [], error: "AI model failed to parse the player data." };
@@ -148,6 +142,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
       // This is a safeguard in case the website returns players from other states or the AI includes them.
       if (state && state !== "ALL") {
         players = players.filter(player => player.state?.toUpperCase() === state.toUpperCase());
+      }
+      
+      if (players.length === 0) {
+        // This case now means parsing failed, as the explicit "No players found" is handled above.
+        return { players: [], error: "Parsing failed. The USCF website may have changed, or the search returned no results in a way that could not be detected." };
       }
 
       return { players };
