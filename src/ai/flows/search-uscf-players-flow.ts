@@ -89,7 +89,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       
       // Iterate all rows and find player rows directly by looking for the member detail link.
-      // This is more robust than trying to find a specific header row.
+      // This is more robust than trying to find a specific header row or assuming a fixed column count.
       for (const row of allHtmlRows) {
         if (!row.includes('MbrDtlMain.php?')) {
             continue;
@@ -97,24 +97,30 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
         
-        // A valid player row should have at least 10 columns for all the data.
-        if (cells.length < 10) {
-            console.warn("USCF Search: Found a potential player row but it had fewer than 10 cells. Skipping.", row);
-            continue;
+        // The most reliable anchor is the cell containing the player's name and ID link.
+        // It has historically been at index 9. We check there first for performance.
+        let nameCellContent: string | undefined = cells[9];
+        
+        if (!nameCellContent || !nameCellContent.includes('MbrDtlMain.php?')) {
+            // If not at index 9, search all cells to be more robust against layout changes.
+            const nameCell = cells.find(c => c.includes('MbrDtlMain.php?'));
+            if (!nameCell) {
+                console.warn("USCF Search: Found a potential player row but could not find the name/ID cell. Skipping.", row);
+                continue;
+            }
+            nameCellContent = nameCell;
         }
 
-        const nameCellContent = cells[9];
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
         const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
-        
         if (!idMatch || !idMatch[1]) {
-            console.warn("USCF Search: Found a player row but could not extract USCF ID from the link. Skipping.", nameCellContent);
+            console.warn("USCF Search: Found a player name cell but could not extract USCF ID from it. Skipping.", nameCellContent);
             continue; 
         }
         const uscfId = idMatch[1];
         
-        // Safely access cell content now that we're confident it's a player row.
+        // Safely access other cells, assuming the historical column positions.
         const ratingStr = cells[1] ? stripTags(cells[1]) : '';
         const stateAbbr = cells[7] ? stripTags(cells[7]) : '';
         const expirationDateRaw = cells[8] ? stripTags(cells[8]) : '';
