@@ -85,27 +85,19 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Isolate the form containing the results to avoid parsing the whole page.
-      const formMatch = html.match(/<form action='.\/player-search.php'[\s\S]*?<\/form>/i);
-      if (!formMatch || !formMatch[0]) {
-          console.error("USCF Search: Could not find the results form on the page.");
-          return { players: [], error: "Could not find the results form on the page. The website layout may have changed." };
-      }
-      const formHtml = formMatch[0];
-      
       const players: PlayerSearchResult[] = [];
-      const htmlRows = formHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
 
       // Find the header row to know where data starts
-      const headerRowIndex = htmlRows.findIndex(row => row.includes("USCF ID</td>"));
+      const headerRowIndex = allHtmlRows.findIndex(row => row.includes("USCF ID</td>") && row.includes("Name</td>"));
       if (headerRowIndex === -1) {
         console.error("USCF Search: Could not find the header row in the results table.");
         return { players: [], error: "Could not find the header row in the results table. The website layout may have changed." };
       }
       
       // Start processing rows after the header
-      for (let i = headerRowIndex + 1; i < htmlRows.length; i++) {
-        const row = htmlRows[i];
+      for (let i = headerRowIndex + 1; i < allHtmlRows.length; i++) {
+        const row = allHtmlRows[i];
 
         // Stop if we hit the footer row which contains form inputs
         if (row.includes("Search Again") || row.includes("<input")) break;
