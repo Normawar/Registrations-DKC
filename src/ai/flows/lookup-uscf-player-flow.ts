@@ -79,7 +79,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         }
       }
       
-      const ratingMatch = text.match(/Rating:\s*(\d+)/);
+      const ratingMatch = text.match(/Regular:\s*(\d+)/);
       if (ratingMatch && ratingMatch[1]) {
         output.rating = parseInt(ratingMatch[1], 10);
       }

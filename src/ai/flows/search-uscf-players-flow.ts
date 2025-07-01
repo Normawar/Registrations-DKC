@@ -103,16 +103,16 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       for (let i = dataStartIndex + 1; i < lines.length; i++) {
         const line = lines[i];
-        if (line.trim().length === 0) continue;
+        if (line.trim().length === 0 || line.length < 90) continue;
 
         try {
-          const uscfId = line.substring(3, 11).trim();
-          if (!uscfId) continue;
+          const uscfId = line.substring(2, 10).trim();
+          if (!uscfId || !/^\d+$/.test(uscfId)) continue;
           
-          const fullNameRaw = line.substring(21, 43).trim();
-          const stateAbbr = line.substring(44, 46).trim();
-          const ratingStr = line.substring(64, 70).trim().split('/')[0];
-          const expDateStr = line.substring(105, 115).trim();
+          const fullNameRaw = line.substring(92).trim();
+          const stateAbbr = line.substring(11, 13).trim();
+          const ratingStr = line.substring(29, 38).trim().split('/')[0].trim();
+          const expDateStr = line.substring(14, 24).trim();
 
           let fullName = fullNameRaw;
           if (fullNameRaw.includes(',')) {
@@ -122,11 +122,13 @@ const searchUscfPlayersFlow = ai.defineFlow(
               fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
           }
 
+          const rating = parseInt(ratingStr, 10);
+
           players.push({
               uscfId,
               fullName,
               state: stateAbbr,
-              rating: /^\d+$/.test(ratingStr) ? parseInt(ratingStr, 10) : undefined,
+              rating: !isNaN(rating) ? rating : undefined,
               expirationDate: /^\d{4}-\d{2}-\d{2}$/.test(expDateStr) ? expDateStr : undefined,
           });
         } catch (parseError) {
