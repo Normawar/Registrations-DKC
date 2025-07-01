@@ -49,26 +49,28 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player last name cannot be empty.' };
     }
     
-    // Using the simpler, more reliable text-based search page.
-    const url = 'https://www.uschess.org/msa/MbrLst.php';
+    // This is a more stable, non-JavaScript endpoint for searching.
+    const baseUrl = 'http://www.uschess.org/datapage/player-search.php';
+    
+    // We only search by last name to get full first names, then filter locally.
     const searchParams = new URLSearchParams({
-        LAST: lastName,
-        FIRST: firstName || '',
-        ST: state === 'ALL' ? '' : state || '',
-        RATING: 'R', // Regular rating
-        EXPIRES: 'E', // Expiration date
-        PHOTOS: 'N', // No photos
-        MEMTYPE: 'M', // All member types
-        ORDER: 'N' // Order by name
+        name: lastName,
+        state: state === 'ALL' ? '' : state || '',
+        rating_op: '>', // Operator for rating
+        rating: '0',     // Rating value, > 0 to get all players
+        gender: 'B',     // Both genders
+        rating_type: 'R',// Regular rating
+        rep: 'N',        // Representative type? 'N' for none
+        sort: 'N'        // Sort by Name
     });
     
-    const searchUrl = `${url}?${searchParams.toString()}`;
+    const searchUrl = `${baseUrl}?${searchParams.toString()}`;
 
     try {
       const response = await fetch(searchUrl, {
         cache: 'no-store',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         },
       });
 
@@ -78,66 +80,86 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       const html = await response.text();
       
-      if (html.includes("Your search returned more than 250 names.")) {
-        return { players: [], error: "Your search is too broad and returned more than 250 names. Please be more specific." };
+      if (html.includes("more than 100 members that match")) {
+        return { players: [], error: "Your search is too broad and returned more than 100 players. Please be more specific by adding a first name or state." };
       }
-      if (html.includes("No players that match your search criteria were found.")) {
+      if (html.includes("no members that match")) {
         return { players: [] };
       }
       
-      const preMatch = html.match(/<pre>([\s\S]*?)<\/pre>/i);
-      if (!preMatch || !preMatch[1]) {
-        console.error("USCF Search Response (No <pre> tag found):", html.substring(0, 500));
-        return { players: [], error: "Could not find player data block in the search results. The USCF website may have changed its format." };
+      const tableMatch = html.match(/<table class="contentpaneopen">([\s\S]*?)<\/table>/i);
+      if (!tableMatch || !tableMatch[1]) {
+          console.error("USCF Search Response (No results table found):", html.substring(0, 1000));
+          return { players: [], error: "Could not find the results table in the response. The USCF website may have changed its format."};
       }
       
-      const text = preMatch[1];
-      const lines = text.split('\n');
-      const players: PlayerSearchResult[] = [];
+      const tableHtml = tableMatch[1];
+      const rowMatches = [...tableHtml.matchAll(/<tr.*?>([\s\S]*?)<\/tr>/gi)];
+      
+      if (rowMatches.length < 2) { // Should be at least a header row and one data row
+          return { players: [] };
+      }
+      
+      let allPlayers: PlayerSearchResult[] = [];
 
-      const dataStartIndex = lines.findIndex(line => line.startsWith('-----------------'));
-      if (dataStartIndex === -1) {
-          console.error("USCF Search Response (Could not find data separator '---'):", html.substring(0, 1000));
-          return { players: [], error: "Failed to parse player data from the USCF website. The format may have changed."};
-      }
-      
-      for (let i = dataStartIndex + 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.trim().length === 0 || line.length < 90) continue;
+      // Skip header row (index 0)
+      for (let i = 1; i < rowMatches.length; i++) {
+        const rowHtml = rowMatches[i][1];
+        const cellMatches = [...rowHtml.matchAll(/<td.*?>([\s\S]*?)<\/td>/gi)];
+        
+        if (cellMatches.length < 4) continue; // Expect at least 4 columns
 
         try {
-          const uscfId = line.substring(3, 11).trim();
-          if (!uscfId || !/^\d+$/.test(uscfId)) continue;
-          
-          const fullNameRaw = line.substring(92).trim();
-          const stateAbbr = line.substring(25, 27).trim();
-          const ratingStr = line.substring(29, 38).trim().split('/')[0].trim();
-          const expDateStr = line.substring(14, 24).trim();
+            const idAndNameHtml = cellMatches[0][1];
+            const linkMatch = idAndNameHtml.match(/<a href="MbrDtlMain\.php\?(\d{8})">([\s\S]*?)<\/a>/i);
+            if (!linkMatch) continue;
+            
+            const uscfId = linkMatch[1].trim();
+            const rawName = linkMatch[2].replace(/<.*?>/g, '').trim();
+            
+            let fullName = rawName;
+            if (rawName.includes(',')) {
+                const nameParts = rawName.split(',').map(p => p.trim());
+                const lastNamePart = nameParts[0];
+                const firstNameAndMiddle = nameParts.slice(1).join(' ');
+                fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
+            }
 
-          let fullName = fullNameRaw;
-          if (fullNameRaw.includes(',')) {
-              const nameParts = fullNameRaw.split(',').map(p => p.trim());
-              const lastNamePart = nameParts[0];
-              const firstNameAndMiddle = nameParts.slice(1).join(' ');
-              fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
-          }
+            const ratingStr = cellMatches[1][1].trim();
+            const rating = parseInt(ratingStr, 10);
 
-          const rating = parseInt(ratingStr, 10);
+            const expDateStr = cellMatches[2][1].trim();
+            let expirationDate: string | undefined;
+            if (expDateStr && expDateStr !== '9999-12-31') {
+                const dateParts = expDateStr.split('/');
+                if (dateParts.length === 3) {
+                    expirationDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
+                }
+            }
+            
+            const stateAbbr = cellMatches[3][1].trim();
+            
+            allPlayers.push({
+                uscfId,
+                fullName,
+                state: stateAbbr,
+                rating: !isNaN(rating) ? rating : undefined,
+                expirationDate,
+            });
 
-          players.push({
-              uscfId,
-              fullName,
-              state: stateAbbr,
-              rating: !isNaN(rating) ? rating : undefined,
-              expirationDate: /^\d{4}-\d{2}-\d{2}$/.test(expDateStr) ? expDateStr : undefined,
-          });
         } catch (parseError) {
-          console.error(`Failed to parse line: "${line}"`, parseError);
+          console.error(`Failed to parse row: "${rowHtml}"`, parseError);
           continue;
         }
       }
+
+      // If a first name was provided, filter the results locally
+      if (firstName) {
+        const lowerFirstName = firstName.toLowerCase();
+        allPlayers = allPlayers.filter(p => p.fullName.toLowerCase().startsWith(lowerFirstName));
+      }
       
-      return { players };
+      return { players: allPlayers };
 
     } catch (error) {
       console.error("Error in searchUscfPlayersFlow:", error);
