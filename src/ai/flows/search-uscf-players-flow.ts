@@ -49,11 +49,12 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player last name cannot be empty.' };
     }
     
-    const baseUrl = 'http://msa.uschess.org/MbrLst.php';
+    // Use the www.uschess.org endpoint which is more stable than the msa subdomain.
+    const baseUrl = 'https://www.uschess.org/msa/MbrLst.php';
     
     const searchParams = new URLSearchParams({
-        // FNM (First Name), FLNM (Last Name), ST (State)
-        FLNM: lastName,
+        // LNM (Last Name Match), FNM (First Name Match), ST (State)
+        LNM: lastName,
         FNM: firstName || '',
         ST: state === 'ALL' ? '' : state || '',
     });
@@ -82,7 +83,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const lines = text.split('\n');
       const players: PlayerSearchResult[] = [];
       
-      const headerIndex = lines.findIndex(line => line.includes("ID   | Name"));
+      // Make header check more robust to spacing changes
+      const headerIndex = lines.findIndex(line => line.includes("ID") && line.includes("Name") && line.includes("St"));
       if (headerIndex === -1) {
           return { players: [], error: "Could not find player data block in the response. The USCF website may have changed its format." };
       }
@@ -93,30 +95,47 @@ const searchUscfPlayersFlow = ai.defineFlow(
         if (line.trim().length < 10) continue; // Skip empty or short lines
 
         try {
-            const uscfId = line.substring(1, 9).trim();
+            // More robust parsing logic that does not depend on fixed-width columns.
+            const uscfId = line.substring(0, 8).trim();
             if (!/^\d{8}$/.test(uscfId)) continue;
-
-            const rawName = line.substring(12, 46).trim();
-            const stateAbbr = line.substring(48, 51).trim();
-            const expDateStr = line.substring(53, 63).trim();
-            const ratingStr = line.substring(65).trim();
-
-            let fullName = rawName;
-            const nameParts = rawName.split(',');
+    
+            let restOfLine = line.substring(8).trim();
+            
+            let rating: number | undefined;
+            const ratingMatch = restOfLine.match(/(\d{3,4})$/);
+            if (ratingMatch) {
+                rating = parseInt(ratingMatch[1], 10);
+                restOfLine = restOfLine.substring(0, restOfLine.length - ratingMatch[1].length).trim();
+            }
+    
+            let expirationDate: string | undefined;
+            const dateMatch = restOfLine.match(/(\d{4}-\d{2}-\d{2})$/);
+            if (dateMatch) {
+                expirationDate = dateMatch[1];
+                restOfLine = restOfLine.substring(0, restOfLine.length - dateMatch[1].length).trim();
+            }
+    
+            let stateAbbr: string | undefined;
+            const stateMatch = restOfLine.match(/([A-Z]{2})$/);
+            if (stateMatch) {
+                stateAbbr = stateMatch[1];
+                restOfLine = restOfLine.substring(0, restOfLine.length - stateMatch[1].length).trim();
+            }
+    
+            let fullName = restOfLine;
+            const nameParts = fullName.split(',');
             if (nameParts.length > 1) {
                 const lastNamePart = nameParts.shift()!.trim();
                 const firstNameAndMiddle = nameParts.join(',').trim();
                 fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
             }
-
-            const rating = parseInt(ratingStr, 10);
             
             players.push({
                 uscfId,
                 fullName,
                 state: stateAbbr,
-                rating: !isNaN(rating) ? rating : undefined,
-                expirationDate: expDateStr || undefined,
+                rating: !isNaN(rating as number) ? rating : undefined,
+                expirationDate,
             });
 
         } catch (parseError) {

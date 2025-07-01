@@ -38,7 +38,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     if (!uscfId || !/^\d{8}$/.test(uscfId)) {
       return { error: 'Invalid USCF ID format. It must be an 8-digit number.' };
     }
-    const url = `http://msa.uschess.org/thin3.php?${uscfId}`;
+    // Use the www.uschess.org endpoint which is more stable than the msa subdomain.
+    const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
     
     try {
       const response = await fetch(url, { cache: 'no-store' });
@@ -55,6 +56,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = {};
       
+      // Regex is more robust than substring parsing
       const nameMatch = text.match(/Name\s*:\s*(.*)/);
       if (nameMatch && nameMatch[1]) {
         const rawName = nameMatch[1].trim();
