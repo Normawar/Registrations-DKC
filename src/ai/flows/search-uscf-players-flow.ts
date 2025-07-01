@@ -41,19 +41,23 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing HTML tables. I will provide the HTML source code of a USCF player search results page.
+    prompt: `You are an expert at parsing messy HTML. I will provide the HTML source code of a USCF player search results page.
 
-Your task is to find the table containing the player search results. The table header row contains columns like "USCF ID", "Rating", "State", and "Name".
-For each player row *after* the header, extract the following details and format them into a JSON object:
+Your task is to find the table containing the player search results. The header row for this table will look like this:
+\`\`\`html
+<tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr>
+\`\`\`
 
-- \`uscfId\`: The player's 8-digit USCF ID. This is in the first column.
-- \`fullName\`: The player's name as it appears in the "Name" column.
-- \`rating\`: The player's USCF rating from the "Rating" column. This is the second column. This must be a number. If the rating is "Unrated", omit this field.
-- \`state\`: The player's state abbreviation from the "State" column.
+For each player data row *after* that header, extract the following details into a JSON object:
 
-If the HTML contains the text "Total players found: 0", return an empty array for the "players" field.
+- \`uscfId\`: The player's 8-digit USCF ID. This is in the first \`<td>\`.
+- \`fullName\`: The player's name. This is inside an \`<a>\` tag in the tenth and final \`<td>\`.
+- \`rating\`: The player's regular USCF rating from the "Rating" column. This is in the second \`<td>\`. This must be a number. If the rating is "Unrated" or blank, omit this field from the JSON object.
+- \`state\`: The player's two-letter state abbreviation. This is in the eighth \`<td>\`.
 
-Example of a player row in the HTML table:
+If the HTML contains the exact text "Total players found: 0", or if you cannot find the results table described above, return an empty array for the "players" field.
+
+Example of a player data row in the HTML table:
 \`\`\`html
 <tr><td valign=top>16153316 &nbsp;&nbsp;</td><td valign=top>319 &nbsp;&nbsp;</td><td valign=top>340 &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>TX &nbsp;&nbsp;</td><td valign=top>2025-11-30 &nbsp;&nbsp;</td><td valign=top><a href=...>GUERRA, KALI RENAE</a></td></tr>
 \`\`\`
@@ -113,10 +117,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       const html = await response.text();
       
-      if (html.includes("Total players found: 0")) {
-        return { players: [] };
-      }
-
       const { output } = await searchPrompt(html);
 
       if (!output) {
@@ -127,9 +127,9 @@ const searchUscfPlayersFlow = ai.defineFlow(
           return { players: [], error: output.error };
       }
 
-      if (output.players.length === 0 && !html.includes("Total players found: 0")) {
-        console.warn("AI returned no players, but the page does not explicitly state '0 players found'. Possible parsing issue.");
-        return { players: [], error: "No players found matching your criteria." };
+      // The prompt now handles the "0 players found" case. If the array is empty, it's a valid result.
+      if (output.players.length === 0) {
+        return { players: [] };
       }
       
       const players: PlayerSearchResult[] = output.players.map(player => {
