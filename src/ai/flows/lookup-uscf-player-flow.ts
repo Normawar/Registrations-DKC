@@ -44,7 +44,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       const response = await fetch(url, {
         cache: 'no-store',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         },
       });
       if (!response.ok) {
@@ -57,12 +58,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         return { error: "Player not found with this USCF ID." };
       }
       
-      const preMatch = html.match(/<pre>([\s\S]*?)<\/pre>/i);
-      if (!preMatch || !preMatch[1]) {
-        console.error("USCF Lookup Response (No <pre> tag found):", html.substring(0, 500));
-        return { error: "Could not find player data block in the lookup results. The USCF website may be temporarily unavailable or blocking requests." };
-      }
-      const text = preMatch[1];
+      // Removed fragile <pre> tag matching. Now searching the whole document for the data.
+      const text = html;
       
       const output: LookupUscfPlayerOutput = {};
       

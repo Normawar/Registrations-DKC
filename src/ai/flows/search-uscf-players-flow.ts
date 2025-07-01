@@ -49,8 +49,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player last name cannot be empty.' };
     }
     
-    // This is a more stable, non-JavaScript endpoint for searching.
-    const baseUrl = 'http://www.uschess.org/datapage/player-search.php';
+    // Use the secure HTTPS endpoint for searching.
+    const baseUrl = 'https://www.uschess.org/datapage/player-search.php';
     
     const searchParams = new URLSearchParams({
         name: lastName,
@@ -70,7 +70,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const response = await fetch(searchUrl, {
         cache: 'no-store',
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         },
       });
 
@@ -87,7 +88,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
       
-      const tableMatch = html.match(/<table class="contentpaneopen">([\s\S]*?)<\/table>/i);
+      // A more robust regex that looks for the content of the table header ("ID Number"), not a specific class name.
+      const tableMatch = html.match(/<table[^>]*>([\s\S]*?ID Number[\s\S]*?)<\/table>/i);
       if (!tableMatch || !tableMatch[1]) {
           console.error("USCF Search Response (No results table found):", html.substring(0, 1000));
           return { players: [], error: "Could not find the results table in the response. The USCF website may have changed its format."};
@@ -111,7 +113,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
         try {
             const idAndNameHtml = cellMatches[0][1];
-            const linkMatch = idAndNameHtml.match(/<a href="MbrDtlMain\.php\?(\d{8})">([\s\S]*?)<\/a>/i);
+            // The link may be in MbrDtlMain.php or thin3.php, be more flexible
+            const linkMatch = idAndNameHtml.match(/<a href="[^"]*?(\d{8})">([\s\S]*?)<\/a>/i);
             if (!linkMatch) continue;
             
             const uscfId = linkMatch[1].trim();
