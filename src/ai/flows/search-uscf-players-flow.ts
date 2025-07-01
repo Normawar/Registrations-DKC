@@ -97,7 +97,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       );
 
       if (headerRowIndex === -1) {
-        console.error("USCF Search: Could not find the header row in the results table.");
+        console.error("USCF Search: Could not find the header row in the results table. Full response:", html.substring(0, 2000));
         return { players: [], error: "Could not find the header row in the results table. The website layout may have changed." };
       }
       
@@ -159,7 +159,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
 
       if (players.length === 0 && !html.includes("No players found")) {
-        console.error("USCF Search: Found no players, but did not see 'No players found' message. Parsing likely failed.");
+        console.error("USCF Search: Found no players, but did not see 'No players found' message. Parsing likely failed. Full response:", html.substring(0, 2000));
         return { players: [], error: "Found a results table, but was unable to extract any player data. The website layout may have changed." };
       }
       
