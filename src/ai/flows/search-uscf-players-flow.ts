@@ -87,77 +87,60 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
-
-      const headerMap: { [key: string]: number } = {};
-      let headerRowIndex = -1;
-
-      for (let i = 0; i < allHtmlRows.length; i++) {
-        const row = allHtmlRows[i];
-        
-        const cells = row.match(/<(th|td)[^>]*>([\s\S]*?)<\/(th|td)>/gi) || [];
-        if (cells.length < 3) continue;
-
-        const headerTexts = cells.map(stripTags);
-        const lowerHeaderTexts = headerTexts.map(h => h.toLowerCase());
-        
-        const hasName = lowerHeaderTexts.some(h => h.includes('name'));
-        const hasRating = lowerHeaderTexts.some(h => h.includes('rat')); // rating, rat'g
-        const hasState = lowerHeaderTexts.some(h => h === 'st' || h === 'state');
-        
-        if (hasName && hasRating && hasState) {
-          lowerHeaderTexts.forEach((text, index) => {
-            if (text.includes('name')) headerMap['name'] = index;
-            if (text.includes('rat')) headerMap['rating'] = index;
-            if (text === 'st' || text === 'state') headerMap['state'] = index;
-            if (text.includes('exp')) headerMap['expires'] = index;
-          });
-
-          if (headerMap['name'] !== undefined && headerMap['rating'] !== undefined && headerMap['state'] !== undefined) {
-              headerRowIndex = i;
-              break;
-          }
-        }
-      }
       
-      if (headerRowIndex === -1) {
-          console.error("USCF Search: Could not find the results table header. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
-          return { players: [], error: "Could not find the results table header. The website layout may have changed." };
-      }
-
       const players: PlayerSearchResult[] = [];
-      
-      for (let i = headerRowIndex + 1; i < allHtmlRows.length; i++) {
-        const row = allHtmlRows[i];
-        if (!row.includes('MbrDtlMain.php?')) {
-            continue;
-        }
-        
-        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-        if (cells.length === 0) continue;
 
-        let nameCellContent: string | undefined;
-        let idMatch: RegExpMatchArray | null = null;
-        
-        for (const cell of cells) {
-            const match = cell.match(/MbrDtlMain\.php\?([^"&']+)/);
-            if (match && match[1]) {
-                nameCellContent = cell;
-                idMatch = match;
-                break;
-            }
-        }
-        
-        if (!nameCellContent || !idMatch || !idMatch[1]) {
-            console.warn("USCF Search: Could not extract an ID from any cell in the row. Skipping.", row);
-            continue;
+      for (const row of allHtmlRows) {
+        // Identify a player row by looking for the unique link pattern. This is the most reliable anchor.
+        const idMatch = row.match(/MbrDtlMain\.php\?([^"&']+)/);
+        if (!idMatch || !idMatch[1]) {
+            continue; // This is not a player row, skip it.
         }
         const uscfId = idMatch[1];
         
-        const fullNameRaw = stripTags(nameCellContent);
-        const ratingStr = headerMap['rating'] !== undefined && cells.length > headerMap['rating'] ? stripTags(cells[headerMap['rating']]) : '';
-        const stateAbbr = headerMap['state'] !== undefined && cells.length > headerMap['state'] ? stripTags(cells[headerMap['state']]) : '';
-        const expirationDateRaw = headerMap['expires'] !== undefined && cells.length > headerMap['expires'] ? stripTags(cells[headerMap['expires']]) : '';
-        
+        // Now that we have a player row, extract all its cells and parse them defensively.
+        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+        if (cells.length === 0) continue;
+
+        let fullNameRaw = '';
+        let rating: number | undefined;
+        let playerState: string | undefined;
+        let expirationDate: string | undefined;
+
+        // Find the cell that contains the name and ID to extract the full name.
+        const nameCellContent = cells.find(cell => cell.includes(uscfId));
+        if (nameCellContent) {
+            fullNameRaw = stripTags(nameCellContent);
+        }
+
+        // Iterate over ALL cells in the row to find other data points by their distinct patterns.
+        // This avoids any reliance on column order.
+        for (const cell of cells) {
+            const text = stripTags(cell);
+
+            // A 3 or 4 digit number is likely a rating.
+            const ratingMatch = text.match(/^\d{3,4}$/);
+            if (ratingMatch && !rating) {
+                rating = parseInt(ratingMatch[0], 10);
+                continue;
+            }
+
+            // A two-letter uppercase string is likely a state.
+            const stateMatch = text.match(/^[A-Z]{2}$/);
+            if (stateMatch && !playerState) {
+                playerState = stateMatch[0];
+                continue;
+            }
+
+            // A date in YYYY-MM-DD format is the expiration date.
+            const expiresMatch = text.match(/^\d{4}-\d{2}-\d{2}$/);
+            if (expiresMatch && !expirationDate) {
+                expirationDate = expiresMatch[0];
+                continue;
+            }
+        }
+
+        // Parse the extracted full name into its parts.
         let parsedFirstName, parsedMiddleName, parsedLastName;
         const nameParts = fullNameRaw.split(',');
         if (nameParts.length > 1) {
@@ -167,23 +150,20 @@ const searchUscfPlayersFlow = ai.defineFlow(
             parsedMiddleName = firstAndMiddleParts.join(' ');
         } else {
             parsedLastName = fullNameRaw;
-            console.warn("USCF Search: Could not parse full name into parts from:", fullNameRaw);
         }
-        
-        const rating = ratingStr && !isNaN(parseInt(ratingStr, 10)) ? parseInt(ratingStr, 10) : undefined;
-        
-        const expiresMatch = expirationDateRaw?.match(/(\d{4}-\d{2}-\d{2})/);
-        const expirationDate = expiresMatch ? expiresMatch[1] : undefined;
-        
-        players.push({
-            uscfId,
-            firstName: parsedFirstName,
-            lastName: parsedLastName,
-            middleName: parsedMiddleName,
-            state: stateAbbr,
-            rating,
-            expirationDate,
-        });
+
+        // Only add the player if we successfully parsed at least a last name.
+        if (parsedLastName) {
+            players.push({
+                uscfId,
+                firstName: parsedFirstName,
+                lastName: parsedLastName,
+                middleName: parsedMiddleName,
+                state: playerState,
+                rating: rating,
+                expirationDate: expirationDate,
+            });
+        }
       }
 
       if (players.length === 0 && !html.includes("No players found")) {
