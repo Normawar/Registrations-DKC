@@ -88,35 +88,34 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
 
-      // Find the header row and map column indices
       const headerMap: { [key: string]: number } = {};
       let headerRowIndex = -1;
 
       for (let i = 0; i < allHtmlRows.length; i++) {
         const row = allHtmlRows[i];
-        // Header rows typically use <th> tags. This check makes the search more efficient and reliable.
-        if (!row.toLowerCase().includes('<th')) {
-            continue;
-        }
-
+        
         const cells = row.match(/<(th|td)[^>]*>([\s\S]*?)<\/(th|td)>/gi) || [];
+        if (cells.length < 3) continue;
+
         const headerTexts = cells.map(stripTags);
         const lowerHeaderTexts = headerTexts.map(h => h.toLowerCase());
         
-        // Use a more robust, case-insensitive check for the header.
-        const hasName = lowerHeaderTexts.includes('name');
-        const hasRating = lowerHeaderTexts.includes('rating');
-        const hasState = lowerHeaderTexts.includes('state');
+        const hasName = lowerHeaderTexts.some(h => h.includes('name'));
+        const hasRating = lowerHeaderTexts.some(h => h.includes('rat')); // rating, rat'g
+        const hasState = lowerHeaderTexts.some(h => h === 'st' || h === 'state');
         
         if (hasName && hasRating && hasState) {
           lowerHeaderTexts.forEach((text, index) => {
-            if (text === 'name') headerMap['name'] = index;
-            if (text === 'rating') headerMap['rating'] = index;
-            if (text === 'state') headerMap['state'] = index;
-            if (text === 'expires') headerMap['expires'] = index;
+            if (text.includes('name')) headerMap['name'] = index;
+            if (text.includes('rat')) headerMap['rating'] = index;
+            if (text === 'st' || text === 'state') headerMap['state'] = index;
+            if (text.includes('exp')) headerMap['expires'] = index;
           });
-          headerRowIndex = i;
-          break;
+
+          if (headerMap['name'] !== undefined && headerMap['rating'] !== undefined && headerMap['state'] !== undefined) {
+              headerRowIndex = i;
+              break;
+          }
         }
       }
       
@@ -127,10 +126,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       const players: PlayerSearchResult[] = [];
       
-      // Iterate over rows after the header
       for (let i = headerRowIndex + 1; i < allHtmlRows.length; i++) {
         const row = allHtmlRows[i];
-        // Stop if we hit what looks like a footer or non-data row
         if (!row.includes('MbrDtlMain.php?')) {
             continue;
         }
@@ -138,23 +135,31 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
         if (cells.length === 0) continue;
 
-        const nameCellContent = headerMap['name'] !== undefined ? cells[headerMap['name']] : undefined;
-        if (!nameCellContent) continue;
-
-        const idMatch = nameCellContent.match(/MbrDtlMain\.php\?([^"&']+)/);
-        if (!idMatch || !idMatch[1]) {
-            console.warn("USCF Search: Could not extract an ID from the name cell even after finding the link. Skipping.", nameCellContent);
+        let nameCellContent: string | undefined;
+        let idMatch: RegExpMatchArray | null = null;
+        
+        for (const cell of cells) {
+            const match = cell.match(/MbrDtlMain\.php\?([^"&']+)/);
+            if (match && match[1]) {
+                nameCellContent = cell;
+                idMatch = match;
+                break;
+            }
+        }
+        
+        if (!nameCellContent || !idMatch || !idMatch[1]) {
+            console.warn("USCF Search: Could not extract an ID from any cell in the row. Skipping.", row);
             continue;
         }
         const uscfId = idMatch[1];
         
         const fullNameRaw = stripTags(nameCellContent);
-        const ratingStr = headerMap['rating'] !== undefined ? stripTags(cells[headerMap['rating']]) : '';
-        const stateAbbr = headerMap['state'] !== undefined ? stripTags(cells[headerMap['state']]) : '';
-        const expirationDateRaw = headerMap['expires'] !== undefined ? stripTags(cells[headerMap['expires']]) : '';
+        const ratingStr = headerMap['rating'] !== undefined && cells.length > headerMap['rating'] ? stripTags(cells[headerMap['rating']]) : '';
+        const stateAbbr = headerMap['state'] !== undefined && cells.length > headerMap['state'] ? stripTags(cells[headerMap['state']]) : '';
+        const expirationDateRaw = headerMap['expires'] !== undefined && cells.length > headerMap['expires'] ? stripTags(cells[headerMap['expires']]) : '';
         
         let parsedFirstName, parsedMiddleName, parsedLastName;
-        const nameParts = fullNameRaw.split(','); // Format: LAST, FIRST MIDDLE
+        const nameParts = fullNameRaw.split(',');
         if (nameParts.length > 1) {
             parsedLastName = nameParts.shift()!.trim();
             const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
