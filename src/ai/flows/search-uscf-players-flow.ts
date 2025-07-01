@@ -87,45 +87,59 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       const players: PlayerSearchResult[] = [];
       const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
       
-      // Iterate all rows and find player rows directly by looking for the member detail link.
-      // This is more robust than trying to find a specific header row or assuming a fixed column count.
-      for (const row of allHtmlRows) {
-        if (!row.includes('MbrDtlMain.php?')) {
-            continue;
+      // Find the header row to dynamically map column names to indices
+      const headerRowIndex = allHtmlRows.findIndex(row =>
+        row.includes('Rating') && row.includes('State') && row.includes('Expires') && row.includes('Name')
+      );
+
+      if (headerRowIndex === -1) {
+          console.error("USCF Search: Could not find header row. Full response snippet:", html.substring(0, 3000));
+          return { players: [], error: "Could not find the results table header. The website layout may have changed." };
+      }
+
+      const headerCells = allHtmlRows[headerRowIndex].match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+      const columnIndexMap: { [key: string]: number } = {};
+      
+      headerCells.forEach((cell, index) => {
+          const headerText = stripTags(cell);
+          if (headerText.includes('Rating')) columnIndexMap['rating'] = index;
+          if (headerText.includes('State')) columnIndexMap['state'] = index;
+          if (headerText.includes('Expires')) columnIndexMap['expires'] = index;
+          if (headerText.includes('Name') && headerText.includes('ID')) columnIndexMap['name'] = index;
+      });
+
+      // Process player rows which come after the header
+      for (let i = headerRowIndex + 1; i < allHtmlRows.length; i++) {
+        const row = allHtmlRows[i];
+
+        if (row.includes('</table')) {
+            break;
         }
 
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-        
-        // The most reliable anchor is the cell containing the player's name and ID link.
-        // It has historically been at index 9. We check there first for performance.
-        let nameCellContent: string | undefined = cells[9];
-        
-        if (!nameCellContent || !nameCellContent.includes('MbrDtlMain.php?')) {
-            // If not at index 9, search all cells to be more robust against layout changes.
-            const nameCell = cells.find(c => c.includes('MbrDtlMain.php?'));
-            if (!nameCell) {
-                console.warn("USCF Search: Found a potential player row but could not find the name/ID cell. Skipping.", row);
-                continue;
-            }
-            nameCellContent = nameCell;
+        if (cells.length === 0) {
+            continue;
         }
-
-        const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+        
+        const nameCellContent = cells[columnIndexMap['name']];
+        if (!nameCellContent || !nameCellContent.includes('MbrDtlMain.php?')) {
+            continue; // Not a player row
+        }
         
         const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
         if (!idMatch || !idMatch[1]) {
-            console.warn("USCF Search: Found a player name cell but could not extract USCF ID from it. Skipping.", nameCellContent);
+            console.warn("USCF Search: Found a player row but could not extract USCF ID from it. Skipping.", nameCellContent);
             continue; 
         }
         const uscfId = idMatch[1];
         
-        // Safely access other cells, assuming the historical column positions.
-        const ratingStr = cells[1] ? stripTags(cells[1]) : '';
-        const stateAbbr = cells[7] ? stripTags(cells[7]) : '';
-        const expirationDateRaw = cells[8] ? stripTags(cells[8]) : '';
+        const ratingStr = columnIndexMap['rating'] !== undefined && cells[columnIndexMap['rating']] ? stripTags(cells[columnIndexMap['rating']]) : '';
+        const stateAbbr = columnIndexMap['state'] !== undefined && cells[columnIndexMap['state']] ? stripTags(cells[columnIndexMap['state']]) : '';
+        const expirationDateRaw = columnIndexMap['expires'] !== undefined && cells[columnIndexMap['expires']] ? stripTags(cells[columnIndexMap['expires']]) : '';
         const fullNameRaw = stripTags(nameCellContent);
-        
+
         let parsedFirstName, parsedMiddleName, parsedLastName;
         const nameParts = fullNameRaw.split(','); // Format: LAST, FIRST MIDDLE
         if (nameParts.length > 1) {
