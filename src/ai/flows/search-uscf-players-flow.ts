@@ -41,40 +41,42 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing messy HTML. I will provide the HTML source code of a USCF player search results page.
+    prompt: `You are an expert at parsing messy HTML into structured JSON. I will provide the HTML source code of a USCF player search results page. Your task is to extract the details for each player found and return them in a JSON array.
 
-Your task is to find the table with player search results. Look for a table that immediately follows the text "Players found:".
+**RULES:**
+1.  Find the results table which has a header row with columns like "USCF ID", "Rating", "State", and "Name".
+2.  For each player row, extract the \`uscfId\` (1st column), \`rating\` (2nd column), \`state\` (8th column), and \`fullName\` (10th column). The full name is the text within the \`<a>\` tag.
+3.  The \`rating\` must be a number. If a player's rating is "Unrated" or blank, you must **omit** the \`rating\` field for that player in the JSON output.
+4.  If the page contains the text "Total players found: 0", or if you cannot find the results table, you must return an empty array for the "players" field, like this: \`{"players": []}\`.
 
-The header row for this table will look similar to this:
+Here is an example to guide you.
+
+**EXAMPLE INPUT HTML:**
 \`\`\`html
-<tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr>
-\`\`\`
-
-For each player data row *after* that header, extract the following details into a JSON object:
-
-- \`uscfId\`: The player's 8-digit USCF ID. This is in the first column (\`<td>\`).
-- \`fullName\`: The player's name. This is inside an \`<a>\` tag in the tenth and final column (\`<td>\`).
-- \`rating\`: The player's regular USCF rating from the "Rating" column (the second \`<td>\`). This must be a number. If the rating is "Unrated" or blank, omit this field from the JSON object.
-- \`state\`: The player's two-letter state abbreviation. This is in the eighth column (\`<td>\`).
-
-Here is a snippet of the actual HTML structure to guide you. Notice how the results table is nested:
-\`\`\`html
-<center>
-  <div class='contentheading'>Player Search Results</div>
-  <FORM ACTION='./player-search.php' METHOD='GET'>
-    <table>
-      <tr><td colspan=7>Players found: 1</td></tr>
-      <tr><td>USCF ID</td><td>Rating</td><td>...</td><td>Name</td></tr>
-      <tr><td valign=top>16153316 &nbsp;&nbsp;</td><td valign=top>319 &nbsp;&nbsp;</td>...<td valign=top><a href=...>GUERRA, KALI RENAE</a></td></tr>
-    </table>
-  </form>
+<center><div class='contentheading'>Player Search Results</div><FORM ACTION='./player-search.php' METHOD='GET'><table><tr><td colspan=7>Players found: 1</td></tr>
+<tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr><tr><td valign=top>16153316 &nbsp;&nbsp;</td><td valign=top>319 &nbsp;&nbsp;</td><td valign=top>340 &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>TX &nbsp;&nbsp;</td><td valign=top>2025-11-30 &nbsp;&nbsp;</td><td valign=top><a href=https://www.uschess.org/msa/MbrDtlMain.php?16153316 >GUERRA, KALI RENAE</a></td>
+</tr>
+</table></form>
 </center>
 \`\`\`
 
-If the HTML contains the exact text "Total players found: 0", or if you cannot find the results table described above, return an empty array for the "players" field in the JSON output.
+**EXAMPLE OUTPUT JSON for the above HTML:**
+\`\`\`json
+{
+  "players": [
+    {
+      "uscfId": "16153316",
+      "fullName": "GUERRA, KALI RENAE",
+      "rating": 319,
+      "state": "TX"
+    }
+  ]
+}
+\`\`\`
 
-Now, please parse the full HTML source code provided below.
+Now, parse the following HTML and provide the JSON output.
 
+**ACTUAL INPUT HTML:**
 \`\`\`html
 {{{_input}}}
 \`\`\`
@@ -129,8 +131,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       if (output.error) {
           return { players: [], error: output.error };
       }
-
-      // The prompt now handles the "0 players found" case. If the array is empty, it's a valid result.
+      
       if (output.players.length === 0) {
         return { players: [] };
       }
@@ -155,7 +156,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
     } catch (error) {
       console.error("Error in searchUscfPlayersFlow:", error);
       if (error instanceof Error) {
-        // Avoid exposing JSON parsing errors to the user if the server sends HTML unexpectedly
         if (error.message.toLowerCase().includes('json')) {
             return { players: [], error: `Received an unexpected response from the server. Please try again.` };
         }

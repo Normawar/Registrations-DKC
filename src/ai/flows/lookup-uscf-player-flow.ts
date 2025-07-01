@@ -35,13 +35,13 @@ const lookupPrompt = ai.definePrompt({
     output: { schema: LookupUscfPlayerOutputSchema },
     prompt: `You are an expert at parsing text from HTML. I will provide the full HTML source of a USCF player detail page.
 
-Your task is to find and parse the player's details from the page. The data is often inside a \`<pre>\` tag, but you should look for the text labels to be certain, as the structure can vary.
+Your task is to find and parse the player's details from the page. The data is often inside a \`<pre>\` tag, but you should look for the text labels to be certain, as the structure can vary. Spaces around the colon in labels may vary (e.g., "Name :" vs "Name:").
 
 Please extract the following details by finding their labels in the text, and format them into a JSON object:
 
-- \`fullName\`: Find the label "Name :" and extract the player's name that follows it.
-- \`rating\`: Find the label "Rating:" and extract the player's USCF rating. This must be a number.
-- \`expirationDate\`: Find the label "Expires:" and extract the date. Format this as YYYY-MM-DD.
+- \`fullName\`: Find the label "Name" and extract the player's name that follows it (e.g., after "Name :").
+- \`rating\`: Find the label "Rating" and extract the player's USCF rating. This must be a number. If it is "Unrated" or blank, omit the field.
+- \`expirationDate\`: Find the label "Expires" and extract the date. Format this as YYYY-MM-DD.
 - \`error\`: If the HTML contains the exact text "This player is not in our database", set this field to "Player not found with this USCF ID." and leave the other fields blank.
 
 Example of the text content to look for:
