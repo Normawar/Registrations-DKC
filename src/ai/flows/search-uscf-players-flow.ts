@@ -41,49 +41,26 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing HTML into structured JSON. I will provide the HTML source code of a USCF player search results page from uschess.org/datapage/player-search.php.
+    prompt: `You are an expert at parsing messy HTML into structured JSON. I will provide the HTML source code of a USCF player search results page from \`uschess.org/datapage/player-search.php\`.
 
-Your task is to find the table with the class "tbl-s-data" and extract the details for each player.
+Your task is to find the results table and extract the details for each player.
 
 **RULES:**
-1.  Locate the \`<table class="tbl-s-data">\`.
-2.  Iterate over each \`<tr>\` in the table's \`<tbody>\`.
-3.  For each player row, extract the following data from the \`<td>\` elements:
-    - \`uscfId\`: The ID from the 1st column.
-    - \`fullName\`: The name from the 2nd column, which is inside an \`<a>\` tag.
-    - \`state\`: The state abbreviation from the 3rd column.
-    - \`rating\`: The "Reg" (Regular) rating from the 4th column. This value must be a number. If it is "Unrated", blank, or not a number, you must **omit** the \`rating\` field for that player in the JSON output.
+1.  Locate the results table. It does not have a class name. You can identify it by finding the header row \`<tr>\` that contains \`<td>\` elements with the text: "USCF ID", "Rating", "State", and "Name".
+2.  Iterate over each \`<tr>\` that follows the header row.
+3.  For each player row, extract the following data from the \`<td>\` elements based on their column position:
+    - \`uscfId\`: The ID from the **1st column**.
+    - \`fullName\`: The name from the **10th column**. The name is inside an \`<a>\` tag.
+    - \`rating\`: The "Rating" from the **2nd column**. This value must be a number. If it is "Unrated", blank, or not a number, you must **omit** the \`rating\` field for that player in the JSON output.
+    - \`state\`: The state abbreviation from the **8th column**.
 4.  If the page contains the text "No players found that matched your search criteria.", you must return an empty array for the "players" field, like this: \`{"players": []}\`.
 
 **EXAMPLE INPUT HTML:**
 \`\`\`html
-<table class="tbl-s-data">
-    <thead>
-    <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>State</th>
-        <th>Reg</th>
-        ...
-    </tr>
-    </thead>
-    <tbody>
-    <tr>
-        <td>16153316</td>
-        <td><a href="player-feat.php?uscf_id=16153316">GUERRA, KALI RENAE</a></td>
-        <td>TX</td>
-        <td>319</td>
-        ...
-    </tr>
-    <tr>
-        <td>12345678</td>
-        <td><a href="player-feat.php?uscf_id=12345678">DOE, JOHN</a></td>
-        <td>CA</td>
-        <td>Unrated</td>
-        ...
-    </tr>
-    </tbody>
-</table>
+<center><div class='contentheading'>Player Search Results</div><FORM ACTION='./player-search.php' METHOD='GET'><table><tr><td colspan=7>Players found: 1</td></tr>
+<tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr><tr><td valign=top>16153316 &nbsp;&nbsp;</td><td valign=top>319 &nbsp;&nbsp;</td><td valign=top>340 &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>TX &nbsp;&nbsp;</td><td valign=top>2025-11-30 &nbsp;&nbsp;</td><td valign=top><a href=https://www.uschess.org/msa/MbrDtlMain.php?16153316 >GUERRA, KALI RENAE</a></td>
+</tr>
+</table></form></td></tr></tbody></table>
 \`\`\`
 
 **EXAMPLE OUTPUT JSON for the above HTML:**
@@ -95,11 +72,6 @@ Your task is to find the table with the class "tbl-s-data" and extract the detai
       "fullName": "GUERRA, KALI RENAE",
       "rating": 319,
       "state": "TX"
-    },
-    {
-      "uscfId": "12345678",
-      "fullName": "DOE, JOHN",
-      "state": "CA"
     }
   ]
 }
@@ -126,7 +98,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player name cannot be empty.' };
     }
     
-    // Using the more reliable 'datapage' search endpoint with a POST request
+    // Using the 'datapage' search endpoint with a POST request
     const url = 'https://www.uschess.org/datapage/player-search.php';
     const searchParams = new URLSearchParams({
         pname: name,
