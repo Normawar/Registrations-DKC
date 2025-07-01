@@ -63,7 +63,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           'Content-Type': 'application/x-www-form-urlencoded',
           'Referer': 'http://msa.uschess.org/MbrLst.php',
-          'Origin': 'http://msa.uschess.org',
         },
         body: searchParams.toString(),
         cache: 'no-store',
@@ -89,7 +88,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const preMatch = html.match(/<pre>([\s\S]*?)<\/pre>/i);
       if (!preMatch || !preMatch[1]) {
         console.error("USCF Search Response (No <pre> tag found):", html.substring(0, 500));
-        return { players: [], error: "Could not find player data block in the search results." };
+        return { players: [], error: "Could not find player data block in the search results. The USCF website may be temporarily unavailable or blocking requests." };
       }
 
       const lines = preMatch[1].split('\n');

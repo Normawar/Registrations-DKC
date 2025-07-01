@@ -45,9 +45,6 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         cache: 'no-store',
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'Expires': '0',
         },
       });
       if (!response.ok) {
@@ -63,7 +60,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       const preMatch = html.match(/<pre>([\s\S]*?)<\/pre>/i);
       if (!preMatch || !preMatch[1]) {
         console.error("USCF Lookup Response (No <pre> tag found):", html.substring(0, 500));
-        return { error: "Could not find player data block in the lookup results." };
+        return { error: "Could not find player data block in the lookup results. The USCF website may be temporarily unavailable or blocking requests." };
       }
       const text = preMatch[1];
       
