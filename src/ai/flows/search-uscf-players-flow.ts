@@ -87,40 +87,35 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
       
-      // Find the results table using a class that is specific to the results table
-      const tableMatch = text.match(/<table[^>]*class="table-bordered-table-striped"[^>]*>([\s\S]*?)<\/table>/i);
-      if (!tableMatch || !tableMatch[1]) {
-          console.error("USCF Search response did not contain the results table. Full response:", text.substring(0, 2000));
-          return { players: [], error: "Could not find the player data table in the response. The USCF website format may have changed." };
-      }
-
-      const tableContent = tableMatch[1];
-      const rowMatches = [...tableContent.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
-
-      if (rowMatches.length <= 1) { // <=1 to account for the header row
-          return { players: [] };
-      }
-
+      // Instead of finding a specific table, find all table rows and parse them.
+      // A valid player row is identified by having an 8-digit USCF ID in the first cell.
+      const rowMatches = [...text.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
       const players: PlayerSearchResult[] = [];
+
+      if (rowMatches.length === 0) {
+          console.error("USCF Search response did not contain any table rows. Full response:", text.substring(0, 2000));
+          return { players: [], error: "Could not find any player data in the response. The USCF website format may have changed." };
+      }
       
-      // Skip the header row (index 0)
-      for (let i = 1; i < rowMatches.length; i++) {
-        const rowContent = rowMatches[i][1];
+      for (const rowMatch of rowMatches) {
+        const rowContent = rowMatch[1];
         const cellMatches = [...rowContent.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
         
-        if (cellMatches.length < 6) continue; // Expect at least 6 columns for a valid player row
+        if (cellMatches.length < 6) continue; // Skip header rows or malformed rows
 
         try {
             const stripHtml = (html: string) => html.replace(/<[^>]+>/g, '').trim();
 
             const uscfId = stripHtml(cellMatches[0][1]);
+            
+            // Heuristic to identify a player row: the first cell must be an 8-digit ID.
+            if (!/^\d{8}$/.test(uscfId)) continue; 
+
             let fullNameRaw = stripHtml(cellMatches[1][1]); // Format: LAST, FIRST MIDDLE
             const ratingStr = stripHtml(cellMatches[2][1]);
             const stateAbbr = stripHtml(cellMatches[3][1]);
             const expirationDateStr = stripHtml(cellMatches[5][1]); // Format: YYYY-MM-DD
             
-            if (!/^\d{8}$/.test(uscfId)) continue; // Skip if ID is not a valid 8-digit number
-
             let fullName = fullNameRaw;
             const nameParts = fullNameRaw.split(',');
             if (nameParts.length > 1) {
@@ -141,8 +136,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
             });
 
         } catch (parseError) {
-            console.error(`Failed to parse player row: "${rowContent}"`, parseError);
-            continue;
+            console.error(`Failed to parse a potential player row: "${rowContent}"`, parseError);
+            continue; // Move to the next row
         }
       }
 
