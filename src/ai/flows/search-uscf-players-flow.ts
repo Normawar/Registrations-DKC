@@ -51,12 +51,13 @@ const searchUscfPlayersFlow = ai.defineFlow(
     const lastName = nameParts.pop() || '';
     const firstName = nameParts.join(' ');
 
-    const url = 'http://www.uschess.org/msa/MbrLst.php';
+    const url = 'http://msa.uschess.org/MbrLst.php'; // Use direct subdomain
     const searchParams = new URLSearchParams({
         Last: lastName,
         First: firstName,
         State: state === 'ALL' ? '' : state || '',
         Action: 'Search',
+        _cacheBust: Date.now().toString(), // Add cache-busting
     });
     
     try {
@@ -65,6 +66,9 @@ const searchUscfPlayersFlow = ai.defineFlow(
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
           'Content-Type': 'application/x-www-form-urlencoded',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
         body: searchParams.toString(),
         cache: 'no-store',
