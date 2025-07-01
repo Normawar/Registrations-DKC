@@ -36,86 +36,6 @@ export async function searchUscfPlayers(input: SearchUscfPlayersInput): Promise<
   return searchUscfPlayersFlow(input);
 }
 
-const searchPrompt = ai.definePrompt({
-    name: 'searchUscfPlayersPrompt',
-    model: 'googleai/gemini-1.5-pro-latest',
-    input: { schema: z.string() },
-    output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing fixed-width text from an HTML \`<pre>\` tag.
-I will provide the HTML source from the USCF player search results page at \`http://www.uschess.org/msa/MbrLst.php\`.
-
-Your task is to find the \`<pre>\` tag and extract the details for each player listed.
-
-**RULES:**
-1.  Ignore the header lines. The player data starts after the line of dashes (\`------------------------------------------------------\`).
-2.  Each player is on a new line.
-3.  The data is in fixed-width columns. The columns are: USCF ID, Name, St, Rating, Exp. Date.
-4.  For each player line, extract the following data:
-    - \`uscfId\`: The 8-digit ID from the start of the line.
-    - \`fullName\`: The player's name. It can be long and take up all the space before the State column.
-    - \`rating\`: The player's rating. This MUST be a number. If it is blank or not a number, omit the field.
-    - \`state\`: The two-letter state abbreviation.
-5.  Stop parsing when you reach a line that says "X member(s) found." or the end of the \`<pre>\` tag.
-6.  If the page contains the text "0 members found", or if there are no player data lines, you must return an empty array for the "players" field, like this: \`{"players": []}\`.
-
-**EXAMPLE INPUT HTML:**
-\`\`\`html
-<HTML>
-<HEAD>
-<TITLE>USCF Member Search</TITLE>
-</HEAD>
-<BODY>
-<PRE>
-
-Searching for: Last Name = "smith"
-
-                                     Reg   Exp.
-USCF ID   Name                       St  Rating  Date
-------------------------------------------------------
-12345678  SMITH, JOHN A              TX    1500  2025-12-31
-87654321  SMITH, JANE B              CA         2024-08-15
-11112222  SMITH, ROBERT              NY  Unrated 2023-01-01
-
-3 members found.
-</PRE>
-</BODY>
-</HTML>
-\`\`\`
-
-**EXAMPLE OUTPUT JSON for the above HTML:**
-\`\`\`json
-{
-  "players": [
-    {
-      "uscfId": "12345678",
-      "fullName": "SMITH, JOHN A",
-      "rating": 1500,
-      "state": "TX"
-    },
-    {
-      "uscfId": "87654321",
-      "fullName": "SMITH, JANE B",
-      "state": "CA"
-    },
-    {
-      "uscfId": "11112222",
-      "fullName": "SMITH, ROBERT",
-      "state": "NY"
-    }
-  ]
-}
-\`\`\`
-
-Now, parse the following HTML and provide the JSON output.
-
-**ACTUAL INPUT HTML:**
-\`\`\`html
-{{{_input}}}
-\`\`\`
-`
-});
-
-
 const searchUscfPlayersFlow = ai.defineFlow(
   {
     name: 'searchUscfPlayersFlow',
@@ -158,37 +78,50 @@ const searchUscfPlayersFlow = ai.defineFlow(
       if (html.includes("Too many members found")) {
           return { players: [], error: "Search was too broad and returned too many results. Please be more specific." };
       }
-      
-      const { output } = await searchPrompt(html);
-
-      if (!output) {
-          return { players: [], error: "AI model failed to parse the player data." };
-      }
-      
-      if (output.error) {
-          return { players: [], error: output.error };
-      }
-      
-      if (output.players.length === 0) {
+      if (html.includes("0 members found")) {
         return { players: [] };
       }
-      
-      // Re-format name from "LAST, FIRST" to "FIRST LAST" for display
-      const players: PlayerSearchResult[] = output.players.map(player => {
-        const nameParts = player.fullName.split(',').map((p: string) => p.trim());
-        if (nameParts.length < 2) {
-            return player; // Return as is if format is unexpected
-        }
-        const lastName = nameParts[0];
-        const firstNameParts = nameParts.slice(1);
 
-        const reformattedName = `${firstNameParts.join(' ')} ${lastName}`;
-        
-        return {
-          ...player,
-          fullName: reformattedName,
-        };
-      });
+      const preMatch = html.match(/<pre>([\s\S]*?)<\/pre>/i);
+      if (!preMatch || !preMatch[1]) {
+        return { players: [], error: "Could not find player data block in the search results." };
+      }
+
+      const lines = preMatch[1].split('\n');
+      const dataStartIndex = lines.findIndex(line => line.includes('------------------------------------------------------'));
+      
+      if (dataStartIndex === -1) {
+          // If no header is found, it might be that no players were found.
+          return { players: [] };
+      }
+
+      const dataLines = lines.slice(dataStartIndex + 1);
+      const players: PlayerSearchResult[] = [];
+
+      for (const line of dataLines) {
+        if (line.includes("member(s) found.") || line.trim().length === 0) {
+          break;
+        }
+
+        const uscfId = line.substring(0, 8).trim();
+        const fullNameRaw = line.substring(10, 37).trim();
+        const stateAbbr = line.substring(37, 39).trim();
+        const ratingStr = line.substring(41, 48).trim();
+
+        if (uscfId && fullNameRaw && stateAbbr) {
+            const nameParts = fullNameRaw.split(',').map((p: string) => p.trim());
+            const reformattedName = nameParts.length >= 2 
+                ? `${nameParts.slice(1).join(' ')} ${nameParts[0]}`.trim()
+                : fullNameRaw;
+
+            players.push({
+                uscfId,
+                fullName: reformattedName,
+                state: stateAbbr,
+                rating: /^\d+$/.test(ratingStr) ? parseInt(ratingStr, 10) : undefined,
+            });
+        }
+      }
       
       return { players };
 

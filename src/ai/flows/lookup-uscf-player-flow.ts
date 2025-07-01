@@ -28,46 +28,6 @@ export async function lookupUscfPlayer(input: LookupUscfPlayerInput): Promise<Lo
   return lookupUscfPlayerFlow(input);
 }
 
-const lookupPrompt = ai.definePrompt({
-    name: 'lookupUscfPlayerPrompt',
-    model: 'googleai/gemini-1.5-pro-latest',
-    input: { schema: z.string() },
-    output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `You are an expert at parsing text from HTML. I will provide the full HTML source of a USCF player detail page.
-
-Your task is to find and parse the player's details from the page. The data is often inside a \`<pre>\` tag, but you should look for the text labels to be certain, as the structure can vary. Spaces around the colon in labels may vary (e.g., "Name :" vs "Name:").
-
-Please extract the following details by finding their labels in the text, and format them into a JSON object:
-
-- \`fullName\`: Find the label "Name" and extract the player's name that follows it (e.g., after "Name :").
-- \`rating\`: Find the label "Rating" and extract the player's USCF rating. This must be a number. If it is "Unrated" or blank, omit the field.
-- \`expirationDate\`: Find the label "Expires" and extract the date. Format this as YYYY-MM-DD.
-- \`error\`: If the HTML contains the exact text "This player is not in our database", set this field to "Player not found with this USCF ID." and leave the other fields blank.
-
-Example of the text content to look for:
-\`\`\`
----------------------------------------------------------------------------------------
-USCF ID : 12345678      Name : DOE, JOHN M                             Address: ANYTOWN, TX 12345
----------------------------------------------------------------------------------------
- Birth : 1990-01-01  Sex : M   Federation:      Rating: 1500  Expires: 2025-12-31   Updated: 2024-01-01
----------------------------------------------------------------------------------------
-\`\`\`
-
-Based on that example, you would produce this JSON:
-{
-  "fullName": "DOE, JOHN M",
-  "rating": 1500,
-  "expirationDate": "2025-12-31"
-}
-
-Now, please parse the full HTML source code provided below.
-
-\`\`\`html
-{{{_input}}}
-\`\`\`
-`
-});
-
 const lookupUscfPlayerFlow = ai.defineFlow(
   {
     name: 'lookupUscfPlayerFlow',
@@ -95,25 +55,44 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const html = await response.text();
       
-      const { output } = await lookupPrompt(html);
-      
-      if (!output) {
-          return { error: "AI model failed to parse the player data." };
+      if (html.includes("This player is not in our database")) {
+        return { error: "Player not found with this USCF ID." };
       }
       
-      if (output.error) {
-        return { error: output.error };
+      const preMatch = html.match(/<pre>([\s\S]*?)<\/pre>/i);
+      if (!preMatch || !preMatch[1]) {
+        return { error: "Could not find player data block in the lookup results." };
       }
-
-      // Re-format name from "LAST, FIRST" to "FIRST LAST" for display
-      if (output.fullName) {
-          const nameParts = output.fullName.split(',').map(p => p.trim());
-          if (nameParts.length >= 2) {
-              const firstNameParts = nameParts.slice(1);
-              output.fullName = `${firstNameParts.join(' ')} ${nameParts[0]}`;
-          }
+      const text = preMatch[1];
+      
+      const output: LookupUscfPlayerOutput = {};
+      
+      const nameMatch = text.match(/Name\s*:\s*(.*?)\s{2,}/);
+      if (nameMatch && nameMatch[1]) {
+        const rawName = nameMatch[1].trim();
+        const nameParts = rawName.split(',').map(p => p.trim());
+        if (nameParts.length >= 2) {
+            const firstNameParts = nameParts.slice(1);
+            output.fullName = `${firstNameParts.join(' ')} ${nameParts[0]}`.trim();
+        } else {
+            output.fullName = rawName;
+        }
       }
-
+      
+      const ratingMatch = text.match(/Rating:\s*(\d+)/);
+      if (ratingMatch && ratingMatch[1]) {
+        output.rating = parseInt(ratingMatch[1], 10);
+      }
+      
+      const expiresMatch = text.match(/Expires:\s*(\d{4}-\d{2}-\d{2})/);
+      if (expiresMatch && expiresMatch[1]) {
+        output.expirationDate = expiresMatch[1];
+      }
+      
+      if (!output.fullName) {
+          return { error: "Could not parse player name from the page." };
+      }
+      
       return output;
 
     } catch (error) {
