@@ -59,25 +59,20 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      const preContentMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
-      if (!preContentMatch || !preContentMatch[1]) {
-          return { error: "Could not find player data block in the response." };
-      }
-      const preContent = preContentMatch[1];
-      
-      if (preContent.includes("This player is not in our database")) {
+      if (text.includes("This player is not in our database")) {
         return { error: "Player not found with this USCF ID." };
       }
       
       const output: LookupUscfPlayerOutput = {};
       
-      const nameMatch = preContent.match(/Name\s*:\s*(.*)/);
+      // This logic is more robust as it does not rely on a <pre> tag.
+      const nameMatch = text.match(/Name\s*:\s*(.*)/);
       if (nameMatch && nameMatch[1]) {
-        const rawName = nameMatch[1].trim(); // Format: LAST, FIRST MIDDLE
+        const rawName = nameMatch[1].replace(/<[^>]+>/g, '').trim(); // Format: LAST, FIRST MIDDLE
         const nameParts = rawName.split(',');
         if (nameParts.length > 1) {
             output.lastName = nameParts.shift()!.trim();
-            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/);
+            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
             output.firstName = firstAndMiddleParts.shift() || '';
             output.middleName = firstAndMiddleParts.join(' ');
         } else {
@@ -85,12 +80,12 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         }
       }
       
-      const ratingMatch = preContent.match(/Regular:\s*(\d+)/);
+      const ratingMatch = text.match(/Regular:\s*(\d+)/);
       if (ratingMatch && ratingMatch[1]) {
         output.rating = parseInt(ratingMatch[1], 10);
       }
       
-      const expiresMatch = preContent.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
+      const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
       if (expiresMatch && expiresMatch[1]) {
         output.expirationDate = expiresMatch[1];
       }

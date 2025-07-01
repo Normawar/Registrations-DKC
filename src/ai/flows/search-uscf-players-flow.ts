@@ -91,28 +91,31 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const players: PlayerSearchResult[] = [];
 
       for (const row of rows) {
-        // A valid player row contains a link to MbrDtlMain.php with an 8-digit ID.
-        // This is a much more reliable anchor than assuming column structure.
-        const idLinkMatch = row.match(/MbrDtlMain\.php\?(\d{8})/);
+        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+        
+        // A valid player row from player-search.php has at least 10 columns.
+        if (cells.length < 10) {
+          continue;
+        }
+
+        const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+        
+        // The last cell contains the name and the link to the player's profile, which is the most reliable anchor.
+        const nameCellContent = cells[9];
+        const idLinkMatch = nameCellContent.match(/MbrDtlMain\.php\?(\d{8})/);
+        
+        // If we can't find a valid link with an 8-digit ID, it's not a player row.
         if (!idLinkMatch) {
             continue;
         }
-
-        const uscfId = idLinkMatch[1];
-        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-
-        // We can still use cell count as a sanity check.
-        if (cells.length < 5) {
-          continue;
-        }
         
-        const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
-
-        // Assuming fixed column order after we've reliably identified a player row.
-        const fullNameRaw = stripTags(cells[1]);
-        const expirationDate = stripTags(cells[2]);
-        const stateAbbr = stripTags(cells[3]);
-        const ratingStr = stripTags(cells[4]);
+        const uscfId = idLinkMatch[1];
+        
+        // Extract data based on the correct column order from the player search page.
+        const ratingStr = stripTags(cells[1]);
+        const stateAbbr = stripTags(cells[7]);
+        const expirationDateRaw = stripTags(cells[8]);
+        const fullNameRaw = stripTags(nameCellContent);
         
         let parsedFirstName, parsedMiddleName, parsedLastName;
         const nameParts = fullNameRaw.split(',');
@@ -127,6 +130,10 @@ const searchUscfPlayersFlow = ai.defineFlow(
         
         const rating = ratingStr && !isNaN(parseInt(ratingStr)) ? parseInt(ratingStr, 10) : undefined;
         
+        // The date format is YYYY-MM-DD
+        const expiresMatch = expirationDateRaw.match(/(\d{4}-\d{2}-\d{2})/);
+        const expirationDate = expiresMatch ? expiresMatch[1] : undefined;
+
         players.push({
             uscfId,
             firstName: parsedFirstName,
