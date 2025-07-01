@@ -47,9 +47,21 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player name cannot be empty.' };
     }
     
-    const nameParts = name.trim().split(/\s+/);
-    const lastName = nameParts.pop() || '';
-    const firstName = nameParts.join(' ');
+    let firstName = '';
+    let lastName = '';
+    const trimmedName = name.trim();
+
+    if (trimmedName.includes(',')) {
+        // Assume "Last, First" format
+        const parts = trimmedName.split(',').map(p => p.trim());
+        lastName = parts[0];
+        firstName = parts[1] || '';
+    } else {
+        // Assume "First Last" format
+        const parts = trimmedName.split(/\s+/);
+        lastName = parts.pop() || '';
+        firstName = parts.join(' ');
+    }
 
     const url = 'http://msa.uschess.org/MbrLst.php'; // Use direct subdomain
     const searchParams = new URLSearchParams({
