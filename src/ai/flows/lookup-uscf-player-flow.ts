@@ -45,6 +45,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       const response = await fetch(url, {
         cache: 'no-store',
         headers: {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         }
       });
@@ -58,7 +60,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       const preMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
       if (!preMatch || !preMatch[1]) {
         console.error("USCF Lookup Response did not contain a <pre> block. Full response:", text.substring(0, 1000));
-        return { error: "Could not parse player data from the USCF website." };
+        return { error: "Could not parse player data from the USCF website. The page format may have changed." };
       }
       
       const preContent = preMatch[1];
