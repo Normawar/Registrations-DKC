@@ -85,9 +85,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // This logic is more resilient. It finds all table rows, then identifies
-      // a player row by looking for the specific link pattern to a member details page.
-      const rows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      // Isolate the form containing the results table to avoid parsing the whole page.
+      const formContentMatch = html.match(/<form action='.\/player-search.php'[\s\S]*?>([\s\S]*?)<\/form>/i);
+      const searchArea = formContentMatch ? formContentMatch[1] : html;
+
+      const rows = searchArea.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const players: PlayerSearchResult[] = [];
 
       for (const row of rows) {
@@ -100,7 +102,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
-        // The last cell contains the name and the link to the player's profile, which is the most reliable anchor.
+        // The last cell (index 9) contains the name and the link to the player's profile.
         const nameCellContent = cells[9];
         const idLinkMatch = nameCellContent.match(/MbrDtlMain\.php\?(\d{8})/);
         
@@ -112,6 +114,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const uscfId = idLinkMatch[1];
         
         // Extract data based on the correct column order from the player search page.
+        // Columns: USCF ID, Rating, Q Rtg, BL Rtg, OL R, OL Q, OL BL, State, Exp Date, Name
         const ratingStr = stripTags(cells[1]);
         const stateAbbr = stripTags(cells[7]);
         const expirationDateRaw = stripTags(cells[8]);
@@ -146,8 +149,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
 
       if (players.length === 0 && !html.includes("No players found")) {
-        console.error("USCF Search: Found no players, but did not see 'No players found' message. HTML might have changed.");
-        return { players: [], error: "Could not find the player data table in the response. The website layout may have changed." };
+        console.error("USCF Search: Found no players, but did not see 'No players found' message. The website layout may have changed.");
+        return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
       }
       
       return { players };
