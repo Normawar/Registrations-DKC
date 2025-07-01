@@ -41,19 +41,31 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing HTML. I will give you the full HTML source code of a USCF player search results page. Your task is to find the main results table within this HTML. This table can be identified by its columns, which include "ID", "Name", "St", and "Rating".
+    prompt: `You are an expert at parsing messy, real-world HTML from the USCF website. I will provide the full HTML source of a player search results page. Your task is to find the main results table and extract the player data.
 
-Please ignore all other content on the page and focus only on this table.
+The USCF website has at least two different formats for the results table.
 
-For each player row (<tr>) in that table, extract the following details into a JSON object:
-- "uscfId" (string): Found in the first column (<td>).
-- "fullName" (string): Found in the second column (<td>). This will be in "LAST, FIRST" format.
-- "rating" (number): Found in the fourth column (<td>). If the rating is text like 'UNR', this should be null.
-- "state" (string): Found in the third column (<td>).
+Format 1 (Modern) has a header like this:
+\`<tr class="sectiontableheader"> <td>ID</td> <td align="left">Name</td> <td>St</td> <td>Rating</td> <td>Expires</td> </tr>\`
+For this format:
+- "uscfId" is in column 1.
+- "fullName" is in column 2.
+- "rating" is in column 4.
+- "state" is in column 3.
 
-The final output should be a JSON object with a "players" key, which is an array of these player objects.
+Format 2 (Legacy) has a header like this:
+\`<tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr>\`
+For this format:
+- "uscfId" is in column 1.
+- "fullName" is in column 10 (inside an <a> tag).
+- "rating" is in column 2.
+- "state" is in column 8.
 
-If you cannot find this specific table or if the table is empty, return an empty "players" array. Do not invent any players.
+Your task is to automatically detect which format is present in the provided HTML, and then for each data row (\`<tr>\`), extract the player details accordingly. The fullName will be in "LAST, FIRST" format. If the rating is text like 'UNR' or 'Unrated', it should be null. Please clean up any extra whitespace or '&nbsp;' from the extracted text.
+
+The final output must be a JSON object with a "players" key, which is an array of these player objects.
+
+If the HTML contains "No players found" or "Players found: 0", or if you cannot find any player data rows, return an empty "players" array. Do not invent any players.
 
 Here is the full HTML source code:
 \`\`\`html
@@ -101,9 +113,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       const html = await response.text();
 
-      if (html.includes("No players found")) {
-          return { players: [] };
-      }
+      // The AI prompt will handle cases like "No players found", so we can remove the explicit check here.
       
       const { output } = await searchPrompt(html);
       
