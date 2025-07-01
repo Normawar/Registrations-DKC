@@ -90,33 +90,21 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
       
-      // A more robust regex that looks for the content of the table header ("ID Number"), not a specific class name.
-      const tableMatch = html.match(/<table[^>]*>([\s\S]*?ID Number[\s\S]*?)<\/table>/i);
-      if (!tableMatch || !tableMatch[1]) {
-          console.error("USCF Search Response (No results table found):", html.substring(0, 1000));
-          return { players: [], error: "Could not find the results table in the response. The USCF website may have changed its format."};
-      }
-      
-      const tableHtml = tableMatch[1];
-      const rowMatches = [...tableHtml.matchAll(/<tr.*?>([\s\S]*?)<\/tr>/gi)];
-      
-      if (rowMatches.length < 2) { // Should be at least a header row and one data row
-          return { players: [] };
-      }
+      const rowMatches = [...html.matchAll(/<tr.*?>([\s\S]*?)<\/tr>/gi)];
       
       let allPlayers: PlayerSearchResult[] = [];
 
-      // Skip header row (index 0)
-      for (let i = 1; i < rowMatches.length; i++) {
-        const rowHtml = rowMatches[i][1];
+      for (const rowMatch of rowMatches) {
+        const rowHtml = rowMatch[1];
         const cellMatches = [...rowHtml.matchAll(/<td.*?>([\s\S]*?)<\/td>/gi)];
         
-        if (cellMatches.length < 4) continue; // Expect at least 4 columns
+        if (cellMatches.length < 4) continue; // Skip rows that don't look like player data
 
         try {
             const idAndNameHtml = cellMatches[0][1];
-            // The link may be in MbrDtlMain.php or thin3.php, be more flexible
             const linkMatch = idAndNameHtml.match(/<a href="[^"]*?(\d{8})">([\s\S]*?)<\/a>/i);
+            
+            // This is the key check: if a row doesn't contain a valid player link, skip it.
             if (!linkMatch) continue;
             
             const uscfId = linkMatch[1].trim();
@@ -125,9 +113,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
             let fullName = rawName;
             if (rawName.includes(',')) {
                 const nameParts = rawName.split(',').map(p => p.trim());
-                const lastNamePart = nameParts[0];
-                const firstNameAndMiddle = nameParts.slice(1).join(' ');
-                fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
+                if (nameParts.length >= 2) {
+                    const lastNamePart = nameParts[0];
+                    const firstNameAndMiddle = nameParts.slice(1).join(' ');
+                    fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
+                }
             }
 
             const ratingStr = cellMatches[1][1].trim();
@@ -156,6 +146,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
           console.error(`Failed to parse row: "${rowHtml}"`, parseError);
           continue;
         }
+      }
+
+      if (allPlayers.length === 0) {
+        console.error("USCF Search Response (No players parsed):", html.substring(0, 1000));
+        return { players: [], error: "Could not find any players in the response. The USCF website may have changed its format."};
       }
       
       return { players: allPlayers };

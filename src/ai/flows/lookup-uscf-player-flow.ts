@@ -58,7 +58,6 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         return { error: "Player not found with this USCF ID." };
       }
       
-      // Removed fragile <pre> tag matching. Now searching the whole document for the data.
       const text = html;
       
       const output: LookupUscfPlayerOutput = {};
@@ -69,14 +68,14 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         const nameParts = rawName.split(',').map(p => p.trim());
         if (nameParts.length >= 2) {
             const lastName = nameParts[0];
-            const firstName = nameParts.slice(1).join(' ');
-            output.fullName = `${firstName} ${lastName}`.trim();
+            const firstNameAndMiddle = nameParts.slice(1).join(' ');
+            output.fullName = `${firstNameAndMiddle} ${lastName}`.trim();
         } else {
             output.fullName = rawName;
         }
       }
       
-      const ratingMatch = text.match(/Regular:\s*(\d+)/);
+      const ratingMatch = text.match(/(?:Reg|R):\s*(\d+)/);
       if (ratingMatch && ratingMatch[1]) {
         output.rating = parseInt(ratingMatch[1], 10);
       }
