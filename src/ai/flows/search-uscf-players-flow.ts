@@ -43,32 +43,35 @@ const searchPrompt = ai.definePrompt({
     output: { schema: SearchUscfPlayersOutputSchema },
     prompt: `You are an expert at parsing messy HTML. I will provide the HTML source code of a USCF player search results page.
 
-Your task is to find the table containing the player search results. The header row for this table will look like this:
+Your task is to find the table with player search results. Look for a table that immediately follows the text "Players found:".
+
+The header row for this table will look similar to this:
 \`\`\`html
 <tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr>
 \`\`\`
 
 For each player data row *after* that header, extract the following details into a JSON object:
 
-- \`uscfId\`: The player's 8-digit USCF ID. This is in the first \`<td>\`.
-- \`fullName\`: The player's name. This is inside an \`<a>\` tag in the tenth and final \`<td>\`.
-- \`rating\`: The player's regular USCF rating from the "Rating" column. This is in the second \`<td>\`. This must be a number. If the rating is "Unrated" or blank, omit this field from the JSON object.
-- \`state\`: The player's two-letter state abbreviation. This is in the eighth \`<td>\`.
+- \`uscfId\`: The player's 8-digit USCF ID. This is in the first column (\`<td>\`).
+- \`fullName\`: The player's name. This is inside an \`<a>\` tag in the tenth and final column (\`<td>\`).
+- \`rating\`: The player's regular USCF rating from the "Rating" column (the second \`<td>\`). This must be a number. If the rating is "Unrated" or blank, omit this field from the JSON object.
+- \`state\`: The player's two-letter state abbreviation. This is in the eighth column (\`<td>\`).
 
-If the HTML contains the exact text "Total players found: 0", or if you cannot find the results table described above, return an empty array for the "players" field.
-
-Example of a player data row in the HTML table:
+Here is a snippet of the actual HTML structure to guide you. Notice how the results table is nested:
 \`\`\`html
-<tr><td valign=top>16153316 &nbsp;&nbsp;</td><td valign=top>319 &nbsp;&nbsp;</td><td valign=top>340 &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>TX &nbsp;&nbsp;</td><td valign=top>2025-11-30 &nbsp;&nbsp;</td><td valign=top><a href=...>GUERRA, KALI RENAE</a></td></tr>
+<center>
+  <div class='contentheading'>Player Search Results</div>
+  <FORM ACTION='./player-search.php' METHOD='GET'>
+    <table>
+      <tr><td colspan=7>Players found: 1</td></tr>
+      <tr><td>USCF ID</td><td>Rating</td><td>...</td><td>Name</td></tr>
+      <tr><td valign=top>16153316 &nbsp;&nbsp;</td><td valign=top>319 &nbsp;&nbsp;</td>...<td valign=top><a href=...>GUERRA, KALI RENAE</a></td></tr>
+    </table>
+  </form>
+</center>
 \`\`\`
 
-Based on that example row, you would produce this JSON object inside the "players" array:
-{
-  "uscfId": "16153316",
-  "fullName": "GUERRA, KALI RENAE",
-  "rating": 319,
-  "state": "TX"
-}
+If the HTML contains the exact text "Total players found: 0", or if you cannot find the results table described above, return an empty array for the "players" field in the JSON output.
 
 Now, please parse the full HTML source code provided below.
 
@@ -134,8 +137,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       const players: PlayerSearchResult[] = output.players.map(player => {
         const nameParts = player.fullName.split(',').map((p: string) => p.trim());
-        const reformattedName = nameParts.length >= 2
-          ? `${nameParts[1]} ${nameParts[0]}`
+        const firstNameParts = nameParts.slice(1);
+        const lastName = nameParts[0];
+
+        const reformattedName = firstNameParts.length > 0
+          ? `${firstNameParts.join(' ')} ${lastName}`
           : player.fullName;
         
         return {

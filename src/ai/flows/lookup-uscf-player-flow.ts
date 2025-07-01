@@ -35,14 +35,16 @@ const lookupPrompt = ai.definePrompt({
     output: { schema: LookupUscfPlayerOutputSchema },
     prompt: `You are an expert at parsing text from HTML. I will provide the full HTML source of a USCF player detail page.
 
-Your task is to find the text content located inside the \`<pre>\` tag. The content inside is formatted as fixed-width text. Please extract the following details from that text and format them into a JSON object:
+Your task is to find and parse the player's details from the page. The data is often inside a \`<pre>\` tag, but you should look for the text labels to be certain, as the structure can vary.
 
-- \`fullName\`: The player's name. It appears after the label "Name :".
-- \`rating\`: The player's USCF rating. It appears after the label "Rating:". This must be a number.
-- \`expirationDate\`: The player's membership expiration date. It appears after the label "Expires:". Format this as YYYY-MM-DD.
+Please extract the following details by finding their labels in the text, and format them into a JSON object:
+
+- \`fullName\`: Find the label "Name :" and extract the player's name that follows it.
+- \`rating\`: Find the label "Rating:" and extract the player's USCF rating. This must be a number.
+- \`expirationDate\`: Find the label "Expires:" and extract the date. Format this as YYYY-MM-DD.
 - \`error\`: If the HTML contains the exact text "This player is not in our database", set this field to "Player not found with this USCF ID." and leave the other fields blank.
 
-Example of the text content inside the <pre> tag:
+Example of the text content to look for:
 \`\`\`
 ---------------------------------------------------------------------------------------
 USCF ID : 12345678      Name : DOE, JOHN M                             Address: ANYTOWN, TX 12345
@@ -107,7 +109,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       if (output.fullName) {
           const nameParts = output.fullName.split(',').map(p => p.trim());
           if (nameParts.length >= 2) {
-              output.fullName = `${nameParts[1]} ${nameParts[0]}`;
+              const firstNameParts = nameParts.slice(1);
+              output.fullName = `${firstNameParts.join(' ')} ${nameParts[0]}`;
           }
       }
 
