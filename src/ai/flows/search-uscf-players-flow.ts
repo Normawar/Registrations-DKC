@@ -52,9 +52,9 @@ const searchUscfPlayersFlow = ai.defineFlow(
     // This is a more stable, non-JavaScript endpoint for searching.
     const baseUrl = 'http://www.uschess.org/datapage/player-search.php';
     
-    // We only search by last name to get full first names, then filter locally.
     const searchParams = new URLSearchParams({
         name: lastName,
+        f_name: firstName || '', // Pass first name to make search more specific
         state: state === 'ALL' ? '' : state || '',
         rating_op: '>', // Operator for rating
         rating: '0',     // Rating value, > 0 to get all players
@@ -151,12 +151,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
           console.error(`Failed to parse row: "${rowHtml}"`, parseError);
           continue;
         }
-      }
-
-      // If a first name was provided, filter the results locally
-      if (firstName) {
-        const lowerFirstName = firstName.toLowerCase();
-        allPlayers = allPlayers.filter(p => p.fullName.toLowerCase().startsWith(lowerFirstName));
       }
       
       return { players: allPlayers };
