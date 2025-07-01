@@ -33,15 +33,16 @@ const lookupPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `Hey, I have a block of text with a USCF player's record. I need you to pull out a few details into a JSON object.
+    prompt: `You are an expert at parsing text from HTML. I will provide the full HTML source of a USCF player detail page.
 
-The data is in a fixed-width format. Here's what I need:
-- \`fullName\`: The player's name, which you'll find right after "Name :".
-- \`rating\`: The player's rating, found after "Rating:". This should be a number.
-- \`expirationDate\`: The membership expiration date, found after "Expires:". Please format this as YYYY-MM-DD.
-- \`error\`: If you see the exact text "This player is not in our database", please put the message "Player not found with this USCF ID." in this field and leave the others blank.
+Your task is to find the text content located inside the <pre> tag. Once you have that text, which is in a fixed-width format, please extract the following details and format them into a JSON object:
 
-Here's an example of the text format:
+- \`fullName\`: The player's name. It appears after the label "Name :".
+- \`rating\`: The player's USCF rating. It appears after the label "Rating:". This must be a number.
+- \`expirationDate\`: The player's membership expiration date. It appears after the label "Expires:". Format this as YYYY-MM-DD.
+- \`error\`: If the HTML contains the exact text "This player is not in our database", set this field to "Player not found with this USCF ID." and leave the other fields blank.
+
+Example of the text content inside the <pre> tag:
 \`\`\`
 ---------------------------------------------------------------------------------------
 USCF ID : 12345678      Name : DOE, JOHN M                             Address: ANYTOWN, TX 12345
@@ -49,16 +50,17 @@ USCF ID : 12345678      Name : DOE, JOHN M                             Address: 
  Birth : 1990-01-01  Sex : M   Federation:      Rating: 1500  Expires: 2025-12-31   Updated: 2024-01-01
 ---------------------------------------------------------------------------------------
 \`\`\`
-And for that, I'd expect this JSON:
+
+Based on that example, you would produce this JSON:
 {
   "fullName": "DOE, JOHN M",
   "rating": 1500,
   "expirationDate": "2025-12-31"
 }
 
-Ok, here's the text block. Let me know what you find.
+Now, please parse the full HTML source code provided below.
 
-\`\`\`
+\`\`\`html
 {{{_input}}}
 \`\`\`
 `
@@ -91,22 +93,14 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const html = await response.text();
       
-      const preRegex = /<pre>([\s\S]*?)<\/pre>/i;
-      const match = html.match(preRegex);
-
-      if (!match || match.length < 2) {
-          if (html.includes("This player is not in our database")) {
-              return { error: "Player not found with this USCF ID." };
-          }
-          return { error: "Could not find player data in the response from the USCF website." };
-      }
-
-      const textContent = match[1].trim();
-      
-      const { output } = await lookupPrompt(textContent);
+      const { output } = await lookupPrompt(html);
       
       if (!output) {
           return { error: "AI model failed to parse the player data." };
+      }
+      
+      if (output.error) {
+        return { error: output.error };
       }
 
       // Re-format name from "LAST, FIRST" to "FIRST LAST" for display
