@@ -60,6 +60,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const response = await fetch(url, {
         method: 'POST',
         headers: {
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-Requested-With': 'XMLHttpRequest', // Tells the server we want a data response (JSON)
         },
