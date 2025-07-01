@@ -45,7 +45,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       const response = await fetch(url, {
         cache: 'no-store',
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         }
       });
 
@@ -55,14 +55,22 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      if (text.includes("This player is not in our database")) {
+      const preMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
+      if (!preMatch || !preMatch[1]) {
+        console.error("USCF Lookup Response did not contain a <pre> block. Full response:", text.substring(0, 1000));
+        return { error: "Could not parse player data from the USCF website." };
+      }
+      
+      const preContent = preMatch[1];
+      
+      if (preContent.includes("This player is not in our database")) {
         return { error: "Player not found with this USCF ID." };
       }
       
       const output: LookupUscfPlayerOutput = {};
       
       // Regex is more robust than substring parsing
-      const nameMatch = text.match(/Name\s*:\s*(.*)/);
+      const nameMatch = preContent.match(/Name\s*:\s*(.*)/);
       if (nameMatch && nameMatch[1]) {
         const rawName = nameMatch[1].trim();
         const nameParts = rawName.split(',');
@@ -75,12 +83,12 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         }
       }
       
-      const ratingMatch = text.match(/Regular:\s*(\d+)/);
+      const ratingMatch = preContent.match(/Regular:\s*(\d+)/);
       if (ratingMatch && ratingMatch[1]) {
         output.rating = parseInt(ratingMatch[1], 10);
       }
       
-      const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
+      const expiresMatch = preContent.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
       if (expiresMatch && expiresMatch[1]) {
         output.expirationDate = expiresMatch[1];
       }

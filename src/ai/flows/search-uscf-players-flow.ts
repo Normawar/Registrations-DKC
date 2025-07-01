@@ -65,7 +65,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const response = await fetch(url, {
         cache: 'no-store',
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         }
       });
 
@@ -75,20 +75,29 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      if (text.includes("no members that match this criteria")) {
+      const preMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
+      if (!preMatch || !preMatch[1]) {
+        console.error("USCF Search Response did not contain a <pre> block. Full response:", text.substring(0, 1000));
+        return { players: [], error: "Could not find player data block in the response. The USCF website may have changed its format." };
+      }
+      
+      const preContent = preMatch[1];
+      
+      if (preContent.includes("no members that match this criteria")) {
         return { players: [] };
       }
 
-      if (text.includes("more than 100 members that match")) {
+      if (preContent.includes("more than 100 members that match")) {
         return { players: [], error: "Your search is too broad and returned more than 100 players. Please be more specific by adding a first name or state." };
       }
 
-      const lines = text.split('\n');
+      const lines = preContent.split('\n');
       const players: PlayerSearchResult[] = [];
       
       // Make header check more robust to spacing changes
       const headerIndex = lines.findIndex(line => line.includes("ID") && line.includes("Name") && line.includes("St"));
       if (headerIndex === -1) {
+          console.error("USCF Search <pre> block did not contain expected header. Content:", preContent);
           return { players: [], error: "Could not find player data block in the response. The USCF website may have changed its format." };
       }
 
