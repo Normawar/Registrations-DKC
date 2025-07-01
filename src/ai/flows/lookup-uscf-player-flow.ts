@@ -59,13 +59,19 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      if (text.includes("This player is not in our database")) {
+      const preContentMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
+      if (!preContentMatch || !preContentMatch[1]) {
+          return { error: "Could not find player data block in the response." };
+      }
+      const preContent = preContentMatch[1];
+      
+      if (preContent.includes("This player is not in our database")) {
         return { error: "Player not found with this USCF ID." };
       }
       
       const output: LookupUscfPlayerOutput = {};
       
-      const nameMatch = text.match(/Name\s*:\s*(.*)/);
+      const nameMatch = preContent.match(/Name\s*:\s*(.*)/);
       if (nameMatch && nameMatch[1]) {
         const rawName = nameMatch[1].trim(); // Format: LAST, FIRST MIDDLE
         const nameParts = rawName.split(',');
@@ -79,12 +85,12 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         }
       }
       
-      const ratingMatch = text.match(/Regular:\s*(\d+)/);
+      const ratingMatch = preContent.match(/Regular:\s*(\d+)/);
       if (ratingMatch && ratingMatch[1]) {
         output.rating = parseInt(ratingMatch[1], 10);
       }
       
-      const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
+      const expiresMatch = preContent.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
       if (expiresMatch && expiresMatch[1]) {
         output.expirationDate = expiresMatch[1];
       }

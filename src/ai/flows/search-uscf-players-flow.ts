@@ -51,31 +51,20 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player last name cannot be empty.' };
     }
     
-    // Use the modern player search endpoint which is more stable.
-    const url = 'https://www.uschess.org/msa/player-search.php';
-    const fullName = `${firstName || ''} ${lastName}`.trim();
-
-    const body = new URLSearchParams({
-        name: fullName,
-        state: state === 'ALL' ? '' : state || '',
-        rating_op: 'ge', // Greater than or equal to
-        rating: '', // No rating filter
-        fide_op: 'ge',
-        fide_rating: '',
-    });
+    // Use the simpler, more stable text-based endpoint.
+    const baseUrl = 'https://www.uschess.org/msa/thin.php';
+    const params = new URLSearchParams();
+    params.append('LNM', lastName);
+    if (firstName) params.append('FNM', firstName);
+    if (state && state !== 'ALL') params.append('ST', state);
+    
+    const url = `${baseUrl}?${params.toString()}`;
 
     try {
       const response = await fetch(url, {
-        method: 'POST',
         headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Origin': 'https://www.uschess.org',
-            'Referer': 'https://www.uschess.org/msa/player-search.php',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
         },
-        body: body.toString(),
         cache: 'no-store',
       });
 
@@ -85,70 +74,52 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      if (text.includes("No players that match your criteria were found")) {
+      if (text.includes("0 members found")) {
         return { players: [] };
       }
-      
-      // Instead of finding a specific table, find all table rows and parse them.
-      // A valid player row is identified by having an 8-digit USCF ID in the first cell.
-      const rowMatches = [...text.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
+
+      const preContentMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
+      if (!preContentMatch || !preContentMatch[1]) {
+        return { players: [], error: "Could not find player data block in the response from USCF." };
+      }
+
+      const lines = preContentMatch[1].trim().split('\n');
       const players: PlayerSearchResult[] = [];
 
-      if (rowMatches.length === 0) {
-          console.error("USCF Search response did not contain any table rows. Full response:", text.substring(0, 2000));
-          return { players: [], error: "Could not find any player data in the response. The USCF website format may have changed." };
-      }
+      // Regex to parse a line like: "12345678  LAST, FIRST M            Reg: 1234 Exp:2025-12-31 TX"
+      const playerRegex = /(\d{8})\s+(.*?)\s+Reg:\s*(\d+|Unrated)\s+Exp:(\d{4}-\d{2}-\d{2})\s+([A-Z]{2})/;
       
-      for (const rowMatch of rowMatches) {
-        const rowContent = rowMatch[1];
-        const cellMatches = [...rowContent.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
-        
-        // Defensive parsing: Continue if we don't have at least the first cell for the ID.
-        if (cellMatches.length < 1) continue;
+      for (const line of lines) {
+        const match = line.match(playerRegex);
+        if (match) {
+            const [, uscfId, fullNameRaw, ratingStr, expirationDate, stateAbbr] = match;
 
-        try {
-            const stripHtml = (html: string) => html.replace(/<[^>]+>/g, '').trim();
+            const nameParts = fullNameRaw.trim().split(',');
+            let parsedFirstName, parsedMiddleName, parsedLastName;
 
-            const uscfId = stripHtml(cellMatches[0]?.[1] || '');
-            
-            // Heuristic to identify a player row: the first cell must be an 8-digit ID.
-            if (!/^\d{8}$/.test(uscfId)) continue; 
-
-            const fullNameRaw = stripHtml(cellMatches[1]?.[1] || ''); // Format: LAST, FIRST MIDDLE
-            const ratingStr = stripHtml(cellMatches[2]?.[1] || '');
-            const stateAbbr = stripHtml(cellMatches[3]?.[1] || '');
-            const expirationDateStr = stripHtml(cellMatches[5]?.[1] || ''); // Format: YYYY-MM-DD
-            
-            const nameParts = fullNameRaw.split(',');
-            let firstName, middleName, lastName;
             if (nameParts.length > 1) {
-                lastName = nameParts.shift()!.trim();
+                parsedLastName = nameParts.shift()!.trim();
                 const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/);
-                firstName = firstAndMiddleParts.shift() || '';
-                middleName = firstAndMiddleParts.join(' ');
+                parsedFirstName = firstAndMiddleParts.shift() || '';
+                parsedMiddleName = firstAndMiddleParts.join(' ');
             } else {
-                lastName = fullNameRaw;
+                parsedLastName = fullNameRaw.trim();
             }
 
-            const rating = ratingStr ? parseInt(ratingStr, 10) : undefined;
-            const expirationDate = expirationDateStr && /^\d{4}-\d{2}-\d{2}$/.test(expirationDateStr) ? expirationDateStr : undefined;
+            const rating = ratingStr.trim().toLowerCase() === 'unrated' ? undefined : parseInt(ratingStr.trim(), 10);
             
             players.push({
                 uscfId,
-                firstName,
-                middleName,
-                lastName,
+                firstName: parsedFirstName,
+                lastName: parsedLastName,
+                middleName: parsedMiddleName,
                 state: stateAbbr,
                 rating: !isNaN(rating as number) ? rating : undefined,
                 expirationDate,
             });
-
-        } catch (parseError) {
-            console.error(`Failed to parse a potential player row: "${rowContent}"`, parseError);
-            continue; // Move to the next row
         }
       }
-
+      
       return { players };
 
     } catch (error) {
