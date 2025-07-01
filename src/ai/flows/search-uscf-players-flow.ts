@@ -41,26 +41,45 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing messy HTML into structured JSON. I will provide the HTML source code of a USCF player search results page from \`uschess.org/datapage/player-search.php\`.
+    prompt: `You are an expert at parsing fixed-width text from an HTML \`<pre>\` tag.
+I will provide the HTML source from the USCF player search results page at \`http://www.uschess.org/msa/MbrLst.php\`.
 
-Your task is to find the results table and extract the details for each player.
+Your task is to find the \`<pre>\` tag and extract the details for each player listed.
 
 **RULES:**
-1.  Locate the results table. It does not have a class name. You can identify it by finding the header row \`<tr>\` that contains \`<td>\` elements with the text: "USCF ID", "Rating", "State", and "Name".
-2.  Iterate over each \`<tr>\` that follows the header row.
-3.  For each player row, extract the following data from the \`<td>\` elements based on their column position:
-    - \`uscfId\`: The ID from the **1st column**.
-    - \`fullName\`: The name from the **10th column**. The name is inside an \`<a>\` tag.
-    - \`rating\`: The "Rating" from the **2nd column**. This value must be a number. If it is "Unrated", blank, or not a number, you must **omit** the \`rating\` field for that player in the JSON output.
-    - \`state\`: The state abbreviation from the **8th column**.
-4.  If the page contains the text "No players found that matched your search criteria.", you must return an empty array for the "players" field, like this: \`{"players": []}\`.
+1.  Ignore the header lines. The player data starts after the line of dashes (\`------------------------------------------------------\`).
+2.  Each player is on a new line.
+3.  The data is in fixed-width columns. The columns are: USCF ID, Name, St, Rating, Exp. Date.
+4.  For each player line, extract the following data:
+    - \`uscfId\`: The 8-digit ID from the start of the line.
+    - \`fullName\`: The player's name. It can be long and take up all the space before the State column.
+    - \`rating\`: The player's rating. This MUST be a number. If it is blank or not a number, omit the field.
+    - \`state\`: The two-letter state abbreviation.
+5.  Stop parsing when you reach a line that says "X member(s) found." or the end of the \`<pre>\` tag.
+6.  If the page contains the text "0 members found", or if there are no player data lines, you must return an empty array for the "players" field, like this: \`{"players": []}\`.
 
 **EXAMPLE INPUT HTML:**
 \`\`\`html
-<center><div class='contentheading'>Player Search Results</div><FORM ACTION='./player-search.php' METHOD='GET'><table><tr><td colspan=7>Players found: 1</td></tr>
-<tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr><tr><td valign=top>16153316 &nbsp;&nbsp;</td><td valign=top>319 &nbsp;&nbsp;</td><td valign=top>340 &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>TX &nbsp;&nbsp;</td><td valign=top>2025-11-30 &nbsp;&nbsp;</td><td valign=top><a href=https://www.uschess.org/msa/MbrDtlMain.php?16153316 >GUERRA, KALI RENAE</a></td>
-</tr>
-</table></form></td></tr></tbody></table>
+<HTML>
+<HEAD>
+<TITLE>USCF Member Search</TITLE>
+</HEAD>
+<BODY>
+<PRE>
+
+Searching for: Last Name = "smith"
+
+                                     Reg   Exp.
+USCF ID   Name                       St  Rating  Date
+------------------------------------------------------
+12345678  SMITH, JOHN A              TX    1500  2025-12-31
+87654321  SMITH, JANE B              CA         2024-08-15
+11112222  SMITH, ROBERT              NY  Unrated 2023-01-01
+
+3 members found.
+</PRE>
+</BODY>
+</HTML>
 \`\`\`
 
 **EXAMPLE OUTPUT JSON for the above HTML:**
@@ -68,10 +87,20 @@ Your task is to find the results table and extract the details for each player.
 {
   "players": [
     {
-      "uscfId": "16153316",
-      "fullName": "GUERRA, KALI RENAE",
-      "rating": 319,
+      "uscfId": "12345678",
+      "fullName": "SMITH, JOHN A",
+      "rating": 1500,
       "state": "TX"
+    },
+    {
+      "uscfId": "87654321",
+      "fullName": "SMITH, JANE B",
+      "state": "CA"
+    },
+    {
+      "uscfId": "11112222",
+      "fullName": "SMITH, ROBERT",
+      "state": "NY"
     }
   ]
 }
@@ -98,17 +127,16 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player name cannot be empty.' };
     }
     
-    // Using the 'datapage' search endpoint with a POST request
-    const url = 'https://www.uschess.org/datapage/player-search.php';
+    const nameParts = name.trim().split(/\s+/);
+    const lastName = nameParts.pop() || '';
+    const firstName = nameParts.join(' ');
+
+    const url = 'http://www.uschess.org/msa/MbrLst.php';
     const searchParams = new URLSearchParams({
-        pname: name,
-        state: state === 'ALL' ? '' : state || '',
-        rating_op: 'GE', // Greater than or equal to
-        rating: '', // No minimum rating
-        uscf_id: '',
-        gender: 'A', // All genders
-        order_by: 'N', // Order by name
-        mode: 'Search',
+        Last: lastName,
+        First: firstName,
+        State: state === 'ALL' ? '' : state || '',
+        Action: 'Search',
     });
     
     try {
@@ -126,6 +154,10 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
       
       const html = await response.text();
+      
+      if (html.includes("Too many members found")) {
+          return { players: [], error: "Search was too broad and returned too many results. Please be more specific." };
+      }
       
       const { output } = await searchPrompt(html);
 
