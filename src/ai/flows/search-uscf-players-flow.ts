@@ -89,7 +89,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const formMatch = html.match(/<form action='.\/player-search.php'[\s\S]*?<\/form>/i);
       if (!formMatch || !formMatch[0]) {
           console.error("USCF Search: Could not find the results form on the page.");
-          return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
+          return { players: [], error: "Could not find the results form on the page. The website layout may have changed." };
       }
       const formHtml = formMatch[0];
       
@@ -100,7 +100,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const headerRowIndex = htmlRows.findIndex(row => row.includes("USCF ID</td>"));
       if (headerRowIndex === -1) {
         console.error("USCF Search: Could not find the header row in the results table.");
-        return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
+        return { players: [], error: "Could not find the header row in the results table. The website layout may have changed." };
       }
       
       // Start processing rows after the header
@@ -166,7 +166,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       if (players.length === 0 && !html.includes("No players found")) {
         console.error("USCF Search: Found no players, but did not see 'No players found' message. Parsing likely failed.");
-        return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
+        return { players: [], error: "Found a results table, but was unable to extract any player data. The website layout may have changed." };
       }
       
       return { players };

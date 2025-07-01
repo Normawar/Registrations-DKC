@@ -65,19 +65,21 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = {};
       
-      // This logic is more robust as it does not rely on a <pre> tag.
       const nameMatch = text.match(/Name\s*:\s*(.*)/);
-      if (nameMatch && nameMatch[1]) {
-        const rawName = nameMatch[1].replace(/<[^>]+>/g, '').trim(); // Format: LAST, FIRST MIDDLE
-        const nameParts = rawName.split(',');
-        if (nameParts.length > 1) {
-            output.lastName = nameParts.shift()!.trim();
-            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
-            output.firstName = firstAndMiddleParts.shift() || '';
-            output.middleName = firstAndMiddleParts.join(' ');
-        } else {
-            output.lastName = rawName;
-        }
+      if (!nameMatch || !nameMatch[1]) {
+        console.error("USCF Lookup: Could not find 'Name:' field on page. Full response:", text.substring(0, 1000));
+        return { error: "Could not find player's name field on the page. The website layout may have changed." };
+      }
+      
+      const rawName = nameMatch[1].replace(/<[^>]+>/g, '').trim(); // Format: LAST, FIRST MIDDLE
+      const nameParts = rawName.split(',');
+      if (nameParts.length > 1) {
+          output.lastName = nameParts.shift()!.trim();
+          const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
+          output.firstName = firstAndMiddleParts.shift() || '';
+          output.middleName = firstAndMiddleParts.join(' ');
+      } else {
+          output.lastName = rawName;
       }
       
       const ratingMatch = text.match(/Regular:\s*(\d+)/);
@@ -91,8 +93,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       }
       
       if (!output.lastName && !output.firstName) {
-          console.error("USCF Lookup Response did not contain a name. Full response:", text.substring(0, 1000));
-          return { error: "Could not parse player name from the page." };
+          console.error("USCF Lookup: Failed to parse player name from raw string:", rawName);
+          return { error: "Found the player's name field, but could not parse the name from it." };
       }
       
       return output;
