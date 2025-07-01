@@ -85,30 +85,30 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Instead of parsing a specific table, find all table rows and check them individually.
-      // This is more resilient to table structure changes (e.g., missing <thead> or <tbody>).
+      // This logic is more resilient. It finds all table rows, then identifies
+      // a player row by looking for the specific link pattern to a member details page.
       const rows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const players: PlayerSearchResult[] = [];
 
       for (const row of rows) {
+        // A valid player row contains a link to MbrDtlMain.php with an 8-digit ID.
+        // This is a much more reliable anchor than assuming column structure.
+        const idLinkMatch = row.match(/MbrDtlMain\.php\?(\d{8})/);
+        if (!idLinkMatch) {
+            continue;
+        }
+
+        const uscfId = idLinkMatch[1];
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
 
-        // A valid player row should have an ID in the first cell and at least 5 columns.
+        // We can still use cell count as a sanity check.
         if (cells.length < 5) {
           continue;
         }
-
-        const idCellContent = cells[0];
-        const uscfIdMatch = idCellContent.match(/>(\d{8})</);
-        if (!uscfIdMatch) {
-          continue; // Not a valid player row if there's no 8-digit ID in the first cell.
-        }
         
-        const uscfId = uscfIdMatch[1];
-        
-        // Use a function to strip HTML tags for safety.
-        const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').trim();
+        const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
 
+        // Assuming fixed column order after we've reliably identified a player row.
         const fullNameRaw = stripTags(cells[1]);
         const expirationDate = stripTags(cells[2]);
         const stateAbbr = stripTags(cells[3]);
@@ -118,7 +118,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const nameParts = fullNameRaw.split(',');
         if (nameParts.length > 1) {
             parsedLastName = nameParts.shift()!.trim();
-            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/);
+            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
             parsedFirstName = firstAndMiddleParts.shift() || '';
             parsedMiddleName = firstAndMiddleParts.join(' ');
         } else {
