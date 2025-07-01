@@ -17,7 +17,9 @@ const LookupUscfPlayerInputSchema = z.object({
 export type LookupUscfPlayerInput = z.infer<typeof LookupUscfPlayerInputSchema>;
 
 const LookupUscfPlayerOutputSchema = z.object({
-  fullName: z.string().optional().describe("The player's full name as returned by the lookup, in LAST, FIRST format."),
+  firstName: z.string().optional().describe("The player's first name."),
+  middleName: z.string().optional().describe("The player's middle name or initial."),
+  lastName: z.string().optional().describe("The player's last name."),
   rating: z.number().optional().describe("The player's regular USCF rating."),
   expirationDate: z.string().optional().describe("The player's USCF membership expiration date in YYYY-MM-DD format."),
   error: z.string().optional().describe("An error message if the lookup failed or the player was not found.")
@@ -63,17 +65,17 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = {};
       
-      // Regex is more robust than substring parsing
       const nameMatch = text.match(/Name\s*:\s*(.*)/);
       if (nameMatch && nameMatch[1]) {
-        const rawName = nameMatch[1].trim();
+        const rawName = nameMatch[1].trim(); // Format: LAST, FIRST MIDDLE
         const nameParts = rawName.split(',');
         if (nameParts.length > 1) {
-            const lastNamePart = nameParts.shift()!.trim();
-            const firstNameAndMiddle = nameParts.join(',').trim();
-            output.fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
+            output.lastName = nameParts.shift()!.trim();
+            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/);
+            output.firstName = firstAndMiddleParts.shift() || '';
+            output.middleName = firstAndMiddleParts.join(' ');
         } else {
-            output.fullName = rawName;
+            output.lastName = rawName;
         }
       }
       
@@ -87,7 +89,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         output.expirationDate = expiresMatch[1];
       }
       
-      if (!output.fullName) {
+      if (!output.lastName && !output.firstName) {
           console.error("USCF Lookup Response did not contain a name. Full response:", text.substring(0, 1000));
           return { error: "Could not parse player name from the page." };
       }

@@ -20,7 +20,9 @@ export type SearchUscfPlayersInput = z.infer<typeof SearchUscfPlayersInputSchema
 
 const PlayerSearchResultSchema = z.object({
   uscfId: z.string().describe("The player's 8-digit USCF ID."),
-  fullName: z.string().describe("The player's full name in FIRST LAST format."),
+  firstName: z.string().optional().describe("The player's first name."),
+  middleName: z.string().optional().describe("The player's middle name or initial."),
+  lastName: z.string().optional().describe("The player's last name."),
   rating: z.number().optional().describe("The player's regular USCF rating. Should be a number, not 'Unrated'."),
   state: z.string().optional().describe("The player's state abbreviation."),
   expirationDate: z.string().optional().describe("The player's USCF membership expiration date in YYYY-MM-DD format."),
@@ -112,17 +114,20 @@ const searchUscfPlayersFlow = ai.defineFlow(
             // Heuristic to identify a player row: the first cell must be an 8-digit ID.
             if (!/^\d{8}$/.test(uscfId)) continue; 
 
-            let fullNameRaw = stripHtml(cellMatches[1]?.[1] || ''); // Format: LAST, FIRST MIDDLE
+            const fullNameRaw = stripHtml(cellMatches[1]?.[1] || ''); // Format: LAST, FIRST MIDDLE
             const ratingStr = stripHtml(cellMatches[2]?.[1] || '');
             const stateAbbr = stripHtml(cellMatches[3]?.[1] || '');
             const expirationDateStr = stripHtml(cellMatches[5]?.[1] || ''); // Format: YYYY-MM-DD
             
-            let fullName = fullNameRaw;
             const nameParts = fullNameRaw.split(',');
+            let firstName, middleName, lastName;
             if (nameParts.length > 1) {
-                const lastNamePart = nameParts.shift()!.trim();
-                const firstNameAndMiddle = nameParts.join(',').trim();
-                fullName = `${firstNameAndMiddle} ${lastNamePart}`.trim();
+                lastName = nameParts.shift()!.trim();
+                const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/);
+                firstName = firstAndMiddleParts.shift() || '';
+                middleName = firstAndMiddleParts.join(' ');
+            } else {
+                lastName = fullNameRaw;
             }
 
             const rating = ratingStr ? parseInt(ratingStr, 10) : undefined;
@@ -130,7 +135,9 @@ const searchUscfPlayersFlow = ai.defineFlow(
             
             players.push({
                 uscfId,
-                fullName,
+                firstName,
+                middleName,
+                lastName,
                 state: stateAbbr,
                 rating: !isNaN(rating as number) ? rating : undefined,
                 expirationDate,

@@ -323,12 +323,9 @@ export default function PlayersPage() {
   const handleAddFromSearch = (player: PlayerSearchResult) => {
       form.reset(); 
 
-      const nameParts = player.fullName.split(' ');
-      const lastName = nameParts.pop() || '';
-      const firstName = nameParts.join(' ');
-      
-      form.setValue('firstName', firstName);
-      form.setValue('lastName', lastName);
+      form.setValue('firstName', player.firstName || '');
+      form.setValue('lastName', player.lastName || '');
+      form.setValue('middleName', player.middleName || '');
       form.setValue('uscfId', player.uscfId);
       if (player.rating) {
         form.setValue('rating', player.rating);
@@ -601,7 +598,7 @@ export default function PlayersPage() {
                             rel="noopener noreferrer"
                             className="text-primary hover:underline"
                         >
-                            {player.fullName}
+                            {[player.firstName, player.middleName, player.lastName].filter(Boolean).join(' ')}
                         </a>
                       </TableCell>
                       <TableCell>{player.uscfId}</TableCell>

@@ -383,16 +383,17 @@ export default function RosterPage() {
                 form.setValue('uscfExpiration', adjustedDate, { shouldValidate: true });
             }
             
-            const currentFirstName = form.getValues('firstName');
-            if (result.fullName && !currentFirstName) {
-                const nameParts = result.fullName.split(' ');
-                const firstName = nameParts.slice(0, -1).join(' ');
-                const lastName = nameParts.slice(-1).join(' ');
-                if (firstName) form.setValue('firstName', firstName);
-                if (lastName) form.setValue('lastName', lastName);
+            if (!form.getValues('firstName') && result.firstName) {
+                form.setValue('firstName', result.firstName);
+            }
+            if (!form.getValues('lastName') && result.lastName) {
+                form.setValue('lastName', result.lastName);
+            }
+            if (!form.getValues('middleName') && result.middleName) {
+                form.setValue('middleName', result.middleName);
             }
 
-            toast({ title: "Lookup Successful", description: `Updated details for ${result.fullName || 'player'}.` });
+            toast({ title: "Lookup Successful", description: `Updated details for ${[result.firstName, result.lastName].join(' ')}.` });
         }
     } catch (error) {
         const description = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -482,17 +483,14 @@ export default function RosterPage() {
   const handleAddFromSearch = (player: PlayerSearchResult) => {
       setEditingPlayer(null);
       
-      const nameParts = player.fullName.split(' ');
-      const lastName = nameParts.pop() || '';
-      const firstName = nameParts.join(' ');
-
       form.reset({
           ...form.getValues(),
-          firstName: firstName,
-          lastName: lastName,
+          firstName: player.firstName || '',
+          middleName: player.middleName || '',
+          lastName: player.lastName || '',
           uscfId: player.uscfId,
           rating: player.rating,
-          uscfExpiration: undefined,
+          uscfExpiration: player.expirationDate ? new Date(player.expirationDate) : undefined,
           dob: undefined,
           grade: '',
           section: '',
@@ -743,7 +741,7 @@ export default function RosterPage() {
                             rel="noopener noreferrer"
                             className="text-primary hover:underline"
                         >
-                            {player.fullName}
+                            {[player.firstName, player.middleName, player.lastName].filter(Boolean).join(' ')}
                         </a>
                       </TableCell>
                       <TableCell>{player.uscfId}</TableCell>
