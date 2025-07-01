@@ -89,7 +89,13 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
 
       // Find the header row to know where data starts
-      const headerRowIndex = allHtmlRows.findIndex(row => row.includes("USCF ID</td>") && row.includes("Name</td>"));
+      const headerRowIndex = allHtmlRows.findIndex(row => 
+        row.includes("USCF ID") && 
+        row.includes("Rating") &&
+        row.includes("State") &&
+        row.includes("Name")
+      );
+
       if (headerRowIndex === -1) {
         console.error("USCF Search: Could not find the header row in the results table.");
         return { players: [], error: "Could not find the header row in the results table. The website layout may have changed." };
