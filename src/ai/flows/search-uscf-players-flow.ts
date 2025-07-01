@@ -41,23 +41,65 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing messy, real-world HTML from the USCF website. I will provide the full HTML source of a player search results page.
+    prompt: `You are an expert at parsing messy, real-world HTML. I will provide the full HTML source of a USCF player search results page.
 
-Your task is to find a table containing player information. The header of this table will contain columns like "USCF ID", "Name", "Rating", and "State".
+Your task is to extract player information. The data is inside a \`<table>\`.
+The table header row contains \`<td>\` elements like \`USCF ID\`, \`Rating\`, \`State\`, and \`Name\`.
+Each subsequent \`<tr>\` in that table represents a player.
 
-For each row in that table representing a player, extract the following details:
-- \`uscfId\`: The player's 8-digit USCF ID.
-- \`fullName\`: The player's name. It will be in "LAST, FIRST" format. Extract it from the \`<a>\` tag if present.
-- \`rating\`: The player's regular USCF rating. This must be a number. If the text is 'UNR' or 'Unrated', the value should be null.
-- \`state\`: The player's two-letter state abbreviation.
+For each player row, please extract the following details from the corresponding \`<td>\` elements:
+- \`uscfId\`: The player's 8-digit USCF ID. This will be the first column.
+- \`rating\`: The player's regular USCF rating. This is the second column. This must be a number. If the text is 'UNR' or 'Unrated', the value should be null.
+- \`state\`: The player's two-letter state abbreviation. This is the eighth column.
+- \`fullName\`: The player's name, which is in the last column inside an \`<a>\` tag. It will be in "LAST, FIRST" format.
 
 Clean up any extra whitespace or \`&nbsp;\` from the extracted text.
 
 The final output must be a JSON object with a "players" key, which is an array of these player objects.
 
-If the HTML contains "No players found" or "Players found: 0", or if you cannot find any player data rows, return an empty "players" array. Do not invent any players.
+If the HTML contains the text "No players found" or "Players found: 0", or if you cannot find any player data rows, return an empty "players" array. Do not invent any players.
 
-Here is the full HTML source code:
+Here is an example of the HTML structure you will be parsing:
+\`\`\`html
+<center>
+  <div class='contentheading'>Player Search Results</div>
+  <FORM ACTION='./player-search.php' METHOD='GET'>
+    <table>
+      <tr><td colspan=7>Players found: 1</td></tr>
+      <tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr>
+      <tr>
+        <td valign=top>16153316 &nbsp;&nbsp;</td>
+        <td valign=top>319 &nbsp;&nbsp;</td>
+        <td valign=top>340 &nbsp;&nbsp;</td>
+        <td valign=top>Unrated &nbsp;&nbsp;</td>
+        <td valign=top>Unrated &nbsp;&nbsp;</td>
+        <td valign=top>Unrated &nbsp;&nbsp;</td>
+        <td valign=top>Unrated &nbsp;&nbsp;</td>
+        <td valign=top>TX &nbsp;&nbsp;</td>
+        <td valign=top>2025-11-30 &nbsp;&nbsp;</td>
+        <td valign=top><a href=https://www.uschess.org/msa/MbrDtlMain.php?16153316 >GUERRA, KALI RENAE</a></td>
+      </tr>
+    </table>
+  </form>
+</center>
+\`\`\`
+
+Based on that example, you would produce this JSON:
+\`\`\`json
+{
+  "players": [
+    {
+      "uscfId": "16153316",
+      "fullName": "GUERRA, KALI RENAE",
+      "rating": 319,
+      "state": "TX"
+    }
+  ]
+}
+\`\`\`
+
+Now, please parse the full HTML source code provided below.
+
 \`\`\`html
 {{{_input}}}
 \`\`\`
