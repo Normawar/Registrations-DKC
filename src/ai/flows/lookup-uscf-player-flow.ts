@@ -33,18 +33,15 @@ const lookupPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: LookupUscfPlayerOutputSchema },
-    prompt: `You are an expert at extracting structured data from a text block representing a single USCF player's record.
-Your ONLY source of information is the text provided below.
+    prompt: `Hey, I have a block of text with a USCF player's record. I need you to pull out a few details into a JSON object.
 
-**RULES:**
-1. The data is in a fixed-width format.
-2. Extract the player's full name exactly as it appears after "Name :".
-3. Extract the player's rating exactly as it appears after "Rating:".
-4. Extract the expiration date exactly as it appears after "Expires:". The format must be YYYY-MM-DD.
-5. If the input text contains the exact phrase "This player is not in our database", you MUST set the 'error' field in your output to "Player not found with this USCF ID." and leave all other fields empty.
+The data is in a fixed-width format. Here's what I need:
+- \`fullName\`: The player's name, which you'll find right after "Name :".
+- \`rating\`: The player's rating, found after "Rating:". This should be a number.
+- \`expirationDate\`: The membership expiration date, found after "Expires:". Please format this as YYYY-MM-DD.
+- \`error\`: If you see the exact text "This player is not in our database", please put the message "Player not found with this USCF ID." in this field and leave the others blank.
 
-**EXAMPLE:**
-Given this text:
+Here's an example of the text format:
 \`\`\`
 ---------------------------------------------------------------------------------------
 USCF ID : 12345678      Name : DOE, JOHN M                             Address: ANYTOWN, TX 12345
@@ -52,14 +49,15 @@ USCF ID : 12345678      Name : DOE, JOHN M                             Address: 
  Birth : 1990-01-01  Sex : M   Federation:      Rating: 1500  Expires: 2025-12-31   Updated: 2024-01-01
 ---------------------------------------------------------------------------------------
 \`\`\`
-You would extract:
-- fullName: "DOE, JOHN M"
-- rating: 1500
-- expirationDate: "2025-12-31"
+And for that, I'd expect this JSON:
+{
+  "fullName": "DOE, JOHN M",
+  "rating": 1500,
+  "expirationDate": "2025-12-31"
+}
 
-Now, parse the text block provided below.
+Ok, here's the text block. Let me know what you find.
 
-Text to parse:
 \`\`\`
 {{{_input}}}
 \`\`\`

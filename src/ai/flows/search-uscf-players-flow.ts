@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF website.
@@ -40,35 +41,33 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at extracting structured player data from a USCF player search results HTML page.
-Your task is to find the main results table within the provided HTML and parse EACH player row.
+    prompt: `Hey, I've got some HTML from the USCF player search results page. Can you help me pull out the player data into a JSON format?
 
-**RULES:**
-1.  Locate the table containing player data. The table can be identified by its header row which contains columns like 'ID', 'Name', 'St', and 'Reg'.
-2.  For EACH player row (\`<tr>\`) in that table, extract the required information from the table cells (\`<td>\`).
-3.  The data is often inside other HTML tags like \`<font>\` or \`<a>\`. You must extract the visible text content from within these tags.
-4.  If a player's rating is 'UNR' or the cell is empty, the output for the \`rating\` field must be \`null\`.
-5.  If the HTML contains the text "No players found", you MUST return an empty \`players\` array.
-6.  The \`fullName\` is typically in "LAST, FIRST MI" format. Extract it exactly as it appears.
+I'm looking for a JSON object with a single key, "players", which should be an array.
 
-**EXAMPLE HTML of a table row:**
-\`\`\`html
+For each player in the main results table, I need an object with these keys:
+- "uscfId" (string)
+- "fullName" (string)
+- "rating" (number or null if unrated)
+- "state" (string, the 2-letter abbreviation)
+
+The table with the players has a header row with columns like "ID", "Name", "St", and "Reg". Just ignore everything else on the page.
+
+Here's an example of a row from the table:
 <tr><td><font face=verdana,helvetica,arial size=2>16439198</font></td><td align=left><font face=verdana,helvetica,arial size=2><a href=./MbrDtlMain.php?16439198>GUERRA, KALI ANN</a></font></td><td align=center><font face=verdana,helvetica,arial size=2>TX</font></td><td align=right><font face=verdana,helvetica,arial size=2>1084</font></td></tr>
-\`\`\`
 
-**EXAMPLE OUTPUT for that row:**
-\`\`\`json
+For that row, the JSON object in the "players" array should look like:
 {
   "uscfId": "16439198",
   "fullName": "GUERRA, KALI ANN",
   "rating": 1084,
   "state": "TX"
 }
-\`\`\`
 
-Now, parse the full HTML document provided below and return ALL matching players.
+If the HTML says "No players found" somewhere, or if you look at the table and it's empty, just return an empty "players" array.
 
-HTML document to parse:
+Here's the HTML. Please give me the JSON.
+
 \`\`\`
 {{{_input}}}
 \`\`\`
@@ -144,11 +143,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
         players = players.filter(player => player.state?.toUpperCase() === state.toUpperCase());
       }
       
-      if (players.length === 0) {
-        // This case now means parsing failed, as the explicit "No players found" is handled above.
-        return { players: [], error: "Parsing failed. The USCF website may have changed, or the search returned no results in a way that could not be detected." };
-      }
-
       return { players };
 
     } catch (error) {
