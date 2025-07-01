@@ -38,17 +38,16 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     if (!uscfId || !/^\d{8}$/.test(uscfId)) {
       return { error: 'Invalid USCF ID format. It must be an 8-digit number.' };
     }
-    const url = `http://msa.uschess.org/thin3.php?${uscfId}&_cacheBust=${Date.now()}`;
+    const url = `http://msa.uschess.org/thin3.php?${uscfId}`;
     
     try {
       const response = await fetch(url, {
         cache: 'no-store',
         headers: {
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          Pragma: 'no-cache',
-          Expires: '0',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Expires': '0',
         },
       });
       if (!response.ok) {
@@ -63,6 +62,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const preMatch = html.match(/<pre>([\s\S]*?)<\/pre>/i);
       if (!preMatch || !preMatch[1]) {
+        console.error("USCF Lookup Response (No <pre> tag found):", html.substring(0, 500));
         return { error: "Could not find player data block in the lookup results." };
       }
       const text = preMatch[1];
@@ -93,6 +93,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       }
       
       if (!output.fullName) {
+          console.error("USCF Lookup Response (Name not found):", html.substring(0, 500));
           return { error: "Could not parse player name from the page." };
       }
       
