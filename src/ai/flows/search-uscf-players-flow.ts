@@ -68,6 +68,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
           'Pragma': 'no-cache',
           'Expires': '0',
           'Referer': 'http://msa.uschess.org/MbrLst.php',
+          'Origin': 'http://msa.uschess.org',
         },
         body: searchParams.toString(),
         cache: 'no-store',
@@ -78,6 +79,10 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
       
       const html = await response.text();
+
+      if (!html || html.trim().length === 0) {
+        return { players: [], error: 'Received an empty response from the USCF server. This may indicate a network issue or that the server is blocking requests.' };
+      }
       
       if (html.includes("Too many members found")) {
           return { players: [], error: "Search was too broad and returned too many results. Please be more specific." };
