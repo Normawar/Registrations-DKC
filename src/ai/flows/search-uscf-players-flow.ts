@@ -85,31 +85,56 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
+      // Isolate the form containing the results to avoid parsing the whole page.
+      const formMatch = html.match(/<form action='.\/player-search.php'[\s\S]*?<\/form>/i);
+      if (!formMatch || !formMatch[0]) {
+          console.error("USCF Search: Could not find the results form on the page.");
+          return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
+      }
+      const formHtml = formMatch[0];
+      
       const players: PlayerSearchResult[] = [];
-      const htmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      const htmlRows = formHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
 
-      for (const row of htmlRows) {
+      // Find the header row to know where data starts
+      const headerRowIndex = htmlRows.findIndex(row => row.includes("USCF ID</td>"));
+      if (headerRowIndex === -1) {
+        console.error("USCF Search: Could not find the header row in the results table.");
+        return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
+      }
+      
+      // Start processing rows after the header
+      for (let i = headerRowIndex + 1; i < htmlRows.length; i++) {
+        const row = htmlRows[i];
+
+        // Stop if we hit the footer row which contains form inputs
+        if (row.includes("Search Again") || row.includes("<input")) break;
+        
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+        
+        // Player rows should have at least 10 cells. The name cell is the 10th (index 9).
+        if (cells.length < 10) {
+            continue;
+        }
 
-        const nameCellIndex = cells.findIndex(c => c.includes('MbrDtlMain.php'));
-        if (nameCellIndex === -1) {
-            continue; // Not a player row.
+        const nameCellContent = cells[9];
+        // Ensure it's a player link row before proceeding
+        if (!nameCellContent || !nameCellContent.includes('MbrDtlMain.php')) {
+            continue;
         }
 
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
-        const nameCellContent = cells[nameCellIndex];
         const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
         
         if (!idMatch || !idMatch[1]) {
-            continue; // Should be impossible if findIndex worked, but for safety.
+            continue; 
         }
         const uscfId = idMatch[1];
         
-        // Defensively access cell data based on the expected order, allowing for missing cells.
-        const ratingStr = cells.length > 1 ? stripTags(cells[1]) : undefined;
-        const stateAbbr = cells.length > 7 ? stripTags(cells[7]) : undefined;
-        const expirationDateRaw = cells.length > 8 ? stripTags(cells[8]) : undefined;
+        const ratingStr = stripTags(cells[1]);
+        const stateAbbr = stripTags(cells[7]);
+        const expirationDateRaw = stripTags(cells[8]);
         const fullNameRaw = stripTags(nameCellContent);
         
         let parsedFirstName, parsedMiddleName, parsedLastName;
@@ -123,7 +148,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
             parsedLastName = fullNameRaw;
         }
         
-        const rating = ratingStr && !isNaN(parseInt(ratingStr)) ? parseInt(ratingStr, 10) : undefined;
+        const rating = ratingStr && !isNaN(parseInt(ratingStr, 10)) ? parseInt(ratingStr, 10) : undefined;
         
         const expiresMatch = expirationDateRaw?.match(/(\d{4}-\d{2}-\d{2})/);
         const expirationDate = expiresMatch ? expiresMatch[1] : undefined;
