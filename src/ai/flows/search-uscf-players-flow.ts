@@ -89,55 +89,42 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
       
-      // Find the header row to dynamically map column names to indices
-      const headerRowIndex = allHtmlRows.findIndex(row =>
-        row.includes('Rating') && row.includes('State') && row.includes('Expires') && row.includes('Name')
-      );
+      // Instead of relying on a header, find rows that are definitively player rows by looking for the member detail link.
+      const playerRows = allHtmlRows.filter(row => row.includes('MbrDtlMain.php?'));
 
-      if (headerRowIndex === -1) {
-          console.error("USCF Search: Could not find header row. Full response snippet:", html.substring(0, 3000));
-          return { players: [], error: "Could not find the results table header. The website layout may have changed." };
+      if (playerRows.length === 0 && !html.includes("No players found")) {
+        console.error("USCF Search: Found a results page, but no rows contained player links ('MbrDtlMain.php?'). The website layout may have changed. Full response snippet:", html.substring(0, 3000));
+        return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
       }
 
-      const headerCells = allHtmlRows[headerRowIndex].match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-      const columnIndexMap: { [key: string]: number } = {};
-      
-      headerCells.forEach((cell, index) => {
-          const headerText = stripTags(cell);
-          if (headerText.includes('Rating')) columnIndexMap['rating'] = index;
-          if (headerText.includes('State')) columnIndexMap['state'] = index;
-          if (headerText.includes('Expires')) columnIndexMap['expires'] = index;
-          if (headerText.includes('Name') && headerText.includes('ID')) columnIndexMap['name'] = index;
-      });
+      // Assume column order based on observation: 0: Name/ID, 1: Rating, 2: State, 3: Expires
+      const NAME_ID_COL = 0;
+      const RATING_COL = 1;
+      const STATE_COL = 2;
+      const EXPIRES_COL = 3;
 
-      // Process player rows which come after the header
-      for (let i = headerRowIndex + 1; i < allHtmlRows.length; i++) {
-        const row = allHtmlRows[i];
-
-        if (row.includes('</table')) {
-            break;
-        }
-
+      for (const row of playerRows) {
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-        if (cells.length === 0) {
+
+        // Defensively check if the row has enough columns to be a player.
+        if (cells.length < 4) {
+            console.warn("USCF Search: Found a potential player row with fewer than 4 columns. Skipping.", row);
             continue;
         }
         
-        const nameCellContent = cells[columnIndexMap['name']];
-        if (!nameCellContent || !nameCellContent.includes('MbrDtlMain.php?')) {
-            continue; // Not a player row
-        }
-        
+        const nameCellContent = cells[NAME_ID_COL];
         const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
+
+        // If the first cell doesn't have the player link, this row is invalid.
         if (!idMatch || !idMatch[1]) {
-            console.warn("USCF Search: Found a player row but could not extract USCF ID from it. Skipping.", nameCellContent);
+            console.warn("USCF Search: Found a row that looked like a player row but couldn't extract an ID. Skipping.", nameCellContent);
             continue; 
         }
         const uscfId = idMatch[1];
         
-        const ratingStr = columnIndexMap['rating'] !== undefined && cells[columnIndexMap['rating']] ? stripTags(cells[columnIndexMap['rating']]) : '';
-        const stateAbbr = columnIndexMap['state'] !== undefined && cells[columnIndexMap['state']] ? stripTags(cells[columnIndexMap['state']]) : '';
-        const expirationDateRaw = columnIndexMap['expires'] !== undefined && cells[columnIndexMap['expires']] ? stripTags(cells[columnIndexMap['expires']]) : '';
+        const ratingStr = stripTags(cells[RATING_COL] || '');
+        const stateAbbr = stripTags(cells[STATE_COL] || '');
+        const expirationDateRaw = stripTags(cells[EXPIRES_COL] || '');
         const fullNameRaw = stripTags(nameCellContent);
 
         let parsedFirstName, parsedMiddleName, parsedLastName;
@@ -169,7 +156,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
 
       if (players.length === 0 && !html.includes("No players found")) {
-        console.error("USCF Search: Found no players, but did not see 'No players found' message. Parsing likely failed. Full response snippet:", html.substring(0, 3000));
+        console.error("USCF Search: Found no players after parsing, but did not see 'No players found' message. Parsing likely failed. Full response snippet:", html.substring(0, 3000));
         return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
       }
       
