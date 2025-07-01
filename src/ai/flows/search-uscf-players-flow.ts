@@ -106,7 +106,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
             continue;
         }
         
-        const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
+        const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d+)/);
         if (!idMatch || !idMatch[1]) {
             console.warn("USCF Search: Found a row that looked like a player row but couldn't extract an ID. Skipping.", nameCellContent);
             continue; 

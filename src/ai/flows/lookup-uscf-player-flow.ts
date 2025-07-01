@@ -37,8 +37,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     outputSchema: LookupUscfPlayerOutputSchema,
   },
   async ({ uscfId }) => {
-    if (!uscfId || !/^\d{8}$/.test(uscfId)) {
-      return { error: 'Invalid USCF ID format. It must be an 8-digit number.' };
+    if (!uscfId || !/^\d+$/.test(uscfId)) {
+      return { error: 'Invalid USCF ID format. It must be a number.' };
     }
     // Use the www.uschess.org endpoint which is more stable than the msa subdomain.
     const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
