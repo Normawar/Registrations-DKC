@@ -101,20 +101,21 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const rowContent = rowMatch[1];
         const cellMatches = [...rowContent.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)];
         
-        if (cellMatches.length < 6) continue; // Skip header rows or malformed rows
+        // Defensive parsing: Continue if we don't have at least the first cell for the ID.
+        if (cellMatches.length < 1) continue;
 
         try {
             const stripHtml = (html: string) => html.replace(/<[^>]+>/g, '').trim();
 
-            const uscfId = stripHtml(cellMatches[0][1]);
+            const uscfId = stripHtml(cellMatches[0]?.[1] || '');
             
             // Heuristic to identify a player row: the first cell must be an 8-digit ID.
             if (!/^\d{8}$/.test(uscfId)) continue; 
 
-            let fullNameRaw = stripHtml(cellMatches[1][1]); // Format: LAST, FIRST MIDDLE
-            const ratingStr = stripHtml(cellMatches[2][1]);
-            const stateAbbr = stripHtml(cellMatches[3][1]);
-            const expirationDateStr = stripHtml(cellMatches[5][1]); // Format: YYYY-MM-DD
+            let fullNameRaw = stripHtml(cellMatches[1]?.[1] || ''); // Format: LAST, FIRST MIDDLE
+            const ratingStr = stripHtml(cellMatches[2]?.[1] || '');
+            const stateAbbr = stripHtml(cellMatches[3]?.[1] || '');
+            const expirationDateStr = stripHtml(cellMatches[5]?.[1] || ''); // Format: YYYY-MM-DD
             
             let fullName = fullNameRaw;
             const nameParts = fullNameRaw.split(',');
@@ -125,7 +126,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
             }
 
             const rating = ratingStr ? parseInt(ratingStr, 10) : undefined;
-            const expirationDate = /^\d{4}-\d{2}-\d{2}$/.test(expirationDateStr) ? expirationDateStr : undefined;
+            const expirationDate = expirationDateStr && /^\d{4}-\d{2}-\d{2}$/.test(expirationDateStr) ? expirationDateStr : undefined;
             
             players.push({
                 uscfId,
