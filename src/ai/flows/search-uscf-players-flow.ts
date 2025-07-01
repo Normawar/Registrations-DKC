@@ -12,7 +12,8 @@ import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const SearchUscfPlayersInputSchema = z.object({
-  name: z.string().describe('The name of the player to search for.'),
+  firstName: z.string().optional().describe("The player's first name."),
+  lastName: z.string().describe("The player's last name."),
   state: z.string().optional().describe("The player's two-letter state abbreviation. e.g., TX"),
 });
 export type SearchUscfPlayersInput = z.infer<typeof SearchUscfPlayersInputSchema>;
@@ -42,31 +43,15 @@ const searchUscfPlayersFlow = ai.defineFlow(
     inputSchema: SearchUscfPlayersInputSchema,
     outputSchema: SearchUscfPlayersOutputSchema,
   },
-  async ({ name, state }) => {
-    if (!name) {
-      return { players: [], error: 'Player name cannot be empty.' };
+  async ({ firstName, lastName, state }) => {
+    if (!lastName) {
+      return { players: [], error: 'Player last name cannot be empty.' };
     }
     
-    let firstName = '';
-    let lastName = '';
-    const trimmedName = name.trim();
-
-    if (trimmedName.includes(',')) {
-        // Assume "Last, First" format
-        const parts = trimmedName.split(',').map(p => p.trim());
-        lastName = parts[0];
-        firstName = parts[1] || '';
-    } else {
-        // Assume "First Last" format
-        const parts = trimmedName.split(/\s+/);
-        lastName = parts.pop() || '';
-        firstName = parts.join(' ');
-    }
-
     const url = 'http://msa.uschess.org/MbrLst.php'; // Use direct subdomain
     const searchParams = new URLSearchParams({
         Last: lastName,
-        First: firstName,
+        First: firstName || '',
         State: state === 'ALL' ? '' : state || '',
         Action: 'Search',
         _cacheBust: Date.now().toString(), // Add cache-busting

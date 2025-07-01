@@ -53,6 +53,7 @@ import { useToast } from '@/hooks/use-toast';
 import { districts as allDistricts } from '@/lib/data/districts';
 import { schoolData } from '@/lib/data/school-data';
 import { searchUscfPlayers, type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
+import { Label } from "@/components/ui/label";
 
 const initialPlayersData = [
   { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", rating: 1850, school: "Independent", district: "None", events: 2, eventIds: ['e2'] },
@@ -115,7 +116,8 @@ export default function PlayersPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
-  const [searchName, setSearchName] = useState('');
+  const [searchFirstName, setSearchFirstName] = useState('');
+  const [searchLastName, setSearchLastName] = useState('');
   const [searchState, setSearchState] = useState('TX');
   const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -289,10 +291,11 @@ export default function PlayersPage() {
   };
 
   const handleSearch = async () => {
-      if (!searchName.trim()) {
+      if (!searchLastName.trim()) {
           toast({
               variant: 'destructive',
-              title: 'Search name cannot be empty',
+              title: 'Last name is required',
+              description: 'Please enter a last name to perform a search.',
           });
           return;
       }
@@ -300,7 +303,7 @@ export default function PlayersPage() {
       setSearchResults([]);
       try {
           const stateToSearch = searchState === 'ALL' ? '' : searchState;
-          const result = await searchUscfPlayers({ name: searchName, state: stateToSearch });
+          const result = await searchUscfPlayers({ firstName: searchFirstName, lastName: searchLastName, state: stateToSearch });
           if (result.error) {
               toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
           } else {
@@ -530,26 +533,47 @@ export default function PlayersPage() {
               Search for a player by name and state to add them to the system.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex w-full items-center gap-2">
-            <Input
-              className="flex-grow"
-              placeholder="Enter player name..."
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-            />
-            <Select value={searchState} onValueChange={setSearchState}>
-                <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Select State" />
-                </SelectTrigger>
-                <SelectContent>
-                    {usStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                </SelectContent>
-            </Select>
-            <Button onClick={handleSearch} disabled={isSearching}>
-              {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-              Search
-            </Button>
+          <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="search-first-name">First Name (Optional)</Label>
+                    <Input
+                        id="search-first-name"
+                        placeholder="John"
+                        value={searchFirstName}
+                        onChange={(e) => setSearchFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="search-last-name">Last Name</Label>
+                    <Input
+                        id="search-last-name"
+                        placeholder="Smith"
+                        value={searchLastName}
+                        onChange={(e) => setSearchLastName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                    />
+                  </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr,auto] gap-4">
+                <div className="grid gap-1.5">
+                    <Label htmlFor="search-state">State</Label>
+                    <Select value={searchState} onValueChange={setSearchState}>
+                        <SelectTrigger id="search-state">
+                            <SelectValue placeholder="Select State" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {usStates.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="flex items-end h-full">
+                    <Button onClick={handleSearch} disabled={isSearching} className="w-full">
+                        {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                        Search
+                    </Button>
+                </div>
+              </div>
           </div>
           <div className="h-96 w-full overflow-y-auto border rounded-md mt-4">
             {isSearching ? (
