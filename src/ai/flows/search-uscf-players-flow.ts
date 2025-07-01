@@ -41,47 +41,28 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing messy, real-world HTML. I will provide the full HTML source of a USCF player search results page.
+    prompt: `You are an expert at parsing fixed-width text. I will provide the full HTML source of a USCF player search results page. The player data is inside a \`<pre>\` tag.
 
-Your task is to extract player information. The data is inside a \`<table>\`.
-The table header row contains \`<td>\` elements like \`USCF ID\`, \`Rating\`, \`State\`, and \`Name\`.
-Each subsequent \`<tr>\` in that table represents a player.
+Your task is to parse each line of text that represents a player. The header line, which starts with 'St USCF ID', defines the columns. The lines below the dashed line are the player data.
 
-For each player row, please extract the following details from the corresponding \`<td>\` elements:
-- \`uscfId\`: The player's 8-digit USCF ID. This will be the first column.
-- \`rating\`: The player's regular USCF rating. This is the second column. This must be a number. If the text is 'UNR' or 'Unrated', the value should be null.
-- \`state\`: The player's two-letter state abbreviation. This is the eighth column.
-- \`fullName\`: The player's name, which is in the last column inside an \`<a>\` tag. It will be in "LAST, FIRST" format.
+For each player data line, please extract the following details:
+- \`uscfId\`: The player's 8-digit USCF ID. It's the second column.
+- \`fullName\`: The player's name. It's the third column, and it's in "LAST, FIRST" format.
+- \`rating\`: The player's regular USCF rating. It's the fifth column. This must be a number. If it's blank or not a number, the value should be null.
+- \`state\`: The player's two-letter state abbreviation. It's the first column.
 
-Clean up any extra whitespace or \`&nbsp;\` from the extracted text.
+Clean up any extra whitespace from the extracted text.
 
 The final output must be a JSON object with a "players" key, which is an array of these player objects.
 
-If the HTML contains the text "No players found" or "Players found: 0", or if you cannot find any player data rows, return an empty "players" array. Do not invent any players.
+If the \`<pre>\` tag contains the text "no members were found that matched your query", return an empty "players" array. Do not invent any players.
 
-Here is an example of the HTML structure you will be parsing:
-\`\`\`html
-<center>
-  <div class='contentheading'>Player Search Results</div>
-  <FORM ACTION='./player-search.php' METHOD='GET'>
-    <table>
-      <tr><td colspan=7>Players found: 1</td></tr>
-      <tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr>
-      <tr>
-        <td valign=top>16153316 &nbsp;&nbsp;</td>
-        <td valign=top>319 &nbsp;&nbsp;</td>
-        <td valign=top>340 &nbsp;&nbsp;</td>
-        <td valign=top>Unrated &nbsp;&nbsp;</td>
-        <td valign=top>Unrated &nbsp;&nbsp;</td>
-        <td valign=top>Unrated &nbsp;&nbsp;</td>
-        <td valign=top>Unrated &nbsp;&nbsp;</td>
-        <td valign=top>TX &nbsp;&nbsp;</td>
-        <td valign=top>2025-11-30 &nbsp;&nbsp;</td>
-        <td valign=top><a href=https://www.uschess.org/msa/MbrDtlMain.php?16153316 >GUERRA, KALI RENAE</a></td>
-      </tr>
-    </table>
-  </form>
-</center>
+Here is an example of the text inside the <pre> tag:
+\`\`\`
+-----------------------------------------------------------------------------------------------------------------------------------
+ St USCF ID      Name                                     Exp Date   Rating  Status/Expire Date  Status/Expire Date  Status/Expire Date
+-----------------------------------------------------------------------------------------------------------------------------------
+ TX 16153316      GUERRA, KALI RENAE                       2025-11-30    319
 \`\`\`
 
 Based on that example, you would produce this JSON:
@@ -124,11 +105,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
     if (nameParts.length > 1 && !searchName.includes(',')) {
         const lastName = nameParts.pop();
         const firstName = nameParts.join(' ');
-        searchName = `$\{lastName}, $\{firstName}`;
+        searchName = `${lastName}, ${firstName}`;
     }
 
-    const stateParam = (state && state !== 'ALL') ? state : '';
-    const url = `https://www.uschess.org/datapage/player-search.php?name=${encodeURIComponent(searchName)}&state=${encodeURIComponent(stateParam)}&ratingmin=&ratingmax=&order=N&rating=R&mode=Find&_cacheBust=${Date.now()}`;
+    const stateParam = (state && state !== 'ALL') ? `&pstat=${encodeURIComponent(state)}` : '';
+    const url = `https://www.uschess.org/msa/MbrLst.php?FCF=${encodeURIComponent(searchName)}${stateParam}&_cacheBust=${Date.now()}`;
     
     try {
       const response = await fetch(url, {
@@ -144,8 +125,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
       
       const html = await response.text();
-
-      // The AI prompt will handle cases like "No players found", so we can remove the explicit check here.
       
       const { output } = await searchPrompt(html);
       
@@ -159,7 +138,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         // Re-format name from "LAST, FIRST" to "FIRST LAST" for display
         const nameParts = reformattedName.split(',').map(p => p.trim());
         if (nameParts.length >= 2) {
-          reformattedName = `$\{nameParts[1]} $\{nameParts[0]}`;
+          reformattedName = `${nameParts[1]} ${nameParts[0]}`;
         }
         return {
           ...player,
