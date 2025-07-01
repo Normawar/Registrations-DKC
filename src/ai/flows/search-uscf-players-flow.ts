@@ -110,17 +110,13 @@ const searchUscfPlayersFlow = ai.defineFlow(
         
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
         
-        // Player rows should have at least 10 cells. The name cell is the 10th (index 9).
-        if (cells.length < 10) {
+        // A player row must contain a link to their profile, which is the most reliable marker.
+        // It is usually in the 10th column (index 9). We check the whole row for it.
+        if (!row.includes('MbrDtlMain.php') || cells.length < 10) {
             continue;
         }
 
         const nameCellContent = cells[9];
-        // Ensure it's a player link row before proceeding
-        if (!nameCellContent || !nameCellContent.includes('MbrDtlMain.php')) {
-            continue;
-        }
-
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
         const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
