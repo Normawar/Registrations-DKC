@@ -102,42 +102,46 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
         if (cells.length === 0) continue;
 
-        let fullNameRaw = '';
+        let fullNameRaw: string | undefined;
         let rating: number | undefined;
         let playerState: string | undefined;
         let expirationDate: string | undefined;
 
-        // Find the cell that contains the name and ID to extract the full name.
-        const nameCellContent = cells.find(cell => cell.includes(uscfId));
+        // Find the cell containing the link to the player's detail page, which also contains their name.
+        const nameCellContent = cells.find(cell => cell.includes(`MbrDtlMain.php?${uscfId}`));
         if (nameCellContent) {
             fullNameRaw = stripTags(nameCellContent);
         }
-
+        
         // Iterate over ALL cells in the row to find other data points by their distinct patterns.
-        // This avoids any reliance on column order.
         for (const cell of cells) {
             const text = stripTags(cell);
 
-            // A 3 or 4 digit number is likely a rating.
-            const ratingMatch = text.match(/^\d{3,4}$/);
+            // A rating is prefixed with "R: ".
+            const ratingMatch = text.match(/R:\s*(\d{3,4})/);
             if (ratingMatch && !rating) {
-                rating = parseInt(ratingMatch[0], 10);
+                rating = parseInt(ratingMatch[1], 10);
                 continue;
             }
 
-            // A two-letter uppercase string is likely a state.
+            // An expiration date is prefixed with "Exp: ".
+            const expiresMatch = text.match(/Exp:\s*(\d{4}-\d{2}-\d{2})/);
+            if (expiresMatch && !expirationDate) {
+                expirationDate = expiresMatch[1];
+                continue;
+            }
+
+            // A two-letter uppercase string is likely a state, and it's not the name.
             const stateMatch = text.match(/^[A-Z]{2}$/);
-            if (stateMatch && !playerState) {
+            if (stateMatch && !playerState && !fullNameRaw?.includes(text)) {
                 playerState = stateMatch[0];
                 continue;
             }
-
-            // A date in YYYY-MM-DD format is the expiration date.
-            const expiresMatch = text.match(/^\d{4}-\d{2}-\d{2}$/);
-            if (expiresMatch && !expirationDate) {
-                expirationDate = expiresMatch[0];
-                continue;
-            }
+        }
+        
+        // If we couldn't find a name, we can't proceed with this row.
+        if (!fullNameRaw) {
+            continue;
         }
 
         // Parse the extracted full name into its parts.
