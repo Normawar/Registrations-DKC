@@ -49,30 +49,32 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player last name cannot be empty.' };
     }
     
-    // Use the secure HTTPS endpoint for searching.
     const baseUrl = 'https://www.uschess.org/datapage/player-search.php';
     
     const searchParams = new URLSearchParams({
         name: lastName,
-        f_name: firstName || '', // Pass first name to make search more specific
+        f_name: firstName || '',
         state: state === 'ALL' ? '' : state || '',
-        rating_op: '>', // Operator for rating
-        rating: '0',     // Rating value, > 0 to get all players
-        gender: 'B',     // Both genders
-        rating_type: 'R',// Regular rating
-        rep: 'N',        // Representative type? 'N' for none
-        sort: 'N'        // Sort by Name
+        rating_op: '>',
+        rating: '0',
+        gender: 'B',
+        rating_type: 'R',
+        rep: 'N',
+        sort: 'N'
     });
     
-    const searchUrl = `${baseUrl}?${searchParams.toString()}`;
-
     try {
-      const response = await fetch(searchUrl, {
-        cache: 'no-store',
+      const response = await fetch(baseUrl, {
+        method: 'POST',
         headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Origin': 'https://www.uschess.org',
+            'Referer': 'https://www.uschess.org/datapage/player-search.php',
         },
+        body: searchParams.toString(),
+        cache: 'no-store',
       });
 
       if (!response.ok) {
