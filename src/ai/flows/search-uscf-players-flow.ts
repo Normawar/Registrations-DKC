@@ -41,34 +41,39 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `Hey, I've got some HTML from the USCF player search results page. Can you help me pull out the player data into a JSON format?
+    prompt: `You are an expert at parsing HTML tables. Given the following HTML from the USCF player search, extract the player details into a JSON object.
 
-I'm looking for a JSON object with a single key, "players", which should be an array.
+The data for each player is in a \`<tr>\` element.
+- The 1st column (\`<td>\`) contains the USCF ID.
+- The 2nd column (\`<td>\`) contains the Full Name.
+- The 3rd column (\`<td>\`) contains the State.
+- The 4th column (\`<td>\`) contains the Rating.
 
-For each player in the main results table, I need an object with these keys:
+Create a JSON object with a "players" key, which is an array of player objects. Each object should have:
 - "uscfId" (string)
 - "fullName" (string)
-- "rating" (number or null if unrated)
-- "state" (string, the 2-letter abbreviation)
+- "rating" (number, or null if unrated/missing)
+- "state" (string)
 
-The table with the players has a header row with columns like "ID", "Name", "St", and "Reg". Just ignore everything else on the page.
-
-Here's an example of a row from the table:
+Here is an example of a row:
+\`\`\`html
 <tr><td><font face=verdana,helvetica,arial size=2>16439198</font></td><td align=left><font face=verdana,helvetica,arial size=2><a href=./MbrDtlMain.php?16439198>GUERRA, KALI ANN</a></font></td><td align=center><font face=verdana,helvetica,arial size=2>TX</font></td><td align=right><font face=verdana,helvetica,arial size=2>1084</font></td></tr>
+\`\`\`
 
-For that row, the JSON object in the "players" array should look like:
+For that row, you would produce this player object:
+\`\`\`json
 {
   "uscfId": "16439198",
   "fullName": "GUERRA, KALI ANN",
   "rating": 1084,
   "state": "TX"
 }
-
-If the HTML says "No players found" somewhere, or if you look at the table and it's empty, just return an empty "players" array.
-
-Here's the HTML. Please give me the JSON.
-
 \`\`\`
+
+If the provided HTML is empty, contains no player rows, or explicitly says "No players found", return an empty "players" array.
+
+Here is the HTML to parse:
+\`\`\`html
 {{{_input}}}
 \`\`\`
 `
@@ -116,8 +121,21 @@ const searchUscfPlayersFlow = ai.defineFlow(
       if (html.includes("No players found")) {
           return { players: [] };
       }
+      
+      // Extract just the results table to give the AI a cleaner input
+      const listStartIndex = html.indexOf('<!-- Here is the list of players -->');
+      let tableHtml = html;
 
-      const { output } = await searchPrompt(html);
+      if (listStartIndex !== -1) {
+          const tableStartIndex = html.indexOf('<table', listStartIndex);
+          const tableEndIndex = html.indexOf('</table>', tableStartIndex);
+
+          if (tableStartIndex !== -1 && tableEndIndex !== -1) {
+              tableHtml = html.substring(tableStartIndex, tableEndIndex + '</table>'.length);
+          }
+      }
+
+      const { output } = await searchPrompt(tableHtml);
       
       if (!output) {
           return { players: [], error: "AI model failed to parse the player data." };
