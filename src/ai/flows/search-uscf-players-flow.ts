@@ -87,32 +87,19 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       const players: PlayerSearchResult[] = [];
       const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
-
-      // Find the header row to know where data starts
-      const headerRowIndex = allHtmlRows.findIndex(row => 
-        row.includes("USCF ID") && 
-        row.includes("Rating") &&
-        row.includes("State") &&
-        row.includes("Name")
-      );
-
-      if (headerRowIndex === -1) {
-        console.error("USCF Search: Could not find the header row in the results table. Full response:", html.substring(0, 2000));
-        return { players: [], error: "Could not find the header row in the results table. The website layout may have changed." };
-      }
       
-      // Start processing rows after the header
-      for (let i = headerRowIndex + 1; i < allHtmlRows.length; i++) {
-        const row = allHtmlRows[i];
+      // Iterate all rows and find player rows directly by looking for the member detail link.
+      // This is more robust than trying to find a specific header row.
+      for (const row of allHtmlRows) {
+        if (!row.includes('MbrDtlMain.php?')) {
+            continue;
+        }
 
-        // Stop if we hit the footer row which contains form inputs
-        if (row.includes("Search Again") || row.includes("<input")) break;
-        
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
         
-        // A player row must contain a link to their profile, which is the most reliable marker.
-        // It is usually in the 10th column (index 9). We check the whole row for it.
-        if (!row.includes('MbrDtlMain.php') || cells.length < 10) {
+        // A valid player row should have at least 10 columns for all the data.
+        if (cells.length < 10) {
+            console.warn("USCF Search: Found a potential player row but it had fewer than 10 cells. Skipping.", row);
             continue;
         }
 
@@ -122,13 +109,15 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
         
         if (!idMatch || !idMatch[1]) {
+            console.warn("USCF Search: Found a player row but could not extract USCF ID from the link. Skipping.", nameCellContent);
             continue; 
         }
         const uscfId = idMatch[1];
         
-        const ratingStr = stripTags(cells[1]);
-        const stateAbbr = stripTags(cells[7]);
-        const expirationDateRaw = stripTags(cells[8]);
+        // Safely access cell content now that we're confident it's a player row.
+        const ratingStr = cells[1] ? stripTags(cells[1]) : '';
+        const stateAbbr = cells[7] ? stripTags(cells[7]) : '';
+        const expirationDateRaw = cells[8] ? stripTags(cells[8]) : '';
         const fullNameRaw = stripTags(nameCellContent);
         
         let parsedFirstName, parsedMiddleName, parsedLastName;
@@ -140,6 +129,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
             parsedMiddleName = firstAndMiddleParts.join(' ');
         } else {
             parsedLastName = fullNameRaw;
+            console.warn("USCF Search: Could not parse full name into parts from:", fullNameRaw);
         }
         
         const rating = ratingStr && !isNaN(parseInt(ratingStr, 10)) ? parseInt(ratingStr, 10) : undefined;
@@ -159,8 +149,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
 
       if (players.length === 0 && !html.includes("No players found")) {
-        console.error("USCF Search: Found no players, but did not see 'No players found' message. Parsing likely failed. Full response:", html.substring(0, 2000));
-        return { players: [], error: "Found a results table, but was unable to extract any player data. The website layout may have changed." };
+        console.error("USCF Search: Found no players, but did not see 'No players found' message. Parsing likely failed. Full response snippet:", html.substring(0, 3000));
+        return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
       }
       
       return { players };
