@@ -116,7 +116,15 @@ const searchUscfPlayersFlow = ai.defineFlow(
           return { players: [] };
       }
       
-      const { output } = await searchPrompt(html);
+      // Use a robust regex to find the player results table.
+      // This isolates the relevant data for the AI, reducing confusion.
+      const tableRegex = /(\<table[\s\S]*?\<tr class=["']?header["']?[\s\S]*?\<\/table\>)/i;
+      const tableMatch = html.match(tableRegex);
+
+      // If we found the table, parse it. Otherwise, parse the whole page as a fallback.
+      const contentToParse = tableMatch ? tableMatch[0] : html;
+
+      const { output } = await searchPrompt(contentToParse);
       
       if (!output) {
           return { players: [], error: "AI model failed to parse the player data." };
