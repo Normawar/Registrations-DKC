@@ -77,29 +77,21 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      const preMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
-      if (!preMatch || !preMatch[1]) {
-        console.error("USCF Search Response did not contain a <pre> block. Full response:", text.substring(0, 1000));
-        return { players: [], error: "Could not find player data block in the response. The USCF website may have changed its format." };
-      }
-      
-      const preContent = preMatch[1];
-      
-      if (preContent.includes("no members that match this criteria")) {
+      if (text.includes("no members that match this criteria")) {
         return { players: [] };
       }
 
-      if (preContent.includes("more than 100 members that match")) {
+      if (text.includes("more than 100 members that match")) {
         return { players: [], error: "Your search is too broad and returned more than 100 players. Please be more specific by adding a first name or state." };
       }
 
-      const lines = preContent.split('\n');
+      const lines = text.split('\n');
       const players: PlayerSearchResult[] = [];
       
-      // Make header check more robust to spacing changes
+      // Make header check more robust to spacing changes by searching the entire page.
       const headerIndex = lines.findIndex(line => line.includes("ID") && line.includes("Name") && line.includes("St"));
       if (headerIndex === -1) {
-          console.error("USCF Search <pre> block did not contain expected header. Content:", preContent);
+          console.error("USCF Search response did not contain expected header. Full response:", text.substring(0, 1000));
           return { players: [], error: "Could not find the player data table in the response. The USCF website format may have changed." };
       }
 

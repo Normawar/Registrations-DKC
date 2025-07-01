@@ -57,22 +57,14 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      const preMatch = text.match(/<pre>([\s\S]*?)<\/pre>/i);
-      if (!preMatch || !preMatch[1]) {
-        console.error("USCF Lookup Response did not contain a <pre> block. Full response:", text.substring(0, 1000));
-        return { error: "Could not parse player data from the USCF website. The page format may have changed." };
-      }
-      
-      const preContent = preMatch[1];
-      
-      if (preContent.includes("This player is not in our database")) {
+      if (text.includes("This player is not in our database")) {
         return { error: "Player not found with this USCF ID." };
       }
       
       const output: LookupUscfPlayerOutput = {};
       
       // Regex is more robust than substring parsing
-      const nameMatch = preContent.match(/Name\s*:\s*(.*)/);
+      const nameMatch = text.match(/Name\s*:\s*(.*)/);
       if (nameMatch && nameMatch[1]) {
         const rawName = nameMatch[1].trim();
         const nameParts = rawName.split(',');
@@ -85,17 +77,18 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         }
       }
       
-      const ratingMatch = preContent.match(/Regular:\s*(\d+)/);
+      const ratingMatch = text.match(/Regular:\s*(\d+)/);
       if (ratingMatch && ratingMatch[1]) {
         output.rating = parseInt(ratingMatch[1], 10);
       }
       
-      const expiresMatch = preContent.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
+      const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
       if (expiresMatch && expiresMatch[1]) {
         output.expirationDate = expiresMatch[1];
       }
       
       if (!output.fullName) {
+          console.error("USCF Lookup Response did not contain a name. Full response:", text.substring(0, 1000));
           return { error: "Could not parse player name from the page." };
       }
       
