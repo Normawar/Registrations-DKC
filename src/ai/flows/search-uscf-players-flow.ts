@@ -94,17 +94,26 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       for (let i = 0; i < allHtmlRows.length; i++) {
         const row = allHtmlRows[i];
+        // Header rows typically use <th> tags. This check makes the search more efficient and reliable.
+        if (!row.toLowerCase().includes('<th')) {
+            continue;
+        }
+
         const cells = row.match(/<(th|td)[^>]*>([\s\S]*?)<\/(th|td)>/gi) || [];
         const headerTexts = cells.map(stripTags);
+        const lowerHeaderTexts = headerTexts.map(h => h.toLowerCase());
         
-        // Use a more robust check for the header
-        if (headerTexts.includes('Name') && headerTexts.includes('Rating') && headerTexts.includes('State')) {
-          headerTexts.forEach((text, index) => {
-            const lowerText = text.toLowerCase();
-            if (lowerText === 'name') headerMap['name'] = index;
-            if (lowerText === 'rating') headerMap['rating'] = index;
-            if (lowerText === 'state') headerMap['state'] = index;
-            if (lowerText === 'expires') headerMap['expires'] = index;
+        // Use a more robust, case-insensitive check for the header.
+        const hasName = lowerHeaderTexts.includes('name');
+        const hasRating = lowerHeaderTexts.includes('rating');
+        const hasState = lowerHeaderTexts.includes('state');
+        
+        if (hasName && hasRating && hasState) {
+          lowerHeaderTexts.forEach((text, index) => {
+            if (text === 'name') headerMap['name'] = index;
+            if (text === 'rating') headerMap['rating'] = index;
+            if (text === 'state') headerMap['state'] = index;
+            if (text === 'expires') headerMap['expires'] = index;
           });
           headerRowIndex = i;
           break;
@@ -123,7 +132,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const row = allHtmlRows[i];
         // Stop if we hit what looks like a footer or non-data row
         if (!row.includes('MbrDtlMain.php?')) {
-            break;
+            continue;
         }
         
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
