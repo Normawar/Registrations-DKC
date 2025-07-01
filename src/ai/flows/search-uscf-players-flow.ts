@@ -91,26 +91,25 @@ const searchUscfPlayersFlow = ai.defineFlow(
       for (const row of htmlRows) {
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
 
-        // A player data row will have at least 10 columns and contain a link to the member details page in the 10th column.
-        if (cells.length < 10 || !cells[9].includes('MbrDtlMain.php')) {
-            continue;
+        const nameCellIndex = cells.findIndex(c => c.includes('MbrDtlMain.php'));
+        if (nameCellIndex === -1) {
+            continue; // Not a player row.
         }
 
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
-        // Data extraction based on the correct column order from the user's provided HTML
-        const nameCellContent = cells[9];
-        
+        const nameCellContent = cells[nameCellIndex];
         const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
+        
         if (!idMatch || !idMatch[1]) {
-            continue; // Not a valid player row if there's no USCF ID in the name link
+            continue; // Should be impossible if findIndex worked, but for safety.
         }
         const uscfId = idMatch[1];
         
-        const ratingStr = stripTags(cells[1]);
-        const stateAbbr = stripTags(cells[7]);
-        const expirationDateRaw = stripTags(cells[8]);
-        
+        // Defensively access cell data based on the expected order, allowing for missing cells.
+        const ratingStr = cells.length > 1 ? stripTags(cells[1]) : undefined;
+        const stateAbbr = cells.length > 7 ? stripTags(cells[7]) : undefined;
+        const expirationDateRaw = cells.length > 8 ? stripTags(cells[8]) : undefined;
         const fullNameRaw = stripTags(nameCellContent);
         
         let parsedFirstName, parsedMiddleName, parsedLastName;
@@ -126,7 +125,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         
         const rating = ratingStr && !isNaN(parseInt(ratingStr)) ? parseInt(ratingStr, 10) : undefined;
         
-        const expiresMatch = expirationDateRaw.match(/(\d{4}-\d{2}-\d{2})/);
+        const expiresMatch = expirationDateRaw?.match(/(\d{4}-\d{2}-\d{2})/);
         const expirationDate = expiresMatch ? expiresMatch[1] : undefined;
 
         players.push({
