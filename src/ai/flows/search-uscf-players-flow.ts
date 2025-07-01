@@ -41,27 +41,17 @@ const searchPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-pro-latest',
     input: { schema: z.string() },
     output: { schema: SearchUscfPlayersOutputSchema },
-    prompt: `You are an expert at parsing messy, real-world HTML from the USCF website. I will provide the full HTML source of a player search results page. Your task is to find the main results table and extract the player data.
+    prompt: `You are an expert at parsing messy, real-world HTML from the USCF website. I will provide the full HTML source of a player search results page.
 
-The USCF website has at least two different formats for the results table.
+Your task is to find a table containing player information. The header of this table will contain columns like "USCF ID", "Name", "Rating", and "State".
 
-Format 1 (Modern) has a header like this:
-\`<tr class="sectiontableheader"> <td>ID</td> <td align="left">Name</td> <td>St</td> <td>Rating</td> <td>Expires</td> </tr>\`
-For this format:
-- "uscfId" is in column 1.
-- "fullName" is in column 2.
-- "rating" is in column 4.
-- "state" is in column 3.
+For each row in that table representing a player, extract the following details:
+- \`uscfId\`: The player's 8-digit USCF ID.
+- \`fullName\`: The player's name. It will be in "LAST, FIRST" format. Extract it from the \`<a>\` tag if present.
+- \`rating\`: The player's regular USCF rating. This must be a number. If the text is 'UNR' or 'Unrated', the value should be null.
+- \`state\`: The player's two-letter state abbreviation.
 
-Format 2 (Legacy) has a header like this:
-\`<tr><td>USCF ID</td><td>Rating</td><td>Q Rtg</td><td>BL Rtg</td><td>OL R</td><td>OL Q</td><td>OL BL</td><td>State</td><td>Exp Date</td><td>Name</td></tr>\`
-For this format:
-- "uscfId" is in column 1.
-- "fullName" is in column 10 (inside an <a> tag).
-- "rating" is in column 2.
-- "state" is in column 8.
-
-Your task is to automatically detect which format is present in the provided HTML, and then for each data row (\`<tr>\`), extract the player details accordingly. The fullName will be in "LAST, FIRST" format. If the rating is text like 'UNR' or 'Unrated', it should be null. Please clean up any extra whitespace or '&nbsp;' from the extracted text.
+Clean up any extra whitespace or \`&nbsp;\` from the extracted text.
 
 The final output must be a JSON object with a "players" key, which is an array of these player objects.
 
@@ -92,7 +82,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
     if (nameParts.length > 1 && !searchName.includes(',')) {
         const lastName = nameParts.pop();
         const firstName = nameParts.join(' ');
-        searchName = `${lastName}, ${firstName}`;
+        searchName = `$\{lastName}, $\{firstName}`;
     }
 
     const stateParam = (state && state !== 'ALL') ? state : '';
@@ -127,7 +117,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         // Re-format name from "LAST, FIRST" to "FIRST LAST" for display
         const nameParts = reformattedName.split(',').map(p => p.trim());
         if (nameParts.length >= 2) {
-          reformattedName = `${nameParts[1]} ${nameParts[0]}`;
+          reformattedName = `$\{nameParts[1]} $\{nameParts[0]}`;
         }
         return {
           ...player,

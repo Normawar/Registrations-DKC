@@ -35,7 +35,7 @@ const lookupPrompt = ai.definePrompt({
     output: { schema: LookupUscfPlayerOutputSchema },
     prompt: `You are an expert at parsing text from HTML. I will provide the full HTML source of a USCF player detail page.
 
-Your task is to find the text content located inside the <pre> tag. Once you have that text, which is in a fixed-width format, please extract the following details and format them into a JSON object:
+Your task is to find the text content located inside the \`<pre>\` tag. The content inside is formatted as fixed-width text. Please extract the following details from that text and format them into a JSON object:
 
 - \`fullName\`: The player's name. It appears after the label "Name :".
 - \`rating\`: The player's USCF rating. It appears after the label "Rating:". This must be a number.
@@ -76,7 +76,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     if (!uscfId || !/^\d{8}$/.test(uscfId)) {
       return { error: 'Invalid USCF ID format. It must be an 8-digit number.' };
     }
-    const url = `http://msa.uschess.org/thin3.php?${uscfId}&_cacheBust=${Date.now()}`;
+    const url = `http://msa.uschess.org/thin3.php?$\{uscfId}&_cacheBust=${Date.now()}`;
     
     try {
       const response = await fetch(url, {
@@ -107,7 +107,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       if (output.fullName) {
           const nameParts = output.fullName.split(',').map(p => p.trim());
           if (nameParts.length >= 2) {
-              output.fullName = `${nameParts[1]} ${nameParts[0]}`;
+              output.fullName = `$\{nameParts[1]} $\{nameParts[0]}`;
           }
       }
 
