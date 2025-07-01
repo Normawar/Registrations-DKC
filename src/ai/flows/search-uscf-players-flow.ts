@@ -86,58 +86,31 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
 
       const players: PlayerSearchResult[] = [];
-      
-      // Isolate the form containing the results to avoid parsing the whole page.
-      const formMatch = html.match(/<FORM ACTION='.\/player-search.php' METHOD='GET'>([\s\S]*?)<\/FORM>/i);
-      if (!formMatch || !formMatch[1]) {
-          console.error("USCF Search: Could not find the results form. The website layout may have changed.");
-          return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
-      }
-      const formHtml = formMatch[1];
-      
-      // Find the header row to reliably identify the start of the data.
-      const headerRowPattern = /<tr><td>USCF ID<\/td><td>Rating<\/td>.*?<\/tr>/i;
-      const headerMatch = formHtml.match(headerRowPattern);
-
-      if (!headerMatch || typeof headerMatch.index === 'undefined') {
-          console.error("USCF Search: Could not find the header row in the results. The website layout may have changed.");
-          return { players: [], error: "Could not parse player data from the response. The website layout may have changed." };
-      }
-      
-      // Get the HTML content that comes *after* the header row.
-      const contentAfterHeader = formHtml.substring(headerMatch.index + headerMatch[0].length);
-
-      // Split the remaining content into rows. This is safer as it avoids parsing the whole document.
-      const htmlRows = contentAfterHeader.split(/<tr[^>]*>/i);
+      const htmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
 
       for (const row of htmlRows) {
-        // Stop if we hit the footer content of the table.
-        if (row.includes("Search Again") || !row.includes("<td")) {
-            break;
-        }
-
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
 
-        // Player data rows have 10 columns.
-        if (cells.length < 10) {
-          continue; // Skip any malformed or non-player data rows.
+        // A player data row will have at least 10 columns and contain a link to the member details page in the 10th column.
+        if (cells.length < 10 || !cells[9].includes('MbrDtlMain.php')) {
+            continue;
         }
 
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
         // Data extraction based on the correct column order from the user's provided HTML
-        const uscfIdCell = cells[0];
+        const nameCellContent = cells[9];
+        
+        const idMatch = nameCellContent.match(/MbrDtlMain.php\?(\d{8})/);
+        if (!idMatch || !idMatch[1]) {
+            continue; // Not a valid player row if there's no USCF ID in the name link
+        }
+        const uscfId = idMatch[1];
+        
         const ratingStr = stripTags(cells[1]);
         const stateAbbr = stripTags(cells[7]);
         const expirationDateRaw = stripTags(cells[8]);
-        const nameCellContent = cells[9];
-
-        const idMatch = uscfIdCell.match(/\d{8}/);
-        if (!idMatch) {
-            continue; // Not a valid player row if there's no USCF ID.
-        }
-        const uscfId = idMatch[0];
-
+        
         const fullNameRaw = stripTags(nameCellContent);
         
         let parsedFirstName, parsedMiddleName, parsedLastName;
