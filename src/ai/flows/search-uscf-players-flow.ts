@@ -69,6 +69,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0',
+          'Referer': 'http://msa.uschess.org/MbrLst.php',
         },
         body: searchParams.toString(),
         cache: 'no-store',
@@ -114,14 +115,17 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const ratingStr = line.substring(41, 48).trim();
 
         if (uscfId && fullNameRaw && stateAbbr) {
-            const nameParts = fullNameRaw.split(',').map((p: string) => p.trim());
-            const reformattedName = nameParts.length >= 2 
-                ? `${nameParts.slice(1).join(' ')} ${nameParts[0]}`.trim()
-                : fullNameRaw;
+            let fullName = fullNameRaw;
+            if (fullNameRaw.includes(',')) {
+              const nameParts = fullNameRaw.split(',').map((p: string) => p.trim());
+              const lastName = nameParts[0];
+              const firstName = nameParts.slice(1).join(' ');
+              fullName = `${firstName} ${lastName}`.trim();
+            }
 
             players.push({
                 uscfId,
-                fullName: reformattedName,
+                fullName: fullName,
                 state: stateAbbr,
                 rating: /^\d+$/.test(ratingStr) ? parseInt(ratingStr, 10) : undefined,
             });

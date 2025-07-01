@@ -68,13 +68,14 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = {};
       
-      const nameMatch = text.match(/Name\s*:\s*(.*?)\s{2,}/);
+      const nameMatch = text.match(/Name\s*:\s*(.*)/);
       if (nameMatch && nameMatch[1]) {
         const rawName = nameMatch[1].trim();
         const nameParts = rawName.split(',').map(p => p.trim());
         if (nameParts.length >= 2) {
-            const firstNameParts = nameParts.slice(1);
-            output.fullName = `${firstNameParts.join(' ')} ${nameParts[0]}`.trim();
+            const lastName = nameParts[0];
+            const firstName = nameParts.slice(1).join(' ');
+            output.fullName = `${firstName} ${lastName}`.trim();
         } else {
             output.fullName = rawName;
         }
