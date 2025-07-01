@@ -372,6 +372,7 @@ export default function RosterPage() {
     try {
         const result = await lookupUscfPlayer({ uscfId });
         if (result.error) {
+            console.error("USCF Lookup Error:", result.error);
             toast({ variant: "destructive", title: "Lookup Failed", description: result.error });
         } else {
             if (result.rating !== undefined) {
@@ -396,6 +397,7 @@ export default function RosterPage() {
             toast({ title: "Lookup Successful", description: `Updated details for ${[result.firstName, result.lastName].join(' ')}.` });
         }
     } catch (error) {
+        console.error("USCF Lookup Flow Error:", error);
         const description = error instanceof Error ? error.message : "An unknown error occurred.";
         toast({ variant: "destructive", title: "Lookup Failed", description });
     } finally {
@@ -465,6 +467,7 @@ export default function RosterPage() {
           const stateToSearch = searchState === 'ALL' ? '' : searchState;
           const result = await searchUscfPlayers({ firstName: searchFirstName, lastName: searchLastName, state: stateToSearch });
           if (result.error) {
+              console.error("USCF Search Error:", result.error);
               toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
           } else {
               setSearchResults(result.players);
@@ -473,6 +476,7 @@ export default function RosterPage() {
               }
           }
       } catch (e) {
+          console.error("USCF Search Flow Error:", e);
           const error = e as Error;
           toast({ variant: 'destructive', title: 'Search Error', description: error.message });
       } finally {

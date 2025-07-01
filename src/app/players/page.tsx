@@ -305,6 +305,7 @@ export default function PlayersPage() {
           const stateToSearch = searchState === 'ALL' ? '' : searchState;
           const result = await searchUscfPlayers({ firstName: searchFirstName, lastName: searchLastName, state: stateToSearch });
           if (result.error) {
+              console.error("USCF Search Error:", result.error);
               toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
           } else {
               setSearchResults(result.players);
@@ -313,6 +314,7 @@ export default function PlayersPage() {
               }
           }
       } catch (e) {
+          console.error("USCF Search Flow Error:", e);
           const error = e as Error;
           toast({ variant: 'destructive', title: 'Search Error', description: error.message });
       } finally {
