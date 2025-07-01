@@ -86,7 +86,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
 
       // Isolate the form containing the results table to avoid parsing the whole page.
-      const formContentMatch = html.match(/<form action='.\/player-search.php'[\s\S]*?>([\s\S]*?)<\/form>/i);
+      const formContentMatch = html.match(/<form[^>]*action[^>]*player-search\.php[^>]*>([\s\S]*?)<\/form>/i);
       const searchArea = formContentMatch ? formContentMatch[1] : html;
 
       const rows = searchArea.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
@@ -113,7 +113,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         
         const uscfId = idLinkMatch[1];
         
-        // Extract data based on the correct column order from the player search page.
+        // Data extraction based on the correct column order from the player search page.
         // Columns: USCF ID, Rating, Q Rtg, BL Rtg, OL R, OL Q, OL BL, State, Exp Date, Name
         const ratingStr = stripTags(cells[1]);
         const stateAbbr = stripTags(cells[7]);
