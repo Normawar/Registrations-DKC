@@ -125,7 +125,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
         const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
         
-        // Data extraction based on the correct column order.
+        // Data extraction based on the correct column order from the user's provided HTML
         const uscfIdCell = cells[0];
         const ratingStr = stripTags(cells[1]);
         const stateAbbr = stripTags(cells[7]);
