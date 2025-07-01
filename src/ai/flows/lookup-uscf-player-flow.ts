@@ -38,7 +38,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     if (!uscfId || !/^\d{8}$/.test(uscfId)) {
       return { error: 'Invalid USCF ID format. It must be an 8-digit number.' };
     }
-    const url = `http://msa.uschess.org/thin3.php?${uscfId}`;
+    const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
     
     try {
       const response = await fetch(url, {

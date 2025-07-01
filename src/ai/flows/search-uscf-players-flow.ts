@@ -50,7 +50,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
     
     // Using the simpler, more reliable text-based search page.
-    const url = 'http://msa.uschess.org/MbrLst.php';
+    const url = 'https://www.uschess.org/msa/MbrLst.php';
     const searchParams = new URLSearchParams({
         LAST: lastName,
         FIRST: firstName || '',
@@ -106,11 +106,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
         if (line.trim().length === 0 || line.length < 90) continue;
 
         try {
-          const uscfId = line.substring(2, 10).trim();
+          const uscfId = line.substring(3, 11).trim();
           if (!uscfId || !/^\d+$/.test(uscfId)) continue;
           
           const fullNameRaw = line.substring(92).trim();
-          const stateAbbr = line.substring(11, 13).trim();
+          const stateAbbr = line.substring(25, 27).trim();
           const ratingStr = line.substring(29, 38).trim().split('/')[0].trim();
           const expDateStr = line.substring(14, 24).trim();
 
