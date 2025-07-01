@@ -19,8 +19,8 @@ export type SearchUscfPlayersInput = z.infer<typeof SearchUscfPlayersInputSchema
 
 const PlayerSearchResultSchema = z.object({
   uscfId: z.string().describe("The player's 8-digit USCF ID."),
-  fullName: z.string().describe("The player's full name."),
-  rating: z.number().optional().describe("The player's regular USCF rating. Should be a number, not 'UNR' or '0' if unrated."),
+  fullName: z.string().describe("The player's full name in LAST, FIRST format."),
+  rating: z.number().optional().describe("The player's regular USCF rating. Should be a number, not 'Unrated'."),
   state: z.string().optional().describe("The player's state abbreviation."),
 });
 
@@ -36,6 +36,45 @@ export async function searchUscfPlayers(input: SearchUscfPlayersInput): Promise<
   return searchUscfPlayersFlow(input);
 }
 
+const searchPrompt = ai.definePrompt({
+    name: 'searchUscfPlayersPrompt',
+    model: 'googleai/gemini-1.5-pro-latest',
+    input: { schema: z.string() },
+    output: { schema: SearchUscfPlayersOutputSchema },
+    prompt: `You are an expert at parsing HTML tables. I will provide the HTML source code of a USCF player search results page.
+
+Your task is to find the table containing the player search results. The table header row contains columns like "USCF ID", "Rating", "State", and "Name".
+For each player row *after* the header, extract the following details and format them into a JSON object:
+
+- \`uscfId\`: The player's 8-digit USCF ID. This is in the first column.
+- \`fullName\`: The player's name as it appears in the "Name" column.
+- \`rating\`: The player's USCF rating from the "Rating" column. This is the second column. This must be a number. If the rating is "Unrated", omit this field.
+- \`state\`: The player's state abbreviation from the "State" column.
+
+If the HTML contains the text "Total players found: 0", return an empty array for the "players" field.
+
+Example of a player row in the HTML table:
+\`\`\`html
+<tr><td valign=top>16153316 &nbsp;&nbsp;</td><td valign=top>319 &nbsp;&nbsp;</td><td valign=top>340 &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>Unrated &nbsp;&nbsp;</td><td valign=top>TX &nbsp;&nbsp;</td><td valign=top>2025-11-30 &nbsp;&nbsp;</td><td valign=top><a href=...>GUERRA, KALI RENAE</a></td></tr>
+\`\`\`
+
+Based on that example row, you would produce this JSON object inside the "players" array:
+{
+  "uscfId": "16153316",
+  "fullName": "GUERRA, KALI RENAE",
+  "rating": 319,
+  "state": "TX"
+}
+
+Now, please parse the full HTML source code provided below.
+
+\`\`\`html
+{{{_input}}}
+\`\`\`
+`
+});
+
+
 const searchUscfPlayersFlow = ai.defineFlow(
   {
     name: 'searchUscfPlayersFlow',
@@ -47,51 +86,61 @@ const searchUscfPlayersFlow = ai.defineFlow(
       return { players: [], error: 'Player name cannot be empty.' };
     }
     
-    // This new URL returns JSON, which is much more reliable than parsing HTML.
-    const url = 'https://new.uschess.org/civicrm/player/search/results?reset=1&force=1';
+    // Use the older but more consistent HTML search page
+    const searchParams = new URLSearchParams({
+        name: name,
+        rating: 'R', // Search for regular ratings
+    });
+    if (state && state !== 'ALL') {
+        searchParams.append('state', state);
+    }
+    
+    const url = `http://www.uschess.org/msa/player-search.php?${searchParams.toString()}&_cacheBust=${Date.now()}`;
     
     try {
-      const searchParams = new URLSearchParams();
-      searchParams.append('player_name', name);
-      if (state && state !== 'ALL') {
-          searchParams.append('state[]', state);
-      }
-
       const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json, text/javascript, */*; q=0.01',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest', // Tells the server we want a data response (JSON)
-        },
-        body: searchParams.toString(),
         cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+          Expires: '0',
+        },
       });
 
       if (!response.ok) {
-        return { players: [], error: `Failed to fetch from USCF API. Status: ${response.status}` };
+        return { players: [], error: `Failed to fetch from USCF website. Status: ${response.status}` };
       }
       
-      const data = await response.json();
+      const html = await response.text();
       
-      if (!data || !data.records) {
-          return { players: [], error: "Received invalid data from the USCF API." };
+      if (html.includes("Total players found: 0")) {
+        return { players: [] };
       }
 
-      const players: PlayerSearchResult[] = data.records.map((record: any) => {
-        // Re-format name from "LAST, FIRST MIDDLE" to "FIRST MIDDLE LAST"
-        const nameParts = record.sort_name.split(',').map((p: string) => p.trim());
+      const { output } = await searchPrompt(html);
+
+      if (!output) {
+          return { players: [], error: "AI model failed to parse the player data." };
+      }
+      
+      if (output.error) {
+          return { players: [], error: output.error };
+      }
+
+      if (output.players.length === 0 && !html.includes("Total players found: 0")) {
+        console.warn("AI returned no players, but the page does not explicitly state '0 players found'. Possible parsing issue.");
+        return { players: [], error: "No players found matching your criteria." };
+      }
+      
+      const players: PlayerSearchResult[] = output.players.map(player => {
+        const nameParts = player.fullName.split(',').map((p: string) => p.trim());
         const reformattedName = nameParts.length >= 2
           ? `${nameParts[1]} ${nameParts[0]}`
-          : record.sort_name;
-        
-        const rating = record.uscf_rating ? parseInt(record.uscf_rating, 10) : undefined;
+          : player.fullName;
         
         return {
-          uscfId: record.uscf_id,
+          ...player,
           fullName: reformattedName,
-          rating: isNaN(rating) ? undefined : rating,
-          state: state && state !== 'ALL' ? state : record.state_province_abbreviation, // Use input state or abbreviation if available
         };
       });
       
@@ -100,6 +149,10 @@ const searchUscfPlayersFlow = ai.defineFlow(
     } catch (error) {
       console.error("Error in searchUscfPlayersFlow:", error);
       if (error instanceof Error) {
+        // Avoid exposing JSON parsing errors to the user if the server sends HTML unexpectedly
+        if (error.message.toLowerCase().includes('json')) {
+            return { players: [], error: `Received an unexpected response from the server. Please try again.` };
+        }
         return { players: [], error: `An unexpected error occurred: ${error.message}` };
       }
       return { players: [], error: 'An unexpected error occurred during the search.' };
