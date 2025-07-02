@@ -17,25 +17,30 @@ export type ImportedPlayer = {
   quickRating?: string;
 };
 
-// In-memory cache to avoid storage quotas and repeated parsing.
-// This variable acts as a singleton for the browser session.
-let masterPlayerDatabase: ImportedPlayer[] | null = null;
+// To prevent the in-memory database from being cleared on hot-reloads in development,
+// we store it on the globalThis object.
+declare global {
+  // eslint-disable-next-line no-var
+  var masterPlayerDatabase: ImportedPlayer[] | undefined;
+}
+
+// If the global store doesn't exist, initialize it as an empty array.
+// On subsequent hot-reloads, this check will fail, preserving the existing data.
+if (!globalThis.masterPlayerDatabase) {
+    globalThis.masterPlayerDatabase = [];
+}
+
 
 export const getMasterDatabase = (): ImportedPlayer[] => {
-    // If the cache has been initialized, return it.
-    if (masterPlayerDatabase !== null) {
-        return masterPlayerDatabase;
-    }
-    // If not, initialize it as an empty array and return it.
-    masterPlayerDatabase = [];
-    return masterPlayerDatabase;
+    // The store is guaranteed to be an array by the initialization logic above.
+    return globalThis.masterPlayerDatabase!;
 };
 
 export const setMasterDatabase = (players: ImportedPlayer[]) => {
-  masterPlayerDatabase = players;
+  globalThis.masterPlayerDatabase = players;
 };
 
 export const isMasterDatabaseLoaded = (): boolean => {
-    // The database is considered loaded if the in-memory cache is not null and has players.
-    return masterPlayerDatabase !== null && masterPlayerDatabase.length > 0;
+    // The database is loaded if the global array has items in it.
+    return globalThis.masterPlayerDatabase!.length > 0;
 };

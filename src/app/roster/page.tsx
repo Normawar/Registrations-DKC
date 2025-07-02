@@ -226,7 +226,7 @@ export default function RosterPage() {
     if (masterDb.length === 0) return ['ALL'];
     const states = new Set(masterDb.map(p => p.state).filter(Boolean) as string[]);
     return ['ALL', ...Array.from(states).sort()];
-  }, [isDbLoaded]); // Re-calculate when DB status changes
+  }, [isDbLoaded]);
 
   // Debounced search for the master database
   useEffect(() => {
@@ -254,22 +254,16 @@ export default function RosterPage() {
     return () => clearTimeout(handler);
   }, [searchQuery, searchState]);
   
-  // This effect runs whenever the dialog is opened/closed
+  // This effect checks DB status on mount and listens for updates from other pages
   useEffect(() => {
-      if (isDialogOpen) {
-          setIsDbLoaded(isMasterDatabaseLoaded());
-      }
-  }, [isDialogOpen]);
-  
-  // This effect listens for the global event from the All Players page
-  useEffect(() => {
-      const handleDbUpdate = () => {
-          setIsDbLoaded(isMasterDatabaseLoaded());
-      };
-      window.addEventListener('masterDbUpdated', handleDbUpdate);
-      return () => {
-          window.removeEventListener('masterDbUpdated', handleDbUpdate);
-      };
+    const updateDbStatus = () => setIsDbLoaded(isMasterDatabaseLoaded());
+    
+    updateDbStatus(); // Initial check on mount
+    window.addEventListener('masterDbUpdated', updateDbStatus);
+    
+    return () => {
+      window.removeEventListener('masterDbUpdated', updateDbStatus);
+    };
   }, []);
 
   const handleSelectDbPlayer = (player: ImportedPlayer) => {
@@ -704,7 +698,7 @@ export default function RosterPage() {
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder={isDbLoaded ? "Search..." : "Please upload database on All Players page"}
+                                placeholder={isDbLoaded ? "Search..." : 'Upload DB on "All Players" page'}
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className="pl-10"
@@ -1079,5 +1073,3 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
-
-    
