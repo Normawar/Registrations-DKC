@@ -209,114 +209,148 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    toast({ title: 'Import Started', description: 'Processing database file. The page may become temporarily unresponsive.' });
-
-    type ParsedRow = {
-        uscfId: string,
-        firstName: string,
-        lastName: string,
-        middleName?: string,
-        expirationDate?: string,
-        state?: string,
-        regularRating?: number,
-        quickRating?: string
-    };
-
-    const dbMap = new Map<string, MasterPlayer>(masterDatabase.map(p => [p.uscfId, p]));
-    let errorCount = 0;
-    let processedCount = 0;
+    let importToastId: string | null = null;
+    toast({
+        title: 'Import Started',
+        description: 'Your database file is being uploaded and processed...',
+    });
 
     Papa.parse(file, {
-      worker: true,
-      delimiter: "\t",
-      skipEmptyLines: true,
-      step: (results) => {
-        try {
-            processedCount++;
-            const row = results.data as string[];
-            if (!row || row.length < 2) return;
+        worker: true,
+        delimiter: "\t",
+        skipEmptyLines: true,
+        complete: (results) => {
+            const rows = results.data as string[][];
+            const dbMap = new Map<string, MasterPlayer>(masterDatabase.map(p => [p.uscfId, p]));
+            const CHUNK_SIZE = 5000;
+            let currentIndex = 0;
+            let errorCount = 0;
+
+            function processChunk() {
+                const chunkEnd = Math.min(currentIndex + CHUNK_SIZE, rows.length);
+                for (let i = currentIndex; i < chunkEnd; i++) {
+                    try {
+                        const row = rows[i];
+                        if (!row || row.length < 2) continue;
+                        
+                        const uscfId = row[1]?.trim();
+                        if (!uscfId || !/^\d{8}$/.test(uscfId)) continue;
             
-            const uscfId = row[1]?.trim();
-            if (!uscfId || !/^\d{8}$/.test(uscfId)) return;
-
-            const namePart = row[0]?.trim();
-            if (!namePart) { errorCount++; return; }
-
-            let lastName = '', firstName = '', middleName = '';
-            if (namePart.includes(',')) {
-                const parts = namePart.split(',');
-                lastName = parts[0].trim();
-                const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
-                if (firstAndMiddle.length > 0) firstName = firstAndMiddle.shift() || '';
-                if (firstAndMiddle.length > 0) middleName = firstAndMiddle.join(' ');
-            } else {
-                const parts = namePart.split(/\s+/).filter(Boolean);
-                if (parts.length > 0) lastName = parts.pop()!;
-                if (parts.length > 0) firstName = parts.shift()!;
-                if (parts.length > 0) middleName = parts.join(' ');
-            }
-
-            if (!lastName && !firstName) { errorCount++; return; }
-          
-            const expirationDateStr = row[2] || '';
-            const state = row[3] || '';
-            const regularRatingString = row[4] || '';
-            const quickRatingString = row[5] || '';
+                        const namePart = row[0]?.trim();
+                        if (!namePart) { errorCount++; continue; }
             
-            let regularRating: number | undefined = undefined;
-            if (regularRatingString) {
-                const ratingMatch = regularRatingString.match(/^(\d+)/);
-                if (ratingMatch && ratingMatch[1]) { regularRating = parseInt(ratingMatch[1], 10); }
-            }
-
-            const importedPlayer: ParsedRow = { uscfId, firstName: firstName || '', lastName, middleName: middleName || undefined, expirationDate: expirationDateStr, state, regularRating, quickRating: quickRatingString || undefined };
+                        let lastName = '', firstName = '', middleName = '';
+                        if (namePart.includes(',')) {
+                            const parts = namePart.split(',');
+                            lastName = parts[0].trim();
+                            const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
+                            if (firstAndMiddle.length > 0) firstName = firstAndMiddle.shift() || '';
+                            if (firstAndMiddle.length > 0) middleName = firstAndMiddle.join(' ');
+                        } else {
+                            const parts = namePart.split(/\s+/).filter(Boolean);
+                            if (parts.length > 0) lastName = parts.pop()!;
+                            if (parts.length > 0) firstName = parts.shift()!;
+                            if (parts.length > 0) middleName = parts.join(' ');
+                        }
             
-            const existingPlayer = dbMap.get(importedPlayer.uscfId);
-            if (existingPlayer) {
-                existingPlayer.firstName = importedPlayer.firstName || existingPlayer.firstName;
-                existingPlayer.lastName = importedPlayer.lastName || existingPlayer.lastName;
-                existingPlayer.middleName = importedPlayer.middleName;
-                existingPlayer.state = importedPlayer.state;
-                existingPlayer.expirationDate = importedPlayer.expirationDate;
-                existingPlayer.regularRating = importedPlayer.regularRating;
-                existingPlayer.quickRating = importedPlayer.quickRating;
-                dbMap.set(importedPlayer.uscfId, existingPlayer);
-            } else {
-                const newPlayer: MasterPlayer = {
-                    ...importedPlayer,
-                    id: `p-${importedPlayer.uscfId}`,
-                    school: "Independent",
-                    district: "None",
-                    events: 0,
-                    eventIds: [],
-                };
-                dbMap.set(importedPlayer.uscfId, newPlayer);
-            }
+                        if (!lastName && !firstName) { errorCount++; continue; }
+                      
+                        const expirationDateStr = row[2] || '';
+                        const state = row[3] || '';
+                        const regularRatingString = row[4] || '';
+                        const quickRatingString = row[5] || '';
+                        
+                        let regularRating: number | undefined = undefined;
+                        if (regularRatingString) {
+                            const ratingMatch = regularRatingString.match(/^(\d+)/);
+                            if (ratingMatch && ratingMatch[1]) { regularRating = parseInt(ratingMatch[1], 10); }
+                        }
+            
+                        const existingPlayer = dbMap.get(uscfId);
+                        if (existingPlayer) {
+                            existingPlayer.firstName = firstName || existingPlayer.firstName;
+                            existingPlayer.lastName = lastName || existingPlayer.lastName;
+                            existingPlayer.middleName = middleName;
+                            existingPlayer.state = state;
+                            existingPlayer.expirationDate = expirationDateStr;
+                            existingPlayer.regularRating = regularRating;
+                            existingPlayer.quickRating = quickRatingString || undefined;
+                            dbMap.set(uscfId, existingPlayer);
+                        } else {
+                            const newPlayer: MasterPlayer = {
+                                id: `p-${uscfId}`,
+                                uscfId: uscfId,
+                                firstName: firstName || '',
+                                lastName: lastName,
+                                middleName: middleName || undefined,
+                                state: state,
+                                expirationDate: expirationDateStr,
+                                regularRating: regularRating,
+                                quickRating: quickRatingString || undefined,
+                                school: "Independent",
+                                district: "None",
+                                events: 0,
+                                eventIds: [],
+                            };
+                            dbMap.set(uscfId, newPlayer);
+                        }
+                    } catch (e) {
+                        console.error("Error parsing a player row:", rows[i], e);
+                        errorCount++;
+                    }
+                }
 
-        } catch (e) {
-          console.error("Error parsing a player row:", results.data, e);
-          errorCount++;
+                currentIndex += CHUNK_SIZE;
+
+                if (currentIndex < rows.length) {
+                    const progress = Math.round((currentIndex / rows.length) * 100);
+                    if (importToastId) {
+                      toast.update(importToastId, {
+                        title: 'Importing...',
+                        description: `Processing database... ${progress}% complete.`,
+                      });
+                    } else {
+                      const { id } = toast({
+                        title: 'Importing...',
+                        description: `Processing database... ${progress}% complete.`,
+                      });
+                      importToastId = id;
+                    }
+                    setTimeout(processChunk, 0); // Yield to the browser
+                } else {
+                    const newMasterList = Array.from(dbMap.values());
+                    setDatabase(newMasterList);
+                    
+                    setIsImporting(false);
+                    
+                    let description = `Database updated. Processed ${rows.length} records. The database now contains ${newMasterList.length} unique players.`;
+                    if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
+                    
+                    if (importToastId) {
+                      toast.update(importToastId, {
+                        title: 'Import Complete',
+                        description: description,
+                      });
+                    } else {
+                      toast({
+                        title: 'Import Complete',
+                        description: description,
+                        duration: 5000,
+                      });
+                    }
+                }
+            }
+            
+            processChunk();
+        },
+        error: (error: any) => {
+            setIsImporting(false);
+            toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
         }
-      },
-      complete: () => {
-        const newMasterList = Array.from(dbMap.values());
-        setDatabase(newMasterList);
-        
-        setIsImporting(false);
-        
-        let description = `Database updated. Processed ${processedCount} records. The database now contains ${newMasterList.length} unique players.`;
-        if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
-        
-        toast({ title: 'Import Complete', description, duration: 5000 });
-      },
-      error: (error: any) => {
-        setIsImporting(false);
-        toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
-      }
     });
 
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+        fileInputRef.current.value = '';
     }
   };
 
@@ -674,5 +708,3 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
-
-    
