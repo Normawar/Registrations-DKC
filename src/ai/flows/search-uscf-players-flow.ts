@@ -11,6 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { lookupUscfPlayer } from './lookup-uscf-player-flow';
+import { parseThin3Page } from '@/lib/actions/uscf-parser';
 
 const SearchUscfPlayersInputSchema = z.object({
   firstName: z.string().optional().describe("The player's first name."),
@@ -64,7 +65,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
     params.append('psubmit', 'Search');
 
     try {
-      // Step 1: Fetch the search results page.
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -96,43 +96,59 @@ const searchUscfPlayersFlow = ai.defineFlow(
         if (match[1]) ids.add(match[1]);
       }
       
-      // Strategy 2: If no list was found, it might be a single player page.
-      if (ids.size === 0) {
-        // Try to find an ID from a MbrDtlMain.php title format
-        const singleResultMatch = html.match(/<b>(\d{8}):\s*.*?<\/b>/i);
-        if (singleResultMatch && singleResultMatch[1]) {
-            ids.add(singleResultMatch[1]);
-        }
-        // Also check if it's a thin3.php page redirect
-        else if (html.includes("<h2>USCF Member Lookup</h2>")) {
-            const idMatch = html.match(/name=memid[^>]*value='(\d{8})'/i);
-            if (idMatch && idMatch[1]) {
-                ids.add(idMatch[1]);
-            }
-        }
+      // If we found IDs from a list, look them up and return.
+      if (ids.size > 0) {
+        const playerLookupPromises = Array.from(ids).map(uscfId => lookupUscfPlayer({ uscfId }));
+        const lookupResults = await Promise.all(playerLookupPromises);
+        
+        const players: PlayerSearchResult[] = lookupResults
+          .filter(p => !p.error && p.uscfId) // Filter out any failed lookups
+          .map(p => ({
+              uscfId: p.uscfId!,
+              firstName: p.firstName,
+              middleName: p.middleName,
+              lastName: p.lastName,
+              rating: p.rating,
+              state: p.state,
+              expirationDate: p.expirationDate,
+          }));
+        
+        return { players };
       }
 
-      if (ids.size === 0) {
-        return { players: [], error: "Found a results page, but was unable to extract any player IDs. The website layout may have changed." };
+      // If no list was found, it might be a single player page (MbrDtlMain.php or thin3.php).
+      // We can parse the data directly from this page.
+      const idMatch = html.match(/<b>(\d{8}):\s*.*?<\/b>/i);
+      const uscfId = idMatch ? idMatch[1] : null;
+
+      if (uscfId) {
+        // This is a MbrDtlMain.php page, let's try to parse it directly.
+        const parsedData = await parseThin3Page(html, uscfId);
+        if (parsedData.error) {
+            // Fallback to just doing a lookup if parsing fails.
+             const lookupResult = await lookupUscfPlayer({ uscfId });
+             if (lookupResult.error) {
+                 return { players: [], error: lookupResult.error };
+             }
+             return { players: [lookupResult as PlayerSearchResult] };
+        }
+        return { players: [parsedData as PlayerSearchResult] };
       }
 
-      // Step 3: Look up each unique ID using the dedicated lookup flow.
-      const playerLookupPromises = Array.from(ids).map(uscfId => lookupUscfPlayer({ uscfId }));
-      const lookupResults = await Promise.all(playerLookupPromises);
-      
-      const players: PlayerSearchResult[] = lookupResults
-        .filter(p => !p.error && p.uscfId) // Filter out any failed lookups
-        .map(p => ({
-            uscfId: p.uscfId!,
-            firstName: p.firstName,
-            middleName: p.middleName,
-            lastName: p.lastName,
-            rating: p.rating,
-            state: p.state,
-            expirationDate: p.expirationDate,
-        }));
-      
-      return { players };
+      // Final check: if we're on a thin3.php page directly
+      if (html.includes("<h2>USCF Member Lookup</h2>")) {
+          const idFromInput = html.match(/name=memid[^>]*value='(\d{8})'/i);
+          if (idFromInput && idFromInput[1]) {
+             const parsedData = await parseThin3Page(html, idFromInput[1]);
+              if (parsedData.error) {
+                  return { players: [], error: parsedData.error };
+              }
+              return { players: [parsedData as PlayerSearchResult] };
+          }
+      }
+
+      // If we still haven't found anything, then the layout has likely changed.
+      return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
 
     } catch (error) {
       console.error("Error in searchUscfPlayersFlow:", error);
