@@ -85,7 +85,17 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
       
-      const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      // Isolate the form containing the results table to avoid parsing other tables on the page.
+      const formRegex = /<FORM ACTION='\.\/player-search\.php'[\s\S]*?<\/FORM>/i;
+      const formMatch = html.match(formRegex);
+
+      if (!formMatch) {
+        console.error("USCF Search: Could not find the results form container. The website layout may have changed.");
+        return { players: [], error: "Could not find the results form container. The website layout may have changed." };
+      }
+      
+      const formHtml = formMatch[0];
+      const allHtmlRows = formHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const players: PlayerSearchResult[] = [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
