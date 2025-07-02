@@ -91,85 +91,69 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const players: PlayerSearchResult[] = [];
 
       for (const row of allHtmlRows) {
-        // Identify a player row by looking for the unique link pattern. This is the most reliable anchor.
+        // A player row is identifiable by the unique link pattern. This is the most reliable anchor.
         const idMatch = row.match(/MbrDtlMain\.php\?([^"&']+)/);
         if (!idMatch || !idMatch[1]) {
-            continue; // This is not a player row, skip it.
+            continue; // This is not a player row (e.g., header, spacer), skip it.
         }
         const uscfId = idMatch[1];
         
-        // Now that we have a player row, extract all its cells and parse them defensively.
         const cells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
         if (cells.length === 0) continue;
 
-        let fullNameRaw: string | undefined;
-        let rating: number | undefined;
-        let playerState: string | undefined;
-        let expirationDate: string | undefined;
+        const player: Partial<PlayerSearchResult> = { uscfId };
 
-        // Find the cell containing the link to the player's detail page, which also contains their name.
-        const nameCellContent = cells.find(cell => cell.includes(`MbrDtlMain.php?${uscfId}`));
-        if (nameCellContent) {
-            fullNameRaw = stripTags(nameCellContent);
-        }
-        
-        // Iterate over ALL cells in the row to find other data points by their distinct patterns.
+        // Iterate over ALL cells to find data points by their distinct patterns.
+        // This is safer than assuming column order.
         for (const cell of cells) {
             const text = stripTags(cell);
 
-            // A rating is prefixed with "R: ". This handles regular, provisional (e.g. "P1200"), and unrated statuses.
-            if (text.startsWith('R:') && rating === undefined) {
-                const ratingText = text.substring(2).trim();
-                const numericPartMatch = ratingText.match(/^P?(\d+)/);
-                if (numericPartMatch && numericPartMatch[1]) {
-                    rating = parseInt(numericPartMatch[1], 10);
+            // Check for Name from the cell containing the link
+            if (cell.includes(`MbrDtlMain.php?${uscfId}`)) {
+                const fullNameRaw = stripTags(cell);
+                const nameParts = fullNameRaw.split(',');
+                if (nameParts.length > 1) {
+                    player.lastName = nameParts.shift()!.trim();
+                    const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
+                    player.firstName = firstAndMiddleParts.shift() || '';
+                    player.middleName = firstAndMiddleParts.join(' ');
+                } else {
+                    player.lastName = fullNameRaw;
                 }
                 continue;
             }
-
-            // An expiration date is prefixed with "Exp: ".
-            const expiresMatch = text.match(/Exp:\s*(\d{4}-\d{2}-\d{2})/);
-            if (expiresMatch && expirationDate === undefined) {
-                expirationDate = expiresMatch[1];
-                continue;
+            
+            // Check for Rating: number, P-number, or number/number
+            const mainRatingPart = text.split('/')[0].trim();
+            const ratingMatch = mainRatingPart.match(/^P?(\d+)$/);
+            if (ratingMatch && player.rating === undefined) {
+                // To avoid confusing ID with rating, check if the raw cell text is just a number.
+                // The ID column is just a number, the rating column might have "/games" or be "Unrated".
+                // This heuristic is not perfect but helps. A more complex solution would map headers.
+                if(text.includes('/') || text.toUpperCase().startsWith('P') || !/^\d+$/.test(text) || text !== uscfId) {
+                   player.rating = parseInt(ratingMatch[1], 10);
+                   continue;
+                }
             }
 
-            // A two-letter uppercase string is likely a state.
+            // Check for State
             const stateMatch = text.match(/^[A-Z]{2}$/);
-            if (stateMatch && playerState === undefined) {
-                playerState = stateMatch[0];
+            if (stateMatch && player.state === undefined) {
+                player.state = stateMatch[0];
+                continue;
+            }
+            
+            // Check for Expiration Date
+            const expiresMatch = text.match(/^\d{4}-\d{2}-\d{2}$/);
+            if (expiresMatch && player.expirationDate === undefined) {
+                player.expirationDate = expiresMatch[0];
                 continue;
             }
         }
         
-        // If we couldn't find a name, we can't proceed with this row.
-        if (!fullNameRaw) {
-            continue;
-        }
-
-        // Parse the extracted full name into its parts.
-        let parsedFirstName, parsedMiddleName, parsedLastName;
-        const nameParts = fullNameRaw.split(',');
-        if (nameParts.length > 1) {
-            parsedLastName = nameParts.shift()!.trim();
-            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
-            parsedFirstName = firstAndMiddleParts.shift() || '';
-            parsedMiddleName = firstAndMiddleParts.join(' ');
-        } else {
-            parsedLastName = fullNameRaw;
-        }
-
         // Only add the player if we successfully parsed at least a last name.
-        if (parsedLastName) {
-            players.push({
-                uscfId,
-                firstName: parsedFirstName,
-                lastName: parsedLastName,
-                middleName: parsedMiddleName,
-                state: playerState,
-                rating: rating,
-                expirationDate: expirationDate,
-            });
+        if (player.lastName) {
+            players.push(player as PlayerSearchResult);
         }
       }
 
