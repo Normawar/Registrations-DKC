@@ -89,12 +89,13 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const players: PlayerSearchResult[] = [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-      // Find the index of the header row using the exact content provided by the user.
-      const headerRowIndex = allHtmlRows.findIndex(row => 
-          row.includes("<td>USCF ID</td>") &&
-          row.includes("<td>Rating</td>") &&
-          row.includes("<td>Name</td>")
-      );
+      // Find the index of the header row using case-insensitive checks.
+      const headerRowIndex = allHtmlRows.findIndex(row => {
+          const lowerCaseRow = row.toLowerCase();
+          return lowerCaseRow.includes("<td>uscf id</td>") &&
+                 lowerCaseRow.includes("<td>rating</td>") &&
+                 lowerCaseRow.includes("<td>name</td>");
+      });
 
       if (headerRowIndex === -1) {
           console.error("USCF Search: Could not find the results table header. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
@@ -116,11 +117,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
         // Extract Name and USCF ID from the link in column 9.
         const nameCellContent = cells[9];
-        const linkMatch = nameCellContent.match(/<a href=["']?https:\/\/www\.uschess\.org\/msa\/MbrDtlMain\.php\?(\d+)["']?\s*>([\s\S]+?)<\/a>/i);
+        const linkMatch = nameCellContent.match(/<a href=["']?https?:\/\/www\.uschess\.org\/msa\/MbrDtlMain\.php\?(\d+)["']?\s*>/i);
         
         if (linkMatch) {
             player.uscfId = linkMatch[1];
-            const fullNameRaw = stripTags(linkMatch[2]); // e.g., "CASTILLO, COSME"
+            const fullNameRaw = stripTags(nameCellContent); // e.g., "CASTILLO, COSME"
             const nameParts = fullNameRaw.split(',');
             if (nameParts.length > 1) {
                 player.lastName = nameParts.shift()!.trim();
@@ -177,3 +178,5 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
   }
 );
+
+    
