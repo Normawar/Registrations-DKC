@@ -262,26 +262,45 @@ export default function RosterPage() {
             let errorCountInChunk = 0;
             for (let i = currentIndex; i < endIndex; i++) {
                 const row = rows[i] as string[];
-                if (!row || !Array.isArray(row)) { errorCountInChunk++; continue; }
+                
+                if (!row || !Array.isArray(row) || row.length < 6) {
+                    continue;
+                }
                 const uscfId = row[1]?.trim();
-                if (!uscfId || !/^\d{8}$/.test(uscfId)) continue;
-                const namePart = row[0]?.trim();
-                if (!namePart) { errorCountInChunk++; continue; }
+                if (!uscfId || !/^\d{8}$/.test(uscfId)) {
+                    continue;
+                }
+
                 try {
+                    const namePart = row[0]?.trim();
+                    if (!namePart) {
+                        errorCountInChunk++;
+                        continue;
+                    }
+                    
                     let lastName = '', firstName = '', middleName = '';
                     if (namePart.includes(',')) {
                         const parts = namePart.split(',');
                         lastName = parts[0]?.trim() || '';
                         const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
-                        if (firstAndMiddle.length > 0) firstName = firstAndMiddle.shift() || '';
-                        if (firstAndMiddle.length > 0) middleName = firstAndMiddle.join(' ');
+                        firstName = firstAndMiddle.shift() || '';
+                        middleName = firstAndMiddle.join(' ') || '';
                     } else {
                         const parts = namePart.split(/\s+/).filter(Boolean);
-                        if (parts.length > 0) lastName = parts.pop() || '';
-                        if (parts.length > 0) firstName = parts.shift() || '';
-                        if (parts.length > 0) middleName = parts.join(' ');
+                        lastName = parts.pop() || '';
+                        firstName = parts.shift() || '';
+                        middleName = parts.join(' ') || '';
                     }
-                    if (!firstName || !lastName) { errorCountInChunk++; continue; }
+
+                    if (!firstName && lastName) {
+                        firstName = lastName;
+                        lastName = '(No Last Name)';
+                    }
+                    
+                    if (!firstName) {
+                        errorCountInChunk++;
+                        continue;
+                    }
                     
                     const expirationDateStr = row[2] || '';
                     const state = row[3] || '';
@@ -300,7 +319,10 @@ export default function RosterPage() {
                         quickRating: quickRatingString || undefined,
                     };
                     dbMap.set(uscfId, playerRecord);
-                } catch (e) { console.error("Error parsing a valid player row:", row, e); errorCountInChunk++; }
+                } catch (e) { 
+                    console.error("Error parsing a valid player row:", row, e); 
+                    errorCountInChunk++; 
+                }
             }
             totalErrorCount += errorCountInChunk;
             currentIndex = endIndex;
