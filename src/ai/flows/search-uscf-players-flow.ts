@@ -85,98 +85,55 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      const allTables = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi) || [];
-      const resultsTableHtml = allTables.find(table => table.includes('MbrDtlMain.php'));
-
-      if (!resultsTableHtml) {
-          console.error("USCF Search: Could not find the main results table container. The website layout may have changed.");
-          return { players: [], error: "Could not find the main results table container. The website layout may have changed." };
-      }
-      
-      const allHtmlRows = resultsTableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
-      const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-      
+      const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const players: PlayerSearchResult[] = [];
-      let headerMap: Record<string, number> | null = null;
-      
+      const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+
       for (const row of allHtmlRows) {
-        // Use more specific, case-sensitive text to identify the exact header row
-        if (row.includes('>USCF ID<') && row.includes('>Rating<') && row.includes('>Name<')) {
-            headerMap = {};
-            const headerCells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
-            headerCells.forEach((cell, index) => {
-                const cleanHeader = stripTags(cell).toLowerCase();
-                if (cleanHeader.includes('uscf id')) headerMap!['uscfid_col'] = index;
-                if (cleanHeader === 'rating') headerMap!['rating'] = index;
-                if (cleanHeader === 'state') headerMap!['state'] = index;
-                if (cleanHeader.includes('exp date')) headerMap!['expirationdate'] = index;
-                if (cleanHeader === 'name') headerMap!['name'] = index;
-            });
-            break; 
-        }
-      }
-
-      if (!headerMap) {
-        console.error("USCF Search: Could not find the results table header. The website layout may have changed. Full response snippet:", resultsTableHtml.substring(0, 2000));
-        return { players: [], error: "Could not find the results table header. The website layout may have changed." };
-      }
-      
-      for (const row of allHtmlRows) {
-        const idMatch = row.match(/MbrDtlMain\.php\?(\d+)/);
-        if (!idMatch) {
-            continue; // Skip header and footer rows
-        }
-
-        const cells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
-        if (cells.length < Object.keys(headerMap).length) continue;
-
-        const player: Partial<PlayerSearchResult> = {};
+        const linkMatch = row.match(/<a href=["']?https:\/\/www\.uschess\.org\/msa\/MbrDtlMain\.php\?(\d+)["']?\s*>([\s\S]+?)<\/a>/i);
         
-        if (headerMap.name !== undefined && cells[headerMap.name]) {
-            const nameCell = cells[headerMap.name];
-            const linkMatch = nameCell.match(/<a href=["'][^"']+?\?(\d+)["']>([\s\S]+?)<\/a>/);
-            if (linkMatch && linkMatch[1] && linkMatch[2]) {
-                player.uscfId = linkMatch[1];
-                const fullNameRaw = stripTags(linkMatch[2]); // Format: LAST, FIRST MIDDLE
-                const nameParts = fullNameRaw.split(',');
-                if (nameParts.length > 1) {
-                    player.lastName = nameParts.shift()!.trim();
-                    const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
-                    player.firstName = firstAndMiddleParts.shift() || '';
-                    player.middleName = firstAndMiddleParts.join(' ');
-                } else {
-                    player.lastName = fullNameRaw;
-                }
-            }
-        }
-        
-        if (!player.uscfId && headerMap.uscfid_col !== undefined && cells[headerMap.uscfid_col]) {
-            player.uscfId = stripTags(cells[headerMap.uscfid_col]);
-        }
-        
-        if (!player.uscfId) {
+        if (!linkMatch) {
             continue;
         }
 
-        if (headerMap.rating !== undefined && cells[headerMap.rating]) {
-            const ratingText = stripTags(cells[headerMap.rating]);
-            if (ratingText.toLowerCase() !== 'unrated') {
-                const numericPartMatch = ratingText.match(/(\d+)/);
-                if (numericPartMatch && numericPartMatch[1]) {
-                    player.rating = parseInt(numericPartMatch[1], 10);
-                }
+        const uscfId = linkMatch[1];
+        const fullNameRaw = stripTags(linkMatch[2]);
+        
+        const player: Partial<PlayerSearchResult> = { uscfId };
+
+        const nameParts = fullNameRaw.split(',');
+        if (nameParts.length > 1) {
+            player.lastName = nameParts.shift()!.trim();
+            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
+            player.firstName = firstAndMiddleParts.shift() || '';
+            player.middleName = firstAndMiddleParts.join(' ');
+        } else {
+            player.lastName = fullNameRaw;
+        }
+
+        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+        const cellData = cells.map(stripTags);
+        
+        if (cellData.length < 9) {
+            continue;
+        }
+        
+        const ratingText = cellData[1];
+        if (ratingText && ratingText.toLowerCase() !== 'unrated') {
+            const numericPartMatch = ratingText.match(/(\d+)/);
+            if (numericPartMatch && numericPartMatch[1]) {
+                player.rating = parseInt(numericPartMatch[1], 10);
             }
         }
 
-        if (headerMap.state !== undefined && cells[headerMap.state]) {
-            player.state = stripTags(cells[headerMap.state]);
+        const stateText = cellData[7];
+        if (stateText && /^[A-Z]{2}$/.test(stateText)) {
+            player.state = stateText;
         }
         
-        if (headerMap.expirationdate !== undefined && cells[headerMap.expirationdate]) {
-            const dateText = stripTags(cells[headerMap.expirationdate]);
-            if (/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
-                player.expirationDate = dateText;
-            }
+        const dateText = cellData[8];
+        if (dateText && /^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+            player.expirationDate = dateText;
         }
         
         if (player.uscfId && player.lastName) {
