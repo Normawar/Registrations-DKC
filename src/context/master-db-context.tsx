@@ -97,8 +97,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     try {
         await tx.store.clear();
-        await Promise.all(players.map(player => tx.store.add(player)));
-        await tx.done;
+        // Instead of Promise.all, which creates a massive array of promises,
+        // we add players sequentially within the same transaction.
+        // The idb library efficiently queues these operations.
+        for (const player of players) {
+            tx.store.add(player);
+        }
+        await tx.done; // The transaction commits here.
         
         console.log("IndexedDB update complete.");
         setInternalDatabase(players);
