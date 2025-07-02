@@ -1,8 +1,9 @@
 
 'use client';
 
-// This store for the large USCF database uses sessionStorage to persist across a session.
-// It is cleared when the session ends (e.g., tab is closed).
+// This store for the large USCF database uses an in-memory variable to persist across a session.
+// It is cleared when the session ends (e.g., tab is hard-refreshed or closed).
+// This avoids browser storage limitations (like sessionStorage's 5-10MB quota).
 
 export type ImportedPlayer = {
   id: string; // A unique ID generated during import
@@ -16,63 +17,27 @@ export type ImportedPlayer = {
   quickRating?: string;
 };
 
-// In-memory cache to avoid repeated sessionStorage access and parsing
+// In-memory cache to avoid storage quotas and repeated parsing.
+// This variable acts as a singleton for the browser session.
 let masterPlayerDatabase: ImportedPlayer[] | null = null;
-const SESSION_STORAGE_KEY = 'master_player_db';
 
 export const getMasterDatabase = (): ImportedPlayer[] => {
-    // If we have a cached version, return it
+    // If the cache has been initialized, return it.
     if (masterPlayerDatabase !== null) {
         return masterPlayerDatabase;
     }
-
-    // If not cached, try to load from sessionStorage
-    try {
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-            const storedData = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-            if (storedData) {
-                masterPlayerDatabase = JSON.parse(storedData);
-                return masterPlayerDatabase!;
-            }
-        }
-    } catch (e) {
-        console.error("Failed to get master database from sessionStorage", e);
-        masterPlayerDatabase = []; // Reset on error
-        return [];
-    }
-
-    // If nothing in storage, initialize and return empty array
+    // If not, initialize it as an empty array and return it.
     masterPlayerDatabase = [];
     return masterPlayerDatabase;
 };
 
 export const setMasterDatabase = (players: ImportedPlayer[]) => {
   masterPlayerDatabase = players;
-  try {
-      if (typeof window !== 'undefined' && window.sessionStorage) {
-          window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(players));
-      }
-  } catch (e) {
-      console.error("Failed to set master database in sessionStorage", e);
-      // This might happen if storage is full. The in-memory cache will still work for the current page.
-  }
+  // No-op for storage, as we are intentionally avoiding it to prevent quota errors.
+  // The data now lives exclusively in the 'masterPlayerDatabase' variable for the session.
 };
 
 export const isMasterDatabaseLoaded = (): boolean => {
-    // Check cache first
-    if (masterPlayerDatabase !== null) {
-        return masterPlayerDatabase.length > 0;
-    }
-    
-    // Fallback to check sessionStorage directly
-    try {
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-            const storedData = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
-            return !!storedData && JSON.parse(storedData).length > 0;
-        }
-    } catch (e) {
-        console.error("Failed to check master database in sessionStorage", e);
-    }
-    
-    return false;
+    // The database is considered loaded if the in-memory cache is not null and has players.
+    return masterPlayerDatabase !== null && masterPlayerDatabase.length > 0;
 };
