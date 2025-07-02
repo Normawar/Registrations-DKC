@@ -32,6 +32,8 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
+  Search,
+  Info
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -50,6 +52,11 @@ import {
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog';
+import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+} from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -179,9 +186,27 @@ export default function RosterPage() {
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
+
+  const [masterPlayers, setMasterPlayers] = useState<any[]>([]);
+  const [searchName, setSearchName] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchWarning, setSearchWarning] = useState('');
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
+
+  useEffect(() => {
+    try {
+        const stored = localStorage.getItem('all_players_master_db');
+        if (stored) {
+            setMasterPlayers(JSON.parse(stored));
+        }
+    } catch (e) {
+        console.error("Failed to load master player DB", e);
+        setMasterPlayers([]);
+    }
+  }, []);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -202,6 +227,62 @@ export default function RosterPage() {
       studentType: undefined,
     }
   });
+
+  const watchFirstName = form.watch('firstName');
+  const watchLastName = form.watch('lastName');
+  const activeFieldNameRef = useRef<'firstName' | 'lastName' | null>(null);
+
+  useEffect(() => {
+    if (!showSearchResults) return;
+    const query = `${watchFirstName} ${watchLastName}`.trim().toLowerCase();
+
+    if (query.length < 3) {
+      setSearchResults([]);
+      return;
+    }
+
+    const filteredPlayers = masterPlayers.filter(p =>
+      (`${p.firstName} ${p.lastName}`.toLowerCase().includes(query)) ||
+      (`${p.lastName} ${p.firstName}`.toLowerCase().includes(query))
+    );
+    setSearchResults(filteredPlayers);
+    
+    // Check for duplicates
+    const nameStateCounts = new Map<string, number>();
+    let warning = '';
+    filteredPlayers.forEach(p => {
+        const key = `${p.firstName}|${p.lastName}|${p.state}`.toLowerCase();
+        nameStateCounts.set(key, (nameStateCounts.get(key) || 0) + 1);
+    });
+
+    for (const count of nameStateCounts.values()) {
+        if (count > 1) {
+            warning = 'Multiple players with the same name and state found. Please verify the correct player on the USCF website before adding.';
+            break;
+        }
+    }
+    setSearchWarning(warning);
+
+  }, [watchFirstName, watchLastName, masterPlayers, showSearchResults]);
+
+  const handleSelectSearchedPlayer = (player: any) => {
+    form.reset(); 
+    form.setValue('firstName', player.firstName || '');
+    form.setValue('lastName', player.lastName || '');
+    form.setValue('middleName', player.middleName || '');
+    form.setValue('uscfId', player.uscfId || '');
+    form.setValue('regularRating', player.regularRating);
+    form.setValue('quickRating', player.quickRating || '');
+    
+    if (player.expirationDate) {
+        const expDate = parse(player.expirationDate, 'MM/dd/yyyy', new Date());
+        if (isValid(expDate)) {
+            form.setValue('uscfExpiration', expDate);
+        }
+    }
+    
+    setShowSearchResults(false);
+  };
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...players];
@@ -586,19 +667,79 @@ export default function RosterPage() {
           <DialogHeader>
             <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
             <DialogDescription>
-              {editingPlayer ? 'Update the player details below.' : 'Fill in the form to add a new player to your roster.'}
+              {editingPlayer ? 'Update the player details below.' : 'Search the master database or fill in the form to add a new player to your roster.'}
             </DialogDescription>
           </DialogHeader>
+          
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <FormField control={form.control} name="firstName" render={({ field }) => (
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+                 <FormField control={form.control} name="firstName" render={({ field }) => (
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
-                    <FormControl><Input placeholder="John" {...field} /></FormControl>
+                    <FormControl>
+                        <Input 
+                            placeholder="John" 
+                            {...field} 
+                            onFocus={() => {
+                                activeFieldNameRef.current = 'firstName';
+                                setShowSearchResults(true);
+                            }}
+                            onBlur={() => setTimeout(() => {
+                                if (activeFieldNameRef.current === 'firstName') setShowSearchResults(false)
+                            }, 200)}
+                        />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
-                )} />
+                 )} />
+                 <FormField control={form.control} name="lastName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                        <Input 
+                            placeholder="Doe" 
+                            {...field}
+                             onFocus={() => {
+                                activeFieldNameRef.current = 'lastName';
+                                setShowSearchResults(true);
+                            }}
+                            onBlur={() => setTimeout(() => {
+                                if (activeFieldNameRef.current === 'lastName') setShowSearchResults(false)
+                            }, 200)}
+                        />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                 )} />
+                {showSearchResults && searchResults.length > 0 && (
+                    <Card className="absolute z-10 w-full mt-1 top-full max-h-60 overflow-y-auto col-span-full">
+                        <CardContent className="p-0">
+                            {searchResults.map(player => (
+                                <button
+                                    key={player.id}
+                                    type="button"
+                                    className="w-full text-left p-2 hover:bg-accent rounded-md"
+                                    onMouseDown={() => handleSelectSearchedPlayer(player)}
+                                >
+                                    <p className="font-medium">{player.firstName} {player.lastName} ({player.state})</p>
+                                    <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'N/A'}</p>
+                                </button>
+                            ))}
+                        </CardContent>
+                    </Card>
+                )}
+               </div>
+                {searchWarning && (
+                    <Alert variant="destructive">
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>Potential Duplicate</AlertTitle>
+                        <AlertDescription>{searchWarning}</AlertDescription>
+                    </Alert>
+                )}
+
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <FormField control={form.control} name="middleName" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Middle Name (Optional)</FormLabel>
@@ -606,15 +747,6 @@ export default function RosterPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="lastName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl><Input placeholder="Doe" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="uscfId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>USCF ID</FormLabel>
@@ -647,6 +779,8 @@ export default function RosterPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
                   name="dob"

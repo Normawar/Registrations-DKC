@@ -67,14 +67,31 @@ import { schoolData } from '@/lib/data/school-data';
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const initialPlayersData = [
-  { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", regularRating: 1850, quickRating: '1900/10', school: "Independent", district: "None", events: 2, eventIds: ['e2'] },
-  { id: "p2", firstName: "Olivia", middleName: "K", lastName: "Smith", uscfId: "87654321", regularRating: 2100, quickRating: '2120/5', school: "City Chess Club", district: "None", events: 3, eventIds: ['e1', 'e3'] },
-  { id: "p3", firstName: "Noah", middleName: "L", lastName: "Williams", uscfId: "11223344", regularRating: 1600, quickRating: '1650/12', school: "Scholastic Stars", district: "None", events: 1, eventIds: ['e1'] },
-  { id: "p4", firstName: "Emma", middleName: "M", lastName: "Brown", uscfId: "44332211", regularRating: 1950, quickRating: '2000/20', school: "Independent", district: "None", events: 1, eventIds: ['e2'] },
-  { id: "p5", firstName: "James", middleName: "N", lastName: "Jones", uscfId: "55667788", regularRating: 2200, quickRating: '2250/15', school: "Grandmasters Inc.", district: "None", events: 4, eventIds: ['e1', 'e2', 'e3'] },
-  { id: "p6", firstName: "Alex", middleName: "S", lastName: "Ray", uscfId: "98765432", regularRating: 1750, quickRating: '1780/8', school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 2, eventIds: ['e1'] },
-  { id: "p7", firstName: "Jordan", middleName: "T", lastName: "Lee", uscfId: "23456789", regularRating: 2050, quickRating: '2080/7', school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 3, eventIds: ['e1', 'e2'] },
+type Player = {
+  id: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  uscfId: string;
+  regularRating?: number;
+  quickRating?: string;
+  school: string;
+  district: string;
+  events: number;
+  eventIds: string[];
+  expirationDate?: string;
+  state?: string;
+};
+
+
+const initialPlayersData: Player[] = [
+  { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", regularRating: 1850, quickRating: '1900/10', school: "Independent", district: "None", events: 2, eventIds: ['e2'], expirationDate: '12/31/2025', state: 'TX' },
+  { id: "p2", firstName: "Olivia", middleName: "K", lastName: "Smith", uscfId: "87654321", regularRating: 2100, quickRating: '2120/5', school: "City Chess Club", district: "None", events: 3, eventIds: ['e1', 'e3'], expirationDate: '06/30/2026', state: 'CA' },
+  { id: "p3", firstName: "Noah", middleName: "L", lastName: "Williams", uscfId: "11223344", regularRating: 1600, quickRating: '1650/12', school: "Scholastic Stars", district: "None", events: 1, eventIds: ['e1'], expirationDate: '01/01/2025', state: 'NY' },
+  { id: "p4", firstName: "Emma", middleName: "M", lastName: "Brown", uscfId: "44332211", regularRating: 1950, quickRating: '2000/20', school: "Independent", district: "None", events: 1, eventIds: ['e2'], expirationDate: '03/15/2025', state: 'FL' },
+  { id: "p5", firstName: "James", middleName: "N", lastName: "Jones", uscfId: "55667788", regularRating: 2200, quickRating: '2250/15', school: "Grandmasters Inc.", district: "None", events: 4, eventIds: ['e1', 'e2', 'e3'], expirationDate: '11/20/2024', state: 'IL' },
+  { id: "p6", firstName: "Alex", middleName: "S", lastName: "Ray", uscfId: "98765432", regularRating: 1750, quickRating: '1780/8', school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 2, eventIds: ['e1'], expirationDate: '08/01/2025', state: 'TX' },
+  { id: "p7", firstName: "Jordan", middleName: "T", lastName: "Lee", uscfId: "23456789", regularRating: 2050, quickRating: '2080/7', school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 3, eventIds: ['e1', 'e2'], expirationDate: '09/09/2024', state: 'TX' },
 ];
 
 const allEvents = [
@@ -83,7 +100,7 @@ const allEvents = [
   { id: 'e3', name: 'Autumn Classic' },
 ];
 
-type Player = typeof initialPlayersData[0];
+
 type SortableColumnKey = 'name' | 'uscfId' | 'regularRating' | 'school' | 'district' | 'events';
 
 const playerFormSchema = z.object({
@@ -265,8 +282,10 @@ export default function PlayersPage() {
 
             const namePart = row[0];
             const uscfId = row[1];
+            const expirationDateStr = row[2];
+            const state = row[3];
             const regularRatingString = row[4];
-            const quickRatingString = row[5] || ''; // rating2 is optional
+            const quickRatingString = row[5] || '';
 
             if (!namePart || !uscfId) {
                 errorCount++;
@@ -303,6 +322,8 @@ export default function PlayersPage() {
               firstName: firstName,
               lastName: lastName,
               middleName: middleName || undefined,
+              expirationDate: expirationDateStr,
+              state: state,
               regularRating: regularRating,
               quickRating: quickRatingString,
               school: 'Independent',
