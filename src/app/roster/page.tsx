@@ -97,6 +97,7 @@ import { useRoster, type Player } from '@/hooks/use-roster';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Label } from '@/components/ui/label';
 import { getMasterDatabase, isMasterDatabaseLoaded, type ImportedPlayer } from '@/lib/data/master-player-store';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
@@ -195,6 +196,7 @@ export default function RosterPage() {
   const [searchState, setSearchState] = useState('ALL');
   const [dbSearchResults, setDbSearchResults] = useState<ImportedPlayer[]>([]);
   const [isDbSearching, setIsDbSearching] = useState(false);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -218,14 +220,13 @@ export default function RosterPage() {
       studentType: undefined,
     }
   });
-
+  
   const uniqueStates = useMemo(() => {
-    if (!isDialogOpen) return ['ALL'];
     const masterDb = getMasterDatabase();
     if (masterDb.length === 0) return ['ALL'];
     const states = new Set(masterDb.map(p => p.state).filter(Boolean) as string[]);
     return ['ALL', ...Array.from(states).sort()];
-  }, [isDialogOpen]);
+  }, [isDbLoaded]); // Re-calculate when DB status changes
 
   // Debounced search for the master database
   useEffect(() => {
@@ -252,6 +253,24 @@ export default function RosterPage() {
 
     return () => clearTimeout(handler);
   }, [searchQuery, searchState]);
+  
+  // This effect runs whenever the dialog is opened/closed
+  useEffect(() => {
+      if (isDialogOpen) {
+          setIsDbLoaded(isMasterDatabaseLoaded());
+      }
+  }, [isDialogOpen]);
+  
+  // This effect listens for the global event from the All Players page
+  useEffect(() => {
+      const handleDbUpdate = () => {
+          setIsDbLoaded(isMasterDatabaseLoaded());
+      };
+      window.addEventListener('masterDbUpdated', handleDbUpdate);
+      return () => {
+          window.removeEventListener('masterDbUpdated', handleDbUpdate);
+      };
+  }, []);
 
   const handleSelectDbPlayer = (player: ImportedPlayer) => {
     form.reset(); // Clear previous form state
@@ -669,12 +688,10 @@ export default function RosterPage() {
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr] gap-4 items-end">
-                    <div>
+                    <div className="space-y-2">
                         <Label>State</Label>
-                        <Select value={searchState} onValueChange={setSearchState} disabled={!isMasterDatabaseLoaded()}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select State" />
-                            </SelectTrigger>
+                        <Select value={searchState} onValueChange={setSearchState} disabled={!isDbLoaded}>
+                            <SelectTrigger><SelectValue placeholder="Select State" /></SelectTrigger>
                             <SelectContent>
                                 {uniqueStates.map(state => (
                                     <SelectItem key={state} value={state}>{state}</SelectItem>
@@ -682,16 +699,16 @@ export default function RosterPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div>
+                    <div className='space-y-2'>
                         <Label>Player Name or USCF ID</Label>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder={isMasterDatabaseLoaded() ? "Search..." : "Please upload database on All Players page"}
+                                placeholder={isDbLoaded ? "Search..." : "Please upload database on All Players page"}
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className="pl-10"
-                                disabled={!isMasterDatabaseLoaded()}
+                                disabled={!isDbLoaded}
                             />
                         </div>
                     </div>
@@ -702,7 +719,8 @@ export default function RosterPage() {
                             {isDbSearching ? (<div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>)
                             : dbSearchResults.length === 0 ? (<div className="p-2 text-center text-sm text-muted-foreground">No results found.</div>)
                             : (
-                                dbSearchResults.map(p => (
+                                <>
+                                {dbSearchResults.map(p => (
                                     <button
                                         key={p.id}
                                         type="button"
@@ -712,7 +730,17 @@ export default function RosterPage() {
                                         <p className="font-medium">{p.firstName} {p.lastName} ({p.state})</p>
                                         <p className="text-sm text-muted-foreground">ID: {p.uscfId} | Rating: {p.regularRating || 'N/A'}</p>
                                     </button>
-                                ))
+                                ))}
+                                {dbSearchResults.length > 1 && (
+                                    <Alert variant="default" className="mt-2">
+                                        <Info className="h-4 w-4" />
+                                        <AlertTitle>Multiple Results</AlertTitle>
+                                        <AlertDescription>
+                                            Multiple players match this name. Please verify the correct player on the official USCF website if needed.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+                                </>
                             )}
                         </CardContent>
                     </Card>
@@ -1052,3 +1080,4 @@ export default function RosterPage() {
   );
 }
 
+    

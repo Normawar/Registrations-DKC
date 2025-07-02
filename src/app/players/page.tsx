@@ -355,6 +355,9 @@ export default function PlayersPage() {
         setMasterDatabase(newMasterList);
         
         setIsImporting(false);
+        // Dispatch a global event to notify other components (like Roster)
+        window.dispatchEvent(new Event('masterDbUpdated'));
+        
         let description = `Database updated with ${importedPlayers.length} records. The database now contains ${newMasterList.length} unique players for this session.`;
         if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
         
@@ -722,3 +725,5 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
+
+    
