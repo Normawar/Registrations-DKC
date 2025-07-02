@@ -43,17 +43,12 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       return { uscfId: '', error: 'A USCF ID must be provided.' };
     }
     
-    // Use MbrDtlMain.php as it's the canonical source page.
-    const url = `https://www.uschess.org/msa/MbrDtlMain.php?${uscfId}`;
+    // Use thin3.php as it's a more stable, data-focused endpoint.
+    const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
     
     try {
       const response = await fetch(url, {
         cache: 'no-store',
-        headers: {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
-        }
       });
 
       if (!response.ok) {
@@ -62,44 +57,47 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      if (text.includes("Invalid ID") || text.trim() === '') {
+      if (text.includes("Invalid ID") || text.trim() === '' || !text.includes("USCF Member Lookup")) {
         return { uscfId, error: "Player not found with this USCF ID." };
       }
       
       const output: LookupUscfPlayerOutput = { uscfId };
 
-      // Helper to clean up extracted text by removing HTML entities and extra whitespace
-      const cleanText = (str: string) => str.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      // Helper function to extract the value from an input tag
+      const extractInputValue = (html: string, name: string): string | null => {
+        const regex = new RegExp(`name=${name}[^>]*value='([^']*)'`, 'i');
+        const match = html.match(regex);
+        return match ? match[1].trim() : null;
+      };
 
-      // Extract Name from title: <font size=+1><b>16153316: KALI RENAE GUERRA</b></font>
-      const nameIdMatch = text.match(/<font size=\+1><b>\d+:\s*([^<]+)<\/b><\/font>/i);
-      if (nameIdMatch && nameIdMatch[1]) {
-          const nameParts = cleanText(nameIdMatch[1]).split(' ');
+      // Extract Full Name
+      const fullName = extractInputValue(text, 'memname');
+      if (fullName) {
+          const nameParts = fullName.split(' ').filter(p => p);
           output.lastName = nameParts.pop() || '';
           output.firstName = nameParts.shift() || '';
           output.middleName = nameParts.join(' ');
       }
 
-      // Extract Regular Rating from: Regular Rating ... <b><nobr>319&nbsp;&nbsp;2024-02</nobr></b>
-      const ratingMatch = text.match(/Regular Rating[\s\S]*?<b><nobr>([^<]+)<\/nobr><\/b>/i);
-      if (ratingMatch && ratingMatch[1]) {
-        const ratingText = cleanText(ratingMatch[1]);
-        const numericRating = ratingText.match(/^(\d+)/); // Get leading digits
-        if (numericRating && numericRating[1]) {
-          output.rating = parseInt(numericRating[1], 10);
-        }
+      // Extract State
+      const state = extractInputValue(text, 'state_country');
+      if (state) {
+        output.state = state;
       }
 
-      // Extract Expiration Date from: Expiration Dt. ... <td><b>2025-11-30</b></td>
-      const expirationMatch = text.match(/Expiration Dt\.[\s\S]*?<td><b>([\d-]+)<\/b><\/td>/i);
-      if (expirationMatch && expirationMatch[1]) {
-        output.expirationDate = cleanText(expirationMatch[1]);
+      // Extract Membership Expiration Date
+      const expirationDate = extractInputValue(text, 'memexpdt');
+      if (expirationDate) {
+        output.expirationDate = expirationDate;
       }
-      
-      // Extract State from: State ... <td><b> TX </b></td>
-      const stateMatch = text.match(/State[\s\S]*?<td><b>([^<]+)<\/b><\/td>/i);
-      if (stateMatch && stateMatch[1]) {
-        output.state = cleanText(stateMatch[1]);
+
+      // Extract Regular Rating
+      const ratingString = extractInputValue(text, 'rating1');
+      if (ratingString && ratingString.toLowerCase() !== 'unrated') {
+        const ratingMatch = ratingString.match(/^(\d+)/);
+        if (ratingMatch && ratingMatch[1]) {
+          output.rating = parseInt(ratingMatch[1], 10);
+        }
       }
       
       if (!output.lastName && !output.firstName) {
