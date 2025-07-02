@@ -33,8 +33,10 @@ export const getMasterDatabase = (): ImportedPlayer[] => {
 
 export const setMasterDatabase = (players: ImportedPlayer[]) => {
   masterPlayerDatabase = players;
-  // No-op for storage, as we are intentionally avoiding it to prevent quota errors.
-  // The data now lives exclusively in the 'masterPlayerDatabase' variable for the session.
+  // Notify other parts of the app that the database has been updated.
+  if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('masterDbUpdated'));
+  }
 };
 
 export const isMasterDatabaseLoaded = (): boolean => {

@@ -221,22 +221,17 @@ export default function RosterPage() {
   });
 
   useEffect(() => {
+    // Initial check
     setMasterDbLoaded(isMasterDatabaseLoaded());
 
-    const handleStorageChange = () => {
+    // Listener for updates within the same tab/session
+    const handleMasterDbUpdate = () => {
         setMasterDbLoaded(isMasterDatabaseLoaded());
     };
-    
-    // Custom event listener for same-tab updates
-    const handleMasterDbUpdate = () => {
-        handleStorageChange();
-    };
 
-    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('masterDbUpdated', handleMasterDbUpdate);
     
     return () => {
-        window.removeEventListener('storage', handleStorageChange);
         window.removeEventListener('masterDbUpdated', handleMasterDbUpdate);
     };
   }, []);
@@ -264,11 +259,8 @@ export default function RosterPage() {
 
         const lowerCaseQuery = searchQuery.toLowerCase();
         const results = masterDb.filter(p => {
-            if (p.uscfId.toLowerCase().includes(lowerCaseQuery)) {
-                return true;
-            }
             const fullName = [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ').toLowerCase();
-            return fullName.includes(lowerCaseQuery);
+            return fullName.includes(lowerCaseQuery) || p.uscfId.toLowerCase().includes(lowerCaseQuery);
         }).slice(0, 10);
         setDbSearchResults(results);
         setIsDbSearching(false);
@@ -690,10 +682,7 @@ export default function RosterPage() {
             <CardHeader>
                 <CardTitle className="text-base">Master Database Search</CardTitle>
                 <CardDescription>
-                  {masterDbLoaded 
-                    ? "Search by state and name/USCF ID to auto-fill player data."
-                    : <>To enable player search, first go to the <Link href="/players" className="underline font-medium">All Players</Link> page and upload the database file.</>
-                  }
+                  Search the database by state and name/USCF ID to auto-fill player data.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -716,7 +705,7 @@ export default function RosterPage() {
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search..."
+                                placeholder={masterDbLoaded ? "Search..." : "Please upload database first"}
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className="pl-10"
