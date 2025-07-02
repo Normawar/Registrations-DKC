@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF MSA website.
@@ -91,10 +90,9 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const players: PlayerSearchResult[] = [];
 
       for (const row of allHtmlRows) {
-        // A player row is identifiable by the unique link pattern. This is the most reliable anchor.
         const idMatch = row.match(/MbrDtlMain\.php\?([^"&']+)/);
         if (!idMatch || !idMatch[1]) {
-            continue; // This is not a player row (e.g., header, spacer), skip it.
+            continue;
         }
         const uscfId = idMatch[1];
         
@@ -103,13 +101,9 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
         const player: Partial<PlayerSearchResult> = { uscfId };
 
-        // Iterate over ALL cells to find data points by their distinct patterns.
-        // This is safer than assuming column order.
         for (const cell of cells) {
-            const text = stripTags(cell);
-
-            // Check for Name from the cell containing the link
-            if (cell.includes(`MbrDtlMain.php?${uscfId}`)) {
+            // First, find and parse the name from the cell containing the unique link.
+            if (cell.includes(`MbrDtlMain.php?${uscfId}`) && player.lastName === undefined) {
                 const fullNameRaw = stripTags(cell);
                 const nameParts = fullNameRaw.split(',');
                 if (nameParts.length > 1) {
@@ -120,28 +114,27 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 } else {
                     player.lastName = fullNameRaw;
                 }
-            }
-            
-            // Check for a rating. A rating is a number, possibly with extra text (e.g., "/13", "(P6)").
-            // It extracts the first number found in the cell's text.
-            const ratingMatch = text.match(/(\d+)/);
-            if (ratingMatch && ratingMatch[0] && player.rating === undefined) {
-              // Heuristic to avoid confusing an ID with a rating. A cell with just a number that matches the ID is almost certainly the ID column.
-              if (text !== uscfId) {
-                player.rating = parseInt(ratingMatch[0], 10);
-              }
+                // Once name is found, we don't need to process this cell for other patterns.
+                continue; 
             }
 
-            // Check for State
-            const stateMatch = text.match(/^[A-Z]{2}$/);
-            if (stateMatch && player.state === undefined) {
-                player.state = stateMatch[0];
+            const text = stripTags(cell);
+            if (!text) continue;
+
+            // Use specific, full-match regexes to avoid ambiguity.
+            // Check for most unique patterns first.
+            if (player.expirationDate === undefined && /^\d{4}-\d{2}-\d{2}$/.test(text)) {
+                player.expirationDate = text;
+                continue;
             }
-            
-            // Check for Expiration Date
-            const expiresMatch = text.match(/^\d{4}-\d{2}-\d{2}$/);
-            if (expiresMatch && player.expirationDate === undefined) {
-                player.expirationDate = expiresMatch[0];
+            if (player.state === undefined && /^[A-Z]{2}$/.test(text)) {
+                player.state = text;
+                continue;
+            }
+            // Check for rating last, as it's the least unique pattern.
+            if (player.rating === undefined && /^\d{1,4}$/.test(text)) {
+                player.rating = parseInt(text, 10);
+                continue;
             }
         }
         
