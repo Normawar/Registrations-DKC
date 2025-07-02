@@ -82,9 +82,14 @@ const lookupUscfPlayerFlow = ai.defineFlow(
           output.lastName = rawName;
       }
       
-      const ratingMatch = text.match(/Regular:\s*(\d+)/);
-      if (ratingMatch && ratingMatch[1]) {
-        output.rating = parseInt(ratingMatch[1], 10);
+      const ratingLineMatch = text.match(/Regular:\s*(.*)/);
+      if (ratingLineMatch && ratingLineMatch[1]) {
+        const ratingText = ratingLineMatch[1].trim();
+        // This regex handles normal ratings (e.g. "1818"), ratings with provisional info ("829 / P6"), and provisional-only ratings ("P1200").
+        const numericPartMatch = ratingText.match(/^P?(\d+)/);
+        if (numericPartMatch && numericPartMatch[1]) {
+            output.rating = parseInt(numericPartMatch[1], 10);
+        }
       }
       
       const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);

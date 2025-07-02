@@ -117,10 +117,13 @@ const searchUscfPlayersFlow = ai.defineFlow(
         for (const cell of cells) {
             const text = stripTags(cell);
 
-            // A rating is prefixed with "R: ". Use a more flexible digit match.
-            const ratingMatch = text.match(/R:\s*(\d+)/);
-            if (ratingMatch && rating === undefined) {
-                rating = parseInt(ratingMatch[1], 10);
+            // A rating is prefixed with "R: ". This handles regular, provisional (e.g. "P1200"), and unrated statuses.
+            if (text.startsWith('R:') && rating === undefined) {
+                const ratingText = text.substring(2).trim();
+                const numericPartMatch = ratingText.match(/^P?(\d+)/);
+                if (numericPartMatch && numericPartMatch[1]) {
+                    rating = parseInt(numericPartMatch[1], 10);
+                }
                 continue;
             }
 
