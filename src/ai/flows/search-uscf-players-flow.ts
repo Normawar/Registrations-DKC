@@ -11,7 +11,6 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { lookupUscfPlayer } from './lookup-uscf-player-flow';
-import { parseThin3Page } from '@/lib/actions/uscf-parser';
 
 const SearchUscfPlayersInputSchema = z.object({
   firstName: z.string().optional().describe("The player's first name."),
@@ -88,80 +87,52 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
       
-      // Step 2: Try to find multiple player IDs first
+      // Step 2: Extract all possible USCF IDs from the returned page.
       const ids = new Set<string>();
-      const multiResultMatches = html.matchAll(/MbrDtlMain\.php\?(\d+)/gi);
+
+      // Strategy 1: Find all IDs from multi-result links (e.g., MbrDtlMain.php?12345678)
+      const multiResultMatches = html.matchAll(/MbrDtlMain\.php\?(\d{8})/gi);
       for (const match of multiResultMatches) {
-        if (match[1]) {
-          ids.add(match[1]);
+        if (match[1]) ids.add(match[1]);
+      }
+      
+      // Strategy 2: If no list was found, it might be a single player page.
+      if (ids.size === 0) {
+        // Try to find an ID from a MbrDtlMain.php title format
+        const singleResultMatch = html.match(/<b>(\d{8}):\s*.*?<\/b>/i);
+        if (singleResultMatch && singleResultMatch[1]) {
+            ids.add(singleResultMatch[1]);
+        }
+        // Also check if it's a thin3.php page redirect
+        else if (html.includes("<h2>USCF Member Lookup</h2>")) {
+            const idMatch = html.match(/name=memid[^>]*value='(\d{8})'/i);
+            if (idMatch && idMatch[1]) {
+                ids.add(idMatch[1]);
+            }
         }
       }
 
-      // If we found multiple players, look them all up.
-      if (ids.size > 0) {
-        const playerLookupPromises = Array.from(ids).map(uscfId => lookupUscfPlayer({ uscfId }));
-        const lookupResults = await Promise.all(playerLookupPromises);
-        
-        const players: PlayerSearchResult[] = lookupResults
-          .filter(p => !p.error && p.uscfId)
-          .map(p => ({
-              uscfId: p.uscfId!,
-              firstName: p.firstName,
-              middleName: p.middleName,
-              lastName: p.lastName,
-              rating: p.rating,
-              state: p.state,
-              expirationDate: p.expirationDate,
-          }));
-        
-        return { players };
+      if (ids.size === 0) {
+        return { players: [], error: "Found a results page, but was unable to extract any player IDs. The website layout may have changed." };
       }
+
+      // Step 3: Look up each unique ID using the dedicated lookup flow.
+      const playerLookupPromises = Array.from(ids).map(uscfId => lookupUscfPlayer({ uscfId }));
+      const lookupResults = await Promise.all(playerLookupPromises);
       
-      // Step 3: If no multiple players found, it must be a single player page.
+      const players: PlayerSearchResult[] = lookupResults
+        .filter(p => !p.error && p.uscfId) // Filter out any failed lookups
+        .map(p => ({
+            uscfId: p.uscfId!,
+            firstName: p.firstName,
+            middleName: p.middleName,
+            lastName: p.lastName,
+            rating: p.rating,
+            state: p.state,
+            expirationDate: p.expirationDate,
+        }));
       
-      // A) Check for the simple `thin3.php` redirect format first.
-      if (html.includes("<h2>USCF Member Lookup</h2>")) {
-          const playerData = await parseThin3Page(html, '');
-          if (playerData.error) {
-              return { players: [], error: playerData.error };
-          }
-          return { players: [playerData] };
-      }
-      
-      // B) If not, it's probably the full `MbrDtlMain.php` page. Parse it directly.
-      const player: Partial<PlayerSearchResult> = {};
-
-      const nameMatch = html.match(/<b>(\d{8}):\s*([\s\S]*?)<\/b>/i);
-      if (nameMatch && nameMatch[1] && nameMatch[2]) {
-          player.uscfId = nameMatch[1];
-          const nameParts = nameMatch[2].trim().split(/\s+/);
-          player.lastName = nameParts.pop() || '';
-          player.firstName = nameParts.shift() || '';
-          if (nameParts.length > 0) {
-              player.middleName = nameParts.join(' ');
-          }
-      } else {
-          // If we can't even get the ID and name, we can't proceed.
-          console.error("USCF Search: Could not parse ID and Name from single result page.");
-          return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
-      }
-
-      const ratingMatch = html.match(/Regular Rating[\s\S]*?<b><nobr>(\d+)/i);
-      if (ratingMatch && ratingMatch[1]) {
-          player.rating = parseInt(ratingMatch[1], 10);
-      }
-
-      const stateMatch = html.match(/State[\s\S]*?<b>\s*(\w+)\s*<\/b>/i);
-      if (stateMatch && stateMatch[1]) {
-          player.state = stateMatch[1].trim();
-      }
-
-      const expMatch = html.match(/Expiration Dt\.[\s\S]*?<b>(.*?)<\/b>/i);
-      if (expMatch && expMatch[1]) {
-          player.expirationDate = expMatch[1].trim();
-      }
-
-      return { players: [player as PlayerSearchResult] };
+      return { players };
 
     } catch (error) {
       console.error("Error in searchUscfPlayersFlow:", error);
@@ -172,5 +143,3 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
   }
 );
-
-    
