@@ -113,7 +113,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       if (ids.size === 0) {
         // Fallback for MbrDtlMain.php single result redirect (less common)
-        const detailPageIdMatch = html.match(/<font size=\+1><b>(\d+):/i);
+        const detailPageIdMatch = html.match(/<font[^>]*><b>(\d+):/i);
         if (detailPageIdMatch && detailPageIdMatch[1]) {
             ids.add(detailPageIdMatch[1]);
         } else {
