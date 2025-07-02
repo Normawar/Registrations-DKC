@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF MSA website.
@@ -84,7 +85,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Isolate the results table by looking for the one that contains player links. This is more robust than looking for a class name.
       const allTables = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi) || [];
       const resultsTableHtml = allTables.find(table => table.includes('MbrDtlMain.php'));
 
@@ -99,11 +99,9 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const players: PlayerSearchResult[] = [];
       let headerMap: Record<string, number> | null = null;
       
-      // Find the header row and map the column indexes
       for (const row of allHtmlRows) {
-        const lowerCaseRow = row.toLowerCase();
-        // Use a combination of expected headers to reliably identify the header row.
-        if (lowerCaseRow.includes('>uscf id<') && lowerCaseRow.includes('>rating<') && lowerCaseRow.includes('>name<')) {
+        // Use more specific, case-sensitive text to identify the exact header row
+        if (row.includes('>USCF ID<') && row.includes('>Rating<') && row.includes('>Name<')) {
             headerMap = {};
             const headerCells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
             headerCells.forEach((cell, index) => {
@@ -123,7 +121,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [], error: "Could not find the results table header. The website layout may have changed." };
       }
       
-      // Now, process the data rows using the headerMap
       for (const row of allHtmlRows) {
         const idMatch = row.match(/MbrDtlMain\.php\?(\d+)/);
         if (!idMatch) {
@@ -131,7 +128,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         }
 
         const cells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
-        if (cells.length === 0) continue;
+        if (cells.length < Object.keys(headerMap).length) continue;
 
         const player: Partial<PlayerSearchResult> = {};
         
@@ -140,7 +137,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
             const linkMatch = nameCell.match(/<a href=["'][^"']+?\?(\d+)["']>([\s\S]+?)<\/a>/);
             if (linkMatch && linkMatch[1] && linkMatch[2]) {
                 player.uscfId = linkMatch[1];
-                const fullNameRaw = stripTags(linkMatch[2]);
+                const fullNameRaw = stripTags(linkMatch[2]); // Format: LAST, FIRST MIDDLE
                 const nameParts = fullNameRaw.split(',');
                 if (nameParts.length > 1) {
                     player.lastName = nameParts.shift()!.trim();
@@ -176,7 +173,10 @@ const searchUscfPlayersFlow = ai.defineFlow(
         }
         
         if (headerMap.expirationdate !== undefined && cells[headerMap.expirationdate]) {
-            player.expirationDate = stripTags(cells[headerMap.expirationdate]);
+            const dateText = stripTags(cells[headerMap.expirationdate]);
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
+                player.expirationDate = dateText;
+            }
         }
         
         if (player.uscfId && player.lastName) {
