@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { openDB, type IDBPDatabase } from 'idb';
 import { initialMasterPlayerData } from '@/lib/data/master-player-data';
+import { flushSync } from 'react-dom';
 
 // Define a consistent player type to be used everywhere
 export type MasterPlayer = {
@@ -123,8 +124,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         }
     }
 
-    setDatabaseState(newPlayers);
-    setIsDbLoaded(true);
+    // Force React to synchronously update the state before continuing.
+    // This is crucial to prevent race conditions where other pages might
+    // load with stale data after a large import.
+    flushSync(() => {
+      setDatabaseState(newPlayers);
+      setIsDbLoaded(true);
+    });
   }, []);
 
   const dbPlayerCount = database.length;

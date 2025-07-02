@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, type ReactNode, useMemo } from 'react';
 import { format } from 'date-fns';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -47,32 +47,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
-
-
-// NOTE: These types and data are duplicated from the events page for this prototype.
-// In a real application, this would likely come from a shared library or API.
-type Player = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  uscfId: string;
-  uscfExpiration?: Date;
-  regularRating?: number;
-  quickRating?: string;
-  grade: string;
-  section: string;
-  studentType?: 'gt' | 'independent';
-};
-
-const rosterPlayers: Player[] = [
-    { id: "1", firstName: "Alex", lastName: "Ray", uscfId: "12345678", uscfExpiration: new Date('2025-12-31'), regularRating: 1850, quickRating: '1800/10', grade: "10th Grade", section: 'High School K-12' },
-    { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", uscfExpiration: new Date('2023-01-15'), regularRating: 2100, quickRating: '2150/5', grade: "11th Grade", section: 'Championship', studentType: 'independent' },
-    { id: "3", firstName: "Casey", lastName: "Becker", uscfId: "11223344", uscfExpiration: new Date('2025-06-01'), regularRating: 1500, quickRating: '1550/12', grade: "9th Grade", section: 'High School K-12' },
-    { id: "4", firstName: "Morgan", lastName: "Taylor", uscfId: "NEW", regularRating: 1000, quickRating: '1000/1', grade: "5th Grade", section: 'Elementary K-5' },
-    { id: "5", firstName: "Riley", lastName: "Quinn", uscfId: "55667788", uscfExpiration: new Date('2024-11-30'), regularRating: 1980, quickRating: '1950/20', grade: "11th Grade", section: 'Championship' },
-    { id: "6", firstName: "Skyler", lastName: "Jones", uscfId: "99887766", uscfExpiration: new Date('2025-02-28'), regularRating: 1650, quickRating: '1600/8', grade: "9th Grade", section: 'High School K-12' },
-    { id: "7", firstName: "Drew", lastName: "Smith", uscfId: "11122233", uscfExpiration: new Date('2023-10-01'), regularRating: 2050, quickRating: '2000/15', grade: "12th Grade", section: 'Championship' },
-];
+import { useMasterDb } from '@/context/master-db-context';
 
 
 type PlayerRegistration = {
@@ -121,6 +96,7 @@ type ConfirmationInputs = {
 export default function ConfirmationsPage() {
   const { toast } = useToast();
   const { profile: sponsorProfile } = useSponsorProfile();
+  const { database: allPlayers } = useMasterDb();
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
   const [confInputs, setConfInputs] = useState<Record<string, Partial<ConfirmationInputs>>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
@@ -130,6 +106,10 @@ export default function ConfirmationsPage() {
   const [isCompAlertOpen, setIsCompAlertOpen] = useState(false);
   const [confToComp, setConfToComp] = useState<Confirmation | null>(null);
   
+  const playersMap = useMemo(() => {
+    return new Map(allPlayers.map(p => [p.id, p]));
+  }, [allPlayers]);
+
   const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
     confirmationsToFetch.forEach(conf => {
         if (conf.invoiceId) {
@@ -237,7 +217,7 @@ export default function ConfirmationsPage() {
     }
   }, []);
 
-  const getPlayerById = (id: string) => rosterPlayers.find(p => p.id === id);
+  const getPlayerById = (id: string) => playersMap.get(id);
 
   const getStatusBadgeVariant = (status?: string): string => {
     if (!status) return 'bg-gray-400';

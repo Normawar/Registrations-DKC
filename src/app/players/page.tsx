@@ -214,12 +214,8 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    const { update } = toast({
-      title: 'Import Started',
-      description: 'Your database file is being parsed...',
-      duration: Infinity,
-    });
-
+    let toastControls: { update: (props: any) => void; dismiss: () => void; id: string; } | null = null;
+    
     Papa.parse(file, {
         worker: true,
         delimiter: "\t",
@@ -308,47 +304,54 @@ export default function PlayersPage() {
 
             (async () => {
                 try {
-                    const onProgress = (progress: number) => {
-                        update({
-                            title: 'Saving to Database',
-                            description: `Saving ${finalPlayerList.length.toLocaleString()} records... ${progress}% complete.`
-                        });
-                    };
-                    
-                    update({
+                    toastControls = toast({
                         title: 'Saving to Database',
-                        description: `Saving ${finalPlayerList.length.toLocaleString()} records. This may take a moment...`,
+                        description: `Initializing save for ${finalPlayerList.length.toLocaleString()} records...`,
+                        duration: Infinity,
                     });
+                    
+                    const onProgress = (progress: number) => {
+                        if (toastControls) {
+                            toastControls.update({
+                                title: 'Saving to Database',
+                                description: `Saving ${finalPlayerList.length.toLocaleString()} records... ${progress}% complete.`
+                            });
+                        }
+                    };
                     
                     await setDatabase(finalPlayerList, onProgress);
                     
                     setCurrentPage(1);
-                    setIsImporting(false);
                     
                     let description = `Database updated. It now contains ${finalPlayerList.length.toLocaleString()} unique players.`;
                     if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
 
-                    update({
-                        title: 'Import Complete',
-                        description: description,
-                        duration: 10000,
-                    });
+                    if (toastControls) {
+                        toastControls.update({
+                            title: 'Import Complete',
+                            description: description,
+                            duration: 10000,
+                        });
+                    }
                 } catch(err) {
                     console.error("Failed to save to database", err);
                     const description = err instanceof Error ? err.message : 'An unknown error occurred.';
-                     update({
-                        variant: 'destructive',
-                        title: 'Database Save Error',
-                        description: description,
-                        duration: 10000,
-                    });
-                     setIsImporting(false);
+                    if (toastControls) {
+                        toastControls.update({
+                            variant: 'destructive',
+                            title: 'Database Save Error',
+                            description: description,
+                            duration: 10000,
+                        });
+                    }
+                } finally {
+                    setIsImporting(false);
                 }
             })();
         },
         error: (error: any) => {
             setIsImporting(false);
-            update({
+             toast({
               variant: 'destructive',
               title: 'Import Error',
               description: `Failed to parse file: ${error.message}`,
