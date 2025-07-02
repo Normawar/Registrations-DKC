@@ -673,16 +673,16 @@ export default function RosterPage() {
       </div>
 
        <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-            <DialogHeader className="p-6 pb-4 border-b">
-                <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
-                <DialogDescription>
-                    {editingPlayer ? "Update the player's information." : "Search the database or enter details manually."}
-                </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex-1 overflow-y-auto">
-                <div className="p-6 space-y-6">
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0">
+            <div className="flex h-full flex-col">
+              <DialogHeader className="p-6 pb-4 border-b shrink-0">
+                  <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
+                  <DialogDescription>
+                      {editingPlayer ? "Update the player's information." : "Search the database or enter details manually."}
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-6">
                     <Card className="bg-muted/50">
                         <CardHeader>
                             <CardTitle className="text-base">Player Database Search</CardTitle>
@@ -831,8 +831,8 @@ export default function RosterPage() {
                                 }} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value} modal={false}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value} modal={false}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Player Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
@@ -864,11 +864,12 @@ export default function RosterPage() {
                         </form>
                     </Form>
                 </div>
+              </div>
+              <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                  <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                  <Button type="submit" form="player-form">{editingPlayer ? 'Save Changes' : 'Add Player'}</Button>
+              </DialogFooter>
             </div>
-            <DialogFooter className="p-6 pt-4 border-t">
-                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                <Button type="submit" form="player-form">{editingPlayer ? 'Save Changes' : 'Add Player'}</Button>
-            </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -890,5 +891,3 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
-
-    
