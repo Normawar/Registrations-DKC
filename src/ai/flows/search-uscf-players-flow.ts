@@ -85,30 +85,19 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
       
-      // Isolate the form containing the results table to avoid parsing other tables on the page.
-      const formRegex = /<FORM ACTION='\.\/player-search\.php'[\s\S]*?<\/FORM>/i;
-      const formMatch = html.match(formRegex);
-
-      if (!formMatch) {
-        console.error("USCF Search: Could not find the results form container. The website layout may have changed.");
-        return { players: [], error: "Could not find the results form container. The website layout may have changed." };
-      }
-      
-      const formHtml = formMatch[0];
-      const allHtmlRows = formHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const players: PlayerSearchResult[] = [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
       for (const row of allHtmlRows) {
-        // The most reliable way to identify a player row is by the link to their details page.
         if (!row.includes('MbrDtlMain.php')) {
             continue;
         }
 
-        const cells = row.match(/<(td|th)[^>]*>([\s\S]*?)<\/(td|th)>/gi) || [];
+        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
         
-        // A valid player row has at least 10 columns
-        if (cells.length < 10) {
+        // A valid player row has exactly 10 columns.
+        if (cells.length !== 10) {
             continue; 
         }
 
@@ -143,9 +132,14 @@ const searchUscfPlayersFlow = ai.defineFlow(
         
         // Column 9: Name (and link)
         const nameCellContent = cells[9];
-        const nameLinkMatch = nameCellContent.match(/<a[^>]+>([\s\S]+)<\/a>/i);
-        if (nameLinkMatch) {
-            const fullNameRaw = stripTags(nameLinkMatch[1]);
+        const nameLinkMatch = nameCellContent.match(/<a href=[^>]+?\?(\d+)[^>]*>([\s\S]+?)<\/a>/i);
+        if (nameLinkMatch && nameLinkMatch[1] && nameLinkMatch[2]) {
+            const idFromLink = nameLinkMatch[1];
+            if (idFromLink !== player.uscfId) {
+                continue;
+            }
+
+            const fullNameRaw = stripTags(nameLinkMatch[2]);
             const nameParts = fullNameRaw.split(',');
             if (nameParts.length > 1) {
                 player.lastName = nameParts.shift()!.trim();
