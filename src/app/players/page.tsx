@@ -234,6 +234,7 @@ export default function PlayersPage() {
             const progress = Math.round((currentIndex / rows.length) * 100);
             if (toastControls.current) {
               toastControls.current.update({
+                id: toastControls.current.id,
                 description: `Processing database... ${progress}% complete.`,
               });
             }
@@ -256,6 +257,7 @@ export default function PlayersPage() {
                                 description += ` Could not parse ${totalErrorCount} rows due to formatting issues.`;
                             }
                             toastControls.current.update({
+                                id: toastControls.current.id,
                                 title: title,
                                 description: description,
                                 duration: 10000,
@@ -264,6 +266,7 @@ export default function PlayersPage() {
                     } catch(err) {
                         if (toastControls.current) {
                            toastControls.current.update({
+                                id: toastControls.current.id,
                                 variant: 'destructive',
                                 title: 'Database Save Error',
                                 description: err instanceof Error ? err.message : 'An unknown error occurred.',
@@ -791,22 +794,3 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
-
-// Web Worker for parsing
-declare const self: Worker;
-import Papa from 'papaparse';
-
-self.onmessage = (event) => {
-    const file = event.data as File;
-    Papa.parse(file, {
-        worker: false, // Run in this worker thread
-        delimiter: "\t",
-        skipEmptyLines: true,
-        complete: (results) => {
-            self.postMessage({ rows: results.data });
-        },
-        error: (error: any) => {
-            self.postMessage({ error: error.message });
-        }
-    });
-};
