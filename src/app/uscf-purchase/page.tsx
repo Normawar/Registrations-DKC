@@ -30,7 +30,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { useRoster } from '@/hooks/use-roster';
 import { auth, storage } from '@/lib/firebase';
 import { cn } from '@/lib/utils';
 import { createMembershipInvoice, type CreateMembershipInvoiceOutput } from '@/ai/flows/create-membership-invoice-flow';
@@ -49,6 +48,7 @@ import {
     Trash2,
     PlusCircle
 } from 'lucide-react';
+import { useMasterDb } from '@/context/master-db-context';
 
 const playerSchema = z.object({
     firstName: z.string().min(1, { message: 'First name is required.' }),
@@ -95,7 +95,7 @@ function UscfPurchaseComponent() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const { profile: sponsorProfile } = useSponsorProfile();
-    const { players: rosterPlayers } = useRoster();
+    const { database: rosterPlayers } = useMasterDb();
 
     const membershipType = searchParams.get('type') || 'Unknown Membership';
     const justification = searchParams.get('justification') || 'No justification provided.';
@@ -182,7 +182,7 @@ function UscfPurchaseComponent() {
                 form.setError(`players.${index}.email`, { type: 'manual', message: 'This email is used more than once in this form.' });
                 hasError = true;
             }
-            const existingPlayer = rosterPlayers.find(rp => rp.email.toLowerCase() === email);
+            const existingPlayer = rosterPlayers.find(rp => rp.email && rp.email.toLowerCase() === email);
             if (existingPlayer) {
                 form.setError(`players.${index}.email`, { type: 'manual', message: `Email is already assigned to ${existingPlayer.firstName} ${existingPlayer.lastName}.` });
                 hasError = true;

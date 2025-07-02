@@ -2,7 +2,6 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { flushSync } from 'react-dom';
 import { openDB, type IDBPDatabase } from 'idb';
 import { initialMasterPlayerData } from '@/lib/data/master-player-data';
 
@@ -42,81 +41,70 @@ interface MasterDbContextType {
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
-const DB_NAME = 'ChessMateDB';
+const DB_NAME = 'ChessMatePlayerDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'players';
 
 async function getDb(): Promise<IDBPDatabase> {
     return openDB(DB_NAME, DB_VERSION, {
         upgrade(db) {
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-                store.createIndex('uscfId', 'uscfId', { unique: true });
+            if (db.objectStoreNames.contains(STORE_NAME)) {
+                db.deleteObjectStore(STORE_NAME);
             }
+            const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            store.createIndex('uscfId', 'uscfId', { unique: true });
         },
     });
 }
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
-  const [database, setInternalDatabase] = useState<MasterPlayer[]>([]);
-  const [dbPlayerCount, setDbPlayerCount] = useState(0);
+  const [database, setDatabaseState] = useState<MasterPlayer[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
 
-  const loadInitialData = useCallback(async () => {
-    setIsDbLoaded(false);
-    const db = await getDb();
-    const count = await db.count(STORE_NAME);
-    setDbPlayerCount(count);
+  // This effect runs once on mount to load data from IndexedDB
+  useEffect(() => {
+    async function loadDataFromDb() {
+      const db = await getDb();
+      let players = await db.getAll(STORE_NAME);
 
-    if (count === 0) {
+      if (players.length === 0) {
         console.log("No players in DB, populating with initial data...");
         const tx = db.transaction(STORE_NAME, 'readwrite');
         try {
             for (const player of initialMasterPlayerData) {
-                tx.store.add(player);
+                await tx.store.add(player);
             }
             await tx.done;
-            setInternalDatabase(initialMasterPlayerData);
-            setDbPlayerCount(initialMasterPlayerData.length);
+            players = initialMasterPlayerData;
         } catch (error) {
             console.error("Error populating initial data", error);
-            tx.abort();
+            if (!tx.aborted) {
+                tx.abort();
+            }
         }
-    } else {
-        const allPlayers = await db.getAll(STORE_NAME);
-        setInternalDatabase(allPlayers);
+      }
+      
+      setDatabaseState(players);
+      setIsDbLoaded(true);
     }
-    setIsDbLoaded(true);
+    loadDataFromDb();
   }, []);
 
-  useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
-
-  const setDatabase = useCallback(async (players: MasterPlayer[]) => {
-    console.log(`Updating IndexedDB with ${players.length} players...`);
+  // This is the function that components will call to update the database
+  const setDatabase = useCallback(async (newPlayers: MasterPlayer[]) => {
     const db = await getDb();
     const tx = db.transaction(STORE_NAME, 'readwrite');
-    
-    try {
-        await tx.store.clear();
-        for (const player of players) {
-            tx.store.add(player);
-        }
-        await tx.done;
-        
-        console.log("IndexedDB update complete. Forcing synchronous state update.");
-        flushSync(() => {
-            setInternalDatabase(players);
-            setDbPlayerCount(players.length);
-        });
-
-    } catch(error) {
-        console.error("Failed to update database:", error);
-        tx.abort();
-        throw error;
+    await tx.store.clear();
+    for(const player of newPlayers) {
+        await tx.store.add(player);
     }
+    await tx.done;
+
+    // After successfully writing to the DB, update the React state
+    setDatabaseState(newPlayers);
   }, []);
+
+  const dbPlayerCount = database.length;
 
   return (
     <MasterDbContext.Provider value={{ database, setDatabase, isDbLoaded, dbPlayerCount }}>
