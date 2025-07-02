@@ -134,6 +134,7 @@ const playerFormSchema = z.object({
   dob: z.date({ required_error: "Date of birth is required."}),
   zipCode: z.string().min(5, { message: "Please enter a valid 5-digit zip code." }),
   studentType: z.string().optional(),
+  state: z.string().optional(),
 })
 .refine(data => {
     if (data.uscfId.toUpperCase() !== 'NEW') {
@@ -212,6 +213,14 @@ export default function RosterPage() {
     }
     return ['ALL'];
   }, [isDbLoaded, allPlayers]);
+  
+  const formStates = useMemo(() => {
+    if (isDbLoaded) {
+        const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
+        return Array.from(states).sort();
+    }
+    return [];
+  }, [isDbLoaded, allPlayers]);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -230,6 +239,7 @@ export default function RosterPage() {
       phone: '',
       zipCode: '',
       studentType: undefined,
+      state: '',
     }
   });
 
@@ -257,6 +267,7 @@ export default function RosterPage() {
           phone: '',
           zipCode: '',
           studentType: undefined,
+          state: '',
         });
         setSearchFirstName('');
         setSearchLastName('');
@@ -402,6 +413,9 @@ export default function RosterPage() {
             if (!form.getValues('middleName') && result.middleName) {
                 form.setValue('middleName', result.middleName);
             }
+            if (result.state) {
+                form.setValue('state', result.state, { shouldValidate: true });
+            }
 
             toast({ title: "Lookup Successful", description: `Updated details for ${[result.firstName, result.lastName].join(' ')}.` });
         }
@@ -518,6 +532,7 @@ export default function RosterPage() {
     form.setValue('uscfId', player.uscfId || '');
     form.setValue('regularRating', player.rating);
     form.setValue('quickRating', player.quickRating || '');
+    form.setValue('state', player.state || '');
     
     if (player.expirationDate) {
         const expDate = parse(player.expirationDate, 'yyyy-MM-dd', new Date());
@@ -855,8 +870,28 @@ export default function RosterPage() {
                                 <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Player Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Player Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Player Zip Code</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField
+                                  control={form.control}
+                                  name="state"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>State</FormLabel>
+                                      <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select a state" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          {formStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
                                 {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
                                   <FormField control={form.control} name="studentType" render={({ field }) => (
                                       <FormItem>
