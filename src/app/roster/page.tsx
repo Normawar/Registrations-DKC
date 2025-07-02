@@ -683,14 +683,13 @@ export default function RosterPage() {
           
           <Card className="bg-muted/50">
             <CardHeader>
-                <CardTitle className="text-base">Live USCF Player Search</CardTitle>
-                <CardDescription>Find a player on the USCF website to auto-fill their information.</CardDescription>
+                <CardTitle className="text-base">Player Database Search</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="space-y-2">
                         <Label>State</Label>
-                        <Select value={searchState} onValueChange={setSearchState}>
+                        <Select value={searchState} onValueChange={setSearchState} disabled={isSearching}>
                             <SelectTrigger><SelectValue placeholder="All States"/></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="ALL">All States</SelectItem>
@@ -703,11 +702,11 @@ export default function RosterPage() {
                     </div>
                     <div className='space-y-2'>
                         <Label>First Name (Optional)</Label>
-                        <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
+                        <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} disabled={isSearching} />
                     </div>
                     <div className='space-y-2'>
                         <Label>Last Name</Label>
-                        <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
+                        <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} disabled={isSearching} />
                     </div>
                     <Button onClick={handlePerformSearch} disabled={isSearching || !searchLastName}>
                         {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
@@ -787,7 +786,12 @@ export default function RosterPage() {
                         </Button>
                     </div>
                     <FormDescription>
-                      Students without a USCF ID can be added with &quot;NEW&quot;.
+                        Students without a USCF ID can be added with &quot;NEW&quot;.
+                    </FormDescription>
+                    <FormDescription>
+                        <Link href="https://new.uschess.org/civicrm/player-search" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                            Find USCF ID on the official USCF website
+                        </Link>
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
