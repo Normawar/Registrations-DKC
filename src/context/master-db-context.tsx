@@ -2,6 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { openDB, type IDBPDatabase } from 'idb';
 import { initialMasterPlayerData } from '@/lib/data/master-player-data';
 
@@ -71,7 +72,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         console.log("No players in DB, populating with initial data...");
         const tx = db.transaction(STORE_NAME, 'readwrite');
         try {
-            await Promise.all(initialMasterPlayerData.map(player => tx.store.add(player)));
+            for (const player of initialMasterPlayerData) {
+                tx.store.add(player);
+            }
             await tx.done;
             setInternalDatabase(initialMasterPlayerData);
             setDbPlayerCount(initialMasterPlayerData.length);
@@ -97,17 +100,17 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     try {
         await tx.store.clear();
-        // Instead of Promise.all, which creates a massive array of promises,
-        // we add players sequentially within the same transaction.
-        // The idb library efficiently queues these operations.
         for (const player of players) {
             tx.store.add(player);
         }
-        await tx.done; // The transaction commits here.
+        await tx.done;
         
-        console.log("IndexedDB update complete.");
-        setInternalDatabase(players);
-        setDbPlayerCount(players.length);
+        console.log("IndexedDB update complete. Forcing synchronous state update.");
+        flushSync(() => {
+            setInternalDatabase(players);
+            setDbPlayerCount(players.length);
+        });
+
     } catch(error) {
         console.error("Failed to update database:", error);
         tx.abort();
