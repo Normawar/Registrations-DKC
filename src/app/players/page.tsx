@@ -1,10 +1,12 @@
 
 'use client';
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Papa from 'papaparse';
+
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +24,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download } from "lucide-react";
+import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download, Upload, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -47,12 +49,23 @@ import {
   DialogFooter,
   DialogClose
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { districts as allDistricts } from '@/lib/data/districts';
 import { schoolData } from '@/lib/data/school-data';
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const initialPlayersData = [
   { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", rating: 1850, school: "Independent", district: "None", events: 2, eventIds: ['e2'] },
@@ -88,12 +101,37 @@ type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
 export default function PlayersPage() {
   const { toast } = useToast();
-  const [players, setPlayers] = useState<Player[]>(initialPlayersData);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    try {
+        const stored = localStorage.getItem('all_players_master_db');
+        if (stored) {
+            setPlayers(JSON.parse(stored));
+        } else {
+            setPlayers(initialPlayersData);
+        }
+    } catch (e) {
+        setPlayers(initialPlayersData);
+    }
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded) {
+        localStorage.setItem('all_players_master_db', JSON.stringify(players));
+    }
+  }, [players, isLoaded]);
+  
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
     defaultValues: {
@@ -106,18 +144,59 @@ export default function PlayersPage() {
       rating: undefined,
     },
   });
+  
+  useEffect(() => {
+    if (editingPlayer) {
+      form.reset({
+        id: editingPlayer.id,
+        firstName: editingPlayer.firstName,
+        middleName: editingPlayer.middleName || '',
+        lastName: editingPlayer.lastName,
+        district: editingPlayer.district,
+        school: editingPlayer.school,
+        uscfId: editingPlayer.uscfId,
+        rating: editingPlayer.rating,
+      });
+      handleDistrictChange(editingPlayer.district, true);
+    } else {
+      form.reset();
+    }
+  }, [editingPlayer, form]);
 
   const handleAddPlayer = () => {
-    form.reset();
+    setEditingPlayer(null);
     setIsDialogOpen(true);
   };
   
-  const handleDistrictChange = (district: string) => {
+  const handleEditPlayer = (player: Player) => {
+    setEditingPlayer(player);
+    setIsDialogOpen(true);
+  };
+
+  const handleDeletePlayer = (player: Player) => {
+    setPlayerToDelete(player);
+    setIsAlertOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (playerToDelete) {
+        setPlayers(prev => prev.filter(p => p.id !== playerToDelete.id));
+        toast({ title: "Player Removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed.`});
+    }
+    setIsAlertOpen(false);
+    setPlayerToDelete(null);
+  };
+  
+  const handleDistrictChange = (district: string, isEditing = false) => {
+    if (!isEditing) {
+        form.setValue('school', '');
+    }
     form.setValue('district', district);
-    form.setValue('school', '');
     if (district === 'None') {
         setSchoolsForDistrict(['Independent']);
-        form.setValue('school', 'Independent');
+        if (!isEditing) {
+            form.setValue('school', 'Independent');
+        }
     } else {
         const filteredSchools = schoolData
         .filter((school) => school.district === district)
@@ -128,22 +207,101 @@ export default function PlayersPage() {
   };
 
   function onSubmit(values: PlayerFormValues) {
-    const newPlayer: Player = {
-      id: `p-${Date.now()}`,
-      firstName: values.firstName,
-      middleName: values.middleName,
-      lastName: values.lastName,
-      uscfId: values.uscfId,
-      rating: values.rating || 0,
-      district: values.district,
-      school: values.school,
-      events: 0,
-      eventIds: [],
-    };
-    setPlayers(prev => [...prev, newPlayer]);
-    toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added.`});
+    if (editingPlayer) {
+      // Update existing player
+      setPlayers(prev => prev.map(p => 
+        p.id === editingPlayer.id ? { ...p, ...values } : p
+      ));
+      toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s data has been updated.`});
+    } else {
+      // Add new player
+      const newPlayer: Player = {
+        id: `p-${Date.now()}`,
+        firstName: values.firstName,
+        middleName: values.middleName,
+        lastName: values.lastName,
+        uscfId: values.uscfId,
+        rating: values.rating || 0,
+        district: values.district,
+        school: values.school,
+        events: 0,
+        eventIds: [],
+      };
+      setPlayers(prev => [...prev, newPlayer]);
+      toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added.`});
+    }
     setIsDialogOpen(false);
+    setEditingPlayer(null);
   }
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const requiredHeaders = ['USCF_ID', 'FIRST_NAME', 'LAST_NAME', 'RATING', 'DISTRICT', 'SCHOOL'];
+        const fileHeaders = results.meta.fields || [];
+        const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
+
+        if (missingHeaders.length > 0) {
+            toast({ variant: 'destructive', title: 'Import Failed', description: `CSV is missing required columns: ${missingHeaders.join(', ')}` });
+            return;
+        }
+
+        const existingIds = new Set(players.map(p => p.uscfId));
+        let addedCount = 0;
+        let skippedCount = 0;
+        
+        const playersFromCsv: Player[] = results.data
+          .map((row: any, index: number): Player | null => {
+            const uscfId = row.USCF_ID?.trim();
+            if (!uscfId) return null; // Skip rows without an ID
+
+            return {
+              id: `p-${uscfId}-${Date.now()}-${index}`,
+              uscfId: uscfId,
+              firstName: row.FIRST_NAME?.trim() || '',
+              lastName: row.LAST_NAME?.trim() || '',
+              middleName: row.MIDDLE_NAME?.trim() || '',
+              rating: parseInt(row.RATING, 10) || 0,
+              school: row.SCHOOL?.trim() || 'N/A',
+              district: row.DISTRICT?.trim() || 'N/A',
+              events: 0,
+              eventIds: [],
+            };
+          })
+          .filter((p): p is Player => p !== null);
+
+        const newPlayers = playersFromCsv.filter(p => {
+            if (p.uscfId && p.firstName && p.lastName) {
+                if (existingIds.has(p.uscfId)) {
+                    skippedCount++;
+                    return false;
+                }
+                addedCount++;
+                return true;
+            }
+            skippedCount++;
+            return false;
+        });
+
+        if (newPlayers.length > 0) {
+            setPlayers(prev => [...prev, ...newPlayers]);
+        }
+
+        toast({ title: 'Import Complete', description: `Added ${addedCount} new players. Skipped ${skippedCount} duplicate or invalid rows.` });
+      },
+      error: (error) => {
+          toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
+      }
+    });
+
+    if(fileInputRef.current) fileInputRef.current.value = '';
+  };
+
 
   const filteredAndSortedPlayers = useMemo(() => {
     let sortablePlayers = [...players];
@@ -273,6 +431,17 @@ export default function PlayersPage() {
             </p>
           </div>
           <div className="flex gap-2">
+             <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".csv"
+              onChange={handleFileImport}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Database
+            </Button>
             <Button onClick={handleExportCsv}>
                 <Download className="mr-2 h-4 w-4" />
                 Export to CSV
@@ -304,91 +473,99 @@ export default function PlayersPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="p-0">
-                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>
-                          Player {getSortIcon('name')}
-                      </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
-                          USCF ID {getSortIcon('uscfId')}
-                      </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('rating')}>
-                          Rating {getSortIcon('rating')}
-                      </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('school')}>
-                          School {getSortIcon('school')}
-                      </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('district')}>
-                          District {getSortIcon('district')}
-                      </Button>
-                  </TableHead>
-                   <TableHead className="p-0">
-                      <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('events')}>
-                          # Events {getSortIcon('events')}
-                      </Button>
-                  </TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredAndSortedPlayers.map((player) => (
-                  <TableRow key={player.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={player.firstName} data-ai-hint="person face" />
-                          <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
-                      </div>
-                    </TableCell>
-                    <TableCell>{player.uscfId}</TableCell>
-                    <TableCell>{player.rating}</TableCell>
-                    <TableCell>{player.school}</TableCell>
-                    <TableCell>{player.district}</TableCell>
-                    <TableCell>{player.events}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>Edit Player</DropdownMenuItem>
-                          <DropdownMenuItem>View Registrations</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            Remove Player
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            {!isLoaded ? (
+                <div className="space-y-2">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                </div>
+            ) : (
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>
+                            Player {getSortIcon('name')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
+                            USCF ID {getSortIcon('uscfId')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('rating')}>
+                            Rating {getSortIcon('rating')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('school')}>
+                            School {getSortIcon('school')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('district')}>
+                            District {getSortIcon('district')}
+                        </Button>
+                    </TableHead>
+                    <TableHead className="p-0">
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('events')}>
+                            # Events {getSortIcon('events')}
+                        </Button>
+                    </TableHead>
+                    <TableHead>
+                        <span className="sr-only">Actions</span>
+                    </TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {filteredAndSortedPlayers.map((player) => (
+                    <TableRow key={player.id}>
+                        <TableCell className="font-medium">
+                        <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9">
+                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={player.firstName} data-ai-hint="person face" />
+                            <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
+                        </div>
+                        </TableCell>
+                        <TableCell>{player.uscfId}</TableCell>
+                        <TableCell>{player.rating}</TableCell>
+                        <TableCell>{player.school}</TableCell>
+                        <TableCell>{player.district}</TableCell>
+                        <TableCell>{player.events}</TableCell>
+                        <TableCell>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleEditPlayer(player)}>Edit Player</DropdownMenuItem>
+                            <DropdownMenuItem>View Registrations</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" /> Remove Player
+                            </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        </TableCell>
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+            )}
           </CardContent>
         </Card>
       </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add New Player</DialogTitle>
-            <DialogDescription>Fill out the details for the new player.</DialogDescription>
+            <DialogTitle>{editingPlayer ? "Edit Player" : "Add New Player"}</DialogTitle>
+            <DialogDescription>Fill out the details for the player.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
@@ -404,7 +581,7 @@ export default function PlayersPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>District</FormLabel>
-                      <Select onValueChange={handleDistrictChange} value={field.value}>
+                      <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
                         <SelectContent>
                           {allDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
@@ -450,12 +627,28 @@ export default function PlayersPage() {
                 <DialogClose asChild>
                   <Button type="button" variant="ghost">Cancel</Button>
                 </DialogClose>
-                <Button type="submit">Add Player</Button>
+                <Button type="submit">{editingPlayer ? 'Save Changes' : 'Add Player'}</Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently remove the player {playerToDelete?.firstName} {playerToDelete?.lastName}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
