@@ -48,6 +48,9 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     
     try {
       const response = await fetch(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        },
         cache: 'no-store',
       });
 
@@ -57,7 +60,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      if (text.includes("Invalid ID") || text.trim() === '' || !text.includes("USCF Member Lookup")) {
+      // A simple check to see if the page is what we expect. A valid page will have "USCF Member Lookup".
+      if (text.includes("Invalid ID") || !text.includes("USCF Member Lookup")) {
         return { uscfId, error: "Player not found with this USCF ID." };
       }
       
@@ -65,6 +69,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
 
       // Helper function to extract the value from an input tag, handling unquoted attributes.
       const extractInputValue = (html: string, name: string): string | null => {
+        // This regex looks for name=theName, then any characters that are not '>', then value='theValue'
         const regex = new RegExp(`name=${name}[^>]*value='([^']*)'`, 'i');
         const match = html.match(regex);
         return match ? match[1].trim() : null;
@@ -88,6 +93,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       // Extract Regular Rating from the combined field
       const ratingString = extractInputValue(text, 'rating1');
       if (ratingString && ratingString.toLowerCase() !== 'unrated') {
+        // Extract the number at the beginning of the string, ignoring the provisional '*'
         const ratingMatch = ratingString.match(/^(\d+)/);
         if (ratingMatch && ratingMatch[1]) {
           output.rating = parseInt(ratingMatch[1], 10);
