@@ -64,7 +64,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
     params.append('psubmit', 'Search');
 
     try {
-      // Step 1: Fetch the search results page to get the list of players.
+      // Step 1: Fetch the search results page.
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -87,22 +87,27 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Step 2: Extract all unique USCF IDs by splitting the page by the player link anchor.
+      // Step 2: Extract all unique USCF IDs from the page.
       const ids = new Set<string>();
-      const chunks = html.split(/MbrDtlMain\.php\?/gi);
-
-      // The first chunk is before the first match, so we skip it (i=1).
-      for (let i = 1; i < chunks.length; i++) {
-        // The ID will be the digits at the very beginning of the chunk.
-        const idMatch = chunks[i].match(/^(\d+)/);
-        if (idMatch && idMatch[1]) {
-          ids.add(idMatch[1]);
+      
+      // Use a regex to find all matches of the player detail link pattern, which is more robust.
+      const matches = html.matchAll(/MbrDtlMain\.php\?(\d+)/gi);
+      for (const match of matches) {
+        if (match[1]) {
+          ids.add(match[1]);
         }
       }
       
       if (ids.size === 0) {
-        console.error("USCF Search: Found a results page, but was unable to extract any USCF IDs from it. The website layout may have changed.");
-        return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
+        // Fallback for single result redirect: check if the page itself is a member detail page.
+        // This happens when a search returns exactly one player.
+        const detailPageIdMatch = html.match(/<font size=\+1><b>(\d+):/i);
+        if (detailPageIdMatch && detailPageIdMatch[1]) {
+            ids.add(detailPageIdMatch[1]);
+        } else {
+            console.error("USCF Search: Found a results page, but was unable to extract any player IDs from it. The website layout may have changed.");
+            return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
+        }
       }
 
       // Step 3: Concurrently look up each player using the more reliable individual lookup flow.

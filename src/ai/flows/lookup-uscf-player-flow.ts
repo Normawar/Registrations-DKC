@@ -42,7 +42,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     if (!uscfId) {
       return { uscfId: '', error: 'A USCF ID must be provided.' };
     }
-    // Use the main member detail page which is more structured and reliable.
+    
+    // The modern, more reliable member detail page
     const url = `https://www.uschess.org/msa/MbrDtlMain.php?${uscfId}`;
     
     try {
@@ -67,55 +68,66 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = { uscfId };
 
-      // The name is the most stable element, in an <h4> tag.
-      const nameMatch = text.match(/<h4>\s*([\s\S]*?)\s*<\/h4>/i);
-      if (nameMatch && nameMatch[1]) {
-          const rawName = nameMatch[1].replace(/<[^>]+>/g, '').trim(); // Format: LAST, FIRST MIDDLE
+      // Name and ID are in a consistent <font> tag
+      const nameIdMatch = text.match(/<font size=\+1><b>\d+:\s*(.*?)<\/b><\/font>/i);
+      if (nameIdMatch && nameIdMatch[1]) {
+          const rawName = nameIdMatch[1].trim();
           const nameParts = rawName.split(',');
-          if (nameParts.length > 1) {
+          if (nameParts.length > 1) { // Format: LAST, FIRST MIDDLE
               output.lastName = nameParts.shift()!.trim();
               const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
               output.firstName = firstAndMiddleParts.shift() || '';
               output.middleName = firstAndMiddleParts.join(' ');
-          } else {
-              output.lastName = rawName;
+          } else { // Assume FIRST MIDDLE LAST
+              const firstAndMiddleParts = rawName.split(/\s+/).filter(Boolean);
+              output.lastName = firstAndMiddleParts.pop() || '';
+              output.firstName = firstAndMiddleParts.shift() || '';
+              output.middleName = firstAndMiddleParts.join(' ');
           }
       }
 
-      // Extract all table data cells and clean them
-      const cells = text.match(/<TD[^>]*>[\s\S]*?<\/TD>/gi)?.map(cell => cell.replace(/<[^>]+>/g, '').trim()) || [];
-      
-      // Find data by looking for labels in the cell array
-      const findValueByLabel = (label: string): string | undefined => {
-          const labelIndex = cells.findIndex(cell => cell.includes(label));
-          if (labelIndex !== -1 && labelIndex + 1 < cells.length) {
-              return cells[labelIndex + 1];
+      // Helper to find a value in a row by its label, which is more robust
+      const findValueInRow = (label: string): string | undefined => {
+          const rows = text.split(/<tr/i);
+          const rowWithLabel = rows.find(r => new RegExp(label, 'i').test(r));
+          if (rowWithLabel) {
+              const valueMatch = rowWithLabel.match(/<b>(.*?)<\/b>/i);
+              if (valueMatch && valueMatch[1]) {
+                   return valueMatch[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+              }
           }
           return undefined;
-      };
-
-      const ratingText = findValueByLabel('Regular Rating');
+      }
+      
+      const ratingText = findValueInRow('Regular Rating');
       if (ratingText) {
-          const ratingMatch = ratingText.match(/^(\d+)/); // Match only numbers at the start of the string
+          const ratingMatch = ratingText.match(/^(\d+)/); 
           if (ratingMatch && ratingMatch[1]) {
               output.rating = parseInt(ratingMatch[1], 10);
           }
       }
       
-      const expiresText = findValueByLabel('Expires');
+      const expiresText = findValueInRow('Expiration Dt.');
       if (expiresText) {
-          const dateMatch = expiresText.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
-          if (dateMatch && dateMatch[1]) {
-              const [month, day, year] = dateMatch[1].split('/');
-              output.expirationDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          }
+          const dateMatch = expiresText.match(/(\d{4}-\d{2}-\d{2})/);
+           if (dateMatch && dateMatch[1]) {
+             output.expirationDate = dateMatch[1];
+           } else {
+             const otherDateMatch = expiresText.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+             if (otherDateMatch && otherDateMatch[1]) {
+                const [month, day, year] = otherDateMatch[1].split('/');
+                output.expirationDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+             }
+           }
       }
 
-      // State is usually in the address line like "City, ST ZIP"
-      const stateMatch = text.match(/,\s*([A-Z]{2})\s+\d{5}/);
-      if (stateMatch && stateMatch[1]) {
-        output.state = stateMatch[1];
-      }
+       const stateText = findValueInRow('>State<'); // Use angle brackets to be more specific
+       if (stateText) {
+         const stateMatch = stateText.trim().match(/^([A-Z]{2})/);
+         if (stateMatch && stateMatch[1]) {
+           output.state = stateMatch[1];
+         }
+       }
 
       if (!output.lastName && !output.firstName) {
         return { uscfId, error: "Could not parse player name from the details page." };
