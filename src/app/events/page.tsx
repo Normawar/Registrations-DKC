@@ -693,7 +693,7 @@ export default function EventsPage() {
                                         <SelectTrigger id={`section-${player.id}`} className={cn("w-full", isSectionInvalid && "border-destructive ring-1 ring-destructive")}>
                                           <SelectValue placeholder="Select Section" />
                                         </SelectTrigger>
-                                        <SelectContent>{sectionOptions}</SelectContent>
+                                        <SelectContent position="item-aligned">{sectionOptions}</SelectContent>
                                       </Select>
                                       {isSectionInvalid && (
                                           <p className="text-xs text-destructive">Grade level too high for this section.</p>
@@ -705,7 +705,7 @@ export default function EventsPage() {
                                         <SelectTrigger id={`bye1-${player.id}`} className="w-full">
                                           <SelectValue placeholder="Select Bye" />
                                         </SelectTrigger>
-                                        <SelectContent>{roundOptions(selectedEvent.rounds)}</SelectContent>
+                                        <SelectContent position="item-aligned">{roundOptions(selectedEvent.rounds)}</SelectContent>
                                       </Select>
                                     </div>
                                      <div className="grid gap-1.5">
@@ -714,7 +714,7 @@ export default function EventsPage() {
                                         <SelectTrigger id={`bye2-${player.id}`} className="w-full">
                                           <SelectValue placeholder="Select Bye" />
                                         </SelectTrigger>
-                                        <SelectContent>{roundOptions(selectedEvent.rounds, firstBye)}</SelectContent>
+                                        <SelectContent position="item-aligned">{roundOptions(selectedEvent.rounds, firstBye)}</SelectContent>
                                       </Select>
                                     </div>
                                 </div>

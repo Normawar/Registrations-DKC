@@ -11,10 +11,16 @@ function OrganizerRegistrationPage() {
     return (
         <AppLayout>
             <Suspense fallback={<OrganizerRegistrationSkeleton />}>
-                <OrganizerRegistrationForm />
+                <OrganizerRegistrationContent />
             </Suspense>
         </AppLayout>
     );
+}
+
+function OrganizerRegistrationContent() {
+    const searchParams = useSearchParams();
+    const eventId = searchParams.get('eventId');
+    return <OrganizerRegistrationForm eventId={eventId} />;
 }
 
 function OrganizerRegistrationSkeleton() {

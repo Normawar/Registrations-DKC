@@ -661,7 +661,7 @@ export default function PlayersPage() {
                       <FormLabel>District</FormLabel>
                       <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
-                        <SelectContent>
+                        <SelectContent position="item-aligned">
                           {allDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
                         </SelectContent>
                       </Select>
@@ -677,7 +677,7 @@ export default function PlayersPage() {
                       <FormLabel>School</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
-                        <SelectContent>
+                        <SelectContent position="item-aligned">
                           {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
                         </SelectContent>
                       </Select>
