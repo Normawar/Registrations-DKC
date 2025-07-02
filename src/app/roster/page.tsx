@@ -185,7 +185,7 @@ type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 
 export default function RosterPage() {
   const { toast } = useToast();
   const { players, addPlayer, updatePlayer, deletePlayer } = useRoster();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
@@ -232,7 +232,7 @@ export default function RosterPage() {
   }, [isDbLoaded, masterDatabase]);
 
   useEffect(() => {
-    if (isDialogOpen) {
+    if (isPlayerDialogOpen) {
       if (editingPlayer) {
         form.reset(editingPlayer);
       } else {
@@ -257,7 +257,7 @@ export default function RosterPage() {
         setSearchResults([]);
       }
     }
-  }, [isDialogOpen, editingPlayer, form]);
+  }, [isPlayerDialogOpen, editingPlayer, form]);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...players];
@@ -338,12 +338,12 @@ export default function RosterPage() {
   const handleAddPlayer = () => {
     setEditingPlayer(null);
     form.reset();
-    setIsDialogOpen(true);
+    setIsPlayerDialogOpen(true);
   };
 
   const handleEditPlayer = (player: Player) => {
     setEditingPlayer(player);
-    setIsDialogOpen(true);
+    setIsPlayerDialogOpen(true);
   };
   
   const handleDeletePlayer = (player: Player) => {
@@ -451,7 +451,7 @@ export default function RosterPage() {
       addPlayer(newPlayer);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
     }
-    setIsDialogOpen(false);
+    setIsPlayerDialogOpen(false);
     setEditingPlayer(null);
   }
   
@@ -672,7 +672,7 @@ export default function RosterPage() {
         </Card>
       </div>
 
-       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+       <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
           <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-4 border-b">
                 <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
@@ -693,7 +693,7 @@ export default function RosterPage() {
                                     <Label>State</Label>
                                     <Select value={searchState} onValueChange={setSearchState}>
                                         <SelectTrigger><SelectValue placeholder="All States" /></SelectTrigger>
-                                        <SelectContent>
+                                        <SelectContent position="item-aligned">
                                             {dbStates.map(s => <SelectItem key={s} value={s}>{s === 'ALL' ? 'All States' : s}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
@@ -706,7 +706,7 @@ export default function RosterPage() {
                                     <Label>Last Name</Label>
                                     <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
                                 </div>
-                                <Button onClick={handlePerformSearch} disabled={isSearching}>
+                                <Button onClick={handlePerformSearch} disabled={isSearching || !isDbLoaded}>
                                     {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
                                     Search
                                 </Button>
@@ -831,8 +831,8 @@ export default function RosterPage() {
                                 }} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Player Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
