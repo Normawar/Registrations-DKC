@@ -85,84 +85,78 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
       
-      const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const players: PlayerSearchResult[] = [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-      for (const row of allHtmlRows) {
-        // The most reliable way to identify a player row is by the link to their details page.
-        if (!row.includes('MbrDtlMain.php')) {
-            continue;
-        }
+      // Split the HTML by row tags to handle malformed nested tables.
+      const rowChunks = html.split(/<tr/i);
 
-        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-        
-        // A valid player row has exactly 10 columns according to all examples.
-        if (cells.length !== 10) {
-            continue; 
-        }
+      for (const chunk of rowChunks) {
+          const rowHtml = '<tr' + chunk;
+          
+          // A real player row always contains this link.
+          if (!rowHtml.toLowerCase().includes('mbrdtlmain.php')) {
+              continue;
+          }
 
-        const player: Partial<PlayerSearchResult> = {};
+          const cells = rowHtml.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+          
+          // A valid player row has exactly 10 columns. This filters out header/footer/malformed rows.
+          if (cells.length !== 10) {
+              continue; 
+          }
 
-        // Column 0: USCF ID from text content
-        const uscfIdFromCell = stripTags(cells[0]);
-        if (!uscfIdFromCell || !/^\d+$/.test(uscfIdFromCell)) {
-            continue; // Not a valid player row if first cell isn't a plain ID.
-        }
-        player.uscfId = uscfIdFromCell;
+          const player: Partial<PlayerSearchResult> = {};
 
-        // Column 1: Rating
-        const ratingText = stripTags(cells[1]);
-        if (ratingText && ratingText.toLowerCase() !== 'unrated') {
-            // Extracts the first numeric part of the rating string (e.g., from "145/13").
-            const numericPartMatch = ratingText.match(/(\d+)/);
-            if (numericPartMatch && numericPartMatch[1]) {
-                player.rating = parseInt(numericPartMatch[1], 10);
-            }
-        }
+          // Column 0: USCF ID
+          player.uscfId = stripTags(cells[0]);
 
-        // Column 7: State
-        const stateText = stripTags(cells[7]);
-        if (stateText && /^[A-Z]{2}$/.test(stateText)) {
-            player.state = stateText;
-        }
-        
-        // Column 8: Expiration Date
-        const dateText = stripTags(cells[8]);
-        if (dateText && /^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
-            player.expirationDate = dateText;
-        }
-        
-        // Column 9: Name (and link)
-        const nameCellContent = cells[9];
-        const nameLinkMatch = nameCellContent.match(/<a href=[^>]+?\?(\d+)[^>]*>([\s\S]+?)<\/a>/i);
-        if (nameLinkMatch && nameLinkMatch[1] && nameLinkMatch[2]) {
-            const idFromLink = nameLinkMatch[1];
-            // Verify that the ID in the link matches the ID in the first column.
-            if (idFromLink !== player.uscfId) {
-                continue;
-            }
+          // Column 1: Rating
+          const ratingText = stripTags(cells[1]);
+          if (ratingText && ratingText.toLowerCase() !== 'unrated') {
+              const numericPartMatch = ratingText.match(/(\d+)/);
+              if (numericPartMatch && numericPartMatch[1]) {
+                  player.rating = parseInt(numericPartMatch[1], 10);
+              }
+          }
 
-            const fullNameRaw = stripTags(nameLinkMatch[2]); // Format: LAST, FIRST MIDDLE
-            const nameParts = fullNameRaw.split(',');
-            if (nameParts.length > 1) {
-                player.lastName = nameParts.shift()!.trim();
-                const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
-                player.firstName = firstAndMiddleParts.shift() || '';
-                player.middleName = firstAndMiddleParts.join(' ');
-            } else {
-                player.lastName = fullNameRaw;
-            }
-        } else {
-            // If the name cell doesn't have the expected link, this is not a valid player row.
-            continue;
-        }
-        
-        // Final check to ensure we have the essential data before adding.
-        if (player.uscfId && player.lastName) {
-            players.push(player as PlayerSearchResult);
-        }
+          // Column 7: State
+          player.state = stripTags(cells[7]);
+          
+          // Column 8: Expiration Date
+          player.expirationDate = stripTags(cells[8]);
+          
+          // Column 9: Name (and link)
+          const nameCellContent = cells[9];
+          const nameLinkMatch = nameCellContent.match(/<a href=[^>]+?\?(\d+)[^>]*>([\s\S]+?)<\/a>/i);
+          if (nameLinkMatch && nameLinkMatch[1] && nameLinkMatch[2]) {
+              const idFromLink = nameLinkMatch[1];
+              // Verify that the ID in the link matches the ID in the first column.
+              if (idFromLink !== player.uscfId) {
+                  continue;
+              }
+
+              const fullNameRaw = stripTags(nameLinkMatch[2]); // Format: LAST, FIRST MIDDLE
+              const nameParts = fullNameRaw.split(',');
+              if (nameParts.length > 1) {
+                  player.lastName = nameParts.shift()!.trim();
+                  const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
+                  player.firstName = firstAndMiddleParts.shift() || '';
+                  player.middleName = firstAndMiddleParts.join(' ');
+              } else {
+                  player.lastName = fullNameRaw;
+              }
+          } else {
+              // If the name cell doesn't have the expected link, this is not a valid player row.
+              continue;
+          }
+          
+          // Final check to ensure we have the essential data before adding.
+          if (player.uscfId && player.lastName) {
+              players.push(player as PlayerSearchResult);
+          }
       }
+
 
       if (players.length === 0 && !html.includes("No players found")) {
         console.error("USCF Search: Found a results page, but was unable to extract any player data. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
