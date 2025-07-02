@@ -84,27 +84,35 @@ const searchUscfPlayersFlow = ai.defineFlow(
       if (html.includes("No players found")) {
         return { players: [] };
       }
+
+      // Isolate the form containing the results. This is more robust.
+      const formMatch = html.match(/<FORM ACTION='.\/player-search.php'[\s\S]*?<\/FORM>/i);
+      if (!formMatch || !formMatch[0]) {
+          console.error("USCF Search: Could not find the results form container. The website layout may have changed. Snippet:", html.substring(0, 2000));
+          return { players: [], error: "Could not find the results form container. The website layout may have changed." };
+      }
+      const formHtml = formMatch[0];
       
       const players: PlayerSearchResult[] = [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-      // Split the HTML by row tags to handle malformed nested tables.
-      const rowChunks = html.split(/<tr/i);
+      // Find all table rows within the form.
+      const rowMatches = formHtml.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi);
+      if (!rowMatches) {
+        console.error("USCF Search: Found the form, but could not find any table rows within it. Snippet:", formHtml.substring(0, 1000));
+        return { players: [], error: "Found the form, but could not find any table rows within it." };
+      }
 
-      for (const chunk of rowChunks) {
-          // Reconstruct the row, removing a leading '>' if it exists from the split.
-          const reconstructedChunk = chunk.startsWith('>') ? chunk.substring(1) : chunk;
-          const rowHtml = '<tr' + reconstructedChunk;
-          
-          // A real player row always contains this link.
+      for (const rowHtml of rowMatches) {
+          // A real player row always contains this link. This is the most reliable check.
           if (!rowHtml.toLowerCase().includes('mbrdtlmain.php')) {
               continue;
           }
 
           const cells = rowHtml.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
           
-          // A valid player row has exactly 10 columns. This filters out header/footer/malformed rows.
           if (cells.length !== 10) {
+              // This row is not a standard player data row.
               continue; 
           }
 
@@ -131,6 +139,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
           // Column 9: Name (and link)
           const nameCellContent = cells[9];
           const nameLinkMatch = nameCellContent.match(/<a href=[^>]+?\?(\d+)[^>]*>([\s\S]+?)<\/a>/i);
+          
           if (nameLinkMatch && nameLinkMatch[1] && nameLinkMatch[2]) {
               const idFromLink = nameLinkMatch[1];
               // Verify that the ID in the link matches the ID in the first column.
@@ -158,7 +167,6 @@ const searchUscfPlayersFlow = ai.defineFlow(
               players.push(player as PlayerSearchResult);
           }
       }
-
 
       if (players.length === 0 && !html.includes("No players found")) {
         console.error("USCF Search: Found a results page, but was unable to extract any player data. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
