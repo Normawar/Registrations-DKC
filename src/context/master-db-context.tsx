@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 
 export type ImportedPlayer = {
   id: string; // A unique ID generated during import
@@ -23,10 +23,35 @@ interface MasterDbContextType {
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
-export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
-  const [database, setDatabase] = useState<ImportedPlayer[]>([]);
+const DB_STORAGE_KEY = 'master_player_database';
 
-  const isDbLoaded = database.length > 0;
+export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
+  const [database, _setDatabase] = useState<ImportedPlayer[]>([]);
+  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const storedDb = localStorage.getItem(DB_STORAGE_KEY);
+      if (storedDb) {
+        _setDatabase(JSON.parse(storedDb));
+      }
+    } catch (e) {
+      console.error("Failed to load master DB from localStorage", e);
+    } finally {
+        setIsStorageLoaded(true);
+    }
+  }, []);
+
+  const setDatabase = useCallback((players: ImportedPlayer[]) => {
+    try {
+        _setDatabase(players);
+        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(players));
+    } catch (e) {
+        console.error("Failed to save master DB to localStorage", e);
+    }
+  }, []);
+  
+  const isDbLoaded = isStorageLoaded && database.length > 0;
 
   return (
     <MasterDbContext.Provider value={{ database, setDatabase, isDbLoaded }}>
