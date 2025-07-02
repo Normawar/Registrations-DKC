@@ -198,7 +198,6 @@ export default function RosterPage() {
   const [searchFirstName, setSearchFirstName] = useState('');
   const [searchLastName, setSearchLastName] = useState('');
   const [searchState, setSearchState] = useState('ALL');
-  const [dbStates, setDbStates] = useState<string[]>(['ALL']);
   const { database: masterDatabase, isDbLoaded } = useMasterDb();
   
   const { profile } = useSponsorProfile();
@@ -224,15 +223,16 @@ export default function RosterPage() {
     }
   });
 
+  const dbStates = useMemo(() => {
+    if (isDbLoaded) {
+        const states = new Set(masterDatabase.map(p => p.state).filter(Boolean) as string[]);
+        return ['ALL', ...Array.from(states).sort()];
+    }
+    return ['ALL'];
+  }, [isDbLoaded, masterDatabase]);
+
   useEffect(() => {
     if (isDialogOpen) {
-      if (isDbLoaded) {
-          const states = new Set(masterDatabase.map(p => p.state).filter(Boolean) as string[]);
-          setDbStates(['ALL', ...Array.from(states).sort()]);
-      } else {
-          setDbStates(['ALL']);
-      }
-
       if (editingPlayer) {
         form.reset(editingPlayer);
       } else {
@@ -257,7 +257,7 @@ export default function RosterPage() {
         setSearchResults([]);
       }
     }
-  }, [isDialogOpen, editingPlayer, form, isDbLoaded, masterDatabase]);
+  }, [isDialogOpen, editingPlayer, form]);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...players];
@@ -575,30 +575,6 @@ export default function RosterPage() {
           </Card>
         )}
         
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-              <Button variant="outline">
-                  <Search className="mr-2 h-4 w-4" />
-                  Show/Hide Official USCF Player Search
-              </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-              <Card className="mt-4">
-                  <CardHeader>
-                      <CardTitle>USCF Player Search</CardTitle>
-                      <CardDescription>Use this tool to find player details from the official USCF website.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <iframe 
-                      src="https://www.uschess.org/datapage/player-search.php" 
-                      className="w-full h-96 border rounded-md"
-                      title="USCF Player Search"
-                    ></iframe>
-                  </CardContent>
-              </Card>
-          </CollapsibleContent>
-        </Collapsible>
-
         <Card>
           <CardContent className="pt-6">
             <Table>
@@ -725,14 +701,11 @@ export default function RosterPage() {
                         <Label>Last Name</Label>
                         <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
                     </div>
-                    <Button onClick={handlePerformSearch} disabled={isSearching || !isDbLoaded}>
+                    <Button onClick={handlePerformSearch} disabled={isSearching}>
                         {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
                         Search
                     </Button>
                 </div>
-                 {!isDbLoaded && (
-                    <p className="text-xs text-muted-foreground mt-2">To enable player search, first go to the <Link href="/players" className="underline">All Players</Link> page and upload the database file.</p>
-                 )}
                 {searchResults.length > 0 && (
                     <Card className="relative z-10 w-full mt-4 max-h-48 overflow-y-auto">
                         <CardContent className="p-2">
