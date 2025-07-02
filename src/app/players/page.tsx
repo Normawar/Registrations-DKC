@@ -273,64 +273,76 @@ export default function PlayersPage() {
       delimiter: "\t",
       skipEmptyLines: true,
       step: (results) => {
-        const row = results.data as string[];
-        
-        if (!row || row.length < 2) {
-            return;
-        }
-
-        const uscfId = row[1];
-        if (!/^\d{8}$/.test(uscfId)) {
-            return;
-        }
-
         try {
-          const namePart = row[0];
-          if (!namePart || !namePart.includes(',')) {
-            console.warn("Skipping row: Name does not contain a comma, likely a header or footer.", row);
-            errorCount++;
-            return;
-          }
-        
-          const nameParts = namePart.split(',');
-          const lastName = nameParts[0].trim();
-          const firstAndMiddleParts = (nameParts[1] || '').trim().split(' ').filter(p => p);
-          const firstName = firstAndMiddleParts.shift() || '';
-          const middleName = firstAndMiddleParts.join(' ');
+            const row = results.data as string[];
+            
+            if (!row || row.length < 2) {
+                return;
+            }
+            
+            const uscfId = row[1]?.trim();
+            if (!uscfId || !/^\d{8}$/.test(uscfId)) {
+                errorCount++;
+                return;
+            }
 
-          if (!firstName || !lastName) {
-            console.warn("Skipping row: Could not parse first/last name.", row);
-            errorCount++;
-            return;
-          }
-          
-          const expirationDateStr = row[2] || '';
-          const state = row[3] || '';
-          const regularRatingString = row[4] || '';
-          const quickRatingString = row[5] || '';
-          
-          let regularRating: number | undefined = undefined;
-          if (regularRatingString) {
-              const ratingMatch = regularRatingString.match(/^(\d+)/);
-              if (ratingMatch && ratingMatch[1]) {
-                regularRating = parseInt(ratingMatch[1], 10);
-              }
-          }
+            const namePart = row[0]?.trim();
+            if (!namePart) {
+                errorCount++;
+                return;
+            }
 
-          const newPlayer: ImportedPlayer = {
-            id: `p-${uscfId}`,
-            uscfId,
-            firstName,
-            lastName,
-            middleName: middleName || undefined,
-            expirationDate: expirationDateStr,
-            state: state,
-            regularRating: regularRating,
-            quickRating: quickRatingString || undefined,
-          };
-          importedPlayers.push(newPlayer);
+            let lastName = '';
+            let firstName = '';
+            let middleName = '';
+
+            if (namePart.includes(',')) {
+                // Handle "Last, First Middle" format
+                const nameParts = namePart.split(',');
+                lastName = nameParts[0].trim();
+                const firstAndMiddleParts = (nameParts[1] || '').trim().split(/\s+/).filter(Boolean);
+                firstName = firstAndMiddleParts.shift() || '';
+                middleName = firstAndMiddleParts.join(' ');
+            } else {
+                // Assume "First Middle Last" format for names without commas
+                const nameParts = namePart.split(/\s+/).filter(Boolean);
+                if (nameParts.length > 0) lastName = nameParts.pop() || '';
+                if (nameParts.length > 0) firstName = nameParts.shift() || '';
+                if (nameParts.length > 0) middleName = nameParts.join(' ');
+            }
+
+            if (!firstName || !lastName) {
+                errorCount++;
+                return;
+            }
+          
+            const expirationDateStr = row[2] || '';
+            const state = row[3] || '';
+            const regularRatingString = row[4] || '';
+            const quickRatingString = row[5] || '';
+            
+            let regularRating: number | undefined = undefined;
+            if (regularRatingString) {
+                const ratingMatch = regularRatingString.match(/^(\d+)/);
+                if (ratingMatch && ratingMatch[1]) {
+                    regularRating = parseInt(ratingMatch[1], 10);
+                }
+            }
+
+            const newPlayer: ImportedPlayer = {
+                id: `p-${uscfId}`,
+                uscfId,
+                firstName,
+                lastName,
+                middleName: middleName || undefined,
+                expirationDate: expirationDateStr,
+                state: state,
+                regularRating: regularRating,
+                quickRating: quickRatingString || undefined,
+            };
+            importedPlayers.push(newPlayer);
         } catch (e) {
-          console.error("Error parsing a player row:", row, e);
+          console.error("Error parsing a player row:", results.data, e);
           errorCount++;
         }
       },
@@ -346,7 +358,6 @@ export default function PlayersPage() {
         setMasterDatabase(newMasterList);
         
         setIsImporting(false);
-        // Dispatch a global event to notify other components (like Roster)
         window.dispatchEvent(new Event('masterDbUpdated'));
         
         let description = `Database updated with ${importedPlayers.length} records. The database now contains ${newMasterList.length} unique players for this session.`;
@@ -716,5 +727,3 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
-
-    
