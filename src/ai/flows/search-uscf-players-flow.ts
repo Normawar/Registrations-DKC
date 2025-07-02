@@ -84,54 +84,74 @@ const searchUscfPlayersFlow = ai.defineFlow(
       if (html.includes("No players found")) {
         return { players: [] };
       }
-
+      
       const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const players: PlayerSearchResult[] = [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-      for (const row of allHtmlRows) {
-        const linkMatch = row.match(/<a href=["']?https:\/\/www\.uschess\.org\/msa\/MbrDtlMain\.php\?(\d+)["']?\s*>([\s\S]+?)<\/a>/i);
-        
-        if (!linkMatch) {
-            continue;
-        }
+      // Find the index of the header row using the exact content provided by the user.
+      const headerRowIndex = allHtmlRows.findIndex(row => 
+          row.includes("<td>USCF ID</td>") &&
+          row.includes("<td>Rating</td>") &&
+          row.includes("<td>Name</td>")
+      );
 
-        const uscfId = linkMatch[1];
-        const fullNameRaw = stripTags(linkMatch[2]);
-        
-        const player: Partial<PlayerSearchResult> = { uscfId };
+      if (headerRowIndex === -1) {
+          console.error("USCF Search: Could not find the results table header. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
+          return { players: [], error: "Could not find the results table header. The website layout may have changed." };
+      }
 
-        const nameParts = fullNameRaw.split(',');
-        if (nameParts.length > 1) {
-            player.lastName = nameParts.shift()!.trim();
-            const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
-            player.firstName = firstAndMiddleParts.shift() || '';
-            player.middleName = firstAndMiddleParts.join(' ');
-        } else {
-            player.lastName = fullNameRaw;
-        }
+      // The player rows are all the rows after the header.
+      const playerRows = allHtmlRows.slice(headerRowIndex + 1);
 
+      for (const row of playerRows) {
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-        const cellData = cells.map(stripTags);
         
-        if (cellData.length < 9) {
+        // A valid player row has 10 columns according to the provided HTML.
+        if (cells.length < 10) {
+            continue; 
+        }
+
+        const player: Partial<PlayerSearchResult> = {};
+
+        // Extract Name and USCF ID from the link in column 9.
+        const nameCellContent = cells[9];
+        const linkMatch = nameCellContent.match(/<a href=["']?https:\/\/www\.uschess\.org\/msa\/MbrDtlMain\.php\?(\d+)["']?\s*>([\s\S]+?)<\/a>/i);
+        
+        if (linkMatch) {
+            player.uscfId = linkMatch[1];
+            const fullNameRaw = stripTags(linkMatch[2]); // e.g., "CASTILLO, COSME"
+            const nameParts = fullNameRaw.split(',');
+            if (nameParts.length > 1) {
+                player.lastName = nameParts.shift()!.trim();
+                const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
+                player.firstName = firstAndMiddleParts.shift() || '';
+                player.middleName = firstAndMiddleParts.join(' ');
+            } else {
+                player.lastName = fullNameRaw;
+            }
+        } else {
+            // If there's no valid link, it's not a player row.
             continue;
         }
-        
-        const ratingText = cellData[1];
+
+        // Extract Rating from column 1.
+        const ratingText = stripTags(cells[1]);
         if (ratingText && ratingText.toLowerCase() !== 'unrated') {
-            const numericPartMatch = ratingText.match(/(\d+)/);
+            const numericPartMatch = ratingText.match(/(\d+)/); // Extracts the first number, handles "145/13"
             if (numericPartMatch && numericPartMatch[1]) {
                 player.rating = parseInt(numericPartMatch[1], 10);
             }
         }
 
-        const stateText = cellData[7];
+        // Extract State from column 7.
+        const stateText = stripTags(cells[7]);
         if (stateText && /^[A-Z]{2}$/.test(stateText)) {
             player.state = stateText;
         }
         
-        const dateText = cellData[8];
+        // Extract Expiration Date from column 8.
+        const dateText = stripTags(cells[8]);
         if (dateText && /^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
             player.expirationDate = dateText;
         }
