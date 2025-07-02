@@ -98,6 +98,7 @@ import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Label } from '@/components/ui/label';
 import { getMasterDatabase, isMasterDatabaseLoaded, type ImportedPlayer } from '@/lib/data/master-player-store';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { searchUscfPlayers, type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
 
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
@@ -191,12 +192,12 @@ export default function RosterPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
 
-  // States for internal DB search
-  const [searchQuery, setSearchQuery] = useState('');
+  // States for player search
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
+  const [searchFirstName, setSearchFirstName] = useState('');
+  const [searchLastName, setSearchLastName] = useState('');
   const [searchState, setSearchState] = useState('ALL');
-  const [dbSearchResults, setDbSearchResults] = useState<ImportedPlayer[]>([]);
-  const [isDbSearching, setIsDbSearching] = useState(false);
-  const [isDbLoaded, setIsDbLoaded] = useState(false);
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -220,74 +221,6 @@ export default function RosterPage() {
       studentType: undefined,
     }
   });
-  
-  const uniqueStates = useMemo(() => {
-    const masterDb = getMasterDatabase();
-    if (masterDb.length === 0) return ['ALL'];
-    const states = new Set(masterDb.map(p => p.state).filter(Boolean) as string[]);
-    return ['ALL', ...Array.from(states).sort()];
-  }, [isDbLoaded]);
-
-  // Debounced search for the master database
-  useEffect(() => {
-    if (searchQuery.length < 3) {
-      setDbSearchResults([]);
-      return;
-    }
-    setIsDbSearching(true);
-    const handler = setTimeout(() => {
-        let masterDb = getMasterDatabase();
-
-        if (searchState !== 'ALL') {
-            masterDb = masterDb.filter(p => p.state === searchState);
-        }
-
-        const lowerCaseQuery = searchQuery.toLowerCase();
-        const results = masterDb.filter(p => {
-            const fullName = [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ').toLowerCase();
-            return fullName.includes(lowerCaseQuery) || p.uscfId.toLowerCase().includes(lowerCaseQuery);
-        }).slice(0, 10);
-        setDbSearchResults(results);
-        setIsDbSearching(false);
-    }, 300);
-
-    return () => clearTimeout(handler);
-  }, [searchQuery, searchState]);
-  
-  // This effect checks DB status on mount and listens for updates from other pages
-  useEffect(() => {
-    const updateDbStatus = () => setIsDbLoaded(isMasterDatabaseLoaded());
-    
-    updateDbStatus(); // Initial check on mount
-    window.addEventListener('masterDbUpdated', updateDbStatus);
-    
-    return () => {
-      window.removeEventListener('masterDbUpdated', updateDbStatus);
-    };
-  }, []);
-
-  const handleSelectDbPlayer = (player: ImportedPlayer) => {
-    form.reset(); // Clear previous form state
-    form.setValue('firstName', player.firstName || '');
-    form.setValue('lastName', player.lastName || '');
-    form.setValue('middleName', player.middleName || '');
-    form.setValue('uscfId', player.uscfId || '');
-    form.setValue('regularRating', player.regularRating);
-    form.setValue('quickRating', player.quickRating || '');
-    
-    if (player.expirationDate) {
-        // The master DB stores dates as MM/dd/yyyy
-        const expDate = parse(player.expirationDate, 'MM/dd/yyyy', new Date());
-        if (isValid(expDate)) {
-            form.setValue('uscfExpiration', expDate);
-        }
-    }
-    
-    setDbSearchResults([]); // Clear search results after selection
-    setSearchQuery('');
-    toast({ title: 'Player Selected', description: `${player.firstName} ${player.lastName}'s data has been auto-filled.` });
-  };
-
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...players];
@@ -386,8 +319,9 @@ export default function RosterPage() {
           zipCode: '',
           studentType: undefined,
         });
-        setSearchQuery('');
-        setDbSearchResults([]);
+        setSearchFirstName('');
+        setSearchLastName('');
+        setSearchResults([]);
       }
     }
   }, [isDialogOpen, editingPlayer, form]);
@@ -511,6 +445,53 @@ export default function RosterPage() {
     setIsDialogOpen(false);
     setEditingPlayer(null);
   }
+  
+  const handlePerformSearch = async () => {
+    if (!searchLastName) {
+      toast({ variant: 'destructive', title: 'Last Name Required', description: 'Please enter a last name to search.' });
+      return;
+    }
+    setIsSearching(true);
+    setSearchResults([]);
+    try {
+      const result = await searchUscfPlayers({ 
+        firstName: searchFirstName, 
+        lastName: searchLastName, 
+        state: searchState 
+      });
+      if (result.error) {
+        toast({ variant: 'destructive', title: 'Search Error', description: result.error });
+      }
+      setSearchResults(result.players);
+    } catch (e) {
+      const description = e instanceof Error ? e.message : 'An unknown error occurred.';
+      toast({ variant: 'destructive', title: 'Search Failed', description: description });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+  
+  const handleSelectSearchedPlayer = (player: PlayerSearchResult) => {
+    form.reset(); // Clear previous form state
+    form.setValue('firstName', player.firstName || '');
+    form.setValue('lastName', player.lastName || '');
+    form.setValue('middleName', player.middleName || '');
+    form.setValue('uscfId', player.uscfId || '');
+    form.setValue('regularRating', player.rating);
+    form.setValue('quickRating', player.quickRating || '');
+    
+    if (player.expirationDate) {
+        const expDate = parse(player.expirationDate, 'yyyy-MM-dd', new Date());
+        if (isValid(expDate)) {
+            form.setValue('uscfExpiration', expDate);
+        }
+    }
+    
+    setSearchResults([]);
+    setSearchFirstName('');
+    setSearchLastName('');
+    toast({ title: 'Player Selected', description: `${player.firstName} ${player.lastName}'s data has been auto-filled.` });
+  };
 
   return (
     <AppLayout>
@@ -572,6 +553,30 @@ export default function RosterPage() {
               </CardContent>
           </Card>
         )}
+        
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+              <Button variant="outline">
+                  <Search className="mr-2 h-4 w-4" />
+                  Show/Hide Official USCF Player Search
+              </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+              <Card className="mt-4">
+                  <CardHeader>
+                      <CardTitle>USCF Player Search</CardTitle>
+                      <CardDescription>Use this tool to find player details from the official USCF website.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <iframe 
+                      src="https://www.uschess.org/datapage/player-search.php" 
+                      className="w-full h-96 border rounded-md"
+                      title="USCF Player Search"
+                    ></iframe>
+                  </CardContent>
+              </Card>
+          </CollapsibleContent>
+        </Collapsible>
 
         <Card>
           <CardContent className="pt-6">
@@ -678,64 +683,60 @@ export default function RosterPage() {
           
           <Card className="bg-muted/50">
             <CardHeader>
-                <CardTitle className="text-base">Master Database Search</CardTitle>
+                <CardTitle className="text-base">Live USCF Player Search</CardTitle>
+                <CardDescription>Find a player on the USCF website to auto-fill their information.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr] gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="space-y-2">
                         <Label>State</Label>
-                        <Select value={searchState} onValueChange={setSearchState} disabled={!isDbLoaded}>
-                            <SelectTrigger><SelectValue placeholder="Select State" /></SelectTrigger>
+                        <Select value={searchState} onValueChange={setSearchState}>
+                            <SelectTrigger><SelectValue placeholder="All States"/></SelectTrigger>
                             <SelectContent>
-                                {uniqueStates.map(state => (
-                                    <SelectItem key={state} value={state}>{state}</SelectItem>
-                                ))}
+                                <SelectItem value="ALL">All States</SelectItem>
+                                <SelectItem value="TX">Texas</SelectItem>
+                                <SelectItem value="CA">California</SelectItem>
+                                <SelectItem value="FL">Florida</SelectItem>
+                                <SelectItem value="NY">New York</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
                     <div className='space-y-2'>
-                        <Label>Player Name or USCF ID</Label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder={isDbLoaded ? "Search..." : 'Upload DB on "All Players" page'}
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                className="pl-10"
-                                disabled={!isDbLoaded}
-                            />
-                        </div>
+                        <Label>First Name (Optional)</Label>
+                        <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
                     </div>
+                    <div className='space-y-2'>
+                        <Label>Last Name</Label>
+                        <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
+                    </div>
+                    <Button onClick={handlePerformSearch} disabled={isSearching || !searchLastName}>
+                        {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
+                        Search
+                    </Button>
                 </div>
-                {searchQuery.length > 2 && (
-                    <Card className="relative z-10 w-full mt-1 max-h-48 overflow-y-auto">
+                {searchResults.length > 0 && (
+                    <Card className="relative z-10 w-full mt-4 max-h-48 overflow-y-auto">
                         <CardContent className="p-2">
-                            {isDbSearching ? (<div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>)
-                            : dbSearchResults.length === 0 ? (<div className="p-2 text-center text-sm text-muted-foreground">No results found.</div>)
-                            : (
-                                <>
-                                {dbSearchResults.map(p => (
-                                    <button
-                                        key={p.id}
-                                        type="button"
-                                        className="w-full text-left p-2 hover:bg-accent rounded-md"
-                                        onClick={() => handleSelectDbPlayer(p)}
-                                    >
-                                        <p className="font-medium">{p.firstName} {p.lastName} ({p.state})</p>
-                                        <p className="text-sm text-muted-foreground">ID: {p.uscfId} | Rating: {p.regularRating || 'N/A'}</p>
-                                    </button>
-                                ))}
-                                {dbSearchResults.length > 1 && (
-                                    <Alert variant="default" className="mt-2">
-                                        <Info className="h-4 w-4" />
-                                        <AlertTitle>Multiple Results</AlertTitle>
-                                        <AlertDescription>
-                                            Multiple players match this name. Please verify the correct player on the official USCF website if needed.
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
-                                </>
-                            )}
+                          {searchResults.map(p => (
+                              <button
+                                  key={p.uscfId}
+                                  type="button"
+                                  className="w-full text-left p-2 hover:bg-accent rounded-md"
+                                  onClick={() => handleSelectSearchedPlayer(p)}
+                              >
+                                  <p className="font-medium">{p.firstName} {p.lastName} ({p.state})</p>
+                                  <p className="text-sm text-muted-foreground">ID: {p.uscfId} | Rating: {p.rating || 'N/A'}</p>
+                              </button>
+                          ))}
+                          {searchResults.length > 1 && (
+                              <Alert variant="default" className="mt-2">
+                                  <Info className="h-4 w-4" />
+                                  <AlertTitle>Multiple Results</AlertTitle>
+                                  <AlertDescription>
+                                      Multiple players match this name. Please verify the correct player on the official USCF website if needed.
+                                  </AlertDescription>
+                              </Alert>
+                          )}
                         </CardContent>
                     </Card>
                 )}
@@ -787,9 +788,6 @@ export default function RosterPage() {
                     </div>
                     <FormDescription>
                       Students without a USCF ID can be added with &quot;NEW&quot;.
-                      <Link href="https://new.uschess.org/player-search" target="_blank" className="ml-1 text-primary underline">
-                        Find USCF Number on official website
-                      </Link>
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

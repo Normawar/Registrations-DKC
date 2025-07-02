@@ -121,7 +121,15 @@ const searchUscfPlayersFlow = ai.defineFlow(
       // If no list was found, it might be a single player page (MbrDtlMain.php or thin3.php).
       // We can parse the data directly from this page.
       const idMatch = html.match(/<b>(\d{8}):\s*.*?<\/b>/i);
-      const uscfId = idMatch ? idMatch[1] : null;
+      let uscfId = idMatch ? idMatch[1] : null;
+
+      // Handle cases where the ID is in a different format on a direct-hit page
+      if (!uscfId) {
+        const directHitIdMatch = html.match(/USCF ID:\s*<\/td>\s*<td[^>]*>(\d{8})<\/td>/i);
+        if (directHitIdMatch) {
+            uscfId = directHitIdMatch[1];
+        }
+      }
 
       if (uscfId) {
         // This is a MbrDtlMain.php page, let's try to parse it directly.
