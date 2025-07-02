@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF MSA website.
@@ -85,13 +84,14 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Isolate the results table to avoid parsing other tables on the page.
-      const resultsTableMatch = html.match(/<div class='contentheading'>Player Search Results<\/div>([\s\S]*?)<\/table>/i);
-      if (!resultsTableMatch || !resultsTableMatch[0]) {
+      // Isolate the results table by looking for the one that contains player links. This is more robust than looking for a class name.
+      const allTables = html.match(/<table[^>]*>[\s\S]*?<\/table>/gi) || [];
+      const resultsTableHtml = allTables.find(table => table.includes('MbrDtlMain.php'));
+
+      if (!resultsTableHtml) {
           console.error("USCF Search: Could not find the main results table container. The website layout may have changed.");
           return { players: [], error: "Could not find the main results table container. The website layout may have changed." };
       }
-      const resultsTableHtml = resultsTableMatch[0];
       
       const allHtmlRows = resultsTableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
