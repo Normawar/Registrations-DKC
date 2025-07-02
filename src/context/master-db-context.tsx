@@ -37,23 +37,29 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Initial load
+  // Set up listeners for storage changes
   useEffect(() => {
+    // Initial load
     loadFromStorage();
-  }, [loadFromStorage]);
-  
-  // Listen for changes from other tabs/windows
-  useEffect(() => {
+    
+    // Listen for changes from other tabs/windows
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === DB_STORAGE_KEY) {
         loadFromStorage();
       }
     };
+    
+    // Listen for same-tab updates
+    const handleDbUpdate = () => {
+      loadFromStorage();
+    };
 
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('masterDbUpdate', handleDbUpdate);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('masterDbUpdate', handleDbUpdate);
     };
   }, [loadFromStorage]);
 
@@ -62,6 +68,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     try {
         _setDatabase(players);
         localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(players));
+        // Defer dispatch to ensure it happens after the current render cycle.
+        setTimeout(() => window.dispatchEvent(new Event('masterDbUpdate')), 0);
     } catch (e) {
         console.error("Failed to save master DB to localStorage", e);
     }
