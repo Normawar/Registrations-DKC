@@ -87,14 +87,17 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Step 2: Extract all unique USCF IDs from the links on the page using a robust regex loop.
+      // Step 2: Extract all unique USCF IDs by splitting the page by the player link anchor.
       const ids = new Set<string>();
-      const idRegex = /MbrDtlMain\.php\?(\d+)/gi;
-      let match;
-      while ((match = idRegex.exec(html)) !== null) {
-          if (match[1]) {
-              ids.add(match[1]);
-          }
+      const chunks = html.split(/MbrDtlMain\.php\?/gi);
+
+      // The first chunk is before the first match, so we skip it (i=1).
+      for (let i = 1; i < chunks.length; i++) {
+        // The ID will be the digits at the very beginning of the chunk.
+        const idMatch = chunks[i].match(/^(\d+)/);
+        if (idMatch && idMatch[1]) {
+          ids.add(idMatch[1]);
+        }
       }
       
       if (ids.size === 0) {
