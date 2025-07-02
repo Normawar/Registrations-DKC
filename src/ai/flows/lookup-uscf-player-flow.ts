@@ -60,17 +60,17 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      // A simple check to see if the page is what we expect. A valid page will have "USCF Member Lookup".
-      if (text.includes("Invalid ID") || !text.includes("USCF Member Lookup")) {
-        return { uscfId, error: "Player not found with this USCF ID." };
+      // A simple check to see if the page is what we expect. A valid thin3.php page has this heading.
+      if (!text.includes("<h2>USCF Member Lookup</h2>")) {
+        return { uscfId, error: "Player not found or invalid page returned from USCF." };
       }
       
       const output: LookupUscfPlayerOutput = { uscfId };
 
-      // Helper function to extract the value from an input tag, handling unquoted attributes.
+      // Helper function to extract the value from an input tag's value attribute.
+      // This is robust for the unquoted attributes and simple structure of thin3.php
       const extractInputValue = (html: string, name: string): string | null => {
-        // This regex looks for name=theName, then any characters that are not '>', then value='theValue'
-        const regex = new RegExp(`name=${name}[^>]*value='([^']*)'`, 'i');
+        const regex = new RegExp(`name=${name}.*?value='(.*?)'`, 'is');
         const match = html.match(regex);
         return match ? match[1].trim() : null;
       };
@@ -79,16 +79,22 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       const fullName = extractInputValue(text, 'memname');
       if (fullName) {
           const nameParts = fullName.split(' ').filter(p => p);
-          output.lastName = nameParts.pop() || '';
-          output.firstName = nameParts.shift() || '';
-          output.middleName = nameParts.join(' ');
+          if (nameParts.length > 0) {
+              output.lastName = nameParts.pop() || '';
+          }
+          if (nameParts.length > 0) {
+              output.firstName = nameParts.shift() || '';
+          }
+          if (nameParts.length > 0) {
+             output.middleName = nameParts.join(' ');
+          }
       }
 
       // Extract State
-      output.state = extractInputValue(text, 'state_country');
+      output.state = extractInputValue(text, 'state_country') || undefined;
       
-      // Extract Membership Expiration Date
-      output.expirationDate = extractInputValue(text, 'memexpdt');
+      // Extract Membership Expiration Date from its dedicated field
+      output.expirationDate = extractInputValue(text, 'memexpdt') || undefined;
       
       // Extract Regular Rating from the combined field
       const ratingString = extractInputValue(text, 'rating1');
