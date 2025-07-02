@@ -43,7 +43,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       return { uscfId: '', error: 'A USCF ID must be provided.' };
     }
     
-    // Use the simpler, more reliable 'thin' details page
+    // Use the simpler, more reliable 'thin3' details page which returns data in input fields.
     const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
     
     try {
@@ -68,32 +68,47 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = { uscfId };
 
-      const nameMatch = text.match(/Name\s+(.*)/);
-      if (nameMatch && nameMatch[1]) {
-          const rawName = nameMatch[1].trim();
-          const nameParts = rawName.split(/\s+/).filter(Boolean);
-          if (nameParts.length > 0) {
-            output.lastName = nameParts.pop() || '';
-            output.firstName = nameParts.shift() || '';
-            output.middleName = nameParts.join(' ');
-          }
+      // Helper function to extract value from an <input> tag based on its name attribute.
+      const getInputValue = (name: string): string | null => {
+        const regex = new RegExp(`<input[^>]+name=['"]?${name}['"]?[^>]+value=['"]([^'"]+)['"]`, 'i');
+        const match = text.match(regex);
+        return match ? match[1].trim() : null;
+      };
+
+      // Extract Name
+      const rawName = getInputValue('p_name'); // Format: LASTNAME, FIRSTNAME MIDDLENAME
+      if (rawName) {
+        const [lastName, firstAndMiddle] = rawName.split(',').map(s => s.trim());
+        output.lastName = lastName;
+        if (firstAndMiddle) {
+          const nameParts = firstAndMiddle.split(/\s+/).filter(Boolean);
+          output.firstName = nameParts.shift() || '';
+          output.middleName = nameParts.join(' ');
+        }
       }
 
-      const ratingMatch = text.match(/Reg\. Rating\s+(\d+)/);
-      if (ratingMatch && ratingMatch[1]) {
-        output.rating = parseInt(ratingMatch[1], 10);
+      // Extract Rating and Expiration Date from the same input field
+      const ratingAndExpValue = getInputValue('rating1'); // Format: '319* 2024-02-01' or 'UNRATED'
+      if (ratingAndExpValue && !ratingAndExpValue.toLowerCase().includes('unrated')) {
+        const parts = ratingAndExpValue.split(/\s+/).filter(Boolean);
+        const ratingStr = parts[0]?.replace(/[^\d]/g, ''); // Get only digits from first part
+        if (ratingStr) {
+          output.rating = parseInt(ratingStr, 10);
+        }
+
+        // The date is typically the last part
+        const datePart = parts[parts.length - 1];
+        if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+            output.expirationDate = datePart;
+        }
+      }
+
+      // Extract State
+      const state = getInputValue('p_state');
+      if (state) {
+        output.state = state;
       }
       
-      const expirationMatch = text.match(/Expires\s+([\d-]+)/);
-      if (expirationMatch && expirationMatch[1]) {
-        output.expirationDate = expirationMatch[1];
-      }
-
-      const stateMatch = text.match(/State\/Country\s+([A-Z]{2})/);
-       if (stateMatch && stateMatch[1]) {
-         output.state = stateMatch[1];
-       }
-
       if (!output.lastName && !output.firstName) {
         return { uscfId, error: "Could not parse player name from the details page." };
       }
