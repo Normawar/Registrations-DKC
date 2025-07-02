@@ -89,7 +89,7 @@ type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
 export default function PlayersPage() {
   const { toast } = useToast();
-  const { database: masterDatabase, setDatabase, isDbLoaded } = useMasterDb();
+  const { database: masterDatabase, setDatabase, isDbLoaded, dbPlayerCount } = useMasterDb();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -147,9 +147,9 @@ export default function PlayersPage() {
     setIsAlertOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (playerToDelete) {
-        setDatabase(masterDatabase.filter(p => p.id !== playerToDelete.id));
+        await setDatabase(masterDatabase.filter(p => p.id !== playerToDelete.id));
         toast({ title: "Player Removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed.`});
     }
     setIsAlertOpen(false);
@@ -175,18 +175,19 @@ export default function PlayersPage() {
     }
   };
 
-  function onSubmit(values: PlayerFormValues) {
+  async function onSubmit(values: PlayerFormValues) {
+    let updatedPlayer: MasterPlayer;
     if (editingPlayer) {
-      const updatedPlayer: MasterPlayer = {
+      updatedPlayer = {
         ...editingPlayer,
         ...values
       };
-      setDatabase(masterDatabase.map(p => 
+      await setDatabase(masterDatabase.map(p => 
         p.id === editingPlayer.id ? updatedPlayer : p
       ));
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s data has been updated.`});
     } else {
-      const newPlayer: MasterPlayer = {
+      updatedPlayer = {
         id: `p-${Date.now()}`,
         firstName: values.firstName,
         middleName: values.middleName,
@@ -201,7 +202,7 @@ export default function PlayersPage() {
         events: 0,
         eventIds: [],
       };
-      setDatabase([...masterDatabase, newPlayer]);
+      await setDatabase([...masterDatabase, updatedPlayer]);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added.`});
     }
     setIsDialogOpen(false);
@@ -316,19 +317,38 @@ export default function PlayersPage() {
                     setTimeout(processChunk, 0); // Yield to the browser
                 } else {
                     const newMasterList = Array.from(dbMap.values());
-                    setDatabase(newMasterList);
-                    setCurrentPage(1); // Reset to first page after import
-                    
-                    setIsImporting(false);
-                    
-                    let description = `Database updated. Processed ${rows.length} records. The database now contains ${newMasterList.length} unique players.`;
-                    if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
-                    
                     updateToast({
-                      title: 'Import Complete',
-                      description: description,
-                      duration: 5000,
+                        title: 'Saving to Database',
+                        description: `Saving ${newMasterList.length} records. This may take a moment...`,
                     });
+                    
+                    (async () => {
+                        try {
+                            await setDatabase(newMasterList);
+                            
+                            setCurrentPage(1);
+                            setIsImporting(false);
+                            
+                            let description = `Database updated. The database now contains ${newMasterList.length} unique players.`;
+                            if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
+
+                            updateToast({
+                                title: 'Import Complete',
+                                description: description,
+                                duration: 5000,
+                            });
+                        } catch(err) {
+                            console.error("Failed to save to database", err);
+                            const description = err instanceof Error ? err.message : 'An unknown error occurred.';
+                             updateToast({
+                                variant: 'destructive',
+                                title: 'Database Save Error',
+                                description: description,
+                                duration: 10000,
+                            });
+                             setIsImporting(false);
+                        }
+                    })();
                 }
             }
             
@@ -523,9 +543,9 @@ export default function PlayersPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Master Player List</CardTitle>
+            <CardTitle>Master Player List ({isDbLoaded ? dbPlayerCount.toLocaleString() : '...'} players)</CardTitle>
             <CardDescription>
-                This is the central database of all known players. Upload a tab-delimited file to populate or update it. This database is used for the search function on the Roster page.
+                This is the central database of all known players, stored in your browser. Upload a tab-delimited file to populate or update it. This database is used for the search function on the Roster page.
             </CardDescription>
           </CardHeader>
           <CardContent>
