@@ -435,7 +435,7 @@ export default function PlayersPage() {
               type="file"
               ref={fileInputRef}
               className="hidden"
-              accept=".csv"
+              accept=".csv,.txt,.tsv"
               onChange={handleFileImport}
             />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
