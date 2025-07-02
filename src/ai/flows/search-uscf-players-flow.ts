@@ -123,17 +123,16 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 continue;
             }
             
-            // Check for Rating: number, P-number, or number/number
-            const mainRatingPart = text.split('/')[0].trim();
-            const ratingMatch = mainRatingPart.match(/^P?(\d+)$/);
-            if (ratingMatch && player.rating === undefined) {
-                // To avoid confusing ID with rating, check if the raw cell text is just a number.
-                // The ID column is just a number, the rating column might have "/games" or be "Unrated".
-                // This heuristic is not perfect but helps. A more complex solution would map headers.
-                if(text.includes('/') || text.toUpperCase().startsWith('P') || !/^\d+$/.test(text) || text !== uscfId) {
-                   player.rating = parseInt(ratingMatch[1], 10);
-                   continue;
-                }
+            // Check for a rating. A rating is a number, possibly with extra text (e.g., "/13", "(P6)").
+            // It extracts the first number found in the cell's text.
+            const ratingMatch = text.match(/(\d+)/);
+            if (ratingMatch && ratingMatch[0] && player.rating === undefined) {
+              // Heuristic to avoid confusing an ID with a rating. A rating is unlikely to be identical to the uscfId.
+              // A cell with just a number that matches the ID is almost certainly the ID column.
+              if (text !== uscfId) {
+                player.rating = parseInt(ratingMatch[0], 10);
+                continue;
+              }
             }
 
             // Check for State

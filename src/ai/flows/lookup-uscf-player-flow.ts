@@ -85,9 +85,10 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       const ratingLineMatch = text.match(/Regular:\s*(.*)/);
       if (ratingLineMatch && ratingLineMatch[1]) {
         const ratingText = ratingLineMatch[1].trim();
-        // This regex handles normal ratings (e.g. "1818"), ratings with provisional info ("829 / P6" or "145/13"), and provisional-only ratings ("P1200").
-        const mainRatingPart = ratingText.split('/')[0].trim();
-        const numericPartMatch = mainRatingPart.match(/^P?(\d+)/);
+        // This regex handles normal ratings ("1818"), ratings with game counts ("105 (Based on 4 games)"),
+        // and ratings with provisional info ("829 / P6", "145/13", "P1200").
+        // It extracts the first numeric part of the rating string.
+        const numericPartMatch = ratingText.match(/(\d+)/);
         if (numericPartMatch && numericPartMatch[1]) {
             output.rating = parseInt(numericPartMatch[1], 10);
         }
