@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Looks up a USCF player by their ID from the USCF MSA website.
+ * @fileOverview Looks up a USCF player by their ID from the USCF MSA website using the stable thin3.php endpoint.
  *
  * - lookupUscfPlayer - A function that handles the player lookup process.
  * - LookupUscfPlayerInput - The input type for the lookupUscfPlayer function.
@@ -63,7 +63,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = { uscfId };
 
-      // Helper function to extract the value from an input tag
+      // Helper function to extract the value from an input tag, handling unquoted attributes.
       const extractInputValue = (html: string, name: string): string | null => {
         const regex = new RegExp(`name=${name}[^>]*value='([^']*)'`, 'i');
         const match = html.match(regex);
@@ -80,18 +80,12 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       }
 
       // Extract State
-      const state = extractInputValue(text, 'state_country');
-      if (state) {
-        output.state = state;
-      }
-
+      output.state = extractInputValue(text, 'state_country');
+      
       // Extract Membership Expiration Date
-      const expirationDate = extractInputValue(text, 'memexpdt');
-      if (expirationDate) {
-        output.expirationDate = expirationDate;
-      }
-
-      // Extract Regular Rating
+      output.expirationDate = extractInputValue(text, 'memexpdt');
+      
+      // Extract Regular Rating from the combined field
       const ratingString = extractInputValue(text, 'rating1');
       if (ratingString && ratingString.toLowerCase() !== 'unrated') {
         const ratingMatch = ratingString.match(/^(\d+)/);
