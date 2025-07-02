@@ -239,60 +239,86 @@ export default function PlayersPage() {
     if (!file) return;
 
     Papa.parse(file, {
-      header: true,
+      delimiter: "\t",
       skipEmptyLines: true,
       complete: (results) => {
-        const requiredHeaders = ['USCF_ID', 'FIRST_NAME', 'LAST_NAME', 'RATING', 'DISTRICT', 'SCHOOL'];
-        const fileHeaders = results.meta.fields || [];
-        const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
-
-        if (missingHeaders.length > 0) {
-            toast({ variant: 'destructive', title: 'Import Failed', description: `CSV is missing required columns: ${missingHeaders.join(', ')}` });
-            return;
-        }
-
         const existingIds = new Set(players.map(p => p.uscfId));
         let addedCount = 0;
         let skippedCount = 0;
-        
-        const playersFromCsv: Player[] = results.data
-          .map((row: any, index: number): Player | null => {
-            const uscfId = row.USCF_ID?.trim();
-            if (!uscfId) return null; // Skip rows without an ID
+        let errorCount = 0;
 
-            return {
-              id: `p-${uscfId}-${Date.now()}-${index}`,
+        const newPlayers: Player[] = [];
+
+        for (const row of results.data as string[][]) {
+          try {
+            if (row.length < 5) {
+                if(row.length > 0 && row[0]) {
+                  console.warn("Skipping malformed row:", row);
+                  errorCount++;
+                }
+                continue;
+            }
+
+            const namePart = row[0];
+            const uscfId = row[1];
+            const ratingString = row[4];
+
+            if (!namePart || !uscfId) {
+                errorCount++;
+                continue;
+            }
+
+            const nameParts = namePart.split(',');
+            if (nameParts.length < 2) {
+                console.warn("Skipping row with malformed name:", row);
+                errorCount++;
+                continue;
+            }
+            const lastName = nameParts[0].trim();
+            const firstAndMiddleParts = nameParts[1].trim().split(' ').filter(p => p);
+            const firstName = firstAndMiddleParts.shift() || '';
+            const middleName = firstAndMiddleParts.join(' ');
+            
+            if (!firstName || !lastName) {
+                console.warn("Skipping row with missing first/last name:", row);
+                errorCount++;
+                continue;
+            }
+            
+            const rating = parseInt(ratingString.replace('*', ''), 10) || 0;
+
+            const newPlayer: Player = {
+              id: `p-${uscfId}-${Date.now()}-${Math.random()}`,
               uscfId: uscfId,
-              firstName: row.FIRST_NAME?.trim() || '',
-              lastName: row.LAST_NAME?.trim() || '',
-              middleName: row.MIDDLE_NAME?.trim() || '',
-              rating: parseInt(row.RATING, 10) || 0,
-              school: row.SCHOOL?.trim() || 'N/A',
-              district: row.DISTRICT?.trim() || 'N/A',
+              firstName: firstName,
+              lastName: lastName,
+              middleName: middleName || undefined,
+              rating: rating,
+              school: 'Independent',
+              district: 'None',
               events: 0,
               eventIds: [],
             };
-          })
-          .filter((p): p is Player => p !== null);
 
-        const newPlayers = playersFromCsv.filter(p => {
-            if (p.uscfId && p.firstName && p.lastName) {
-                if (existingIds.has(p.uscfId)) {
-                    skippedCount++;
-                    return false;
-                }
-                addedCount++;
-                return true;
-            }
-            skippedCount++;
-            return false;
-        });
+            newPlayers.push(newPlayer);
+            existingIds.add(uscfId);
+            addedCount++;
+
+          } catch (e) {
+            console.error("Error parsing row:", row, e);
+            errorCount++;
+          }
+        }
 
         if (newPlayers.length > 0) {
             setPlayers(prev => [...prev, ...newPlayers]);
         }
 
-        toast({ title: 'Import Complete', description: `Added ${addedCount} new players. Skipped ${skippedCount} duplicate or invalid rows.` });
+        let description = `Added ${addedCount} new players.`;
+        if (skippedCount > 0) description += ` Skipped ${skippedCount} duplicate players.`;
+        if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
+        
+        toast({ title: 'Import Complete', description: description });
       },
       error: (error) => {
           toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
@@ -456,7 +482,7 @@ export default function PlayersPage() {
           <CardHeader>
             <CardTitle>Filter and Sort Players</CardTitle>
             <CardDescription>
-                Use the filter to view players by event. Click column headers to sort.
+                Use the filter to view players by event. You can upload a tab-delimited file or CSV to add players in bulk.
             </CardDescription>
             <div className="pt-2">
                  <Select onValueChange={setSelectedEvent} defaultValue="all">
@@ -652,3 +678,5 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
+
+    
