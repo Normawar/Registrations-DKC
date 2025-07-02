@@ -89,39 +89,42 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const players: PlayerSearchResult[] = [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-      // Find the index of the header row using case-insensitive checks.
-      const headerRowIndex = allHtmlRows.findIndex(row => {
-          const lowerCaseRow = row.toLowerCase();
-          return lowerCaseRow.includes("<td>uscf id</td>") &&
-                 lowerCaseRow.includes("<td>rating</td>") &&
-                 lowerCaseRow.includes("<td>name</td>");
-      });
+      // Find the index of the "Players found" row to reliably locate the results table.
+      const playersFoundRowIndex = allHtmlRows.findIndex(row => 
+          row.toLowerCase().includes('>players found:')
+      );
 
-      if (headerRowIndex === -1) {
-          console.error("USCF Search: Could not find the results table header. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
-          return { players: [], error: "Could not find the results table header. The website layout may have changed." };
+      if (playersFoundRowIndex === -1) {
+          console.error("USCF Search: Could not find the 'Players found:' row. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
+          return { players: [], error: "Could not find the start of the results table. The website layout may have changed." };
       }
 
-      // The player rows are all the rows after the header.
-      const playerRows = allHtmlRows.slice(headerRowIndex + 1);
+      // The header row is the one immediately after "Players found", and data starts after that.
+      const playerRows = allHtmlRows.slice(playersFoundRowIndex + 2);
 
       for (const row of playerRows) {
-        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+        // Match both td and th tags, case-insensitively
+        const cells = row.match(/<(td|th)[^>]*>([\s\S]*?)<\/(td|th)>/gi) || [];
         
-        // A valid player row has 10 columns according to the provided HTML.
+        // A valid player row has at least 10 columns
         if (cells.length < 10) {
             continue; 
         }
 
         const player: Partial<PlayerSearchResult> = {};
 
-        // Extract Name and USCF ID from the link in column 9.
+        // Column 0: USCF ID
+        player.uscfId = stripTags(cells[0]);
+        if (!player.uscfId || !/^\d+$/.test(player.uscfId)) {
+            // Not a valid player row if the first cell isn't a numeric ID.
+            continue;
+        }
+
+        // Column 9: Name (and link)
         const nameCellContent = cells[9];
-        const linkMatch = nameCellContent.match(/<a href=["']?https?:\/\/www\.uschess\.org\/msa\/MbrDtlMain\.php\?(\d+)["']?\s*>/i);
-        
-        if (linkMatch) {
-            player.uscfId = linkMatch[1];
-            const fullNameRaw = stripTags(nameCellContent); // e.g., "CASTILLO, COSME"
+        const nameLinkMatch = nameCellContent.match(/<a[^>]+>([\s\S]+)<\/a>/i);
+        if (nameLinkMatch) {
+            const fullNameRaw = stripTags(nameLinkMatch[1]); // e.g., "CASTILLO, COSME"
             const nameParts = fullNameRaw.split(',');
             if (nameParts.length > 1) {
                 player.lastName = nameParts.shift()!.trim();
@@ -132,11 +135,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 player.lastName = fullNameRaw;
             }
         } else {
-            // If there's no valid link, it's not a player row.
+            // Must have a name to be a valid player row.
             continue;
         }
-
-        // Extract Rating from column 1.
+        
+        // Column 1: Rating
         const ratingText = stripTags(cells[1]);
         if (ratingText && ratingText.toLowerCase() !== 'unrated') {
             const numericPartMatch = ratingText.match(/(\d+)/); // Extracts the first number, handles "145/13"
@@ -145,13 +148,13 @@ const searchUscfPlayersFlow = ai.defineFlow(
             }
         }
 
-        // Extract State from column 7.
+        // Column 7: State
         const stateText = stripTags(cells[7]);
         if (stateText && /^[A-Z]{2}$/.test(stateText)) {
             player.state = stateText;
         }
         
-        // Extract Expiration Date from column 8.
+        // Column 8: Expiration Date
         const dateText = stripTags(cells[8]);
         if (dateText && /^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
             player.expirationDate = dateText;
@@ -178,5 +181,3 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
   }
 );
-
-    
