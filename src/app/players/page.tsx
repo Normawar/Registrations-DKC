@@ -209,7 +209,7 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    toast({ title: 'Import Started', description: 'Processing database file. This may take a moment.' });
+    toast({ title: 'Import Started', description: 'Processing database file. The page may become temporarily unresponsive.' });
 
     type ParsedRow = {
         uscfId: string,
@@ -220,10 +220,11 @@ export default function PlayersPage() {
         state?: string,
         regularRating?: number,
         quickRating?: string
-    }
+    };
 
-    const importedPlayers: ParsedRow[] = [];
+    const dbMap = new Map<string, MasterPlayer>(masterDatabase.map(p => [p.uscfId, p]));
     let errorCount = 0;
+    let processedCount = 0;
 
     Papa.parse(file, {
       worker: true,
@@ -231,6 +232,7 @@ export default function PlayersPage() {
       skipEmptyLines: true,
       step: (results) => {
         try {
+            processedCount++;
             const row = results.data as string[];
             if (!row || row.length < 2) return;
             
@@ -267,51 +269,47 @@ export default function PlayersPage() {
                 if (ratingMatch && ratingMatch[1]) { regularRating = parseInt(ratingMatch[1], 10); }
             }
 
-            const newPlayer: ParsedRow = { uscfId, firstName: firstName || '', lastName, middleName: middleName || undefined, expirationDate: expirationDateStr, state, regularRating, quickRating: quickRatingString || undefined };
-            importedPlayers.push(newPlayer);
+            const importedPlayer: ParsedRow = { uscfId, firstName: firstName || '', lastName, middleName: middleName || undefined, expirationDate: expirationDateStr, state, regularRating, quickRating: quickRatingString || undefined };
+            
+            const existingPlayer = dbMap.get(importedPlayer.uscfId);
+            if (existingPlayer) {
+                existingPlayer.firstName = importedPlayer.firstName || existingPlayer.firstName;
+                existingPlayer.lastName = importedPlayer.lastName || existingPlayer.lastName;
+                existingPlayer.middleName = importedPlayer.middleName;
+                existingPlayer.state = importedPlayer.state;
+                existingPlayer.expirationDate = importedPlayer.expirationDate;
+                existingPlayer.regularRating = importedPlayer.regularRating;
+                existingPlayer.quickRating = importedPlayer.quickRating;
+                dbMap.set(importedPlayer.uscfId, existingPlayer);
+            } else {
+                const newPlayer: MasterPlayer = {
+                    ...importedPlayer,
+                    id: `p-${importedPlayer.uscfId}`,
+                    school: "Independent",
+                    district: "None",
+                    events: 0,
+                    eventIds: [],
+                };
+                dbMap.set(importedPlayer.uscfId, newPlayer);
+            }
+
         } catch (e) {
           console.error("Error parsing a player row:", results.data, e);
           errorCount++;
         }
       },
       complete: () => {
-        const dbMap = new Map<string, MasterPlayer>(masterDatabase.map(p => [p.uscfId, p]));
-        
-        importedPlayers.forEach(imported => {
-            const existingPlayer = dbMap.get(imported.uscfId);
-            if (existingPlayer) {
-                existingPlayer.firstName = imported.firstName || existingPlayer.firstName;
-                existingPlayer.lastName = imported.lastName || existingPlayer.lastName;
-                existingPlayer.middleName = imported.middleName;
-                existingPlayer.state = imported.state;
-                existingPlayer.expirationDate = imported.expirationDate;
-                existingPlayer.regularRating = imported.regularRating;
-                existingPlayer.quickRating = imported.quickRating;
-                dbMap.set(imported.uscfId, existingPlayer);
-            } else {
-                const newPlayer: MasterPlayer = {
-                    ...imported,
-                    id: `p-${imported.uscfId}`,
-                    school: "Independent",
-                    district: "None",
-                    events: 0,
-                    eventIds: [],
-                };
-                dbMap.set(imported.uscfId, newPlayer);
-            }
-        });
-
         const newMasterList = Array.from(dbMap.values());
         setDatabase(newMasterList);
         
         setIsImporting(false);
         
-        let description = `Database updated with ${importedPlayers.length} records. The database now contains ${newMasterList.length} unique players.`;
+        let description = `Database updated. Processed ${processedCount} records. The database now contains ${newMasterList.length} unique players.`;
         if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
         
-        toast({ title: 'Import Complete', description });
+        toast({ title: 'Import Complete', description, duration: 5000 });
       },
-      error: (error) => {
+      error: (error: any) => {
         setIsImporting(false);
         toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
       }
@@ -676,3 +674,5 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
+
+    
