@@ -213,9 +213,10 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    const { id: importToastId, update: updateToast } = toast({
+    const { update: updateToast, dismiss } = toast({
       title: 'Import Started',
       description: 'Your database file is being uploaded and processed...',
+      duration: Infinity,
     });
 
     Papa.parse(file, {
@@ -308,7 +309,7 @@ export default function PlayersPage() {
 
                 if (currentIndex < rows.length) {
                     const progress = Math.round((currentIndex / rows.length) * 100);
-                    updateToast(importToastId, {
+                    updateToast({
                         title: 'Importing...',
                         description: `Processing database... ${progress}% complete.`,
                       });
@@ -323,7 +324,7 @@ export default function PlayersPage() {
                     let description = `Database updated. Processed ${rows.length} records. The database now contains ${newMasterList.length} unique players.`;
                     if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
                     
-                    updateToast(importToastId, {
+                    updateToast({
                       title: 'Import Complete',
                       description: description,
                       duration: 5000,
@@ -335,10 +336,11 @@ export default function PlayersPage() {
         },
         error: (error: any) => {
             setIsImporting(false);
-            updateToast(importToastId, {
+            updateToast({
               variant: 'destructive',
               title: 'Import Error',
-              description: `Failed to parse file: ${error.message}`
+              description: `Failed to parse file: ${error.message}`,
+              duration: 10000,
             });
         }
     });
