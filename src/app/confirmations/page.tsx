@@ -29,7 +29,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -216,6 +216,8 @@ export default function ConfirmationsPage() {
           };
           if (conf.invoiceId) {
             initialStatuses[conf.id] = { status: conf.invoiceStatus || 'LOADING', isLoading: true };
+          } else if (conf.invoiceStatus === 'COMPED') {
+            initialStatuses[conf.id] = { status: 'COMPED', isLoading: false };
           } else {
             initialStatuses[conf.id] = { status: 'NO_SQ_INV', isLoading: false };
           }
@@ -236,30 +238,17 @@ export default function ConfirmationsPage() {
   const getStatusBadgeVariant = (status?: string): string => {
     if (!status) return 'bg-gray-400';
     switch (status.toUpperCase()) {
-        case 'PAID':
-            return 'bg-green-600 text-white';
-        case 'DRAFT':
-            return 'bg-gray-500';
-        case 'PUBLISHED':
-            return 'bg-blue-500 text-white';
-        case 'UNPAID':
-        case 'PARTIALLY_PAID':
-            return 'bg-yellow-500 text-black';
-        case 'CANCELED':
-        case 'VOIDED':
-        case 'FAILED':
-            return 'bg-red-600 text-white';
-        case 'PAYMENT_PENDING':
-            return 'bg-purple-500 text-white';
-        case 'REFUNDED':
-        case 'PARTIALLY_REFUNDED':
-            return 'bg-indigo-500 text-white';
-        case 'LOADING':
-            return 'bg-muted text-muted-foreground animate-pulse';
-        case 'NO_SQ_INV':
-            return 'bg-gray-400 text-white';
-        default:
-            return 'bg-muted text-muted-foreground';
+        case 'PAID': return 'bg-green-600 text-white';
+        case 'DRAFT': return 'bg-gray-500';
+        case 'COMPED': return 'bg-sky-500 text-white';
+        case 'PUBLISHED': return 'bg-blue-500 text-white';
+        case 'UNPAID': case 'PARTIALLY_PAID': return 'bg-yellow-500 text-black';
+        case 'CANCELED': case 'VOIDED': case 'FAILED': return 'bg-red-600 text-white';
+        case 'PAYMENT_PENDING': return 'bg-purple-500 text-white';
+        case 'REFUNDED': case 'PARTIALLY_REFUNDED': return 'bg-indigo-500 text-white';
+        case 'LOADING': return 'bg-muted text-muted-foreground animate-pulse';
+        case 'NO_SQ_INV': return 'bg-gray-400 text-white';
+        default: return 'bg-muted text-muted-foreground';
     }
   };
 
@@ -514,154 +503,163 @@ export default function ConfirmationsPage() {
                           </TableBody>
                         </Table>
                       </div>
+                      
+                      {conf.invoiceStatus === 'COMPED' ? (
+                        <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200">
+                          <Award className="h-4 w-4 text-sky-600" />
+                          <AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle>
+                          <AlertDescription className="text-sky-700">
+                            This registration was completed at no charge. No payment is required.
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <div className="space-y-6 pt-6 mt-6 border-t">
+                          <h4 className="font-semibold">Payment Information</h4>
+                          
+                          <RadioGroup
+                              value={selectedMethod}
+                              onValueChange={(value) => handleInputChange(conf.id, 'paymentMethod', value as PaymentMethod)}
+                              className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                              disabled={isLoading}
+                          >
+                              <div><RadioGroupItem value="po" id={`po-${conf.id}`} className="peer sr-only" />
+                                  <Label htmlFor={`po-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                  Purchase Order</Label></div>
+                              <div><RadioGroupItem value="check" id={`check-${conf.id}`} className="peer sr-only" />
+                                  <Label htmlFor={`check-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                  Pay with Check</Label></div>
+                              <div><RadioGroupItem value="cashapp" id={`cashapp-${conf.id}`} className="peer sr-only" />
+                                  <Label htmlFor={`cashapp-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                  Cash App</Label></div>
+                              <div><RadioGroupItem value="zelle" id={`zelle-${conf.id}`} className="peer sr-only" />
+                                  <Label htmlFor={`zelle-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
+                                  Zelle</Label></div>
+                          </RadioGroup>
 
-                      <div className="space-y-6 pt-6 mt-6 border-t">
-                        <h4 className="font-semibold">Payment Information</h4>
-                        
-                        <RadioGroup
-                            value={selectedMethod}
-                            onValueChange={(value) => handleInputChange(conf.id, 'paymentMethod', value as PaymentMethod)}
-                            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                          {selectedMethod === 'po' && (
+                            <div className="grid md:grid-cols-2 gap-4 items-start">
+                              <div className="space-y-2">
+                                  <Label htmlFor={`po-number-${conf.id}`}>PO Number</Label>
+                                  <Input id={`po-number-${conf.id}`} placeholder="Enter PO Number" value={currentInputs.poNumber || ''} onChange={(e) => handleInputChange(conf.id, 'poNumber', e.target.value)} disabled={isLoading} />
+                              </div>
+                              <div className="space-y-2">
+                                  <Label htmlFor={`po-file-${conf.id}`}>Upload PO Document</Label>
+                                  <Input id={`po-file-${conf.id}`} type="file" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
+                                  {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
+                                  ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'po' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
+                                  ) : null }
+                              </div>
+                            </div>
+                          )}
+
+                          {selectedMethod === 'check' && (
+                              <div className="grid md:grid-cols-3 gap-4 items-start">
+                                  <div className="space-y-2">
+                                      <Label htmlFor={`check-number-${conf.id}`}>Check Number</Label>
+                                      <Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isLoading} />
+                                  </div>
+                                  <div className="space-y-2">
+                                      <Label htmlFor={`check-amount-${conf.id}`}>Check Amount</Label>
+                                      <Input id={`check-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
+                                  </div>
+                                  <div className="space-y-2">
+                                      <Label>Check Date</Label>
+                                      <Popover>
+                                          <PopoverTrigger asChild>
+                                          <Button
+                                              variant={"outline"}
+                                              className={cn(
+                                              "w-full justify-start text-left font-normal",
+                                              !currentInputs.checkDate && "text-muted-foreground"
+                                              )}
+                                              disabled={isLoading}
+                                          >
+                                              <CalendarIcon className="mr-2 h-4 w-4" />
+                                              {currentInputs.checkDate ? format(currentInputs.checkDate, "PPP") : <span>Pick a date</span>}
+                                          </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0">
+                                          <Calendar
+                                              mode="single"
+                                              selected={currentInputs.checkDate}
+                                              onSelect={(date) => handleInputChange(conf.id, 'checkDate', date)}
+                                              initialFocus
+                                          />
+                                          </PopoverContent>
+                                      </Popover>
+                                  </div>
+                              </div>
+                          )}
+
+                          {selectedMethod === 'cashapp' && (
+                              <div className="p-4 rounded-md border bg-muted/50 space-y-4">
+                                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                                      <div>
+                                          <p className="font-semibold">Pay via Cash App</p>
+                                          <p className="text-sm text-muted-foreground">Scan the QR code and enter the total amount due. Upload a screenshot of the confirmation.</p>
+                                          <p className="font-bold text-lg mt-1">$DKChess</p>
+                                      </div>
+                                      <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer">
+                                          <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
+                                      </a>
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-4 items-start">
+                                      <div className="space-y-2">
+                                          <Label htmlFor={`cashapp-amount-${conf.id}`}>Amount Paid</Label>
+                                          <Input id={`cashapp-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
+                                      </div>
+                                      <div className="space-y-2">
+                                          <Label htmlFor={`cashapp-file-${conf.id}`}>Upload Confirmation Screenshot</Label>
+                                          <Input id={`cashapp-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
+                                          {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
+                                          ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'cashapp' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
+                                          ) : null }
+                                      </div>
+                                </div>
+                              </div>
+                          )}
+                          
+                          {selectedMethod === 'zelle' && (
+                              <div className="p-4 rounded-md border bg-muted/50 space-y-4">
+                                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                                      <div>
+                                          <p className="font-semibold">Pay via Zelle</p>
+                                          <p className="text-sm text-muted-foreground">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p>
+                                          <p className="font-bold text-lg mt-1">956-289-3418</p>
+                                      </div>
+                                      <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer">
+                                          <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
+                                      </a>
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-4 items-start">
+                                      <div className="space-y-2">
+                                          <Label htmlFor={`zelle-amount-${conf.id}`}>Amount Paid</Label>
+                                          <Input id={`zelle-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
+                                      </div>
+                                      <div className="space-y-2">
+                                          <Label htmlFor={`zelle-file-${conf.id}`}>Upload Confirmation Screenshot</Label>
+                                          <Input id={`zelle-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
+                                          {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
+                                          ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'zelle' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
+                                          ) : null }
+                                      </div>
+                                </div>
+                              </div>
+                          )}
+
+                          <Button 
+                            onClick={() => handleSavePayment(conf)} 
                             disabled={isLoading}
-                        >
-                            <div><RadioGroupItem value="po" id={`po-${conf.id}`} className="peer sr-only" />
-                                <Label htmlFor={`po-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                Purchase Order</Label></div>
-                            <div><RadioGroupItem value="check" id={`check-${conf.id}`} className="peer sr-only" />
-                                <Label htmlFor={`check-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                Pay with Check</Label></div>
-                            <div><RadioGroupItem value="cashapp" id={`cashapp-${conf.id}`} className="peer sr-only" />
-                                <Label htmlFor={`cashapp-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                Cash App</Label></div>
-                            <div><RadioGroupItem value="zelle" id={`zelle-${conf.id}`} className="peer sr-only" />
-                                <Label htmlFor={`zelle-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">
-                                Zelle</Label></div>
-                        </RadioGroup>
-
-                        {selectedMethod === 'po' && (
-                          <div className="grid md:grid-cols-2 gap-4 items-start">
-                            <div className="space-y-2">
-                                <Label htmlFor={`po-number-${conf.id}`}>PO Number</Label>
-                                <Input id={`po-number-${conf.id}`} placeholder="Enter PO Number" value={currentInputs.poNumber || ''} onChange={(e) => handleInputChange(conf.id, 'poNumber', e.target.value)} disabled={isLoading} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor={`po-file-${conf.id}`}>Upload PO Document</Label>
-                                <Input id={`po-file-${conf.id}`} type="file" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
-                                {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
-                                ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'po' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
-                                ) : null }
-                            </div>
-                          </div>
-                        )}
-
-                        {selectedMethod === 'check' && (
-                            <div className="grid md:grid-cols-3 gap-4 items-start">
-                                <div className="space-y-2">
-                                    <Label htmlFor={`check-number-${conf.id}`}>Check Number</Label>
-                                    <Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isLoading} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor={`check-amount-${conf.id}`}>Check Amount</Label>
-                                    <Input id={`check-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Check Date</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !currentInputs.checkDate && "text-muted-foreground"
-                                            )}
-                                            disabled={isLoading}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {currentInputs.checkDate ? format(currentInputs.checkDate, "PPP") : <span>Pick a date</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                            mode="single"
-                                            selected={currentInputs.checkDate}
-                                            onSelect={(date) => handleInputChange(conf.id, 'checkDate', date)}
-                                            initialFocus
-                                        />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            </div>
-                        )}
-
-                        {selectedMethod === 'cashapp' && (
-                            <div className="p-4 rounded-md border bg-muted/50 space-y-4">
-                               <div className="flex flex-col sm:flex-row gap-4 items-center">
-                                    <div>
-                                        <p className="font-semibold">Pay via Cash App</p>
-                                        <p className="text-sm text-muted-foreground">Scan the QR code and enter the total amount due. Upload a screenshot of the confirmation.</p>
-                                        <p className="font-bold text-lg mt-1">$DKChess</p>
-                                    </div>
-                                    <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer">
-                                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
-                                    </a>
-                               </div>
-                               <div className="grid md:grid-cols-2 gap-4 items-start">
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`cashapp-amount-${conf.id}`}>Amount Paid</Label>
-                                        <Input id={`cashapp-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`cashapp-file-${conf.id}`}>Upload Confirmation Screenshot</Label>
-                                        <Input id={`cashapp-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
-                                        {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
-                                        ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'cashapp' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
-                                        ) : null }
-                                    </div>
-                               </div>
-                            </div>
-                        )}
-                        
-                        {selectedMethod === 'zelle' && (
-                            <div className="p-4 rounded-md border bg-muted/50 space-y-4">
-                               <div className="flex flex-col sm:flex-row gap-4 items-center">
-                                    <div>
-                                        <p className="font-semibold">Pay via Zelle</p>
-                                        <p className="text-sm text-muted-foreground">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p>
-                                        <p className="font-bold text-lg mt-1">956-289-3418</p>
-                                    </div>
-                                    <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer">
-                                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
-                                    </a>
-                               </div>
-                               <div className="grid md:grid-cols-2 gap-4 items-start">
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`zelle-amount-${conf.id}`}>Amount Paid</Label>
-                                        <Input id={`zelle-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor={`zelle-file-${conf.id}`}>Upload Confirmation Screenshot</Label>
-                                        <Input id={`zelle-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />
-                                        {currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div>
-                                        ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'zelle' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div>
-                                        ) : null }
-                                    </div>
-                               </div>
-                            </div>
-                        )}
-
-                        <Button 
-                          onClick={() => handleSavePayment(conf)} 
-                          disabled={isLoading}
-                        >
-                            {isLoading ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                                <UploadCloud className="mr-2 h-4 w-4" />
-                            )}
-                            {isLoading ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Payment & Update Invoice'}
-                        </Button>
-                      </div>
-
+                          >
+                              {isLoading ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                  <UploadCloud className="mr-2 h-4 w-4" />
+                              )}
+                              {isLoading ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Payment & Update Invoice'}
+                          </Button>
+                        </div>
+                      )}
                     </AccordionContent>
                   </AccordionItem>
                 )})}

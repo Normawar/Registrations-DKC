@@ -31,7 +31,8 @@ import {
     Loader2,
     Search,
     Info,
-    CalendarIcon
+    CalendarIcon,
+    Award
 } from "lucide-react";
 import {
   Dialog,
@@ -285,6 +286,46 @@ export function OrganizerRegistrationForm() {
             setIsSubmitting(false);
         }
     };
+    
+    const handleCompRegistration = async (recipient: InvoiceRecipientValues) => {
+        setIsSubmitting(true);
+        try {
+            const confirmationId = `COMP_${Date.now()}`;
+
+            const newConfirmation = {
+                id: confirmationId,
+                eventName: event.name,
+                eventDate: event.date,
+                submissionTimestamp: new Date().toISOString(),
+                selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus } }), {}),
+                totalInvoiced: 0,
+                teamCode: recipient.teamCode,
+                invoiceStatus: 'COMPED',
+                purchaserName: recipient.sponsorName,
+                schoolName: recipient.schoolName,
+            };
+
+            const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+            localStorage.setItem('confirmations', JSON.stringify([...existingConfirmations, newConfirmation]));
+            window.dispatchEvent(new Event('storage'));
+
+            toast({
+                title: "Registration Comped",
+                description: `${stagedPlayers.length} players have been registered for ${event.name} at no charge.`
+            });
+
+            setStagedPlayers([]);
+            setIsInvoiceDialogOpen(false);
+
+        } catch (error) {
+            console.error("Failed to comp registration:", error);
+            const description = error instanceof Error ? error.message : "An unknown error occurred.";
+            toast({ variant: "destructive", title: "Submission Error", description });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
 
     return (
         <div className="space-y-8">
@@ -383,7 +424,7 @@ export function OrganizerRegistrationForm() {
                 </CardContent>
                 <CardFooter>
                     <Button onClick={() => setIsInvoiceDialogOpen(true)} disabled={stagedPlayers.length === 0}>
-                        Proceed to Invoice ({stagedPlayers.length} Players)
+                        Proceed to Register ({stagedPlayers.length} Players)
                     </Button>
                 </CardFooter>
             </Card>
@@ -428,19 +469,29 @@ export function OrganizerRegistrationForm() {
                  <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Finalize Registration</DialogTitle>
-                        <DialogDescription>Please provide the recipient details for the invoice.</DialogDescription>
+                        <DialogDescription>Provide recipient details for the invoice, or comp the registration.</DialogDescription>
                     </DialogHeader>
                     <Form {...invoiceForm}>
-                        <form onSubmit={invoiceForm.handleSubmit(handleGenerateInvoice)} className="space-y-4 pt-4">
+                        <form className="space-y-4 pt-4">
                             <FormField control={invoiceForm.control} name="sponsorName" render={({ field }) => ( <FormItem><FormLabel>Recipient/Sponsor Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={invoiceForm.control} name="sponsorEmail" render={({ field }) => ( <FormItem><FormLabel>Recipient Email</FormLabel><FormControl><Input type="email" placeholder="sponsor@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={invoiceForm.control} name="schoolName" render={({ field }) => ( <FormItem><FormLabel>School/Organization Name</FormLabel><FormControl><Input placeholder="e.g., Lincoln High School" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={invoiceForm.control} name="teamCode" render={({ field }) => ( <FormItem><FormLabel>Team Code</FormLabel><FormControl><Input placeholder="e.g., LIHS" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <DialogFooter>
-                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                                <Button type="submit" disabled={isSubmitting}>
+                            
+                            <DialogFooter className="flex-col sm:flex-col sm:items-stretch gap-2 pt-4">
+                               <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateInvoice)} disabled={isSubmitting}>
                                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Generate Invoice
+                                </Button>
+                                
+                                <div className="relative">
+                                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
+                                </div>
+                                
+                                <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleCompRegistration)} disabled={isSubmitting}>
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Award className="mr-2 h-4 w-4" />}
+                                    Comp Registration (No Invoice)
                                 </Button>
                             </DialogFooter>
                         </form>
@@ -451,4 +502,3 @@ export function OrganizerRegistrationForm() {
         </div>
     );
 }
-
