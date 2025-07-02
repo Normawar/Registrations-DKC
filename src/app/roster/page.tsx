@@ -1,11 +1,12 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isValid, parse } from 'date-fns';
+import Papa from 'papaparse';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
+  Upload,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -178,6 +180,7 @@ export default function RosterPage() {
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -373,6 +376,77 @@ export default function RosterPage() {
     }
   };
 
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+            const requiredHeaders = ['FirstName', 'LastName', 'Email', 'Grade', 'Section', 'DOB', 'ZipCode', 'USCFID'];
+            const fileHeaders = results.meta.fields || [];
+            
+            const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
+            if (missingHeaders.length > 0) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Import Failed: Invalid CSV',
+                    description: `The CSV file is missing required columns: ${missingHeaders.join(', ')}`,
+                });
+                return;
+            }
+
+            let importedCount = 0;
+            let skippedCount = 0;
+
+            results.data.forEach((row: any) => {
+                const newPlayer = {
+                    id: Date.now().toString() + Math.random(), // simple unique id
+                    firstName: row.FirstName?.trim(),
+                    lastName: row.LastName?.trim(),
+                    middleName: row.MiddleName?.trim() || undefined,
+                    uscfId: row.USCFID?.trim() || 'NEW',
+                    uscfExpiration: row.USCFExpiration ? new Date(row.USCFExpiration) : undefined,
+                    rating: row.Rating ? parseInt(row.Rating, 10) : undefined,
+                    grade: row.Grade?.trim(),
+                    section: row.Section?.trim(),
+                    email: row.Email?.trim(),
+                    phone: row.Phone?.trim() || undefined,
+                    dob: row.DOB ? new Date(row.DOB) : new Date(0), // Needs a valid date
+                    zipCode: row.ZipCode?.trim(),
+                    studentType: row.StudentType?.trim() as 'gt' | 'independent' | undefined,
+                };
+                
+                // Basic validation
+                if (newPlayer.firstName && newPlayer.lastName && newPlayer.email && newPlayer.grade && newPlayer.section && isValid(newPlayer.dob) && newPlayer.zipCode) {
+                    addPlayer(newPlayer);
+                    importedCount++;
+                } else {
+                    skippedCount++;
+                }
+            });
+
+            toast({
+                title: 'Import Complete',
+                description: `Successfully imported ${importedCount} players. Skipped ${skippedCount} rows due to missing required data.`,
+            });
+        },
+        error: (error) => {
+            toast({
+                variant: 'destructive',
+                title: 'Import Error',
+                description: `Failed to parse CSV file: ${error.message}`,
+            });
+        }
+    });
+
+    // Reset file input
+    if(fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  };
+
   function onSubmit(values: PlayerFormValues) {
     if (values.uscfId.toUpperCase() !== 'NEW') {
       const existingPlayerWithUscfId = players.find(p => 
@@ -431,8 +505,18 @@ export default function RosterPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".csv"
+              onChange={handleFileImport}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 h-4 w-4" /> Import CSV
+            </Button>
             <Button onClick={handleAddPlayer}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Player to Roster
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Player
             </Button>
           </div>
         </div>
