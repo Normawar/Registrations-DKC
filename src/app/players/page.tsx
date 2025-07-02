@@ -275,56 +275,47 @@ export default function PlayersPage() {
       step: (results) => {
         const row = results.data as string[];
         
-        // Skip rows that don't have at least the USCF ID column.
         if (!row || row.length < 2) {
             return;
         }
 
         const uscfId = row[1];
-        // A valid USCF ID is an 8-digit number. This check will effectively
-        // skip most header, footer, or malformed non-player data rows.
         if (!/^\d{8}$/.test(uscfId)) {
             return;
         }
 
         try {
-          // From here, we assume it's a player row and apply stricter parsing.
-          if (row.length < 5) {
-            console.warn('Skipping malformed player row (not enough columns):', row);
+          const namePart = row[0];
+          if (!namePart || !namePart.includes(',')) {
+            console.warn("Skipping row: Name does not contain a comma, likely a header or footer.", row);
             errorCount++;
             return;
           }
         
-          const namePart = row[0];
-          const expirationDateStr = row[2];
-          const state = row[3];
-          const regularRatingString = row[4];
-          const quickRatingString = row[5] || '';
-
-          if (!namePart) {
-            console.warn('Skipping malformed player row (missing name):', row);
-            errorCount++;
-            return;
-          }
-
           const nameParts = namePart.split(',');
-          if (nameParts.length < 2) {
-            console.warn("Skipping malformed player row (name not in 'Last, First' format):", row);
-            errorCount++;
-            return;
-          }
           const lastName = nameParts[0].trim();
-          const firstAndMiddleParts = nameParts[1].trim().split(' ').filter(p => p);
+          const firstAndMiddleParts = (nameParts[1] || '').trim().split(' ').filter(p => p);
           const firstName = firstAndMiddleParts.shift() || '';
           const middleName = firstAndMiddleParts.join(' ');
 
           if (!firstName || !lastName) {
-            console.warn("Skipping malformed player row (could not parse first/last name):", row);
+            console.warn("Skipping row: Could not parse first/last name.", row);
             errorCount++;
             return;
           }
-
-          const regularRating = parseInt(regularRatingString?.replace('*', ''), 10) || undefined;
+          
+          const expirationDateStr = row[2] || '';
+          const state = row[3] || '';
+          const regularRatingString = row[4] || '';
+          const quickRatingString = row[5] || '';
+          
+          let regularRating: number | undefined = undefined;
+          if (regularRatingString) {
+              const ratingMatch = regularRatingString.match(/^(\d+)/);
+              if (ratingMatch && ratingMatch[1]) {
+                regularRating = parseInt(ratingMatch[1], 10);
+              }
+          }
 
           const newPlayer: ImportedPlayer = {
             id: `p-${uscfId}`,
@@ -334,12 +325,12 @@ export default function PlayersPage() {
             middleName: middleName || undefined,
             expirationDate: expirationDateStr,
             state: state,
-            regularRating,
-            quickRating: quickRatingString,
+            regularRating: regularRating,
+            quickRating: quickRatingString || undefined,
           };
           importedPlayers.push(newPlayer);
         } catch (e) {
-          console.error("Error parsing a row that appeared to be a player:", row, e);
+          console.error("Error parsing a player row:", row, e);
           errorCount++;
         }
       },
