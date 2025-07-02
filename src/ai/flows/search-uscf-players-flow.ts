@@ -120,18 +120,15 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 } else {
                     player.lastName = fullNameRaw;
                 }
-                continue;
             }
             
             // Check for a rating. A rating is a number, possibly with extra text (e.g., "/13", "(P6)").
             // It extracts the first number found in the cell's text.
             const ratingMatch = text.match(/(\d+)/);
             if (ratingMatch && ratingMatch[0] && player.rating === undefined) {
-              // Heuristic to avoid confusing an ID with a rating. A rating is unlikely to be identical to the uscfId.
-              // A cell with just a number that matches the ID is almost certainly the ID column.
+              // Heuristic to avoid confusing an ID with a rating. A cell with just a number that matches the ID is almost certainly the ID column.
               if (text !== uscfId) {
                 player.rating = parseInt(ratingMatch[0], 10);
-                continue;
               }
             }
 
@@ -139,14 +136,12 @@ const searchUscfPlayersFlow = ai.defineFlow(
             const stateMatch = text.match(/^[A-Z]{2}$/);
             if (stateMatch && player.state === undefined) {
                 player.state = stateMatch[0];
-                continue;
             }
             
             // Check for Expiration Date
             const expiresMatch = text.match(/^\d{4}-\d{2}-\d{2}$/);
             if (expiresMatch && player.expirationDate === undefined) {
                 player.expirationDate = expiresMatch[0];
-                continue;
             }
         }
         
