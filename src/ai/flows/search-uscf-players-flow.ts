@@ -99,7 +99,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const uscfId = idMatch[1];
         
         // Now that we have a player row, extract all its cells and parse them defensively.
-        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
+        const cells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || []; // Use t[dh] to catch both <td> and <th>
         if (cells.length === 0) continue;
 
         let fullNameRaw: string | undefined;
@@ -117,8 +117,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
         for (const cell of cells) {
             const text = stripTags(cell);
 
-            // A rating is prefixed with "R: ".
-            const ratingMatch = text.match(/R:\s*(\d{3,4})/);
+            // A rating is prefixed with "R: ". Use a more flexible digit match.
+            const ratingMatch = text.match(/R:\s*(\d+)/);
             if (ratingMatch && !rating) {
                 rating = parseInt(ratingMatch[1], 10);
                 continue;
@@ -131,9 +131,10 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 continue;
             }
 
-            // A two-letter uppercase string is likely a state, and it's not the name.
+            // A two-letter uppercase string is likely a state.
+            // This is safer than the previous implementation.
             const stateMatch = text.match(/^[A-Z]{2}$/);
-            if (stateMatch && !playerState && !fullNameRaw?.includes(text)) {
+            if (stateMatch && !playerState) {
                 playerState = stateMatch[0];
                 continue;
             }
