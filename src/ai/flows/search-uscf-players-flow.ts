@@ -89,21 +89,12 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const players: PlayerSearchResult[] = [];
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-      // Find the index of the "Players found" row to reliably locate the results table.
-      const playersFoundRowIndex = allHtmlRows.findIndex(row => 
-          row.toLowerCase().includes('>players found:')
-      );
+      for (const row of allHtmlRows) {
+        // The most reliable way to identify a player row is by the link to their details page.
+        if (!row.includes('MbrDtlMain.php')) {
+            continue;
+        }
 
-      if (playersFoundRowIndex === -1) {
-          console.error("USCF Search: Could not find the 'Players found:' row. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
-          return { players: [], error: "Could not find the start of the results table. The website layout may have changed." };
-      }
-
-      // The header row is the one immediately after "Players found", and data starts after that.
-      const playerRows = allHtmlRows.slice(playersFoundRowIndex + 2);
-
-      for (const row of playerRows) {
-        // Match both td and th tags, case-insensitively
         const cells = row.match(/<(td|th)[^>]*>([\s\S]*?)<\/(td|th)>/gi) || [];
         
         // A valid player row has at least 10 columns
@@ -116,33 +107,13 @@ const searchUscfPlayersFlow = ai.defineFlow(
         // Column 0: USCF ID
         player.uscfId = stripTags(cells[0]);
         if (!player.uscfId || !/^\d+$/.test(player.uscfId)) {
-            // Not a valid player row if the first cell isn't a numeric ID.
             continue;
         }
 
-        // Column 9: Name (and link)
-        const nameCellContent = cells[9];
-        const nameLinkMatch = nameCellContent.match(/<a[^>]+>([\s\S]+)<\/a>/i);
-        if (nameLinkMatch) {
-            const fullNameRaw = stripTags(nameLinkMatch[1]); // e.g., "CASTILLO, COSME"
-            const nameParts = fullNameRaw.split(',');
-            if (nameParts.length > 1) {
-                player.lastName = nameParts.shift()!.trim();
-                const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
-                player.firstName = firstAndMiddleParts.shift() || '';
-                player.middleName = firstAndMiddleParts.join(' ');
-            } else {
-                player.lastName = fullNameRaw;
-            }
-        } else {
-            // Must have a name to be a valid player row.
-            continue;
-        }
-        
         // Column 1: Rating
         const ratingText = stripTags(cells[1]);
         if (ratingText && ratingText.toLowerCase() !== 'unrated') {
-            const numericPartMatch = ratingText.match(/(\d+)/); // Extracts the first number, handles "145/13"
+            const numericPartMatch = ratingText.match(/(\d+)/);
             if (numericPartMatch && numericPartMatch[1]) {
                 player.rating = parseInt(numericPartMatch[1], 10);
             }
@@ -158,6 +129,24 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const dateText = stripTags(cells[8]);
         if (dateText && /^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
             player.expirationDate = dateText;
+        }
+        
+        // Column 9: Name (and link)
+        const nameCellContent = cells[9];
+        const nameLinkMatch = nameCellContent.match(/<a[^>]+>([\s\S]+)<\/a>/i);
+        if (nameLinkMatch) {
+            const fullNameRaw = stripTags(nameLinkMatch[1]);
+            const nameParts = fullNameRaw.split(',');
+            if (nameParts.length > 1) {
+                player.lastName = nameParts.shift()!.trim();
+                const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
+                player.firstName = firstAndMiddleParts.shift() || '';
+                player.middleName = firstAndMiddleParts.join(' ');
+            } else {
+                player.lastName = fullNameRaw;
+            }
+        } else {
+            continue;
         }
         
         if (player.uscfId && player.lastName) {
