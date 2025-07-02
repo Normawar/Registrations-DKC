@@ -76,6 +76,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
+import Link from 'next/link';
 
 const eventFormSchema = z.object({
   id: z.string().optional(),
@@ -305,6 +306,11 @@ export default function ManageEventsPage() {
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => handleEditEvent(event)}>
                             <FilePenLine className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/organizer-registration?eventId=${event.id}`}>
+                              <PlusCircle className="mr-2 h-4 w-4" /> Register Players
+                            </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive">
                             <Trash2 className="mr-2 h-4 w-4" /> Delete
