@@ -119,9 +119,9 @@ const createInvoiceFlow = ai.defineFlow(
       // 1. Registration Line Item
       if (input.players.length > 0) {
           const registrationFee = input.players[0].baseRegistrationFee;
-          const playerNotes = input.players.map((p, index) => `${index + 1} ${p.playerName} ${p.uscfId}`).join('\n');
+          const playerNotes = input.players.map((p, index) => `${index + 1}. ${p.playerName} (${p.uscfId})`).join('\n');
           lineItems.push({
-              name: `Scholastic Tournament Registration`,
+              name: `Tournament Registration`,
               quantity: String(input.players.length),
               basePriceMoney: {
                   amount: BigInt(Math.round(registrationFee * 100)),
@@ -135,7 +135,7 @@ const createInvoiceFlow = ai.defineFlow(
       const lateFeePlayers = input.players.filter(p => p.lateFee > 0);
       if (lateFeePlayers.length > 0) {
           const lateFee = lateFeePlayers[0].lateFee;
-          const lateFeePlayerNames = lateFeePlayers.map(p => p.playerName).join(', ');
+          const lateFeePlayerNotes = lateFeePlayers.map((p, index) => `${index + 1}. ${p.playerName}`).join('\n');
           lineItems.push({
               name: 'Late Fee',
               quantity: String(lateFeePlayers.length),
@@ -143,14 +143,14 @@ const createInvoiceFlow = ai.defineFlow(
                   amount: BigInt(Math.round(lateFee * 100)),
                   currency: 'USD',
               },
-              note: `For players: ${lateFeePlayerNames}`,
+              note: lateFeePlayerNotes,
           });
       }
 
       // 3. USCF Membership Line Item
       const uscfActionPlayers = input.players.filter(p => p.uscfAction);
       if (uscfActionPlayers.length > 0) {
-          const uscfPlayerNames = uscfActionPlayers.map(p => p.playerName).join(', ');
+          const uscfPlayerNotes = uscfActionPlayers.map((p, index) => `${index + 1}. ${p.playerName}`).join('\n');
           lineItems.push({
               name: 'USCF Membership (New/Renew)',
               quantity: String(uscfActionPlayers.length),
@@ -158,7 +158,7 @@ const createInvoiceFlow = ai.defineFlow(
                   amount: BigInt(Math.round(input.uscfFee * 100)),
                   currency: 'USD',
               },
-              note: `For players: ${uscfPlayerNames}`,
+              note: uscfPlayerNotes,
           });
       }
 
