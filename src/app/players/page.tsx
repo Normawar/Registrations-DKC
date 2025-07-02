@@ -66,7 +66,7 @@ import { districts as allDistricts } from '@/lib/data/districts';
 import { schoolData } from '@/lib/data/school-data';
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import { setMasterDatabase, type ImportedPlayer } from '@/lib/data/master-player-store';
+import { getMasterDatabase, setMasterDatabase, type ImportedPlayer } from '@/lib/data/master-player-store';
 
 
 type Player = {
@@ -329,9 +329,18 @@ export default function PlayersPage() {
         }
       },
       complete: () => {
-        setMasterDatabase(importedPlayers);
+        const existingDb = getMasterDatabase();
+        const dbMap = new Map<string, ImportedPlayer>(existingDb.map(p => [p.uscfId, p]));
+        
+        importedPlayers.forEach(player => {
+            dbMap.set(player.uscfId, player);
+        });
+
+        const newMasterList = Array.from(dbMap.values());
+        setMasterDatabase(newMasterList);
+        
         setIsImporting(false);
-        let description = `Database loaded with ${importedPlayers.length} players for this session. It will be cleared on page refresh.`;
+        let description = `Database updated with ${importedPlayers.length} records. The database now contains ${newMasterList.length} unique players for this session.`;
         if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
         
         toast({ title: 'Import Complete', description: description });
