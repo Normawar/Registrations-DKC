@@ -192,6 +192,7 @@ export default function RosterPage() {
 
   // States for internal DB search
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchState, setSearchState] = useState('ALL');
   const [dbSearchResults, setDbSearchResults] = useState<ImportedPlayer[]>([]);
   const [isDbSearching, setIsDbSearching] = useState(false);
   const [masterDbLoaded, setMasterDbLoaded] = useState(false);
@@ -240,6 +241,13 @@ export default function RosterPage() {
     };
   }, []);
 
+  const uniqueStates = useMemo(() => {
+    if (!masterDbLoaded) return ['ALL'];
+    const masterDb = getMasterDatabase();
+    const states = new Set(masterDb.map(p => p.state).filter(Boolean) as string[]);
+    return ['ALL', ...Array.from(states).sort()];
+  }, [masterDbLoaded]);
+
   // Debounced search for the master database
   useEffect(() => {
     if (searchQuery.length < 3) {
@@ -248,7 +256,12 @@ export default function RosterPage() {
     }
     setIsDbSearching(true);
     const handler = setTimeout(() => {
-        const masterDb = getMasterDatabase();
+        let masterDb = getMasterDatabase();
+
+        if (searchState !== 'ALL') {
+            masterDb = masterDb.filter(p => p.state === searchState);
+        }
+
         const lowerCaseQuery = searchQuery.toLowerCase();
         const results = masterDb.filter(p => {
             if (p.uscfId.toLowerCase().includes(lowerCaseQuery)) {
@@ -262,7 +275,7 @@ export default function RosterPage() {
     }, 300);
 
     return () => clearTimeout(handler);
-  }, [searchQuery]);
+  }, [searchQuery, searchState]);
 
   const handleSelectDbPlayer = (player: ImportedPlayer) => {
     form.reset(); // Clear previous form state
@@ -678,43 +691,61 @@ export default function RosterPage() {
                 <CardTitle className="text-base">Master Database Search</CardTitle>
                 <CardDescription>
                   {masterDbLoaded 
-                    ? "Search by USCF ID or name to auto-fill player data."
+                    ? "Search by state and name/USCF ID to auto-fill player data."
                     : <>To enable player search, first go to the <Link href="/players" className="underline font-medium">All Players</Link> page and upload the database file.</>
                   }
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        placeholder="Search by USCF ID or Name..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        className="pl-10"
-                        disabled={!masterDbLoaded}
-                    />
-                    {searchQuery.length > 2 && (
-                        <Card className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto">
-                            <CardContent className="p-2">
-                                {isDbSearching ? (<div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>)
-                                : dbSearchResults.length === 0 ? (<div className="p-2 text-center text-sm text-muted-foreground">No results found.</div>)
-                                : (
-                                    dbSearchResults.map(p => (
-                                        <button
-                                            key={p.id}
-                                            type="button"
-                                            className="w-full text-left p-2 hover:bg-accent rounded-md"
-                                            onClick={() => handleSelectDbPlayer(p)}
-                                        >
-                                            <p className="font-medium">{p.firstName} {p.lastName} ({p.state})</p>
-                                            <p className="text-sm text-muted-foreground">ID: {p.uscfId} | Rating: {p.regularRating || 'N/A'}</p>
-                                        </button>
-                                    ))
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
+                <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr] gap-4 items-end">
+                    <div>
+                        <Label>State</Label>
+                        <Select value={searchState} onValueChange={setSearchState} disabled={!masterDbLoaded}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select State" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {uniqueStates.map(state => (
+                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label>Player Name or USCF ID</Label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search..."
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                className="pl-10"
+                                disabled={!masterDbLoaded}
+                            />
+                        </div>
+                    </div>
                 </div>
+                {searchQuery.length > 2 && (
+                    <Card className="relative z-10 w-full mt-1 max-h-48 overflow-y-auto">
+                        <CardContent className="p-2">
+                            {isDbSearching ? (<div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>)
+                            : dbSearchResults.length === 0 ? (<div className="p-2 text-center text-sm text-muted-foreground">No results found.</div>)
+                            : (
+                                dbSearchResults.map(p => (
+                                    <button
+                                        key={p.id}
+                                        type="button"
+                                        className="w-full text-left p-2 hover:bg-accent rounded-md"
+                                        onClick={() => handleSelectDbPlayer(p)}
+                                    >
+                                        <p className="font-medium">{p.firstName} {p.lastName} ({p.state})</p>
+                                        <p className="text-sm text-muted-foreground">ID: {p.uscfId} | Rating: {p.regularRating || 'N/A'}</p>
+                                    </button>
+                                ))
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </CardContent>
           </Card>
           
