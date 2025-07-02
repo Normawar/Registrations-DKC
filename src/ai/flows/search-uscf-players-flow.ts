@@ -88,7 +88,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
 
       // Step 2: Extract all unique USCF IDs from the links on the page.
-      const idRegex = /MbrDtlMain\.php\?(\d+)/g;
+      const idRegex = /MbrDtlMain\.php\?(\d+)/gi;
       const ids = new Set<string>();
       let match;
       while ((match = idRegex.exec(html)) !== null) {

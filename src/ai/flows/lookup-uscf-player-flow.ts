@@ -67,7 +67,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = { uscfId };
       
-      const nameMatch = text.match(/Name\s*:\s*(.*)/);
+      const nameMatch = text.match(/Name\s*:\s*(.*)/i);
       if (!nameMatch || !nameMatch[1]) {
         console.error("USCF Lookup: Could not find 'Name:' field on page. Full response:", text.substring(0, 1000));
         return { uscfId, error: "Could not find player's name field on the page. The website layout may have changed." };
@@ -84,7 +84,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
           output.lastName = rawName;
       }
       
-      const ratingLineMatch = text.match(/Regular:\s*(.*)/);
+      const ratingLineMatch = text.match(/Regular:\s*(.*)/i);
       if (ratingLineMatch && ratingLineMatch[1]) {
         const ratingText = ratingLineMatch[1].trim();
         const numericPartMatch = ratingText.match(/(\d+)/);
@@ -93,7 +93,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         }
       }
       
-      const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/);
+      const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/i);
       if (expiresMatch && expiresMatch[1]) {
         output.expirationDate = expiresMatch[1];
       }
