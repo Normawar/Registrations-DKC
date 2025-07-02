@@ -278,12 +278,15 @@ export default function PlayersPage() {
             if (!row || row.length < 2) return;
             
             const uscfId = row[1]?.trim();
+            // The most reliable way to identify a non-player row (header, footer, etc.)
+            // is by checking if the USCF ID column is a valid 8-digit number.
+            // If it's not, we just skip it without counting it as an error.
             if (!uscfId || !/^\d{8}$/.test(uscfId)) {
-                errorCount++;
                 return;
             }
 
             const namePart = row[0]?.trim();
+            // If we have a valid ID but no name, this is a genuine parsing error.
             if (!namePart) {
                 errorCount++;
                 return;
@@ -297,7 +300,9 @@ export default function PlayersPage() {
                 const parts = namePart.split(',');
                 lastName = parts[0].trim();
                 const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
-                firstName = firstAndMiddle.shift() || '';
+                if (firstAndMiddle.length > 0) {
+                    firstName = firstAndMiddle.shift() || '';
+                }
                 middleName = firstAndMiddle.join(' ');
             } else {
                 const parts = namePart.split(/\s+/).filter(Boolean);
@@ -306,10 +311,11 @@ export default function PlayersPage() {
                 if (parts.length > 0) middleName = parts.join(' ');
             }
 
-            if (!lastName) {
-                if (firstName) {
-                    lastName = firstName;
-                    firstName = '';
+            // If namePart exists but we couldn't parse a name from it, that's an error.
+            if (!lastName && !firstName) {
+                // However, if there's only one name, assign it to lastName.
+                if (namePart.split(/\s+/).filter(Boolean).length === 1) {
+                    lastName = namePart;
                 } else {
                     errorCount++;
                     return;
@@ -332,8 +338,8 @@ export default function PlayersPage() {
             const newPlayer: ImportedPlayer = {
                 id: `p-${uscfId}`,
                 uscfId,
-                firstName,
-                lastName,
+                firstName: firstName || '',
+                lastName: lastName,
                 middleName: middleName || undefined,
                 expirationDate: expirationDateStr,
                 state: state,
@@ -361,7 +367,9 @@ export default function PlayersPage() {
         window.dispatchEvent(new Event('masterDbUpdated'));
         
         let description = `Database updated with ${importedPlayers.length} records. The database now contains ${newMasterList.length} unique players for this session.`;
-        if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
+        if (errorCount > 0) {
+            description += ` Could not parse ${errorCount} rows.`;
+        }
         
         toast({ title: 'Import Complete', description: description });
       },
