@@ -10,6 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { parseThin3Page } from '@/lib/actions/uscf-parser';
 
 const LookupUscfPlayerInputSchema = z.object({
   uscfId: z.string().describe('The USCF ID of the player to look up.'),
@@ -59,58 +60,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       }
       
       const text = await response.text();
-      
-      // A simple check to see if the page is what we expect. A valid thin3.php page has this heading.
-      if (!text.includes("<h2>USCF Member Lookup</h2>")) {
-        return { uscfId, error: "Player not found or invalid page returned from USCF." };
-      }
-      
-      const output: LookupUscfPlayerOutput = { uscfId };
-
-      // Helper function to extract the value from an input tag's value attribute.
-      // This is robust for the unquoted attributes and simple structure of thin3.php
-      const extractInputValue = (html: string, name: string): string | null => {
-        const regex = new RegExp(`name=${name}.*?value='(.*?)'`, 'is');
-        const match = html.match(regex);
-        return match ? match[1].trim() : null;
-      };
-
-      // Extract Full Name
-      const fullName = extractInputValue(text, 'memname');
-      if (fullName) {
-          const nameParts = fullName.split(' ').filter(p => p);
-          if (nameParts.length > 0) {
-              output.lastName = nameParts.pop() || '';
-          }
-          if (nameParts.length > 0) {
-              output.firstName = nameParts.shift() || '';
-          }
-          if (nameParts.length > 0) {
-             output.middleName = nameParts.join(' ');
-          }
-      }
-
-      // Extract State
-      output.state = extractInputValue(text, 'state_country') || undefined;
-      
-      // Extract Membership Expiration Date from its dedicated field
-      output.expirationDate = extractInputValue(text, 'memexpdt') || undefined;
-      
-      // Extract Regular Rating from the combined field
-      const ratingString = extractInputValue(text, 'rating1');
-      if (ratingString && ratingString.toLowerCase() !== 'unrated') {
-        // Extract the number at the beginning of the string, ignoring the provisional '*'
-        const ratingMatch = ratingString.match(/^(\d+)/);
-        if (ratingMatch && ratingMatch[1]) {
-          output.rating = parseInt(ratingMatch[1], 10);
-        }
-      }
-      
-      if (!output.lastName && !output.firstName) {
-        return { uscfId, error: "Could not parse player name from the details page." };
-      }
-      
-      return output;
+      return parseThin3Page(text, uscfId);
 
     } catch (error) {
       console.error("Error in lookupUscfPlayerFlow:", error);

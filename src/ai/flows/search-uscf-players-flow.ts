@@ -11,6 +11,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { lookupUscfPlayer } from './lookup-uscf-player-flow';
+import { parseThin3Page } from '@/lib/actions/uscf-parser';
 
 const SearchUscfPlayersInputSchema = z.object({
   firstName: z.string().optional().describe("The player's first name."),
@@ -87,10 +88,22 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Step 2: Extract all unique USCF IDs from the page.
+      // Step 2: Check for a single result redirect to a thin3.php page
+      if (html.includes("<h2>USCF Member Lookup</h2>")) {
+          const idMatch = html.match(/name=memid.*?value='(\d+)'/is);
+          const uscfId = idMatch ? idMatch[1] : '';
+          if (uscfId) {
+            const playerData = parseThin3Page(html, uscfId);
+            if (playerData.error) {
+                return { players: [], error: playerData.error };
+            }
+            return { players: [playerData] };
+          }
+      }
+      
+      // Step 3: Extract all unique USCF IDs from a multi-result page.
       const ids = new Set<string>();
       
-      // Use a regex to find all matches of the player detail link pattern for multi-result pages.
       const matches = html.matchAll(/MbrDtlMain\.php\?(\d+)/gi);
       for (const match of matches) {
         if (match[1]) {
@@ -99,30 +112,21 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
       
       if (ids.size === 0) {
-        // Fallback for single result redirect. A search for one player can redirect to
-        // either the MbrDtlMain.php page or the thin3.php page. We'll check for both.
-        
-        // Check for thin3.php format first
-        const thin3IdMatch = html.match(/<input[^>]*name=memid[^>]*value='(\d+)'/i);
-        if (thin3IdMatch && thin3IdMatch[1]) {
-            ids.add(thin3IdMatch[1]);
+        // Fallback for MbrDtlMain.php single result redirect (less common)
+        const detailPageIdMatch = html.match(/<font size=\+1><b>(\d+):/i);
+        if (detailPageIdMatch && detailPageIdMatch[1]) {
+            ids.add(detailPageIdMatch[1]);
         } else {
-            // Check for MbrDtlMain.php format
-            const detailPageIdMatch = html.match(/<font size=\+1><b>(\d+):/i);
-            if (detailPageIdMatch && detailPageIdMatch[1]) {
-                ids.add(detailPageIdMatch[1]);
-            } else {
-                console.error("USCF Search: Found a results page, but was unable to extract any player IDs from it. The website layout may have changed.");
-                return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
-            }
+            console.error("USCF Search: Found a results page, but was unable to extract any player IDs from it. The website layout may have changed.");
+            return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
         }
       }
 
-      // Step 3: Concurrently look up each player using the more reliable individual lookup flow.
+      // Step 4: Concurrently look up each player using the more reliable individual lookup flow.
       const playerLookupPromises = Array.from(ids).map(uscfId => lookupUscfPlayer({ uscfId }));
       const lookupResults = await Promise.all(playerLookupPromises);
       
-      // Step 4: Filter out any failed lookups and map the results to the final format.
+      // Step 5: Filter out any failed lookups and map the results to the final format.
       const players: PlayerSearchResult[] = lookupResults
         .filter(p => !p.error && p.uscfId)
         .map(p => ({
