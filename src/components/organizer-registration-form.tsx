@@ -235,6 +235,7 @@ export function OrganizerRegistrationForm() {
             const lateFeeAmount = registrationFeePerPlayer - event.regularFee;
             return {
                 playerName: `${p.firstName} ${p.lastName}`,
+                uscfId: p.uscfId,
                 baseRegistrationFee: event.regularFee,
                 lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
                 uscfAction: p.uscfStatus !== 'current',

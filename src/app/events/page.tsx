@@ -317,7 +317,7 @@ export default function EventsPage() {
                 const registrationPlayers = Object.entries(selections).map(([playerId]) => {
                     const player = rosterPlayers.find(p => p.id === playerId)!;
                     const lateFeeAmount = registrationFeePerPlayer - selectedEvent!.regularFee;
-                    return { playerName: `${player.firstName} ${player.lastName}`, baseRegistrationFee: selectedEvent!.regularFee, lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0, uscfAction: false, };
+                    return { playerName: `${player.firstName} ${player.lastName}`, uscfId: player.uscfId, baseRegistrationFee: selectedEvent!.regularFee, lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0, uscfAction: false, };
                 });
 
                 const regResult = await createInvoice({
@@ -373,7 +373,7 @@ export default function EventsPage() {
                 const playersToInvoice = Object.entries(selections).map(([playerId, registration]) => {
                     const player = rosterPlayers.find(p => p.id === playerId)!;
                     const lateFeeAmount = registrationFeePerPlayer - selectedEvent!.regularFee;
-                    return { playerName: `${player.firstName} ${player.lastName}`, baseRegistrationFee: selectedEvent!.regularFee, lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0, uscfAction: registration.uscfStatus !== 'current', };
+                    return { playerName: `${player.firstName} ${player.lastName}`, uscfId: player.uscfId, baseRegistrationFee: selectedEvent!.regularFee, lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0, uscfAction: registration.uscfStatus !== 'current', };
                 });
 
                 const result = await createInvoice({
@@ -644,7 +644,7 @@ export default function EventsPage() {
                                 {player.firstName} {player.lastName}
                             </Label>
                             <p className="text-sm text-muted-foreground">
-                                Grade: {player.grade} &bull; Section: {player.section} &bull; Rating: {player.rating || 'N/A'}
+                                Grade: {player.grade} &bull; Section: {player.section} &bull; Rating: {player.regularRating || 'N/A'}
                             </p>
                             <p className="text-sm text-muted-foreground">
                                 USCF ID: {player.uscfId} &bull; Expires: {player.uscfExpiration ? format(player.uscfExpiration, 'MM/dd/yyyy') : 'N/A'}

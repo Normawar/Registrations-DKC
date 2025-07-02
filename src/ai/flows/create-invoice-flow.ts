@@ -11,13 +11,14 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError } from 'square';
+import { ApiError, type OrderLineItem } from 'square';
 import { format } from 'date-fns';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const PlayerInvoiceInfoSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
+  uscfId: z.string().describe('The USCF ID of the player.'),
   baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
   lateFee: z.number().describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
@@ -113,43 +114,53 @@ const createInvoiceFlow = ai.defineFlow(
       }
       
       // Create an Order
-      const lineItems = [];
+      const lineItems: OrderLineItem[] = [];
 
-      input.players.forEach(player => {
-        // Line item for registration
-        lineItems.push({
-          name: `Registration: ${player.playerName}`,
-          quantity: '1',
-          basePriceMoney: {
-            amount: BigInt(Math.round(player.baseRegistrationFee * 100)),
-            currency: 'USD',
-          },
-        });
+      // 1. Registration Line Item
+      if (input.players.length > 0) {
+          const registrationFee = input.players[0].baseRegistrationFee;
+          const playerNotes = input.players.map((p, index) => `${index + 1} ${p.playerName} ${p.uscfId}`).join('\n');
+          lineItems.push({
+              name: `Scholastic Tournament Registration`,
+              quantity: String(input.players.length),
+              basePriceMoney: {
+                  amount: BigInt(Math.round(registrationFee * 100)),
+                  currency: 'USD',
+              },
+              note: playerNotes,
+          });
+      }
 
-        // Line item for late fee if applicable
-        if (player.lateFee > 0) {
-            lineItems.push({
-                name: `Late Fee: ${player.playerName}`,
-                quantity: '1',
-                basePriceMoney: {
-                    amount: BigInt(Math.round(player.lateFee * 100)),
-                    currency: 'USD',
-                },
-            });
-        }
+      // 2. Late Fee Line Item
+      const lateFeePlayers = input.players.filter(p => p.lateFee > 0);
+      if (lateFeePlayers.length > 0) {
+          const lateFee = lateFeePlayers[0].lateFee;
+          const lateFeePlayerNames = lateFeePlayers.map(p => p.playerName).join(', ');
+          lineItems.push({
+              name: 'Late Fee',
+              quantity: String(lateFeePlayers.length),
+              basePriceMoney: {
+                  amount: BigInt(Math.round(lateFee * 100)),
+                  currency: 'USD',
+              },
+              note: `For players: ${lateFeePlayerNames}`,
+          });
+      }
 
-        // Line item for USCF membership if applicable
-        if (player.uscfAction) {
-            lineItems.push({
-                name: `USCF Membership: ${player.playerName}`,
-                quantity: '1',
-                basePriceMoney: {
-                    amount: BigInt(Math.round(input.uscfFee * 100)),
-                    currency: 'USD',
-                },
-            });
-        }
-      });
+      // 3. USCF Membership Line Item
+      const uscfActionPlayers = input.players.filter(p => p.uscfAction);
+      if (uscfActionPlayers.length > 0) {
+          const uscfPlayerNames = uscfActionPlayers.map(p => p.playerName).join(', ');
+          lineItems.push({
+              name: 'USCF Membership (New/Renew)',
+              quantity: String(uscfActionPlayers.length),
+              basePriceMoney: {
+                  amount: BigInt(Math.round(input.uscfFee * 100)),
+                  currency: 'USD',
+              },
+              note: `For players: ${uscfPlayerNames}`,
+          });
+      }
 
       console.log("Creating order with line items:", JSON.stringify(lineItems, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
       const createOrderResponse = await ordersApi.createOrder({
