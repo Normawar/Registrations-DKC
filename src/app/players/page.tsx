@@ -275,10 +275,7 @@ export default function PlayersPage() {
       step: (results) => {
         try {
             const row = results.data as string[];
-            
-            if (!row || row.length < 2) {
-                return;
-            }
+            if (!row || row.length < 2) return;
             
             const uscfId = row[1]?.trim();
             if (!uscfId || !/^\d{8}$/.test(uscfId)) {
@@ -297,23 +294,26 @@ export default function PlayersPage() {
             let middleName = '';
 
             if (namePart.includes(',')) {
-                // Handle "Last, First Middle" format
-                const nameParts = namePart.split(',');
-                lastName = nameParts[0].trim();
-                const firstAndMiddleParts = (nameParts[1] || '').trim().split(/\s+/).filter(Boolean);
-                firstName = firstAndMiddleParts.shift() || '';
-                middleName = firstAndMiddleParts.join(' ');
+                const parts = namePart.split(',');
+                lastName = parts[0].trim();
+                const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
+                firstName = firstAndMiddle.shift() || '';
+                middleName = firstAndMiddle.join(' ');
             } else {
-                // Assume "First Middle Last" format for names without commas
-                const nameParts = namePart.split(/\s+/).filter(Boolean);
-                if (nameParts.length > 0) lastName = nameParts.pop() || '';
-                if (nameParts.length > 0) firstName = nameParts.shift() || '';
-                if (nameParts.length > 0) middleName = nameParts.join(' ');
+                const parts = namePart.split(/\s+/).filter(Boolean);
+                if (parts.length > 0) lastName = parts.pop()!;
+                if (parts.length > 0) firstName = parts.shift()!;
+                if (parts.length > 0) middleName = parts.join(' ');
             }
 
-            if (!firstName || !lastName) {
-                errorCount++;
-                return;
+            if (!lastName) {
+                if (firstName) {
+                    lastName = firstName;
+                    firstName = '';
+                } else {
+                    errorCount++;
+                    return;
+                }
             }
           
             const expirationDateStr = row[2] || '';
