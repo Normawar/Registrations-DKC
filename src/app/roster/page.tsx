@@ -194,6 +194,7 @@ export default function RosterPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dbSearchResults, setDbSearchResults] = useState<ImportedPlayer[]>([]);
   const [isDbSearching, setIsDbSearching] = useState(false);
+  const [masterDbLoaded, setMasterDbLoaded] = useState(false);
 
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -218,6 +219,27 @@ export default function RosterPage() {
     }
   });
 
+  useEffect(() => {
+    setMasterDbLoaded(isMasterDatabaseLoaded());
+
+    const handleStorageChange = () => {
+        setMasterDbLoaded(isMasterDatabaseLoaded());
+    };
+    
+    // Custom event listener for same-tab updates
+    const handleMasterDbUpdate = () => {
+        handleStorageChange();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('masterDbUpdated', handleMasterDbUpdate);
+    
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('masterDbUpdated', handleMasterDbUpdate);
+    };
+  }, []);
+
   // Debounced search for the master database
   useEffect(() => {
     if (searchQuery.length < 3) {
@@ -227,10 +249,14 @@ export default function RosterPage() {
     setIsDbSearching(true);
     const handler = setTimeout(() => {
         const masterDb = getMasterDatabase();
-        const results = masterDb.filter(p => 
-            p.uscfId.includes(searchQuery) || 
-            `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
-        ).slice(0, 10);
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        const results = masterDb.filter(p => {
+            if (p.uscfId.toLowerCase().includes(lowerCaseQuery)) {
+                return true;
+            }
+            const fullName = [p.firstName, p.middleName, p.lastName].filter(Boolean).join(' ').toLowerCase();
+            return fullName.includes(lowerCaseQuery);
+        }).slice(0, 10);
         setDbSearchResults(results);
         setIsDbSearching(false);
     }, 300);
@@ -645,14 +671,17 @@ export default function RosterPage() {
         <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
-            <DialogDescription>
-              Search the database to auto-fill player information or enter details manually.
-            </DialogDescription>
           </DialogHeader>
 
           <Card className="bg-muted/50">
             <CardHeader>
                 <CardTitle className="text-base">Master Database Search</CardTitle>
+                <CardDescription>
+                  {masterDbLoaded 
+                    ? "Search by USCF ID or name to auto-fill player data."
+                    : <>To enable player search, first go to the <Link href="/players" className="underline font-medium">All Players</Link> page and upload the database file.</>
+                  }
+                </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="relative">
@@ -662,6 +691,7 @@ export default function RosterPage() {
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         className="pl-10"
+                        disabled={!masterDbLoaded}
                     />
                     {searchQuery.length > 2 && (
                         <Card className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto">
