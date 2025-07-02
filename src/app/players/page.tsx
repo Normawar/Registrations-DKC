@@ -209,8 +209,7 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    let importToastId: string | null = null;
-    toast({
+    const { update: updateToast } = toast({
         title: 'Import Started',
         description: 'Your database file is being uploaded and processed...',
     });
@@ -304,18 +303,10 @@ export default function PlayersPage() {
 
                 if (currentIndex < rows.length) {
                     const progress = Math.round((currentIndex / rows.length) * 100);
-                    if (importToastId) {
-                      toast.update(importToastId, {
-                        title: 'Importing...',
-                        description: `Processing database... ${progress}% complete.`,
-                      });
-                    } else {
-                      const { id } = toast({
-                        title: 'Importing...',
-                        description: `Processing database... ${progress}% complete.`,
-                      });
-                      importToastId = id;
-                    }
+                    updateToast({
+                      title: 'Importing...',
+                      description: `Processing database... ${progress}% complete.`,
+                    });
                     setTimeout(processChunk, 0); // Yield to the browser
                 } else {
                     const newMasterList = Array.from(dbMap.values());
@@ -326,18 +317,11 @@ export default function PlayersPage() {
                     let description = `Database updated. Processed ${rows.length} records. The database now contains ${newMasterList.length} unique players.`;
                     if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
                     
-                    if (importToastId) {
-                      toast.update(importToastId, {
-                        title: 'Import Complete',
-                        description: description,
-                      });
-                    } else {
-                      toast({
-                        title: 'Import Complete',
-                        description: description,
-                        duration: 5000,
-                      });
-                    }
+                    updateToast({
+                      title: 'Import Complete',
+                      description: description,
+                      duration: 5000,
+                    });
                 }
             }
             
@@ -345,7 +329,11 @@ export default function PlayersPage() {
         },
         error: (error: any) => {
             setIsImporting(false);
-            toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
+            updateToast({
+              variant: 'destructive',
+              title: 'Import Error',
+              description: `Failed to parse file: ${error.message}`
+            });
         }
     });
 
