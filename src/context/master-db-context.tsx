@@ -34,7 +34,7 @@ export type MasterPlayer = {
 
 interface MasterDbContextType {
   database: MasterPlayer[];
-  setDatabase: (players: MasterPlayer[]) => Promise<void>;
+  setDatabase: (players: MasterPlayer[], onProgress?: (progress: number) => void) => Promise<void>;
   isDbLoaded: boolean;
   dbPlayerCount: number;
 }
@@ -91,17 +91,40 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // This is the function that components will call to update the database
-  const setDatabase = useCallback(async (newPlayers: MasterPlayer[]) => {
+  const setDatabase = useCallback(async (newPlayers: MasterPlayer[], onProgress?: (progress: number) => void) => {
     const db = await getDb();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    await tx.store.clear();
-    for(const player of newPlayers) {
-        await tx.store.add(player);
-    }
-    await tx.done;
+    
+    const clearTx = db.transaction(STORE_NAME, 'readwrite');
+    await clearTx.store.clear();
+    await clearTx.done;
+    
+    const totalPlayers = newPlayers.length;
+    const CHUNK_SIZE = 5000;
+    let playersWritten = 0;
 
-    // After successfully writing to the DB, update the React state
+    for (let i = 0; i < totalPlayers; i += CHUNK_SIZE) {
+        const chunk = newPlayers.slice(i, i + CHUNK_SIZE);
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        
+        try {
+            const addPromises = chunk.map(player => tx.store.add(player));
+            await Promise.all(addPromises);
+            await tx.done;
+            
+            playersWritten += chunk.length;
+            if (onProgress) {
+                const progress = Math.round((playersWritten / totalPlayers) * 100);
+                onProgress(progress);
+            }
+        } catch(e) {
+            console.error("Failed to write chunk to IndexedDB", e);
+            if (!tx.aborted) tx.abort();
+            throw e; 
+        }
+    }
+
     setDatabaseState(newPlayers);
+    setIsDbLoaded(true);
   }, []);
 
   const dbPlayerCount = database.length;

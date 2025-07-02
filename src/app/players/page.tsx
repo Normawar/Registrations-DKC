@@ -214,9 +214,9 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    const { update: updateToast, dismiss } = toast({
+    const { update } = toast({
       title: 'Import Started',
-      description: 'Your database file is being uploaded and processed...',
+      description: 'Your database file is being parsed...',
       duration: Infinity,
     });
 
@@ -228,135 +228,127 @@ export default function PlayersPage() {
             const rows = results.data as string[][];
             const dbMap = new Map<string, MasterPlayer>(masterDatabase.map(p => [p.uscfId, p]));
             
-            const CHUNK_SIZE = 5000;
-            let currentIndex = 0;
             let errorCount = 0;
+            const newMasterList: MasterPlayer[] = [];
 
-            function processChunk() {
-                const chunkEnd = Math.min(currentIndex + CHUNK_SIZE, rows.length);
-                for (let i = currentIndex; i < chunkEnd; i++) {
-                    try {
-                        const row = rows[i];
-                        if (!row || row.length < 2) continue;
-                        
-                        const uscfId = row[1]?.trim();
-                        if (!uscfId || !/^\d{8}$/.test(uscfId)) continue;
-            
-                        const namePart = row[0]?.trim();
-                        if (!namePart) { errorCount++; continue; }
-            
-                        let lastName = '', firstName = '', middleName = '';
-                        if (namePart.includes(',')) {
-                            const parts = namePart.split(',');
-                            lastName = parts[0].trim();
-                            const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
-                            if (firstAndMiddle.length > 0) firstName = firstAndMiddle.shift() || '';
-                            if (firstAndMiddle.length > 0) middleName = firstAndMiddle.join(' ');
-                        } else {
-                            const parts = namePart.split(/\s+/).filter(Boolean);
-                            if (parts.length > 0) lastName = parts.pop()!;
-                            if (parts.length > 0) firstName = parts.shift()!;
-                            if (parts.length > 0) middleName = parts.join(' ');
-                        }
-            
-                        if (!lastName && !firstName) { errorCount++; continue; }
-                      
-                        const expirationDateStr = row[2] || '';
-                        const state = row[3] || '';
-                        const regularRatingString = row[4] || '';
-                        const quickRatingString = row[5] || '';
-                        
-                        let regularRating: number | undefined = undefined;
-                        if (regularRatingString) {
-                            const ratingMatch = regularRatingString.match(/^(\d+)/);
-                            if (ratingMatch && ratingMatch[1]) { regularRating = parseInt(ratingMatch[1], 10); }
-                        }
-            
-                        const existingPlayer = dbMap.get(uscfId);
-                        if (existingPlayer) {
-                            existingPlayer.firstName = firstName || existingPlayer.firstName;
-                            existingPlayer.lastName = lastName || existingPlayer.lastName;
-                            existingPlayer.middleName = middleName;
-                            existingPlayer.state = state;
-                            existingPlayer.expirationDate = expirationDateStr;
-                            existingPlayer.regularRating = regularRating;
-                            existingPlayer.quickRating = quickRatingString || undefined;
-                            dbMap.set(uscfId, existingPlayer);
-                        } else {
-                            const newPlayer: MasterPlayer = {
-                                id: `p-${uscfId}`,
-                                uscfId: uscfId,
-                                firstName: firstName || '',
-                                lastName: lastName,
-                                middleName: middleName || undefined,
-                                state: state,
-                                expirationDate: expirationDateStr,
-                                regularRating: regularRating,
-                                quickRating: quickRatingString || undefined,
-                                school: "Independent",
-                                district: "None",
-                                events: 0,
-                                eventIds: [],
-                            };
-                            dbMap.set(uscfId, newPlayer);
-                        }
-                    } catch (e) {
-                        console.error("Error parsing a player row:", rows[i], e);
-                        errorCount++;
-                    }
-                }
-
-                currentIndex += CHUNK_SIZE;
-
-                if (currentIndex < rows.length) {
-                    const progress = Math.round((currentIndex / rows.length) * 100);
-                    updateToast({
-                        title: 'Importing...',
-                        description: `Processing database... ${progress}% complete.`,
-                      });
-                    setTimeout(processChunk, 0); // Yield to the browser
-                } else {
-                    const newMasterList = Array.from(dbMap.values());
-                    updateToast({
-                        title: 'Saving to Database',
-                        description: `Saving ${newMasterList.length} records. This may take a moment...`,
-                    });
+            // This part is fast, no need for chunking here.
+            for (let i = 0; i < rows.length; i++) {
+                try {
+                    const row = rows[i];
+                    if (!row || row.length < 2) continue;
                     
-                    (async () => {
-                        try {
-                            await setDatabase(newMasterList);
-                            
-                            setCurrentPage(1);
-                            setIsImporting(false);
-                            
-                            let description = `Database updated. The database now contains ${newMasterList.length} unique players.`;
-                            if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
-
-                            updateToast({
-                                title: 'Import Complete',
-                                description: description,
-                                duration: 5000,
-                            });
-                        } catch(err) {
-                            console.error("Failed to save to database", err);
-                            const description = err instanceof Error ? err.message : 'An unknown error occurred.';
-                             updateToast({
-                                variant: 'destructive',
-                                title: 'Database Save Error',
-                                description: description,
-                                duration: 10000,
-                            });
-                             setIsImporting(false);
-                        }
-                    })();
+                    const uscfId = row[1]?.trim();
+                    if (!uscfId || !/^\d{8}$/.test(uscfId)) continue;
+        
+                    const namePart = row[0]?.trim();
+                    if (!namePart) { errorCount++; continue; }
+        
+                    let lastName = '', firstName = '', middleName = '';
+                    if (namePart.includes(',')) {
+                        const parts = namePart.split(',');
+                        lastName = parts[0].trim();
+                        const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
+                        if (firstAndMiddle.length > 0) firstName = firstAndMiddle.shift() || '';
+                        if (firstAndMiddle.length > 0) middleName = firstAndMiddle.join(' ');
+                    } else {
+                        const parts = namePart.split(/\s+/).filter(Boolean);
+                        if (parts.length > 0) lastName = parts.pop()!;
+                        if (parts.length > 0) firstName = parts.shift()!;
+                        if (parts.length > 0) middleName = parts.join(' ');
+                    }
+        
+                    if (!lastName && !firstName) { errorCount++; continue; }
+                  
+                    const expirationDateStr = row[2] || '';
+                    const state = row[3] || '';
+                    const regularRatingString = row[4] || '';
+                    const quickRatingString = row[5] || '';
+                    
+                    let regularRating: number | undefined = undefined;
+                    if (regularRatingString) {
+                        const ratingMatch = regularRatingString.match(/^(\d+)/);
+                        if (ratingMatch && ratingMatch[1]) { regularRating = parseInt(ratingMatch[1], 10); }
+                    }
+        
+                    const existingPlayer = dbMap.get(uscfId);
+                    if (existingPlayer) {
+                        existingPlayer.firstName = firstName || existingPlayer.firstName;
+                        existingPlayer.lastName = lastName || existingPlayer.lastName;
+                        existingPlayer.middleName = middleName;
+                        existingPlayer.state = state;
+                        existingPlayer.expirationDate = expirationDateStr;
+                        existingPlayer.regularRating = regularRating;
+                        existingPlayer.quickRating = quickRatingString || undefined;
+                        dbMap.set(uscfId, existingPlayer);
+                    } else {
+                        const newPlayer: MasterPlayer = {
+                            id: `p-${uscfId}`,
+                            uscfId: uscfId,
+                            firstName: firstName || '',
+                            lastName: lastName,
+                            middleName: middleName || undefined,
+                            state: state,
+                            expirationDate: expirationDateStr,
+                            regularRating: regularRating,
+                            quickRating: quickRatingString || undefined,
+                            school: "Independent",
+                            district: "None",
+                            events: 0,
+                            eventIds: [],
+                        };
+                        dbMap.set(uscfId, newPlayer);
+                    }
+                } catch (e) {
+                    console.error("Error parsing a player row:", rows[i], e);
+                    errorCount++;
                 }
             }
             
-            processChunk();
+            const finalPlayerList = Array.from(dbMap.values());
+
+            (async () => {
+                try {
+                    const onProgress = (progress: number) => {
+                        update({
+                            title: 'Saving to Database',
+                            description: `Saving ${finalPlayerList.length.toLocaleString()} records... ${progress}% complete.`
+                        });
+                    };
+                    
+                    update({
+                        title: 'Saving to Database',
+                        description: `Saving ${finalPlayerList.length.toLocaleString()} records. This may take a moment...`,
+                    });
+                    
+                    await setDatabase(finalPlayerList, onProgress);
+                    
+                    setCurrentPage(1);
+                    setIsImporting(false);
+                    
+                    let description = `Database updated. It now contains ${finalPlayerList.length.toLocaleString()} unique players.`;
+                    if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
+
+                    update({
+                        title: 'Import Complete',
+                        description: description,
+                        duration: 10000,
+                    });
+                } catch(err) {
+                    console.error("Failed to save to database", err);
+                    const description = err instanceof Error ? err.message : 'An unknown error occurred.';
+                     update({
+                        variant: 'destructive',
+                        title: 'Database Save Error',
+                        description: description,
+                        duration: 10000,
+                    });
+                     setIsImporting(false);
+                }
+            })();
         },
         error: (error: any) => {
             setIsImporting(false);
-            updateToast({
+            update({
               variant: 'destructive',
               title: 'Import Error',
               description: `Failed to parse file: ${error.message}`,
