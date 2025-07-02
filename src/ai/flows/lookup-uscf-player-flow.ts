@@ -67,18 +67,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = { uscfId };
 
-      // Helper function to extract data from a table row based on a label.
-      const extractData = (label: string): string | null => {
-        const regex = new RegExp(`<TD.*?>\\s*${label}\\s*<\\/TD>[\\s\\S]*?<TD.*?>(.*?)<`, "i");
-        const match = text.match(regex);
-        if (match && match[1]) {
-            return match[1].replace(/<[^>]+>/g, '').trim();
-        }
-        return null;
-      }
-      
-      // The name is typically in an <h4> tag.
-      const nameMatch = text.match(/<h4>([\s\S]*?)<\/h4>/i);
+      // The name is the most stable element, in an <h4> tag.
+      const nameMatch = text.match(/<h4>\s*([\s\S]*?)\s*<\/h4>/i);
       if (nameMatch && nameMatch[1]) {
           const rawName = nameMatch[1].replace(/<[^>]+>/g, '').trim(); // Format: LAST, FIRST MIDDLE
           const nameParts = rawName.split(',');
@@ -92,27 +82,36 @@ const lookupUscfPlayerFlow = ai.defineFlow(
           }
       }
 
-      // Extract rating. The value is usually preceded by "R: ".
-      const ratingText = extractData('Regular Rating');
+      // Extract all table data cells and clean them
+      const cells = text.match(/<TD[^>]*>[\s\S]*?<\/TD>/gi)?.map(cell => cell.replace(/<[^>]+>/g, '').trim()) || [];
+      
+      // Find data by looking for labels in the cell array
+      const findValueByLabel = (label: string): string | undefined => {
+          const labelIndex = cells.findIndex(cell => cell.includes(label));
+          if (labelIndex !== -1 && labelIndex + 1 < cells.length) {
+              return cells[labelIndex + 1];
+          }
+          return undefined;
+      };
+
+      const ratingText = findValueByLabel('Regular Rating');
       if (ratingText) {
-          const ratingMatch = ratingText.match(/(\d+)/);
+          const ratingMatch = ratingText.match(/^(\d+)/); // Match only numbers at the start of the string
           if (ratingMatch && ratingMatch[1]) {
               output.rating = parseInt(ratingMatch[1], 10);
           }
       }
       
-      // Extract expiration date.
-      const expiresText = extractData('Expires');
+      const expiresText = findValueByLabel('Expires');
       if (expiresText) {
           const dateMatch = expiresText.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
           if (dateMatch && dateMatch[1]) {
-              // Convert MM/DD/YYYY to YYYY-MM-DD
               const [month, day, year] = dateMatch[1].split('/');
               output.expirationDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
           }
       }
 
-      // Extract state from the address block.
+      // State is usually in the address line like "City, ST ZIP"
       const stateMatch = text.match(/,\s*([A-Z]{2})\s+\d{5}/);
       if (stateMatch && stateMatch[1]) {
         output.state = stateMatch[1];
