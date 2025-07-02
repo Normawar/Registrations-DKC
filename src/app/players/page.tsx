@@ -14,7 +14,8 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription
+  CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -99,6 +100,9 @@ export default function PlayersPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
   
+  const [currentPage, setCurrentPage] = useState(1);
+  const ROWS_PER_PAGE = 50;
+
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
     defaultValues: {
@@ -209,9 +213,9 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    const { update: updateToast } = toast({
-        title: 'Import Started',
-        description: 'Your database file is being uploaded and processed...',
+    const { id: importToastId, update: updateToast } = toast({
+      title: 'Import Started',
+      description: 'Your database file is being uploaded and processed...',
     });
 
     Papa.parse(file, {
@@ -221,6 +225,7 @@ export default function PlayersPage() {
         complete: (results) => {
             const rows = results.data as string[][];
             const dbMap = new Map<string, MasterPlayer>(masterDatabase.map(p => [p.uscfId, p]));
+            
             const CHUNK_SIZE = 5000;
             let currentIndex = 0;
             let errorCount = 0;
@@ -303,21 +308,22 @@ export default function PlayersPage() {
 
                 if (currentIndex < rows.length) {
                     const progress = Math.round((currentIndex / rows.length) * 100);
-                    updateToast({
-                      title: 'Importing...',
-                      description: `Processing database... ${progress}% complete.`,
-                    });
+                    updateToast(importToastId, {
+                        title: 'Importing...',
+                        description: `Processing database... ${progress}% complete.`,
+                      });
                     setTimeout(processChunk, 0); // Yield to the browser
                 } else {
                     const newMasterList = Array.from(dbMap.values());
                     setDatabase(newMasterList);
+                    setCurrentPage(1); // Reset to first page after import
                     
                     setIsImporting(false);
                     
                     let description = `Database updated. Processed ${rows.length} records. The database now contains ${newMasterList.length} unique players.`;
                     if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
                     
-                    updateToast({
+                    updateToast(importToastId, {
                       title: 'Import Complete',
                       description: description,
                       duration: 5000,
@@ -329,7 +335,7 @@ export default function PlayersPage() {
         },
         error: (error: any) => {
             setIsImporting(false);
-            updateToast({
+            updateToast(importToastId, {
               variant: 'destructive',
               title: 'Import Error',
               description: `Failed to parse file: ${error.message}`
@@ -382,6 +388,15 @@ export default function PlayersPage() {
     return sortablePlayers;
   }, [sortConfig, selectedEvent, masterDatabase]);
   
+  const paginatedPlayers = useMemo(() => {
+    return filteredAndSortedPlayers.slice(
+      (currentPage - 1) * ROWS_PER_PAGE,
+      currentPage * ROWS_PER_PAGE
+    );
+  }, [filteredAndSortedPlayers, currentPage]);
+
+  const totalPages = Math.ceil(filteredAndSortedPlayers.length / ROWS_PER_PAGE);
+
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
@@ -558,7 +573,7 @@ export default function PlayersPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredAndSortedPlayers.map((player) => (
+                    {paginatedPlayers.map((player) => (
                     <TableRow key={player.id}>
                         <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
@@ -598,6 +613,31 @@ export default function PlayersPage() {
                 </Table>
             )}
           </CardContent>
+          <CardFooter>
+            <div className="flex items-center justify-between w-full">
+                <div className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                    >
+                        Previous
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                    >
+                        Next
+                    </Button>
+                </div>
+            </div>
+          </CardFooter>
         </Card>
       </div>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
