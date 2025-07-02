@@ -646,7 +646,7 @@ export default function RosterPage() {
           <DialogHeader>
             <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
             <DialogDescription>
-              Search the master player database to auto-fill information, or enter the details manually below.
+              Search the database to auto-fill player information or enter details manually.
             </DialogDescription>
           </DialogHeader>
 
@@ -662,11 +662,7 @@ export default function RosterPage() {
                         value={searchQuery}
                         onChange={e => setSearchQuery(e.target.value)}
                         className="pl-10"
-                        disabled={!isMasterDatabaseLoaded()}
                     />
-                    {!isMasterDatabaseLoaded() && (
-                        <p className="text-xs text-muted-foreground mt-1">Player database not loaded. Please <Link href="/players" className='underline'>upload it</Link> to enable search.</p>
-                    )}
                     {searchQuery.length > 2 && (
                         <Card className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto">
                             <CardContent className="p-2">
