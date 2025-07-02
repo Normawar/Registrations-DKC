@@ -92,7 +92,9 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const rowChunks = html.split(/<tr/i);
 
       for (const chunk of rowChunks) {
-          const rowHtml = '<tr' + chunk;
+          // Reconstruct the row, removing a leading '>' if it exists from the split.
+          const reconstructedChunk = chunk.startsWith('>') ? chunk.substring(1) : chunk;
+          const rowHtml = '<tr' + reconstructedChunk;
           
           // A real player row always contains this link.
           if (!rowHtml.toLowerCase().includes('mbrdtlmain.php')) {
@@ -132,7 +134,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
           if (nameLinkMatch && nameLinkMatch[1] && nameLinkMatch[2]) {
               const idFromLink = nameLinkMatch[1];
               // Verify that the ID in the link matches the ID in the first column.
-              if (idFromLink !== player.uscfId) {
+              if (idFromLink.trim() !== player.uscfId?.trim()) {
                   continue;
               }
 
