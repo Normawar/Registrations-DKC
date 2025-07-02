@@ -723,7 +723,7 @@ export default function ConfirmationsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will mark the entire registration as complimentary and cancel the associated invoice in Square, affecting all players on this submission. This action cannot be undone.
+              This will cancel the **entire invoice** for this registration. All players on this submission will be marked as complimentary, and no payment will be due. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
