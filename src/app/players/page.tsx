@@ -259,105 +259,105 @@ export default function PlayersPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const newPlayers: Player[] = [];
+    const existingIds = new Set(players.map(p => p.uscfId));
+    let addedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+
+    toast({ title: 'Import Started', description: 'Processing large file. The page will update when complete.' });
+
     Papa.parse(file, {
+      worker: true, // Use a web worker to avoid blocking the main thread.
       delimiter: "\t",
       skipEmptyLines: true,
-      complete: (results) => {
-        const existingIds = new Set(players.map(p => p.uscfId));
-        let addedCount = 0;
-        let skippedCount = 0;
-        let errorCount = 0;
-
-        const newPlayers: Player[] = [];
-
-        for (const row of results.data as string[][]) {
-          try {
-            if (row.length < 5) {
-                if(row.length > 0 && row[0]) {
-                  console.warn("Skipping malformed row:", row);
-                  errorCount++;
-                }
-                continue;
+      step: (results) => {
+        const row = results.data as string[];
+        try {
+          if (row.length < 5) {
+            if (row.length > 0 && row[0]) {
+              errorCount++;
             }
-
-            const namePart = row[0];
-            const uscfId = row[1];
-            const expirationDateStr = row[2];
-            const state = row[3];
-            const regularRatingString = row[4];
-            const quickRatingString = row[5] || '';
-
-            if (!namePart || !uscfId) {
-                errorCount++;
-                continue;
-            }
-
-            if (existingIds.has(uscfId)) {
-                skippedCount++;
-                continue;
-            }
-
-            const nameParts = namePart.split(',');
-            if (nameParts.length < 2) {
-                console.warn("Skipping row with malformed name:", row);
-                errorCount++;
-                continue;
-            }
-            const lastName = nameParts[0].trim();
-            const firstAndMiddleParts = nameParts[1].trim().split(' ').filter(p => p);
-            const firstName = firstAndMiddleParts.shift() || '';
-            const middleName = firstAndMiddleParts.join(' ');
-            
-            if (!firstName || !lastName) {
-                console.warn("Skipping row with missing first/last name:", row);
-                errorCount++;
-                continue;
-            }
-            
-            const regularRating = parseInt(regularRatingString?.replace('*', ''), 10) || undefined;
-
-            const newPlayer: Player = {
-              id: `p-${uscfId}-${Date.now()}-${Math.random()}`,
-              uscfId: uscfId,
-              firstName: firstName,
-              lastName: lastName,
-              middleName: middleName || undefined,
-              expirationDate: expirationDateStr,
-              state: state,
-              regularRating: regularRating,
-              quickRating: quickRatingString,
-              school: 'Independent',
-              district: 'None',
-              events: 0,
-              eventIds: [],
-            };
-
-            newPlayers.push(newPlayer);
-            existingIds.add(uscfId);
-            addedCount++;
-
-          } catch (e) {
-            console.error("Error parsing row:", row, e);
-            errorCount++;
+            return;
           }
-        }
 
+          const namePart = row[0];
+          const uscfId = row[1];
+          const expirationDateStr = row[2];
+          const state = row[3];
+          const regularRatingString = row[4];
+          const quickRatingString = row[5] || '';
+
+          if (!namePart || !uscfId) {
+            errorCount++;
+            return;
+          }
+
+          if (existingIds.has(uscfId)) {
+            skippedCount++;
+            return;
+          }
+
+          const nameParts = namePart.split(',');
+          if (nameParts.length < 2) {
+            errorCount++;
+            return;
+          }
+          const lastName = nameParts[0].trim();
+          const firstAndMiddleParts = nameParts[1].trim().split(' ').filter(p => p);
+          const firstName = firstAndMiddleParts.shift() || '';
+          const middleName = firstAndMiddleParts.join(' ');
+
+          if (!firstName || !lastName) {
+            errorCount++;
+            return;
+          }
+
+          const regularRating = parseInt(regularRatingString?.replace('*', ''), 10) || undefined;
+
+          const newPlayer: Player = {
+            id: `p-${uscfId}-${Date.now()}-${Math.random()}`,
+            uscfId,
+            firstName,
+            lastName,
+            middleName: middleName || undefined,
+            expirationDate: expirationDateStr,
+            state: state,
+            regularRating,
+            quickRating: quickRatingString,
+            school: 'Independent',
+            district: 'None',
+            events: 0,
+            eventIds: [],
+          };
+
+          newPlayers.push(newPlayer);
+          existingIds.add(uscfId); // Prevent duplicates within the same file
+          addedCount++;
+        } catch (e) {
+          console.error("Error parsing row:", row, e);
+          errorCount++;
+        }
+      },
+      complete: () => {
         if (newPlayers.length > 0) {
-            setPlayers(prev => [...prev, ...newPlayers]);
+          setPlayers(prev => [...prev, ...newPlayers]);
         }
 
         let description = `Added ${addedCount} new players.`;
-        if (skippedCount > 0) description += ` Skipped ${skippedCount} duplicate players.`;
+        if (skippedCount > 0) description += ` Skipped ${skippedCount} duplicates.`;
         if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
         
-        toast({ title: 'Import Complete', description: description });
+        toast({ title: 'Import Complete', description });
       },
       error: (error) => {
-          toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
+        toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
       }
     });
 
-    if(fileInputRef.current) fileInputRef.current.value = '';
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
 
