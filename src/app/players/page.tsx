@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { flushSync } from 'react-dom';
+import { format, isValid, parse } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -25,7 +24,20 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download, Upload, Trash2, Loader2 } from "lucide-react";
+import { 
+  PlusCircle, 
+  MoreHorizontal,
+  CalendarIcon,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Loader2,
+  Search,
+  Info,
+  Download,
+  Upload,
+  Trash2
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -34,13 +46,6 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +56,11 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+} from '@/components/ui/alert';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -60,83 +70,189 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { districts as allDistricts } from '@/lib/data/districts';
-import { schoolData } from '@/lib/data/school-data';
-import Link from "next/link";
-import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from '@/lib/utils';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { generateTeamCode } from '@/lib/school-utils';
+import { Skeleton } from '@/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
+import { Label } from '@/components/ui/label';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import { type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
 
-type SortableColumnKey = 'name' | 'uscfId' | 'regularRating' | 'school' | 'district' | 'events';
+
+const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
+const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
+
+const gradeToNumber: { [key: string]: number } = {
+  'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3,
+  '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7,
+  '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11,
+  '12th Grade': 12,
+};
+
+const sectionMaxGrade: { [key: string]: number } = {
+  'Kinder-1st': 1,
+  'Primary K-3': 3,
+  'Elementary K-5': 5,
+  'Middle School K-8': 8,
+  'High School K-12': 12,
+  'Championship': 12, // Open to all, so it's always valid
+};
 
 const playerFormSchema = z.object({
   id: z.string().optional(),
-  firstName: z.string().min(1, "First Name is required."),
+  firstName: z.string().min(1, { message: "First Name is required." }),
   middleName: z.string().optional(),
-  lastName: z.string().min(1, "Last Name is required."),
-  district: z.string().min(1, "District is required."),
-  school: z.string().min(1, "School is required."),
-  uscfId: z.string().min(1, "USCF ID is required."),
+  lastName: z.string().min(1, { message: "Last Name is required." }),
+  uscfId: z.string().min(1, { message: "USCF ID is required." }),
+  uscfExpiration: z.date().optional(),
   regularRating: z.coerce.number().optional(),
   quickRating: z.string().optional(),
+  grade: z.string().min(1, { message: "Please select a grade." }),
+  section: z.string().min(1, { message: "Please select a section." }),
+  email: z.string().email({ message: "Please enter a valid email." }),
+  phone: z.string().optional(),
+  dob: z.date({ required_error: "Date of birth is required."}),
+  zipCode: z.string().min(5, { message: "Please enter a valid 5-digit zip code." }),
+  studentType: z.string().optional(),
   state: z.string().optional(),
-  expirationDate: z.string().optional(),
-});
+})
+.refine(data => {
+    if (data.uscfId.toUpperCase() !== 'NEW') {
+      return data.uscfExpiration !== undefined;
+    }
+    return true;
+}, {
+  message: "USCF Expiration is required unless ID is NEW.",
+  path: ["uscfExpiration"],
+})
+.refine(data => {
+  if (data.uscfId.toUpperCase() !== 'NEW') {
+    return data.regularRating !== undefined && data.regularRating !== null && !isNaN(data.regularRating);
+  }
+  return true;
+}, {
+  message: "Rating is required unless USCF ID is NEW.",
+  path: ["regularRating"],
+})
+.refine((data) => {
+    if (!data.grade || !data.section) {
+      return true; // Let other validators handle if these are missing
+    }
+    // Championship section is open to all grades, so it's always valid.
+    if (data.section === 'Championship') {
+      return true;
+    }
+    const playerGradeLevel = gradeToNumber[data.grade];
+    const sectionMaxLevel = sectionMaxGrade[data.section];
+    
+    // This can happen if the dropdown values are not in the map, but they should be.
+    if (playerGradeLevel === undefined || sectionMaxLevel === undefined) {
+      return true; 
+    }
+
+    // A player's grade level must be less than or equal to the section's max grade level.
+    return playerGradeLevel <= sectionMaxLevel;
+  }, {
+    message: "Player's grade is too high for this section.",
+    path: ["section"],
+  });
+
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
+type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
 
-export default function PlayersPage() {
+export default function RosterPage() {
   const { toast } = useToast();
-  const { database: masterDatabase, setDatabase, isDbLoaded, dbPlayerCount } = useMasterDb();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
-  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
-  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
-  const [selectedEvent, setSelectedEvent] = useState<string>('all');
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
+  const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
+
+  // States for player search
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
+  const [searchFirstName, setSearchFirstName] = useState('');
+  const [searchLastName, setSearchLastName] = useState('');
+  const [searchState, setSearchState] = useState('ALL');
+  
+  const { profile } = useSponsorProfile();
+  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded } = useMasterDb();
+  const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
+
+  const rosterPlayers = useMemo(() => {
+    if (!profile || !isDbLoaded || profile.role !== 'sponsor') return [];
+    return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
+  }, [allPlayers, profile, isDbLoaded]);
+
+  const dbStates = useMemo(() => {
+    if (isDbLoaded) {
+        const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
+        return ['ALL', ...Array.from(states).sort()];
+    }
+    return ['ALL'];
+  }, [isDbLoaded, allPlayers]);
+  
+  const formStates = useMemo(() => {
+    if (isDbLoaded) {
+        const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
+        return Array.from(states).sort();
+    }
+    return [];
+  }, [isDbLoaded, allPlayers]);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workerRef = useRef<Worker>();
   const [isImporting, setIsImporting] = useState(false);
-  
-  const [currentPage, setCurrentPage] = useState(1);
-  const ROWS_PER_PAGE = 50;
 
   useEffect(() => {
-    // Initialize the Web Worker
     workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url));
 
     const toastControls = {
-      current: null as null | ReturnType<typeof toast>,
+      current: null as null | { id: string; dismiss: () => void; update: (props: any) => void },
     };
 
     workerRef.current.onmessage = (event) => {
         const { rows, error } = event.data;
-
         if (error) {
             setIsImporting(false);
-            if (toastControls.current) {
-              toastControls.current.dismiss();
-            }
-            toast({
-                variant: 'destructive',
-                title: 'Import Error',
-                description: `Failed to parse file: ${error}`,
-                duration: 10000,
-            });
+            if (toastControls.current) toastControls.current.dismiss();
+            toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error}`, duration: 10000 });
             return;
         }
 
         let currentIndex = 0;
         let totalErrorCount = 0;
         const dbMap = new Map<string, MasterPlayer>();
-        masterDatabase.forEach(p => dbMap.set(p.uscfId, p));
+        allPlayers.forEach(p => dbMap.set(p.uscfId, p));
 
         toastControls.current = toast({
             title: 'Importing...',
-            description: 'Processing database... 0% complete.',
+            description: 'Parsing file... 0% complete.',
             duration: Infinity,
         });
 
@@ -144,30 +260,15 @@ export default function PlayersPage() {
             const CHUNK_SIZE = 10000;
             const endIndex = Math.min(currentIndex + CHUNK_SIZE, rows.length);
             let errorCountInChunk = 0;
-            let newOrUpdatedPlayersInChunk: MasterPlayer[] = [];
-
             for (let i = currentIndex; i < endIndex; i++) {
                 const row = rows[i] as string[];
-            
-                if (!row || !Array.isArray(row)) {
-                    errorCountInChunk++;
-                    continue;
-                }
-                
+                if (!row || !Array.isArray(row)) { errorCountInChunk++; continue; }
                 const uscfId = row[1]?.trim();
-                if (!uscfId || !/^\d{8}$/.test(uscfId)) {
-                    continue; // Skip headers/footers/invalid rows silently
-                }
-            
+                if (!uscfId || !/^\d{8}$/.test(uscfId)) continue;
                 const namePart = row[0]?.trim();
-                if (!namePart) {
-                    errorCountInChunk++;
-                    continue;
-                }
-            
+                if (!namePart) { errorCountInChunk++; continue; }
                 try {
                     let lastName = '', firstName = '', middleName = '';
-                    
                     if (namePart.includes(',')) {
                         const parts = namePart.split(',');
                         lastName = parts[0]?.trim() || '';
@@ -180,113 +281,70 @@ export default function PlayersPage() {
                         if (parts.length > 0) firstName = parts.shift() || '';
                         if (parts.length > 0) middleName = parts.join(' ');
                     }
-            
-                    if (!firstName || !lastName) {
-                        errorCountInChunk++;
-                        continue;
-                    }
-            
+                    if (!firstName || !lastName) { errorCountInChunk++; continue; }
+                    
                     const expirationDateStr = row[2] || '';
                     const state = row[3] || '';
                     const regularRatingString = row[4] || '';
                     const quickRatingString = row[5] || '';
-                    
                     let regularRating: number | undefined = undefined;
                     if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated') {
                         const ratingMatch = regularRatingString.match(/^(\d+)/);
-                        if (ratingMatch && ratingMatch[1]) {
-                            regularRating = parseInt(ratingMatch[1], 10);
-                        }
+                        if (ratingMatch && ratingMatch[1]) regularRating = parseInt(ratingMatch[1], 10);
                     }
-            
                     const existingPlayer = dbMap.get(uscfId);
-                    
                     const playerRecord: MasterPlayer = {
-                        ...(existingPlayer || {
-                            id: `p-${uscfId}`,
-                            school: "Independent",
-                            district: "None",
-                            events: 0,
-                            eventIds: [],
-                        }),
-                        uscfId: uscfId,
-                        firstName: firstName,
-                        lastName: lastName,
-                        middleName: middleName || undefined,
-                        state: state || undefined,
-                        expirationDate: expirationDateStr || undefined,
-                        regularRating: regularRating,
+                        ...(existingPlayer || { id: `p-${uscfId}`, school: "Independent", district: "None", events: 0, eventIds: [] }),
+                        uscfId: uscfId, firstName: firstName, lastName: lastName, middleName: middleName || undefined,
+                        state: state || undefined, expirationDate: expirationDateStr || undefined, regularRating: regularRating,
                         quickRating: quickRatingString || undefined,
                     };
-                    
-                    newOrUpdatedPlayersInChunk.push(playerRecord);
-            
-                } catch (e) {
-                    console.error("Error parsing a valid player row:", row, e);
-                    errorCountInChunk++;
-                }
+                    dbMap.set(uscfId, playerRecord);
+                } catch (e) { console.error("Error parsing a valid player row:", row, e); errorCountInChunk++; }
             }
-
             totalErrorCount += errorCountInChunk;
-            newOrUpdatedPlayersInChunk.forEach(p => dbMap.set(p.uscfId, p));
             currentIndex = endIndex;
-
             const progress = Math.round((currentIndex / rows.length) * 100);
             if (toastControls.current) {
-              toastControls.current.update({
-                id: toastControls.current.id,
-                description: `Processing database... ${progress}% complete.`,
-              });
+              toastControls.current.update({ id: toastControls.current.id, description: `Parsing file... ${progress}% complete.` });
             }
-
             if (currentIndex < rows.length) {
-                setTimeout(processChunk, 0); // Yield to main thread
+                setTimeout(processChunk, 0);
             } else {
                 (async () => {
                     try {
                         const finalPlayerList = Array.from(dbMap.values());
-                        await setDatabase(finalPlayerList);
-                        
-                        setCurrentPage(1);
-
-                        if (toastControls.current) {
-                            let title = 'Database Updated Successfully!';
-                            let description = `The database now contains ${finalPlayerList.length.toLocaleString()} unique players.`;
-                            if (totalErrorCount > 0) {
-                                title = 'Import Partially Successful';
-                                description += ` Could not parse ${totalErrorCount} rows due to formatting issues.`;
+                        await setAllPlayers(finalPlayerList, (progress) => {
+                            if (toastControls.current) {
+                                toastControls.current.update({
+                                    id: toastControls.current.id,
+                                    title: 'Saving to Database...',
+                                    description: `Writing records... ${progress}% complete.`
+                                });
                             }
-                            toastControls.current.update({
-                                id: toastControls.current.id,
-                                title: title,
-                                description: description,
-                                duration: 10000,
-                            });
+                        });
+                        let title = 'Database Updated Successfully!';
+                        let description = `The database now contains ${finalPlayerList.length.toLocaleString()} unique players.`;
+                        if (totalErrorCount > 0) {
+                            title = 'Import Partially Successful';
+                            description += ` Could not parse ${totalErrorCount} rows.`;
+                        }
+                        if (toastControls.current) {
+                          toastControls.current.update({ id: toastControls.current.id, title: title, description: description, duration: 10000 });
                         }
                     } catch(err) {
                         if (toastControls.current) {
-                           toastControls.current.update({
-                                id: toastControls.current.id,
-                                variant: 'destructive',
-                                title: 'Database Save Error',
-                                description: err instanceof Error ? err.message : 'An unknown error occurred.',
-                                duration: 10000,
-                            });
+                           toastControls.current.update({ id: toastControls.current.id, variant: 'destructive', title: 'Database Save Error', description: err instanceof Error ? err.message : 'An unknown error occurred.', duration: 10000 });
                         }
-                    } finally {
-                        setIsImporting(false);
-                    }
+                    } finally { setIsImporting(false); }
                 })();
             }
         };
-
         processChunk();
     };
 
-    return () => {
-        workerRef.current?.terminate();
-    };
-  }, [masterDatabase, setDatabase, toast]);
+    return () => { workerRef.current?.terminate(); };
+  }, [allPlayers, setAllPlayers, toast]);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -294,166 +352,107 @@ export default function PlayersPage() {
       firstName: '',
       middleName: '',
       lastName: '',
-      district: '',
-      school: '',
       uscfId: '',
       regularRating: undefined,
       quickRating: '',
+      uscfExpiration: undefined,
+      dob: undefined,
+      grade: '',
+      section: '',
+      email: '',
+      phone: '',
+      zipCode: '',
+      studentType: undefined,
       state: '',
-      expirationDate: '',
-    },
+    }
   });
-  
-  const openDialog = (player: MasterPlayer | null) => {
-    setEditingPlayer(player);
-    if (player) {
-      form.reset({
-        id: player.id,
-        firstName: player.firstName,
-        middleName: player.middleName || '',
-        lastName: player.lastName,
-        district: player.district,
-        school: player.school,
-        uscfId: player.uscfId,
-        regularRating: player.regularRating,
-        quickRating: player.quickRating || '',
-        state: player.state || '',
-        expirationDate: player.expirationDate || '',
-      });
-      handleDistrictChange(player.district, true);
-    } else {
-      form.reset();
+
+  useEffect(() => {
+    if (isPlayerDialogOpen) {
+      if (editingPlayer) {
+        form.reset({
+          ...editingPlayer,
+          dob: editingPlayer.dob ? new Date(editingPlayer.dob) : undefined,
+          uscfExpiration: editingPlayer.uscfExpiration ? new Date(editingPlayer.uscfExpiration) : undefined,
+        });
+      } else {
+        form.reset({
+          firstName: '',
+          middleName: '',
+          lastName: '',
+          uscfId: '',
+          regularRating: undefined,
+          quickRating: '',
+          uscfExpiration: undefined,
+          dob: undefined,
+          grade: '',
+          section: '',
+          email: '',
+          phone: '',
+          zipCode: '',
+          studentType: undefined,
+          state: '',
+        });
+        setSearchFirstName('');
+        setSearchLastName('');
+        setSearchResults([]);
+      }
     }
-    setIsDialogOpen(true);
-  }
+  }, [isPlayerDialogOpen, editingPlayer, form]);
 
-  const handleDeletePlayer = (player: MasterPlayer) => {
-    setPlayerToDelete(player);
-    setIsAlertOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    if (playerToDelete) {
-        await setDatabase(masterDatabase.filter(p => p.id !== playerToDelete.id));
-        toast({ title: "Player Removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed.`});
-    }
-    setIsAlertOpen(false);
-    setPlayerToDelete(null);
-  };
-  
-  const handleDistrictChange = (district: string, isEditing = false) => {
-    if (!isEditing) {
-        form.setValue('school', '');
-    }
-    form.setValue('district', district);
-    if (district === 'None') {
-        setSchoolsForDistrict(['Independent']);
-        if (!isEditing) {
-            form.setValue('school', 'Independent');
-        }
-    } else {
-        const filteredSchools = schoolData
-        .filter((school) => school.district === district)
-        .map((school) => school.schoolName)
-        .sort();
-        setSchoolsForDistrict(filteredSchools);
-    }
-  };
-
-  async function onSubmit(values: PlayerFormValues) {
-    let updatedPlayer: MasterPlayer;
-    if (editingPlayer) {
-      updatedPlayer = {
-        ...editingPlayer,
-        ...values
-      };
-      await setDatabase(masterDatabase.map(p => 
-        p.id === editingPlayer.id ? updatedPlayer : p
-      ));
-      toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s data has been updated.`});
-    } else {
-      updatedPlayer = {
-        id: `p-${Date.now()}`,
-        firstName: values.firstName,
-        middleName: values.middleName,
-        lastName: values.lastName,
-        uscfId: values.uscfId,
-        regularRating: values.regularRating || 0,
-        quickRating: values.quickRating || '',
-        district: values.district,
-        school: values.school,
-        state: values.state,
-        expirationDate: values.expirationDate,
-        events: 0,
-        eventIds: [],
-      };
-      await setDatabase([...masterDatabase, updatedPlayer]);
-      toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added.`});
-    }
-    setIsDialogOpen(false);
-    setEditingPlayer(null);
-  }
-
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    workerRef.current?.postMessage(file);
-
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
-  };
-
-
-  const filteredAndSortedPlayers = useMemo(() => {
-    let sortablePlayers = [...masterDatabase];
-    
-    if (selectedEvent !== 'all') {
-      sortablePlayers = sortablePlayers.filter(p => p.eventIds.includes(selectedEvent));
-    }
-
+  const sortedPlayers = useMemo(() => {
+    const sortablePlayers = [...rosterPlayers];
     if (sortConfig) {
-        sortablePlayers.sort((a, b) => {
-            const key = sortConfig.key;
-            let aVal: any;
-            let bVal: any;
-            
-            if (key === 'name') {
+      sortablePlayers.sort((a, b) => {
+        const key = sortConfig.key;
+        let aVal: any;
+        let bVal: any;
+        let result = 0;
+
+        if (key === 'teamCode') {
+            if (!profile) return 0;
+            const codeA = generateTeamCode({ schoolName: profile.school, district: profile.district, studentType: a.studentType });
+            const codeB = generateTeamCode({ schoolName: profile.school, district: profile.district, studentType: b.studentType });
+            if (codeA < codeB) result = -1;
+            if (codeA > codeB) result = 1;
+        } else {
+            aVal = a[key as keyof MasterPlayer];
+            bVal = b[key as keyof MasterPlayer];
+
+            if (key === 'grade' && typeof a.grade === 'string' && typeof b.grade === 'string') {
+              aVal = gradeToNumber[a.grade] ?? -1;
+              bVal = gradeToNumber[b.grade] ?? -1;
+            } else if (key === 'regularRating') {
+              aVal = a.regularRating ?? -Infinity;
+              bVal = b.regularRating ?? -Infinity;
+            } else if (key === 'lastName') {
                 aVal = a.lastName;
                 bVal = b.lastName;
-            } else {
-                aVal = a[key as keyof MasterPlayer];
-                bVal = b[key as keyof MasterPlayer];
             }
-            
-            let result = 0;
+
             if (typeof aVal === 'string' && typeof bVal === 'string') {
                 result = aVal.localeCompare(bVal);
             } else {
                 if (aVal < bVal) result = -1;
                 if (aVal > bVal) result = 1;
             }
-            
-            if (key === 'name' && result === 0) {
-                result = a.firstName.localeCompare(b.firstName);
-            }
+        }
 
-            return sortConfig.direction === 'ascending' ? result : -result;
+        if (result === 0 && key === 'lastName') {
+            result = a.firstName.localeCompare(b.firstName);
+        }
+
+        return sortConfig.direction === 'ascending' ? result : -result;
+      });
+    } else {
+        sortablePlayers.sort((a, b) => {
+            const lastNameComparison = a.lastName.localeCompare(b.lastName);
+            if (lastNameComparison !== 0) return lastNameComparison;
+            return a.firstName.localeCompare(b.firstName);
         });
     }
     return sortablePlayers;
-  }, [sortConfig, selectedEvent, masterDatabase]);
-  
-  const paginatedPlayers = useMemo(() => {
-    return filteredAndSortedPlayers.slice(
-      (currentPage - 1) * ROWS_PER_PAGE,
-      currentPage * ROWS_PER_PAGE
-    );
-  }, [filteredAndSortedPlayers, currentPage]);
-
-  const totalPages = Math.ceil(filteredAndSortedPlayers.length / ROWS_PER_PAGE);
+  }, [rosterPlayers, sortConfig, profile]);
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -473,89 +472,229 @@ export default function PlayersPage() {
       return <ArrowDown className="ml-2 h-4 w-4" />;
     }
   };
-  
-  const selectedDistrict = form.watch('district');
 
-  const handleExportCsv = () => {
-    if (filteredAndSortedPlayers.length === 0) {
+  const watchUscfId = form.watch('uscfId');
+  const isUscfNew = watchUscfId.toUpperCase() === 'NEW';
+
+  const handleAddPlayer = () => {
+    setEditingPlayer(null);
+    form.reset();
+    setIsPlayerDialogOpen(true);
+  };
+
+  const handleEditPlayer = (player: MasterPlayer) => {
+    setEditingPlayer(player);
+    setIsPlayerDialogOpen(true);
+  };
+  
+  const handleDeletePlayer = (player: MasterPlayer) => {
+    setPlayerToDelete(player);
+    setIsAlertOpen(true);
+  };
+  
+  const confirmDelete = () => {
+    if (playerToDelete) {
+      setAllPlayers(allPlayers.filter(p => p.id !== playerToDelete.id));
+      toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the roster.` });
+    }
+    setIsAlertOpen(false);
+    setPlayerToDelete(null);
+  };
+
+  const handleUscfLookup = async () => {
+    const uscfId = form.getValues('uscfId');
+    if (!uscfId || uscfId.toUpperCase() === 'NEW') {
         toast({
             variant: "destructive",
-            title: "No Players to Export",
-            description: "There are no players in the current view to export."
+            title: "Invalid USCF ID",
+            description: "Please enter a valid USCF ID to look up.",
         });
         return;
     }
 
-    const headers = ['FullName', 'LastName', 'FirstName', 'MiddleName', 'USCF_ID', 'RegularRating', 'QuickRating', 'School', 'District', 'EventsCount'];
-
-    const csvRows = filteredAndSortedPlayers.map(player => {
-        const fullName = `${player.lastName}, ${player.firstName}`;
-        const row = [
-            fullName,
-            player.lastName,
-            player.firstName,
-            player.middleName || '',
-            player.uscfId,
-            player.regularRating,
-            player.quickRating,
-            player.school,
-            player.district,
-            player.events,
-        ];
-        return row.map(value => {
-            const stringValue = String(value ?? '').replace(/"/g, '""'); // Escape double quotes
-            if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-                return `"${stringValue}"`;
+    setIsLookingUpUscfId(true);
+    try {
+        const result = await lookupUscfPlayer({ uscfId });
+        if (result.error) {
+            console.error("USCF Lookup Error:", result.error);
+            toast({ variant: "destructive", title: "Lookup Failed", description: result.error });
+        } else {
+            if (result.rating !== undefined) {
+                form.setValue('regularRating', result.rating, { shouldValidate: true });
             }
-            return stringValue;
-        }).join(',');
-    });
+            if (result.expirationDate) {
+                const expDate = new Date(result.expirationDate);
+                const adjustedDate = new Date(expDate.getTime() + expDate.getTimezoneOffset() * 60000);
+                form.setValue('uscfExpiration', adjustedDate, { shouldValidate: true });
+            }
+            
+            if (!form.getValues('firstName') && result.firstName) {
+                form.setValue('firstName', result.firstName);
+            }
+            if (!form.getValues('lastName') && result.lastName) {
+                form.setValue('lastName', result.lastName);
+            }
+            if (!form.getValues('middleName') && result.middleName) {
+                form.setValue('middleName', result.middleName);
+            }
+            if (result.state) {
+                form.setValue('state', result.state, { shouldValidate: true });
+            }
 
-    const csvContent = [headers.join(','), ...csvRows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-
-    const eventName = 'master_player_list';
-    const fileName = `${eventName}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.setAttribute('download', fileName);
-    
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    toast({
-        title: "Export Successful",
-        description: `${fileName} has been downloaded.`
-    });
+            toast({ title: "Lookup Successful", description: `Updated details for ${[result.firstName, result.lastName].join(' ')}.` });
+        }
+    } catch (error) {
+        console.error("USCF Lookup Flow Error:", error);
+        const description = error instanceof Error ? error.message : "An unknown error occurred.";
+        toast({ variant: "destructive", title: "Lookup Failed", description });
+    } finally {
+        setIsLookingUpUscfId(false);
+    }
   };
 
-  const allEvents = useMemo(() => {
-    const eventsMap = new Map<string, { id: string, name: string }>();
-    masterDatabase.forEach(player => {
-        player.eventIds?.forEach(eventId => {
-            if (!eventsMap.has(eventId)) {
-                // In a real app, you'd look up the event name from an events service/context
-                eventsMap.set(eventId, { id: eventId, name: `Event ${eventId}` });
-            }
+  function onSubmit(values: PlayerFormValues) {
+    if (!profile) return;
+
+    if (values.uscfId.toUpperCase() !== 'NEW') {
+      const existingPlayerWithUscfId = allPlayers.find(p => 
+        p.uscfId.toLowerCase() === values.uscfId.toLowerCase() && p.id !== values.id
+      );
+
+      if (existingPlayerWithUscfId) {
+        form.setError("uscfId", { 
+          type: "manual", 
+          message: `USCF ID already assigned to ${existingPlayerWithUscfId.firstName} ${existingPlayerWithUscfId.lastName}.` 
         });
-    });
-    return Array.from(eventsMap.values());
-  }, [masterDatabase]);
+        return;
+      }
+    }
+
+    const isDuplicatePlayer = allPlayers.some(p => 
+      p.id !== values.id &&
+      p.firstName.trim().toLowerCase() === values.firstName.trim().toLowerCase() &&
+      p.lastName.trim().toLowerCase() === values.lastName.trim().toLowerCase() &&
+      p.dob && new Date(p.dob).getTime() === values.dob.getTime()
+    );
+
+    if (isDuplicatePlayer) {
+      form.setError("firstName", { type: "manual", message: "A player with this name and date of birth already exists." });
+      return;
+    }
+    
+    const isEmailUnique = !allPlayers.some(p => p.email && p.email.toLowerCase() === values.email.toLowerCase() && p.id !== values.id);
+
+    if (!isEmailUnique) {
+      const existingPlayer = allPlayers.find(p => p.email && p.email.toLowerCase() === values.email.toLowerCase());
+      form.setError("email", { type: "manual", message: `Email already used by ${existingPlayer?.firstName} ${existingPlayer?.lastName}.` });
+      return;
+    }
+
+    const playerRecord: MasterPlayer = {
+      ...values,
+      id: editingPlayer?.id || `p-${Date.now()}`,
+      school: profile.school,
+      district: profile.district,
+      dob: values.dob.toISOString(),
+      uscfExpiration: values.uscfExpiration?.toISOString(),
+      events: editingPlayer?.events || 0,
+      eventIds: editingPlayer?.eventIds || [],
+    };
+
+    if (editingPlayer) {
+      setAllPlayers(allPlayers.map(p => p.id === editingPlayer.id ? playerRecord : p));
+      toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
+    } else {
+      setAllPlayers([...allPlayers, playerRecord]);
+      toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
+    }
+    setIsPlayerDialogOpen(false);
+    setEditingPlayer(null);
+  }
+  
+  const handlePerformSearch = async () => {
+    if (!searchLastName && !searchFirstName) {
+        toast({ variant: 'destructive', title: 'Name Required', description: 'Please enter a first or last name to search.' });
+        return;
+    }
+    setIsSearching(true);
+    setSearchResults([]);
+    try {
+        const results = allPlayers.filter(p => {
+            const stateMatch = searchState === 'ALL' || p.state === searchState;
+            const lastNameMatch = !searchLastName || (p.lastName && p.lastName.toLowerCase().includes(searchLastName.toLowerCase()));
+            const firstNameMatch = !searchFirstName || (p.firstName && p.firstName.toLowerCase().includes(searchFirstName.toLowerCase()));
+            
+            return stateMatch && lastNameMatch && firstNameMatch;
+        });
+
+        const mappedResults: PlayerSearchResult[] = results.map(p => ({
+            uscfId: p.uscfId,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            middleName: p.middleName,
+            rating: p.regularRating,
+            state: p.state,
+            expirationDate: p.uscfExpiration ? format(new Date(p.uscfExpiration), 'yyyy-MM-dd') : undefined,
+            quickRating: p.quickRating
+        }));
+
+        setSearchResults(mappedResults.slice(0, 50));
+        
+    } catch (e) {
+        const description = e instanceof Error ? e.message : 'An unknown error occurred.';
+        toast({ variant: 'destructive', title: 'Search Failed', description: description });
+    } finally {
+        setIsSearching(false);
+    }
+  };
+  
+  const handleSelectSearchedPlayer = (player: PlayerSearchResult) => {
+    form.reset(); // Clear previous form state
+    form.setValue('firstName', player.firstName || '');
+    form.setValue('lastName', player.lastName || '');
+    form.setValue('middleName', player.middleName || '');
+    form.setValue('uscfId', player.uscfId || '');
+    form.setValue('regularRating', player.rating);
+    form.setValue('quickRating', player.quickRating || '');
+    form.setValue('state', player.state || '');
+    
+    if (player.expirationDate) {
+        const expDate = parse(player.expirationDate, 'yyyy-MM-dd', new Date());
+        if (isValid(expDate)) {
+            form.setValue('uscfExpiration', expDate);
+        }
+    }
+    
+    setSearchResults([]);
+    setSearchFirstName('');
+    setSearchLastName('');
+    toast({ title: 'Player Selected', description: `${player.firstName} ${player.lastName}'s data has been auto-filled.` });
+  };
+  
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    workerRef.current?.postMessage(file);
+
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  };
+
 
   return (
     <AppLayout>
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold font-headline">All Players</h1>
+            <h1 className="text-3xl font-bold font-headline">Roster</h1>
             <p className="text-muted-foreground">
-              Manage the master player database for the entire system.
+              Manage your school's player roster.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
              <input
               type="file"
               ref={fileInputRef}
@@ -567,230 +706,387 @@ export default function PlayersPage() {
                 {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 Upload Database (.txt)
             </Button>
-            <Button onClick={handleExportCsv}>
-                <Download className="mr-2 h-4 w-4" />
-                Export to CSV
-            </Button>
-            <Button onClick={() => openDialog(null)}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Player
+            <Button onClick={handleAddPlayer}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Player
             </Button>
           </div>
         </div>
 
+        {profile ? (
+          <Card className="bg-secondary/50 border-dashed">
+              <CardHeader>
+                  <CardTitle className="text-lg">Sponsor Information</CardTitle>
+                  <CardDescription>This district and school will be associated with all players added to this roster.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-3 gap-4">
+                  <div>
+                      <p className="text-sm font-medium text-muted-foreground">District</p>
+                      <p className="font-semibold">{profile.district}</p>
+                  </div>
+                  <div>
+                      <p className="text-sm font-medium text-muted-foreground">School</p>
+                      <p className="font-semibold">{profile.school}</p>
+                  </div>
+                  <div>
+                      <p className="text-sm font-medium text-muted-foreground">Team Code</p>
+                      <p className="font-semibold font-mono">{teamCode}</p>
+                  </div>
+              </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-secondary/50 border-dashed animate-pulse">
+              <CardHeader>
+                  <Skeleton className="h-6 w-1/4" />
+                  <Skeleton className="h-4 w-2/3 mt-1" />
+              </CardHeader>
+              <CardContent className="grid sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-5 w-2/3" />
+                  </div>
+                  <div className="space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-5 w-3/4" />
+                  </div>
+                  <div className="space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-5 w-1/2" />
+                  </div>
+              </CardContent>
+          </Card>
+        )}
+        
         <Card>
-          <CardHeader>
-            <CardTitle>Master Player List ({isDbLoaded ? dbPlayerCount.toLocaleString() : '...'} players)</CardTitle>
-            <CardDescription>
-                This is the central database of all known players, stored in your browser. Upload a tab-delimited file to populate or update it. This database is used for the search function on the Roster page.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!isDbLoaded ? (
-                <div className="space-y-2">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                </div>
-            ) : (
-                <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead className="p-0">
-                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>
-                            Player {getSortIcon('name')}
-                        </Button>
-                    </TableHead>
-                    <TableHead className="p-0">
-                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
-                            USCF ID {getSortIcon('uscfId')}
-                        </Button>
-                    </TableHead>
-                    <TableHead className="p-0">
-                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
-                            Regular Rating {getSortIcon('regularRating')}
-                        </Button>
-                    </TableHead>
-                    <TableHead className="p-0">
-                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('school')}>
-                            School {getSortIcon('school')}
-                        </Button>
-                    </TableHead>
-                    <TableHead className="p-0">
-                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('district')}>
-                            District {getSortIcon('district')}
-                        </Button>
-                    </TableHead>
-                    <TableHead className="p-0">
-                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('events')}>
-                            # Events {getSortIcon('events')}
-                        </Button>
-                    </TableHead>
-                    <TableHead>
-                        <span className="sr-only">Actions</span>
-                    </TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {paginatedPlayers.map((player) => (
-                    <TableRow key={player.id}>
-                        <TableCell className="font-medium">
-                        <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9">
-                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={player.firstName} data-ai-hint="person face" />
-                            <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
+          <CardContent className="pt-6">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('lastName')}>
+                      Player
+                      {getSortIcon('lastName')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('teamCode')}>
+                        Team Code
+                        {getSortIcon('teamCode')}
+                    </Button>
+                  </TableHead>
+                   <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
+                      USCF ID
+                      {getSortIcon('uscfId')}
+                    </Button>
+                  </TableHead>
+                   <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
+                      Rating
+                      {getSortIcon('regularRating')}
+                    </Button>
+                  </TableHead>
+                   <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('grade')}>
+                      Grade
+                      {getSortIcon('grade')}
+                    </Button>
+                  </TableHead>
+                   <TableHead className="p-0">
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('section')}>
+                      Section
+                      {getSortIcon('section')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedPlayers.map((player) => (
+                  <TableRow key={player.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-9 w-9">
+                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                          <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
+                           <div className="text-sm text-muted-foreground">{player.email}</div>
                         </div>
-                        </TableCell>
-                        <TableCell>{player.uscfId}</TableCell>
-                        <TableCell>{player.regularRating}</TableCell>
-                        <TableCell>{player.school}</TableCell>
-                        <TableCell>{player.district}</TableCell>
-                        <TableCell>{player.events}</TableCell>
-                        <TableCell>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                            <Button aria-haspopup="true" size="icon" variant="ghost">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Toggle menu</span>
-                            </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => openDialog(player)}>Edit Player</DropdownMenuItem>
-                            <DropdownMenuItem>View Registrations</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">
-                                <Trash2 className="mr-2 h-4 w-4" /> Remove Player
-                            </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        </TableCell>
-                    </TableRow>
-                    ))}
-                </TableBody>
-                </Table>
-            )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      {profile ? generateTeamCode({
+                        schoolName: profile.school,
+                        district: profile.district,
+                        studentType: player.studentType
+                      }) : '...'}
+                    </TableCell>
+                    <TableCell>{player.uscfId}</TableCell>
+                    <TableCell>{player.regularRating || 'N/A'}</TableCell>
+                    <TableCell>{player.grade}</TableCell>
+                    <TableCell>{player.section}</TableCell>
+                     <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button aria-haspopup="true" size="icon" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Toggle menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleEditPlayer(player)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
-          <CardFooter>
-            <div className="flex items-center justify-between w-full">
-                <div className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                    >
-                        Previous
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
-                    >
-                        Next
-                    </Button>
-                </div>
-            </div>
-          </CardFooter>
         </Card>
       </div>
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editingPlayer ? "Edit Player" : "Add New Player"}</DialogTitle>
-            <DialogDescription>Fill out the details for the player.</DialogDescription>
-          </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Opt.)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="district"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>District</FormLabel>
-                      <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
-                        <SelectContent position="item-aligned">
-                          {allDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="school"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>School</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
-                        <SelectContent position="item-aligned">
-                          {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <FormField control={form.control} name="uscfId" render={({ field }) => ( 
-                    <FormItem>
-                        <FormLabel>USCF ID</FormLabel>
-                        <FormControl><Input placeholder="12345678 or NEW" {...field} /></FormControl>
-                        <FormDescription>
-                            <Link href="https://new.uschess.org/player-search" target="_blank" className="text-primary underline">
-                                Find USCF ID on official website
-                            </Link>
-                        </FormDescription>
-                        <FormMessage />
-                    </FormItem> 
-                 )} />
-                 <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Regular Rating</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="expirationDate" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input placeholder="MM/DD/YYYY" {...field} /></FormControl><FormMessage /></FormItem> )} />
-              </div>
 
-              <DialogFooter className="pt-4">
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost">Cancel</Button>
-                </DialogClose>
-                <Button type="submit">{editingPlayer ? 'Save Changes' : 'Add Player'}</Button>
-              </DialogFooter>
-            </form>
-          </Form>
+       <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-6 pb-4 border-b shrink-0">
+                <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
+                <DialogDescription>
+                    {editingPlayer ? "Update the player's information." : "Search the database or enter details manually."}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-6">
+                    <Card className="bg-muted/50">
+                        <CardHeader>
+                            <CardTitle className="text-base">Player Database Search</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                <div className="space-y-2">
+                                    <Label>State</Label>
+                                    <Select value={searchState} onValueChange={setSearchState}>
+                                        <SelectTrigger><SelectValue placeholder="All States" /></SelectTrigger>
+                                        <SelectContent>
+                                            {dbStates.map(s => <SelectItem key={s} value={s}>{s === 'ALL' ? 'All States' : s}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className='space-y-2'>
+                                    <Label>First Name (Optional)</Label>
+                                    <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
+                                </div>
+                                <div className='space-y-2'>
+                                    <Label>Last Name</Label>
+                                    <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
+                                </div>
+                                <Button onClick={handlePerformSearch} disabled={isSearching}>
+                                    {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
+                                    Search
+                                </Button>
+                            </div>
+                            
+                            {searchResults.length > 0 && (
+                                <Card className="w-full mt-4 max-h-48 overflow-y-auto">
+                                    <CardContent className="p-2">
+                                      {searchResults.map(p => (
+                                          <button
+                                              key={p.uscfId}
+                                              type="button"
+                                              className="w-full text-left p-2 hover:bg-accent rounded-md"
+                                              onClick={() => handleSelectSearchedPlayer(p)}
+                                          >
+                                              <p className="font-medium">{p.firstName} {p.lastName} ({p.state})</p>
+                                              <p className="text-sm text-muted-foreground">ID: {p.uscfId} | Rating: {p.rating || 'N/A'}</p>
+                                          </button>
+                                      ))}
+                                      {searchResults.length > 1 && (
+                                          <Alert variant="default" className="mt-2">
+                                              <Info className="h-4 w-4" />
+                                              <AlertTitle>Multiple Results</AlertTitle>
+                                              <AlertDescription>
+                                                  Multiple players match this name. Please verify the correct player on the official USCF website if needed.
+                                              </AlertDescription>
+                                          </Alert>
+                                      )}
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Form {...form}>
+                        <form id="player-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input placeholder="Michael" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={form.control} name="uscfId" render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>USCF ID</FormLabel>
+                                    <div className="flex items-center gap-2">
+                                        <FormControl>
+                                            <Input placeholder="12345678 or NEW" {...field} />
+                                        </FormControl>
+                                        <Button type="button" variant="outline" onClick={handleUscfLookup} disabled={isLookingUpUscfId || isUscfNew || !watchUscfId}>
+                                            {isLookingUpUscfId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Lookup"}
+                                        </Button>
+                                    </div>
+                                    <FormDescription>
+                                        Students without a USCF ID can be added with &quot;NEW&quot;.
+                                    </FormDescription>
+                                    <FormDescription>
+                                        <Link href="https://new.uschess.org/player-search" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                                            Find USCF ID on the official USCF website
+                                        </Link>
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )} />
+                                <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="number" placeholder="1500" {...field} value={field.value ?? ''} disabled={isUscfNew} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={form.control} name="dob" render={({ field }) => {
+                                    const [inputValue, setInputValue] = useState<string>( field.value ? format(field.value, "MM/dd/yyyy") : "" );
+                                    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+                                    useEffect(() => { field.value ? setInputValue(format(field.value, "MM/dd/yyyy")) : setInputValue(""); }, [field.value]);
+                                    const handleBlur = () => {
+                                        const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                                        if (isValid(parsedDate)) {
+                                            if (parsedDate <= new Date() && parsedDate >= new Date("1900-01-01")) { field.onChange(parsedDate); } 
+                                            else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                        } else {
+                                            if (inputValue === "") { field.onChange(undefined); } 
+                                            else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                        }
+                                    };
+                                    return (
+                                        <FormItem className="flex flex-col"><FormLabel>Date of Birth</FormLabel>
+                                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                            <div className="relative">
+                                            <FormControl><Input placeholder="MM/DD/YYYY" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onBlur={handleBlur} /></FormControl>
+                                            <PopoverTrigger asChild><Button variant={"ghost"} className="absolute right-0 top-0 h-full w-10 p-0 font-normal" aria-label="Open calendar"><CalendarIcon className="h-4 w-4 text-muted-foreground" /></Button></PopoverTrigger>
+                                            </div>
+                                            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsCalendarOpen(false); }} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent>
+                                        </Popover><FormMessage /></FormItem>
+                                    );
+                                }} />
+                                <FormField control={form.control} name="uscfExpiration" render={({ field }) => {
+                                    const [inputValue, setInputValue] = useState<string>( field.value ? format(field.value, "MM/dd/yyyy") : "" );
+                                    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+                                    useEffect(() => { if (field.value) { setInputValue(format(field.value, "MM/dd/yyyy")); } else { setInputValue(""); } }, [field.value]);
+                                    const handleBlur = () => {
+                                      const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                                      if (isValid(parsedDate)) {
+                                        field.onChange(parsedDate);
+                                      } else {
+                                        if (inputValue === "") { field.onChange(undefined); } 
+                                        else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                      }
+                                    };
+                                    return (
+                                      <FormItem className="flex flex-col"><FormLabel>USCF Expiration</FormLabel>
+                                         <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                           <div className="relative">
+                                            <FormControl><Input placeholder="MM/DD/YYYY" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onBlur={handleBlur} disabled={isUscfNew} /></FormControl>
+                                             <PopoverTrigger asChild>
+                                              <Button variant={"ghost"} className="absolute right-0 top-0 h-full w-10 p-0 font-normal" aria-label="Open calendar" disabled={isUscfNew}>
+                                                <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                              </Button>
+                                            </PopoverTrigger>
+                                          </div>
+                                          <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsCalendarOpen(false); }} initialFocus disabled={isUscfNew} />
+                                          </PopoverContent>
+                                        </Popover><FormMessage /></FormItem>
+                                    );
+                                }} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Player Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Player Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Player Zip Code</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField
+                                  control={form.control}
+                                  name="state"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>State</FormLabel>
+                                      <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select a state" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          {formStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                  <FormField control={form.control} name="studentType" render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Student Type (PSJA Only)</FormLabel>
+                                        <FormControl>
+                                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center gap-4 pt-2">
+                                            <FormItem className="flex items-center space-x-2">
+                                              <FormControl><RadioGroupItem value="gt" id={`gt-radio-${editingPlayer?.id || 'new'}`} /></FormControl>
+                                              <FormLabel htmlFor={`gt-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">GT Student</FormLabel>
+                                            </FormItem>
+                                            <FormItem className="flex items-center space-x-2">
+                                              <FormControl><RadioGroupItem value="independent" id={`ind-radio-${editingPlayer?.id || 'new'}`} /></FormControl>
+                                              <FormLabel htmlFor={`ind-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">Independent</FormLabel>
+                                            </FormItem>
+                                          </RadioGroup>
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                  )} />
+                                )}
+                            </div>
+                        </form>
+                    </Form>
+                </div>
+            </div>
+            <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                <Button type="submit" form="player-form">{editingPlayer ? 'Save Changes' : 'Add Player'}</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
+
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently remove the player {playerToDelete?.firstName} {playerToDelete?.lastName}.
+              This will permanently remove {playerToDelete?.firstName} {playerToDelete?.lastName} from your roster.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </AppLayout>
   );
 }
