@@ -83,16 +83,18 @@ const searchUscfPlayersFlow = ai.defineFlow(
       
       const html = await response.text();
       
-      if (html.includes("No players found")) {
+      if (html.toLowerCase().includes("no players found")) {
         return { players: [] };
       }
 
       // Step 2: Extract all unique USCF IDs from the links on the page.
-      const idRegex = /MbrDtlMain\.php\?(\d+)/gi;
       const ids = new Set<string>();
-      let match;
-      while ((match = idRegex.exec(html)) !== null) {
-          ids.add(match[1]);
+      const parts = html.split(/MbrDtlMain\.php\?/i);
+      for (let i = 1; i < parts.length; i++) {
+        const idMatch = parts[i].match(/^(\d+)/);
+        if (idMatch && idMatch[1]) {
+          ids.add(idMatch[1]);
+        }
       }
       
       if (ids.size === 0) {
