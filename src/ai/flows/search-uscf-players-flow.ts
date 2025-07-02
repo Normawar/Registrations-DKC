@@ -87,14 +87,14 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Step 2: Extract all unique USCF IDs from the links on the page.
+      // Step 2: Extract all unique USCF IDs from the links on the page using a robust regex loop.
       const ids = new Set<string>();
-      const parts = html.split(/MbrDtlMain\.php\?/i);
-      for (let i = 1; i < parts.length; i++) {
-        const idMatch = parts[i].match(/^(\d+)/);
-        if (idMatch && idMatch[1]) {
-          ids.add(idMatch[1]);
-        }
+      const idRegex = /MbrDtlMain\.php\?(\d+)/gi;
+      let match;
+      while ((match = idRegex.exec(html)) !== null) {
+          if (match[1]) {
+              ids.add(match[1]);
+          }
       }
       
       if (ids.size === 0) {
