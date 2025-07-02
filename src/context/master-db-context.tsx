@@ -18,65 +18,59 @@ const DB_STORAGE_KEY = 'master_player_database';
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, _setDatabase] = useState<MasterPlayer[]>([]);
-  const [isStorageLoaded, setIsStorageLoaded] = useState(false);
+  const [isDbLoaded, setIsDbLoaded] = useState(false);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
 
-  const loadFromStorage = useCallback(() => {
+  // This effect loads from localStorage and runs whenever updateTrigger changes
+  useEffect(() => {
     try {
       const storedDb = localStorage.getItem(DB_STORAGE_KEY);
       if (storedDb) {
         _setDatabase(JSON.parse(storedDb));
       } else {
-        _setDatabase(initialMasterPlayerData);
-        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(initialMasterPlayerData));
+        // If nothing is in storage, use initial data and save it.
+        const initialData = initialMasterPlayerData;
+        _setDatabase(initialData);
+        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(initialData));
       }
     } catch (e) {
       console.error("Failed to load master DB from localStorage", e);
       _setDatabase(initialMasterPlayerData);
     } finally {
-        setIsStorageLoaded(true);
+        setIsDbLoaded(true);
     }
-  }, []);
+  }, [updateTrigger]);
 
-  // Set up listeners for storage changes
+  // This effect sets up listeners for cross-tab synchronization
   useEffect(() => {
-    // Initial load
-    loadFromStorage();
-    
-    // Listen for changes from other tabs/windows
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === DB_STORAGE_KEY) {
-        loadFromStorage();
+        // Trigger a re-load from storage when another tab changes the data
+        setUpdateTrigger(c => c + 1);
       }
-    };
-    
-    // Listen for same-tab updates
-    const handleDbUpdate = () => {
-      loadFromStorage();
     };
 
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('masterDbUpdate', handleDbUpdate);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('masterDbUpdate', handleDbUpdate);
     };
-  }, [loadFromStorage]);
+  }, []);
 
-
+  // This function is exposed to update the database
   const setDatabase = useCallback((players: MasterPlayer[]) => {
     try {
-        _setDatabase(players);
-        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(players));
-        // Defer dispatch to ensure it happens after the current render cycle.
-        setTimeout(() => window.dispatchEvent(new Event('masterDbUpdate')), 0);
+        const newDbString = JSON.stringify(players);
+        localStorage.setItem(DB_STORAGE_KEY, newDbString);
+        // This triggers the useEffect to re-load the data in the current tab/app instance
+        setUpdateTrigger(c => c + 1);
     } catch (e) {
         console.error("Failed to save master DB to localStorage", e);
     }
   }, []);
   
   return (
-    <MasterDbContext.Provider value={{ database, setDatabase, isDbLoaded: isStorageLoaded }}>
+    <MasterDbContext.Provider value={{ database, setDatabase, isDbLoaded }}>
       {children}
     </MasterDbContext.Provider>
   );
