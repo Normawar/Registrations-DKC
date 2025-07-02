@@ -136,10 +136,10 @@ const playerFormSchema = z.object({
   studentType: z.string().optional(),
 })
 .refine(data => {
-  if (data.uscfId.toUpperCase() !== 'NEW') {
-    return data.uscfExpiration !== undefined;
-  }
-  return true;
+    if (data.uscfId.toUpperCase() !== 'NEW') {
+      return data.uscfExpiration !== undefined;
+    }
+    return true;
 }, {
   message: "USCF Expiration is required unless ID is NEW.",
   path: ["uscfExpiration"],
@@ -195,8 +195,7 @@ export default function RosterPage() {
   const [searchState, setSearchState] = useState('ALL');
   const [dbSearchResults, setDbSearchResults] = useState<ImportedPlayer[]>([]);
   const [isDbSearching, setIsDbSearching] = useState(false);
-  const [masterDbLoaded, setMasterDbLoaded] = useState(false);
-
+  
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
@@ -221,11 +220,12 @@ export default function RosterPage() {
   });
 
   const uniqueStates = useMemo(() => {
-    if (!isMasterDatabaseLoaded()) return ['ALL'];
+    if (!isDialogOpen) return ['ALL'];
     const masterDb = getMasterDatabase();
+    if (masterDb.length === 0) return ['ALL'];
     const states = new Set(masterDb.map(p => p.state).filter(Boolean) as string[]);
     return ['ALL', ...Array.from(states).sort()];
-  }, [masterDbLoaded]); // Re-calculate when dialog opens and state is set
+  }, [isDialogOpen]);
 
   // Debounced search for the master database
   useEffect(() => {
@@ -382,13 +382,11 @@ export default function RosterPage() {
   const handleAddPlayer = () => {
     setEditingPlayer(null);
     form.reset();
-    setMasterDbLoaded(isMasterDatabaseLoaded());
     setIsDialogOpen(true);
   };
 
   const handleEditPlayer = (player: Player) => {
     setEditingPlayer(player);
-    setMasterDbLoaded(isMasterDatabaseLoaded());
     setIsDialogOpen(true);
   };
   
@@ -664,19 +662,16 @@ export default function RosterPage() {
           <DialogHeader>
             <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
           </DialogHeader>
-
+          
           <Card className="bg-muted/50">
             <CardHeader>
                 <CardTitle className="text-base">Master Database Search</CardTitle>
-                <CardDescription>
-                  Search the database by state and name/USCF ID to auto-fill player data.
-                </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-[1fr,2fr] gap-4 items-end">
                     <div>
                         <Label>State</Label>
-                        <Select value={searchState} onValueChange={setSearchState} disabled={!masterDbLoaded}>
+                        <Select value={searchState} onValueChange={setSearchState} disabled={!isMasterDatabaseLoaded()}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select State" />
                             </SelectTrigger>
@@ -692,11 +687,11 @@ export default function RosterPage() {
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder={masterDbLoaded ? "Search..." : "Please upload database on All Players page"}
+                                placeholder={isMasterDatabaseLoaded() ? "Search..." : "Please upload database on All Players page"}
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className="pl-10"
-                                disabled={!masterDbLoaded}
+                                disabled={!isMasterDatabaseLoaded()}
                             />
                         </div>
                     </div>
@@ -1056,3 +1051,4 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
+
