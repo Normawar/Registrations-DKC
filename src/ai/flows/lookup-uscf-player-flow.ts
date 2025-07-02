@@ -42,8 +42,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     if (!uscfId) {
       return { uscfId: '', error: 'A USCF ID must be provided.' };
     }
-    // Use the www.uschess.org endpoint which is more stable than the msa subdomain.
-    const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
+    // Use the main member detail page which is more structured and reliable.
+    const url = `https://www.uschess.org/msa/MbrDtlMain.php?${uscfId}`;
     
     try {
       const response = await fetch(url, {
@@ -61,52 +61,65 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const text = await response.text();
       
-      if (text.includes("This player is not in our database")) {
+      if (text.includes("The member you requested is not in our database")) {
         return { uscfId, error: "Player not found with this USCF ID." };
       }
       
       const output: LookupUscfPlayerOutput = { uscfId };
-      
-      const nameMatch = text.match(/Name\s*:\s*(.*)/i);
-      if (!nameMatch || !nameMatch[1]) {
-        console.error("USCF Lookup: Could not find 'Name:' field on page. Full response:", text.substring(0, 1000));
-        return { uscfId, error: "Could not find player's name field on the page. The website layout may have changed." };
-      }
-      
-      const rawName = nameMatch[1].replace(/<[^>]+>/g, '').trim(); // Format: LAST, FIRST MIDDLE
-      const nameParts = rawName.split(',');
-      if (nameParts.length > 1) {
-          output.lastName = nameParts.shift()!.trim();
-          const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
-          output.firstName = firstAndMiddleParts.shift() || '';
-          output.middleName = firstAndMiddleParts.join(' ');
-      } else {
-          output.lastName = rawName;
-      }
-      
-      const ratingLineMatch = text.match(/Regular:\s*(.*)/i);
-      if (ratingLineMatch && ratingLineMatch[1]) {
-        const ratingText = ratingLineMatch[1].trim();
-        const numericPartMatch = ratingText.match(/(\d+)/);
-        if (numericPartMatch && numericPartMatch[1]) {
-            output.rating = parseInt(numericPartMatch[1], 10);
+
+      // Helper function to extract data from a table row based on a label.
+      const extractData = (label: string): string | null => {
+        const regex = new RegExp(`<TD.*?>\\s*${label}\\s*<\\/TD>[\\s\\S]*?<TD.*?>(.*?)<`, "i");
+        const match = text.match(regex);
+        if (match && match[1]) {
+            return match[1].replace(/<[^>]+>/g, '').trim();
         }
+        return null;
       }
       
-      const expiresMatch = text.match(/Expires\s*:\s*(\d{4}-\d{2}-\d{2})/i);
-      if (expiresMatch && expiresMatch[1]) {
-        output.expirationDate = expiresMatch[1];
+      // The name is typically in an <h4> tag.
+      const nameMatch = text.match(/<h4>([\s\S]*?)<\/h4>/i);
+      if (nameMatch && nameMatch[1]) {
+          const rawName = nameMatch[1].replace(/<[^>]+>/g, '').trim(); // Format: LAST, FIRST MIDDLE
+          const nameParts = rawName.split(',');
+          if (nameParts.length > 1) {
+              output.lastName = nameParts.shift()!.trim();
+              const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
+              output.firstName = firstAndMiddleParts.shift() || '';
+              output.middleName = firstAndMiddleParts.join(' ');
+          } else {
+              output.lastName = rawName;
+          }
+      }
+
+      // Extract rating. The value is usually preceded by "R: ".
+      const ratingText = extractData('Regular Rating');
+      if (ratingText) {
+          const ratingMatch = ratingText.match(/(\d+)/);
+          if (ratingMatch && ratingMatch[1]) {
+              output.rating = parseInt(ratingMatch[1], 10);
+          }
       }
       
-      // Regex to find state, e.g., ", TX 78501"
+      // Extract expiration date.
+      const expiresText = extractData('Expires');
+      if (expiresText) {
+          const dateMatch = expiresText.match(/(\d{1,2}\/\d{1,2}\/\d{4})/);
+          if (dateMatch && dateMatch[1]) {
+              // Convert MM/DD/YYYY to YYYY-MM-DD
+              const [month, day, year] = dateMatch[1].split('/');
+              output.expirationDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+      }
+
+      // Extract state from the address block.
       const stateMatch = text.match(/,\s*([A-Z]{2})\s+\d{5}/);
       if (stateMatch && stateMatch[1]) {
         output.state = stateMatch[1];
       }
 
       if (!output.lastName && !output.firstName) {
-          console.error("USCF Lookup: Failed to parse player name from raw string:", rawName);
-          return { uscfId, error: "Found the player's name field, but could not parse the name from it." };
+        return { uscfId, error: "Could not parse player name from the details page." };
       }
       
       return output;
