@@ -90,15 +90,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
       // Step 2: Check for a single result redirect to a thin3.php page
       if (html.includes("<h2>USCF Member Lookup</h2>")) {
-          const idMatch = html.match(/name=memid.*?value='(\d+)'/is);
-          const uscfId = idMatch ? idMatch[1] : '';
-          if (uscfId) {
-            const playerData = await parseThin3Page(html, uscfId);
-            if (playerData.error) {
-                return { players: [], error: playerData.error };
-            }
-            return { players: [playerData] };
+          const playerData = await parseThin3Page(html, '');
+          if (playerData.error) {
+              return { players: [], error: playerData.error };
           }
+          return { players: [playerData] };
       }
       
       // Step 3: Extract all unique USCF IDs from a multi-result page.
@@ -112,8 +108,8 @@ const searchUscfPlayersFlow = ai.defineFlow(
       }
       
       if (ids.size === 0) {
-        // Fallback for MbrDtlMain.php single result redirect (less common)
-        const detailPageIdMatch = html.match(/<font[^>]*><b>(\d+):/i);
+        // Fallback for single-result redirect to MbrDtlMain.php page
+        const detailPageIdMatch = html.match(/<b>(\d{8}):\s*.*?<\/b>/i);
         if (detailPageIdMatch && detailPageIdMatch[1]) {
             ids.add(detailPageIdMatch[1]);
         } else {
