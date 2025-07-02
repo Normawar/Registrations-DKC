@@ -6,7 +6,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, isValid, parse } from 'date-fns';
-import Papa from 'papaparse';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,6 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
-  Upload,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -117,7 +115,8 @@ const playerFormSchema = z.object({
   lastName: z.string().min(1, { message: "Last Name is required." }),
   uscfId: z.string().min(1, { message: "USCF ID is required." }),
   uscfExpiration: z.date().optional(),
-  rating: z.coerce.number().optional(),
+  regularRating: z.coerce.number().optional(),
+  quickRating: z.string().optional(),
   grade: z.string().min(1, { message: "Please select a grade." }),
   section: z.string().min(1, { message: "Please select a section." }),
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -137,12 +136,12 @@ const playerFormSchema = z.object({
 })
 .refine(data => {
   if (data.uscfId.toUpperCase() !== 'NEW') {
-    return data.rating !== undefined && data.rating !== null && !isNaN(data.rating);
+    return data.regularRating !== undefined && data.regularRating !== null && !isNaN(data.regularRating);
   }
   return true;
 }, {
   message: "Rating is required unless USCF ID is NEW.",
-  path: ["rating"],
+  path: ["regularRating"],
 })
 .refine((data) => {
     if (!data.grade || !data.section) {
@@ -168,7 +167,7 @@ const playerFormSchema = z.object({
   });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
-type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'rating' | 'grade' | 'section';
+type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
 
 export default function RosterPage() {
@@ -180,7 +179,6 @@ export default function RosterPage() {
   const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -192,7 +190,8 @@ export default function RosterPage() {
       middleName: '',
       lastName: '',
       uscfId: '',
-      rating: undefined,
+      regularRating: undefined,
+      quickRating: '',
       uscfExpiration: undefined,
       dob: undefined,
       grade: '',
@@ -226,9 +225,9 @@ export default function RosterPage() {
             if (key === 'grade') {
               aVal = gradeToNumber[a.grade] ?? -1;
               bVal = gradeToNumber[b.grade] ?? -1;
-            } else if (key === 'rating') {
-              aVal = a.rating ?? -Infinity;
-              bVal = b.rating ?? -Infinity;
+            } else if (key === 'regularRating') {
+              aVal = a.regularRating ?? -Infinity;
+              bVal = b.regularRating ?? -Infinity;
             } else if (key === 'lastName') {
                 aVal = a.lastName;
                 bVal = b.lastName;
@@ -290,7 +289,8 @@ export default function RosterPage() {
           middleName: '',
           lastName: '',
           uscfId: '',
-          rating: undefined,
+          regularRating: undefined,
+          quickRating: '',
           uscfExpiration: undefined,
           dob: undefined,
           grade: '',
@@ -347,7 +347,7 @@ export default function RosterPage() {
             toast({ variant: "destructive", title: "Lookup Failed", description: result.error });
         } else {
             if (result.rating !== undefined) {
-                form.setValue('rating', result.rating, { shouldValidate: true });
+                form.setValue('regularRating', result.rating, { shouldValidate: true });
             }
             if (result.expirationDate) {
                 const expDate = new Date(result.expirationDate);
@@ -373,77 +373,6 @@ export default function RosterPage() {
         toast({ variant: "destructive", title: "Lookup Failed", description });
     } finally {
         setIsLookingUpUscfId(false);
-    }
-  };
-
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-            const requiredHeaders = ['FirstName', 'LastName', 'Email', 'Grade', 'Section', 'DOB', 'ZipCode', 'USCFID'];
-            const fileHeaders = results.meta.fields || [];
-            
-            const missingHeaders = requiredHeaders.filter(h => !fileHeaders.includes(h));
-            if (missingHeaders.length > 0) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Import Failed: Invalid CSV',
-                    description: `The CSV file is missing required columns: ${missingHeaders.join(', ')}`,
-                });
-                return;
-            }
-
-            let importedCount = 0;
-            let skippedCount = 0;
-
-            results.data.forEach((row: any) => {
-                const newPlayer = {
-                    id: Date.now().toString() + Math.random(), // simple unique id
-                    firstName: row.FirstName?.trim(),
-                    lastName: row.LastName?.trim(),
-                    middleName: row.MiddleName?.trim() || undefined,
-                    uscfId: row.USCFID?.trim() || 'NEW',
-                    uscfExpiration: row.USCFExpiration ? new Date(row.USCFExpiration) : undefined,
-                    rating: row.Rating ? parseInt(row.Rating, 10) : undefined,
-                    grade: row.Grade?.trim(),
-                    section: row.Section?.trim(),
-                    email: row.Email?.trim(),
-                    phone: row.Phone?.trim() || undefined,
-                    dob: row.DOB ? new Date(row.DOB) : new Date(0), // Needs a valid date
-                    zipCode: row.ZipCode?.trim(),
-                    studentType: row.StudentType?.trim() as 'gt' | 'independent' | undefined,
-                };
-                
-                // Basic validation
-                if (newPlayer.firstName && newPlayer.lastName && newPlayer.email && newPlayer.grade && newPlayer.section && isValid(newPlayer.dob) && newPlayer.zipCode) {
-                    addPlayer(newPlayer);
-                    importedCount++;
-                } else {
-                    skippedCount++;
-                }
-            });
-
-            toast({
-                title: 'Import Complete',
-                description: `Successfully imported ${importedCount} players. Skipped ${skippedCount} rows due to missing required data.`,
-            });
-        },
-        error: (error) => {
-            toast({
-                variant: 'destructive',
-                title: 'Import Error',
-                description: `Failed to parse CSV file: ${error.message}`,
-            });
-        }
-    });
-
-    // Reset file input
-    if(fileInputRef.current) {
-        fileInputRef.current.value = '';
     }
   };
 
@@ -505,16 +434,6 @@ export default function RosterPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".csv"
-              onChange={handleFileImport}
-            />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" /> Import CSV
-            </Button>
             <Button onClick={handleAddPlayer}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Player
             </Button>
@@ -589,9 +508,9 @@ export default function RosterPage() {
                     </Button>
                   </TableHead>
                    <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('rating')}>
+                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
                       Rating
-                      {getSortIcon('rating')}
+                      {getSortIcon('regularRating')}
                     </Button>
                   </TableHead>
                    <TableHead className="p-0">
@@ -634,7 +553,7 @@ export default function RosterPage() {
                       }) : '...'}
                     </TableCell>
                     <TableCell>{player.uscfId}</TableCell>
-                    <TableCell>{player.rating || 'N/A'}</TableCell>
+                    <TableCell>{player.regularRating || 'N/A'}</TableCell>
                     <TableCell>{player.grade}</TableCell>
                     <TableCell>{player.section}</TableCell>
                      <TableCell>
@@ -721,7 +640,7 @@ export default function RosterPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="rating" render={({ field }) => (
+                <FormField control={form.control} name="regularRating" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Rating</FormLabel>
                     <FormControl><Input type="number" placeholder="1500" {...field} value={field.value ?? ''} disabled={isUscfNew} /></FormControl>

@@ -11,7 +11,8 @@ export type Player = {
   lastName: string;
   uscfId: string;
   uscfExpiration?: Date;
-  rating?: number;
+  regularRating?: number;
+  quickRating?: string;
   grade: string;
   section: string;
   email: string;
@@ -22,8 +23,8 @@ export type Player = {
 };
 
 const initialPlayers: Player[] = [
-  { id: "1", firstName: "Alex", middleName: "Michael", lastName: "Ray", uscfId: "12345678", rating: 1850, uscfExpiration: new Date('2025-12-31'), grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', phone: '956-111-1111', dob: new Date('2008-05-10'), zipCode: '78501'},
-  { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", rating: 2100, uscfExpiration: new Date('2023-01-15'), grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com', phone: '956-222-2222', dob: new Date('2007-09-15'), zipCode: '78504', studentType: 'independent' },
+  { id: "1", firstName: "Alex", middleName: "Michael", lastName: "Ray", uscfId: "12345678", regularRating: 1850, quickRating: "1800/10", uscfExpiration: new Date('2025-12-31'), grade: "10th Grade", section: 'High School K-12', email: 'alex.ray@example.com', phone: '956-111-1111', dob: new Date('2008-05-10'), zipCode: '78501'},
+  { id: "2", firstName: "Jordan", lastName: "Lee", uscfId: "87654321", regularRating: 2100, quickRating: "2150/5", uscfExpiration: new Date('2023-01-15'), grade: "11th Grade", section: 'Championship', email: 'jordan.lee@example.com', phone: '956-222-2222', dob: new Date('2007-09-15'), zipCode: '78504', studentType: 'independent' },
 ];
 
 export function useRoster() {

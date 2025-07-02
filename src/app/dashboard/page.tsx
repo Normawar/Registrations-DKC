@@ -111,7 +111,7 @@ export default function DashboardPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Player</TableHead>
-                    <TableHead className="text-right">Rating</TableHead>
+                    <TableHead className="text-right">Regular Rating</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -131,7 +131,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">{player.rating || 'N/A'}</TableCell>
+                      <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

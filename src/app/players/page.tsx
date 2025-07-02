@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -68,13 +68,13 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const initialPlayersData = [
-  { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", rating: 1850, school: "Independent", district: "None", events: 2, eventIds: ['e2'] },
-  { id: "p2", firstName: "Olivia", middleName: "K", lastName: "Smith", uscfId: "87654321", rating: 2100, school: "City Chess Club", district: "None", events: 3, eventIds: ['e1', 'e3'] },
-  { id: "p3", firstName: "Noah", middleName: "L", lastName: "Williams", uscfId: "11223344", rating: 1600, school: "Scholastic Stars", district: "None", events: 1, eventIds: ['e1'] },
-  { id: "p4", firstName: "Emma", middleName: "M", lastName: "Brown", uscfId: "44332211", rating: 1950, school: "Independent", district: "None", events: 1, eventIds: ['e2'] },
-  { id: "p5", firstName: "James", middleName: "N", lastName: "Jones", uscfId: "55667788", rating: 2200, school: "Grandmasters Inc.", district: "None", events: 4, eventIds: ['e1', 'e2', 'e3'] },
-  { id: "p6", firstName: "Alex", middleName: "S", lastName: "Ray", uscfId: "98765432", rating: 1750, school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 2, eventIds: ['e1'] },
-  { id: "p7", firstName: "Jordan", middleName: "T", lastName: "Lee", uscfId: "23456789", rating: 2050, school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 3, eventIds: ['e1', 'e2'] },
+  { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", regularRating: 1850, quickRating: '1900/10', school: "Independent", district: "None", events: 2, eventIds: ['e2'] },
+  { id: "p2", firstName: "Olivia", middleName: "K", lastName: "Smith", uscfId: "87654321", regularRating: 2100, quickRating: '2120/5', school: "City Chess Club", district: "None", events: 3, eventIds: ['e1', 'e3'] },
+  { id: "p3", firstName: "Noah", middleName: "L", lastName: "Williams", uscfId: "11223344", regularRating: 1600, quickRating: '1650/12', school: "Scholastic Stars", district: "None", events: 1, eventIds: ['e1'] },
+  { id: "p4", firstName: "Emma", middleName: "M", lastName: "Brown", uscfId: "44332211", regularRating: 1950, quickRating: '2000/20', school: "Independent", district: "None", events: 1, eventIds: ['e2'] },
+  { id: "p5", firstName: "James", middleName: "N", lastName: "Jones", uscfId: "55667788", regularRating: 2200, quickRating: '2250/15', school: "Grandmasters Inc.", district: "None", events: 4, eventIds: ['e1', 'e2', 'e3'] },
+  { id: "p6", firstName: "Alex", middleName: "S", lastName: "Ray", uscfId: "98765432", regularRating: 1750, quickRating: '1780/8', school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 2, eventIds: ['e1'] },
+  { id: "p7", firstName: "Jordan", middleName: "T", lastName: "Lee", uscfId: "23456789", regularRating: 2050, quickRating: '2080/7', school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 3, eventIds: ['e1', 'e2'] },
 ];
 
 const allEvents = [
@@ -84,7 +84,7 @@ const allEvents = [
 ];
 
 type Player = typeof initialPlayersData[0];
-type SortableColumnKey = 'name' | 'uscfId' | 'rating' | 'school' | 'district' | 'events';
+type SortableColumnKey = 'name' | 'uscfId' | 'regularRating' | 'school' | 'district' | 'events';
 
 const playerFormSchema = z.object({
   id: z.string().optional(),
@@ -94,7 +94,8 @@ const playerFormSchema = z.object({
   district: z.string().min(1, "District is required."),
   school: z.string().min(1, "School is required."),
   uscfId: z.string().min(1, "USCF ID is required."),
-  rating: z.coerce.number().optional(),
+  regularRating: z.coerce.number().optional(),
+  quickRating: z.string().optional(),
 });
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
@@ -141,7 +142,8 @@ export default function PlayersPage() {
       district: '',
       school: '',
       uscfId: '',
-      rating: undefined,
+      regularRating: undefined,
+      quickRating: '',
     },
   });
   
@@ -155,7 +157,8 @@ export default function PlayersPage() {
         district: editingPlayer.district,
         school: editingPlayer.school,
         uscfId: editingPlayer.uscfId,
-        rating: editingPlayer.rating,
+        regularRating: editingPlayer.regularRating,
+        quickRating: editingPlayer.quickRating || '',
       });
       handleDistrictChange(editingPlayer.district, true);
     } else {
@@ -221,7 +224,8 @@ export default function PlayersPage() {
         middleName: values.middleName,
         lastName: values.lastName,
         uscfId: values.uscfId,
-        rating: values.rating || 0,
+        regularRating: values.regularRating || 0,
+        quickRating: values.quickRating || '',
         district: values.district,
         school: values.school,
         events: 0,
@@ -261,10 +265,16 @@ export default function PlayersPage() {
 
             const namePart = row[0];
             const uscfId = row[1];
-            const ratingString = row[4];
+            const regularRatingString = row[4];
+            const quickRatingString = row[5] || ''; // rating2 is optional
 
             if (!namePart || !uscfId) {
                 errorCount++;
+                continue;
+            }
+
+            if (existingIds.has(uscfId)) {
+                skippedCount++;
                 continue;
             }
 
@@ -285,7 +295,7 @@ export default function PlayersPage() {
                 continue;
             }
             
-            const rating = parseInt(ratingString.replace('*', ''), 10) || 0;
+            const regularRating = parseInt(regularRatingString?.replace('*', ''), 10) || undefined;
 
             const newPlayer: Player = {
               id: `p-${uscfId}-${Date.now()}-${Math.random()}`,
@@ -293,7 +303,8 @@ export default function PlayersPage() {
               firstName: firstName,
               lastName: lastName,
               middleName: middleName || undefined,
-              rating: rating,
+              regularRating: regularRating,
+              quickRating: quickRatingString,
               school: 'Independent',
               district: 'None',
               events: 0,
@@ -399,7 +410,7 @@ export default function PlayersPage() {
         return;
     }
 
-    const headers = ['FullName', 'LastName', 'FirstName', 'MiddleName', 'USCF_ID', 'Rating', 'School', 'District', 'EventsCount'];
+    const headers = ['FullName', 'LastName', 'FirstName', 'MiddleName', 'USCF_ID', 'RegularRating', 'QuickRating', 'School', 'District', 'EventsCount'];
 
     const csvRows = filteredAndSortedPlayers.map(player => {
         const fullName = `${player.lastName}, ${player.firstName}`;
@@ -409,7 +420,8 @@ export default function PlayersPage() {
             player.firstName,
             player.middleName || '',
             player.uscfId,
-            player.rating,
+            player.regularRating,
+            player.quickRating,
             player.school,
             player.district,
             player.events,
@@ -461,12 +473,12 @@ export default function PlayersPage() {
               type="file"
               ref={fileInputRef}
               className="hidden"
-              accept=".csv,.txt,.tsv"
+              accept=".txt,.tsv"
               onChange={handleFileImport}
             />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
                 <Upload className="mr-2 h-4 w-4" />
-                Upload Database
+                Upload Database (.txt)
             </Button>
             <Button onClick={handleExportCsv}>
                 <Download className="mr-2 h-4 w-4" />
@@ -520,8 +532,8 @@ export default function PlayersPage() {
                         </Button>
                     </TableHead>
                     <TableHead className="p-0">
-                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('rating')}>
-                            Rating {getSortIcon('rating')}
+                        <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
+                            Regular Rating {getSortIcon('regularRating')}
                         </Button>
                     </TableHead>
                     <TableHead className="p-0">
@@ -557,7 +569,7 @@ export default function PlayersPage() {
                         </div>
                         </TableCell>
                         <TableCell>{player.uscfId}</TableCell>
-                        <TableCell>{player.rating}</TableCell>
+                        <TableCell>{player.regularRating}</TableCell>
                         <TableCell>{player.school}</TableCell>
                         <TableCell>{player.district}</TableCell>
                         <TableCell>{player.events}</TableCell>
@@ -647,7 +659,7 @@ export default function PlayersPage() {
                         <FormMessage />
                     </FormItem> 
                  )} />
-                 <FormField control={form.control} name="rating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                 <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Regular Rating</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
               </div>
               <DialogFooter className="pt-4">
                 <DialogClose asChild>
@@ -678,5 +690,3 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
-
-    
