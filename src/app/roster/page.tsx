@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -224,21 +223,41 @@ export default function RosterPage() {
   });
 
   useEffect(() => {
-    const updateStates = () => {
-        const db = getMasterDatabase();
-        if (db && db.length > 0) {
-            const states = new Set(db.map(p => p.state).filter(Boolean) as string[]);
-            setDbStates(['ALL', ...Array.from(states).sort()]);
-        }
-    };
-    
-    updateStates();
+    if (isDialogOpen) {
+      // This will run every time the dialog opens, ensuring the states are fresh.
+      const db = getMasterDatabase();
+      if (db && db.length > 0) {
+          const states = new Set(db.map(p => p.state).filter(Boolean) as string[]);
+          setDbStates(['ALL', ...Array.from(states).sort()]);
+      } else {
+          setDbStates(['ALL']);
+      }
 
-    window.addEventListener('masterDbUpdated', updateStates);
-    return () => {
-        window.removeEventListener('masterDbUpdated', updateStates);
-    };
-  }, []);
+      if (editingPlayer) {
+        form.reset(editingPlayer);
+      } else {
+        form.reset({
+          firstName: '',
+          middleName: '',
+          lastName: '',
+          uscfId: '',
+          regularRating: undefined,
+          quickRating: '',
+          uscfExpiration: undefined,
+          dob: undefined,
+          grade: '',
+          section: '',
+          email: '',
+          phone: '',
+          zipCode: '',
+          studentType: undefined,
+        });
+        setSearchFirstName('');
+        setSearchLastName('');
+        setSearchResults([]);
+      }
+    }
+  }, [isDialogOpen, editingPlayer, form]);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...players];
@@ -315,34 +334,6 @@ export default function RosterPage() {
 
   const watchUscfId = form.watch('uscfId');
   const isUscfNew = watchUscfId.toUpperCase() === 'NEW';
-
-  useEffect(() => {
-    if (isDialogOpen) {
-      if (editingPlayer) {
-        form.reset(editingPlayer);
-      } else {
-        form.reset({
-          firstName: '',
-          middleName: '',
-          lastName: '',
-          uscfId: '',
-          regularRating: undefined,
-          quickRating: '',
-          uscfExpiration: undefined,
-          dob: undefined,
-          grade: '',
-          section: '',
-          email: '',
-          phone: '',
-          zipCode: '',
-          studentType: undefined,
-        });
-        setSearchFirstName('');
-        setSearchLastName('');
-        setSearchResults([]);
-      }
-    }
-  }, [isDialogOpen, editingPlayer, form]);
 
   const handleAddPlayer = () => {
     setEditingPlayer(null);
@@ -735,11 +726,14 @@ export default function RosterPage() {
                         <Label>Last Name</Label>
                         <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
                     </div>
-                    <Button onClick={handlePerformSearch} disabled={isSearching}>
+                    <Button onClick={handlePerformSearch} disabled={isSearching || !isMasterDatabaseLoaded()}>
                         {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
                         Search
                     </Button>
                 </div>
+                 {!isMasterDatabaseLoaded() && (
+                    <p className="text-xs text-muted-foreground mt-2">To enable player search, first go to the <Link href="/players" className="underline">All Players</Link> page and upload the database file.</p>
+                 )}
                 {searchResults.length > 0 && (
                     <Card className="relative z-10 w-full mt-4 max-h-48 overflow-y-auto">
                         <CardContent className="p-2">
