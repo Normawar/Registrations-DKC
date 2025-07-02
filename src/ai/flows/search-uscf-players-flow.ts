@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Searches for USCF players by name from the USCF MSA website.
+ * @fileOverview Searches for USCF players by name, extracts their IDs, and then looks up each player individually.
  *
  * - searchUscfPlayers - A function that handles the player search process.
  * - SearchUscfPlayersInput - The input type for the searchUscfPlayers function.
@@ -10,6 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { lookupUscfPlayer } from './lookup-uscf-player-flow';
 
 const SearchUscfPlayersInputSchema = z.object({
   firstName: z.string().optional().describe("The player's first name."),
@@ -63,6 +64,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
     params.append('psubmit', 'Search');
 
     try {
+      // Step 1: Fetch the search results page to get the list of players.
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -85,93 +87,35 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      // Isolate the form containing the results. This is more robust.
-      const formMatch = html.match(/<FORM ACTION='.\/player-search.php'[\s\S]*?<\/FORM>/i);
-      if (!formMatch || !formMatch[0]) {
-          console.error("USCF Search: Could not find the results form container. The website layout may have changed. Snippet:", html.substring(0, 2000));
-          return { players: [], error: "Could not find the results form container. The website layout may have changed." };
+      // Step 2: Extract all unique USCF IDs from the links on the page.
+      const idRegex = /MbrDtlMain\.php\?(\d+)/g;
+      const ids = new Set<string>();
+      let match;
+      while ((match = idRegex.exec(html)) !== null) {
+          ids.add(match[1]);
       }
-      const formHtml = formMatch[0];
       
-      const players: PlayerSearchResult[] = [];
-      const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-
-      // Find all table rows within the form.
-      const rowMatches = formHtml.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi);
-      if (!rowMatches) {
-        console.error("USCF Search: Found the form, but could not find any table rows within it. Snippet:", formHtml.substring(0, 1000));
-        return { players: [], error: "Found the form, but could not find any table rows within it." };
-      }
-
-      for (const rowHtml of rowMatches) {
-          // A real player row always contains this link. This is the most reliable check.
-          if (!rowHtml.toLowerCase().includes('mbrdtlmain.php')) {
-              continue;
-          }
-
-          const cells = rowHtml.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
-          
-          if (cells.length !== 10) {
-              // This row is not a standard player data row.
-              continue; 
-          }
-
-          const player: Partial<PlayerSearchResult> = {};
-
-          // Column 0: USCF ID
-          player.uscfId = stripTags(cells[0]);
-
-          // Column 1: Rating
-          const ratingText = stripTags(cells[1]);
-          if (ratingText && ratingText.toLowerCase() !== 'unrated') {
-              const numericPartMatch = ratingText.match(/(\d+)/);
-              if (numericPartMatch && numericPartMatch[1]) {
-                  player.rating = parseInt(numericPartMatch[1], 10);
-              }
-          }
-
-          // Column 7: State
-          player.state = stripTags(cells[7]);
-          
-          // Column 8: Expiration Date
-          player.expirationDate = stripTags(cells[8]);
-          
-          // Column 9: Name (and link)
-          const nameCellContent = cells[9];
-          const nameLinkMatch = nameCellContent.match(/<a href=[^>]+?\?(\d+)[^>]*>([\s\S]+?)<\/a>/i);
-          
-          if (nameLinkMatch && nameLinkMatch[1] && nameLinkMatch[2]) {
-              const idFromLink = nameLinkMatch[1];
-              // Verify that the ID in the link matches the ID in the first column.
-              if (idFromLink.trim() !== player.uscfId?.trim()) {
-                  continue;
-              }
-
-              const fullNameRaw = stripTags(nameLinkMatch[2]); // Format: LAST, FIRST MIDDLE
-              const nameParts = fullNameRaw.split(',');
-              if (nameParts.length > 1) {
-                  player.lastName = nameParts.shift()!.trim();
-                  const firstAndMiddleParts = nameParts.join(',').trim().split(/\s+/).filter(Boolean);
-                  player.firstName = firstAndMiddleParts.shift() || '';
-                  player.middleName = firstAndMiddleParts.join(' ');
-              } else {
-                  player.lastName = fullNameRaw;
-              }
-          } else {
-              // If the name cell doesn't have the expected link, this is not a valid player row.
-              continue;
-          }
-          
-          // Final check to ensure we have the essential data before adding.
-          if (player.uscfId && player.lastName) {
-              players.push(player as PlayerSearchResult);
-          }
-      }
-
-      if (players.length === 0 && !html.includes("No players found")) {
-        console.error("USCF Search: Found a results page, but was unable to extract any player data. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
+      if (ids.size === 0) {
+        console.error("USCF Search: Found a results page, but was unable to extract any USCF IDs from it. The website layout may have changed.");
         return { players: [], error: "Found a results page, but was unable to extract any player data. The website layout may have changed." };
       }
+
+      // Step 3: Concurrently look up each player using the more reliable individual lookup flow.
+      const playerLookupPromises = Array.from(ids).map(uscfId => lookupUscfPlayer({ uscfId }));
+      const lookupResults = await Promise.all(playerLookupPromises);
+      
+      // Step 4: Filter out any failed lookups and map the results to the final format.
+      const players: PlayerSearchResult[] = lookupResults
+        .filter(p => !p.error && p.uscfId)
+        .map(p => ({
+            uscfId: p.uscfId!,
+            firstName: p.firstName,
+            middleName: p.middleName,
+            lastName: p.lastName,
+            rating: p.rating,
+            state: p.state,
+            expirationDate: p.expirationDate,
+        }));
       
       return { players };
 
@@ -184,5 +128,3 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
   }
 );
-
-    

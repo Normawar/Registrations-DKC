@@ -17,9 +17,11 @@ const LookupUscfPlayerInputSchema = z.object({
 export type LookupUscfPlayerInput = z.infer<typeof LookupUscfPlayerInputSchema>;
 
 const LookupUscfPlayerOutputSchema = z.object({
+  uscfId: z.string().describe("The player's USCF ID."),
   firstName: z.string().optional().describe("The player's first name."),
   middleName: z.string().optional().describe("The player's middle name or initial."),
   lastName: z.string().optional().describe("The player's last name."),
+  state: z.string().optional().describe("The player's state abbreviation."),
   rating: z.number().optional().describe("The player's regular USCF rating."),
   expirationDate: z.string().optional().describe("The player's USCF membership expiration date in YYYY-MM-DD format."),
   error: z.string().optional().describe("An error message if the lookup failed or the player was not found.")
@@ -38,7 +40,7 @@ const lookupUscfPlayerFlow = ai.defineFlow(
   },
   async ({ uscfId }) => {
     if (!uscfId) {
-      return { error: 'A USCF ID must be provided.' };
+      return { uscfId: '', error: 'A USCF ID must be provided.' };
     }
     // Use the www.uschess.org endpoint which is more stable than the msa subdomain.
     const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
@@ -54,21 +56,21 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       });
 
       if (!response.ok) {
-        return { error: `Failed to fetch from USCF website. Status: ${response.status}` };
+        return { uscfId, error: `Failed to fetch from USCF website. Status: ${response.status}` };
       }
       
       const text = await response.text();
       
       if (text.includes("This player is not in our database")) {
-        return { error: "Player not found with this USCF ID." };
+        return { uscfId, error: "Player not found with this USCF ID." };
       }
       
-      const output: LookupUscfPlayerOutput = {};
+      const output: LookupUscfPlayerOutput = { uscfId };
       
       const nameMatch = text.match(/Name\s*:\s*(.*)/);
       if (!nameMatch || !nameMatch[1]) {
         console.error("USCF Lookup: Could not find 'Name:' field on page. Full response:", text.substring(0, 1000));
-        return { error: "Could not find player's name field on the page. The website layout may have changed." };
+        return { uscfId, error: "Could not find player's name field on the page. The website layout may have changed." };
       }
       
       const rawName = nameMatch[1].replace(/<[^>]+>/g, '').trim(); // Format: LAST, FIRST MIDDLE
@@ -85,9 +87,6 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       const ratingLineMatch = text.match(/Regular:\s*(.*)/);
       if (ratingLineMatch && ratingLineMatch[1]) {
         const ratingText = ratingLineMatch[1].trim();
-        // This regex handles normal ratings ("1818"), ratings with game counts ("105 (Based on 4 games)"),
-        // and ratings with provisional info ("829 / P6", "145/13", "P1200").
-        // It extracts the first numeric part of the rating string.
         const numericPartMatch = ratingText.match(/(\d+)/);
         if (numericPartMatch && numericPartMatch[1]) {
             output.rating = parseInt(numericPartMatch[1], 10);
@@ -99,9 +98,15 @@ const lookupUscfPlayerFlow = ai.defineFlow(
         output.expirationDate = expiresMatch[1];
       }
       
+      // Regex to find state, e.g., ", TX 78501"
+      const stateMatch = text.match(/,\s*([A-Z]{2})\s+\d{5}/);
+      if (stateMatch && stateMatch[1]) {
+        output.state = stateMatch[1];
+      }
+
       if (!output.lastName && !output.firstName) {
           console.error("USCF Lookup: Failed to parse player name from raw string:", rawName);
-          return { error: "Found the player's name field, but could not parse the name from it." };
+          return { uscfId, error: "Found the player's name field, but could not parse the name from it." };
       }
       
       return output;
@@ -109,9 +114,9 @@ const lookupUscfPlayerFlow = ai.defineFlow(
     } catch (error) {
       console.error("Error in lookupUscfPlayerFlow:", error);
       if (error instanceof Error) {
-        return { error: error.message };
+        return { uscfId, error: error.message };
       }
-      return { error: 'An unexpected error occurred during the lookup.' };
+      return { uscfId, error: 'An unexpected error occurred during the lookup.' };
     }
   }
 );
