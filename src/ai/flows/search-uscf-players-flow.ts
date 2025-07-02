@@ -85,17 +85,25 @@ const searchUscfPlayersFlow = ai.defineFlow(
         return { players: [] };
       }
 
-      const allHtmlRows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
-      const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+      // Isolate the results table to avoid parsing other tables on the page.
+      const resultsTableMatch = html.match(/<div class='contentheading'>Player Search Results<\/div>([\s\S]*?)<\/table>/i);
+      if (!resultsTableMatch || !resultsTableMatch[0]) {
+          console.error("USCF Search: Could not find the main results table container. The website layout may have changed.");
+          return { players: [], error: "Could not find the main results table container. The website layout may have changed." };
+      }
+      const resultsTableHtml = resultsTableMatch[0];
+      
+      const allHtmlRows = resultsTableHtml.match(/<tr[^>]*>([\s\S]*?)<\/tr>/gi) || [];
+      const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
       
       const players: PlayerSearchResult[] = [];
       let headerMap: Record<string, number> | null = null;
-      let headerFound = false;
-
-      // First, find the header row and map the column indexes
+      
+      // Find the header row and map the column indexes
       for (const row of allHtmlRows) {
         const lowerCaseRow = row.toLowerCase();
-        if (lowerCaseRow.includes('uscf id') && lowerCaseRow.includes('rating') && lowerCaseRow.includes('name')) {
+        // Use a combination of expected headers to reliably identify the header row.
+        if (lowerCaseRow.includes('>uscf id<') && lowerCaseRow.includes('>rating<') && lowerCaseRow.includes('>name<')) {
             headerMap = {};
             const headerCells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
             headerCells.forEach((cell, index) => {
@@ -106,19 +114,17 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 if (cleanHeader.includes('exp date')) headerMap!['expirationdate'] = index;
                 if (cleanHeader === 'name') headerMap!['name'] = index;
             });
-            headerFound = true;
             break; 
         }
       }
 
       if (!headerMap) {
-        console.error("USCF Search: Could not find the results table header. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
+        console.error("USCF Search: Could not find the results table header. The website layout may have changed. Full response snippet:", resultsTableHtml.substring(0, 2000));
         return { players: [], error: "Could not find the results table header. The website layout may have changed." };
       }
-
+      
       // Now, process the data rows using the headerMap
       for (const row of allHtmlRows) {
-        // A player data row must contain the player link. This is our most reliable check.
         const idMatch = row.match(/MbrDtlMain\.php\?(\d+)/);
         if (!idMatch) {
             continue; // Skip header and footer rows
@@ -129,13 +135,12 @@ const searchUscfPlayersFlow = ai.defineFlow(
 
         const player: Partial<PlayerSearchResult> = {};
         
-        // Extract Name and ID from the name column using the map
         if (headerMap.name !== undefined && cells[headerMap.name]) {
             const nameCell = cells[headerMap.name];
             const linkMatch = nameCell.match(/<a href=["'][^"']+?\?(\d+)["']>([\s\S]+?)<\/a>/);
             if (linkMatch && linkMatch[1] && linkMatch[2]) {
                 player.uscfId = linkMatch[1];
-                const fullNameRaw = stripTags(linkMatch[2]); // Name is inside the <a> tag
+                const fullNameRaw = stripTags(linkMatch[2]);
                 const nameParts = fullNameRaw.split(',');
                 if (nameParts.length > 1) {
                     player.lastName = nameParts.shift()!.trim();
@@ -147,13 +152,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 }
             }
         }
-
-        // If we didn't get a USCF ID from the name link, use the one from the first column if available
+        
         if (!player.uscfId && headerMap.uscfid_col !== undefined && cells[headerMap.uscfid_col]) {
             player.uscfId = stripTags(cells[headerMap.uscfid_col]);
         }
-
-        // If we still don't have a USCF ID, we can't process this row.
+        
         if (!player.uscfId) {
             continue;
         }
@@ -197,5 +200,3 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
   }
 );
-
-    
