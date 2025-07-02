@@ -274,28 +274,42 @@ export default function PlayersPage() {
       skipEmptyLines: true,
       step: (results) => {
         const row = results.data as string[];
+        
+        // Skip rows that don't have at least the USCF ID column.
+        if (!row || row.length < 2) {
+            return;
+        }
+
+        const uscfId = row[1];
+        // A valid USCF ID is an 8-digit number. This check will effectively
+        // skip most header, footer, or malformed non-player data rows.
+        if (!/^\d{8}$/.test(uscfId)) {
+            return;
+        }
+
         try {
+          // From here, we assume it's a player row and apply stricter parsing.
           if (row.length < 5) {
-            if (row.length > 0 && row[0]) {
-              errorCount++;
-            }
+            console.warn('Skipping malformed player row (not enough columns):', row);
+            errorCount++;
             return;
           }
-
+        
           const namePart = row[0];
-          const uscfId = row[1];
           const expirationDateStr = row[2];
           const state = row[3];
           const regularRatingString = row[4];
           const quickRatingString = row[5] || '';
 
-          if (!namePart || !uscfId) {
+          if (!namePart) {
+            console.warn('Skipping malformed player row (missing name):', row);
             errorCount++;
             return;
           }
 
           const nameParts = namePart.split(',');
           if (nameParts.length < 2) {
+            console.warn("Skipping malformed player row (name not in 'Last, First' format):", row);
             errorCount++;
             return;
           }
@@ -305,6 +319,7 @@ export default function PlayersPage() {
           const middleName = firstAndMiddleParts.join(' ');
 
           if (!firstName || !lastName) {
+            console.warn("Skipping malformed player row (could not parse first/last name):", row);
             errorCount++;
             return;
           }
@@ -324,7 +339,7 @@ export default function PlayersPage() {
           };
           importedPlayers.push(newPlayer);
         } catch (e) {
-          console.error("Error parsing row:", row, e);
+          console.error("Error parsing a row that appeared to be a player:", row, e);
           errorCount++;
         }
       },
