@@ -220,28 +220,12 @@ export default function RosterPage() {
     }
   });
 
-  useEffect(() => {
-    // Initial check
-    setMasterDbLoaded(isMasterDatabaseLoaded());
-
-    // Listener for updates within the same tab/session
-    const handleMasterDbUpdate = () => {
-        setMasterDbLoaded(isMasterDatabaseLoaded());
-    };
-
-    window.addEventListener('masterDbUpdated', handleMasterDbUpdate);
-    
-    return () => {
-        window.removeEventListener('masterDbUpdated', handleMasterDbUpdate);
-    };
-  }, []);
-
   const uniqueStates = useMemo(() => {
-    if (!masterDbLoaded) return ['ALL'];
+    if (!isMasterDatabaseLoaded()) return ['ALL'];
     const masterDb = getMasterDatabase();
     const states = new Set(masterDb.map(p => p.state).filter(Boolean) as string[]);
     return ['ALL', ...Array.from(states).sort()];
-  }, [masterDbLoaded]);
+  }, [masterDbLoaded]); // Re-calculate when dialog opens and state is set
 
   // Debounced search for the master database
   useEffect(() => {
@@ -397,11 +381,14 @@ export default function RosterPage() {
 
   const handleAddPlayer = () => {
     setEditingPlayer(null);
+    form.reset();
+    setMasterDbLoaded(isMasterDatabaseLoaded());
     setIsDialogOpen(true);
   };
 
   const handleEditPlayer = (player: Player) => {
     setEditingPlayer(player);
+    setMasterDbLoaded(isMasterDatabaseLoaded());
     setIsDialogOpen(true);
   };
   
@@ -705,7 +692,7 @@ export default function RosterPage() {
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder={masterDbLoaded ? "Search..." : "Please upload database first"}
+                                placeholder={masterDbLoaded ? "Search..." : "Please upload database on All Players page"}
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 className="pl-10"

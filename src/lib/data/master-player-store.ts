@@ -33,10 +33,6 @@ export const getMasterDatabase = (): ImportedPlayer[] => {
 
 export const setMasterDatabase = (players: ImportedPlayer[]) => {
   masterPlayerDatabase = players;
-  // Notify other parts of the app that the database has been updated.
-  if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('masterDbUpdated'));
-  }
 };
 
 export const isMasterDatabaseLoaded = (): boolean => {
