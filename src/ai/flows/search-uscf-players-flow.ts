@@ -93,7 +93,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
           const idMatch = html.match(/name=memid.*?value='(\d+)'/is);
           const uscfId = idMatch ? idMatch[1] : '';
           if (uscfId) {
-            const playerData = parseThin3Page(html, uscfId);
+            const playerData = await parseThin3Page(html, uscfId);
             if (playerData.error) {
                 return { players: [], error: playerData.error };
             }

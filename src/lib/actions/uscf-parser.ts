@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A utility for parsing USCF player data from HTML.
@@ -22,9 +21,9 @@ export type ParsedPlayerData = z.infer<typeof ParsedPlayerDataSchema>;
  * Parses player data from the HTML content of a thin3.php page.
  * @param html The HTML content of the page.
  * @param uscfId The USCF ID of the player, as it might not be in the HTML itself if it's a search result.
- * @returns {ParsedPlayerData} The parsed player data.
+ * @returns {Promise<ParsedPlayerData>} The parsed player data.
  */
-export function parseThin3Page(html: string, uscfId: string): ParsedPlayerData {
+export async function parseThin3Page(html: string, uscfId: string): Promise<ParsedPlayerData> {
   // A simple check to see if the page is what we expect. A valid thin3.php page has this heading.
   if (!html.includes("<h2>USCF Member Lookup</h2>")) {
     return { uscfId, error: "Player not found or invalid page returned from USCF." };
