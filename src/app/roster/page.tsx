@@ -98,7 +98,7 @@ import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Label } from '@/components/ui/label';
 import { getMasterDatabase, isMasterDatabaseLoaded, type ImportedPlayer } from '@/lib/data/master-player-store';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { searchUscfPlayers, type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
+import { type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
 
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
@@ -198,6 +198,7 @@ export default function RosterPage() {
   const [searchFirstName, setSearchFirstName] = useState('');
   const [searchLastName, setSearchLastName] = useState('');
   const [searchState, setSearchState] = useState('ALL');
+  const [dbStates, setDbStates] = useState<string[]>(['ALL']);
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -221,6 +222,23 @@ export default function RosterPage() {
       studentType: undefined,
     }
   });
+
+  useEffect(() => {
+    const updateStates = () => {
+        const db = getMasterDatabase();
+        if (db && db.length > 0) {
+            const states = new Set(db.map(p => p.state).filter(Boolean) as string[]);
+            setDbStates(['ALL', ...Array.from(states).sort()]);
+        }
+    };
+    
+    updateStates();
+
+    window.addEventListener('masterDbUpdated', updateStates);
+    return () => {
+        window.removeEventListener('masterDbUpdated', updateStates);
+    };
+  }, []);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...players];
@@ -447,27 +465,40 @@ export default function RosterPage() {
   }
   
   const handlePerformSearch = async () => {
-    if (!searchLastName) {
-      toast({ variant: 'destructive', title: 'Last Name Required', description: 'Please enter a last name to search.' });
-      return;
+    if (!searchLastName && !searchFirstName) {
+        toast({ variant: 'destructive', title: 'Name Required', description: 'Please enter a first or last name to search.' });
+        return;
     }
     setIsSearching(true);
     setSearchResults([]);
     try {
-      const result = await searchUscfPlayers({ 
-        firstName: searchFirstName, 
-        lastName: searchLastName, 
-        state: searchState 
-      });
-      if (result.error) {
-        toast({ variant: 'destructive', title: 'Search Error', description: result.error });
-      }
-      setSearchResults(result.players);
+        const db = getMasterDatabase();
+        const results = db.filter(p => {
+            const stateMatch = searchState === 'ALL' || p.state === searchState;
+            const lastNameMatch = !searchLastName || (p.lastName && p.lastName.toLowerCase().includes(searchLastName.toLowerCase()));
+            const firstNameMatch = !searchFirstName || (p.firstName && p.firstName.toLowerCase().includes(searchFirstName.toLowerCase()));
+            
+            return stateMatch && lastNameMatch && firstNameMatch;
+        });
+
+        const mappedResults: PlayerSearchResult[] = results.map(p => ({
+            uscfId: p.uscfId,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            middleName: p.middleName,
+            rating: p.regularRating,
+            state: p.state,
+            expirationDate: p.expirationDate ? format(parse(p.expirationDate, 'MM/dd/yyyy', new Date()), 'yyyy-MM-dd') : undefined,
+            quickRating: p.quickRating
+        }));
+
+        setSearchResults(mappedResults.slice(0, 50));
+        
     } catch (e) {
-      const description = e instanceof Error ? e.message : 'An unknown error occurred.';
-      toast({ variant: 'destructive', title: 'Search Failed', description: description });
+        const description = e instanceof Error ? e.message : 'An unknown error occurred.';
+        toast({ variant: 'destructive', title: 'Search Failed', description: description });
     } finally {
-      setIsSearching(false);
+        setIsSearching(false);
     }
   };
   
@@ -689,26 +720,22 @@ export default function RosterPage() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="space-y-2">
                         <Label>State</Label>
-                        <Select value={searchState} onValueChange={setSearchState} disabled={isSearching}>
+                        <Select value={searchState} onValueChange={setSearchState}>
                             <SelectTrigger><SelectValue placeholder="All States"/></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="ALL">All States</SelectItem>
-                                <SelectItem value="TX">Texas</SelectItem>
-                                <SelectItem value="CA">California</SelectItem>
-                                <SelectItem value="FL">Florida</SelectItem>
-                                <SelectItem value="NY">New York</SelectItem>
+                                {dbStates.map(s => <SelectItem key={s} value={s}>{s === 'ALL' ? 'All States' : s}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
                     <div className='space-y-2'>
                         <Label>First Name (Optional)</Label>
-                        <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} disabled={isSearching} />
+                        <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
                     </div>
                     <div className='space-y-2'>
                         <Label>Last Name</Label>
-                        <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} disabled={isSearching} />
+                        <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
                     </div>
-                    <Button onClick={handlePerformSearch} disabled={isSearching || !searchLastName}>
+                    <Button onClick={handlePerformSearch} disabled={isSearching}>
                         {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
                         Search
                     </Button>
@@ -789,7 +816,7 @@ export default function RosterPage() {
                         Students without a USCF ID can be added with &quot;NEW&quot;.
                     </FormDescription>
                     <FormDescription>
-                        <Link href="https://new.uschess.org/civicrm/player-search" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+                        <Link href="https://new.uschess.org/player-search" target="_blank" rel="noopener noreferrer" className="text-primary underline">
                             Find USCF ID on the official USCF website
                         </Link>
                     </FormDescription>
