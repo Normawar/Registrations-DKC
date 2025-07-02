@@ -90,28 +90,31 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
       for (const row of allHtmlRows) {
+        // The most reliable way to identify a player row is by the link to their details page.
         if (!row.includes('MbrDtlMain.php')) {
             continue;
         }
 
         const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [];
         
-        // A valid player row has exactly 10 columns.
+        // A valid player row has exactly 10 columns according to all examples.
         if (cells.length !== 10) {
             continue; 
         }
 
         const player: Partial<PlayerSearchResult> = {};
 
-        // Column 0: USCF ID
-        player.uscfId = stripTags(cells[0]);
-        if (!player.uscfId || !/^\d+$/.test(player.uscfId)) {
-            continue;
+        // Column 0: USCF ID from text content
+        const uscfIdFromCell = stripTags(cells[0]);
+        if (!uscfIdFromCell || !/^\d+$/.test(uscfIdFromCell)) {
+            continue; // Not a valid player row if first cell isn't a plain ID.
         }
+        player.uscfId = uscfIdFromCell;
 
         // Column 1: Rating
         const ratingText = stripTags(cells[1]);
         if (ratingText && ratingText.toLowerCase() !== 'unrated') {
+            // Extracts the first numeric part of the rating string (e.g., from "145/13").
             const numericPartMatch = ratingText.match(/(\d+)/);
             if (numericPartMatch && numericPartMatch[1]) {
                 player.rating = parseInt(numericPartMatch[1], 10);
@@ -135,11 +138,12 @@ const searchUscfPlayersFlow = ai.defineFlow(
         const nameLinkMatch = nameCellContent.match(/<a href=[^>]+?\?(\d+)[^>]*>([\s\S]+?)<\/a>/i);
         if (nameLinkMatch && nameLinkMatch[1] && nameLinkMatch[2]) {
             const idFromLink = nameLinkMatch[1];
+            // Verify that the ID in the link matches the ID in the first column.
             if (idFromLink !== player.uscfId) {
                 continue;
             }
 
-            const fullNameRaw = stripTags(nameLinkMatch[2]);
+            const fullNameRaw = stripTags(nameLinkMatch[2]); // Format: LAST, FIRST MIDDLE
             const nameParts = fullNameRaw.split(',');
             if (nameParts.length > 1) {
                 player.lastName = nameParts.shift()!.trim();
@@ -150,9 +154,11 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 player.lastName = fullNameRaw;
             }
         } else {
+            // If the name cell doesn't have the expected link, this is not a valid player row.
             continue;
         }
         
+        // Final check to ensure we have the essential data before adding.
         if (player.uscfId && player.lastName) {
             players.push(player as PlayerSearchResult);
         }
