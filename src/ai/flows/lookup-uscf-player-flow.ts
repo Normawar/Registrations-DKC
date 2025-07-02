@@ -43,8 +43,8 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       return { uscfId: '', error: 'A USCF ID must be provided.' };
     }
     
-    // Use the simpler, more reliable 'thin3' details page which returns data in input fields.
-    const url = `https://www.uschess.org/msa/thin3.php?${uscfId}`;
+    // Use MbrDtlMain.php as it's the canonical source page.
+    const url = `https://www.uschess.org/msa/MbrDtlMain.php?${uscfId}`;
     
     try {
       const response = await fetch(url, {
@@ -68,45 +68,38 @@ const lookupUscfPlayerFlow = ai.defineFlow(
       
       const output: LookupUscfPlayerOutput = { uscfId };
 
-      // Helper function to extract value from an <input> tag based on its name attribute.
-      const getInputValue = (name: string): string | null => {
-        const regex = new RegExp(`<input[^>]+name=['"]?${name}['"]?[^>]+value=['"]([^'"]+)['"]`, 'i');
-        const match = text.match(regex);
-        return match ? match[1].trim() : null;
-      };
+      // Helper to clean up extracted text by removing HTML entities and extra whitespace
+      const cleanText = (str: string) => str.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
-      // Extract Name
-      const rawName = getInputValue('p_name'); // Format: LASTNAME, FIRSTNAME MIDDLENAME
-      if (rawName) {
-        const [lastName, firstAndMiddle] = rawName.split(',').map(s => s.trim());
-        output.lastName = lastName;
-        if (firstAndMiddle) {
-          const nameParts = firstAndMiddle.split(/\s+/).filter(Boolean);
+      // Extract Name from title: <font size=+1><b>16153316: KALI RENAE GUERRA</b></font>
+      const nameIdMatch = text.match(/<font size=\+1><b>\d+:\s*([^<]+)<\/b><\/font>/i);
+      if (nameIdMatch && nameIdMatch[1]) {
+          const nameParts = cleanText(nameIdMatch[1]).split(' ');
+          output.lastName = nameParts.pop() || '';
           output.firstName = nameParts.shift() || '';
           output.middleName = nameParts.join(' ');
+      }
+
+      // Extract Regular Rating from: Regular Rating ... <b><nobr>319&nbsp;&nbsp;2024-02</nobr></b>
+      const ratingMatch = text.match(/Regular Rating[\s\S]*?<b><nobr>([^<]+)<\/nobr><\/b>/i);
+      if (ratingMatch && ratingMatch[1]) {
+        const ratingText = cleanText(ratingMatch[1]);
+        const numericRating = ratingText.match(/^(\d+)/); // Get leading digits
+        if (numericRating && numericRating[1]) {
+          output.rating = parseInt(numericRating[1], 10);
         }
       }
 
-      // Extract Rating and Expiration Date from the same input field
-      const ratingAndExpValue = getInputValue('rating1'); // Format: '319* 2024-02-01' or 'UNRATED'
-      if (ratingAndExpValue && !ratingAndExpValue.toLowerCase().includes('unrated')) {
-        const parts = ratingAndExpValue.split(/\s+/).filter(Boolean);
-        const ratingStr = parts[0]?.replace(/[^\d]/g, ''); // Get only digits from first part
-        if (ratingStr) {
-          output.rating = parseInt(ratingStr, 10);
-        }
-
-        // The date is typically the last part
-        const datePart = parts[parts.length - 1];
-        if (datePart && /^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
-            output.expirationDate = datePart;
-        }
+      // Extract Expiration Date from: Expiration Dt. ... <td><b>2025-11-30</b></td>
+      const expirationMatch = text.match(/Expiration Dt\.[\s\S]*?<td><b>([\d-]+)<\/b><\/td>/i);
+      if (expirationMatch && expirationMatch[1]) {
+        output.expirationDate = cleanText(expirationMatch[1]);
       }
-
-      // Extract State
-      const state = getInputValue('p_state');
-      if (state) {
-        output.state = state;
+      
+      // Extract State from: State ... <td><b> TX </b></td>
+      const stateMatch = text.match(/State[\s\S]*?<td><b>([^<]+)<\/b><\/td>/i);
+      if (stateMatch && stateMatch[1]) {
+        output.state = cleanText(stateMatch[1]);
       }
       
       if (!output.lastName && !output.firstName) {
