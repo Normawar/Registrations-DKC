@@ -95,11 +95,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
-import { searchUscfPlayers, type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
+import { Label } from '@/components/ui/label';
+import { getMasterDatabase, isMasterDatabaseLoaded, type ImportedPlayer } from '@/lib/data/master-player-store';
+
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
-const usStates = [ 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'ALL' ];
 
 const gradeToNumber: { [key: string]: number } = {
   'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3,
@@ -189,13 +190,10 @@ export default function RosterPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
 
-  // States for live USCF search
-  const [searchState, setSearchState] = useState('TX');
-  const [searchFirstName, setSearchFirstName] = useState('');
-  const [searchLastName, setSearchLastName] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
-  const [searchError, setSearchError] = useState('');
+  // States for internal DB search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dbSearchResults, setDbSearchResults] = useState<ImportedPlayer[]>([]);
+  const [isDbSearching, setIsDbSearching] = useState(false);
 
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -220,71 +218,45 @@ export default function RosterPage() {
     }
   });
 
-  const handlePlayerSearch = async () => {
-    if (!searchLastName) {
-        setSearchError('Last name is required for search.');
-        return;
+  // Debounced search for the master database
+  useEffect(() => {
+    if (searchQuery.length < 3) {
+      setDbSearchResults([]);
+      return;
     }
-    setIsSearching(true);
-    setSearchError('');
-    setSearchResults([]);
-    try {
-        const result = await searchUscfPlayers({
-            firstName: searchFirstName,
-            lastName: searchLastName,
-            state: searchState,
-        });
+    setIsDbSearching(true);
+    const handler = setTimeout(() => {
+        const masterDb = getMasterDatabase();
+        const results = masterDb.filter(p => 
+            p.uscfId.includes(searchQuery) || 
+            `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
+        ).slice(0, 10);
+        setDbSearchResults(results);
+        setIsDbSearching(false);
+    }, 300);
 
-        if (result.error) {
-            setSearchError(result.error);
-            toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
-        } else {
-            setSearchResults(result.players);
-            if (result.players.length === 0) {
-                toast({ title: 'No Results', description: 'No players found matching your criteria.' });
-            }
-            
-            // Check for players with identical names
-            const nameCounts = result.players.reduce((acc, player) => {
-                const nameKey = `${player.firstName} ${player.lastName}`.toLowerCase();
-                acc[nameKey] = (acc[nameKey] || 0) + 1;
-                return acc;
-            }, {} as Record<string, number>);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-            const hasDuplicates = Object.values(nameCounts).some(count => count > 1);
-
-            if (hasDuplicates) {
-                setSearchError('Multiple players found with the same name. Please verify the correct player on the USCF website before adding.');
-            }
-        }
-    } catch (e) {
-        const message = e instanceof Error ? e.message : 'An unknown error occurred during search.';
-        setSearchError(message);
-        toast({ variant: 'destructive', title: 'Search Error', description: message });
-    } finally {
-        setIsSearching(false);
-    }
-  };
-
-
-  const handleSelectSearchedPlayer = (player: PlayerSearchResult) => {
+  const handleSelectDbPlayer = (player: ImportedPlayer) => {
     form.reset(); // Clear previous form state
     form.setValue('firstName', player.firstName || '');
     form.setValue('lastName', player.lastName || '');
     form.setValue('middleName', player.middleName || '');
     form.setValue('uscfId', player.uscfId || '');
-    form.setValue('regularRating', player.rating);
+    form.setValue('regularRating', player.regularRating);
     form.setValue('quickRating', player.quickRating || '');
     
     if (player.expirationDate) {
-        const expDate = parse(player.expirationDate, 'yyyy-MM-dd', new Date());
+        // The master DB stores dates as MM/dd/yyyy
+        const expDate = parse(player.expirationDate, 'MM/dd/yyyy', new Date());
         if (isValid(expDate)) {
             form.setValue('uscfExpiration', expDate);
         }
     }
     
-    setSearchResults([]); // Clear search results after selection
-    setSearchError('');
+    setDbSearchResults([]); // Clear search results after selection
+    setSearchQuery('');
     toast({ title: 'Player Selected', description: `${player.firstName} ${player.lastName}'s data has been auto-filled.` });
   };
 
@@ -386,11 +358,8 @@ export default function RosterPage() {
           zipCode: '',
           studentType: undefined,
         });
-        setSearchFirstName('');
-        setSearchLastName('');
-        setSearchState('TX');
-        setSearchResults([]);
-        setSearchError('');
+        setSearchQuery('');
+        setDbSearchResults([]);
       }
     }
   }, [isDialogOpen, editingPlayer, form]);
@@ -677,73 +646,49 @@ export default function RosterPage() {
           <DialogHeader>
             <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
             <DialogDescription>
-              Search for a player on the USCF website to auto-fill their information, or enter the details manually below.
+              Search the master player database to auto-fill information, or enter the details manually below.
             </DialogDescription>
           </DialogHeader>
 
           <Card className="bg-muted/50">
             <CardHeader>
-                <CardTitle className="text-base">USCF Player Search</CardTitle>
+                <CardTitle className="text-base">Master Database Search</CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div className="space-y-2">
-                        <Label>State</Label>
-                        <Select value={searchState} onValueChange={setSearchState}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                {usStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                     <div className="space-y-2">
-                        <Label>First Name</Label>
-                        <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
-                    </div>
-                     <div className="space-y-2">
-                        <Label>Last Name</Label>
-                        <Input placeholder="Doe" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
-                    </div>
-                    <Button onClick={handlePlayerSearch} disabled={isSearching || !searchLastName}>
-                        {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                        Search
-                    </Button>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search by USCF ID or Name..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                        disabled={!isMasterDatabaseLoaded()}
+                    />
+                    {!isMasterDatabaseLoaded() && (
+                        <p className="text-xs text-muted-foreground mt-1">Player database not loaded. Please <Link href="/players" className='underline'>upload it</Link> to enable search.</p>
+                    )}
+                    {searchQuery.length > 2 && (
+                        <Card className="absolute z-10 w-full mt-1 max-h-48 overflow-y-auto">
+                            <CardContent className="p-2">
+                                {isDbSearching ? (<div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>)
+                                : dbSearchResults.length === 0 ? (<div className="p-2 text-center text-sm text-muted-foreground">No results found.</div>)
+                                : (
+                                    dbSearchResults.map(p => (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            className="w-full text-left p-2 hover:bg-accent rounded-md"
+                                            onClick={() => handleSelectDbPlayer(p)}
+                                        >
+                                            <p className="font-medium">{p.firstName} {p.lastName} ({p.state})</p>
+                                            <p className="text-sm text-muted-foreground">ID: {p.uscfId} | Rating: {p.regularRating || 'N/A'}</p>
+                                        </button>
+                                    ))
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
-                {searchError && (
-                    <Alert variant="destructive" className="mt-4">
-                        <Info className="h-4 w-4" />
-                        <AlertTitle>Heads up!</AlertTitle>
-                        <AlertDescription>{searchError}</AlertDescription>
-                    </Alert>
-                )}
-                 {searchResults.length > 0 && (
-                    <div className="mt-4 border rounded-md max-h-48 overflow-y-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>USCF ID</TableHead>
-                                    <TableHead>Rating</TableHead>
-                                    <TableHead>Expires</TableHead>
-                                    <TableHead></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {searchResults.map(p => (
-                                    <TableRow key={p.uscfId}>
-                                        <TableCell>{p.firstName} {p.lastName} ({p.state})</TableCell>
-                                        <TableCell>{p.uscfId}</TableCell>
-                                        <TableCell>{p.rating || 'N/A'}</TableCell>
-                                        <TableCell>{p.expirationDate ? format(parse(p.expirationDate, 'yyyy-MM-dd', new Date()), 'MM/dd/yy') : 'N/A'}</TableCell>
-                                        <TableCell>
-                                            <Button size="sm" onClick={() => handleSelectSearchedPlayer(p)}>Select</Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                )}
             </CardContent>
           </Card>
           
