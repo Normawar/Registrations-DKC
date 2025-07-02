@@ -44,7 +44,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 
 
 // NOTE: These types and data are duplicated from the events page for this prototype.
@@ -125,6 +127,8 @@ export default function ConfirmationsPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isCompAlertOpen, setIsCompAlertOpen] = useState(false);
+  const [confToComp, setConfToComp] = useState<Confirmation | null>(null);
   
   const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
     confirmationsToFetch.forEach(conf => {
@@ -369,6 +373,43 @@ export default function ConfirmationsPage() {
     }
   };
 
+  const handleCompRegistration = async () => {
+    if (!confToComp) return;
+
+    setIsUpdating(prev => ({ ...prev, [confToComp.id]: true }));
+    setIsCompAlertOpen(false);
+
+    try {
+        if (confToComp.invoiceId) {
+            console.log(`Canceling Square invoice ${confToComp.invoiceId} for comped registration.`);
+            await cancelInvoice({ invoiceId: confToComp.invoiceId });
+        }
+
+        const updatedConfirmations = confirmations.map(c => {
+            if (c.id === confToComp.id) {
+                return { ...c, invoiceStatus: 'COMPED' };
+            }
+            return c;
+        });
+
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+        setConfirmations(updatedConfirmations);
+        setStatuses(prev => ({ ...prev, [confToComp.id]: { status: 'COMPED', isLoading: false } }));
+
+        toast({
+            title: "Registration Comped",
+            description: `The registration for "${confToComp.eventName}" has been marked as complimentary.`
+        });
+    } catch (error) {
+        console.error("Failed to comp registration:", error);
+        const description = error instanceof Error ? error.message : "An unknown error occurred.";
+        toast({ variant: "destructive", title: "Operation Failed", description });
+    } finally {
+        setIsUpdating(prev => ({ ...prev, [confToComp.id]: false }));
+        setConfToComp(null);
+    }
+  };
+
 
   return (
     <AppLayout>
@@ -443,6 +484,14 @@ export default function ConfirmationsPage() {
                         <div className="flex justify-between items-center">
                             <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
                             <div className="flex items-center gap-2">
+                                {sponsorProfile?.role === 'organizer' && conf.invoiceStatus !== 'COMPED' && (
+                                    <Button variant="secondary" size="sm" onClick={() => {
+                                        setConfToComp(conf);
+                                        setIsCompAlertOpen(true);
+                                    }}>
+                                        <Award className="mr-2 h-4 w-4" /> Comp Registration
+                                    </Button>
+                                )}
                                 <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId}>
                                     <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} />
                                     Refresh Status
@@ -668,6 +717,23 @@ export default function ConfirmationsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={isCompAlertOpen} onOpenChange={setIsCompAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark the registration as complimentary. If an invoice exists on Square, it will be canceled. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfToComp(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCompRegistration} className="bg-primary hover:bg-primary/90">
+                Confirm & Comp
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
