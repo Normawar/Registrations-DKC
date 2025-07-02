@@ -20,7 +20,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, _setDatabase] = useState<MasterPlayer[]>([]);
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
 
-  useEffect(() => {
+  const loadFromStorage = useCallback(() => {
     try {
       const storedDb = localStorage.getItem(DB_STORAGE_KEY);
       if (storedDb) {
@@ -37,6 +37,27 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Initial load
+  useEffect(() => {
+    loadFromStorage();
+  }, [loadFromStorage]);
+  
+  // Listen for changes from other tabs/windows
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === DB_STORAGE_KEY) {
+        loadFromStorage();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [loadFromStorage]);
+
+
   const setDatabase = useCallback((players: MasterPlayer[]) => {
     try {
         _setDatabase(players);
@@ -46,10 +67,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
   
-  const isDbLoaded = isStorageLoaded && database.length > 0;
-
   return (
-    <MasterDbContext.Provider value={{ database, setDatabase, isDbLoaded }}>
+    <MasterDbContext.Provider value={{ database, setDatabase, isDbLoaded: isStorageLoaded }}>
       {children}
     </MasterDbContext.Provider>
   );
