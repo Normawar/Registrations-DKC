@@ -25,6 +25,7 @@ const LookupUscfPlayerOutputSchema = z.object({
   state: z.string().optional().describe("The player's state abbreviation."),
   rating: z.number().optional().describe("The player's regular USCF rating."),
   expirationDate: z.string().optional().describe("The player's USCF membership expiration date in YYYY-MM-DD format."),
+  quickRating: z.string().optional().describe("The player's quick rating string."),
   error: z.string().optional().describe("An error message if the lookup failed or the player was not found.")
 });
 export type LookupUscfPlayerOutput = z.infer<typeof LookupUscfPlayerOutputSchema>;

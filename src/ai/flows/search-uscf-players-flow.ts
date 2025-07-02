@@ -28,6 +28,7 @@ const PlayerSearchResultSchema = z.object({
   rating: z.number().optional().describe("The player's regular USCF rating. Should be a number, not 'Unrated'."),
   state: z.string().optional().describe("The player's state abbreviation."),
   expirationDate: z.string().optional().describe("The player's USCF membership expiration date in YYYY-MM-DD format."),
+  quickRating: z.string().optional().describe("The player's quick rating string.")
 });
 
 const SearchUscfPlayersOutputSchema = z.object({
@@ -111,6 +112,7 @@ const searchUscfPlayersFlow = ai.defineFlow(
               rating: p.rating,
               state: p.state,
               expirationDate: p.expirationDate,
+              quickRating: p.quickRating,
           }));
         
         return { players };

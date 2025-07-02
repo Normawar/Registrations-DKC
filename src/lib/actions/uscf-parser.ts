@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A utility for parsing USCF player data from HTML.
@@ -13,6 +14,7 @@ const ParsedPlayerDataSchema = z.object({
   state: z.string().optional().describe("The player's state abbreviation."),
   rating: z.number().optional().describe("The player's regular USCF rating."),
   expirationDate: z.string().optional().describe("The player's USCF membership expiration date in YYYY-MM-DD format."),
+  quickRating: z.string().optional().describe("The player's quick rating string."),
   error: z.string().optional().describe("An error message if the lookup failed or the player was not found.")
 });
 export type ParsedPlayerData = z.infer<typeof ParsedPlayerDataSchema>;
@@ -67,6 +69,9 @@ export async function parseThin3Page(html: string, uscfId: string): Promise<Pars
       output.rating = parseInt(ratingMatch[1], 10);
     }
   }
+  
+  // Extract Quick Rating
+  output.quickRating = extractInputValue('rating2') || undefined;
   
   if (!output.lastName && !output.firstName) {
     return { uscfId, error: "Could not parse player name from the details page." };

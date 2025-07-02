@@ -95,10 +95,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
-import { getMasterDatabase, isMasterDatabaseLoaded } from '@/lib/data/master-player-store';
+import { searchUscfPlayers, type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
+const usStates = [ 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'ALL' ];
 
 const gradeToNumber: { [key: string]: number } = {
   'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3,
@@ -188,10 +189,14 @@ export default function RosterPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
 
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [searchWarning, setSearchWarning] = useState('');
-  
+  // States for live USCF search
+  const [searchState, setSearchState] = useState('TX');
+  const [searchFirstName, setSearchFirstName] = useState('');
+  const [searchLastName, setSearchLastName] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
+  const [searchError, setSearchError] = useState('');
+
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
@@ -215,62 +220,74 @@ export default function RosterPage() {
     }
   });
 
-  const watchFirstName = form.watch('firstName');
-  const watchLastName = form.watch('lastName');
-  const activeFieldNameRef = useRef<'firstName' | 'lastName' | null>(null);
-
-  useEffect(() => {
-    if (!showSearchResults) return;
-    const query = `${watchFirstName} ${watchLastName}`.trim().toLowerCase();
-
-    if (query.length < 3) {
-      setSearchResults([]);
-      return;
+  const handlePlayerSearch = async () => {
+    if (!searchLastName) {
+        setSearchError('Last name is required for search.');
+        return;
     }
+    setIsSearching(true);
+    setSearchError('');
+    setSearchResults([]);
+    try {
+        const result = await searchUscfPlayers({
+            firstName: searchFirstName,
+            lastName: searchLastName,
+            state: searchState,
+        });
 
-    const masterPlayers = getMasterDatabase();
-    const filteredPlayers = masterPlayers.filter(p =>
-      (`${p.firstName} ${p.lastName}`.toLowerCase().includes(query)) ||
-      (`${p.lastName}, ${p.firstName}`.toLowerCase().includes(query))
-    );
-    setSearchResults(filteredPlayers);
-    
-    // Check for duplicates
-    const nameStateCounts = new Map<string, number>();
-    let warning = '';
-    filteredPlayers.forEach(p => {
-        const key = `${p.firstName}|${p.lastName}|${p.state}`.toLowerCase();
-        nameStateCounts.set(key, (nameStateCounts.get(key) || 0) + 1);
-    });
+        if (result.error) {
+            setSearchError(result.error);
+            toast({ variant: 'destructive', title: 'Search Failed', description: result.error });
+        } else {
+            setSearchResults(result.players);
+            if (result.players.length === 0) {
+                toast({ title: 'No Results', description: 'No players found matching your criteria.' });
+            }
+            
+            // Check for players with identical names
+            const nameCounts = result.players.reduce((acc, player) => {
+                const nameKey = `${player.firstName} ${player.lastName}`.toLowerCase();
+                acc[nameKey] = (acc[nameKey] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>);
 
-    for (const count of nameStateCounts.values()) {
-        if (count > 1) {
-            warning = 'Multiple players with the same name and state found. Please verify the correct player on the USCF website before adding.';
-            break;
+            const hasDuplicates = Object.values(nameCounts).some(count => count > 1);
+
+            if (hasDuplicates) {
+                setSearchError('Multiple players found with the same name. Please verify the correct player on the USCF website before adding.');
+            }
         }
+    } catch (e) {
+        const message = e instanceof Error ? e.message : 'An unknown error occurred during search.';
+        setSearchError(message);
+        toast({ variant: 'destructive', title: 'Search Error', description: message });
+    } finally {
+        setIsSearching(false);
     }
-    setSearchWarning(warning);
+  };
 
-  }, [watchFirstName, watchLastName, showSearchResults]);
 
-  const handleSelectSearchedPlayer = (player: any) => {
-    form.reset(); 
+  const handleSelectSearchedPlayer = (player: PlayerSearchResult) => {
+    form.reset(); // Clear previous form state
     form.setValue('firstName', player.firstName || '');
     form.setValue('lastName', player.lastName || '');
     form.setValue('middleName', player.middleName || '');
     form.setValue('uscfId', player.uscfId || '');
-    form.setValue('regularRating', player.regularRating);
+    form.setValue('regularRating', player.rating);
     form.setValue('quickRating', player.quickRating || '');
     
     if (player.expirationDate) {
-        const expDate = parse(player.expirationDate, 'MM/dd/yyyy', new Date());
+        const expDate = parse(player.expirationDate, 'yyyy-MM-dd', new Date());
         if (isValid(expDate)) {
             form.setValue('uscfExpiration', expDate);
         }
     }
     
-    setShowSearchResults(false);
+    setSearchResults([]); // Clear search results after selection
+    setSearchError('');
+    toast({ title: 'Player Selected', description: `${player.firstName} ${player.lastName}'s data has been auto-filled.` });
   };
+
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...players];
@@ -369,6 +386,11 @@ export default function RosterPage() {
           zipCode: '',
           studentType: undefined,
         });
+        setSearchFirstName('');
+        setSearchLastName('');
+        setSearchState('TX');
+        setSearchResults([]);
+        setSearchError('');
       }
     }
   }, [isDialogOpen, editingPlayer, form]);
@@ -655,82 +677,93 @@ export default function RosterPage() {
           <DialogHeader>
             <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
             <DialogDescription>
-               {isMasterDatabaseLoaded()
-                ? 'Search for a player by name to auto-fill their details, or enter them manually.'
-                : 'To enable player search, first go to the "All Players" page and upload the database file.'
-               }
+              Search for a player on the USCF website to auto-fill their information, or enter the details manually below.
             </DialogDescription>
           </DialogHeader>
+
+          <Card className="bg-muted/50">
+            <CardHeader>
+                <CardTitle className="text-base">USCF Player Search</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    <div className="space-y-2">
+                        <Label>State</Label>
+                        <Select value={searchState} onValueChange={setSearchState}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {usStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>First Name</Label>
+                        <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Last Name</Label>
+                        <Input placeholder="Doe" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
+                    </div>
+                    <Button onClick={handlePlayerSearch} disabled={isSearching || !searchLastName}>
+                        {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                        Search
+                    </Button>
+                </div>
+                {searchError && (
+                    <Alert variant="destructive" className="mt-4">
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>Heads up!</AlertTitle>
+                        <AlertDescription>{searchError}</AlertDescription>
+                    </Alert>
+                )}
+                 {searchResults.length > 0 && (
+                    <div className="mt-4 border rounded-md max-h-48 overflow-y-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>USCF ID</TableHead>
+                                    <TableHead>Rating</TableHead>
+                                    <TableHead>Expires</TableHead>
+                                    <TableHead></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {searchResults.map(p => (
+                                    <TableRow key={p.uscfId}>
+                                        <TableCell>{p.firstName} {p.lastName} ({p.state})</TableCell>
+                                        <TableCell>{p.uscfId}</TableCell>
+                                        <TableCell>{p.rating || 'N/A'}</TableCell>
+                                        <TableCell>{p.expirationDate ? format(parse(p.expirationDate, 'yyyy-MM-dd', new Date()), 'MM/dd/yy') : 'N/A'}</TableCell>
+                                        <TableCell>
+                                            <Button size="sm" onClick={() => handleSelectSearchedPlayer(p)}>Select</Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+            </CardContent>
+          </Card>
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <FormField control={form.control} name="firstName" render={({ field }) => (
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
-                    <FormControl>
-                        <Input 
-                            placeholder="John" 
-                            {...field} 
-                            onFocus={() => {
-                                activeFieldNameRef.current = 'firstName';
-                                setShowSearchResults(true);
-                            }}
-                            onBlur={() => setTimeout(() => {
-                                if (activeFieldNameRef.current === 'firstName') setShowSearchResults(false)
-                            }, 200)}
-                        />
-                    </FormControl>
+                    <FormControl><Input placeholder="John" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                  )} />
                  <FormField control={form.control} name="lastName" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Last Name</FormLabel>
-                    <FormControl>
-                        <Input 
-                            placeholder="Doe" 
-                            {...field}
-                             onFocus={() => {
-                                activeFieldNameRef.current = 'lastName';
-                                setShowSearchResults(true);
-                            }}
-                            onBlur={() => setTimeout(() => {
-                                if (activeFieldNameRef.current === 'lastName') setShowSearchResults(false)
-                            }, 200)}
-                        />
-                    </FormControl>
+                    <FormControl><Input placeholder="Doe" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                  )} />
-                {showSearchResults && searchResults.length > 0 && (
-                    <Card className="absolute z-10 w-full mt-1 top-full max-h-60 overflow-y-auto col-span-full">
-                        <CardContent className="p-0">
-                            {searchResults.map(player => (
-                                <button
-                                    key={player.id}
-                                    type="button"
-                                    className="w-full text-left p-2 hover:bg-accent rounded-md"
-                                    onMouseDown={() => handleSelectSearchedPlayer(player)}
-                                >
-                                    <p className="font-medium">{player.firstName} {player.lastName} ({player.state})</p>
-                                    <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'N/A'}</p>
-                                </button>
-                            ))}
-                        </CardContent>
-                    </Card>
-                )}
-               </div>
-                {searchWarning && (
-                    <Alert variant="destructive">
-                        <Info className="h-4 w-4" />
-                        <AlertTitle>Potential Duplicate</AlertTitle>
-                        <AlertDescription>{searchWarning}</AlertDescription>
-                    </Alert>
-                )}
-
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                  <FormField control={form.control} name="middleName" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Middle Name (Optional)</FormLabel>
@@ -738,6 +771,9 @@ export default function RosterPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="uscfId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>USCF ID</FormLabel>
@@ -922,10 +958,12 @@ export default function RosterPage() {
                     );
                   }}
                 />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <FormField control={form.control} name="grade" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Grade</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger>
                         </FormControl>
@@ -939,7 +977,7 @@ export default function RosterPage() {
                  <FormField control={form.control} name="section" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Section</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger>
                         </FormControl>
@@ -950,6 +988,8 @@ export default function RosterPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <FormField control={form.control} name="email" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Player Email</FormLabel>
@@ -964,6 +1004,8 @@ export default function RosterPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <FormField control={form.control} name="zipCode" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Player Zip Code</FormLabel>
