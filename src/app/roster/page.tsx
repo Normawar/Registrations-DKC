@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -95,7 +96,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Label } from '@/components/ui/label';
-import { getMasterDatabase, isMasterDatabaseLoaded, type ImportedPlayer } from '@/lib/data/master-player-store';
+import { useMasterDb, type ImportedPlayer } from '@/context/master-db-context';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
 
@@ -198,6 +199,7 @@ export default function RosterPage() {
   const [searchLastName, setSearchLastName] = useState('');
   const [searchState, setSearchState] = useState('ALL');
   const [dbStates, setDbStates] = useState<string[]>(['ALL']);
+  const { database: masterDatabase, isDbLoaded } = useMasterDb();
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -224,10 +226,8 @@ export default function RosterPage() {
 
   useEffect(() => {
     if (isDialogOpen) {
-      // This will run every time the dialog opens, ensuring the states are fresh.
-      const db = getMasterDatabase();
-      if (db && db.length > 0) {
-          const states = new Set(db.map(p => p.state).filter(Boolean) as string[]);
+      if (isDbLoaded) {
+          const states = new Set(masterDatabase.map(p => p.state).filter(Boolean) as string[]);
           setDbStates(['ALL', ...Array.from(states).sort()]);
       } else {
           setDbStates(['ALL']);
@@ -257,7 +257,7 @@ export default function RosterPage() {
         setSearchResults([]);
       }
     }
-  }, [isDialogOpen, editingPlayer, form]);
+  }, [isDialogOpen, editingPlayer, form, isDbLoaded, masterDatabase]);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...players];
@@ -463,8 +463,7 @@ export default function RosterPage() {
     setIsSearching(true);
     setSearchResults([]);
     try {
-        const db = getMasterDatabase();
-        const results = db.filter(p => {
+        const results = masterDatabase.filter(p => {
             const stateMatch = searchState === 'ALL' || p.state === searchState;
             const lastNameMatch = !searchLastName || (p.lastName && p.lastName.toLowerCase().includes(searchLastName.toLowerCase()));
             const firstNameMatch = !searchFirstName || (p.firstName && p.firstName.toLowerCase().includes(searchFirstName.toLowerCase()));
@@ -726,12 +725,12 @@ export default function RosterPage() {
                         <Label>Last Name</Label>
                         <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
                     </div>
-                    <Button onClick={handlePerformSearch} disabled={isSearching || !isMasterDatabaseLoaded()}>
+                    <Button onClick={handlePerformSearch} disabled={isSearching || !isDbLoaded}>
                         {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
                         Search
                     </Button>
                 </div>
-                 {!isMasterDatabaseLoaded() && (
+                 {!isDbLoaded && (
                     <p className="text-xs text-muted-foreground mt-2">To enable player search, first go to the <Link href="/players" className="underline">All Players</Link> page and upload the database file.</p>
                  )}
                 {searchResults.length > 0 && (

@@ -69,7 +69,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
-import { getMasterDatabase, isMasterDatabaseLoaded, type ImportedPlayer } from '@/lib/data/master-player-store';
+import { useMasterDb, type ImportedPlayer } from '@/context/master-db-context';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -139,6 +139,7 @@ export function OrganizerRegistrationForm() {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<ImportedPlayer[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const { database: masterDatabase, isDbLoaded } = useMasterDb();
 
     const playerForm = useForm<PlayerFormValues>({
         resolver: zodResolver(playerFormSchema),
@@ -157,8 +158,7 @@ export function OrganizerRegistrationForm() {
         }
         setIsSearching(true);
         const handler = setTimeout(() => {
-            const masterDb = getMasterDatabase();
-            const results = masterDb.filter(p => 
+            const results = masterDatabase.filter(p => 
                 p.uscfId.includes(searchQuery) || 
                 `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
             ).slice(0, 10);
@@ -167,7 +167,7 @@ export function OrganizerRegistrationForm() {
         }, 300);
 
         return () => clearTimeout(handler);
-    }, [searchQuery]);
+    }, [searchQuery, masterDatabase]);
 
     if (!event) {
         return <Card><CardContent className='pt-6'>Event not found. Please go back to Manage Events and select an event.</CardContent></Card>;
@@ -360,9 +360,9 @@ export function OrganizerRegistrationForm() {
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="pl-10"
-                            disabled={!isMasterDatabaseLoaded()}
+                            disabled={!isDbLoaded}
                         />
-                         {!isMasterDatabaseLoaded() && (
+                         {!isDbLoaded && (
                             <p className="text-xs text-muted-foreground mt-1">Player database not loaded. Please <Link href="/players" className='underline'>upload it</Link> to enable search.</p>
                         )}
                         {searchQuery.length > 2 && (

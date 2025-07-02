@@ -66,7 +66,7 @@ import { districts as allDistricts } from '@/lib/data/districts';
 import { schoolData } from '@/lib/data/school-data';
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getMasterDatabase, setMasterDatabase, type ImportedPlayer } from '@/lib/data/master-player-store';
+import { useMasterDb, type ImportedPlayer } from '@/context/master-db-context';
 
 
 type Player = {
@@ -122,6 +122,7 @@ type PlayerFormValues = z.infer<typeof playerFormSchema>;
 export default function PlayersPage() {
   const { toast } = useToast();
   const [players, setPlayers] = useState<Player[]>([]);
+  const { database: masterDatabase, setDatabase } = useMasterDb();
   const [isLoaded, setIsLoaded] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -278,15 +279,11 @@ export default function PlayersPage() {
             if (!row || row.length < 2) return;
             
             const uscfId = row[1]?.trim();
-            // The most reliable way to identify a non-player row (header, footer, etc.)
-            // is by checking if the USCF ID column is a valid 8-digit number.
-            // If it's not, we just skip it without counting it as an error.
             if (!uscfId || !/^\d{8}$/.test(uscfId)) {
                 return;
             }
 
             const namePart = row[0]?.trim();
-            // If we have a valid ID but no name, this is a genuine parsing error.
             if (!namePart) {
                 errorCount++;
                 return;
@@ -303,7 +300,9 @@ export default function PlayersPage() {
                 if (firstAndMiddle.length > 0) {
                     firstName = firstAndMiddle.shift() || '';
                 }
-                middleName = firstAndMiddle.join(' ');
+                if(firstAndMiddle.length > 0) {
+                    middleName = firstAndMiddle.join(' ');
+                }
             } else {
                 const parts = namePart.split(/\s+/).filter(Boolean);
                 if (parts.length > 0) lastName = parts.pop()!;
@@ -311,9 +310,7 @@ export default function PlayersPage() {
                 if (parts.length > 0) middleName = parts.join(' ');
             }
 
-            // If namePart exists but we couldn't parse a name from it, that's an error.
             if (!lastName && !firstName) {
-                // However, if there's only one name, assign it to lastName.
                 if (namePart.split(/\s+/).filter(Boolean).length === 1) {
                     lastName = namePart;
                 } else {
@@ -353,20 +350,18 @@ export default function PlayersPage() {
         }
       },
       complete: () => {
-        const existingDb = getMasterDatabase();
-        const dbMap = new Map<string, ImportedPlayer>(existingDb.map(p => [p.uscfId, p]));
+        const dbMap = new Map<string, ImportedPlayer>(masterDatabase.map(p => [p.uscfId, p]));
         
         importedPlayers.forEach(player => {
             dbMap.set(player.uscfId, player);
         });
 
         const newMasterList = Array.from(dbMap.values());
-        setMasterDatabase(newMasterList);
+        setDatabase(newMasterList);
         
         setIsImporting(false);
-        window.dispatchEvent(new Event('masterDbUpdated'));
         
-        let description = `Database updated with ${importedPlayers.length} records. The database now contains ${newMasterList.length} unique players for this session.`;
+        let description = `Database updated with ${importedPlayers.length} records. The database now contains ${newMasterList.length} unique players.`;
         if (errorCount > 0) {
             description += ` Could not parse ${errorCount} rows.`;
         }
