@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Searches for USCF players by name from the USCF MSA website.
@@ -88,23 +89,53 @@ const searchUscfPlayersFlow = ai.defineFlow(
       const stripTags = (str: string) => str.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
       
       const players: PlayerSearchResult[] = [];
+      let headerMap: Record<string, number> | null = null;
+      let headerFound = false;
 
+      // First, find the header row and map the column indexes
       for (const row of allHtmlRows) {
-        const idMatch = row.match(/MbrDtlMain\.php\?([^"&']+)/);
-        if (!idMatch || !idMatch[1]) {
-            continue;
+        const lowerCaseRow = row.toLowerCase();
+        if (lowerCaseRow.includes('uscf id') && lowerCaseRow.includes('rating') && lowerCaseRow.includes('name')) {
+            headerMap = {};
+            const headerCells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
+            headerCells.forEach((cell, index) => {
+                const cleanHeader = stripTags(cell).toLowerCase();
+                if (cleanHeader.includes('uscf id')) headerMap!['uscfid_col'] = index;
+                if (cleanHeader === 'rating') headerMap!['rating'] = index;
+                if (cleanHeader === 'state') headerMap!['state'] = index;
+                if (cleanHeader.includes('exp date')) headerMap!['expirationdate'] = index;
+                if (cleanHeader === 'name') headerMap!['name'] = index;
+            });
+            headerFound = true;
+            break; 
         }
-        const uscfId = idMatch[1];
-        
+      }
+
+      if (!headerMap) {
+        console.error("USCF Search: Could not find the results table header. The website layout may have changed. Full response snippet:", html.substring(0, 3000));
+        return { players: [], error: "Could not find the results table header. The website layout may have changed." };
+      }
+
+      // Now, process the data rows using the headerMap
+      for (const row of allHtmlRows) {
+        // A player data row must contain the player link. This is our most reliable check.
+        const idMatch = row.match(/MbrDtlMain\.php\?(\d+)/);
+        if (!idMatch) {
+            continue; // Skip header and footer rows
+        }
+
         const cells = row.match(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi) || [];
         if (cells.length === 0) continue;
 
-        const player: Partial<PlayerSearchResult> = { uscfId };
-
-        for (const cell of cells) {
-            // First, find and parse the name from the cell containing the unique link.
-            if (cell.includes(`MbrDtlMain.php?${uscfId}`) && player.lastName === undefined) {
-                const fullNameRaw = stripTags(cell);
+        const player: Partial<PlayerSearchResult> = {};
+        
+        // Extract Name and ID from the name column using the map
+        if (headerMap.name !== undefined && cells[headerMap.name]) {
+            const nameCell = cells[headerMap.name];
+            const linkMatch = nameCell.match(/<a href=["'][^"']+?\?(\d+)["']>([\s\S]+?)<\/a>/);
+            if (linkMatch && linkMatch[1] && linkMatch[2]) {
+                player.uscfId = linkMatch[1];
+                const fullNameRaw = stripTags(linkMatch[2]); // Name is inside the <a> tag
                 const nameParts = fullNameRaw.split(',');
                 if (nameParts.length > 1) {
                     player.lastName = nameParts.shift()!.trim();
@@ -114,32 +145,38 @@ const searchUscfPlayersFlow = ai.defineFlow(
                 } else {
                     player.lastName = fullNameRaw;
                 }
-                // Once name is found, we don't need to process this cell for other patterns.
-                continue; 
-            }
-
-            const text = stripTags(cell);
-            if (!text) continue;
-
-            // Use specific, full-match regexes to avoid ambiguity.
-            // Check for most unique patterns first.
-            if (player.expirationDate === undefined && /^\d{4}-\d{2}-\d{2}$/.test(text)) {
-                player.expirationDate = text;
-                continue;
-            }
-            if (player.state === undefined && /^[A-Z]{2}$/.test(text)) {
-                player.state = text;
-                continue;
-            }
-            // Check for rating last, as it's the least unique pattern.
-            if (player.rating === undefined && /^\d{1,4}$/.test(text)) {
-                player.rating = parseInt(text, 10);
-                continue;
             }
         }
+
+        // If we didn't get a USCF ID from the name link, use the one from the first column if available
+        if (!player.uscfId && headerMap.uscfid_col !== undefined && cells[headerMap.uscfid_col]) {
+            player.uscfId = stripTags(cells[headerMap.uscfid_col]);
+        }
+
+        // If we still don't have a USCF ID, we can't process this row.
+        if (!player.uscfId) {
+            continue;
+        }
+
+        if (headerMap.rating !== undefined && cells[headerMap.rating]) {
+            const ratingText = stripTags(cells[headerMap.rating]);
+            if (ratingText.toLowerCase() !== 'unrated') {
+                const numericPartMatch = ratingText.match(/(\d+)/);
+                if (numericPartMatch && numericPartMatch[1]) {
+                    player.rating = parseInt(numericPartMatch[1], 10);
+                }
+            }
+        }
+
+        if (headerMap.state !== undefined && cells[headerMap.state]) {
+            player.state = stripTags(cells[headerMap.state]);
+        }
         
-        // Only add the player if we successfully parsed at least a last name.
-        if (player.lastName) {
+        if (headerMap.expirationdate !== undefined && cells[headerMap.expirationdate]) {
+            player.expirationDate = stripTags(cells[headerMap.expirationdate]);
+        }
+        
+        if (player.uscfId && player.lastName) {
             players.push(player as PlayerSearchResult);
         }
       }
@@ -160,3 +197,5 @@ const searchUscfPlayersFlow = ai.defineFlow(
     }
   }
 );
+
+    
