@@ -2,18 +2,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import { initialMasterPlayerData, type ImportedPlayer as ImportedPlayerType } from '@/lib/data/master-player-data';
 
-export type ImportedPlayer = {
-  id: string; // A unique ID generated during import
-  uscfId: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  state?: string;
-  expirationDate?: string;
-  regularRating?: number;
-  quickRating?: string;
-};
+export type ImportedPlayer = ImportedPlayerType;
 
 interface MasterDbContextType {
   database: ImportedPlayer[];
@@ -34,9 +25,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       const storedDb = localStorage.getItem(DB_STORAGE_KEY);
       if (storedDb) {
         _setDatabase(JSON.parse(storedDb));
+      } else {
+        _setDatabase(initialMasterPlayerData);
+        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(initialMasterPlayerData));
       }
     } catch (e) {
       console.error("Failed to load master DB from localStorage", e);
+      _setDatabase(initialMasterPlayerData);
     } finally {
         setIsStorageLoaded(true);
     }
