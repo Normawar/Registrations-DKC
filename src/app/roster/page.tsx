@@ -673,15 +673,14 @@ export default function RosterPage() {
       </div>
 
        <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0">
-            <div className="flex h-full flex-col">
-              <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                  <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
-                  <DialogDescription>
-                      {editingPlayer ? "Update the player's information." : "Search the database or enter details manually."}
-                  </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto p-6">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-6 pb-4 border-b shrink-0">
+                <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
+                <DialogDescription>
+                    {editingPlayer ? "Update the player's information." : "Search the database or enter details manually."}
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6">
                 <div className="space-y-6">
                     <Card className="bg-muted/50">
                         <CardHeader>
@@ -864,12 +863,11 @@ export default function RosterPage() {
                         </form>
                     </Form>
                 </div>
-              </div>
-              <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                  <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                  <Button type="submit" form="player-form">{editingPlayer ? 'Save Changes' : 'Add Player'}</Button>
-              </DialogFooter>
             </div>
+            <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                <Button type="submit" form="player-form">{editingPlayer ? 'Save Changes' : 'Add Player'}</Button>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
 
