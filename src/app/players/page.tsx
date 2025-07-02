@@ -24,7 +24,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download, Upload, Trash2 } from "lucide-react";
+import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Download, Upload, Trash2, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -66,6 +66,8 @@ import { districts as allDistricts } from '@/lib/data/districts';
 import { schoolData } from '@/lib/data/school-data';
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { setMasterDatabase, type ImportedPlayer } from '@/lib/data/master-player-store';
+
 
 type Player = {
   id: string;
@@ -129,6 +131,7 @@ export default function PlayersPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   useEffect(() => {
     try {
@@ -259,16 +262,14 @@ export default function PlayersPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const newPlayers: Player[] = [];
-    const existingIds = new Set(players.map(p => p.uscfId));
-    let addedCount = 0;
-    let skippedCount = 0;
+    setIsImporting(true);
+    toast({ title: 'Import Started', description: 'Processing database file in the background. This may take a moment. The page itself will not freeze.' });
+
+    const importedPlayers: ImportedPlayer[] = [];
     let errorCount = 0;
 
-    toast({ title: 'Import Started', description: 'Processing large file. The page will update when complete.' });
-
     Papa.parse(file, {
-      worker: true, // Use a web worker to avoid blocking the main thread.
+      worker: true,
       delimiter: "\t",
       skipEmptyLines: true,
       step: (results) => {
@@ -293,11 +294,6 @@ export default function PlayersPage() {
             return;
           }
 
-          if (existingIds.has(uscfId)) {
-            skippedCount++;
-            return;
-          }
-
           const nameParts = namePart.split(',');
           if (nameParts.length < 2) {
             errorCount++;
@@ -315,8 +311,8 @@ export default function PlayersPage() {
 
           const regularRating = parseInt(regularRatingString?.replace('*', ''), 10) || undefined;
 
-          const newPlayer: Player = {
-            id: `p-${uscfId}-${Date.now()}-${Math.random()}`,
+          const newPlayer: ImportedPlayer = {
+            id: `p-${uscfId}`,
             uscfId,
             firstName,
             lastName,
@@ -325,32 +321,23 @@ export default function PlayersPage() {
             state: state,
             regularRating,
             quickRating: quickRatingString,
-            school: 'Independent',
-            district: 'None',
-            events: 0,
-            eventIds: [],
           };
-
-          newPlayers.push(newPlayer);
-          existingIds.add(uscfId); // Prevent duplicates within the same file
-          addedCount++;
+          importedPlayers.push(newPlayer);
         } catch (e) {
           console.error("Error parsing row:", row, e);
           errorCount++;
         }
       },
       complete: () => {
-        if (newPlayers.length > 0) {
-          setPlayers(prev => [...prev, ...newPlayers]);
-        }
-
-        let description = `Added ${addedCount} new players.`;
-        if (skippedCount > 0) description += ` Skipped ${skippedCount} duplicates.`;
+        setMasterDatabase(importedPlayers);
+        setIsImporting(false);
+        let description = `Database loaded with ${importedPlayers.length} players for this session. It will be cleared on page refresh.`;
         if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
         
-        toast({ title: 'Import Complete', description });
+        toast({ title: 'Import Complete', description: description });
       },
       error: (error) => {
+        setIsImporting(false);
         toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error.message}` });
       }
     });
@@ -497,8 +484,8 @@ export default function PlayersPage() {
               accept=".txt,.tsv"
               onChange={handleFileImport}
             />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="mr-2 h-4 w-4" />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
+                {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 Upload Database (.txt)
             </Button>
             <Button onClick={handleExportCsv}>
@@ -515,7 +502,7 @@ export default function PlayersPage() {
           <CardHeader>
             <CardTitle>Filter and Sort Players</CardTitle>
             <CardDescription>
-                Use the filter to view players by event. You can upload a tab-delimited file or CSV to add players in bulk.
+                Use the filter to view players by event. Upload a tab-delimited file or CSV to load the master database for searching on the Roster page.
             </CardDescription>
             <div className="pt-2">
                  <Select onValueChange={setSelectedEvent} defaultValue="all">

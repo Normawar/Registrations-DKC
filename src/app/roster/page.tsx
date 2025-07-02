@@ -95,6 +95,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
+import { getMasterDatabase, isMasterDatabaseLoaded } from '@/lib/data/master-player-store';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -187,26 +188,12 @@ export default function RosterPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
 
-  const [masterPlayers, setMasterPlayers] = useState<any[]>([]);
-  const [searchName, setSearchName] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchWarning, setSearchWarning] = useState('');
   
   const { profile } = useSponsorProfile();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
-
-  useEffect(() => {
-    try {
-        const stored = localStorage.getItem('all_players_master_db');
-        if (stored) {
-            setMasterPlayers(JSON.parse(stored));
-        }
-    } catch (e) {
-        console.error("Failed to load master player DB", e);
-        setMasterPlayers([]);
-    }
-  }, []);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -241,9 +228,10 @@ export default function RosterPage() {
       return;
     }
 
+    const masterPlayers = getMasterDatabase();
     const filteredPlayers = masterPlayers.filter(p =>
       (`${p.firstName} ${p.lastName}`.toLowerCase().includes(query)) ||
-      (`${p.lastName} ${p.firstName}`.toLowerCase().includes(query))
+      (`${p.lastName}, ${p.firstName}`.toLowerCase().includes(query))
     );
     setSearchResults(filteredPlayers);
     
@@ -263,7 +251,7 @@ export default function RosterPage() {
     }
     setSearchWarning(warning);
 
-  }, [watchFirstName, watchLastName, masterPlayers, showSearchResults]);
+  }, [watchFirstName, watchLastName, showSearchResults]);
 
   const handleSelectSearchedPlayer = (player: any) => {
     form.reset(); 
@@ -667,7 +655,10 @@ export default function RosterPage() {
           <DialogHeader>
             <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
             <DialogDescription>
-              {editingPlayer ? 'Update the player details below.' : 'Search the master database or fill in the form to add a new player to your roster.'}
+               {isMasterDatabaseLoaded()
+                ? 'Search for a player by name to auto-fill their details, or enter them manually.'
+                : 'To enable player search, first go to the "All Players" page and upload the database file.'
+               }
             </DialogDescription>
           </DialogHeader>
           
