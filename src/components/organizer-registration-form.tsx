@@ -69,7 +69,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
-import { useMasterDb, type ImportedPlayer } from '@/context/master-db-context';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -135,7 +135,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
 
     // Player search states
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<ImportedPlayer[]>([]);
+    const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const { database: masterDatabase, isDbLoaded } = useMasterDb();
 
@@ -171,7 +171,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         return <Card><CardContent className='pt-6'>Event not found. Please go back to Manage Events and select an event.</CardContent></Card>;
     }
     
-    const handleSelectSearchedPlayer = (player: ImportedPlayer) => {
+    const handleSelectSearchedPlayer = (player: MasterPlayer) => {
         setSearchQuery('');
         setSearchResults([]);
         playerForm.reset({

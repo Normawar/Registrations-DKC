@@ -2,13 +2,13 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { initialMasterPlayerData, type ImportedPlayer as ImportedPlayerType } from '@/lib/data/master-player-data';
+import { initialMasterPlayerData, type MasterPlayer as MasterPlayerType } from '@/lib/data/master-player-data';
 
-export type ImportedPlayer = ImportedPlayerType;
+export type MasterPlayer = MasterPlayerType;
 
 interface MasterDbContextType {
-  database: ImportedPlayer[];
-  setDatabase: (players: ImportedPlayer[]) => void;
+  database: MasterPlayer[];
+  setDatabase: (players: MasterPlayer[]) => void;
   isDbLoaded: boolean;
 }
 
@@ -17,7 +17,7 @@ const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined
 const DB_STORAGE_KEY = 'master_player_database';
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
-  const [database, _setDatabase] = useState<ImportedPlayer[]>([]);
+  const [database, _setDatabase] = useState<MasterPlayer[]>([]);
   const [isStorageLoaded, setIsStorageLoaded] = useState(false);
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const setDatabase = useCallback((players: ImportedPlayer[]) => {
+  const setDatabase = useCallback((players: MasterPlayer[]) => {
     try {
         _setDatabase(players);
         localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(players));

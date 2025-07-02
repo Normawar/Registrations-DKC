@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -66,42 +66,7 @@ import { districts as allDistricts } from '@/lib/data/districts';
 import { schoolData } from '@/lib/data/school-data';
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useMasterDb, type ImportedPlayer } from '@/context/master-db-context';
-
-
-type Player = {
-  id: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  uscfId: string;
-  regularRating?: number;
-  quickRating?: string;
-  school: string;
-  district: string;
-  events: number;
-  eventIds: string[];
-  expirationDate?: string;
-  state?: string;
-};
-
-
-const initialPlayersData: Player[] = [
-  { id: "p1", firstName: "Liam", middleName: "J", lastName: "Johnson", uscfId: "12345678", regularRating: 1850, quickRating: '1900/10', school: "Independent", district: "None", events: 2, eventIds: ['e2'], expirationDate: '12/31/2025', state: 'TX' },
-  { id: "p2", firstName: "Olivia", middleName: "K", lastName: "Smith", uscfId: "87654321", regularRating: 2100, quickRating: '2120/5', school: "City Chess Club", district: "None", events: 3, eventIds: ['e1', 'e3'], expirationDate: '06/30/2026', state: 'CA' },
-  { id: "p3", firstName: "Noah", middleName: "L", lastName: "Williams", uscfId: "11223344", regularRating: 1600, quickRating: '1650/12', school: "Scholastic Stars", district: "None", events: 1, eventIds: ['e1'], expirationDate: '01/01/2025', state: 'NY' },
-  { id: "p4", firstName: "Emma", middleName: "M", lastName: "Brown", uscfId: "44332211", regularRating: 1950, quickRating: '2000/20', school: "Independent", district: "None", events: 1, eventIds: ['e2'], expirationDate: '03/15/2025', state: 'FL' },
-  { id: "p5", firstName: "James", middleName: "N", lastName: "Jones", uscfId: "55667788", regularRating: 2200, quickRating: '2250/15', school: "Grandmasters Inc.", district: "None", events: 4, eventIds: ['e1', 'e2', 'e3'], expirationDate: '11/20/2024', state: 'IL' },
-  { id: "p6", firstName: "Alex", middleName: "S", lastName: "Ray", uscfId: "98765432", regularRating: 1750, quickRating: '1780/8', school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 2, eventIds: ['e1'], expirationDate: '08/01/2025', state: 'TX' },
-  { id: "p7", firstName: "Jordan", middleName: "T", lastName: "Lee", uscfId: "23456789", regularRating: 2050, quickRating: '2080/7', school: "SHARYLAND PIONEER H S", district: "SHARYLAND ISD", events: 3, eventIds: ['e1', 'e2'], expirationDate: '09/09/2024', state: 'TX' },
-];
-
-const allEvents = [
-  { id: 'e1', name: 'Spring Open 2024' },
-  { id: 'e2', name: 'Summer Championship' },
-  { id: 'e3', name: 'Autumn Classic' },
-];
-
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 
 type SortableColumnKey = 'name' | 'uscfId' | 'regularRating' | 'school' | 'district' | 'events';
 
@@ -115,44 +80,24 @@ const playerFormSchema = z.object({
   uscfId: z.string().min(1, "USCF ID is required."),
   regularRating: z.coerce.number().optional(),
   quickRating: z.string().optional(),
+  state: z.string().optional(),
+  expirationDate: z.string().optional(),
 });
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
 
 export default function PlayersPage() {
   const { toast } = useToast();
-  const [players, setPlayers] = useState<Player[]>([]);
-  const { database: masterDatabase, setDatabase } = useMasterDb();
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { database: masterDatabase, setDatabase, isDbLoaded } = useMasterDb();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
-  const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
+  const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImporting, setIsImporting] = useState(false);
-
-  useEffect(() => {
-    try {
-        const stored = localStorage.getItem('all_players_master_db');
-        if (stored) {
-            setPlayers(JSON.parse(stored));
-        } else {
-            setPlayers(initialPlayersData);
-        }
-    } catch (e) {
-        setPlayers(initialPlayersData);
-    }
-    setIsLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (isLoaded) {
-        localStorage.setItem('all_players_master_db', JSON.stringify(players));
-    }
-  }, [players, isLoaded]);
   
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -165,46 +110,42 @@ export default function PlayersPage() {
       uscfId: '',
       regularRating: undefined,
       quickRating: '',
+      state: '',
+      expirationDate: '',
     },
   });
   
-  useEffect(() => {
-    if (editingPlayer) {
+  const openDialog = (player: MasterPlayer | null) => {
+    setEditingPlayer(player);
+    if (player) {
       form.reset({
-        id: editingPlayer.id,
-        firstName: editingPlayer.firstName,
-        middleName: editingPlayer.middleName || '',
-        lastName: editingPlayer.lastName,
-        district: editingPlayer.district,
-        school: editingPlayer.school,
-        uscfId: editingPlayer.uscfId,
-        regularRating: editingPlayer.regularRating,
-        quickRating: editingPlayer.quickRating || '',
+        id: player.id,
+        firstName: player.firstName,
+        middleName: player.middleName || '',
+        lastName: player.lastName,
+        district: player.district,
+        school: player.school,
+        uscfId: player.uscfId,
+        regularRating: player.regularRating,
+        quickRating: player.quickRating || '',
+        state: player.state || '',
+        expirationDate: player.expirationDate || '',
       });
-      handleDistrictChange(editingPlayer.district, true);
+      handleDistrictChange(player.district, true);
     } else {
       form.reset();
     }
-  }, [editingPlayer, form]);
-
-  const handleAddPlayer = () => {
-    setEditingPlayer(null);
     setIsDialogOpen(true);
-  };
-  
-  const handleEditPlayer = (player: Player) => {
-    setEditingPlayer(player);
-    setIsDialogOpen(true);
-  };
+  }
 
-  const handleDeletePlayer = (player: Player) => {
+  const handleDeletePlayer = (player: MasterPlayer) => {
     setPlayerToDelete(player);
     setIsAlertOpen(true);
   };
 
   const confirmDelete = () => {
     if (playerToDelete) {
-        setPlayers(prev => prev.filter(p => p.id !== playerToDelete.id));
+        setDatabase(masterDatabase.filter(p => p.id !== playerToDelete.id));
         toast({ title: "Player Removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed.`});
     }
     setIsAlertOpen(false);
@@ -232,14 +173,16 @@ export default function PlayersPage() {
 
   function onSubmit(values: PlayerFormValues) {
     if (editingPlayer) {
-      // Update existing player
-      setPlayers(prev => prev.map(p => 
-        p.id === editingPlayer.id ? { ...p, ...values } : p
+      const updatedPlayer: MasterPlayer = {
+        ...editingPlayer,
+        ...values
+      };
+      setDatabase(masterDatabase.map(p => 
+        p.id === editingPlayer.id ? updatedPlayer : p
       ));
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s data has been updated.`});
     } else {
-      // Add new player
-      const newPlayer: Player = {
+      const newPlayer: MasterPlayer = {
         id: `p-${Date.now()}`,
         firstName: values.firstName,
         middleName: values.middleName,
@@ -249,10 +192,12 @@ export default function PlayersPage() {
         quickRating: values.quickRating || '',
         district: values.district,
         school: values.school,
+        state: values.state,
+        expirationDate: values.expirationDate,
         events: 0,
         eventIds: [],
       };
-      setPlayers(prev => [...prev, newPlayer]);
+      setDatabase([...masterDatabase, newPlayer]);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added.`});
     }
     setIsDialogOpen(false);
@@ -264,9 +209,20 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    toast({ title: 'Import Started', description: 'Processing database file in the background. This may take a moment. The page itself will not freeze.' });
+    toast({ title: 'Import Started', description: 'Processing database file. This may take a moment.' });
 
-    const importedPlayers: ImportedPlayer[] = [];
+    type ParsedRow = {
+        uscfId: string,
+        firstName: string,
+        lastName: string,
+        middleName?: string,
+        expirationDate?: string,
+        state?: string,
+        regularRating?: number,
+        quickRating?: string
+    }
+
+    const importedPlayers: ParsedRow[] = [];
     let errorCount = 0;
 
     Papa.parse(file, {
@@ -279,30 +235,18 @@ export default function PlayersPage() {
             if (!row || row.length < 2) return;
             
             const uscfId = row[1]?.trim();
-            if (!uscfId || !/^\d{8}$/.test(uscfId)) {
-                return;
-            }
+            if (!uscfId || !/^\d{8}$/.test(uscfId)) return;
 
             const namePart = row[0]?.trim();
-            if (!namePart) {
-                errorCount++;
-                return;
-            }
+            if (!namePart) { errorCount++; return; }
 
-            let lastName = '';
-            let firstName = '';
-            let middleName = '';
-
+            let lastName = '', firstName = '', middleName = '';
             if (namePart.includes(',')) {
                 const parts = namePart.split(',');
                 lastName = parts[0].trim();
                 const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
-                if (firstAndMiddle.length > 0) {
-                    firstName = firstAndMiddle.shift() || '';
-                }
-                if(firstAndMiddle.length > 0) {
-                    middleName = firstAndMiddle.join(' ');
-                }
+                if (firstAndMiddle.length > 0) firstName = firstAndMiddle.shift() || '';
+                if (firstAndMiddle.length > 0) middleName = firstAndMiddle.join(' ');
             } else {
                 const parts = namePart.split(/\s+/).filter(Boolean);
                 if (parts.length > 0) lastName = parts.pop()!;
@@ -310,14 +254,7 @@ export default function PlayersPage() {
                 if (parts.length > 0) middleName = parts.join(' ');
             }
 
-            if (!lastName && !firstName) {
-                if (namePart.split(/\s+/).filter(Boolean).length === 1) {
-                    lastName = namePart;
-                } else {
-                    errorCount++;
-                    return;
-                }
-            }
+            if (!lastName && !firstName) { errorCount++; return; }
           
             const expirationDateStr = row[2] || '';
             const state = row[3] || '';
@@ -327,22 +264,10 @@ export default function PlayersPage() {
             let regularRating: number | undefined = undefined;
             if (regularRatingString) {
                 const ratingMatch = regularRatingString.match(/^(\d+)/);
-                if (ratingMatch && ratingMatch[1]) {
-                    regularRating = parseInt(ratingMatch[1], 10);
-                }
+                if (ratingMatch && ratingMatch[1]) { regularRating = parseInt(ratingMatch[1], 10); }
             }
 
-            const newPlayer: ImportedPlayer = {
-                id: `p-${uscfId}`,
-                uscfId,
-                firstName: firstName || '',
-                lastName: lastName,
-                middleName: middleName || undefined,
-                expirationDate: expirationDateStr,
-                state: state,
-                regularRating: regularRating,
-                quickRating: quickRatingString || undefined,
-            };
+            const newPlayer: ParsedRow = { uscfId, firstName: firstName || '', lastName, middleName: middleName || undefined, expirationDate: expirationDateStr, state, regularRating, quickRating: quickRatingString || undefined };
             importedPlayers.push(newPlayer);
         } catch (e) {
           console.error("Error parsing a player row:", results.data, e);
@@ -350,10 +275,30 @@ export default function PlayersPage() {
         }
       },
       complete: () => {
-        const dbMap = new Map<string, ImportedPlayer>(masterDatabase.map(p => [p.uscfId, p]));
+        const dbMap = new Map<string, MasterPlayer>(masterDatabase.map(p => [p.uscfId, p]));
         
-        importedPlayers.forEach(player => {
-            dbMap.set(player.uscfId, player);
+        importedPlayers.forEach(imported => {
+            const existingPlayer = dbMap.get(imported.uscfId);
+            if (existingPlayer) {
+                existingPlayer.firstName = imported.firstName || existingPlayer.firstName;
+                existingPlayer.lastName = imported.lastName || existingPlayer.lastName;
+                existingPlayer.middleName = imported.middleName;
+                existingPlayer.state = imported.state;
+                existingPlayer.expirationDate = imported.expirationDate;
+                existingPlayer.regularRating = imported.regularRating;
+                existingPlayer.quickRating = imported.quickRating;
+                dbMap.set(imported.uscfId, existingPlayer);
+            } else {
+                const newPlayer: MasterPlayer = {
+                    ...imported,
+                    id: `p-${imported.uscfId}`,
+                    school: "Independent",
+                    district: "None",
+                    events: 0,
+                    eventIds: [],
+                };
+                dbMap.set(imported.uscfId, newPlayer);
+            }
         });
 
         const newMasterList = Array.from(dbMap.values());
@@ -362,11 +307,9 @@ export default function PlayersPage() {
         setIsImporting(false);
         
         let description = `Database updated with ${importedPlayers.length} records. The database now contains ${newMasterList.length} unique players.`;
-        if (errorCount > 0) {
-            description += ` Could not parse ${errorCount} rows.`;
-        }
+        if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
         
-        toast({ title: 'Import Complete', description: description });
+        toast({ title: 'Import Complete', description });
       },
       error: (error) => {
         setIsImporting(false);
@@ -381,7 +324,7 @@ export default function PlayersPage() {
 
 
   const filteredAndSortedPlayers = useMemo(() => {
-    let sortablePlayers = [...players];
+    let sortablePlayers = [...masterDatabase];
     
     if (selectedEvent !== 'all') {
       sortablePlayers = sortablePlayers.filter(p => p.eventIds.includes(selectedEvent));
@@ -397,8 +340,8 @@ export default function PlayersPage() {
                 aVal = a.lastName;
                 bVal = b.lastName;
             } else {
-                aVal = a[key as keyof Player];
-                bVal = b[key as keyof Player];
+                aVal = a[key as keyof MasterPlayer];
+                bVal = b[key as keyof MasterPlayer];
             }
             
             let result = 0;
@@ -417,7 +360,7 @@ export default function PlayersPage() {
         });
     }
     return sortablePlayers;
-  }, [sortConfig, selectedEvent, players]);
+  }, [sortConfig, selectedEvent, masterDatabase]);
   
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -481,9 +424,7 @@ export default function PlayersPage() {
     const link = document.createElement('a');
     link.setAttribute('href', url);
 
-    const eventName = selectedEvent === 'all' 
-        ? 'all_players' 
-        : allEvents.find(e => e.id === selectedEvent)?.name.replace(/\s+/g, '_').toLowerCase() || 'event_players';
+    const eventName = 'master_player_list';
     const fileName = `${eventName}_${new Date().toISOString().split('T')[0]}.csv`;
     link.setAttribute('download', fileName);
     
@@ -498,6 +439,19 @@ export default function PlayersPage() {
     });
   };
 
+  const allEvents = useMemo(() => {
+    const eventsMap = new Map<string, { id: string, name: string }>();
+    masterDatabase.forEach(player => {
+        player.eventIds?.forEach(eventId => {
+            if (!eventsMap.has(eventId)) {
+                // In a real app, you'd look up the event name from an events service/context
+                eventsMap.set(eventId, { id: eventId, name: `Event ${eventId}` });
+            }
+        });
+    });
+    return Array.from(eventsMap.values());
+  }, [masterDatabase]);
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -505,7 +459,7 @@ export default function PlayersPage() {
           <div>
             <h1 className="text-3xl font-bold font-headline">All Players</h1>
             <p className="text-muted-foreground">
-              Manage player rosters for all events. (Organizer View)
+              Manage the master player database for the entire system.
             </p>
           </div>
           <div className="flex gap-2">
@@ -524,7 +478,7 @@ export default function PlayersPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Export to CSV
             </Button>
-            <Button onClick={handleAddPlayer}>
+            <Button onClick={() => openDialog(null)}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add New Player
             </Button>
           </div>
@@ -532,26 +486,13 @@ export default function PlayersPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Filter and Sort Players</CardTitle>
+            <CardTitle>Master Player List</CardTitle>
             <CardDescription>
-                Use the filter to view players by event. Upload a tab-delimited file or CSV to load the master database for searching on the Roster page.
+                This is the central database of all known players. Upload a tab-delimited file to populate or update it. This database is used for the search function on the Roster page.
             </CardDescription>
-            <div className="pt-2">
-                 <Select onValueChange={setSelectedEvent} defaultValue="all">
-                    <SelectTrigger className="w-full sm:w-[280px]">
-                        <SelectValue placeholder="Filter by event..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Players</SelectItem>
-                        {allEvents.map(event => (
-                            <SelectItem key={event.id} value={event.id}>{event.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
           </CardHeader>
           <CardContent>
-            {!isLoaded ? (
+            {!isDbLoaded ? (
                 <div className="space-y-2">
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
@@ -623,7 +564,7 @@ export default function PlayersPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleEditPlayer(player)}>Edit Player</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDialog(player)}>Edit Player</DropdownMenuItem>
                             <DropdownMenuItem>View Registrations</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">
                                 <Trash2 className="mr-2 h-4 w-4" /> Remove Player
@@ -701,6 +642,11 @@ export default function PlayersPage() {
                  )} />
                  <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Regular Rating</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="expirationDate" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input placeholder="MM/DD/YYYY" {...field} /></FormControl><FormMessage /></FormItem> )} />
+              </div>
+
               <DialogFooter className="pt-4">
                 <DialogClose asChild>
                   <Button type="button" variant="ghost">Cancel</Button>

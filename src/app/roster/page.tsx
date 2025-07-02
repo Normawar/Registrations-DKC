@@ -96,8 +96,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useRoster, type Player } from '@/hooks/use-roster';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Label } from '@/components/ui/label';
-import { useMasterDb, type ImportedPlayer } from '@/context/master-db-context';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useMasterDb } from '@/context/master-db-context';
 import { type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
 
 
@@ -117,7 +116,7 @@ const sectionMaxGrade: { [key: string]: number } = {
   'Elementary K-5': 5,
   'Middle School K-8': 8,
   'High School K-12': 12,
-  'Championship': 12, // Open to all, so max is 12th grade
+  'Championship': 12, // Open to all, so it's always valid
 };
 
 const playerFormSchema = z.object({
