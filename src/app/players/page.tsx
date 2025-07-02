@@ -1,11 +1,11 @@
 
 'use client';
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Papa from 'papaparse';
+import { flushSync } from 'react-dom';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -98,10 +98,192 @@ export default function PlayersPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
   const [selectedEvent, setSelectedEvent] = useState<string>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const workerRef = useRef<Worker>();
   const [isImporting, setIsImporting] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
+
+  useEffect(() => {
+    // Initialize the Web Worker
+    workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url));
+
+    const toastControls = {
+      current: null as null | ReturnType<typeof toast>,
+    };
+
+    workerRef.current.onmessage = (event) => {
+        const { rows, error } = event.data;
+
+        if (error) {
+            setIsImporting(false);
+            if (toastControls.current) {
+              toastControls.current.dismiss();
+            }
+            toast({
+                variant: 'destructive',
+                title: 'Import Error',
+                description: `Failed to parse file: ${error}`,
+                duration: 10000,
+            });
+            return;
+        }
+
+        let currentIndex = 0;
+        let totalErrorCount = 0;
+        const dbMap = new Map<string, MasterPlayer>();
+        masterDatabase.forEach(p => dbMap.set(p.uscfId, p));
+
+        toastControls.current = toast({
+            title: 'Importing...',
+            description: 'Processing database... 0% complete.',
+            duration: Infinity,
+        });
+
+        const processChunk = () => {
+            const CHUNK_SIZE = 10000;
+            const endIndex = Math.min(currentIndex + CHUNK_SIZE, rows.length);
+            let errorCountInChunk = 0;
+            let newOrUpdatedPlayersInChunk: MasterPlayer[] = [];
+
+            for (let i = currentIndex; i < endIndex; i++) {
+                const row = rows[i] as string[];
+            
+                if (!row || !Array.isArray(row)) {
+                    errorCountInChunk++;
+                    continue;
+                }
+                
+                const uscfId = row[1]?.trim();
+                if (!uscfId || !/^\d{8}$/.test(uscfId)) {
+                    continue; // Skip headers/footers/invalid rows silently
+                }
+            
+                const namePart = row[0]?.trim();
+                if (!namePart) {
+                    errorCountInChunk++;
+                    continue;
+                }
+            
+                try {
+                    let lastName = '', firstName = '', middleName = '';
+                    
+                    if (namePart.includes(',')) {
+                        const parts = namePart.split(',');
+                        lastName = parts[0]?.trim() || '';
+                        const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
+                        if (firstAndMiddle.length > 0) firstName = firstAndMiddle.shift() || '';
+                        if (firstAndMiddle.length > 0) middleName = firstAndMiddle.join(' ');
+                    } else {
+                        const parts = namePart.split(/\s+/).filter(Boolean);
+                        if (parts.length > 0) lastName = parts.pop() || '';
+                        if (parts.length > 0) firstName = parts.shift() || '';
+                        if (parts.length > 0) middleName = parts.join(' ');
+                    }
+            
+                    if (!firstName || !lastName) {
+                        errorCountInChunk++;
+                        continue;
+                    }
+            
+                    const expirationDateStr = row[2] || '';
+                    const state = row[3] || '';
+                    const regularRatingString = row[4] || '';
+                    const quickRatingString = row[5] || '';
+                    
+                    let regularRating: number | undefined = undefined;
+                    if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated') {
+                        const ratingMatch = regularRatingString.match(/^(\d+)/);
+                        if (ratingMatch && ratingMatch[1]) {
+                            regularRating = parseInt(ratingMatch[1], 10);
+                        }
+                    }
+            
+                    const existingPlayer = dbMap.get(uscfId);
+                    
+                    const playerRecord: MasterPlayer = {
+                        ...(existingPlayer || {
+                            id: `p-${uscfId}`,
+                            school: "Independent",
+                            district: "None",
+                            events: 0,
+                            eventIds: [],
+                        }),
+                        uscfId: uscfId,
+                        firstName: firstName,
+                        lastName: lastName,
+                        middleName: middleName || undefined,
+                        state: state || undefined,
+                        expirationDate: expirationDateStr || undefined,
+                        regularRating: regularRating,
+                        quickRating: quickRatingString || undefined,
+                    };
+                    
+                    newOrUpdatedPlayersInChunk.push(playerRecord);
+            
+                } catch (e) {
+                    console.error("Error parsing a valid player row:", row, e);
+                    errorCountInChunk++;
+                }
+            }
+
+            totalErrorCount += errorCountInChunk;
+            newOrUpdatedPlayersInChunk.forEach(p => dbMap.set(p.uscfId, p));
+            currentIndex = endIndex;
+
+            const progress = Math.round((currentIndex / rows.length) * 100);
+            if (toastControls.current) {
+              toastControls.current.update({
+                description: `Processing database... ${progress}% complete.`,
+              });
+            }
+
+            if (currentIndex < rows.length) {
+                setTimeout(processChunk, 0); // Yield to main thread
+            } else {
+                (async () => {
+                    try {
+                        const finalPlayerList = Array.from(dbMap.values());
+                        await setDatabase(finalPlayerList);
+                        
+                        setCurrentPage(1);
+
+                        if (toastControls.current) {
+                            let title = 'Database Updated Successfully!';
+                            let description = `The database now contains ${finalPlayerList.length.toLocaleString()} unique players.`;
+                            if (totalErrorCount > 0) {
+                                title = 'Import Partially Successful';
+                                description += ` Could not parse ${totalErrorCount} rows due to formatting issues.`;
+                            }
+                            toastControls.current.update({
+                                title: title,
+                                description: description,
+                                duration: 10000,
+                            });
+                        }
+                    } catch(err) {
+                        if (toastControls.current) {
+                           toastControls.current.update({
+                                variant: 'destructive',
+                                title: 'Database Save Error',
+                                description: err instanceof Error ? err.message : 'An unknown error occurred.',
+                                duration: 10000,
+                            });
+                        }
+                    } finally {
+                        setIsImporting(false);
+                    }
+                })();
+            }
+        };
+
+        processChunk();
+    };
+
+    return () => {
+        workerRef.current?.terminate();
+    };
+  }, [masterDatabase, setDatabase, toast]);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -214,151 +396,7 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    let toastControls: { update: (props: any) => void; dismiss: () => void; id: string; } | null = null;
-    
-    Papa.parse(file, {
-        worker: true,
-        delimiter: "\t",
-        skipEmptyLines: true,
-        complete: (results) => {
-            const rows = results.data as string[][];
-            const dbMap = new Map<string, MasterPlayer>(masterDatabase.map(p => [p.uscfId, p]));
-            
-            let errorCount = 0;
-            const newMasterList: MasterPlayer[] = [];
-
-            // This part is fast, no need for chunking here.
-            for (let i = 0; i < rows.length; i++) {
-                try {
-                    const row = rows[i];
-                    if (!row || row.length < 2) continue;
-                    
-                    const uscfId = row[1]?.trim();
-                    if (!uscfId || !/^\d{8}$/.test(uscfId)) continue;
-        
-                    const namePart = row[0]?.trim();
-                    if (!namePart) { errorCount++; continue; }
-        
-                    let lastName = '', firstName = '', middleName = '';
-                    if (namePart.includes(',')) {
-                        const parts = namePart.split(',');
-                        lastName = parts[0].trim();
-                        const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
-                        if (firstAndMiddle.length > 0) firstName = firstAndMiddle.shift() || '';
-                        if (firstAndMiddle.length > 0) middleName = firstAndMiddle.join(' ');
-                    } else {
-                        const parts = namePart.split(/\s+/).filter(Boolean);
-                        if (parts.length > 0) lastName = parts.pop()!;
-                        if (parts.length > 0) firstName = parts.shift()!;
-                        if (parts.length > 0) middleName = parts.join(' ');
-                    }
-        
-                    if (!lastName && !firstName) { errorCount++; continue; }
-                  
-                    const expirationDateStr = row[2] || '';
-                    const state = row[3] || '';
-                    const regularRatingString = row[4] || '';
-                    const quickRatingString = row[5] || '';
-                    
-                    let regularRating: number | undefined = undefined;
-                    if (regularRatingString) {
-                        const ratingMatch = regularRatingString.match(/^(\d+)/);
-                        if (ratingMatch && ratingMatch[1]) { regularRating = parseInt(ratingMatch[1], 10); }
-                    }
-        
-                    const existingPlayer = dbMap.get(uscfId);
-                    if (existingPlayer) {
-                        existingPlayer.firstName = firstName || existingPlayer.firstName;
-                        existingPlayer.lastName = lastName || existingPlayer.lastName;
-                        existingPlayer.middleName = middleName;
-                        existingPlayer.state = state;
-                        existingPlayer.expirationDate = expirationDateStr;
-                        existingPlayer.regularRating = regularRating;
-                        existingPlayer.quickRating = quickRatingString || undefined;
-                        dbMap.set(uscfId, existingPlayer);
-                    } else {
-                        const newPlayer: MasterPlayer = {
-                            id: `p-${uscfId}`,
-                            uscfId: uscfId,
-                            firstName: firstName || '',
-                            lastName: lastName,
-                            middleName: middleName || undefined,
-                            state: state,
-                            expirationDate: expirationDateStr,
-                            regularRating: regularRating,
-                            quickRating: quickRatingString || undefined,
-                            school: "Independent",
-                            district: "None",
-                            events: 0,
-                            eventIds: [],
-                        };
-                        dbMap.set(uscfId, newPlayer);
-                    }
-                } catch (e) {
-                    console.error("Error parsing a player row:", rows[i], e);
-                    errorCount++;
-                }
-            }
-            
-            const finalPlayerList = Array.from(dbMap.values());
-
-            (async () => {
-                try {
-                    toastControls = toast({
-                        title: 'Saving to Database',
-                        description: `Initializing save for ${finalPlayerList.length.toLocaleString()} records...`,
-                        duration: Infinity,
-                    });
-                    
-                    const onProgress = (progress: number) => {
-                        if (toastControls) {
-                            toastControls.update({
-                                title: 'Saving to Database',
-                                description: `Saving ${finalPlayerList.length.toLocaleString()} records... ${progress}% complete.`
-                            });
-                        }
-                    };
-                    
-                    await setDatabase(finalPlayerList, onProgress);
-                    
-                    setCurrentPage(1);
-                    
-                    let description = `Database updated. It now contains ${finalPlayerList.length.toLocaleString()} unique players.`;
-                    if (errorCount > 0) description += ` Could not parse ${errorCount} rows.`;
-
-                    if (toastControls) {
-                        toastControls.update({
-                            title: 'Import Complete',
-                            description: description,
-                            duration: 10000,
-                        });
-                    }
-                } catch(err) {
-                    console.error("Failed to save to database", err);
-                    const description = err instanceof Error ? err.message : 'An unknown error occurred.';
-                    if (toastControls) {
-                        toastControls.update({
-                            variant: 'destructive',
-                            title: 'Database Save Error',
-                            description: description,
-                            duration: 10000,
-                        });
-                    }
-                } finally {
-                    setIsImporting(false);
-                }
-            })();
-        },
-        error: (error: any) => {
-            setIsImporting(false);
-             toast({
-              variant: 'destructive',
-              title: 'Import Error',
-              description: `Failed to parse file: ${error.message}`,
-              duration: 10000,
-            });
-        }
-    });
+    workerRef.current?.postMessage(file);
 
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -753,3 +791,22 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
+
+// Web Worker for parsing
+declare const self: Worker;
+import Papa from 'papaparse';
+
+self.onmessage = (event) => {
+    const file = event.data as File;
+    Papa.parse(file, {
+        worker: false, // Run in this worker thread
+        delimiter: "\t",
+        skipEmptyLines: true,
+        complete: (results) => {
+            self.postMessage({ rows: results.data });
+        },
+        error: (error: any) => {
+            self.postMessage({ error: error.message });
+        }
+    });
+};
