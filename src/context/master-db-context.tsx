@@ -2,9 +2,34 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { initialMasterPlayerData, type MasterPlayer as MasterPlayerType } from '@/lib/data/master-player-data';
+import { initialMasterPlayerData } from '@/lib/data/master-player-data';
 
-export type MasterPlayer = MasterPlayerType;
+// Define a consistent player type to be used everywhere
+export type MasterPlayer = {
+  id: string;
+  uscfId: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  state?: string;
+  // Dates should be stored as ISO strings for JSON compatibility
+  expirationDate?: string; 
+  regularRating?: number;
+  quickRating?: string;
+  school: string;
+  district: string;
+  events: number;
+  eventIds: string[];
+  // Roster-specific fields
+  grade?: string;
+  section?: string;
+  email?: string;
+  phone?: string;
+  dob?: string; // ISO String
+  zipCode?: string;
+  studentType?: 'gt' | 'independent';
+};
+
 
 interface MasterDbContextType {
   database: MasterPlayer[];
@@ -20,16 +45,16 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, setInternalDatabase] = useState<MasterPlayer[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
 
-  // Function to load data from localStorage
-  const loadDataFromStorage = useCallback(() => {
+  // Load data on initial mount
+  useEffect(() => {
     try {
       const storedDb = localStorage.getItem(DB_STORAGE_KEY);
       if (storedDb) {
         setInternalDatabase(JSON.parse(storedDb));
       } else {
-        // If nothing is in storage, initialize with default data
-        setInternalDatabase(initialMasterPlayerData);
-        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(initialMasterPlayerData));
+        const initialData = initialMasterPlayerData;
+        setInternalDatabase(initialData);
+        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(initialData));
       }
     } catch (e) {
       console.error("Failed to load master DB from localStorage", e);
@@ -39,29 +64,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Initial load and listener for cross-tab updates
-  useEffect(() => {
-    loadDataFromStorage();
-
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === DB_STORAGE_KEY) {
-        loadDataFromStorage();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [loadDataFromStorage]); // Dependency on the memoized load function
-
-  // The function to be used by components to update the database
+  // Centralized function to update the database state and localStorage
   const setDatabase = useCallback((players: MasterPlayer[]) => {
     try {
-      // Update local state immediately
+      // Update state immediately. This triggers re-renders in consumers.
       setInternalDatabase(players);
-      // Update localStorage
+      // Persist the changes to localStorage.
       localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(players));
     } catch (e) {
       console.error("Failed to save master DB to localStorage", e);

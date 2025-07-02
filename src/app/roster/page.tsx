@@ -93,10 +93,9 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useRoster, type Player } from '@/hooks/use-roster';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Label } from '@/components/ui/label';
-import { useMasterDb } from '@/context/master-db-context';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
 
 
@@ -183,11 +182,10 @@ type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 
 
 export default function RosterPage() {
   const { toast } = useToast();
-  const { players, addPlayer, updatePlayer, deletePlayer } = useRoster();
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
-  const [playerToDelete, setPlayerToDelete] = useState<Player | null>(null);
+  const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
 
@@ -197,10 +195,23 @@ export default function RosterPage() {
   const [searchFirstName, setSearchFirstName] = useState('');
   const [searchLastName, setSearchLastName] = useState('');
   const [searchState, setSearchState] = useState('ALL');
-  const { database: masterDatabase, isDbLoaded } = useMasterDb();
   
   const { profile } = useSponsorProfile();
+  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded } = useMasterDb();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
+
+  const rosterPlayers = useMemo(() => {
+    if (!profile || !isDbLoaded || profile.role !== 'sponsor') return [];
+    return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
+  }, [allPlayers, profile, isDbLoaded]);
+
+  const dbStates = useMemo(() => {
+    if (isDbLoaded) {
+        const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
+        return ['ALL', ...Array.from(states).sort()];
+    }
+    return ['ALL'];
+  }, [isDbLoaded, allPlayers]);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -222,18 +233,14 @@ export default function RosterPage() {
     }
   });
 
-  const dbStates = useMemo(() => {
-    if (isDbLoaded) {
-        const states = new Set(masterDatabase.map(p => p.state).filter(Boolean) as string[]);
-        return ['ALL', ...Array.from(states).sort()];
-    }
-    return ['ALL'];
-  }, [isDbLoaded, masterDatabase]);
-
   useEffect(() => {
     if (isPlayerDialogOpen) {
       if (editingPlayer) {
-        form.reset(editingPlayer);
+        form.reset({
+          ...editingPlayer,
+          dob: editingPlayer.dob ? new Date(editingPlayer.dob) : undefined,
+          uscfExpiration: editingPlayer.uscfExpiration ? new Date(editingPlayer.uscfExpiration) : undefined,
+        });
       } else {
         form.reset({
           firstName: '',
@@ -259,7 +266,7 @@ export default function RosterPage() {
   }, [isPlayerDialogOpen, editingPlayer, form]);
 
   const sortedPlayers = useMemo(() => {
-    const sortablePlayers = [...players];
+    const sortablePlayers = [...rosterPlayers];
     if (sortConfig) {
       sortablePlayers.sort((a, b) => {
         const key = sortConfig.key;
@@ -274,10 +281,10 @@ export default function RosterPage() {
             if (codeA < codeB) result = -1;
             if (codeA > codeB) result = 1;
         } else {
-            aVal = a[key as keyof Player];
-            bVal = b[key as keyof Player];
+            aVal = a[key as keyof MasterPlayer];
+            bVal = b[key as keyof MasterPlayer];
 
-            if (key === 'grade') {
+            if (key === 'grade' && typeof a.grade === 'string' && typeof b.grade === 'string') {
               aVal = gradeToNumber[a.grade] ?? -1;
               bVal = gradeToNumber[b.grade] ?? -1;
             } else if (key === 'regularRating') {
@@ -310,7 +317,7 @@ export default function RosterPage() {
         });
     }
     return sortablePlayers;
-  }, [players, sortConfig, profile]);
+  }, [rosterPlayers, sortConfig, profile]);
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -340,19 +347,19 @@ export default function RosterPage() {
     setIsPlayerDialogOpen(true);
   };
 
-  const handleEditPlayer = (player: Player) => {
+  const handleEditPlayer = (player: MasterPlayer) => {
     setEditingPlayer(player);
     setIsPlayerDialogOpen(true);
   };
   
-  const handleDeletePlayer = (player: Player) => {
+  const handleDeletePlayer = (player: MasterPlayer) => {
     setPlayerToDelete(player);
     setIsAlertOpen(true);
   };
   
   const confirmDelete = () => {
     if (playerToDelete) {
-      deletePlayer(playerToDelete.id);
+      setAllPlayers(allPlayers.filter(p => p.id !== playerToDelete.id));
       toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the roster.` });
     }
     setIsAlertOpen(false);
@@ -408,8 +415,10 @@ export default function RosterPage() {
   };
 
   function onSubmit(values: PlayerFormValues) {
+    if (!profile) return;
+
     if (values.uscfId.toUpperCase() !== 'NEW') {
-      const existingPlayerWithUscfId = players.find(p => 
+      const existingPlayerWithUscfId = allPlayers.find(p => 
         p.uscfId.toLowerCase() === values.uscfId.toLowerCase() && p.id !== values.id
       );
 
@@ -422,11 +431,11 @@ export default function RosterPage() {
       }
     }
 
-    const isDuplicatePlayer = players.some(p => 
+    const isDuplicatePlayer = allPlayers.some(p => 
       p.id !== values.id &&
       p.firstName.trim().toLowerCase() === values.firstName.trim().toLowerCase() &&
       p.lastName.trim().toLowerCase() === values.lastName.trim().toLowerCase() &&
-      p.dob.getTime() === values.dob.getTime()
+      p.dob && new Date(p.dob).getTime() === values.dob.getTime()
     );
 
     if (isDuplicatePlayer) {
@@ -434,20 +443,30 @@ export default function RosterPage() {
       return;
     }
     
-    const isEmailUnique = !players.some(p => p.email.toLowerCase() === values.email.toLowerCase() && p.id !== values.id);
+    const isEmailUnique = !allPlayers.some(p => p.email && p.email.toLowerCase() === values.email.toLowerCase() && p.id !== values.id);
 
     if (!isEmailUnique) {
-      const existingPlayer = players.find(p => p.email.toLowerCase() === values.email.toLowerCase());
+      const existingPlayer = allPlayers.find(p => p.email && p.email.toLowerCase() === values.email.toLowerCase());
       form.setError("email", { type: "manual", message: `Email already used by ${existingPlayer?.firstName} ${existingPlayer?.lastName}.` });
       return;
     }
 
+    const playerRecord: MasterPlayer = {
+      ...values,
+      id: editingPlayer?.id || `p-${Date.now()}`,
+      school: profile.school,
+      district: profile.district,
+      dob: values.dob.toISOString(),
+      uscfExpiration: values.uscfExpiration?.toISOString(),
+      events: editingPlayer?.events || 0,
+      eventIds: editingPlayer?.eventIds || [],
+    };
+
     if (editingPlayer) {
-      updatePlayer({ ...editingPlayer, ...values });
+      setAllPlayers(allPlayers.map(p => p.id === editingPlayer.id ? playerRecord : p));
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
     } else {
-      const newPlayer: Player = { ...(values as Omit<Player, 'id'>), id: Date.now().toString() };
-      addPlayer(newPlayer);
+      setAllPlayers([...allPlayers, playerRecord]);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
     }
     setIsPlayerDialogOpen(false);
@@ -462,7 +481,7 @@ export default function RosterPage() {
     setIsSearching(true);
     setSearchResults([]);
     try {
-        const results = masterDatabase.filter(p => {
+        const results = allPlayers.filter(p => {
             const stateMatch = searchState === 'ALL' || p.state === searchState;
             const lastNameMatch = !searchLastName || (p.lastName && p.lastName.toLowerCase().includes(searchLastName.toLowerCase()));
             const firstNameMatch = !searchFirstName || (p.firstName && p.firstName.toLowerCase().includes(searchFirstName.toLowerCase()));
@@ -477,7 +496,7 @@ export default function RosterPage() {
             middleName: p.middleName,
             rating: p.regularRating,
             state: p.state,
-            expirationDate: p.expirationDate ? format(parse(p.expirationDate, 'MM/dd/yyyy', new Date()), 'yyyy-MM-dd') : undefined,
+            expirationDate: p.uscfExpiration ? format(new Date(p.uscfExpiration), 'yyyy-MM-dd') : undefined,
             quickRating: p.quickRating
         }));
 
@@ -873,7 +892,7 @@ export default function RosterPage() {
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently remove {playerToDelete?.firstName} {playerToDelete?.lastName} from your roster.
             </AlertDialogDescription>

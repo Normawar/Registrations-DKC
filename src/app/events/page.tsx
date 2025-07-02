@@ -55,11 +55,12 @@ import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { generateTeamCode } from '@/lib/school-utils';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { useRoster, type Player } from '@/hooks/use-roster';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { createMembershipInvoice } from '@/ai/flows/create-membership-invoice-flow';
 import { checkSquareConfig } from '@/lib/actions/check-config';
+import { useMasterDb } from '@/context/master-db-context';
+import type { MasterPlayer as Player } from '@/context/master-db-context';
 
 type PlayerRegistration = {
   byes: {
@@ -96,7 +97,7 @@ export default function EventsPage() {
     const { toast } = useToast();
     const { events } = useEvents();
     const { profile: sponsorProfile } = useSponsorProfile();
-    const { players: rosterPlayers } = useRoster();
+    const { database: allPlayers } = useMasterDb();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -107,6 +108,11 @@ export default function EventsPage() {
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
     const [isSquareConfigured, setIsSquareConfigured] = useState(true);
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
+
+    const rosterPlayers = useMemo(() => {
+        if (!sponsorProfile || sponsorProfile.role !== 'sponsor') return [];
+        return allPlayers.filter(p => p.district === sponsorProfile.district && p.school === sponsorProfile.school);
+    }, [allPlayers, sponsorProfile]);
 
     useEffect(() => {
         setClientReady(true);
@@ -228,7 +234,8 @@ export default function EventsPage() {
             const player = rosterPlayers.find(p => p.id === playerId);
             if (isSelected && player && selectedEvent) {
                 const eventDate = new Date(selectedEvent.date);
-                const isExpired = !player.uscfExpiration || player.uscfExpiration < eventDate;
+                const expDate = player.uscfExpiration ? new Date(player.uscfExpiration) : null;
+                const isExpired = !expDate || expDate < eventDate;
                 newSelections[playerId] = { 
                     byes: { round1: 'none', round2: 'none' },
                     section: player.section,
@@ -341,7 +348,7 @@ export default function EventsPage() {
                 // 2. Create USCF Invoice
                 const uscfPlayers = playersWithUscfAction.map(([playerId]) => {
                     const player = rosterPlayers.find(p => p.id === playerId)!;
-                    return { firstName: player.firstName, middleName: player.middleName, lastName: player.lastName, email: player.email, phone: player.phone, dob: player.dob.toISOString(), zipCode: player.zipCode, };
+                    return { firstName: player.firstName, middleName: player.middleName, lastName: player.lastName, email: player.email, phone: player.phone, dob: new Date(player.dob).toISOString(), zipCode: player.zipCode, };
                 });
                 const uscfResult = await createMembershipInvoice({
                     purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, purchaserEmail: sponsorProfile.email, schoolName: sponsorProfile.school,
@@ -445,14 +452,16 @@ export default function EventsPage() {
     const isUscfStatusValid = (player: Player, registration: PlayerRegistration, event: Event): boolean => {
       if (registration.uscfStatus === 'current') {
         if (player.uscfId.toUpperCase() === 'NEW') return false;
-        if (!player.uscfExpiration) return false;
-        if (new Date(event.date) > player.uscfExpiration) return false;
+        const expDate = player.uscfExpiration ? new Date(player.uscfExpiration) : null;
+        if (!expDate) return false;
+        if (new Date(event.date) > expDate) return false;
       }
       return true;
     };
 
     const isPersonalDataComplete = (player: Player): boolean => {
-        return !!(player.dob && player.zipCode && player.email);
+        const dob = player.dob ? new Date(player.dob) : null;
+        return !!(dob && player.zipCode && player.email);
     }
 
     const isRenewingDataValid = (player: Player): boolean => {
@@ -647,7 +656,7 @@ export default function EventsPage() {
                                 Grade: {player.grade} &bull; Section: {player.section} &bull; Rating: {player.regularRating || 'N/A'}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                                USCF ID: {player.uscfId} &bull; Expires: {player.uscfExpiration ? format(player.uscfExpiration, 'MM/dd/yyyy') : 'N/A'}
+                                USCF ID: {player.uscfId} &bull; Expires: {player.uscfExpiration ? format(new Date(player.uscfExpiration), 'MM/dd/yyyy') : 'N/A'}
                             </p>
                             
                             {isSelected && selectedEvent && (

@@ -27,13 +27,20 @@ import { useEvents } from "@/hooks/use-events";
 import { useMemo } from "react";
 import { format } from "date-fns";
 import { FileText, ImageIcon, Info } from "lucide-react";
-import { useRoster } from "@/hooks/use-roster";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { useMasterDb } from "@/context/master-db-context";
+import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 
 
 export default function DashboardPage() {
   const { events } = useEvents();
-  const { players: rosterPlayers } = useRoster();
+  const { database: allPlayers } = useMasterDb();
+  const { profile } = useSponsorProfile();
+
+  const rosterPlayers = useMemo(() => {
+    if (!profile || profile.role !== 'sponsor') return [];
+    return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
+  }, [allPlayers, profile]);
 
   const upcomingEvents = useMemo(() => {
     return events
