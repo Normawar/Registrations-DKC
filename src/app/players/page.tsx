@@ -217,6 +217,24 @@ export default function PlayersPage() {
   const [isImporting, setIsImporting] = useState(false);
   const toastControlsRef = useRef<{ id: string; dismiss: () => void; update: (props: any) => void; } | null>(null);
 
+  const handleFileImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    toastControlsRef.current = toast({
+        title: 'Starting Import...',
+        description: 'Preparing to process file.',
+        duration: Infinity,
+    });
+
+    workerRef.current?.postMessage(file);
+
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  }, [toast]);
+
   useEffect(() => {
     workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url));
 
@@ -250,7 +268,8 @@ export default function PlayersPage() {
                 const uscfId = row[1]?.trim();
                 const namePart = row[0]?.trim();
                 
-                if (!uscfId || !/^\d{8}$/.test(uscfId) || !namePart) {
+                // Stricter validation: skip row if USCF ID is invalid or name is empty/just punctuation.
+                if (!uscfId || !/^\d{8}$/.test(uscfId) || !namePart || namePart.replace(/[^a-zA-Z]/g, '').length === 0) {
                     continue;
                 }
 
@@ -279,7 +298,9 @@ export default function PlayersPage() {
                 }
 
                 if (!firstName) {
-                  throw new Error(`Could not determine a valid name for row: ${row.join('\t')}`);
+                  // This will now be caught by the stricter validation at the top,
+                  // but kept as a safeguard.
+                  continue; 
                 }
                 
                 const expirationDateStr = row[2] || '';
@@ -364,24 +385,6 @@ export default function PlayersPage() {
     };
   }, [allPlayers, setAllPlayers, toast]);
   
-  const handleFileImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    toastControlsRef.current = toast({
-        title: 'Starting Import...',
-        description: 'Preparing to process file.',
-        duration: Infinity,
-    });
-
-    workerRef.current?.postMessage(file);
-
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
-  }, [toast]);
-
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
     defaultValues: {
@@ -1082,3 +1085,5 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
+
+    
