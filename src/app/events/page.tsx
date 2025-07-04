@@ -333,7 +333,7 @@ export default function EventsPage() {
                 });
                 
                 const regConfirmation = {
-                    id: regResult.invoiceId, invoiceId: regResult.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(),
+                    id: regResult.invoiceId, eventId: selectedEvent.id, invoiceId: regResult.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(),
                     selections, totalInvoiced: calculatedFees.registration, invoiceUrl: regResult.invoiceUrl, invoiceNumber: regResult.invoiceNumber, teamCode: teamCode,
                     invoiceStatus: regResult.status, purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, schoolName: sponsorProfile.school, district: sponsorProfile.district,
                 };
@@ -389,7 +389,7 @@ export default function EventsPage() {
                 });
 
                 const newConfirmation = {
-                    id: result.invoiceId, invoiceId: result.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(), selections,
+                    id: result.invoiceId, eventId: selectedEvent.id, invoiceId: result.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(), selections,
                     totalInvoiced: calculatedFees.total, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: teamCode, invoiceStatus: result.status,
                     purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, schoolName: sponsorProfile.school, district: sponsorProfile.district,
                 };

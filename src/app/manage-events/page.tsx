@@ -32,7 +32,8 @@ import {
   FilePenLine,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Users
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -77,6 +78,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 
 const eventFormSchema = z.object({
   id: z.string().optional(),
@@ -95,14 +97,34 @@ const eventFormSchema = z.object({
 type EventFormValues = z.infer<typeof eventFormSchema>;
 type SortableColumnKey = 'name' | 'date' | 'location' | 'regularFee' | 'status';
 
+type StoredConfirmation = {
+  eventId?: string;
+  selections: Record<string, { section: string; uscfStatus: 'current' | 'new' | 'renewing' }>;
+};
+
+type RegistrationInfo = {
+  player: MasterPlayer;
+  details: {
+    section: string;
+    uscfStatus: 'current' | 'new' | 'renewing';
+  }
+};
+
 export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addEvent, updateEvent, deleteEvent } = useEvents();
+  const { database: allPlayers } = useMasterDb();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
+  
+  const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
+  const [registrations, setRegistrations] = useState<RegistrationInfo[]>([]);
+  const [selectedEventForReg, setSelectedEventForReg] = useState<Event | null>(null);
+
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
@@ -210,6 +232,27 @@ export default function ManageEventsPage() {
     setEventToDelete(event);
     setIsAlertOpen(true);
   };
+
+  const handleViewRegistrations = (event: Event) => {
+    const rawConfirmations = localStorage.getItem('confirmations');
+    const confirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
+    const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+    
+    const eventRegistrations: RegistrationInfo[] = [];
+    for (const conf of confirmations) {
+        if (conf.eventId === event.id) {
+            for (const playerId in conf.selections) {
+                const player = playerMap.get(playerId);
+                if (player) {
+                    eventRegistrations.push({ player, details: conf.selections[playerId] });
+                }
+            }
+        }
+    }
+    setRegistrations(eventRegistrations);
+    setSelectedEventForReg(event);
+    setIsRegistrationsOpen(true);
+  };
   
   const confirmDelete = () => {
     if (eventToDelete) {
@@ -304,6 +347,9 @@ export default function ManageEventsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                           <DropdownMenuItem onClick={() => handleViewRegistrations(event)}>
+                            <Users className="mr-2 h-4 w-4" /> View Registrations
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEditEvent(event)}>
                             <FilePenLine className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
@@ -478,6 +524,51 @@ export default function ManageEventsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isRegistrationsOpen} onOpenChange={setIsRegistrationsOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
+            <DialogDescription>
+              {registrations.length} player(s) registered for this event.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Player</TableHead>
+                  <TableHead>School</TableHead>
+                  <TableHead>Section</TableHead>
+                  <TableHead>USCF Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {registrations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center">
+                      No players registered yet.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  registrations.map(({ player, details }) => (
+                    <TableRow key={player.id}>
+                      <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
+                      <TableCell>{player.school}</TableCell>
+                      <TableCell>{details.section}</TableCell>
+                      <TableCell>
+                        <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={cn(details.uscfStatus === 'current' ? 'bg-green-600 text-white' : '', 'capitalize')}>
+                          {details.uscfStatus}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
