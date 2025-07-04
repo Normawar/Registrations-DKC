@@ -236,7 +236,9 @@ export default function PlayersPage() {
   }, [toast]);
 
   useEffect(() => {
-    workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url));
+    workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url), {
+      type: 'module'
+    });
 
     workerRef.current.onmessage = (event) => {
         const { rows, error, progress: parseProgress } = event.data;
@@ -1085,5 +1087,3 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
-
-    
