@@ -739,9 +739,9 @@ export default function PlayersPage() {
             <CardHeader>
                 <CardTitle>Master Player Database</CardTitle>
                 <div className="flex justify-between items-center">
-                    <CardDescription>
+                    <div className="text-sm text-muted-foreground">
                       There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database.
-                    </CardDescription>
+                    </div>
                     <div className="relative w-full max-w-sm">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
