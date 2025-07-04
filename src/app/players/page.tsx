@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -212,31 +212,30 @@ export default function PlayersPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workerRef = useRef<Worker>();
   const [isImporting, setIsImporting] = useState(false);
+  const toastControlsRef = useRef<{ id: string; dismiss: () => void; update: (props: any) => void; } | null>(null);
 
   useEffect(() => {
     workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url));
-
-    let toastControls: { id: string; dismiss: () => void; update: (props: any) => void; } | null = null;
 
     workerRef.current.onmessage = (event) => {
         const { rows, error, progress: parseProgress } = event.data;
 
         if (parseProgress !== undefined) {
-            if (toastControls) {
-                toastControls.update({ id: toastControls.id, description: `Processing database... ${parseProgress}% complete.` });
+            if (toastControlsRef.current) {
+                toastControlsRef.current.update({ id: toastControlsRef.current.id, description: `Processing database... ${parseProgress}% complete.` });
             }
             return;
         }
 
         if (error) {
             setIsImporting(false);
-            if (toastControls) toastControls.dismiss();
+            if (toastControlsRef.current) toastControlsRef.current.dismiss();
             toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error}`, duration: 10000 });
             return;
         }
 
-        if (toastControls) {
-            toastControls.update({ id: toastControls.id, description: 'Processing complete. Saving to database...' });
+        if (toastControlsRef.current) {
+            toastControlsRef.current.update({ id: toastControlsRef.current.id, description: 'Processing complete. Saving to database...' });
         }
 
         let totalErrorCount = 0;
@@ -320,9 +319,9 @@ export default function PlayersPage() {
             try {
                 const finalPlayerList = Array.from(dbMap.values());
                 await setAllPlayers(finalPlayerList, (progress) => {
-                    if (toastControls) {
-                        toastControls.update({
-                            id: toastControls.id,
+                    if (toastControlsRef.current) {
+                        toastControlsRef.current.update({
+                            id: toastControlsRef.current.id,
                             title: 'Saving to Database...',
                             description: `Writing records... ${progress}% complete.`
                         });
@@ -334,52 +333,51 @@ export default function PlayersPage() {
                     title = 'Import Partially Successful';
                     description += ` Could not parse ${totalErrorCount} rows.`;
                 }
-                if (toastControls) {
-                  toastControls.update({ id: toastControls.id, title: title, description: description, duration: 10000 });
+                if (toastControlsRef.current) {
+                  toastControlsRef.current.update({ id: toastControlsRef.current.id, title: title, description: description, duration: 10000 });
                 }
             } catch(err) {
-                if (toastControls) {
-                   toastControls.update({ id: toastControls.id, variant: 'destructive', title: 'Database Save Error', description: err instanceof Error ? err.message : 'An unknown error occurred.', duration: 10000 });
+                if (toastControlsRef.current) {
+                   toastControlsRef.current.update({ id: toastControlsRef.current.id, variant: 'destructive', title: 'Database Save Error', description: err instanceof Error ? err.message : 'An unknown error occurred.', duration: 10000 });
                 }
             } finally { 
               setIsImporting(false);
-              toastControls = null;
+              toastControlsRef.current = null;
             }
         })();
     };
 
     workerRef.current.onerror = (e) => {
         console.error("Worker error:", e);
-        if (toastControls) {
-            toastControls.update({ id: toastControls.id, variant: 'destructive', title: 'Import Failed', description: 'A worker error occurred. Please check the console.', duration: 10000 });
+        if (toastControlsRef.current) {
+            toastControlsRef.current.update({ id: toastControlsRef.current.id, variant: 'destructive', title: 'Import Failed', description: 'A worker error occurred. Please check the console.', duration: 10000 });
         }
         setIsImporting(false);
-        toastControls = null;
+        toastControlsRef.current = null;
     }
-
-    const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      setIsImporting(true);
-      toastControls = toast({
-          title: 'Starting Import...',
-          description: 'Preparing to process file.',
-          duration: Infinity,
-      });
-
-      workerRef.current?.postMessage(file);
-
-      if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-      }
-    };
-
 
     return () => { 
         workerRef.current?.terminate();
     };
   }, [allPlayers, setAllPlayers, toast]);
+  
+  const handleFileImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    toastControlsRef.current = toast({
+        title: 'Starting Import...',
+        description: 'Preparing to process file.',
+        duration: Infinity,
+    });
+
+    workerRef.current?.postMessage(file);
+
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  }, [toast]);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
