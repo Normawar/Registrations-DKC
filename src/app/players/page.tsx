@@ -247,19 +247,22 @@ export default function PlayersPage() {
             try {
                 const uscfId = row[1]?.trim();
                 const namePart = row[0]?.trim();
+                
                 if (!uscfId || !/^\d{8}$/.test(uscfId) || !namePart) {
-                    continue; 
+                    continue;
                 }
 
                 let lastName = '', firstName = '', middleName = '';
                 const cleanedName = namePart.replace(/\s+/g, ' ').trim();
-
+                
                 if (cleanedName.includes(',')) {
-                    const namePieces = cleanedName.split(',').map(p => p.trim()).filter(Boolean);
+                    const namePieces = cleanedName.split(',').map(p => p.trim());
                     lastName = namePieces[0] || '';
-                    const firstAndMiddle = (namePieces[1] || '').split(' ').filter(Boolean);
-                    firstName = firstAndMiddle.shift() || '';
-                    middleName = firstAndMiddle.join(' ');
+                    if (namePieces.length > 1 && namePieces[1]) {
+                        const firstAndMiddle = namePieces[1].split(' ').filter(Boolean);
+                        firstName = firstAndMiddle.shift() || '';
+                        middleName = firstAndMiddle.join(' ');
+                    }
                 } else {
                     const namePieces = cleanedName.split(' ').filter(Boolean);
                     if (namePieces.length > 0) {
@@ -270,17 +273,22 @@ export default function PlayersPage() {
 
                 if (!firstName && lastName) {
                     firstName = lastName;
-                    lastName = '(No Last Name)';
-                    middleName = '';
-                } else if (!lastName && firstName) {
-                    lastName = '(No Last Name)';
+                    lastName = '';
                 }
-                
+
                 if (!firstName) {
-                  throw new Error("Could not determine first name.");
+                  throw new Error(`Could not determine a valid name for row: ${row.join('\t')}`);
                 }
                 
                 const expirationDateStr = row[2] || '';
+                let expirationDateISO: string | undefined = undefined;
+                if (expirationDateStr) {
+                    const parsedDate = new Date(expirationDateStr);
+                    if (!isNaN(parsedDate.getTime())) {
+                        expirationDateISO = parsedDate.toISOString();
+                    }
+                }
+                
                 const state = row[3] || '';
                 const regularRatingString = row[4] || '';
                 const quickRatingString = row[5] || '';
@@ -292,13 +300,18 @@ export default function PlayersPage() {
                 const existingPlayer = dbMap.get(uscfId);
                 const playerRecord: MasterPlayer = {
                     ...(existingPlayer || { id: `p-${uscfId}`, school: "Independent", district: "None", events: 0, eventIds: [] }),
-                    uscfId: uscfId, firstName: firstName, lastName: lastName, middleName: middleName || undefined,
-                    state: state || undefined, expirationDate: expirationDateStr || undefined, regularRating: regularRating,
+                    uscfId: uscfId, 
+                    firstName: firstName, 
+                    lastName: lastName, 
+                    middleName: middleName || undefined,
+                    state: state || undefined,
+                    expirationDate: expirationDateISO, 
+                    regularRating: regularRating,
                     quickRating: quickRatingString || undefined,
                 };
                 dbMap.set(uscfId, playerRecord);
             } catch (e) { 
-                console.error("Error parsing a valid player row:", row, e); 
+                console.error("Error parsing a player row:", row, e); 
                 totalErrorCount++;
             }
         }
@@ -521,7 +534,7 @@ export default function PlayersPage() {
   const confirmDelete = () => {
     if (playerToDelete) {
       setAllPlayers(allPlayers.filter(p => p.id !== playerToDelete.id));
-      toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the roster.` });
+      toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the master database.` });
     }
     setIsAlertOpen(false);
     setPlayerToDelete(null);
@@ -1027,3 +1040,5 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
+
+    
