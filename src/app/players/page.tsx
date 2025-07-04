@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -182,6 +183,8 @@ export default function PlayersPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
   const [filterText, setFilterText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ROWS_PER_PAGE = 50;
 
   // States for player search
   const [isSearching, setIsSearching] = useState(false);
@@ -436,6 +439,10 @@ export default function PlayersPage() {
       }
     }
   }, [isPlayerDialogOpen, editingPlayer, form]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterText]);
   
   const filteredPlayers = useMemo(() => {
     if (!filterText) return allPlayers;
@@ -490,6 +497,17 @@ export default function PlayersPage() {
     }
     return sortablePlayers;
   }, [filteredPlayers, sortConfig]);
+
+  const totalPages = useMemo(() => {
+    if (sortedPlayers.length === 0) return 1;
+    return Math.ceil(sortedPlayers.length / ROWS_PER_PAGE);
+  }, [sortedPlayers]);
+
+  const paginatedPlayers = useMemo(() => {
+    const startIndex = (currentPage - 1) * ROWS_PER_PAGE;
+    const endIndex = startIndex + ROWS_PER_PAGE;
+    return sortedPlayers.slice(startIndex, endIndex);
+  }, [sortedPlayers, currentPage]);
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -768,7 +786,7 @@ export default function PlayersPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {sortedPlayers.map((player) => (
+                            {paginatedPlayers.map((player) => (
                             <TableRow key={player.id}>
                                 <TableCell className="font-medium">
                                 <div className="flex items-center gap-3">
@@ -814,6 +832,32 @@ export default function PlayersPage() {
                     </Table>
                 </ScrollArea>
             </CardContent>
+            <CardFooter className="flex items-center justify-between pt-6">
+                <div className="text-sm text-muted-foreground">
+                    Showing <strong>{paginatedPlayers.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                    >
+                        Previous
+                    </Button>
+                    <span className="text-sm font-medium">
+                        Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
+                    </span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                    >
+                        Next
+                    </Button>
+                </div>
+            </CardFooter>
         </Card>
       </div>
 
@@ -1038,5 +1082,3 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
-
-    
