@@ -100,6 +100,7 @@ import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Label } from '@/components/ui/label';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
@@ -130,14 +131,16 @@ const playerFormSchema = z.object({
   uscfExpiration: z.date().optional(),
   regularRating: z.coerce.number().optional(),
   quickRating: z.string().optional(),
-  grade: z.string().min(1, { message: "Please select a grade." }),
-  section: z.string().min(1, { message: "Please select a section." }),
-  email: z.string().email({ message: "Please enter a valid email." }),
+  grade: z.string().optional(),
+  section: z.string().optional(),
+  email: z.string().email({ message: "Please enter a valid email." }).optional().or(z.literal('')),
   phone: z.string().optional(),
-  dob: z.date({ required_error: "Date of birth is required."}),
-  zipCode: z.string().min(5, { message: "Please enter a valid 5-digit zip code." }),
+  dob: z.date().optional(),
+  zipCode: z.string().optional(),
   studentType: z.string().optional(),
   state: z.string().optional(),
+  school: z.string().min(1, { message: "School name is required."}),
+  district: z.string().min(1, { message: "District name is required."}),
 })
 .refine(data => {
     if (data.uscfId.toUpperCase() !== 'NEW') {
@@ -148,32 +151,18 @@ const playerFormSchema = z.object({
   message: "USCF Expiration is required unless ID is NEW.",
   path: ["uscfExpiration"],
 })
-.refine(data => {
-  if (data.uscfId.toUpperCase() !== 'NEW') {
-    return data.regularRating !== undefined && data.regularRating !== null && !isNaN(data.regularRating);
-  }
-  return true;
-}, {
-  message: "Rating is required unless USCF ID is NEW.",
-  path: ["regularRating"],
-})
 .refine((data) => {
     if (!data.grade || !data.section) {
-      return true; // Let other validators handle if these are missing
+      return true;
     }
-    // Championship section is open to all grades, so it's always valid.
     if (data.section === 'Championship') {
       return true;
     }
     const playerGradeLevel = gradeToNumber[data.grade];
     const sectionMaxLevel = sectionMaxGrade[data.section];
-    
-    // This can happen if the dropdown values are not in the map, but they should be.
     if (playerGradeLevel === undefined || sectionMaxLevel === undefined) {
       return true; 
     }
-
-    // A player's grade level must be less than or equal to the section's max grade level.
     return playerGradeLevel <= sectionMaxLevel;
   }, {
     message: "Player's grade is too high for this section.",
@@ -181,10 +170,10 @@ const playerFormSchema = z.object({
   });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
-type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
+type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state';
 
 
-export default function RosterPage() {
+export default function PlayersPage() {
   const { toast } = useToast();
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
@@ -192,6 +181,7 @@ export default function RosterPage() {
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
+  const [filterText, setFilterText] = useState('');
 
   // States for player search
   const [isSearching, setIsSearching] = useState(false);
@@ -201,14 +191,8 @@ export default function RosterPage() {
   const [searchState, setSearchState] = useState('ALL');
   
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded } = useMasterDb();
-  const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
-
-  const rosterPlayers = useMemo(() => {
-    if (!profile || !isDbLoaded || profile.role !== 'sponsor') return [];
-    return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
-  }, [allPlayers, profile, isDbLoaded]);
-
+  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount } = useMasterDb();
+  
   const dbStates = useMemo(() => {
     if (isDbLoaded) {
         const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
@@ -232,140 +216,156 @@ export default function RosterPage() {
   useEffect(() => {
     workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url));
 
-    const toastControls = {
-      current: null as null | { id: string; dismiss: () => void; update: (props: any) => void },
-    };
+    let toastControls: { id: string; dismiss: () => void; update: (props: any) => void; } | null = null;
 
     workerRef.current.onmessage = (event) => {
-        const { rows, error } = event.data;
+        const { rows, error, progress: parseProgress } = event.data;
+
+        if (parseProgress !== undefined) {
+            if (toastControls) {
+                toastControls.update({ id: toastControls.id, description: `Processing database... ${parseProgress}% complete.` });
+            }
+            return;
+        }
+
         if (error) {
             setIsImporting(false);
-            if (toastControls.current) toastControls.current.dismiss();
+            if (toastControls) toastControls.dismiss();
             toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error}`, duration: 10000 });
             return;
         }
 
-        let currentIndex = 0;
+        if (toastControls) {
+            toastControls.update({ id: toastControls.id, description: 'Processing complete. Saving to database...' });
+        }
+
         let totalErrorCount = 0;
         const dbMap = new Map<string, MasterPlayer>();
         allPlayers.forEach(p => dbMap.set(p.uscfId, p));
 
-        toastControls.current = toast({
-            title: 'Importing...',
-            description: 'Parsing file... 0% complete.',
-            duration: Infinity,
-        });
-
-        const processChunk = () => {
-            const CHUNK_SIZE = 10000;
-            const endIndex = Math.min(currentIndex + CHUNK_SIZE, rows.length);
-            let errorCountInChunk = 0;
-            for (let i = currentIndex; i < endIndex; i++) {
-                const row = rows[i] as string[];
-                
-                if (!row || !Array.isArray(row) || row.length < 6) {
-                    continue;
-                }
+        for (const row of rows) {
+            try {
                 const uscfId = row[1]?.trim();
-                if (!uscfId || !/^\d{8}$/.test(uscfId)) {
-                    continue;
+                const namePart = row[0]?.trim();
+                if (!uscfId || !/^\d{8}$/.test(uscfId) || !namePart) {
+                    continue; 
                 }
 
-                try {
-                    const namePart = row[0]?.trim();
-                    if (!namePart) {
-                        errorCountInChunk++;
-                        continue;
-                    }
-                    
-                    let lastName = '', firstName = '', middleName = '';
-                    if (namePart.includes(',')) {
-                        const parts = namePart.split(',');
-                        lastName = parts[0]?.trim() || '';
-                        const firstAndMiddle = (parts[1] || '').trim().split(/\s+/).filter(Boolean);
-                        firstName = firstAndMiddle.shift() || '';
-                        middleName = firstAndMiddle.join(' ') || '';
-                    } else {
-                        const parts = namePart.split(/\s+/).filter(Boolean);
-                        lastName = parts.pop() || '';
-                        firstName = parts.shift() || '';
-                        middleName = parts.join(' ') || '';
-                    }
+                let lastName = '', firstName = '', middleName = '';
+                const cleanedName = namePart.replace(/\s+/g, ' ').trim();
 
-                    if (!firstName && lastName) {
-                        firstName = lastName;
-                        lastName = '(No Last Name)';
+                if (cleanedName.includes(',')) {
+                    const namePieces = cleanedName.split(',').map(p => p.trim()).filter(Boolean);
+                    lastName = namePieces[0] || '';
+                    const firstAndMiddle = (namePieces[1] || '').split(' ').filter(Boolean);
+                    firstName = firstAndMiddle.shift() || '';
+                    middleName = firstAndMiddle.join(' ');
+                } else {
+                    const namePieces = cleanedName.split(' ').filter(Boolean);
+                    if (namePieces.length > 0) {
+                        lastName = namePieces.pop() || '';
+                        firstName = namePieces.join(' ');
                     }
-                    
-                    if (!firstName) {
-                        errorCountInChunk++;
-                        continue;
-                    }
-                    
-                    const expirationDateStr = row[2] || '';
-                    const state = row[3] || '';
-                    const regularRatingString = row[4] || '';
-                    const quickRatingString = row[5] || '';
-                    let regularRating: number | undefined = undefined;
-                    if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated') {
-                        const ratingMatch = regularRatingString.match(/^(\d+)/);
-                        if (ratingMatch && ratingMatch[1]) regularRating = parseInt(ratingMatch[1], 10);
-                    }
-                    const existingPlayer = dbMap.get(uscfId);
-                    const playerRecord: MasterPlayer = {
-                        ...(existingPlayer || { id: `p-${uscfId}`, school: "Independent", district: "None", events: 0, eventIds: [] }),
-                        uscfId: uscfId, firstName: firstName, lastName: lastName, middleName: middleName || undefined,
-                        state: state || undefined, expirationDate: expirationDateStr || undefined, regularRating: regularRating,
-                        quickRating: quickRatingString || undefined,
-                    };
-                    dbMap.set(uscfId, playerRecord);
-                } catch (e) { 
-                    console.error("Error parsing a valid player row:", row, e); 
-                    errorCountInChunk++; 
                 }
+
+                if (!firstName && lastName) {
+                    firstName = lastName;
+                    lastName = '(No Last Name)';
+                    middleName = '';
+                } else if (!lastName && firstName) {
+                    lastName = '(No Last Name)';
+                }
+                
+                if (!firstName) {
+                  throw new Error("Could not determine first name.");
+                }
+                
+                const expirationDateStr = row[2] || '';
+                const state = row[3] || '';
+                const regularRatingString = row[4] || '';
+                const quickRatingString = row[5] || '';
+                let regularRating: number | undefined = undefined;
+                if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated') {
+                    const ratingMatch = regularRatingString.match(/^(\d+)/);
+                    if (ratingMatch && ratingMatch[1]) regularRating = parseInt(ratingMatch[1], 10);
+                }
+                const existingPlayer = dbMap.get(uscfId);
+                const playerRecord: MasterPlayer = {
+                    ...(existingPlayer || { id: `p-${uscfId}`, school: "Independent", district: "None", events: 0, eventIds: [] }),
+                    uscfId: uscfId, firstName: firstName, lastName: lastName, middleName: middleName || undefined,
+                    state: state || undefined, expirationDate: expirationDateStr || undefined, regularRating: regularRating,
+                    quickRating: quickRatingString || undefined,
+                };
+                dbMap.set(uscfId, playerRecord);
+            } catch (e) { 
+                console.error("Error parsing a valid player row:", row, e); 
+                totalErrorCount++;
             }
-            totalErrorCount += errorCountInChunk;
-            currentIndex = endIndex;
-            const progress = Math.round((currentIndex / rows.length) * 100);
-            if (toastControls.current) {
-              toastControls.current.update({ id: toastControls.current.id, description: `Parsing file... ${progress}% complete.` });
-            }
-            if (currentIndex < rows.length) {
-                setTimeout(processChunk, 0);
-            } else {
-                (async () => {
-                    try {
-                        const finalPlayerList = Array.from(dbMap.values());
-                        await setAllPlayers(finalPlayerList, (progress) => {
-                            if (toastControls.current) {
-                                toastControls.current.update({
-                                    id: toastControls.current.id,
-                                    title: 'Saving to Database...',
-                                    description: `Writing records... ${progress}% complete.`
-                                });
-                            }
+        }
+        
+        (async () => {
+            try {
+                const finalPlayerList = Array.from(dbMap.values());
+                await setAllPlayers(finalPlayerList, (progress) => {
+                    if (toastControls) {
+                        toastControls.update({
+                            id: toastControls.id,
+                            title: 'Saving to Database...',
+                            description: `Writing records... ${progress}% complete.`
                         });
-                        let title = 'Database Updated Successfully!';
-                        let description = `The database now contains ${finalPlayerList.length.toLocaleString()} unique players.`;
-                        if (totalErrorCount > 0) {
-                            title = 'Import Partially Successful';
-                            description += ` Could not parse ${totalErrorCount} rows.`;
-                        }
-                        if (toastControls.current) {
-                          toastControls.current.update({ id: toastControls.current.id, title: title, description: description, duration: 10000 });
-                        }
-                    } catch(err) {
-                        if (toastControls.current) {
-                           toastControls.current.update({ id: toastControls.current.id, variant: 'destructive', title: 'Database Save Error', description: err instanceof Error ? err.message : 'An unknown error occurred.', duration: 10000 });
-                        }
-                    } finally { setIsImporting(false); }
-                })();
+                    }
+                });
+                let title = 'Import Complete!';
+                let description = `The database now contains ${finalPlayerList.length.toLocaleString()} players.`;
+                if (totalErrorCount > 0) {
+                    title = 'Import Partially Successful';
+                    description += ` Could not parse ${totalErrorCount} rows.`;
+                }
+                if (toastControls) {
+                  toastControls.update({ id: toastControls.id, title: title, description: description, duration: 10000 });
+                }
+            } catch(err) {
+                if (toastControls) {
+                   toastControls.update({ id: toastControls.id, variant: 'destructive', title: 'Database Save Error', description: err instanceof Error ? err.message : 'An unknown error occurred.', duration: 10000 });
+                }
+            } finally { 
+              setIsImporting(false);
+              toastControls = null;
             }
-        };
-        processChunk();
+        })();
     };
 
-    return () => { workerRef.current?.terminate(); };
+    workerRef.current.onerror = (e) => {
+        console.error("Worker error:", e);
+        if (toastControls) {
+            toastControls.update({ id: toastControls.id, variant: 'destructive', title: 'Import Failed', description: 'A worker error occurred. Please check the console.', duration: 10000 });
+        }
+        setIsImporting(false);
+        toastControls = null;
+    }
+
+    const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setIsImporting(true);
+      toastControls = toast({
+          title: 'Starting Import...',
+          description: 'Preparing to process file.',
+          duration: Infinity,
+      });
+
+      workerRef.current?.postMessage(file);
+
+      if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+      }
+    };
+
+
+    return () => { 
+        workerRef.current?.terminate();
+    };
   }, [allPlayers, setAllPlayers, toast]);
 
   const form = useForm<PlayerFormValues>({
@@ -386,6 +386,8 @@ export default function RosterPage() {
       zipCode: '',
       studentType: undefined,
       state: '',
+      school: '',
+      district: '',
     }
   });
 
@@ -414,6 +416,8 @@ export default function RosterPage() {
           zipCode: '',
           studentType: undefined,
           state: '',
+          school: 'Independent',
+          district: 'None',
         });
         setSearchFirstName('');
         setSearchLastName('');
@@ -421,43 +425,43 @@ export default function RosterPage() {
       }
     }
   }, [isPlayerDialogOpen, editingPlayer, form]);
+  
+  const filteredPlayers = useMemo(() => {
+    if (!filterText) return allPlayers;
+    const lowercasedFilter = filterText.toLowerCase();
+    return allPlayers.filter(player => {
+        return (
+            player.firstName.toLowerCase().includes(lowercasedFilter) ||
+            player.lastName.toLowerCase().includes(lowercasedFilter) ||
+            player.uscfId.includes(lowercasedFilter) ||
+            player.school.toLowerCase().includes(lowercasedFilter) ||
+            player.district.toLowerCase().includes(lowercasedFilter)
+        );
+    });
+  }, [allPlayers, filterText]);
 
   const sortedPlayers = useMemo(() => {
-    const sortablePlayers = [...rosterPlayers];
+    const sortablePlayers = [...filteredPlayers];
     if (sortConfig) {
       sortablePlayers.sort((a, b) => {
         const key = sortConfig.key;
-        let aVal: any;
-        let bVal: any;
+        let aVal: any = a[key as keyof MasterPlayer] ?? '';
+        let bVal: any = b[key as keyof MasterPlayer] ?? '';
         let result = 0;
 
-        if (key === 'teamCode') {
-            if (!profile) return 0;
-            const codeA = generateTeamCode({ schoolName: profile.school, district: profile.district, studentType: a.studentType });
-            const codeB = generateTeamCode({ schoolName: profile.school, district: profile.district, studentType: b.studentType });
-            if (codeA < codeB) result = -1;
-            if (codeA > codeB) result = 1;
+        if (key === 'grade' && typeof a.grade === 'string' && typeof b.grade === 'string') {
+          aVal = gradeToNumber[a.grade] ?? -1;
+          bVal = gradeToNumber[b.grade] ?? -1;
+        } else if (key === 'regularRating') {
+          aVal = a.regularRating ?? -Infinity;
+          bVal = b.regularRating ?? -Infinity;
+        }
+
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+            result = aVal.localeCompare(bVal);
         } else {
-            aVal = a[key as keyof MasterPlayer];
-            bVal = b[key as keyof MasterPlayer];
-
-            if (key === 'grade' && typeof a.grade === 'string' && typeof b.grade === 'string') {
-              aVal = gradeToNumber[a.grade] ?? -1;
-              bVal = gradeToNumber[b.grade] ?? -1;
-            } else if (key === 'regularRating') {
-              aVal = a.regularRating ?? -Infinity;
-              bVal = b.regularRating ?? -Infinity;
-            } else if (key === 'lastName') {
-                aVal = a.lastName;
-                bVal = b.lastName;
-            }
-
-            if (typeof aVal === 'string' && typeof bVal === 'string') {
-                result = aVal.localeCompare(bVal);
-            } else {
-                if (aVal < bVal) result = -1;
-                if (aVal > bVal) result = 1;
-            }
+            if (aVal < bVal) result = -1;
+            if (aVal > bVal) result = 1;
         }
 
         if (result === 0 && key === 'lastName') {
@@ -474,7 +478,7 @@ export default function RosterPage() {
         });
     }
     return sortablePlayers;
-  }, [rosterPlayers, sortConfig, profile]);
+  }, [filteredPlayers, sortConfig]);
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -575,8 +579,6 @@ export default function RosterPage() {
   };
 
   function onSubmit(values: PlayerFormValues) {
-    if (!profile) return;
-
     if (values.uscfId.toUpperCase() !== 'NEW') {
       const existingPlayerWithUscfId = allPlayers.find(p => 
         p.uscfId.toLowerCase() === values.uscfId.toLowerCase() && p.id !== values.id
@@ -590,33 +592,12 @@ export default function RosterPage() {
         return;
       }
     }
-
-    const isDuplicatePlayer = allPlayers.some(p => 
-      p.id !== values.id &&
-      p.firstName.trim().toLowerCase() === values.firstName.trim().toLowerCase() &&
-      p.lastName.trim().toLowerCase() === values.lastName.trim().toLowerCase() &&
-      p.dob && new Date(p.dob).getTime() === values.dob.getTime()
-    );
-
-    if (isDuplicatePlayer) {
-      form.setError("firstName", { type: "manual", message: "A player with this name and date of birth already exists." });
-      return;
-    }
     
-    const isEmailUnique = !allPlayers.some(p => p.email && p.email.toLowerCase() === values.email.toLowerCase() && p.id !== values.id);
-
-    if (!isEmailUnique) {
-      const existingPlayer = allPlayers.find(p => p.email && p.email.toLowerCase() === values.email.toLowerCase());
-      form.setError("email", { type: "manual", message: `Email already used by ${existingPlayer?.firstName} ${existingPlayer?.lastName}.` });
-      return;
-    }
-
     const playerRecord: MasterPlayer = {
+      ...editingPlayer, // Preserve fields not in the form like events
       ...values,
       id: editingPlayer?.id || `p-${Date.now()}`,
-      school: profile.school,
-      district: profile.district,
-      dob: values.dob.toISOString(),
+      dob: values.dob?.toISOString(),
       uscfExpiration: values.uscfExpiration?.toISOString(),
       events: editingPlayer?.events || 0,
       eventIds: editingPlayer?.eventIds || [],
@@ -627,7 +608,7 @@ export default function RosterPage() {
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
     } else {
       setAllPlayers([...allPlayers, playerRecord]);
-      toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
+      toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the master database.`});
     }
     setIsPlayerDialogOpen(false);
     setEditingPlayer(null);
@@ -693,27 +674,15 @@ export default function RosterPage() {
     toast({ title: 'Player Selected', description: `${player.firstName} ${player.lastName}'s data has been auto-filled.` });
   };
   
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    workerRef.current?.postMessage(file);
-
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
-  };
-
 
   return (
     <AppLayout>
       <div className="space-y-8">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Roster</h1>
+            <h1 className="text-3xl font-bold font-headline">All Players</h1>
             <p className="text-muted-foreground">
-              Manage your school's player roster.
+              Manage the master database of all players in the system.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -726,152 +695,114 @@ export default function RosterPage() {
             />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
                 {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                Upload Database (.txt)
+                Import Database (.txt)
             </Button>
             <Button onClick={handleAddPlayer}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Player
             </Button>
           </div>
         </div>
-
-        {profile ? (
-          <Card className="bg-secondary/50 border-dashed">
-              <CardHeader>
-                  <CardTitle className="text-lg">Sponsor Information</CardTitle>
-                  <CardDescription>This district and school will be associated with all players added to this roster.</CardDescription>
-              </CardHeader>
-              <CardContent className="grid sm:grid-cols-3 gap-4">
-                  <div>
-                      <p className="text-sm font-medium text-muted-foreground">District</p>
-                      <p className="font-semibold">{profile.district}</p>
-                  </div>
-                  <div>
-                      <p className="text-sm font-medium text-muted-foreground">School</p>
-                      <p className="font-semibold">{profile.school}</p>
-                  </div>
-                  <div>
-                      <p className="text-sm font-medium text-muted-foreground">Team Code</p>
-                      <p className="font-semibold font-mono">{teamCode}</p>
-                  </div>
-              </CardContent>
-          </Card>
-        ) : (
-          <Card className="bg-secondary/50 border-dashed animate-pulse">
-              <CardHeader>
-                  <Skeleton className="h-6 w-1/4" />
-                  <Skeleton className="h-4 w-2/3 mt-1" />
-              </CardHeader>
-              <CardContent className="grid sm:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                      <Skeleton className="h-4 w-1/3" />
-                      <Skeleton className="h-5 w-2/3" />
-                  </div>
-                  <div className="space-y-2">
-                      <Skeleton className="h-4 w-1/3" />
-                      <Skeleton className="h-5 w-3/4" />
-                  </div>
-                  <div className="space-y-2">
-                      <Skeleton className="h-4 w-1/3" />
-                      <Skeleton className="h-5 w-1/2" />
-                  </div>
-              </CardContent>
-          </Card>
-        )}
         
         <Card>
-          <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('lastName')}>
-                      Player
-                      {getSortIcon('lastName')}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('teamCode')}>
-                        Team Code
-                        {getSortIcon('teamCode')}
-                    </Button>
-                  </TableHead>
-                   <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
-                      USCF ID
-                      {getSortIcon('uscfId')}
-                    </Button>
-                  </TableHead>
-                   <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
-                      Rating
-                      {getSortIcon('regularRating')}
-                    </Button>
-                  </TableHead>
-                   <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('grade')}>
-                      Grade
-                      {getSortIcon('grade')}
-                    </Button>
-                  </TableHead>
-                   <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('section')}>
-                      Section
-                      {getSortIcon('section')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedPlayers.map((player) => (
-                  <TableRow key={player.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-9 w-9">
-                          <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                          <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
-                           <div className="text-sm text-muted-foreground">{player.email}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      {profile ? generateTeamCode({
-                        schoolName: profile.school,
-                        district: profile.district,
-                        studentType: player.studentType
-                      }) : '...'}
-                    </TableCell>
-                    <TableCell>{player.uscfId}</TableCell>
-                    <TableCell>{player.regularRating || 'N/A'}</TableCell>
-                    <TableCell>{player.grade}</TableCell>
-                    <TableCell>{player.section}</TableCell>
-                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEditPlayer(player)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
+            <CardHeader>
+                <CardTitle>Master Player Database</CardTitle>
+                <div className="flex justify-between items-center">
+                    <CardDescription>
+                      There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database.
+                    </CardDescription>
+                    <div className="relative w-full max-w-sm">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Filter players by name, ID, school..."
+                            value={filterText}
+                            onChange={e => setFilterText(e.target.value)}
+                            className="pl-10"
+                        />
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="h-[60vh]">
+                    <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                                <TableHead className="p-0">
+                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('lastName')}>
+                                        Player {getSortIcon('lastName')}
+                                    </Button>
+                                </TableHead>
+                                <TableHead className="p-0">
+                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('school')}>
+                                        School / District {getSortIcon('school')}
+                                    </Button>
+                                </TableHead>
+                                <TableHead className="p-0">
+                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
+                                        USCF ID {getSortIcon('uscfId')}
+                                    </Button>
+                                </TableHead>
+                                <TableHead className="p-0">
+                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
+                                        Rating {getSortIcon('regularRating')}
+                                    </Button>
+                                </TableHead>
+                                <TableHead className="p-0">
+                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('state')}>
+                                        State {getSortIcon('state')}
+                                    </Button>
+                                </TableHead>
+                                <TableHead>
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedPlayers.map((player) => (
+                            <TableRow key={player.id}>
+                                <TableCell className="font-medium">
+                                <div className="flex items-center gap-3">
+                                    <Avatar className="h-9 w-9">
+                                    <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                    <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                    {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
+                                    <div className="text-sm text-muted-foreground">{player.email}</div>
+                                    </div>
+                                </div>
+                                </TableCell>
+                                <TableCell>
+                                    <div>
+                                        <p className="font-medium">{player.school}</p>
+                                        <p className="text-sm text-muted-foreground">{player.district}</p>
+                                    </div>
+                                </TableCell>
+                                <TableCell>{player.uscfId}</TableCell>
+                                <TableCell>{player.regularRating || 'N/A'}</TableCell>
+                                <TableCell>{player.state}</TableCell>
+                                <TableCell className="text-right">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                    <Button aria-haspopup="true" size="icon" variant="ghost">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                        <span className="sr-only">Toggle menu</span>
+                                    </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => handleEditPlayer(player)}>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">
+                                        Delete
+                                    </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </CardContent>
         </Card>
       </div>
 
@@ -950,6 +881,10 @@ export default function RosterPage() {
                                 <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input placeholder="Michael" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={form.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input placeholder="e.g., Lincoln High School" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input placeholder="e.g., Lincoln ISD" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={form.control} name="uscfId" render={({ field }) => (
                                   <FormItem>
@@ -991,7 +926,7 @@ export default function RosterPage() {
                                         }
                                     };
                                     return (
-                                        <FormItem className="flex flex-col"><FormLabel>Date of Birth</FormLabel>
+                                        <FormItem className="flex flex-col"><FormLabel>Date of Birth (Optional)</FormLabel>
                                         <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                                             <div className="relative">
                                             <FormControl><Input placeholder="MM/DD/YYYY" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onBlur={handleBlur} /></FormControl>
@@ -1033,21 +968,21 @@ export default function RosterPage() {
                                 }} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade (Optional)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section (Optional)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Player Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Player Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Player Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Player Zip Code</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Player Zip Code (Optional)</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField
                                   control={form.control}
                                   name="state"
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>State</FormLabel>
+                                      <FormLabel>State (Optional)</FormLabel>
                                       <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                           <SelectTrigger>
@@ -1062,26 +997,6 @@ export default function RosterPage() {
                                     </FormItem>
                                   )}
                                 />
-                                {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                                  <FormField control={form.control} name="studentType" render={({ field }) => (
-                                      <FormItem>
-                                        <FormLabel>Student Type (PSJA Only)</FormLabel>
-                                        <FormControl>
-                                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center gap-4 pt-2">
-                                            <FormItem className="flex items-center space-x-2">
-                                              <FormControl><RadioGroupItem value="gt" id={`gt-radio-${editingPlayer?.id || 'new'}`} /></FormControl>
-                                              <FormLabel htmlFor={`gt-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">GT Student</FormLabel>
-                                            </FormItem>
-                                            <FormItem className="flex items-center space-x-2">
-                                              <FormControl><RadioGroupItem value="independent" id={`ind-radio-${editingPlayer?.id || 'new'}`} /></FormControl>
-                                              <FormLabel htmlFor={`ind-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">Independent</FormLabel>
-                                            </FormItem>
-                                          </RadioGroup>
-                                        </FormControl>
-                                        <FormMessage />
-                                      </FormItem>
-                                  )} />
-                                )}
                             </div>
                         </form>
                     </Form>
@@ -1099,7 +1014,7 @@ export default function RosterPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove {playerToDelete?.firstName} {playerToDelete?.lastName} from your roster.
+              This will permanently remove {playerToDelete?.firstName} {playerToDelete?.lastName} from the master database. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
