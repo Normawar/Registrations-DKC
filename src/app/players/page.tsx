@@ -666,9 +666,9 @@ export default function PlayersPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Master Player Database</CardTitle>
-                <CardDescription>
+                <div className="text-sm text-muted-foreground">
                     There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
-                </CardDescription>
+                </div>
                 <div className="pt-2 flex flex-col sm:flex-row gap-4">
                     <div className="flex-1 space-y-1">
                         <Label htmlFor="search-first-name">First Name</Label>
