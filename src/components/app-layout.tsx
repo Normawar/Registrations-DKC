@@ -46,7 +46,7 @@ const sponsorMenuItems = [
 const organizerMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
   { href: "/manage-events", icon: FolderKanban, label: "Manage Events" },
-  { href: "/players", icon: PawnIcon, label: "All Players" },
+  { href: "/players", icon: PawnIcon, label: "Master Player Database" },
   { href: "/schools", icon: School, label: "Schools & Districts" },
   { href: "/invoices", icon: Receipt, label: "All Invoices" },
   { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
