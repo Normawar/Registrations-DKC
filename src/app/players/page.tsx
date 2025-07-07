@@ -186,6 +186,7 @@ export default function PlayersPage() {
   const [searchFirstName, setSearchFirstName] = useState('');
   const [searchLastName, setSearchLastName] = useState('');
   const [searchUscfId, setSearchUscfId] = useState('');
+  const [searchState, setSearchState] = useState('ALL');
 
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
@@ -377,24 +378,25 @@ export default function PlayersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchFirstName, searchLastName, searchUscfId]);
+  }, [searchFirstName, searchLastName, searchUscfId, searchState]);
   
   const filteredPlayers = useMemo(() => {
     const lowerFirstName = searchFirstName.toLowerCase();
     const lowerLastName = searchLastName.toLowerCase();
 
-    if (!lowerFirstName && !lowerLastName && !searchUscfId) {
+    if (!lowerFirstName && !lowerLastName && !searchUscfId && searchState === 'ALL') {
         return allPlayers;
     }
 
     return allPlayers.filter(player => {
+        const stateMatch = searchState === 'ALL' || player.state === searchState;
         const firstNameMatch = !lowerFirstName || player.firstName.toLowerCase().includes(lowerFirstName);
         const lastNameMatch = !lowerLastName || player.lastName.toLowerCase().includes(lowerLastName);
         const uscfIdMatch = !searchUscfId || player.uscfId.includes(searchUscfId);
 
-        return firstNameMatch && lastNameMatch && uscfIdMatch;
+        return stateMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
     });
-  }, [allPlayers, searchFirstName, searchLastName, searchUscfId]);
+  }, [allPlayers, searchFirstName, searchLastName, searchUscfId, searchState]);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...filteredPlayers];
@@ -669,8 +671,19 @@ export default function PlayersPage() {
                 <div className="text-sm text-muted-foreground">
                     There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
                 </div>
-                <div className="pt-2 flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1 space-y-1">
+                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="search-state">State</Label>
+                        <Select value={searchState} onValueChange={setSearchState}>
+                            <SelectTrigger id="search-state">
+                                <SelectValue placeholder="All States" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {dbStates.map(s => <SelectItem key={s} value={s}>{s === 'ALL' ? 'All States' : s}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1">
                         <Label htmlFor="search-first-name">First Name</Label>
                         <Input
                             id="search-first-name"
@@ -679,7 +692,7 @@ export default function PlayersPage() {
                             onChange={e => setSearchFirstName(e.target.value)}
                         />
                     </div>
-                    <div className="flex-1 space-y-1">
+                    <div className="space-y-1">
                         <Label htmlFor="search-last-name">Last Name</Label>
                         <Input
                             id="search-last-name"
@@ -688,7 +701,7 @@ export default function PlayersPage() {
                             onChange={e => setSearchLastName(e.target.value)}
                         />
                     </div>
-                    <div className="flex-1 space-y-1">
+                    <div className="space-y-1">
                         <Label htmlFor="search-uscf-id">USCF ID</Label>
                         <Input
                             id="search-uscf-id"
