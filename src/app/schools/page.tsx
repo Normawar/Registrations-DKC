@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
@@ -72,7 +73,7 @@ const schoolFormSchema = z.object({
 type SchoolFormValues = z.infer<typeof schoolFormSchema>;
 
 export default function SchoolsPage() {
-  const { toast } } from useToast();
+  const { toast } = useToast();
   const [schools, setSchools] = useState<SchoolWithTeamCode[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState<SchoolWithTeamCode | null>(null);
