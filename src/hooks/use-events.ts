@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -13,7 +14,9 @@ export type Event = {
   veryLateFee: number;
   dayOfFee: number;
   imageUrl?: string;
+  imageName?: string;
   pdfUrl?: string;
+  pdfName?: string;
 };
 
 const initialEvents: Event[] = [
@@ -28,7 +31,9 @@ const initialEvents: Event[] = [
         veryLateFee: 30,
         dayOfFee: 35,
         imageUrl: "https://placehold.co/100x100.png",
+        imageName: "Event Banner",
         pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+        pdfName: "Spring Flyer",
     },
     {
         id: '2',
@@ -52,6 +57,7 @@ const initialEvents: Event[] = [
         veryLateFee: 30,
         dayOfFee: 35,
         pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+        pdfName: "Autumn Classic PDF",
     },
     {
         id: '4',
@@ -75,6 +81,7 @@ const initialEvents: Event[] = [
         veryLateFee: 25,
         dayOfFee: 30,
         imageUrl: "https://placehold.co/100x100.png",
+        imageName: "Blitz Image"
     },
 ];
 

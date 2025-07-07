@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, ReactNode, useMemo } from 'react';
-import { format, differenceInHours, isSameDay } from 'date-fns';
+import { format, differenceInHours, isSameDay, startOfToday } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -132,7 +132,9 @@ export default function EventsPage() {
     };
 
     const sortedEvents = useMemo(() => {
-        const sortableEvents = [...events];
+        const today = startOfToday();
+        const sortableEvents = events.filter(event => new Date(event.date) >= today);
+
         if (sortConfig) {
             sortableEvents.sort((a, b) => {
                 let aValue: string | number | Date;
@@ -578,12 +580,20 @@ export default function EventsPage() {
                       <TableCell>{clientReady ? format(new Date(event.date), 'PPP') : ''}</TableCell>
                       <TableCell>{event.location}</TableCell>
                       <TableCell>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col items-start gap-1">
                               {event.imageUrl && (
-                                  <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title="Event Image"><ImageIcon className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                                  <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                    <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title={event.imageName}>
+                                      <ImageIcon className="mr-2 h-4 w-4" /> {event.imageName || 'Image'}
+                                    </a>
+                                  </Button>
                               )}
                               {event.pdfUrl && event.pdfUrl !== '#' && (
-                                  <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title="Event PDF"><FileText className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                                  <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                    <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title={event.pdfName}>
+                                      <FileText className="mr-2 h-4 w-4" /> {event.pdfName || 'PDF'}
+                                    </a>
+                                  </Button>
                               )}
                               {(!event.imageUrl && (!event.pdfUrl || event.pdfUrl === '#')) && <span className="text-xs text-muted-foreground">None</span>}
                           </div>

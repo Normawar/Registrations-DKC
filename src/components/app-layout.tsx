@@ -27,7 +27,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { requestsData } from "@/lib/data/requests-data";
@@ -37,6 +37,7 @@ const sponsorMenuItems = [
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/roster", icon: PawnIcon, label: "Roster" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
+  { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
   { href: "/invoices", icon: Receipt, label: "Invoices" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
@@ -51,6 +52,7 @@ const organizerMenuItems = [
   { href: "/invoices", icon: Receipt, label: "All Invoices" },
   { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
   { href: "/events", icon: RookIcon, label: "Upcoming Events" },
+  { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
 ];
@@ -59,6 +61,7 @@ const individualMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
   { href: "/individual-dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
+  { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
   { href: "/invoices", icon: Receipt, label: "Invoices" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },

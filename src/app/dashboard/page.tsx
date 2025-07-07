@@ -86,12 +86,20 @@ export default function DashboardPage() {
                 {upcomingEvents.map((event) => (
                   <div key={event.id} className="flex justify-between items-center">
                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-start gap-1">
                             {event.imageUrl && (
-                                <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title="Event Image"><ImageIcon className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                  <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title={event.imageName}>
+                                    <ImageIcon className="mr-2 h-4 w-4" /> {event.imageName || 'Image'}
+                                  </a>
+                                </Button>
                             )}
                             {event.pdfUrl && event.pdfUrl !== '#' && (
-                                <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title="Event PDF"><FileText className="h-4 w-4 text-muted-foreground hover:text-primary" /></a>
+                                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                  <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title={event.pdfName}>
+                                    <FileText className="mr-2 h-4 w-4" /> {event.pdfName || 'PDF'}
+                                  </a>
+                                </Button>
                             )}
                         </div>
                         <div>

@@ -92,7 +92,9 @@ const eventFormSchema = z.object({
   veryLateFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   dayOfFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   imageUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+  imageName: z.string().optional(),
   pdfUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+  pdfName: z.string().optional(),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -140,7 +142,9 @@ export default function ManageEventsPage() {
       veryLateFee: 30,
       dayOfFee: 35,
       imageUrl: '',
+      imageName: '',
       pdfUrl: '',
+      pdfName: '',
     },
   });
 
@@ -214,7 +218,9 @@ export default function ManageEventsPage() {
           veryLateFee: 30,
           dayOfFee: 35,
           imageUrl: '',
+          imageName: '',
           pdfUrl: '',
+          pdfName: '',
         });
       }
     }
@@ -257,7 +263,9 @@ export default function ManageEventsPage() {
               veryLateFee: parseFloat(row.veryLateFee),
               dayOfFee: parseFloat(row.dayOfFee),
               imageUrl: row.imageUrl || undefined,
+              imageName: row.imageName || undefined,
               pdfUrl: row.pdfUrl || undefined,
+              pdfName: row.pdfName || undefined,
             };
 
             if (isNaN(event.rounds) || isNaN(event.regularFee) || isNaN(event.lateFee) || isNaN(event.veryLateFee) || isNaN(event.dayOfFee)) {
@@ -565,18 +573,36 @@ export default function ManageEventsPage() {
                 </Card>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <FormField control={form.control} name="imageUrl" render={({ field }) => (
+              <div className="space-y-4">
+                <FormField control={form.control} name="imageUrl" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Image URL (Optional)</FormLabel>
                     <FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
+                <FormField control={form.control} name="imageName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Image Name (Optional)</FormLabel>
+                    <FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl>
+                    <FormDescription>A descriptive name for the image attachment.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <div className="space-y-4">
                  <FormField control={form.control} name="pdfUrl" render={({ field }) => (
                   <FormItem>
                     <FormLabel>PDF Flyer URL (Optional)</FormLabel>
                     <FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                 <FormField control={form.control} name="pdfName" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>PDF Name (Optional)</FormLabel>
+                    <FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl>
+                     <FormDescription>A descriptive name for the PDF attachment.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )} />
