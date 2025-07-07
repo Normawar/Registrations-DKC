@@ -226,14 +226,14 @@ export default function PlayersPage() {
         const finalStateList = [
             'ALL',
             'TX',
-            '', // For "No State"
+            'NO_STATE', 
             ...sortedUsStates,
             ...sortedNonUsRegions
         ];
         
         return finalStateList;
     }
-    return ['ALL', 'TX', ''];
+    return ['ALL', 'TX', 'NO_STATE'];
   }, [isDbLoaded, allPlayers]);
   
   const formStates = useMemo(() => {
@@ -415,7 +415,9 @@ export default function PlayersPage() {
     }
 
     return allPlayers.filter(player => {
-        const stateMatch = searchState === 'ALL' || (player.state || '') === searchState;
+        const stateMatch = searchState === 'ALL' 
+            || (searchState === 'NO_STATE' && !player.state)
+            || player.state === searchState;
         const firstNameMatch = !lowerFirstName || player.firstName.toLowerCase().includes(lowerFirstName);
         const lastNameMatch = !lowerLastName || player.lastName.toLowerCase().includes(lowerLastName);
         const uscfIdMatch = !searchUscfId || player.uscfId.includes(searchUscfId);
@@ -707,7 +709,7 @@ export default function PlayersPage() {
                             <SelectContent>
                                 {dbStates.map(s => (
                                     <SelectItem key={s} value={s}>
-                                        {s === 'ALL' ? 'All States' : s === '' ? 'No State' : s}
+                                        {s === 'ALL' ? 'All States' : s === 'NO_STATE' ? 'No State' : s}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
@@ -1078,4 +1080,3 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
-
