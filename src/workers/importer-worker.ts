@@ -18,6 +18,7 @@ self.onmessage = (event) => {
     existingPlayers.forEach(p => dbMap.set(p.uscfId, p));
 
     let skippedCount = 0;
+    let duplicateIdCount = 0;
 
     Papa.parse(file, {
         worker: false, // Run parsing in this worker thread, not another one.
@@ -34,6 +35,10 @@ self.onmessage = (event) => {
                     if (!uscfId) {
                         skippedCount++;
                         continue;
+                    }
+
+                    if (dbMap.has(uscfId)) {
+                        duplicateIdCount++;
                     }
 
                     const namePart = row[0]?.trim();
@@ -56,7 +61,7 @@ self.onmessage = (event) => {
                             // Handles "First Middle Last" and "First"
                             const namePieces = cleanedName.split(' ').filter(Boolean);
                             if (namePieces.length === 1) {
-                                // Assume a single word is a last name.
+                                // If only one word, treat it as the last name.
                                 lastName = namePieces[0];
                             } else if (namePieces.length > 1) {
                                 lastName = namePieces.pop() || '';
@@ -128,10 +133,10 @@ self.onmessage = (event) => {
             }
             
             const finalPlayerList = Array.from(dbMap.values());
-            self.postMessage({ players: finalPlayerList, skipped: skippedCount });
+            self.postMessage({ players: finalPlayerList, skipped: skippedCount, duplicates: duplicateIdCount });
         },
         error: (error: any) => {
-            self.postMessage({ error: error.message, skipped: 0 });
+            self.postMessage({ error: error.message, skipped: 0, duplicates: 0 });
         }
     });
 };

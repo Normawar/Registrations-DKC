@@ -100,7 +100,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Label } from '@/components/ui/label';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { type PlayerSearchResult } from '@/ai/flows/search-uscf-players-flow';
+import { type PlayerSearchResult, searchUscfPlayers } from '@/ai/flows/search-uscf-players-flow';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
@@ -195,7 +195,7 @@ export default function PlayersPage() {
   const [searchState, setSearchState] = useState('ALL');
   
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount, searchPlayers } = useMasterDb();
+  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount } = useMasterDb();
   
   const dbStates = useMemo(() => {
     if (isDbLoaded) {
@@ -246,7 +246,7 @@ export default function PlayersPage() {
     });
 
     workerRef.current.onmessage = (event) => {
-        const { players, error, skipped } = event.data;
+        const { players, error, skipped, duplicates } = event.data;
 
         if (error) {
             setIsImporting(false);
@@ -275,6 +275,9 @@ export default function PlayersPage() {
                     let title = 'Import Complete!';
                     let description = `The database now contains ${players.length.toLocaleString()} players.`;
 
+                    if (duplicates > 0) {
+                        description += ` Found and merged ${duplicates} duplicate records.`;
+                    }
                     if (skipped > 0) {
                       description += ` Skipped ${skipped} invalid records.`
                     }
@@ -578,25 +581,18 @@ export default function PlayersPage() {
     setIsSearching(true);
     setSearchResults([]);
     try {
-        const results = await searchPlayers({
+        const results = await searchUscfPlayers({
             firstName: searchFirstName,
             lastName: searchLastName,
-            uscfId: searchUscfId,
             state: searchState
         });
 
-        const mappedResults: PlayerSearchResult[] = results.map(p => ({
-            uscfId: p.uscfId,
-            firstName: p.firstName,
-            lastName: p.lastName,
-            middleName: p.middleName,
-            rating: p.regularRating,
-            state: p.state,
-            expirationDate: p.uscfExpiration ? format(new Date(p.uscfExpiration), 'yyyy-MM-dd') : undefined,
-            quickRating: p.quickRating
-        }));
+        if (results.error) {
+            toast({ variant: 'destructive', title: 'Search Failed', description: results.error });
+            return;
+        }
 
-        setSearchResults(mappedResults.slice(0, 50));
+        setSearchResults(results.players.slice(0, 50));
         
     } catch (e) {
         const description = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -604,7 +600,7 @@ export default function PlayersPage() {
     } finally {
         setIsSearching(false);
     }
-  }, [searchFirstName, searchLastName, searchUscfId, searchState, searchPlayers, toast]);
+  }, [searchFirstName, searchLastName, searchUscfId, searchState, toast]);
   
   const handleSelectSearchedPlayer = (player: PlayerSearchResult) => {
     form.reset(); // Clear previous form state
