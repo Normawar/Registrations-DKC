@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -33,7 +32,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Users
+  Users,
+  Upload
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -79,6 +79,7 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import Papa from 'papaparse';
 
 const eventFormSchema = z.object({
   id: z.string().optional(),
@@ -112,7 +113,7 @@ type RegistrationInfo = {
 
 export default function ManageEventsPage() {
   const { toast } = useToast();
-  const { events, addEvent, updateEvent, deleteEvent } = useEvents();
+  const { events, addBulkEvents, updateEvent, deleteEvent } = useEvents();
   const { database: allPlayers } = useMasterDb();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -125,6 +126,7 @@ export default function ManageEventsPage() {
   const [registrations, setRegistrations] = useState<RegistrationInfo[]>([]);
   const [selectedEventForReg, setSelectedEventForReg] = useState<Event | null>(null);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
@@ -218,6 +220,78 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
+  const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const requiredFields = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
+        const headers = results.meta.fields;
+        if (!headers || !requiredFields.every(field => headers.includes(field))) {
+            toast({
+                variant: 'destructive',
+                title: 'Import Failed',
+                description: `CSV must contain the following headers: ${requiredFields.join(', ')}.`
+            });
+            return;
+        }
+
+        const newEvents: Event[] = [];
+        let errors = 0;
+        results.data.forEach((row: any) => {
+          try {
+            const date = new Date(row.date);
+            if (!isValid(date)) throw new Error('Invalid date format');
+            
+            const event: Event = {
+              id: `evt-${Date.now()}-${Math.random()}`,
+              name: row.name,
+              date: date.toISOString(),
+              location: row.location,
+              rounds: parseInt(row.rounds, 10),
+              regularFee: parseFloat(row.regularFee),
+              lateFee: parseFloat(row.lateFee),
+              veryLateFee: parseFloat(row.veryLateFee),
+              dayOfFee: parseFloat(row.dayOfFee),
+              imageUrl: row.imageUrl || undefined,
+              pdfUrl: row.pdfUrl || undefined,
+            };
+
+            if (isNaN(event.rounds) || isNaN(event.regularFee) || isNaN(event.lateFee) || isNaN(event.veryLateFee) || isNaN(event.dayOfFee)) {
+                throw new Error('Numeric fields contain non-numeric values.');
+            }
+            
+            newEvents.push(event);
+          } catch(e) {
+            errors++;
+            console.error("Error parsing event row:", row, e);
+          }
+        });
+
+        addBulkEvents(newEvents);
+        
+        toast({
+          title: "Import Complete",
+          description: `Successfully imported ${newEvents.length} events. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
+        });
+      },
+      error: (error) => {
+        toast({
+          variant: 'destructive',
+          title: 'Import Failed',
+          description: `An error occurred while parsing the CSV file: ${error.message}`
+        });
+      },
+    });
+
+    if (e.target) {
+        e.target.value = '';
+    }
+  };
+
   const handleAddEvent = () => {
     setEditingEvent(null);
     setIsDialogOpen(true);
@@ -269,7 +343,7 @@ export default function ManageEventsPage() {
       updateEvent(eventData as Event);
       toast({ title: "Event Updated", description: `"${values.name}" has been successfully updated.` });
     } else {
-      addEvent({ ...eventData, id: Date.now().toString() });
+      addBulkEvents([{ ...eventData, id: Date.now().toString() }]);
       toast({ title: "Event Added", description: `"${values.name}" has been successfully created.` });
     }
     setIsDialogOpen(false);
@@ -285,9 +359,21 @@ export default function ManageEventsPage() {
               Create, edit, and manage your tournament events and fees.
             </p>
           </div>
-          <Button onClick={handleAddEvent}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Event
-          </Button>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".csv"
+              onChange={handleFileImport}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 h-4 w-4" /> Import CSV
+            </Button>
+            <Button onClick={handleAddEvent}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New Event
+            </Button>
+          </div>
         </div>
 
         <Card>

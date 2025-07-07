@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -112,6 +111,10 @@ export function useEvents() {
     setEvents(prev => [...prev, event]);
   }, []);
 
+  const addBulkEvents = useCallback((eventsToAdd: Event[]) => {
+    setEvents(prev => [...prev, ...eventsToAdd]);
+  }, []);
+
   const updateEvent = useCallback((updatedEvent: Event) => {
     setEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
   }, []);
@@ -120,5 +123,5 @@ export function useEvents() {
     setEvents(prev => prev.filter(e => e.id !== eventId));
   }, []);
 
-  return { events, addEvent, updateEvent, deleteEvent };
+  return { events, addEvent, addBulkEvents, updateEvent, deleteEvent };
 }

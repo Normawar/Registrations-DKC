@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,7 +24,7 @@ import {
 } from "@/components/ui/table";
 import { schoolData, type School } from "@/lib/data/school-data";
 import { generateTeamCode } from '@/lib/school-utils';
-import { PlusCircle, MoreHorizontal } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Upload } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -55,6 +54,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import Papa from 'papaparse';
 
 export type SchoolWithTeamCode = School & { id: string; teamCode: string };
 
@@ -72,12 +72,13 @@ const schoolFormSchema = z.object({
 type SchoolFormValues = z.infer<typeof schoolFormSchema>;
 
 export default function SchoolsPage() {
-  const { toast } = useToast();
+  const { toast } } from useToast();
   const [schools, setSchools] = useState<SchoolWithTeamCode[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState<SchoolWithTeamCode | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [schoolToDelete, setSchoolToDelete] = useState<SchoolWithTeamCode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const initialSchools = schoolData.map((school, index) => ({
@@ -100,6 +101,77 @@ export default function SchoolsPage() {
       county: '',
     },
   });
+
+  const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+            const requiredFields = ['schoolName', 'district', 'streetAddress', 'city', 'zip', 'phone', 'county'];
+            const headers = results.meta.fields;
+            if (!headers || !requiredFields.every(field => headers.includes(field))) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Import Failed',
+                    description: `CSV must contain the following headers: ${requiredFields.join(', ')}.`
+                });
+                return;
+            }
+
+            const newSchools: SchoolWithTeamCode[] = [];
+            let errors = 0;
+            results.data.forEach((row: any) => {
+                try {
+                    const school: SchoolWithTeamCode = {
+                        id: `sch-${Date.now()}-${Math.random()}`,
+                        schoolName: row.schoolName,
+                        district: row.district,
+                        streetAddress: row.streetAddress,
+                        city: row.city,
+                        zip: row.zip,
+                        phone: row.phone,
+                        county: row.county,
+                        charter: row.charter || '',
+                        students: row.students || '',
+                        state: row.state || 'TX',
+                        zip4: row.zip4 || '',
+                        teamCode: generateTeamCode({ schoolName: row.schoolName, district: row.district })
+                    };
+
+                    if (!school.schoolName || !school.district) {
+                        throw new Error('Missing required school name or district.');
+                    }
+                    
+                    newSchools.push(school);
+                } catch (e) {
+                    errors++;
+                    console.error("Error parsing school row:", row, e);
+                }
+            });
+
+            setSchools(prev => [...prev, ...newSchools]);
+            
+            toast({
+                title: "Import Complete",
+                description: `Successfully imported ${newSchools.length} schools. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
+            });
+        },
+        error: (error) => {
+            toast({
+                variant: 'destructive',
+                title: 'Import Failed',
+                description: `An error occurred while parsing the CSV file: ${error.message}`
+            });
+        }
+    });
+
+    if (e.target) {
+        e.target.value = '';
+    }
+  };
 
   const handleAddSchool = () => {
     setEditingSchool(null);
@@ -164,14 +236,26 @@ export default function SchoolsPage() {
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold font-headline">Schools & Districts</h1>
+            <h1 className="text-3xl font-bold font-headline">Schools &amp; Districts</h1>
             <p className="text-muted-foreground">
               Add, edit, or delete school and district information.
             </p>
           </div>
-          <Button onClick={handleAddSchool}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New School
-          </Button>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".csv"
+              onChange={handleFileImport}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 h-4 w-4" /> Import CSV
+            </Button>
+            <Button onClick={handleAddSchool}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New School
+            </Button>
+          </div>
         </div>
 
         <Card>
