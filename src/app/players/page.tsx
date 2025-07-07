@@ -222,14 +222,17 @@ export default function PlayersPage() {
     if (!file) return;
 
     setIsImporting(true);
-    toastControlsRef.current = toast({
-        title: 'Parsing File...',
-        description: 'Please wait while the file is being processed in the background.',
-        duration: Infinity,
-    });
+    // Use a timeout to ensure the UI updates to show the "Preparing" toast before starting heavy work.
+    setTimeout(() => {
+      toastControlsRef.current = toast({
+          title: 'Preparing Import...',
+          description: 'This may take a moment for large files.',
+          duration: Infinity,
+      });
 
-    // Pass the existing DB state to the worker for merging
-    workerRef.current?.postMessage({ file, existingPlayers: allPlayers });
+      // Pass the existing DB state to the worker for merging
+      workerRef.current?.postMessage({ file, existingPlayers: allPlayers });
+    }, 50);
 
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -251,18 +254,19 @@ export default function PlayersPage() {
             return;
         }
 
+        const totalToSave = players.length;
         if (toastControlsRef.current) {
-            toastControlsRef.current.update({ id: toastControlsRef.current.id, title: 'Parsing Complete', description: `Found ${players.length.toLocaleString()} total players. Saving to database...` });
+            toastControlsRef.current.update({ id: toastControlsRef.current.id, title: 'Parsing Complete', description: `Parsed ${totalToSave.toLocaleString()} players. Now saving to database...` });
         }
         
         (async () => {
             try {
-                await setAllPlayers(players, (progress) => {
+                await setAllPlayers(players, (saved, total) => {
                     if (toastControlsRef.current) {
                         toastControlsRef.current.update({
                             id: toastControlsRef.current.id,
                             title: 'Saving to Database...',
-                            description: `Writing records... ${progress}% complete.`
+                            description: `Parsed: ${total.toLocaleString()} | Saved: ${saved.toLocaleString()} of ${total.toLocaleString()}`
                         });
                     }
                 });

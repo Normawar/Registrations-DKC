@@ -28,7 +28,7 @@ self.onmessage = (event) => {
                     const uscfId = row[1]?.trim();
                     const namePart = row[0]?.trim();
                     
-                    if (!uscfId || !/^\d{8}$/.test(uscfId) || !namePart || namePart.replace(/[^a-zA-Z]/g, '').length === 0) {
+                    if (!uscfId || !namePart || namePart.replace(/[^a-zA-Z]/g, '').length === 0) {
                         continue;
                     }
 

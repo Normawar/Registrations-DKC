@@ -35,7 +35,7 @@ export type MasterPlayer = {
 
 interface MasterDbContextType {
   database: MasterPlayer[];
-  setDatabase: (players: MasterPlayer[], onProgress?: (progress: number) => void) => Promise<void>;
+  setDatabase: (players: MasterPlayer[], onProgress?: (saved: number, total: number) => void) => Promise<void>;
   isDbLoaded: boolean;
   dbPlayerCount: number;
 }
@@ -92,7 +92,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // This is the function that components will call to update the database
-  const setDatabase = useCallback(async (newPlayers: MasterPlayer[], onProgress?: (progress: number) => void) => {
+  const setDatabase = useCallback(async (newPlayers: MasterPlayer[], onProgress?: (saved: number, total: number) => void) => {
     const db = await getDb();
     
     const clearTx = db.transaction(STORE_NAME, 'readwrite');
@@ -114,8 +114,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             
             playersWritten += chunk.length;
             if (onProgress) {
-                const progress = Math.round((playersWritten / totalPlayers) * 100);
-                onProgress(progress);
+                onProgress(playersWritten, totalPlayers);
             }
         } catch(e) {
             console.error("Failed to write chunk to IndexedDB", e);
