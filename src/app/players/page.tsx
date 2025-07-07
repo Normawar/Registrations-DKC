@@ -194,7 +194,7 @@ export default function PlayersPage() {
   const [searchState, setSearchState] = useState('ALL');
   
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount } = useMasterDb();
+  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount, searchPlayers } = useMasterDb();
   
   const dbStates = useMemo(() => {
     if (isDbLoaded) {
@@ -223,17 +223,18 @@ export default function PlayersPage() {
 
     setIsImporting(true);
     toastControlsRef.current = toast({
-        title: 'Starting Import...',
-        description: 'Preparing to process file.',
+        title: 'Parsing File...',
+        description: 'Please wait while the file is being processed in the background.',
         duration: Infinity,
     });
 
-    workerRef.current?.postMessage(file);
+    // Pass the existing DB state to the worker for merging
+    workerRef.current?.postMessage({ file, existingPlayers: allPlayers });
 
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
     }
-  }, [toast]);
+  }, [toast, allPlayers]);
 
   useEffect(() => {
     workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url), {
@@ -241,14 +242,7 @@ export default function PlayersPage() {
     });
 
     workerRef.current.onmessage = (event) => {
-        const { rows, error, progress: parseProgress } = event.data;
-
-        if (parseProgress !== undefined) {
-            if (toastControlsRef.current) {
-                toastControlsRef.current.update({ id: toastControlsRef.current.id, description: `Processing database... ${parseProgress}% complete.` });
-            }
-            return;
-        }
+        const { players, error } = event.data;
 
         if (error) {
             setIsImporting(false);
@@ -258,93 +252,12 @@ export default function PlayersPage() {
         }
 
         if (toastControlsRef.current) {
-            toastControlsRef.current.update({ id: toastControlsRef.current.id, description: 'Processing complete. Saving to database...' });
-        }
-
-        let totalErrorCount = 0;
-        const dbMap = new Map<string, MasterPlayer>();
-        allPlayers.forEach(p => dbMap.set(p.uscfId, p));
-
-        for (const row of rows) {
-            try {
-                const uscfId = row[1]?.trim();
-                const namePart = row[0]?.trim();
-                
-                // Stricter validation: skip row if USCF ID is invalid or name is empty/just punctuation.
-                if (!uscfId || !/^\d{8}$/.test(uscfId) || !namePart || namePart.replace(/[^a-zA-Z]/g, '').length === 0) {
-                    continue;
-                }
-
-                let lastName = '', firstName = '', middleName = '';
-                const cleanedName = namePart.replace(/\s+/g, ' ').trim();
-                
-                if (cleanedName.includes(',')) {
-                    const namePieces = cleanedName.split(',').map(p => p.trim());
-                    lastName = namePieces[0] || '';
-                    if (namePieces.length > 1 && namePieces[1]) {
-                        const firstAndMiddle = namePieces[1].split(' ').filter(Boolean);
-                        firstName = firstAndMiddle.shift() || '';
-                        middleName = firstAndMiddle.join(' ');
-                    }
-                } else {
-                    const namePieces = cleanedName.split(' ').filter(Boolean);
-                    if (namePieces.length > 0) {
-                        lastName = namePieces.pop() || '';
-                        firstName = namePieces.join(' ');
-                    }
-                }
-
-                if (!firstName && lastName) {
-                    firstName = lastName;
-                    lastName = '';
-                }
-
-                if (!firstName) {
-                  // This will now be caught by the stricter validation at the top,
-                  // but kept as a safeguard.
-                  continue; 
-                }
-                
-                const expirationDateStr = row[2] || '';
-                let expirationDateISO: string | undefined = undefined;
-                if (expirationDateStr) {
-                    const parsedDate = new Date(expirationDateStr);
-                    if (!isNaN(parsedDate.getTime())) {
-                        expirationDateISO = parsedDate.toISOString();
-                    }
-                }
-                
-                const state = row[3] || '';
-                const regularRatingString = row[4] || '';
-                const quickRatingString = row[5] || '';
-                let regularRating: number | undefined = undefined;
-                if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated') {
-                    const ratingMatch = regularRatingString.match(/^(\d+)/);
-                    if (ratingMatch && ratingMatch[1]) regularRating = parseInt(ratingMatch[1], 10);
-                }
-                const existingPlayer = dbMap.get(uscfId);
-                const playerRecord: MasterPlayer = {
-                    ...(existingPlayer || { id: `p-${uscfId}`, school: "Independent", district: "None", events: 0, eventIds: [] }),
-                    uscfId: uscfId, 
-                    firstName: firstName, 
-                    lastName: lastName, 
-                    middleName: middleName || undefined,
-                    state: state || undefined,
-                    expirationDate: expirationDateISO, 
-                    regularRating: regularRating,
-                    quickRating: quickRatingString || undefined,
-                };
-                dbMap.set(uscfId, playerRecord);
-            } catch (e) { 
-                console.error("Error parsing a player row:", row, e); 
-                totalErrorCount++;
-            }
+            toastControlsRef.current.update({ id: toastControlsRef.current.id, title: 'Parsing Complete', description: `Found ${players.length.toLocaleString()} total players. Saving to database...` });
         }
         
         (async () => {
             try {
-                const finalPlayerList = Array.from(dbMap.values());
-                await setAllPlayers(finalPlayerList, (progress) => {
+                await setAllPlayers(players, (progress) => {
                     if (toastControlsRef.current) {
                         toastControlsRef.current.update({
                             id: toastControlsRef.current.id,
@@ -354,11 +267,8 @@ export default function PlayersPage() {
                     }
                 });
                 let title = 'Import Complete!';
-                let description = `The database now contains ${finalPlayerList.length.toLocaleString()} players.`;
-                if (totalErrorCount > 0) {
-                    title = 'Import Partially Successful';
-                    description += ` Could not parse ${totalErrorCount} rows.`;
-                }
+                let description = `The database now contains ${players.length.toLocaleString()} players.`;
+
                 if (toastControlsRef.current) {
                   toastControlsRef.current.update({ id: toastControlsRef.current.id, title: title, description: description, duration: 10000 });
                 }
@@ -385,7 +295,7 @@ export default function PlayersPage() {
     return () => { 
         workerRef.current?.terminate();
     };
-  }, [allPlayers, setAllPlayers, toast]);
+  }, [setAllPlayers, toast]);
   
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -648,7 +558,7 @@ export default function PlayersPage() {
     setEditingPlayer(null);
   }
   
-  const handlePerformSearch = async () => {
+  const handlePerformSearch = useCallback(async () => {
     if (!searchLastName && !searchFirstName) {
         toast({ variant: 'destructive', title: 'Name Required', description: 'Please enter a first or last name to search.' });
         return;
@@ -656,12 +566,10 @@ export default function PlayersPage() {
     setIsSearching(true);
     setSearchResults([]);
     try {
-        const results = allPlayers.filter(p => {
-            const stateMatch = searchState === 'ALL' || p.state === searchState;
-            const lastNameMatch = !searchLastName || (p.lastName && p.lastName.toLowerCase().includes(searchLastName.toLowerCase()));
-            const firstNameMatch = !searchFirstName || (p.firstName && p.firstName.toLowerCase().includes(searchFirstName.toLowerCase()));
-            
-            return stateMatch && lastNameMatch && firstNameMatch;
+        const results = await searchPlayers({
+            firstName: searchFirstName,
+            lastName: searchLastName,
+            state: searchState
         });
 
         const mappedResults: PlayerSearchResult[] = results.map(p => ({
@@ -683,7 +591,7 @@ export default function PlayersPage() {
     } finally {
         setIsSearching(false);
     }
-  };
+  }, [searchFirstName, searchLastName, searchState, searchPlayers, toast]);
   
   const handleSelectSearchedPlayer = (player: PlayerSearchResult) => {
     form.reset(); // Clear previous form state
