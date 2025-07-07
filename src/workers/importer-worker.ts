@@ -29,16 +29,18 @@ self.onmessage = (event) => {
             for (const row of rows) {
                 try {
                     const uscfId = row[1]?.trim();
-                    const namePart = row[0]?.trim();
                     
-                    // Skip row only if essential data is missing.
-                    if (!uscfId || !namePart) {
+                    // A USCF ID is the only absolute requirement.
+                    if (!uscfId) {
                         skippedCount++;
                         continue;
                     }
 
+                    const namePart = row[0]?.trim();
                     let lastName = '', firstName = '', middleName = '';
-                    const cleanedName = namePart.replace(/\s+/g, ' ').trim();
+                    
+                    // Use a placeholder if name is missing but ID is present.
+                    const cleanedName = (namePart || `Player ${uscfId}`).replace(/\s+/g, ' ').trim();
                     
                     if (cleanedName) {
                         if (cleanedName.includes(',')) {
@@ -54,9 +56,8 @@ self.onmessage = (event) => {
                             // Handles "First Middle Last" and "First"
                             const namePieces = cleanedName.split(' ').filter(Boolean);
                             if (namePieces.length === 1) {
-                                // If only one word, it could be either first or last name.
-                                // We'll assume first name for consistency.
-                                firstName = namePieces[0];
+                                // Assume a single word is a last name.
+                                lastName = namePieces[0];
                             } else if (namePieces.length > 1) {
                                 lastName = namePieces.pop() || '';
                                 firstName = namePieces.shift() || '';
@@ -65,8 +66,10 @@ self.onmessage = (event) => {
                         }
                     }
 
-                    // If after parsing, a name part is still missing, we provide a placeholder
-                    // instead of skipping the record.
+                    // Fallback placeholders if parsing fails to populate names.
+                    if (cleanedName && !firstName && !lastName) {
+                        lastName = cleanedName;
+                    }
                     if (cleanedName && !firstName) firstName = '.';
                     if (cleanedName && !lastName) lastName = '.';
 
