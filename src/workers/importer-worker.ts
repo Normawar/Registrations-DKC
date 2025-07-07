@@ -12,23 +12,27 @@ self.onmessage = (event) => {
         return;
     }
 
+    const dbMap = new Map<string, MasterPlayer>();
+    
+    // Pre-load existing players for efficient merging
+    existingPlayers.forEach(p => dbMap.set(p.uscfId, p));
+
+    let skippedCount = 0;
+
     Papa.parse(file, {
         worker: false, // Run parsing in this worker thread, not another one.
         delimiter: "\t",
         skipEmptyLines: true,
         complete: (results) => {
             const rows = results.data as string[][];
-            const dbMap = new Map<string, MasterPlayer>();
             
-            // Pre-load existing players for efficient merging
-            existingPlayers.forEach(p => dbMap.set(p.uscfId, p));
-
             for (const row of rows) {
                 try {
                     const uscfId = row[1]?.trim();
                     const namePart = row[0]?.trim();
                     
                     if (!uscfId || !namePart || namePart.replace(/[^a-zA-Z]/g, '').length === 0) {
+                        skippedCount++;
                         continue;
                     }
 
@@ -45,20 +49,43 @@ self.onmessage = (event) => {
                         }
                     } else {
                         const namePieces = cleanedName.split(' ').filter(Boolean);
-                        if (namePieces.length > 0) {
+                        if (namePieces.length === 1) {
+                            // Assume single word is a first name, use a placeholder for last name.
+                            firstName = namePieces[0];
+                            lastName = '.';
+                        } else if (namePieces.length > 1) {
                             lastName = namePieces.pop() || '';
-                            firstName = namePieces.join(' ');
+                            firstName = namePieces.shift() || '';
+                            middleName = namePieces.join(' ');
                         }
                     }
 
-                    if (!firstName) continue;
+                    if (!firstName || !lastName) {
+                        skippedCount++;
+                        continue;
+                    }
                     
                     const expirationDateStr = row[2] || '';
                     let expirationDateISO: string | undefined = undefined;
                     if (expirationDateStr) {
-                        const parsedDate = new Date(expirationDateStr);
-                        if (!isNaN(parsedDate.getTime())) {
-                            expirationDateISO = parsedDate.toISOString();
+                        // Support MM/DD/YY and MM/DD/YYYY formats
+                        const dateParts = expirationDateStr.split('/');
+                        if (dateParts.length === 3) {
+                            let year = parseInt(dateParts[2], 10);
+                            if (year < 100) { // Handle 2-digit years
+                                year += (year > 50 ? 1900 : 2000);
+                            }
+                            const month = parseInt(dateParts[0], 10) - 1;
+                            const day = parseInt(dateParts[1], 10);
+                            const parsedDate = new Date(year, month, day);
+                            if (!isNaN(parsedDate.getTime())) {
+                                expirationDateISO = parsedDate.toISOString();
+                            }
+                        } else {
+                            const parsedDate = new Date(expirationDateStr);
+                             if (!isNaN(parsedDate.getTime())) {
+                                expirationDateISO = parsedDate.toISOString();
+                            }
                         }
                     }
                     
@@ -86,14 +113,15 @@ self.onmessage = (event) => {
                     dbMap.set(uscfId, playerRecord);
                 } catch (e) { 
                     console.error("Worker: Error parsing a player row:", row, e); 
+                    skippedCount++;
                 }
             }
             
             const finalPlayerList = Array.from(dbMap.values());
-            self.postMessage({ players: finalPlayerList });
+            self.postMessage({ players: finalPlayerList, skipped: skippedCount });
         },
         error: (error: any) => {
-            self.postMessage({ error: error.message });
+            self.postMessage({ error: error.message, skipped: 0 });
         }
     });
 };

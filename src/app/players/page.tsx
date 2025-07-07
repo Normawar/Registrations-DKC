@@ -191,6 +191,7 @@ export default function PlayersPage() {
   const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
   const [searchFirstName, setSearchFirstName] = useState('');
   const [searchLastName, setSearchLastName] = useState('');
+  const [searchUscfId, setSearchUscfId] = useState('');
   const [searchState, setSearchState] = useState('ALL');
   
   const { profile } = useSponsorProfile();
@@ -245,7 +246,7 @@ export default function PlayersPage() {
     });
 
     workerRef.current.onmessage = (event) => {
-        const { players, error } = event.data;
+        const { players, error, skipped } = event.data;
 
         if (error) {
             setIsImporting(false);
@@ -254,37 +255,43 @@ export default function PlayersPage() {
             return;
         }
 
-        const totalToSave = players.length;
-        if (toastControlsRef.current) {
-            toastControlsRef.current.update({ id: toastControlsRef.current.id, title: 'Parsing Complete', description: `Parsed ${totalToSave.toLocaleString()} players. Now saving to database...` });
-        }
-        
-        (async () => {
-            try {
-                await setAllPlayers(players, (saved, total) => {
-                    if (toastControlsRef.current) {
-                        toastControlsRef.current.update({
-                            id: toastControlsRef.current.id,
-                            title: 'Saving to Database...',
-                            description: `Parsed: ${total.toLocaleString()} | Saved: ${saved.toLocaleString()} of ${total.toLocaleString()}`
-                        });
-                    }
-                });
-                let title = 'Import Complete!';
-                let description = `The database now contains ${players.length.toLocaleString()} players.`;
-
-                if (toastControlsRef.current) {
-                  toastControlsRef.current.update({ id: toastControlsRef.current.id, title: title, description: description, duration: 10000 });
-                }
-            } catch(err) {
-                if (toastControlsRef.current) {
-                   toastControlsRef.current.update({ id: toastControlsRef.current.id, variant: 'destructive', title: 'Database Save Error', description: err instanceof Error ? err.message : 'An unknown error occurred.', duration: 10000 });
-                }
-            } finally { 
-              setIsImporting(false);
-              toastControlsRef.current = null;
+        if (players) {
+            const totalToSave = players.length;
+            if (toastControlsRef.current) {
+                toastControlsRef.current.update({ id: toastControlsRef.current.id, title: 'Parsing Complete', description: `Found ${totalToSave.toLocaleString()} players. Now saving to database...` });
             }
-        })();
+            
+            (async () => {
+                try {
+                    await setAllPlayers(players, (saved, total) => {
+                        if (toastControlsRef.current) {
+                            toastControlsRef.current.update({
+                                id: toastControlsRef.current.id,
+                                title: 'Saving to Database...',
+                                description: `Parsed: ${total.toLocaleString()} | Saved: ${saved.toLocaleString()} of ${total.toLocaleString()}`
+                            });
+                        }
+                    });
+                    let title = 'Import Complete!';
+                    let description = `The database now contains ${players.length.toLocaleString()} players.`;
+
+                    if (skipped > 0) {
+                      description += ` Skipped ${skipped} invalid records.`
+                    }
+
+                    if (toastControlsRef.current) {
+                      toastControlsRef.current.update({ id: toastControlsRef.current.id, title: title, description: description, duration: 10000 });
+                    }
+                } catch(err) {
+                    if (toastControlsRef.current) {
+                       toastControlsRef.current.update({ id: toastControlsRef.current.id, variant: 'destructive', title: 'Database Save Error', description: err instanceof Error ? err.message : 'An unknown error occurred.', duration: 10000 });
+                    }
+                } finally { 
+                  setIsImporting(false);
+                  toastControlsRef.current = null;
+                }
+            })();
+        }
     };
 
     workerRef.current.onerror = (e) => {
@@ -354,6 +361,7 @@ export default function PlayersPage() {
         });
         setSearchFirstName('');
         setSearchLastName('');
+        setSearchUscfId('');
         setSearchResults([]);
       }
     }
@@ -563,8 +571,8 @@ export default function PlayersPage() {
   }
   
   const handlePerformSearch = useCallback(async () => {
-    if (!searchLastName && !searchFirstName) {
-        toast({ variant: 'destructive', title: 'Name Required', description: 'Please enter a first or last name to search.' });
+    if (!searchLastName && !searchFirstName && !searchUscfId) {
+        toast({ variant: 'destructive', title: 'Search Term Required', description: 'Please enter a name or USCF ID to search.' });
         return;
     }
     setIsSearching(true);
@@ -573,6 +581,7 @@ export default function PlayersPage() {
         const results = await searchPlayers({
             firstName: searchFirstName,
             lastName: searchLastName,
+            uscfId: searchUscfId,
             state: searchState
         });
 
@@ -595,7 +604,7 @@ export default function PlayersPage() {
     } finally {
         setIsSearching(false);
     }
-  }, [searchFirstName, searchLastName, searchState, searchPlayers, toast]);
+  }, [searchFirstName, searchLastName, searchUscfId, searchState, searchPlayers, toast]);
   
   const handleSelectSearchedPlayer = (player: PlayerSearchResult) => {
     form.reset(); // Clear previous form state
@@ -617,6 +626,7 @@ export default function PlayersPage() {
     setSearchResults([]);
     setSearchFirstName('');
     setSearchLastName('');
+    setSearchUscfId('');
     toast({ title: 'Player Selected', description: `${player.firstName} ${player.lastName}'s data has been auto-filled.` });
   };
   
@@ -790,11 +800,11 @@ export default function PlayersPage() {
                 <div className="space-y-6">
                     <Card className="bg-muted/50">
                         <CardHeader>
-                            <CardTitle className="text-base">Player Database Search</CardTitle>
+                            <CardTitle className="text-base">USCF Player Search</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                                <div className="space-y-2">
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                                <div className="space-y-2 md:col-span-1">
                                     <Label>State</Label>
                                     <Select value={searchState} onValueChange={setSearchState}>
                                         <SelectTrigger><SelectValue placeholder="All States" /></SelectTrigger>
@@ -803,13 +813,17 @@ export default function PlayersPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className='space-y-2'>
+                                <div className='space-y-2 md:col-span-1'>
                                     <Label>First Name (Optional)</Label>
                                     <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
                                 </div>
-                                <div className='space-y-2'>
+                                <div className='space-y-2 md:col-span-1'>
                                     <Label>Last Name</Label>
                                     <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
+                                </div>
+                                <div className='space-y-2 md:col-span-1'>
+                                    <Label>USCF ID (Optional)</Label>
+                                    <Input placeholder="12345678" value={searchUscfId} onChange={e => setSearchUscfId(e.target.value)} />
                                 </div>
                                 <Button onClick={handlePerformSearch} disabled={isSearching}>
                                     {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
