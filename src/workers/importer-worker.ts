@@ -31,7 +31,8 @@ self.onmessage = (event) => {
                     const uscfId = row[1]?.trim();
                     const namePart = row[0]?.trim();
                     
-                    if (!uscfId || !namePart || namePart.replace(/[^a-zA-Z]/g, '').length === 0) {
+                    // Skip row only if essential data is missing.
+                    if (!uscfId || !namePart) {
                         skippedCount++;
                         continue;
                     }
@@ -39,59 +40,65 @@ self.onmessage = (event) => {
                     let lastName = '', firstName = '', middleName = '';
                     const cleanedName = namePart.replace(/\s+/g, ' ').trim();
                     
-                    if (cleanedName.includes(',')) {
-                        const namePieces = cleanedName.split(',').map(p => p.trim());
-                        lastName = namePieces[0] || '';
-                        if (namePieces.length > 1 && namePieces[1]) {
-                            const firstAndMiddle = namePieces[1].split(' ').filter(Boolean);
-                            firstName = firstAndMiddle.shift() || '';
-                            middleName = firstAndMiddle.join(' ');
-                        }
-                    } else {
-                        const namePieces = cleanedName.split(' ').filter(Boolean);
-                        if (namePieces.length === 1) {
-                            // Assume single word is a first name, use a placeholder for last name.
-                            firstName = namePieces[0];
-                            lastName = '.';
-                        } else if (namePieces.length > 1) {
-                            lastName = namePieces.pop() || '';
-                            firstName = namePieces.shift() || '';
-                            middleName = namePieces.join(' ');
+                    if (cleanedName) {
+                        if (cleanedName.includes(',')) {
+                            // Handles "Last, First Middle" and "Last,"
+                            const namePieces = cleanedName.split(',').map(p => p.trim());
+                            lastName = namePieces[0] || '';
+                            if (namePieces.length > 1 && namePieces[1]) {
+                                const firstAndMiddle = namePieces[1].split(' ').filter(Boolean);
+                                firstName = firstAndMiddle.shift() || '';
+                                middleName = firstAndMiddle.join(' ');
+                            }
+                        } else {
+                            // Handles "First Middle Last" and "First"
+                            const namePieces = cleanedName.split(' ').filter(Boolean);
+                            if (namePieces.length === 1) {
+                                // If only one word, it could be either first or last name.
+                                // We'll assume first name for consistency.
+                                firstName = namePieces[0];
+                            } else if (namePieces.length > 1) {
+                                lastName = namePieces.pop() || '';
+                                firstName = namePieces.shift() || '';
+                                middleName = namePieces.join(' ');
+                            }
                         }
                     }
 
-                    if (!firstName || !lastName) {
-                        skippedCount++;
-                        continue;
-                    }
-                    
+                    // If after parsing, a name part is still missing, we provide a placeholder
+                    // instead of skipping the record.
+                    if (cleanedName && !firstName) firstName = '.';
+                    if (cleanedName && !lastName) lastName = '.';
+
+                    // Date parsing
                     const expirationDateStr = row[2] || '';
                     let expirationDateISO: string | undefined = undefined;
                     if (expirationDateStr) {
-                        // Support MM/DD/YY and MM/DD/YYYY formats
                         const dateParts = expirationDateStr.split('/');
                         if (dateParts.length === 3) {
                             let year = parseInt(dateParts[2], 10);
-                            if (year < 100) { // Handle 2-digit years
+                            if (!isNaN(year) && year < 100) {
                                 year += (year > 50 ? 1900 : 2000);
                             }
                             const month = parseInt(dateParts[0], 10) - 1;
                             const day = parseInt(dateParts[1], 10);
-                            const parsedDate = new Date(year, month, day);
-                            if (!isNaN(parsedDate.getTime())) {
-                                expirationDateISO = parsedDate.toISOString();
+                            if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+                                const parsedDate = new Date(Date.UTC(year, month, day));
+                                if (!isNaN(parsedDate.getTime())) {
+                                    expirationDateISO = parsedDate.toISOString();
+                                }
                             }
                         } else {
                             const parsedDate = new Date(expirationDateStr);
                              if (!isNaN(parsedDate.getTime())) {
-                                expirationDateISO = parsedDate.toISOString();
+                                expirationDateISO = new Date(Date.UTC(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate())).toISOString();
                             }
                         }
                     }
                     
-                    const state = row[3] || '';
+                    const state = row[3]?.trim() || undefined;
                     const regularRatingString = row[4] || '';
-                    const quickRatingString = row[5] || '';
+                    const quickRatingString = row[5]?.trim() || undefined;
                     let regularRating: number | undefined = undefined;
                     if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated') {
                         const ratingMatch = regularRatingString.match(/^(\d+)/);
@@ -105,10 +112,10 @@ self.onmessage = (event) => {
                         firstName: firstName, 
                         lastName: lastName, 
                         middleName: middleName || undefined,
-                        state: state || undefined,
+                        state: state,
                         expirationDate: expirationDateISO, 
                         regularRating: regularRating,
-                        quickRating: quickRatingString || undefined,
+                        quickRating: quickRatingString,
                     };
                     dbMap.set(uscfId, playerRecord);
                 } catch (e) { 
