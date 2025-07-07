@@ -186,7 +186,7 @@ export default function PlayersPage() {
   const [searchFirstName, setSearchFirstName] = useState('');
   const [searchLastName, setSearchLastName] = useState('');
   const [searchUscfId, setSearchUscfId] = useState('');
-  const [searchState, setSearchState] = useState('ALL');
+  const [searchState, setSearchState] = useState('TX');
 
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
@@ -205,10 +205,35 @@ export default function PlayersPage() {
   
   const dbStates = useMemo(() => {
     if (isDbLoaded) {
-        const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
-        return ['ALL', ...Array.from(states).sort()];
+        const usStates = [
+            'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
+            'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+            'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+            'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+            'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+        ];
+        const allUniqueStatesFromDb = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
+
+        // Separate US states from other regions found in the DB
+        const usStatesInDb = usStates.filter(s => allUniqueStatesFromDb.has(s));
+        const nonUsRegionsInDb = [...allUniqueStatesFromDb].filter(s => !usStates.includes(s));
+        
+        // Sort them alphabetically, but keep TX aside
+        const sortedUsStates = usStatesInDb.filter(s => s !== 'TX').sort();
+        const sortedNonUsRegions = nonUsRegionsInDb.sort();
+        
+        // Construct the final list in the desired order
+        const finalStateList = [
+            'ALL',
+            'TX',
+            '', // For "No State"
+            ...sortedUsStates,
+            ...sortedNonUsRegions
+        ];
+        
+        return finalStateList;
     }
-    return ['ALL'];
+    return ['ALL', 'TX', ''];
   }, [isDbLoaded, allPlayers]);
   
   const formStates = useMemo(() => {
@@ -271,10 +296,11 @@ export default function PlayersPage() {
                 try {
                     await setAllPlayers(players, (saved, total) => {
                         if (toastControlsRef.current) {
+                            const description = `Parsed: ${total.toLocaleString()} | Saved: ${saved.toLocaleString()} of ${total.toLocaleString()}`
                             toastControlsRef.current.update({
                                 id: toastControlsRef.current.id,
                                 title: 'Saving to Database...',
-                                description: `Parsed: ${total.toLocaleString()} | Saved: ${saved.toLocaleString()} of ${total.toLocaleString()}`
+                                description,
                             });
                         }
                     });
@@ -389,7 +415,7 @@ export default function PlayersPage() {
     }
 
     return allPlayers.filter(player => {
-        const stateMatch = searchState === 'ALL' || player.state === searchState;
+        const stateMatch = searchState === 'ALL' || (player.state || '') === searchState;
         const firstNameMatch = !lowerFirstName || player.firstName.toLowerCase().includes(lowerFirstName);
         const lastNameMatch = !lowerLastName || player.lastName.toLowerCase().includes(lowerLastName);
         const uscfIdMatch = !searchUscfId || player.uscfId.includes(searchUscfId);
@@ -669,7 +695,7 @@ export default function PlayersPage() {
             <CardHeader>
                 <CardTitle>Master Player Database</CardTitle>
                 <div className="text-sm text-muted-foreground">
-                    There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
+                    There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <div className="animate-pulse rounded-md bg-muted h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
                 </div>
                 <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-1">
@@ -679,7 +705,11 @@ export default function PlayersPage() {
                                 <SelectValue placeholder="All States" />
                             </SelectTrigger>
                             <SelectContent>
-                                {dbStates.map(s => <SelectItem key={s} value={s}>{s === 'ALL' ? 'All States' : s}</SelectItem>)}
+                                {dbStates.map(s => (
+                                    <SelectItem key={s} value={s}>
+                                        {s === 'ALL' ? 'All States' : s === '' ? 'No State' : s}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
@@ -1048,3 +1078,4 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
+
