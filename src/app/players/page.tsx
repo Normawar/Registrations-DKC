@@ -182,17 +182,22 @@ export default function PlayersPage() {
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   const [isLookingUpUscfId, setIsLookingUpUscfId] = useState(false);
-  const [filterText, setFilterText] = useState('');
+  
+  const [searchFirstName, setSearchFirstName] = useState('');
+  const [searchLastName, setSearchLastName] = useState('');
+  const [searchUscfId, setSearchUscfId] = useState('');
+
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
 
   // States for player search
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<PlayerSearchResult[]>([]);
-  const [searchFirstName, setSearchFirstName] = useState('');
-  const [searchLastName, setSearchLastName] = useState('');
-  const [searchUscfId, setSearchUscfId] = useState('');
-  const [searchState, setSearchState] = useState('ALL');
+  // These are for the search inside the dialog, not the main page filter
+  const [dialogSearchFirstName, setDialogSearchFirstName] = useState('');
+  const [dialogSearchLastName, setDialogSearchLastName] = useState('');
+  const [dialogSearchUscfId, setDialogSearchUscfId] = useState('');
+  const [dialogSearchState, setDialogSearchState] = useState('ALL');
   
   const { profile } = useSponsorProfile();
   const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount } = useMasterDb();
@@ -362,9 +367,9 @@ export default function PlayersPage() {
           school: 'Independent',
           district: 'None',
         });
-        setSearchFirstName('');
-        setSearchLastName('');
-        setSearchUscfId('');
+        setDialogSearchFirstName('');
+        setDialogSearchLastName('');
+        setDialogSearchUscfId('');
         setSearchResults([]);
       }
     }
@@ -372,21 +377,24 @@ export default function PlayersPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterText]);
+  }, [searchFirstName, searchLastName, searchUscfId]);
   
   const filteredPlayers = useMemo(() => {
-    if (!filterText) return allPlayers;
-    const lowercasedFilter = filterText.toLowerCase();
+    const lowerFirstName = searchFirstName.toLowerCase();
+    const lowerLastName = searchLastName.toLowerCase();
+
+    if (!lowerFirstName && !lowerLastName && !searchUscfId) {
+        return allPlayers;
+    }
+
     return allPlayers.filter(player => {
-        return (
-            player.firstName.toLowerCase().includes(lowercasedFilter) ||
-            player.lastName.toLowerCase().includes(lowercasedFilter) ||
-            player.uscfId.includes(lowercasedFilter) ||
-            player.school.toLowerCase().includes(lowercasedFilter) ||
-            player.district.toLowerCase().includes(lowercasedFilter)
-        );
+        const firstNameMatch = !lowerFirstName || player.firstName.toLowerCase().includes(lowerFirstName);
+        const lastNameMatch = !lowerLastName || player.lastName.toLowerCase().includes(lowerLastName);
+        const uscfIdMatch = !searchUscfId || player.uscfId.includes(searchUscfId);
+
+        return firstNameMatch && lastNameMatch && uscfIdMatch;
     });
-  }, [allPlayers, filterText]);
+  }, [allPlayers, searchFirstName, searchLastName, searchUscfId]);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...filteredPlayers];
@@ -574,7 +582,7 @@ export default function PlayersPage() {
   }
   
   const handlePerformSearch = useCallback(async () => {
-    if (!searchLastName && !searchFirstName && !searchUscfId) {
+    if (!dialogSearchLastName && !dialogSearchFirstName && !dialogSearchUscfId) {
         toast({ variant: 'destructive', title: 'Search Term Required', description: 'Please enter a name or USCF ID to search.' });
         return;
     }
@@ -582,9 +590,9 @@ export default function PlayersPage() {
     setSearchResults([]);
     try {
         const results = await searchUscfPlayers({
-            firstName: searchFirstName,
-            lastName: searchLastName,
-            state: searchState
+            firstName: dialogSearchFirstName,
+            lastName: dialogSearchLastName,
+            state: dialogSearchState
         });
 
         if (results.error) {
@@ -600,7 +608,7 @@ export default function PlayersPage() {
     } finally {
         setIsSearching(false);
     }
-  }, [searchFirstName, searchLastName, searchUscfId, searchState, toast]);
+  }, [dialogSearchFirstName, dialogSearchLastName, dialogSearchUscfId, dialogSearchState, toast]);
   
   const handleSelectSearchedPlayer = (player: PlayerSearchResult) => {
     form.reset(); // Clear previous form state
@@ -620,9 +628,9 @@ export default function PlayersPage() {
     }
     
     setSearchResults([]);
-    setSearchFirstName('');
-    setSearchLastName('');
-    setSearchUscfId('');
+    setDialogSearchFirstName('');
+    setDialogSearchLastName('');
+    setDialogSearchUscfId('');
     toast({ title: 'Player Selected', description: `${player.firstName} ${player.lastName}'s data has been auto-filled.` });
   };
   
@@ -658,17 +666,35 @@ export default function PlayersPage() {
         <Card>
             <CardHeader>
                 <CardTitle>Master Player Database</CardTitle>
-                <div className="flex justify-between items-center">
-                    <div className="text-sm text-muted-foreground">
-                      There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database.
-                    </div>
-                    <div className="relative w-full max-w-sm">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <CardDescription>
+                    There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
+                </CardDescription>
+                <div className="pt-2 flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1 space-y-1">
+                        <Label htmlFor="search-first-name">First Name</Label>
                         <Input
-                            placeholder="Filter players by name, ID, school..."
-                            value={filterText}
-                            onChange={e => setFilterText(e.target.value)}
-                            className="pl-10"
+                            id="search-first-name"
+                            placeholder="Filter by first name..."
+                            value={searchFirstName}
+                            onChange={e => setSearchFirstName(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                        <Label htmlFor="search-last-name">Last Name</Label>
+                        <Input
+                            id="search-last-name"
+                            placeholder="Filter by last name..."
+                            value={searchLastName}
+                            onChange={e => setSearchLastName(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                        <Label htmlFor="search-uscf-id">USCF ID</Label>
+                        <Input
+                            id="search-uscf-id"
+                            placeholder="Filter by USCF ID..."
+                            value={searchUscfId}
+                            onChange={e => setSearchUscfId(e.target.value)}
                         />
                     </div>
                 </div>
@@ -802,7 +828,7 @@ export default function PlayersPage() {
                             <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                                 <div className="space-y-2 md:col-span-1">
                                     <Label>State</Label>
-                                    <Select value={searchState} onValueChange={setSearchState}>
+                                    <Select value={dialogSearchState} onValueChange={setDialogSearchState}>
                                         <SelectTrigger><SelectValue placeholder="All States" /></SelectTrigger>
                                         <SelectContent>
                                             {dbStates.map(s => <SelectItem key={s} value={s}>{s === 'ALL' ? 'All States' : s}</SelectItem>)}
@@ -811,15 +837,15 @@ export default function PlayersPage() {
                                 </div>
                                 <div className='space-y-2 md:col-span-1'>
                                     <Label>First Name (Optional)</Label>
-                                    <Input placeholder="John" value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
+                                    <Input placeholder="John" value={dialogSearchFirstName} onChange={e => setDialogSearchFirstName(e.target.value)} />
                                 </div>
                                 <div className='space-y-2 md:col-span-1'>
                                     <Label>Last Name</Label>
-                                    <Input placeholder="Smith" value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
+                                    <Input placeholder="Smith" value={dialogSearchLastName} onChange={e => setDialogSearchLastName(e.target.value)} />
                                 </div>
                                 <div className='space-y-2 md:col-span-1'>
                                     <Label>USCF ID (Optional)</Label>
-                                    <Input placeholder="12345678" value={searchUscfId} onChange={e => setSearchUscfId(e.target.value)} />
+                                    <Input placeholder="12345678" value={dialogSearchUscfId} onChange={e => setDialogSearchUscfId(e.target.value)} />
                                 </div>
                                 <Button onClick={handlePerformSearch} disabled={isSearching}>
                                     {isSearching ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Search className='mr-2 h-4 w-4' />}
