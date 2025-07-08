@@ -387,19 +387,30 @@ export default function RosterPage() {
 
   const handleSelectSearchedPlayer = (player: MasterPlayer) => {
     setSearchResults([]);
+    
+    let expirationDate: Date | undefined = undefined;
+    if (player.uscfExpiration) {
+      // The date from DB is a UTC ISO string. `new Date()` creates a local time object.
+      // This can cause an off-by-one day error depending on the user's timezone.
+      // To fix this, we create a new Date object accounting for the timezone offset.
+      const date = new Date(player.uscfExpiration);
+      const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+      expirationDate = new Date(date.getTime() + userTimezoneOffset);
+    }
+    
     form.reset({
       id: player.id,
       firstName: player.firstName,
       middleName: player.middleName || '',
       lastName: player.lastName,
       uscfId: player.uscfId,
-      uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+      uscfExpiration: expirationDate,
       regularRating: player.regularRating,
       grade: player.grade || '',
       section: player.section || '',
       email: player.email || '',
       phone: player.phone || '',
-      dob: player.dob ? new Date(player.dob) : undefined,
+      dob: undefined, // Per user request, do not auto-fill date of birth
       zipCode: player.zipCode || '',
       state: player.state || '',
       studentType: player.studentType,
