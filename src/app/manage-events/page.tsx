@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
@@ -156,18 +157,22 @@ export default function ManageEventsPage() {
     const sortableEvents = [...events];
     if (sortConfig !== null) {
       sortableEvents.sort((a, b) => {
-        let aValue: string | number | Date;
-        let bValue: string | number | Date;
+        // Primary sort: "Open" events before "Completed" events
+        const aStatus = getEventStatus(a);
+        const bStatus = getEventStatus(b);
+        if (aStatus === 'Open' && bStatus === 'Completed') return -1;
+        if (aStatus === 'Completed' && bStatus === 'Open') return 1;
 
-        if (sortConfig.key === 'status') {
-            aValue = getEventStatus(a);
-            bValue = getEventStatus(b);
-        } else if (sortConfig.key === 'date') {
-            aValue = new Date(a.date);
-            bValue = new Date(b.date);
-        } else {
-            aValue = a[sortConfig.key];
-            bValue = b[sortConfig.key];
+        // Secondary sort: based on user's choice (sortConfig)
+        let aValue: any = a[sortConfig.key as keyof Event];
+        let bValue: any = b[sortConfig.key as keyof Event];
+        
+        if (sortConfig.key === 'date') {
+            aValue = new Date(a.date).getTime();
+            bValue = new Date(b.date).getTime();
+        } else if (sortConfig.key === 'status') {
+            aValue = aStatus;
+            bValue = bStatus;
         }
 
         if (aValue < bValue) {
@@ -406,7 +411,7 @@ export default function ManageEventsPage() {
                   </TableHead>
                   <TableHead className="p-0">
                     <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>
-                        Fees (Reg/Late/V.Late/Day of) {getSortIcon('regularFee')}
+                        Fees (Early, Reg., Late, Day of) {getSortIcon('regularFee')}
                     </Button>
                   </TableHead>
                   <TableHead className="p-0">
@@ -543,28 +548,28 @@ export default function ManageEventsPage() {
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="regularFee" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Regular Fee ($)</FormLabel>
+                        <FormLabel>Early Fee ($)</FormLabel>
                         <FormControl><Input type="number" placeholder="20" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
                      <FormField control={form.control} name="lateFee" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Late Fee (2 days prior) ($)</FormLabel>
+                        <FormLabel>Regular Fee ($)</FormLabel>
                         <FormControl><Input type="number" placeholder="25" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
                      <FormField control={form.control} name="veryLateFee" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Late Fee (1 day prior) ($)</FormLabel>
+                        <FormLabel>Late Fee ($)</FormLabel>
                         <FormControl><Input type="number" placeholder="30" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
                      <FormField control={form.control} name="dayOfFee" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Day of Registration Fee ($)</FormLabel>
+                        <FormLabel>Day of Fee ($)</FormLabel>
                         <FormControl><Input type="number" placeholder="35" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
