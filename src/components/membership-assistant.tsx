@@ -213,13 +213,8 @@ export function MembershipAssistant() {
               {hasPlayed === 'yes' && (
                   <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg border">
                       <p>
-                          Welcome back! You will likely need to renew your membership. You can find your USCF ID and check your membership status using the official player search tool.
+                          Welcome back! You will likely need to renew your membership. You can search for your details in the Master Player Database if you have been previously added by an organizer.
                       </p>
-                      <Button asChild variant="link" className="p-0 h-auto mt-1">
-                          <a href="https://new.uschess.org/civicrm/player-search" target="_blank" rel="noopener noreferrer">
-                              Find your USCF ID &rarr;
-                          </a>
-                      </Button>
                   </div>
               )}
             </CardContent>

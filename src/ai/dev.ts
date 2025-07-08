@@ -8,5 +8,4 @@ import '@/ai/flows/update-invoice-title-flow.ts';
 import '@/ai/flows/get-invoice-status-flow.ts';
 import '@/ai/flows/create-membership-invoice-flow.ts';
 import '@/ai/flows/create-organizer-invoice-flow.ts';
-import '@/ai/flows/lookup-uscf-player-flow.ts';
 import '@/ai/flows/cancel-invoice-flow.ts';
