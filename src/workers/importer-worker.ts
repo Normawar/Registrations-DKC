@@ -121,7 +121,7 @@ self.onmessage = (event) => {
                         lastName: lastName, 
                         middleName: middleName || undefined,
                         state: state,
-                        expirationDate: expirationDateISO, 
+                        uscfExpiration: expirationDateISO, 
                         regularRating: regularRating,
                         quickRating: quickRatingString,
                     };

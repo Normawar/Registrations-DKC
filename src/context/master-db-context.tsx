@@ -15,7 +15,7 @@ export type MasterPlayer = {
   middleName?: string;
   state?: string;
   // Dates should be stored as ISO strings for JSON compatibility
-  expirationDate?: string; 
+  uscfExpiration?: string; 
   regularRating?: number;
   quickRating?: string;
   school: string;

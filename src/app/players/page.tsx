@@ -518,12 +518,14 @@ export default function PlayersPage() {
       }
     }
     
+    const { uscfExpiration, dob, ...restOfValues } = values;
+
     const playerRecord: MasterPlayer = {
       ...editingPlayer, 
-      ...values,
+      ...restOfValues,
       id: editingPlayer?.id || `p-${Date.now()}`,
-      dob: values.dob?.toISOString(),
-      uscfExpiration: values.uscfExpiration?.toISOString(),
+      dob: dob?.toISOString(),
+      uscfExpiration: uscfExpiration?.toISOString(),
       events: editingPlayer?.events || 0,
       eventIds: editingPlayer?.eventIds || [],
     };

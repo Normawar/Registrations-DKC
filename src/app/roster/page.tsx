@@ -393,7 +393,7 @@ export default function RosterPage() {
       middleName: player.middleName || '',
       lastName: player.lastName,
       uscfId: player.uscfId,
-      uscfExpiration: player.uscfExpiration ? parse(player.uscfExpiration, 'yyyy-MM-dd', new Date()) : undefined,
+      uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
       regularRating: player.regularRating,
       grade: player.grade || '',
       section: player.section || '',
@@ -444,13 +444,15 @@ export default function RosterPage() {
       return;
     }
 
+    const { uscfExpiration, dob, ...restOfValues } = values;
+
     const playerRecord: MasterPlayer = {
-      ...values,
+      ...restOfValues,
       id: editingPlayer?.id || `p-${Date.now()}`,
       school: profile.school,
       district: profile.district,
-      dob: values.dob.toISOString(),
-      uscfExpiration: values.uscfExpiration?.toISOString(),
+      dob: dob.toISOString(),
+      uscfExpiration: uscfExpiration?.toISOString(),
       events: editingPlayer?.events || 0,
       eventIds: editingPlayer?.eventIds || [],
     };
