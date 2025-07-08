@@ -187,6 +187,14 @@ export default function RosterPage() {
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
   
+  // Search state for the dialog
+  const [searchFirstName, setSearchFirstName] = useState('');
+  const [searchLastName, setSearchLastName] = useState('');
+  const [searchUscfId, setSearchUscfId] = useState('');
+  const [searchState, setSearchState] = useState('TX');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
+
   const { profile } = useSponsorProfile();
   const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded } = useMasterDb();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
@@ -196,6 +204,19 @@ export default function RosterPage() {
     return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
   }, [allPlayers, profile, isDbLoaded]);
 
+  const dbStates = useMemo(() => {
+    if (isDbLoaded) {
+        const usStates = [ 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY' ];
+        const allUniqueStatesFromDb = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
+        const usStatesInDb = usStates.filter(s => allUniqueStatesFromDb.has(s));
+        const nonUsRegionsInDb = [...allUniqueStatesFromDb].filter(s => !usStates.includes(s));
+        const sortedUsStates = usStatesInDb.filter(s => s !== 'TX').sort();
+        const sortedNonUsRegions = nonUsRegionsInDb.sort();
+        return ['ALL', 'TX', 'NO_STATE', ...sortedUsStates, ...sortedNonUsRegions];
+    }
+    return ['ALL', 'TX', 'NO_STATE'];
+  }, [isDbLoaded, allPlayers]);
+  
   const formStates = useMemo(() => {
     if (isDbLoaded) {
         const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
@@ -203,30 +224,50 @@ export default function RosterPage() {
     }
     return [];
   }, [isDbLoaded, allPlayers]);
-
+  
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
     defaultValues: {
-      firstName: '',
-      middleName: '',
-      lastName: '',
-      uscfId: '',
-      regularRating: undefined,
-      quickRating: '',
-      uscfExpiration: undefined,
-      dob: undefined,
-      grade: '',
-      section: '',
-      email: '',
-      phone: '',
-      zipCode: '',
-      studentType: undefined,
-      state: '',
+      firstName: '', middleName: '', lastName: '', uscfId: '',
+      regularRating: undefined, quickRating: '', uscfExpiration: undefined,
+      dob: undefined, grade: '', section: '', email: '', phone: '',
+      zipCode: '', studentType: undefined, state: '',
     }
   });
 
+  // Debounced search effect
+  useEffect(() => {
+    if (!searchFirstName && !searchLastName && !searchUscfId && searchState === 'ALL') {
+        setSearchResults([]);
+        return;
+    }
+    setIsSearching(true);
+    const handler = setTimeout(() => {
+        const lowerFirstName = searchFirstName.toLowerCase();
+        const lowerLastName = searchLastName.toLowerCase();
+        const results = allPlayers.filter(p => {
+            const stateMatch = searchState === 'ALL' || (searchState === 'NO_STATE' && !p.state) || p.state === searchState;
+            const firstNameMatch = !lowerFirstName || p.firstName.toLowerCase().includes(lowerFirstName);
+            const lastNameMatch = !lowerLastName || p.lastName.toLowerCase().includes(lowerLastName);
+            const uscfIdMatch = !searchUscfId || p.uscfId.includes(searchUscfId);
+            return stateMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
+        }).slice(0, 50); // Limit results to avoid performance issues
+        setSearchResults(results);
+        setIsSearching(false);
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [searchFirstName, searchLastName, searchUscfId, searchState, allPlayers]);
+
+
   useEffect(() => {
     if (isPlayerDialogOpen) {
+      // Reset search fields when dialog opens
+      setSearchFirstName('');
+      setSearchLastName('');
+      setSearchUscfId('');
+      setSearchState('TX');
+      setSearchResults([]);
       if (editingPlayer) {
         form.reset({
           ...editingPlayer,
@@ -235,21 +276,10 @@ export default function RosterPage() {
         });
       } else {
         form.reset({
-          firstName: '',
-          middleName: '',
-          lastName: '',
-          uscfId: '',
-          regularRating: undefined,
-          quickRating: '',
-          uscfExpiration: undefined,
-          dob: undefined,
-          grade: '',
-          section: '',
-          email: '',
-          phone: '',
-          zipCode: '',
-          studentType: undefined,
-          state: '',
+          firstName: '', middleName: '', lastName: '', uscfId: '',
+          regularRating: undefined, quickRating: '', uscfExpiration: undefined,
+          dob: undefined, grade: '', section: '', email: '', phone: '',
+          zipCode: '', studentType: undefined, state: '',
         });
       }
     }
@@ -333,7 +363,6 @@ export default function RosterPage() {
 
   const handleAddPlayer = () => {
     setEditingPlayer(null);
-    form.reset();
     setIsPlayerDialogOpen(true);
   };
 
@@ -354,6 +383,28 @@ export default function RosterPage() {
     }
     setIsAlertOpen(false);
     setPlayerToDelete(null);
+  };
+
+  const handleSelectSearchedPlayer = (player: MasterPlayer) => {
+    setSearchResults([]);
+    form.reset({
+      id: player.id,
+      firstName: player.firstName,
+      middleName: player.middleName || '',
+      lastName: player.lastName,
+      uscfId: player.uscfId,
+      uscfExpiration: player.uscfExpiration ? parse(player.uscfExpiration, 'yyyy-MM-dd', new Date()) : undefined,
+      regularRating: player.regularRating,
+      grade: player.grade || '',
+      section: player.section || '',
+      email: player.email || '',
+      phone: player.phone || '',
+      dob: player.dob ? new Date(player.dob) : undefined,
+      zipCode: player.zipCode || '',
+      state: player.state || '',
+      studentType: player.studentType,
+    });
+    toast({ title: "Player Loaded", description: "Player information has been pre-filled. Please complete any missing fields." });
   };
 
   function onSubmit(values: PlayerFormValues) {
@@ -578,10 +629,58 @@ export default function RosterPage() {
             <DialogHeader className="p-6 pb-4 border-b shrink-0">
                 <DialogTitle>{editingPlayer ? 'Edit Player' : 'Add New Player'}</DialogTitle>
                 <DialogDescription>
-                    {editingPlayer ? "Update the player's information." : "Enter the player's details manually."}
+                    {editingPlayer ? "Update the player's information." : "Search the local database or enter the player's details manually."}
                 </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto p-6">
+                {!editingPlayer && (
+                    <Card className="mb-6">
+                        <CardHeader>
+                            <CardTitle className="text-lg">Search Local Database</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="dialog-search-state">State</Label>
+                                    <Select value={searchState} onValueChange={setSearchState}>
+                                        <SelectTrigger id="dialog-search-state"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {dbStates.map(s => <SelectItem key={s} value={s}>{s === 'ALL' ? 'All States' : s === 'NO_STATE' ? 'No State' : s}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="dialog-search-first-name">First Name</Label>
+                                    <Input id="dialog-search-first-name" placeholder="Filter by first name..." value={searchFirstName} onChange={e => setSearchFirstName(e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="dialog-search-last-name">Last Name</Label>
+                                    <Input id="dialog-search-last-name" placeholder="Filter by last name..." value={searchLastName} onChange={e => setSearchLastName(e.target.value)} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="dialog-search-uscf-id">USCF ID</Label>
+                                    <Input id="dialog-search-uscf-id" placeholder="Filter by USCF ID..." value={searchUscfId} onChange={e => setSearchUscfId(e.target.value)} />
+                                </div>
+                            </div>
+                            {(isSearching || searchResults.length > 0) && (
+                                <Card className="max-h-48 overflow-y-auto">
+                                    <CardContent className="p-2">
+                                        {isSearching ? (<div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>)
+                                        : searchResults.length === 0 ? (<div className="p-2 text-center text-sm text-muted-foreground">No results found.</div>)
+                                        : (
+                                            searchResults.map(player => (
+                                                <button key={player.id} type="button" className="w-full text-left p-2 hover:bg-accent rounded-md" onClick={() => handleSelectSearchedPlayer(player)}>
+                                                    <p className="font-medium">{player.firstName} {player.lastName} ({player.state || 'N/A'})</p>
+                                                    <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'N/A'} | School: {player.school}</p>
+                                                </button>
+                                            ))
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
                 <Form {...form}>
                     <form id="player-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -593,11 +692,11 @@ export default function RosterPage() {
                             <FormField control={form.control} name="uscfId" render={({ field }) => (
                               <FormItem>
                                 <FormLabel>USCF ID</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="12345678 or NEW" {...field} />
-                                </FormControl>
+                                <FormControl><Input placeholder="12345678 or NEW" {...field} /></FormControl>
                                 <FormDescription>
-                                    Students without a USCF ID can be added with &quot;NEW&quot;.
+                                    <Link href="https://new.uschess.org/player-search" target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline-offset-4 hover:underline">
+                                        Use the USCF Player Search to verify an ID.
+                                    </Link>
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>

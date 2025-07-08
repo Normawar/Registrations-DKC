@@ -208,7 +208,7 @@ export default function PlayersPage() {
         const sortedUsStates = usStatesInDb.filter(s => s !== 'TX').sort();
         const sortedNonUsRegions = nonUsRegionsInDb.sort();
         
-        const finalStateList = [
+        const finalList = [
             'ALL',
             'TX',
             'NO_STATE', 
@@ -216,7 +216,7 @@ export default function PlayersPage() {
             ...sortedNonUsRegions
         ];
         
-        return finalStateList;
+        return finalList;
     }
     return ['ALL', 'TX', 'NO_STATE'];
   }, [isDbLoaded, allPlayers]);
@@ -757,7 +757,9 @@ export default function PlayersPage() {
                                     <Input placeholder="12345678 or NEW" {...field} />
                                 </FormControl>
                                 <FormDescription>
-                                    Students without a USCF ID can be added with &quot;NEW&quot;.
+                                    <Link href="https://new.uschess.org/player-search" target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline-offset-4 hover:underline">
+                                        Use the USCF Player Search to verify an ID.
+                                    </Link>
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>

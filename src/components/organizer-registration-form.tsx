@@ -70,7 +70,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { lookupUscfPlayer } from '@/ai/flows/lookup-uscf-player-flow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // --- Types and Schemas ---
@@ -180,7 +179,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             lastName: player.lastName,
             uscfId: player.uscfId,
             regularRating: player.regularRating,
-            uscfExpiration: player.expirationDate ? parse(player.expirationDate, 'MM/dd/yyyy', new Date()) : undefined,
+            uscfExpiration: player.expirationDate ? parse(player.expirationDate, 'yyyy-MM-dd', new Date()) : undefined,
         });
         setIsPlayerDialogOpen(true);
     };

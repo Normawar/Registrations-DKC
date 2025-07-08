@@ -213,7 +213,11 @@ export function MembershipAssistant() {
               {hasPlayed === 'yes' && (
                   <div className="text-sm text-muted-foreground p-3 bg-muted/50 rounded-lg border">
                       <p>
-                          Welcome back! You will likely need to renew your membership. You can search for your details in the Master Player Database if you have been previously added by an organizer.
+                          Welcome back! You will likely need to renew your membership. You can{" "}
+                          <Link href="https://new.uschess.org/player-search" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">
+                              search for your profile on the USCF website
+                          </Link>
+                          {" "}to verify your information.
                       </p>
                   </div>
               )}
