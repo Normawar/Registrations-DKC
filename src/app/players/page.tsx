@@ -189,7 +189,7 @@ export default function PlayersPage() {
   const ROWS_PER_PAGE = 50;
 
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount } = useMasterDb();
+  const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount } = useMasterDb();
   
   const dbStates = useMemo(() => {
     if (isDbLoaded) {
@@ -324,7 +324,7 @@ export default function PlayersPage() {
     return () => { 
         workerRef.current?.terminate();
     };
-  }, [setAllPlayers, toast]);
+  }, [setAllPlayers, toast, allPlayers]);
   
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -499,7 +499,7 @@ export default function PlayersPage() {
   
   const confirmDelete = () => {
     if (playerToDelete) {
-      setAllPlayers(allPlayers.filter(p => p.id !== playerToDelete.id));
+      deletePlayer(playerToDelete.id);
       toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the master database.` });
     }
     setIsAlertOpen(false);
@@ -534,10 +534,10 @@ export default function PlayersPage() {
     };
 
     if (editingPlayer) {
-      setAllPlayers(allPlayers.map(p => p.id === editingPlayer.id ? playerRecord : p));
+      updatePlayer(playerRecord);
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
     } else {
-      setAllPlayers([...allPlayers, playerRecord]);
+      addPlayer(playerRecord);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the master database.`});
     }
     setIsPlayerDialogOpen(false);
@@ -778,67 +778,110 @@ export default function PlayersPage() {
                             <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="number" placeholder="1500" {...field} value={field.value ?? ''} disabled={isUscfNew} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           <FormField
-                                control={form.control}
-                                name="dob"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-col">
-                                        <FormLabel>Date of Birth (Optional)</FormLabel>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant={"outline"}
-                                                    className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={field.value}
-                                                    onSelect={field.onChange}
-                                                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="uscfExpiration"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-col">
-                                        <FormLabel>USCF Expiration</FormLabel>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant={"outline"}
-                                                    className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
-                                                    disabled={isUscfNew}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <Calendar
-                                                    mode="single"
-                                                    selected={field.value}
-                                                    onSelect={field.onChange}
-                                                    disabled={isUscfNew}
-                                                    initialFocus
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                           <FormField control={form.control} name="dob" render={({ field }) => {
+                                const [inputValue, setInputValue] = useState<string>( field.value ? format(field.value, "MM/dd/yyyy") : "" );
+                                const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+                                useEffect(() => { field.value ? setInputValue(format(field.value, "MM/dd/yyyy")) : setInputValue(""); }, [field.value]);
+                                const handleBlur = () => {
+                                    const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                                    if (isValid(parsedDate)) {
+                                        if (parsedDate <= new Date() && parsedDate >= new Date("1900-01-01")) { field.onChange(parsedDate); } 
+                                        else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                    } else {
+                                        if (inputValue === "") { field.onChange(undefined); } 
+                                        else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                    }
+                                };
+                                return (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Date of Birth (Optional)</FormLabel>
+                                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                        <div className="relative">
+                                        <FormControl>
+                                            <Input
+                                                placeholder="MM/DD/YYYY"
+                                                value={inputValue}
+                                                onChange={(e) => setInputValue(e.target.value)}
+                                                onBlur={handleBlur}
+                                            />
+                                        </FormControl>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                            variant={"ghost"}
+                                            className="absolute right-0 top-0 h-full w-10 p-0 font-normal"
+                                            aria-label="Open calendar"
+                                            >
+                                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        </div>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={field.value}
+                                                onSelect={(date) => { field.onChange(date); setIsCalendarOpen(false); }}
+                                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
+                                );
+                            }} />
+                             <FormField control={form.control} name="uscfExpiration" render={({ field }) => {
+                                const [inputValue, setInputValue] = useState<string>( field.value ? format(field.value, "MM/dd/yyyy") : "" );
+                                const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+                                useEffect(() => { field.value ? setInputValue(format(field.value, "MM/dd/yyyy")) : setInputValue(""); }, [field.value]);
+                                const handleBlur = () => {
+                                    if (isUscfNew) return;
+                                    const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                                    if (isValid(parsedDate)) {
+                                        field.onChange(parsedDate);
+                                    } else {
+                                        if (inputValue === "") { field.onChange(undefined); } 
+                                        else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                    }
+                                };
+                                return (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>USCF Expiration</FormLabel>
+                                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                        <div className="relative">
+                                        <FormControl>
+                                            <Input
+                                                placeholder="MM/DD/YYYY"
+                                                value={inputValue}
+                                                onChange={(e) => setInputValue(e.target.value)}
+                                                onBlur={handleBlur}
+                                                disabled={isUscfNew}
+                                            />
+                                        </FormControl>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                            variant={"ghost"}
+                                            className="absolute right-0 top-0 h-full w-10 p-0 font-normal"
+                                            aria-label="Open calendar"
+                                            disabled={isUscfNew}
+                                            >
+                                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        </div>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value}
+                                            onSelect={(date) => { field.onChange(date); setIsCalendarOpen(false); }}
+                                            initialFocus
+                                            disabled={isUscfNew}
+                                        />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
+                                );
+                            }} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade (Optional)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />

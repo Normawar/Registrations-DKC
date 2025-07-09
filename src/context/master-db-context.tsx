@@ -36,6 +36,9 @@ export type MasterPlayer = {
 interface MasterDbContextType {
   database: MasterPlayer[];
   setDatabase: (players: MasterPlayer[], onProgress?: (saved: number, total: number) => void) => Promise<void>;
+  addPlayer: (player: MasterPlayer) => Promise<void>;
+  updatePlayer: (player: MasterPlayer) => Promise<void>;
+  deletePlayer: (playerId: string) => Promise<void>;
   isDbLoaded: boolean;
   dbPlayerCount: number;
 }
@@ -91,7 +94,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     loadDataFromDb();
   }, []);
 
-  // This is the function that components will call to update the database
   const setDatabase = useCallback(async (newPlayers: MasterPlayer[], onProgress?: (saved: number, total: number) => void) => {
     const db = await getDb();
     
@@ -122,20 +124,34 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             throw e; 
         }
     }
-
-    // Force React to synchronously update the state before continuing.
-    // This is crucial to prevent race conditions where other pages might
-    // load with stale data after a large import.
     flushSync(() => {
       setDatabaseState(newPlayers);
       setIsDbLoaded(true);
     });
   }, []);
 
+  const addPlayer = useCallback(async (player: MasterPlayer) => {
+    const db = await getDb();
+    await db.add(STORE_NAME, player);
+    setDatabaseState(prev => [...prev, player]);
+  }, []);
+
+  const updatePlayer = useCallback(async (player: MasterPlayer) => {
+    const db = await getDb();
+    await db.put(STORE_NAME, player);
+    setDatabaseState(prev => prev.map(p => p.id === player.id ? player : p));
+  }, []);
+
+  const deletePlayer = useCallback(async (playerId: string) => {
+    const db = await getDb();
+    await db.delete(STORE_NAME, playerId);
+    setDatabaseState(prev => prev.filter(p => p.id !== playerId));
+  }, []);
+
   const dbPlayerCount = database.length;
 
   return (
-    <MasterDbContext.Provider value={{ database, setDatabase, isDbLoaded, dbPlayerCount }}>
+    <MasterDbContext.Provider value={{ database, setDatabase, addPlayer, updatePlayer, deletePlayer, isDbLoaded, dbPlayerCount }}>
       {children}
     </MasterDbContext.Provider>
   );

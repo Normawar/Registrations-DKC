@@ -196,7 +196,7 @@ export default function RosterPage() {
   const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
 
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, setDatabase: setAllPlayers, isDbLoaded } = useMasterDb();
+  const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, isDbLoaded } = useMasterDb();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
   const rosterPlayers = useMemo(() => {
@@ -378,7 +378,7 @@ export default function RosterPage() {
   
   const confirmDelete = () => {
     if (playerToDelete) {
-      setAllPlayers(allPlayers.filter(p => p.id !== playerToDelete.id));
+      deletePlayer(playerToDelete.id);
       toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the roster.` });
     }
     setIsAlertOpen(false);
@@ -390,7 +390,6 @@ export default function RosterPage() {
     
     let expirationDate: Date | undefined = undefined;
     if (player.uscfExpiration) {
-      // Correct for timezone issues when converting from ISO string to Date object
       const date = new Date(player.uscfExpiration);
       const userTimezoneOffset = date.getTimezoneOffset() * 60000;
       expirationDate = new Date(date.getTime() + userTimezoneOffset);
@@ -467,10 +466,10 @@ export default function RosterPage() {
     };
 
     if (editingPlayer) {
-      setAllPlayers(allPlayers.map(p => p.id === editingPlayer.id ? playerRecord : p));
+      updatePlayer(playerRecord);
       toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
     } else {
-      setAllPlayers([...allPlayers, playerRecord]);
+      addPlayer(playerRecord);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
     }
     setIsPlayerDialogOpen(false);
