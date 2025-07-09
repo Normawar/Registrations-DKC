@@ -108,7 +108,7 @@ self.onmessage = (event) => {
                     const regularRatingString = row[4] || '';
                     const quickRatingString = row[5]?.trim() || undefined;
                     let regularRating: number | undefined = undefined;
-                    if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated') {
+                    if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated' && !isNaN(parseInt(regularRatingString, 10))) {
                         const ratingMatch = regularRatingString.match(/^(\d+)/);
                         if (ratingMatch && ratingMatch[1]) regularRating = parseInt(ratingMatch[1], 10);
                     }
