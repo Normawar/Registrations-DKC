@@ -407,7 +407,7 @@ export default function RosterPage() {
       section: player.section || '',
       email: player.email || '',
       phone: player.phone || '',
-      dob: undefined,
+      dob: undefined, // DOB is not auto-filled
       zipCode: player.zipCode || '',
       state: player.state || '',
       studentType: player.studentType,
@@ -681,7 +681,7 @@ export default function RosterPage() {
                                             searchResults.map(player => (
                                                 <button key={player.id} type="button" className="w-full text-left p-2 hover:bg-accent rounded-md" onClick={() => handleSelectSearchedPlayer(player)}>
                                                     <p className="font-medium">{player.firstName} {player.lastName} ({player.state || 'N/A'})</p>
-                                                    <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'N/A'} | School: {player.school}</p>
+                                                    <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'N/A'} | Expires: {player.uscfExpiration ? format(new Date(player.uscfExpiration), 'MM/dd/yyyy') : 'N/A'} | School: {player.school}</p>
                                                 </button>
                                             ))
                                         )}
@@ -733,25 +733,59 @@ export default function RosterPage() {
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                            <FormField control={form.control} name="uscfExpiration" render={({ field }) => (
+                            <FormField control={form.control} name="uscfExpiration" render={({ field }) => {
+                                const [inputValue, setInputValue] = useState<string>( field.value ? format(field.value, "MM/dd/yyyy") : "" );
+                                const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+                                useEffect(() => { field.value ? setInputValue(format(field.value, "MM/dd/yyyy")) : setInputValue(""); }, [field.value]);
+                                const handleBlur = () => {
+                                    if (isUscfNew) return;
+                                    const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
+                                    if (isValid(parsedDate)) {
+                                        field.onChange(parsedDate);
+                                    } else {
+                                        if (inputValue === "") { field.onChange(undefined); } 
+                                        else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
+                                    }
+                                };
+                                return (
                                 <FormItem className="flex flex-col">
                                     <FormLabel>USCF Expiration</FormLabel>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
+                                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                                        <div className="relative">
                                         <FormControl>
-                                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isUscfNew}>
-                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                            </Button>
+                                            <Input
+                                                placeholder="MM/DD/YYYY"
+                                                value={inputValue}
+                                                onChange={(e) => setInputValue(e.target.value)}
+                                                onBlur={handleBlur}
+                                                disabled={isUscfNew}
+                                            />
                                         </FormControl>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                            variant={"ghost"}
+                                            className="absolute right-0 top-0 h-full w-10 p-0 font-normal"
+                                            aria-label="Open calendar"
+                                            disabled={isUscfNew}
+                                            >
+                                            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                                            </Button>
                                         </PopoverTrigger>
+                                        </div>
                                         <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus disabled={isUscfNew} />
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value}
+                                            onSelect={(date) => { field.onChange(date); setIsCalendarOpen(false); }}
+                                            initialFocus
+                                            disabled={isUscfNew}
+                                        />
                                         </PopoverContent>
                                     </Popover>
                                     <FormMessage />
                                 </FormItem>
-                            )} />
+                                );
+                            }} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
