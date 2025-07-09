@@ -422,31 +422,31 @@ function UscfPurchaseComponent() {
                                                 <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                              </div>
                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <FormField control={form.control} name={`players.${index}.dob`} render={({ field }) => {
-                                                    const [inputValue, setInputValue] = useState<string>( field.value ? format(field.value, "MM/dd/yyyy") : "" );
-                                                    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-                                                    useEffect(() => { field.value ? setInputValue(format(field.value, "MM/dd/yyyy")) : setInputValue(""); }, [field.value]);
-                                                    const handleBlur = () => {
-                                                        const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
-                                                        if (isValid(parsedDate)) {
-                                                            if (parsedDate <= new Date() && parsedDate >= new Date("1900-01-01")) { field.onChange(parsedDate); } 
-                                                            else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
-                                                        } else {
-                                                            if (inputValue === "") { field.onChange(undefined); } 
-                                                            else { setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : ""); }
-                                                        }
-                                                    };
-                                                    return (
-                                                        <FormItem><FormLabel>Date of Birth</FormLabel>
-                                                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                                                            <div className="relative">
-                                                            <FormControl><Input placeholder="MM/DD/YYYY" value={inputValue} onChange={(e) => setInputValue(e.target.value)} onBlur={handleBlur} /></FormControl>
-                                                            <PopoverTrigger asChild><Button variant={"ghost"} className="absolute right-0 top-0 h-full w-10 p-0 font-normal" aria-label="Open calendar"><CalendarIcon className="h-4 w-4 text-muted-foreground" /></Button></PopoverTrigger>
-                                                            </div>
-                                                            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsCalendarOpen(false); }} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent>
-                                                        </Popover><FormMessage /></FormItem>
-                                                    );
-                                                }} />
+                                                <FormField control={form.control} name={`players.${index}.dob`} render={({ field }) => ( 
+                                                    <FormItem className='flex flex-col'><FormLabel>Date of Birth</FormLabel>
+                                                        <Popover><PopoverTrigger asChild>
+                                                        <FormControl>
+                                                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                            </Button>
+                                                        </FormControl>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-auto p-0" align="start">
+                                                            <Calendar
+                                                                mode="single"
+                                                                selected={field.value}
+                                                                onSelect={field.onChange}
+                                                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                                initialFocus
+                                                                captionLayout="dropdown-buttons"
+                                                                fromYear={new Date().getFullYear() - 100}
+                                                                toYear={new Date().getFullYear()}
+                                                            />
+                                                        </PopoverContent>
+                                                    </Popover><FormMessage />
+                                                    </FormItem>
+                                                )} />
                                                 <FormField control={form.control} name={`players.${index}.zipCode`} render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                              </div>
                                         </div>
@@ -552,7 +552,15 @@ function UscfPurchaseComponent() {
                                             </Button>
                                             </PopoverTrigger>
                                             <PopoverContent className="w-auto p-0">
-                                            <Calendar mode="single" selected={paymentInputs.checkDate} onSelect={(date) => handleInputChange('checkDate', date)} initialFocus />
+                                            <Calendar 
+                                                mode="single" 
+                                                selected={paymentInputs.checkDate} 
+                                                onSelect={(date) => handleInputChange('checkDate', date)} 
+                                                initialFocus 
+                                                captionLayout="dropdown-buttons"
+                                                fromYear={new Date().getFullYear() - 5}
+                                                toYear={new Date().getFullYear() + 5}
+                                            />
                                             </PopoverContent>
                                         </Popover>
                                     </div>

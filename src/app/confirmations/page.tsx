@@ -613,6 +613,9 @@ export default function ConfirmationsPage() {
                                               selected={currentInputs.checkDate}
                                               onSelect={(date) => handleInputChange(conf.id, 'checkDate', date)}
                                               initialFocus
+                                              captionLayout="dropdown-buttons"
+                                              fromYear={new Date().getFullYear() - 5}
+                                              toYear={new Date().getFullYear() + 5}
                                           />
                                           </PopoverContent>
                                       </Popover>

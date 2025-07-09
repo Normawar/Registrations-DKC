@@ -101,79 +101,43 @@ export function MembershipAssistant() {
               <FormField
                 control={form.control}
                 name="dob"
-                render={({ field }) => {
-                  const [inputValue, setInputValue] = useState<string>(
-                    field.value ? format(field.value, "MM/dd/yyyy") : ""
-                  );
-                  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-
-                  useEffect(() => {
-                    if (field.value) {
-                      setInputValue(format(field.value, "MM/dd/yyyy"));
-                    } else {
-                      setInputValue("");
-                    }
-                  }, [field.value]);
-
-                  const handleBlur = () => {
-                    const parsedDate = parse(inputValue, "MM/dd/yyyy", new Date());
-                    if (isValid(parsedDate)) {
-                      if (parsedDate <= new Date() && parsedDate >= new Date("1900-01-01")) {
-                        field.onChange(parsedDate);
-                      } else {
-                        setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : "");
-                      }
-                    } else {
-                      if (inputValue === "") {
-                        field.onChange(undefined);
-                      } else {
-                        setInputValue(field.value ? format(field.value, "MM/dd/yyyy") : "");
-                      }
-                    }
-                  };
-                  
-                  return (
-                    <FormItem>
+                render={({ field }) => (
+                    <FormItem className="flex flex-col">
                       <FormLabel>Your Date of Birth</FormLabel>
-                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <div className="relative">
+                      <Popover>
+                        <PopoverTrigger asChild>
                           <FormControl>
-                            <Input
-                              placeholder="MM/DD/YYYY"
-                              value={inputValue}
-                              onChange={(e) => setInputValue(e.target.value)}
-                              onBlur={handleBlur}
-                            />
-                          </FormControl>
-                          <PopoverTrigger asChild>
                             <Button
-                              variant={"ghost"}
-                              className="absolute right-0 top-0 h-full w-10 p-0 font-normal"
-                              aria-label="Open calendar"
+                              variant={"outline"}
+                              className={cn(
+                                "pl-3 text-left font-normal",
+                                !field.value && "text-muted-foreground"
+                              )}
                             >
-                              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
-                          </PopoverTrigger>
-                        </div>
+                          </FormControl>
+                        </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={(date) => {
-                              field.onChange(date);
-                              setIsCalendarOpen(false);
-                            }}
+                            onSelect={field.onChange}
                             disabled={(date) =>
                               date > new Date() || date < new Date("1900-01-01")
                             }
                             initialFocus
+                            captionLayout="dropdown-buttons"
+                            fromYear={new Date().getFullYear() - 100}
+                            toYear={new Date().getFullYear()}
                           />
                         </PopoverContent>
                       </Popover>
                       <FormMessage />
                     </FormItem>
-                  );
-                }}
+                  )
+                }
               />
               <FormField
                 control={form.control}
