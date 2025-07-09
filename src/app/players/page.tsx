@@ -169,7 +169,7 @@ const playerFormSchema = z.object({
   });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
-type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state';
+type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state' | 'uscfExpiration';
 
 
 export default function PlayersPage() {
@@ -420,6 +420,9 @@ export default function PlayersPage() {
         } else if (key === 'regularRating') {
           aVal = a.regularRating ?? -Infinity;
           bVal = b.regularRating ?? -Infinity;
+        } else if (key === 'uscfExpiration') {
+          aVal = a.uscfExpiration ? new Date(a.uscfExpiration).getTime() : 0;
+          bVal = b.uscfExpiration ? new Date(b.uscfExpiration).getTime() : 0;
         }
 
         if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -641,6 +644,11 @@ export default function PlayersPage() {
                                     </Button>
                                 </TableHead>
                                 <TableHead className="p-0">
+                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfExpiration')}>
+                                        Expiration {getSortIcon('uscfExpiration')}
+                                    </Button>
+                                </TableHead>
+                                <TableHead className="p-0">
                                     <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
                                         Rating {getSortIcon('regularRating')}
                                     </Button>
@@ -677,6 +685,7 @@ export default function PlayersPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>{player.uscfId}</TableCell>
+                                <TableCell>{player.uscfExpiration ? format(new Date(player.uscfExpiration), 'PPP') : 'N/A'}</TableCell>
                                 <TableCell>{player.regularRating || 'N/A'}</TableCell>
                                 <TableCell>{player.state}</TableCell>
                                 <TableCell className="text-right">
@@ -769,44 +778,67 @@ export default function PlayersPage() {
                             <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="number" placeholder="1500" {...field} value={field.value ?? ''} disabled={isUscfNew} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FormField control={form.control} name="dob" render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel>Date of Birth (Optional)</FormLabel>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <FormControl>
-                                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                            </Button>
-                                        </FormControl>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus/>
-                                        </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="uscfExpiration" render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                    <FormLabel>USCF Expiration</FormLabel>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <FormControl>
-                                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} disabled={isUscfNew}>
-                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                            </Button>
-                                        </FormControl>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus disabled={isUscfNew} />
-                                        </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
+                           <FormField
+                                control={form.control}
+                                name="dob"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel>Date of Birth (Optional)</FormLabel>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant={"outline"}
+                                                    className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={field.value}
+                                                    onSelect={field.onChange}
+                                                    disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={form.control}
+                                name="uscfExpiration"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                        <FormLabel>USCF Expiration</FormLabel>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant={"outline"}
+                                                    className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                                                    disabled={isUscfNew}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={field.value}
+                                                    onSelect={field.onChange}
+                                                    disabled={isUscfNew}
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade (Optional)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
