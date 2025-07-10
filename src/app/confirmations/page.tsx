@@ -58,7 +58,7 @@ import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/comp
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
-import type { Event } from '@/hooks/use-events';
+import { useEvents, type Event } from '@/hooks/use-events';
 
 
 type PlayerRegistration = {
