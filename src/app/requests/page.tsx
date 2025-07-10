@@ -1,3 +1,7 @@
+
+'use client';
+
+import { useState, useEffect } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import {
   Card,
@@ -12,9 +16,39 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { requestsData } from "@/lib/data/requests-data";
+import type { ChangeRequest } from "@/lib/data/requests-data";
+import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
 
 export default function RequestsPage() {
+  const [requests, setRequests] = useState<ChangeRequest[]>([]);
+
+  useEffect(() => {
+    const loadRequests = () => {
+      try {
+        const storedRequests = localStorage.getItem('change_requests');
+        const parsedRequests = storedRequests ? JSON.parse(storedRequests) : initialRequestsData;
+        // Ensure data is always an array
+        setRequests(Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData);
+      } catch (e) {
+        console.error("Failed to parse change requests from localStorage", e);
+        setRequests(initialRequestsData);
+      }
+    };
+
+    loadRequests();
+
+    // Listen for changes from other tabs/windows
+    window.addEventListener('storage', (event) => {
+      if (event.key === 'change_requests') {
+        loadRequests();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('storage', loadRequests);
+    };
+  }, []);
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -39,8 +73,8 @@ export default function RequestsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {requestsData.map((request) => (
-                  <TableRow key={`${request.player}-${request.submitted}`}>
+                {requests.map((request, index) => (
+                  <TableRow key={`${request.player}-${request.submitted}-${index}`}>
                     <TableCell className="font-medium">{request.player}</TableCell>
                     <TableCell>{request.event}</TableCell>
                     <TableCell>{request.type}</TableCell>

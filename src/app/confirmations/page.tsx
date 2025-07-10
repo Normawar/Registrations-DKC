@@ -51,7 +51,8 @@ import { useMasterDb } from '@/context/master-db-context';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { requestsData } from '@/lib/data/requests-data';
+import type { ChangeRequest } from '@/lib/data/requests-data';
+import { requestsData as initialRequestsData } from '@/lib/data/requests-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
@@ -114,6 +115,7 @@ export default function ConfirmationsPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   
   const [isCompAlertOpen, setIsCompAlertOpen] = useState(false);
   const [confToComp, setConfToComp] = useState<Confirmation | null>(null);
@@ -201,6 +203,9 @@ export default function ConfirmationsPage() {
       storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
       setConfirmations(storedConfirmations);
 
+      const storedRequests = localStorage.getItem('change_requests');
+      setChangeRequests(storedRequests ? JSON.parse(storedRequests) : initialRequestsData);
+
       const initialInputs: Record<string, Partial<ConfirmationInputs>> = {};
       const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
       for (const conf of storedConfirmations) {
@@ -228,8 +233,9 @@ export default function ConfirmationsPage() {
       fetchAllInvoiceStatuses(storedConfirmations.filter((c: Confirmation) => c.invoiceId));
 
     } catch (error) {
-        console.error("Failed to load or parse confirmations from localStorage", error);
+        console.error("Failed to load or parse data from localStorage", error);
         setConfirmations([]);
+        setChangeRequests(initialRequestsData);
     }
   }, []);
 
@@ -420,19 +426,18 @@ export default function ConfirmationsPage() {
     
     const player = getPlayerById(changeRequestInputs.playerId);
     
-    // This is a mock implementation. In a real app, this would be an API call.
     const newRequest = {
         player: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
         event: confToRequestChange.eventName,
         type: changeRequestInputs.requestType,
-        details: changeRequestInputs.details,
+        details: changeRequestInputs.details || '',
         submitted: format(new Date(), 'yyyy-MM-dd'),
         status: 'Pending',
     };
     
-    // Simulate updating the shared requests data
-    // In a real app, you would not do this client-side.
-    requestsData.unshift(newRequest);
+    const updatedRequests = [newRequest, ...changeRequests];
+    setChangeRequests(updatedRequests);
+    localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
 
     toast({ title: 'Request Submitted', description: 'Your change request has been sent to the organizer for review.' });
     setIsRequestDialogOpen(false);
@@ -551,7 +556,7 @@ export default function ConfirmationsPage() {
                               if (!player) return null;
 
                               const playerName = `${player.firstName} ${player.lastName}`;
-                              const hasPendingRequest = requestsData.some(
+                              const hasPendingRequest = changeRequests.some(
                                 req => req.player === playerName && req.event === conf.eventName && req.status === 'Pending'
                               );
 

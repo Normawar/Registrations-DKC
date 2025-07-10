@@ -37,11 +37,11 @@ const sponsorMenuItems = [
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/roster", icon: PawnIcon, label: "Roster" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
-  { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
   { href: "/invoices", icon: Receipt, label: "Invoices" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+  { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
 const organizerMenuItems = [
@@ -52,19 +52,19 @@ const organizerMenuItems = [
   { href: "/invoices", icon: Receipt, label: "All Invoices" },
   { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
   { href: "/events", icon: RookIcon, label: "Upcoming Events" },
-  { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
+  { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
 const individualMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
   { href: "/individual-dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
-  { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
   { href: "/invoices", icon: Receipt, label: "Invoices" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+  { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
 const icons: { [key: string]: React.ElementType } = {
