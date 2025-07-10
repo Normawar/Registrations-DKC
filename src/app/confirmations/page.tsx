@@ -29,7 +29,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -48,6 +48,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { useMasterDb } from '@/context/master-db-context';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { requestsData } from '@/lib/data/requests-data';
 
 
 type PlayerRegistration = {
@@ -92,6 +96,12 @@ type ConfirmationInputs = {
   paymentFileUrl?: string;
 };
 
+type ChangeRequestInputs = {
+  playerId: string;
+  requestType: string;
+  details: string;
+};
+
 
 export default function ConfirmationsPage() {
   const { toast } = useToast();
@@ -103,9 +113,14 @@ export default function ConfirmationsPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [isAuthReady, setIsAuthReady] = useState(false);
+  
   const [isCompAlertOpen, setIsCompAlertOpen] = useState(false);
   const [confToComp, setConfToComp] = useState<Confirmation | null>(null);
   
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [confToRequestChange, setConfToRequestChange] = useState<Confirmation | null>(null);
+  const [changeRequestInputs, setChangeRequestInputs] = useState<Partial<ChangeRequestInputs>>({});
+
   const playersMap = useMemo(() => {
     return new Map(allPlayers.map(p => [p.id, p]));
   }, [allPlayers]);
@@ -389,6 +404,38 @@ export default function ConfirmationsPage() {
         setConfToComp(null);
     }
   };
+  
+  const handleOpenRequestDialog = (conf: Confirmation) => {
+    setConfToRequestChange(conf);
+    setChangeRequestInputs({});
+    setIsRequestDialogOpen(true);
+  };
+  
+  const handleSubmitChangeRequest = () => {
+    if (!confToRequestChange || !changeRequestInputs.playerId || !changeRequestInputs.requestType) {
+        toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select a player and request type.' });
+        return;
+    }
+    
+    const player = getPlayerById(changeRequestInputs.playerId);
+    
+    // This is a mock implementation. In a real app, this would be an API call.
+    const newRequest = {
+        player: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
+        event: confToRequestChange.eventName,
+        type: changeRequestInputs.requestType,
+        details: changeRequestInputs.details,
+        submitted: format(new Date(), 'yyyy-MM-dd'),
+        status: 'Pending',
+    };
+    
+    // Simulate updating the shared requests data
+    // In a real app, you would not do this client-side.
+    requestsData.unshift(newRequest);
+
+    toast({ title: 'Request Submitted', description: 'Your change request has been sent to the organizer for review.' });
+    setIsRequestDialogOpen(false);
+  };
 
 
   return (
@@ -464,6 +511,9 @@ export default function ConfirmationsPage() {
                         <div className="flex justify-between items-center">
                             <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
                             <div className="flex items-center gap-2">
+                                <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)}>
+                                    <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change
+                                </Button>
                                 {sponsorProfile?.role === 'organizer' && conf.invoiceStatus !== 'COMPED' && (
                                     <Button variant="secondary" size="sm" onClick={() => {
                                         setConfToComp(conf);
@@ -717,6 +767,67 @@ export default function ConfirmationsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request a Change</DialogTitle>
+            <DialogDescription>
+              Submit a request to the tournament organizer regarding this registration for "{confToRequestChange?.eventName}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="request-player">Player</Label>
+              <Select
+                value={changeRequestInputs.playerId}
+                onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, playerId: value}))}
+              >
+                <SelectTrigger id="request-player">
+                  <SelectValue placeholder="Select a player..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {confToRequestChange && Object.keys(confToRequestChange.selections).map(playerId => {
+                    const player = getPlayerById(playerId);
+                    return player ? <SelectItem key={playerId} value={playerId}>{player.firstName} {player.lastName}</SelectItem> : null;
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="request-type">Request Type</Label>
+              <Select
+                value={changeRequestInputs.requestType}
+                onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, requestType: value}))}
+              >
+                <SelectTrigger id="request-type">
+                  <SelectValue placeholder="Select a request type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Withdraw Player">Withdraw Player</SelectItem>
+                  <SelectItem value="Section Change">Section Change</SelectItem>
+                  <SelectItem value="Bye Request">Bye Request</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="request-details">Details</Label>
+              <Textarea
+                id="request-details"
+                placeholder="Provide any additional details for the organizer..."
+                value={changeRequestInputs.details || ''}
+                onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmitChangeRequest}>Submit Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
     </AppLayout>
   );
 }
