@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -29,15 +30,34 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
+import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { cn } from '@/lib/utils';
-import { ExternalLink, RefreshCw, Receipt } from 'lucide-react';
+import { ExternalLink, RefreshCw, Receipt, MoreHorizontal, FilePenLine, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
-// This combines data from event registrations and membership purchases
+// This combines data from event registrations and membership/organizer purchases
 type CombinedInvoice = {
   id: string; // confirmation ID or invoice ID
-  description: string; // event name or membership type
+  description: string; // event name or membership/invoice type
   submissionTimestamp: string;
   totalInvoiced: number;
   invoiceId?: string;
@@ -47,6 +67,10 @@ type CombinedInvoice = {
   invoiceStatus?: string;
   schoolName?: string;
   district?: string;
+  // For editing organizer invoices
+  type?: 'event' | 'membership' | 'organizer';
+  lineItems?: { name: string; amount: number; note?: string }[];
+  sponsorEmail?: string;
 };
 
 
@@ -68,12 +92,18 @@ const INVOICE_STATUSES = [
 
 export default function InvoicesPage() {
   const { profile } = useSponsorProfile();
+  const router = useRouter();
+  const { toast } = useToast();
 
   const [allInvoices, setAllInvoices] = useState<CombinedInvoice[]>([]);
   const [statuses, setStatuses] = useState<Record<string, { status?: string; isLoading: boolean }>>({});
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [schoolFilter, setSchoolFilter] = useState('ALL');
   
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [invoiceToCancel, setInvoiceToCancel] = useState<CombinedInvoice | null>(null);
+
+
   const loadAndProcessInvoices = useCallback(() => {
     let storedData: any[] = [];
     try {
@@ -99,6 +129,9 @@ export default function InvoicesPage() {
         district: inv.district,
         purchaserName: inv.purchaserName || inv.sponsorName,
         invoiceStatus: inv.invoiceStatus || inv.status,
+        type: inv.lineItems ? 'organizer' : inv.membershipType ? 'membership' : 'event',
+        lineItems: inv.lineItems,
+        sponsorEmail: inv.sponsorEmail || inv.purchaserEmail,
     })).filter(inv => inv.invoiceId);
 
     const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
@@ -118,6 +151,17 @@ export default function InvoicesPage() {
       try {
           const { status } = await getInvoiceStatus({ invoiceId });
           setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
+          // Update localStorage
+          const allInvoicesRaw = localStorage.getItem('all_invoices') || '[]';
+          const allInvoicesParsed = JSON.parse(allInvoicesRaw);
+          const updatedInvoices = allInvoicesParsed.map((inv: any) => {
+              if (inv.invoiceId === invoiceId) {
+                  return { ...inv, status: status, invoiceStatus: status };
+              }
+              return inv;
+          });
+          localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
+
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
           if (error instanceof Error && (error.message.includes('404') || error.message.includes("Not Found"))) {
@@ -164,8 +208,8 @@ export default function InvoicesPage() {
             }
         }
 
+        const currentStatus = statuses[inv.id]?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
         if (statusFilter !== 'ALL') {
-            const currentStatus = statuses[inv.id]?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
             if (statusFilter === 'UNPAID') {
                 return ['PUBLISHED', 'UNPAID', 'DRAFT'].includes(currentStatus);
             }
@@ -186,7 +230,7 @@ export default function InvoicesPage() {
             
             if (!currentStatusInfo || !currentStatusInfo.isLoading) {
                 const status = currentStatusInfo?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
-                const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND'].includes(status);
+                const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND', 'COMPED'].includes(status);
                 return !isFinalState;
             }
             return false;
@@ -230,7 +274,7 @@ export default function InvoicesPage() {
         case 'PAYMENT_PENDING': return 'bg-purple-500 text-white';
         case 'REFUNDED': case 'PARTIALLY_REFUNDED': return 'bg-indigo-500 text-white';
         case 'LOADING': return 'bg-muted text-muted-foreground animate-pulse';
-        case 'NO_INVOICE': return 'bg-slate-400 text-white';
+        case 'NO_INVOICE': case 'COMPED': return 'bg-sky-500 text-white';
         case 'NOT_FOUND': return 'bg-destructive/80 text-white';
         case 'ERROR': return 'bg-destructive text-white';
         default: return 'bg-muted text-muted-foreground';
@@ -243,6 +287,45 @@ export default function InvoicesPage() {
     if (status.toUpperCase() === 'NO_INVOICE') return 'No Invoice';
     return status.replace(/_/g, ' ').toLowerCase();
   };
+
+  const handleEditInvoice = (invoice: CombinedInvoice) => {
+    router.push(`/organizer-invoice?edit=${invoice.id}`);
+  };
+
+  const handleCancelInvoice = (invoice: CombinedInvoice) => {
+    setInvoiceToCancel(invoice);
+    setIsAlertOpen(true);
+  };
+  
+  const confirmCancel = async () => {
+      if (!invoiceToCancel) return;
+
+      try {
+        await cancelInvoice({ invoiceId: invoiceToCancel.invoiceId! });
+        
+        const allInvoicesRaw = localStorage.getItem('all_invoices') || '[]';
+        const allInvoicesParsed = JSON.parse(allInvoicesRaw);
+        const updatedInvoices = allInvoicesParsed.map((inv: any) => {
+            if (inv.invoiceId === invoiceToCancel.invoiceId) {
+                return { ...inv, status: 'CANCELED', invoiceStatus: 'CANCELED' };
+            }
+            return inv;
+        });
+        localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
+
+        setAllInvoices(prev => prev.map(inv => inv.id === invoiceToCancel.id ? {...inv, invoiceStatus: 'CANCELED'} : inv));
+        setStatuses(prev => ({...prev, [invoiceToCancel.id]: {status: 'CANCELED', isLoading: false}}));
+
+        toast({ title: 'Invoice Canceled', description: `Invoice ${invoiceToCancel.invoiceNumber} has been canceled.`});
+      } catch(error) {
+        console.error("Failed to cancel invoice:", error);
+        toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Could not cancel the invoice.' });
+      } finally {
+        setIsAlertOpen(false);
+        setInvoiceToCancel(null);
+      }
+  }
+
 
   const hasInvoicesButFilterHidesThem = allInvoices.length > 0 && filteredInvoices.length === 0;
 
@@ -343,6 +426,8 @@ export default function InvoicesPage() {
                         {filteredInvoices.map((inv) => {
                             const currentStatus = statuses[inv.id];
                             const isStatusLoading = currentStatus?.isLoading;
+                            const status = currentStatus?.status || inv.invoiceStatus;
+                            const isCancelable = status && !['PAID', 'CANCELED', 'REFUNDED', 'VOIDED', 'COMPED'].includes(status.toUpperCase());
                             
                             return (
                                 <TableRow key={inv.id}>
@@ -352,8 +437,8 @@ export default function InvoicesPage() {
                                     <TableCell>{format(new Date(inv.submissionTimestamp), 'PPP')}</TableCell>
                                     <TableCell>${inv.totalInvoiced.toFixed(2)}</TableCell>
                                     <TableCell>
-                                        <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus?.status || inv.invoiceStatus))}>
-                                            {isStatusLoading ? 'Loading...' : getStatusDisplayName(currentStatus?.status || inv.invoiceStatus)}
+                                        <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(status))}>
+                                            {isStatusLoading ? 'Loading...' : getStatusDisplayName(status)}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
@@ -362,11 +447,32 @@ export default function InvoicesPage() {
                                                 <RefreshCw className={cn("h-4 w-4", isStatusLoading && "animate-spin")} />
                                                 <span className="sr-only">Refresh Status</span>
                                             </Button>
-                                            <Button asChild variant="outline" size="sm" disabled={!inv.invoiceUrl}>
-                                                <a href={inv.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!inv.invoiceUrl && 'pointer-events-none opacity-50')}>
-                                                    <ExternalLink className="mr-2 h-4 w-4" /> View
-                                                </a>
-                                            </Button>
+                                             <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                  <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                    <span className="sr-only">Toggle menu</span>
+                                                  </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                  <DropdownMenuItem asChild>
+                                                    <a href={inv.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!inv.invoiceUrl && 'pointer-events-none opacity-50')}>
+                                                        <ExternalLink className="mr-2 h-4 w-4" /> View Invoice
+                                                    </a>
+                                                  </DropdownMenuItem>
+                                                  {profile.role === 'organizer' && inv.type === 'organizer' && isCancelable && (
+                                                    <>
+                                                        <DropdownMenuItem onClick={() => handleEditInvoice(inv)}>
+                                                            <FilePenLine className="mr-2 h-4 w-4" /> Edit
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Cancel
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                  )}
+                                                </DropdownMenuContent>
+                                             </DropdownMenu>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -378,6 +484,24 @@ export default function InvoicesPage() {
           </CardContent>
         </Card>
       </div>
+
+       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action will cancel the invoice with number {invoiceToCancel?.invoiceNumber || invoiceToCancel?.id}. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmCancel} className="bg-destructive hover:bg-destructive/90">
+                Yes, Cancel Invoice
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </AppLayout>
   );
 }

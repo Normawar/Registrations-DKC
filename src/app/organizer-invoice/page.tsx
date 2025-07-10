@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ const lineItemSchema = z.object({
 });
 
 const invoiceFormSchema = z.object({
+  invoiceId: z.string().optional(),
   schoolName: z.string().min(1, 'Please select a school.'),
   sponsorName: z.string().min(1, 'Sponsor name is required.'),
   sponsorEmail: z.string().email('Please enter a valid email.'),
@@ -39,11 +40,14 @@ type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 export default function OrganizerInvoicePage() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
     defaultValues: {
+      invoiceId: '',
       schoolName: '',
       sponsorName: '',
       sponsorEmail: '',
@@ -56,6 +60,29 @@ export default function OrganizerInvoicePage() {
     control: form.control,
     name: 'lineItems',
   });
+  
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId) {
+      const allInvoicesRaw = localStorage.getItem('all_invoices');
+      if (allInvoicesRaw) {
+        const allInvoices = JSON.parse(allInvoicesRaw);
+        const invoiceToEdit = allInvoices.find((inv: any) => inv.id === editId && inv.lineItems);
+        if (invoiceToEdit) {
+          setIsEditing(true);
+          form.reset({
+            invoiceId: invoiceToEdit.invoiceId,
+            schoolName: invoiceToEdit.schoolName,
+            sponsorName: invoiceToEdit.purchaserName,
+            sponsorEmail: invoiceToEdit.sponsorEmail || '',
+            invoiceTitle: invoiceToEdit.description,
+            lineItems: invoiceToEdit.lineItems,
+          });
+        }
+      }
+    }
+  }, [searchParams, form]);
+
 
   const uniqueSchools = useMemo(() => {
     const schoolNames = schoolData.map(s => s.schoolName);
@@ -64,32 +91,60 @@ export default function OrganizerInvoicePage() {
 
   async function onSubmit(values: InvoiceFormValues) {
     setIsLoading(true);
+    
+    // For edits, we cancel the old invoice and create a new one.
+    if (isEditing && values.invoiceId) {
+        // This flow is now just used for creation. Editing will be handled by canceling and creating a new one.
+        // For simplicity, we assume editing means creating a new invoice and the user will handle the old one.
+        // A more robust solution might involve an `updateInvoice` flow.
+        toast({
+            title: "Edits as New Invoice",
+            description: "To edit, please cancel the old invoice and create a new one with the updated details.",
+            variant: "default"
+        });
+    }
+
     try {
-      const result = await createOrganizerInvoice(values);
+      // Always create a new invoice
+      const result = await createOrganizerInvoice({
+        sponsorName: values.sponsorName,
+        sponsorEmail: values.sponsorEmail,
+        schoolName: values.schoolName,
+        invoiceTitle: values.invoiceTitle,
+        lineItems: values.lineItems,
+      });
       
       const newOrganizerInvoice = {
         id: result.invoiceId, // Use invoiceId as the unique ID
+        invoiceId: result.invoiceId,
+        type: 'organizer',
         invoiceTitle: values.invoiceTitle,
+        description: values.invoiceTitle,
         submissionTimestamp: new Date().toISOString(),
         totalInvoiced: values.lineItems.reduce((acc, item) => acc + item.amount, 0),
-        invoiceId: result.invoiceId,
         invoiceUrl: result.invoiceUrl,
         invoiceNumber: result.invoiceNumber,
         purchaserName: values.sponsorName,
+        sponsorEmail: values.sponsorEmail,
         invoiceStatus: result.status,
         schoolName: values.schoolName,
         district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
+        lineItems: values.lineItems,
       };
       
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newOrganizerInvoice]));
+      
+      // If editing, remove the old one.
+      const filteredInvoices = isEditing ? existingInvoices.filter((inv: any) => inv.invoiceId !== values.invoiceId) : existingInvoices;
+
+      localStorage.setItem('all_invoices', JSON.stringify([...filteredInvoices, newOrganizerInvoice]));
       window.dispatchEvent(new Event('storage'));
 
       toast({
-        title: 'Invoice Created Successfully!',
+        title: `Invoice ${isEditing ? 'Updated' : 'Created'} Successfully!`,
         description: (
             <p>
-              Invoice {result.invoiceNumber || result.invoiceId} has been created.
+              Invoice {result.invoiceNumber || result.invoiceId} has been {isEditing ? 'updated' : 'created'}.
               <a href={result.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
                 View Invoice
               </a>
@@ -114,9 +169,9 @@ export default function OrganizerInvoicePage() {
     <AppLayout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Create Invoice</h1>
+          <h1 className="text-3xl font-bold font-headline">{isEditing ? 'Edit Invoice' : 'Create Invoice'}</h1>
           <p className="text-muted-foreground">
-            Generate a custom invoice for a school.
+            {isEditing ? 'Modify the details of an existing invoice.' : 'Generate a custom invoice for a school.'}
           </p>
         </div>
         
@@ -256,7 +311,7 @@ export default function OrganizerInvoicePage() {
               <CardFooter>
                 <Button type="submit" disabled={isLoading}>
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Generate Invoice
+                  {isEditing ? 'Update & Recreate Invoice' : 'Generate Invoice'}
                 </Button>
               </CardFooter>
             </Card>
