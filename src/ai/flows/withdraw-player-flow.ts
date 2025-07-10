@@ -10,7 +10,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { ApiError, type Invoice, type LineItem } from 'square';
+import { ApiError, type Invoice } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 import { differenceInHours } from 'date-fns';
@@ -135,9 +135,13 @@ const withdrawPlayerFlow = ai.defineFlow(
       
       // We must delete these fields as they are read-only and will cause an error if sent back.
       // This is a critical step for updating invoices.
-      const invoiceToUpdate: any = invoice;
+      const invoiceToUpdate: any = { ...invoice };
       delete invoiceToUpdate.createdAt;
       delete invoiceToUpdate.updatedAt;
+      delete invoiceToUpdate.publicUrl;
+      delete invoiceToUpdate.scheduledAt;
+      delete invoiceToUpdate.location;
+
       if (invoiceToUpdate.paymentRequests) {
           invoiceToUpdate.paymentRequests.forEach((pr: any) => {
               delete pr.computedAmountMoney;
