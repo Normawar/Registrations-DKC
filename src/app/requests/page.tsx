@@ -18,9 +18,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { ChangeRequest } from "@/lib/data/requests-data";
 import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
+import { Button } from '@/components/ui/button';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useToast } from '@/hooks/use-toast';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
+  const { profile } = useSponsorProfile();
+  const { toast } = useToast();
 
   const loadRequests = useCallback(() => {
     try {
@@ -49,13 +54,26 @@ export default function RequestsPage() {
     };
   }, [loadRequests]);
 
+  const handleRequestUpdate = (index: number, newStatus: 'Approved' | 'Denied') => {
+    const updatedRequests = [...requests];
+    updatedRequests[index].status = newStatus;
+    
+    setRequests(updatedRequests);
+    localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+
+    toast({
+      title: `Request ${newStatus}`,
+      description: `The request for ${updatedRequests[index].player} has been marked as ${newStatus.toLowerCase()}.`,
+    });
+  };
+
   return (
     <AppLayout>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold font-headline">Change Requests</h1>
           <p className="text-muted-foreground">
-            View the status of player-submitted requests.
+            View and manage player-submitted change requests.
           </p>
         </div>
 
@@ -70,6 +88,7 @@ export default function RequestsPage() {
                   <TableHead>Details</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Status</TableHead>
+                  {profile?.role === 'organizer' && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -92,6 +111,18 @@ export default function RequestsPage() {
                         {request.status}
                       </Badge>
                     </TableCell>
+                    {profile?.role === 'organizer' && (
+                        <TableCell className="text-right">
+                            {request.status === 'Pending' ? (
+                                <div className="flex gap-2 justify-end">
+                                    <Button variant="outline" size="sm" onClick={() => handleRequestUpdate(index, 'Approve')}>Approve</Button>
+                                    <Button variant="destructive" size="sm" onClick={() => handleRequestUpdate(index, 'Denied')}>Deny</Button>
+                                </div>
+                            ) : (
+                                <span className="text-xs text-muted-foreground">Actioned</span>
+                            )}
+                        </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
