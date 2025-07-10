@@ -237,17 +237,6 @@ export default function ManageEventsPage() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const requiredFields = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
-        const headers = results.meta.fields;
-        if (!headers || !requiredFields.every(field => headers.includes(field))) {
-            toast({
-                variant: 'destructive',
-                title: 'Import Failed',
-                description: `CSV must contain the following headers: ${requiredFields.join(', ')}.`
-            });
-            return;
-        }
-
         const newEvents: Event[] = [];
         let errors = 0;
         results.data.forEach((row: any) => {
@@ -271,8 +260,11 @@ export default function ManageEventsPage() {
               pdfName: row.pdfName || undefined,
             };
 
-            if (isNaN(event.rounds) || isNaN(event.regularFee) || isNaN(event.lateFee) || isNaN(event.veryLateFee) || isNaN(event.dayOfFee)) {
-                throw new Error('Numeric fields contain non-numeric values.');
+            const requiredFields: (keyof Event)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
+            for (const field of requiredFields) {
+              if (event[field] === undefined || event[field] === null || (typeof event[field] === 'number' && isNaN(event[field]))) {
+                throw new Error(`Missing or invalid required field: ${field}`);
+              }
             }
             
             newEvents.push(event);
@@ -281,6 +273,15 @@ export default function ManageEventsPage() {
             console.error("Error parsing event row:", row, e);
           }
         });
+
+        if (newEvents.length === 0 && results.data.length > 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Import Failed',
+                description: `Could not import any events. Please ensure your CSV has the required headers: name, date, location, rounds, regularFee, lateFee, veryLateFee, dayOfFee.`
+            });
+            return;
+        }
 
         addBulkEvents(newEvents);
         
@@ -409,7 +410,7 @@ export default function ManageEventsPage() {
                   </TableHead>
                   <TableHead className="p-0">
                     <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>
-                        Fees (Reg, Late, V.Late, Day of) {getSortIcon('regularFee')}
+                        Fees (Early, Reg., Late, Day of) {getSortIcon('regularFee')}
                     </Button>
                   </TableHead>
                   <TableHead className="p-0">

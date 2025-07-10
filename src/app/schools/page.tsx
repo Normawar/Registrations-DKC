@@ -111,40 +111,32 @@ export default function SchoolsPage() {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-            const requiredFields = ['schoolName', 'district', 'streetAddress', 'city', 'zip', 'phone', 'county'];
-            const headers = results.meta.fields;
-            if (!headers || !requiredFields.every(field => headers.includes(field))) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Import Failed',
-                    description: `CSV must contain the following headers: ${requiredFields.join(', ')}.`
-                });
-                return;
-            }
-
             const newSchools: SchoolWithTeamCode[] = [];
             let errors = 0;
             results.data.forEach((row: any) => {
                 try {
+                    // Map common CSV header variations to our internal model properties
                     const school: SchoolWithTeamCode = {
                         id: `sch-${Date.now()}-${Math.random()}`,
-                        schoolName: row.schoolName,
-                        district: row.district,
-                        streetAddress: row.streetAddress,
-                        city: row.city,
-                        zip: row.zip,
-                        phone: row.phone,
-                        county: row.county,
-                        charter: row.charter || '',
-                        students: row.students || '',
-                        state: row.state || 'TX',
-                        zip4: row.zip4 || '',
-                        teamCode: generateTeamCode({ schoolName: row.schoolName, district: row.district })
+                        schoolName: row['School Name'] || row['schoolName'],
+                        district: row['District'] || row['district'],
+                        streetAddress: row['Street Address'] || row['streetAddress'],
+                        city: row['City'] || row['city'],
+                        zip: row['ZIP'] || row['zip'],
+                        phone: row['Phone'] || row['phone'],
+                        county: row['County Name'] || row['county'],
+                        charter: row['Charter'] || row['charter'] || '',
+                        students: row['Students'] || row['students'] || '',
+                        state: row['State'] || row['state'] || 'TX',
+                        zip4: row['ZIP 4-digit'] || row['zip4'] || '',
+                        teamCode: ''
                     };
-
+                    
                     if (!school.schoolName || !school.district) {
                         throw new Error('Missing required school name or district.');
                     }
+
+                    school.teamCode = generateTeamCode({ schoolName: school.schoolName, district: school.district });
                     
                     newSchools.push(school);
                 } catch (e) {
@@ -152,6 +144,15 @@ export default function SchoolsPage() {
                     console.error("Error parsing school row:", row, e);
                 }
             });
+            
+            if (newSchools.length === 0 && results.data.length > 0) {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Import Failed',
+                    description: 'Could not find any valid schools. Please check if your CSV headers match the expected format (e.g., "School Name", "District").'
+                });
+                return;
+            }
 
             setSchools(prev => [...prev, ...newSchools]);
             
