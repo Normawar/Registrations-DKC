@@ -34,7 +34,8 @@ import {
   ArrowUp,
   ArrowDown,
   Users,
-  Upload
+  Upload,
+  ClipboardPaste
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import Papa from 'papaparse';
+import { Textarea } from '@/components/ui/textarea';
 
 const eventFormSchema = z.object({
   id: z.string().optional(),
@@ -128,6 +130,8 @@ export default function ManageEventsPage() {
   const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
   const [registrations, setRegistrations] = useState<RegistrationInfo[]>([]);
   const [selectedEventForReg, setSelectedEventForReg] = useState<Event | null>(null);
+  const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
+  const [pasteData, setPasteData] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -229,6 +233,83 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
+  const processImportData = (data: any[]) => {
+      const newEvents: Event[] = [];
+      let errors = 0;
+      data.forEach((row: any) => {
+        try {
+          const dateStr = row['date'] || row['Date'];
+          if (!dateStr) {
+              console.warn("Skipping row due to missing date:", row);
+              errors++;
+              return;
+          }
+          const date = new Date(dateStr);
+          if (!isValid(date)) throw new Error(`Invalid date format for value: "${dateStr}"`);
+          
+          const eventData = {
+            id: `evt-${Date.now()}-${Math.random()}`,
+            name: row['name'] || row['Name'],
+            date: date.toISOString(),
+            location: row['location'] || row['Location'],
+            rounds: row['rounds'] || row['Rounds'],
+            regularFee: row['regularFee'] || row['Regular Fee'],
+            lateFee: row['lateFee'] || row['Late Fee'],
+            veryLateFee: row['veryLateFee'] || row['Very Late Fee'],
+            dayOfFee: row['dayOfFee'] || row['Day of Fee'],
+            imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
+            imageName: row['imageName'] || row['Image Name'] || undefined,
+            pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
+            pdfName: row['pdfName'] || row['PDF Name'] || undefined,
+          };
+
+          const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
+          for (const field of requiredFields) {
+            if (eventData[field] === undefined || eventData[field] === null || (typeof eventData[field] === 'number' && isNaN(eventData[field]))) {
+              throw new Error(`Missing or invalid required field: ${field}`);
+            }
+          }
+          
+          const finalEvent: Event = {
+              id: eventData.id,
+              name: String(eventData.name),
+              date: eventData.date,
+              location: String(eventData.location),
+              rounds: parseInt(String(eventData.rounds), 10),
+              regularFee: parseFloat(String(eventData.regularFee)),
+              lateFee: parseFloat(String(eventData.lateFee)),
+              veryLateFee: parseFloat(String(eventData.veryLateFee)),
+              dayOfFee: parseFloat(String(eventData.dayOfFee)),
+              imageUrl: eventData.imageUrl ? String(eventData.imageUrl) : undefined,
+              imageName: eventData.imageName ? String(eventData.imageName) : undefined,
+              pdfUrl: eventData.pdfUrl ? String(eventData.pdfUrl) : undefined,
+              pdfName: eventData.pdfName ? String(eventData.pdfName) : undefined,
+          };
+          
+          newEvents.push(finalEvent);
+        } catch(e) {
+          errors++;
+          console.error("Error parsing event row:", row, e);
+        }
+      });
+
+      if (newEvents.length === 0 && data.length > 0) {
+          toast({
+              variant: 'destructive',
+              title: 'Import Failed',
+              description: `Could not import any events. Please ensure your data has the required headers and valid data.`
+          });
+          return;
+      }
+
+      addBulkEvents(newEvents);
+      
+      toast({
+        title: "Import Complete",
+        description: `Successfully imported ${newEvents.length} events. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
+      });
+  };
+  
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -236,82 +317,7 @@ export default function ManageEventsPage() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
-        const newEvents: Event[] = [];
-        let errors = 0;
-        results.data.forEach((row: any) => {
-          try {
-            const dateStr = row['date'] || row['Date'];
-            if (!dateStr) {
-                console.warn("Skipping row due to missing date:", row);
-                errors++;
-                return;
-            }
-            const date = new Date(dateStr);
-            if (!isValid(date)) throw new Error(`Invalid date format for value: "${dateStr}"`);
-            
-            const eventData = {
-              id: `evt-${Date.now()}-${Math.random()}`,
-              name: row['name'] || row['Name'],
-              date: date.toISOString(),
-              location: row['location'] || row['Location'],
-              rounds: row['rounds'] || row['Rounds'],
-              regularFee: row['regularFee'] || row['Regular Fee'],
-              lateFee: row['lateFee'] || row['Late Fee'],
-              veryLateFee: row['veryLateFee'] || row['Very Late Fee'],
-              dayOfFee: row['dayOfFee'] || row['Day of Fee'],
-              imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
-              imageName: row['imageName'] || row['Image Name'] || undefined,
-              pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
-              pdfName: row['pdfName'] || row['PDF Name'] || undefined,
-            };
-
-            const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
-            for (const field of requiredFields) {
-              if (eventData[field] === undefined || eventData[field] === null || (typeof eventData[field] === 'number' && isNaN(eventData[field]))) {
-                throw new Error(`Missing or invalid required field: ${field}`);
-              }
-            }
-            
-            const finalEvent: Event = {
-                id: eventData.id,
-                name: String(eventData.name),
-                date: eventData.date,
-                location: String(eventData.location),
-                rounds: parseInt(String(eventData.rounds), 10),
-                regularFee: parseFloat(String(eventData.regularFee)),
-                lateFee: parseFloat(String(eventData.lateFee)),
-                veryLateFee: parseFloat(String(eventData.veryLateFee)),
-                dayOfFee: parseFloat(String(eventData.dayOfFee)),
-                imageUrl: eventData.imageUrl ? String(eventData.imageUrl) : undefined,
-                imageName: eventData.imageName ? String(eventData.imageName) : undefined,
-                pdfUrl: eventData.pdfUrl ? String(eventData.pdfUrl) : undefined,
-                pdfName: eventData.pdfName ? String(eventData.pdfName) : undefined,
-            };
-            
-            newEvents.push(finalEvent);
-          } catch(e) {
-            errors++;
-            console.error("Error parsing event row:", row, e);
-          }
-        });
-
-        if (newEvents.length === 0 && results.data.length > 0) {
-            toast({
-                variant: 'destructive',
-                title: 'Import Failed',
-                description: `Could not import any events. Please ensure your CSV has the required headers and valid data.`
-            });
-            return;
-        }
-
-        addBulkEvents(newEvents);
-        
-        toast({
-          title: "Import Complete",
-          description: `Successfully imported ${newEvents.length} events. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
-        });
-      },
+      complete: (results) => processImportData(results.data),
       error: (error) => {
         toast({
           variant: 'destructive',
@@ -324,6 +330,30 @@ export default function ManageEventsPage() {
     if (e.target) {
         e.target.value = '';
     }
+  };
+
+  const handlePasteImport = () => {
+    if (!pasteData) {
+        toast({ variant: 'destructive', title: 'No data', description: 'Please paste data into the text area.' });
+        return;
+    }
+
+    Papa.parse(pasteData, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+            processImportData(results.data);
+            setIsPasteDialogOpen(false);
+            setPasteData('');
+        },
+        error: (error) => {
+            toast({
+              variant: 'destructive',
+              title: 'Parse Failed',
+              description: `An error occurred while parsing the pasted data: ${error.message}`
+            });
+        }
+    });
   };
 
   const handleAddEvent = () => {
@@ -401,6 +431,9 @@ export default function ManageEventsPage() {
               accept=".csv"
               onChange={handleFileImport}
             />
+             <Button variant="outline" onClick={() => setIsPasteDialogOpen(true)}>
+              <ClipboardPaste className="mr-2 h-4 w-4" /> Paste from Sheet
+            </Button>
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
               <Upload className="mr-2 h-4 w-4" /> Import CSV
             </Button>
@@ -710,6 +743,34 @@ export default function ManageEventsPage() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Paste from Spreadsheet</DialogTitle>
+            <DialogDescription>
+              Copy the data from your Google Sheet or Excel file (including the header row) and paste it into the text area below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Paste your tab-separated data here..."
+              className="h-64"
+              value={pasteData}
+              onChange={(e) => setPasteData(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+                <Button type="button" variant="ghost">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handlePasteImport}>
+              <ClipboardPaste className="mr-2 h-4 w-4" /> Import Data
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </AppLayout>
   );
 }
