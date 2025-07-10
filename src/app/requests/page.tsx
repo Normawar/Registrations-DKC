@@ -22,7 +22,6 @@ import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
-import Link from 'next/link';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
@@ -60,6 +59,9 @@ export default function RequestsPage() {
   const handleRequestUpdate = (index: number, newStatus: 'Approved' | 'Denied') => {
     const updatedRequests = [...requests];
     const requestToUpdate = updatedRequests[index];
+    
+    if (!requestToUpdate) return;
+    
     requestToUpdate.status = newStatus;
     
     setRequests(updatedRequests);
