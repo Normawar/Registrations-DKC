@@ -27,8 +27,6 @@ import Link from 'next/link';
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
   const { profile } = useSponsorProfile();
-  const { toast } = useToast();
-  const router = useRouter();
 
   const loadRequests = useCallback(() => {
     try {
@@ -37,7 +35,6 @@ export default function RequestsPage() {
       
       const allRequests = (Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData).map((req, index) => ({
         ...req,
-        // Ensure a unique ID for each request for reliable state updates
         id: req.id || `${req.confirmationId}-${req.player.replace(/\s/g, '')}-${index}` 
       }));
 
@@ -62,19 +59,6 @@ export default function RequestsPage() {
       window.removeEventListener('storage', handleStorageChange);
     };
   }, [loadRequests]);
-
-  const handleRequestStatusUpdate = (requestId: string, newStatus: 'Approved' | 'Denied') => {
-    const updatedRequests = requests.map(req => 
-      req.id === requestId ? { ...req, status: newStatus } : req
-    );
-    setRequests(updatedRequests);
-    localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-
-    toast({
-      title: `Request ${newStatus}`,
-      description: `The request has been marked as ${newStatus.toLowerCase()}.`,
-    });
-  };
 
   return (
     <AppLayout>

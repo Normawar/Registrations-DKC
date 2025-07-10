@@ -130,6 +130,8 @@ export default function ConfirmationsPage() {
   const [confToRequestChange, setConfToRequestChange] = useState<Confirmation | null>(null);
   const [changeRequestInputs, setChangeRequestInputs] = useState<Partial<ChangeRequestInputs>>({});
 
+  const [openAccordionItem, setOpenAccordionItem] = useState<string | undefined>(undefined);
+
   const playersMap = useMemo(() => {
     return new Map(allPlayers.map(p => [p.id, p]));
   }, [allPlayers]);
@@ -214,6 +216,13 @@ export default function ConfirmationsPage() {
   useEffect(() => {
     loadAllData();
     window.addEventListener('storage', loadAllData);
+    
+    // Check for a hash in the URL on initial load
+    if (window.location.hash) {
+      const hashId = window.location.hash.substring(1);
+      setOpenAccordionItem(hashId);
+    }
+
     return () => {
         window.removeEventListener('storage', loadAllData);
     };
@@ -413,7 +422,7 @@ export default function ConfirmationsPage() {
                 <p className="text-sm">When you register for an event, a confirmation will appear here.</p>
               </div>
             ) : (
-              <Accordion type="single" collapsible className="w-full">
+              <Accordion type="single" collapsible className="w-full" value={openAccordionItem} onValueChange={setOpenAccordionItem}>
                 {confirmations.map((conf) => {
                   const currentInputs = confInputs[conf.id] || {};
                   const selectedMethod = currentInputs.paymentMethod || 'po';
