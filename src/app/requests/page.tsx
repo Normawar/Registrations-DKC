@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import {
   Card,
@@ -22,28 +22,24 @@ import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
 
-  useEffect(() => {
-    const loadRequests = () => {
-      try {
-        const storedRequests = localStorage.getItem('change_requests');
-        const parsedRequests = storedRequests ? JSON.parse(storedRequests) : initialRequestsData;
-        // Ensure data is always an array and sort it
-        const sortedRequests = (Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData)
-            .sort((a, b) => new Date(b.submitted).getTime() - new Date(a.submitted).getTime());
-        setRequests(sortedRequests);
-      } catch (e) {
-        console.error("Failed to parse change requests from localStorage", e);
-        setRequests(initialRequestsData);
-      }
-    };
+  const loadRequests = useCallback(() => {
+    try {
+      const storedRequests = localStorage.getItem('change_requests');
+      const parsedRequests = storedRequests ? JSON.parse(storedRequests) : initialRequestsData;
+      const sortedRequests = (Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData)
+          .sort((a, b) => new Date(b.submitted).getTime() - new Date(a.submitted).getTime());
+      setRequests(sortedRequests);
+    } catch (e) {
+      console.error("Failed to parse change requests from localStorage", e);
+      setRequests(initialRequestsData);
+    }
+  }, []);
 
+  useEffect(() => {
     loadRequests();
 
-    const handleStorageChange = (event: Event) => {
-      // Custom 'storage' event or browser's 'storage' event for cross-tab sync
-      if ((event as StorageEvent).key === 'change_requests' || event.type === 'storage') {
-        loadRequests();
-      }
+    const handleStorageChange = () => {
+      loadRequests();
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -51,7 +47,7 @@ export default function RequestsPage() {
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [loadRequests]);
 
   return (
     <AppLayout>
