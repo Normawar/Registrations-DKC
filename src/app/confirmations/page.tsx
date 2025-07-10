@@ -524,7 +524,7 @@ export default function ConfirmationsPage() {
                                 <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)}>
                                     <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change
                                 </Button>
-                                {sponsorProfile?.role === 'organizer' && conf.invoiceStatus !== 'COMPED' && (
+                                {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
                                     <Button variant="secondary" size="sm" onClick={() => {
                                         setConfToComp(conf);
                                         setIsCompAlertOpen(true);
@@ -614,7 +614,7 @@ export default function ConfirmationsPage() {
                         </Table>
                       </div>
                       
-                      {conf.invoiceStatus === 'COMPED' ? (
+                      {currentStatus?.status === 'COMPED' ? (
                         <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200">
                           <Award className="h-4 w-4 text-sky-600" />
                           <AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle>
