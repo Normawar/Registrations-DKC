@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppLayout } from "@/components/app-layout";
 import {
   Card,
@@ -21,11 +22,13 @@ import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
   const { profile } = useSponsorProfile();
   const { toast } = useToast();
+  const router = useRouter();
 
   const loadRequests = useCallback(() => {
     try {
@@ -56,15 +59,20 @@ export default function RequestsPage() {
 
   const handleRequestUpdate = (index: number, newStatus: 'Approved' | 'Denied') => {
     const updatedRequests = [...requests];
-    updatedRequests[index].status = newStatus;
+    const requestToUpdate = updatedRequests[index];
+    requestToUpdate.status = newStatus;
     
     setRequests(updatedRequests);
     localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
 
     toast({
       title: `Request ${newStatus}`,
-      description: `The request for ${updatedRequests[index].player} has been marked as ${newStatus.toLowerCase()}.`,
+      description: `The request for ${requestToUpdate.player} has been marked as ${newStatus.toLowerCase()}.`,
     });
+
+    if (newStatus === 'Approved' && requestToUpdate.confirmationId) {
+        router.push(`/confirmations#${requestToUpdate.confirmationId}`);
+    }
   };
 
   return (
@@ -115,7 +123,7 @@ export default function RequestsPage() {
                         <TableCell className="text-right">
                             {request.status === 'Pending' ? (
                                 <div className="flex gap-2 justify-end">
-                                    <Button variant="outline" size="sm" onClick={() => handleRequestUpdate(index, 'Approve')}>Approve</Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleRequestUpdate(index, 'Approved')}>Review & Approve</Button>
                                     <Button variant="destructive" size="sm" onClick={() => handleRequestUpdate(index, 'Denied')}>Deny</Button>
                                 </div>
                             ) : (

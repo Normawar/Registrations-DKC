@@ -427,6 +427,7 @@ export default function ConfirmationsPage() {
     const player = getPlayerById(changeRequestInputs.playerId);
     
     const newRequest: ChangeRequest = {
+        confirmationId: confToRequestChange.id, // Add confirmation ID
         player: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
         event: confToRequestChange.eventName,
         type: changeRequestInputs.requestType,
@@ -486,7 +487,7 @@ export default function ConfirmationsPage() {
                   const showStudentTypeColumn = sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
 
                   return (
-                  <AccordionItem key={conf.id} value={conf.id}>
+                  <AccordionItem key={conf.id} value={conf.id} id={conf.id}>
                     <AccordionTrigger>
                       <div className="flex justify-between items-center w-full pr-4">
                         <div className="flex flex-col items-start text-left">
