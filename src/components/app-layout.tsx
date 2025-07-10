@@ -37,7 +37,7 @@ const sponsorMenuItems = [
   { href: "/dashboard", icon: QueenIcon, label: "Dashboard" },
   { href: "/roster", icon: PawnIcon, label: "Roster" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
-  { href: "/confirmations", icon: ClipboardCheck, label: "Confirmations" },
+  { href: "/confirmations", icon: ClipboardCheck, label: "Confirmed Registrations" },
   { href: "/invoices", icon: Receipt, label: "Invoices" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
