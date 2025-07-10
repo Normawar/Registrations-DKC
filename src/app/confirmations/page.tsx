@@ -497,12 +497,22 @@ export default function ConfirmationsPage() {
     setConfirmations(prevConfirmations => {
       const newConfirmations = prevConfirmations.map(conf => {
         if (conf.id === confId) {
-          const newSelections = { ...conf.selections };
+          const newSelections = JSON.parse(JSON.stringify(conf.selections));
           if (newSelections[playerId]) {
-            newSelections[playerId].byes[byeKey] = value;
-            // Logic to handle cascading bye resets if needed
-            if (byeKey === 'round1' && value === 'none') {
-              newSelections[playerId].byes.round2 = 'none';
+            const playerByes = newSelections[playerId].byes;
+            playerByes[byeKey] = value;
+
+            // Handle bye dependencies
+            if (byeKey === 'round1') {
+              // If round 1 is set to none, round 2 must also be none
+              if (value === 'none') {
+                playerByes.round2 = 'none';
+              }
+            } else if (byeKey === 'round2') {
+              // If round 2 is selected, but round 1 is none, set round 1 to the first available round (e.g., '1')
+              if (value !== 'none' && playerByes.round1 === 'none') {
+                playerByes.round1 = '1'; 
+              }
             }
           }
           return { ...conf, selections: newSelections };
