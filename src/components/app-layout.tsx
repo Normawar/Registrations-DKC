@@ -31,6 +31,9 @@ import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { requestsData } from "@/lib/data/requests-data";
+import { useState, useEffect, useMemo } from 'react';
+import type { ChangeRequest } from '@/lib/data/requests-data';
+
 
 const sponsorMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
@@ -81,6 +84,49 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { profile } = useSponsorProfile();
+  
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
+  const [confirmations, setConfirmations] = useState<any[]>([]);
+
+  useEffect(() => {
+      const loadData = () => {
+        try {
+            const storedRequests = localStorage.getItem('change_requests');
+            setChangeRequests(storedRequests ? JSON.parse(storedRequests) : []);
+            
+            const storedConfirmations = localStorage.getItem('confirmations');
+            setConfirmations(storedConfirmations ? JSON.parse(storedConfirmations) : []);
+        } catch (error) {
+            console.error("Failed to load data for sidebar notifications:", error);
+            setChangeRequests([]);
+            setConfirmations([]);
+        }
+      };
+
+      loadData();
+      window.addEventListener('storage', loadData);
+      return () => {
+          window.removeEventListener('storage', loadData);
+      };
+  }, []);
+
+  const pendingRequestsCount = useMemo(() => {
+    if (!profile) return 0;
+    
+    if (profile.role === 'organizer') {
+        return changeRequests.filter(r => r.status === 'Pending').length;
+    }
+    
+    if (profile.role === 'sponsor') {
+        const sponsorConfirmationIds = new Set(confirmations
+            .filter(c => c.schoolName === profile.school && c.district === profile.district)
+            .map(c => c.id));
+        
+        return changeRequests.filter(req => req.status === 'Pending' && sponsorConfirmationIds.has(req.confirmationId)).length;
+    }
+    
+    return 0;
+  }, [profile, changeRequests, confirmations]);
 
   const handleLogout = () => {
     localStorage.removeItem('user_role');
@@ -95,10 +141,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
-
-  const pendingRequestsCount = profile?.role === 'organizer' 
-    ? requestsData.filter(r => r.status === 'Pending').length
-    : 0;
 
   return (
     <SidebarProvider>
@@ -161,7 +203,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       <span>{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
-                  {item.href === '/requests' && profile?.role === 'organizer' && pendingRequestsCount > 0 && (
+                  {item.href === '/requests' && pendingRequestsCount > 0 && (
                     <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
                       {pendingRequestsCount}
                     </SidebarMenuBadge>
@@ -205,5 +247,3 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    
