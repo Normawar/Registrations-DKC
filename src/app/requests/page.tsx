@@ -27,6 +27,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { ClipboardList } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
@@ -96,7 +97,7 @@ export default function RequestsPage() {
                     <TableHead>Details</TableHead>
                     <TableHead>Submitted</TableHead>
                     <TableHead>Status</TableHead>
-                    {profile?.role === 'organizer' && <TableHead className="text-right">Actions</TableHead>}
+                    {profile?.role === 'organizer' && <TableHead>Action</TableHead>}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -106,7 +107,7 @@ export default function RequestsPage() {
                         <TableCell>{request.event}</TableCell>
                         <TableCell>{request.type}</TableCell>
                         <TableCell>{request.details || '—'}</TableCell>
-                        <TableCell>{request.submitted}</TableCell>
+                        <TableCell>{format(new Date(request.submitted), 'MM/dd/yy, p')}</TableCell>
                         <TableCell>
                         <Badge
                             variant={
@@ -120,15 +121,16 @@ export default function RequestsPage() {
                         </Badge>
                         </TableCell>
                         {profile?.role === 'organizer' && (
-                            <TableCell className="text-right">
+                            <TableCell>
                                 {request.status === 'Pending' ? (
-                                    <div className="flex gap-2 justify-end">
-                                        <Button asChild variant="outline" size="sm">
-                                        <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
-                                        </Button>
-                                    </div>
+                                    <Button asChild variant="outline" size="sm">
+                                      <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
+                                    </Button>
                                 ) : (
-                                    <span className="text-xs text-muted-foreground">Actioned</span>
+                                    <div className="text-xs text-muted-foreground">
+                                        <p>By {request.approvedBy || 'N/A'}</p>
+                                        <p>{request.approvedAt ? format(new Date(request.approvedAt), 'MM/dd/yy, p') : ''}</p>
+                                    </div>
                                 )}
                             </TableCell>
                         )}
