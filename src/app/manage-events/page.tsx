@@ -255,14 +255,14 @@ export default function ManageEventsPage() {
           
           const eventData = {
             id: `evt-${Date.now()}-${Math.random()}`,
-            name: row['name'] || row['Name'],
+            name: row['name'] || row['Name'] || row['Tournament'],
             date: date.toISOString(),
             location: row['location'] || row['Location'],
             rounds: row['rounds'] || row['Rounds'],
-            regularFee: row['regularFee'] || row['Regular Fee'],
-            lateFee: row['lateFee'] || row['Late Fee'],
+            regularFee: row['regularFee'] || row['Regular Fee'] || row['Regular EF'],
+            lateFee: row['lateFee'] || row['Late Fee'] || row['Late EF'],
             veryLateFee: row['veryLateFee'] || row['Very Late Fee'],
-            dayOfFee: row['dayOfFee'] || row['Day of Fee'],
+            dayOfFee: row['dayOfFee'] || row['Day of Fee'] || row['On-site EF'],
             imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
             imageName: row['imageName'] || row['Image Name'] || undefined,
             pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
