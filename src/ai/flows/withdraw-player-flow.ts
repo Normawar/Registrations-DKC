@@ -73,40 +73,41 @@ const withdrawPlayerFlow = ai.defineFlow(
         throw new Error(`Could not retrieve order or order has no line items for ID: ${orderId}`);
       }
 
-      // Identify and filter out line items associated with the player.
-      const updatedLineItems = order.lineItems.filter(item => {
-        const isRegistrationItem = item.name === 'Tournament Registration';
-        const isLateFeeItem = item.name === 'Late Fee';
-        const isUscfItem = item.name === 'USCF Membership (New/Renew)';
+      let playerFound = false;
+      const updatedLineItems = order.lineItems.map(item => {
+        const itemCopy: OrderLineItem = { ...item };
+        const isPlayerItem = (itemCopy.note || '').toLowerCase().includes(playerName.toLowerCase());
         
-        if (isRegistrationItem || isLateFeeItem || isUscfItem) {
-          const notes = item.note || '';
-          return !notes.toLowerCase().includes(playerName.toLowerCase());
+        if (isPlayerItem) {
+          playerFound = true;
+          // Zero out the cost for this player's items
+          itemCopy.basePriceMoney = { amount: 0n, currency: itemCopy.basePriceMoney?.currency || 'USD' };
+          itemCopy.totalMoney = { amount: 0n, currency: itemCopy.totalMoney?.currency || 'USD' };
+          
+          // Update the note to reflect withdrawal
+          if (itemCopy.note) {
+              const notes = itemCopy.note.split('\n');
+              const newNotes = notes.map(noteLine => {
+                  if (noteLine.toLowerCase().includes(playerName.toLowerCase())) {
+                      return `${noteLine.trim()} (Withdrawn)`;
+                  }
+                  return noteLine;
+              });
+              itemCopy.note = newNotes.join('\n');
+          }
         }
-        return true;
+        return itemCopy;
       });
       
-      if (updatedLineItems.length === order.lineItems.length) {
-          throw new Error(`Could not find a line item for player "${playerName}" to remove.`);
+      if (!playerFound) {
+          throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
       }
       
-      // Update quantities for items that list multiple players
-      const itemsToUpdate = ['Tournament Registration', 'Late Fee', 'USCF Membership (New/Renew)'];
-      const finalLineItems = updatedLineItems.map(item => {
-          if (itemsToUpdate.includes(item.name!)) {
-              // The new quantity is the number of players left in the notes
-              const newQuantity = (item.note?.split('\n').filter(name => name.trim() !== '').length || 0).toString();
-              return { ...item, quantity: newQuantity };
-          }
-          return item;
-      }).filter(item => parseInt(item.quantity) > 0); // Remove items if quantity becomes 0
-      
-
       console.log(`Updating order ${orderId} for invoice ${invoiceId}...`);
       const { result: { order: updatedOrder } } = await ordersApi.updateOrder(orderId, {
         order: {
           locationId: order.locationId!,
-          lineItems: finalLineItems,
+          lineItems: updatedLineItems,
           version: order.version,
         },
       });
@@ -114,12 +115,13 @@ const withdrawPlayerFlow = ai.defineFlow(
       console.log("Successfully updated order:", updatedOrder);
       
       // Fetch the invoice again to get the final updated state
+      await new Promise(resolve => setTimeout(resolve, 2000));
       const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(invoiceId);
 
       return {
         invoiceId: finalInvoice!.id!,
         orderId: updatedOrder!.id!,
-        totalAmount: Number(finalInvoice!.total?.amount || 0) / 100,
+        totalAmount: Number(finalInvoice!.paymentRequests?.[0].computedAmountMoney?.amount || finalInvoice!.total?.amount || 0) / 100,
         status: finalInvoice!.status!,
       };
 

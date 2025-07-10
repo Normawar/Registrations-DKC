@@ -78,6 +78,7 @@ type Confirmation = {
   totalInvoiced: number;
   invoiceId?: string;
   invoiceUrl?: string;
+  invoiceNumber?: string;
   teamCode: string;
   paymentMethod?: PaymentMethod;
   poNumber?: string;
@@ -329,7 +330,7 @@ export default function ConfirmationsPage() {
         playerName: playerToWithdraw.playerName,
       });
 
-      // Update local state
+      // Update local state by removing the player from the selections
       const updatedConfirmations = confirmations.map(c => {
         if (c.id === playerToWithdraw.confId) {
           const newSelections = { ...c.selections };
@@ -342,7 +343,7 @@ export default function ConfirmationsPage() {
       setConfirmations(updatedConfirmations);
 
       // Refresh invoice status after a short delay
-      setTimeout(() => fetchInvoiceStatus(playerToWithdraw.confId, playerToWithdraw.invoiceId), 1000);
+      setTimeout(() => fetchInvoiceStatus(playerToWithdraw.confId, playerToWithdraw.invoiceId), 2000);
 
       toast({
         title: "Player Withdrawn",
@@ -551,4 +552,3 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
-
