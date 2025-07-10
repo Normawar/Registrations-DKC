@@ -22,6 +22,7 @@ import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
@@ -31,10 +32,16 @@ export default function RequestsPage() {
 
   const loadRequests = useCallback(() => {
     try {
-      const storedRequests = localStorage.getItem('change_requests');
-      const parsedRequests = storedRequests ? JSON.parse(storedRequests) : initialRequestsData;
-      const sortedRequests = (Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData)
-          .sort((a, b) => new Date(b.submitted).getTime() - new Date(a.submitted).getTime());
+      const storedRequestsRaw = localStorage.getItem('change_requests');
+      const parsedRequests: ChangeRequest[] = storedRequestsRaw ? JSON.parse(storedRequestsRaw) : initialRequestsData;
+      
+      const allRequests = (Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData).map((req, index) => ({
+        ...req,
+        // Ensure a unique ID for each request for reliable state updates
+        id: req.id || `${req.confirmationId}-${req.player.replace(/\s/g, '')}-${index}` 
+      }));
+
+      const sortedRequests = allRequests.sort((a, b) => new Date(b.submitted).getTime() - new Date(a.submitted).getTime());
       setRequests(sortedRequests);
     } catch (e) {
       console.error("Failed to parse change requests from localStorage", e);
@@ -56,25 +63,17 @@ export default function RequestsPage() {
     };
   }, [loadRequests]);
 
-  const handleRequestUpdate = (index: number, newStatus: 'Approved' | 'Denied') => {
-    const updatedRequests = [...requests];
-    const requestToUpdate = updatedRequests[index];
-    
-    if (!requestToUpdate) return;
-    
-    requestToUpdate.status = newStatus;
-    
+  const handleRequestStatusUpdate = (requestId: string, newStatus: 'Approved' | 'Denied') => {
+    const updatedRequests = requests.map(req => 
+      req.id === requestId ? { ...req, status: newStatus } : req
+    );
     setRequests(updatedRequests);
     localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
 
     toast({
       title: `Request ${newStatus}`,
-      description: `The request for ${requestToUpdate.player} has been marked as ${newStatus.toLowerCase()}.`,
+      description: `The request has been marked as ${newStatus.toLowerCase()}.`,
     });
-
-    if (newStatus === 'Approved' && requestToUpdate.confirmationId) {
-        router.push(`/confirmations#${requestToUpdate.confirmationId}`);
-    }
   };
 
   return (
@@ -103,7 +102,7 @@ export default function RequestsPage() {
               </TableHeader>
               <TableBody>
                 {requests.map((request, index) => (
-                  <TableRow key={`${request.player}-${request.submitted}-${index}`}>
+                  <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`}>
                     <TableCell className="font-medium">{request.player}</TableCell>
                     <TableCell>{request.event}</TableCell>
                     <TableCell>{request.type}</TableCell>
@@ -125,8 +124,10 @@ export default function RequestsPage() {
                         <TableCell className="text-right">
                             {request.status === 'Pending' ? (
                                 <div className="flex gap-2 justify-end">
-                                    <Button variant="outline" size="sm" onClick={() => handleRequestUpdate(index, 'Approved')}>Review & Approve</Button>
-                                    <Button variant="destructive" size="sm" onClick={() => handleRequestUpdate(index, 'Denied')}>Deny</Button>
+                                    <Button asChild variant="outline" size="sm">
+                                      <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
+                                    </Button>
+                                    <Button variant="destructive" size="sm" onClick={() => handleRequestStatusUpdate(request.id!, 'Denied')}>Deny</Button>
                                 </div>
                             ) : (
                                 <span className="text-xs text-muted-foreground">Actioned</span>
