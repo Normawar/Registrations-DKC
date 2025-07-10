@@ -68,7 +68,7 @@ type CombinedInvoice = {
   schoolName?: string;
   district?: string;
   // For editing organizer invoices
-  type?: 'event' | 'membership' | 'organizer';
+  type: 'event' | 'membership' | 'organizer';
   lineItems?: { name: string; amount: number; note?: string }[];
   sponsorEmail?: string;
 };
@@ -462,14 +462,14 @@ export default function InvoicesPage() {
                                                     </a>
                                                   </DropdownMenuItem>
                                                   {profile.role === 'organizer' && inv.type === 'organizer' && isCancelable && (
-                                                    <>
-                                                        <DropdownMenuItem onClick={() => handleEditInvoice(inv)}>
-                                                            <FilePenLine className="mr-2 h-4 w-4" /> Edit
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
-                                                            <Trash2 className="mr-2 h-4 w-4" /> Cancel
-                                                        </DropdownMenuItem>
-                                                    </>
+                                                    <DropdownMenuItem onClick={() => handleEditInvoice(inv)}>
+                                                        <FilePenLine className="mr-2 h-4 w-4" /> Edit
+                                                    </DropdownMenuItem>
+                                                  )}
+                                                  {profile.role === 'organizer' && isCancelable && (
+                                                      <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
+                                                          <Trash2 className="mr-2 h-4 w-4" /> Cancel
+                                                      </DropdownMenuItem>
                                                   )}
                                                 </DropdownMenuContent>
                                              </DropdownMenu>
