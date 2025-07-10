@@ -495,6 +495,8 @@ export default function ConfirmationsPage() {
   };
 
   const handleByeChange = (confId: string, playerId: string, byeKey: 'round1' | 'round2', value: string) => {
+    const player = getPlayerById(playerId);
+
     setConfirmations(prevConfirmations => {
       const newConfirmations = prevConfirmations.map(conf => {
         if (conf.id === confId) {
@@ -517,7 +519,24 @@ export default function ConfirmationsPage() {
       return newConfirmations;
     });
 
-    const player = getPlayerById(playerId);
+    if (sponsorProfile?.role === 'organizer' && player) {
+        setChangeRequests(prevRequests => {
+            const newRequests = prevRequests.map(req => {
+                if (req.confirmationId === confId && req.player === `${player.firstName} ${player.lastName}` && req.type === 'Bye Request' && req.status === 'Pending') {
+                    return {
+                        ...req,
+                        status: 'Approved' as const,
+                        approvedBy: `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`,
+                        approvedAt: new Date().toISOString()
+                    };
+                }
+                return req;
+            });
+            localStorage.setItem('change_requests', JSON.stringify(newRequests));
+            return newRequests;
+        });
+    }
+
     toast({ title: "Bye Updated", description: `Bye request for ${player?.firstName} has been updated.` });
   };
 
