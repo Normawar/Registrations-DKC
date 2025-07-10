@@ -2,7 +2,10 @@
 'use client';
 
 import { useState, useEffect, type ReactNode, useMemo, useCallback } from 'react';
-import { format, differenceInHours, isSameDay } from 'date-fns';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { format, differenceInHours, isSameDay, parse, isValid } from 'date-fns';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
@@ -29,7 +32,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -48,7 +51,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { rebuildInvoiceFromRoster } from '@/ai/flows/rebuild-invoice-from-roster-flow';
-import { useMasterDb } from '@/context/master-db-context';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import type { ChangeRequest } from '@/lib/data/requests-data';
 import { requestsData as initialRequestsData } from '@/lib/data/requests-data';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -59,7 +62,47 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { useEvents, type Event } from '@/hooks/use-events';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
+const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
+const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
+const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3, '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7, '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11, '12th Grade': 12, };
+const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12, 'Championship': 12 };
+
+const playerFormSchema = z.object({
+  id: z.string().optional(),
+  firstName: z.string().min(1, { message: "First Name is required." }),
+  middleName: z.string().optional(),
+  lastName: z.string().min(1, { message: "Last Name is required." }),
+  uscfId: z.string().min(1, { message: "USCF ID is required." }),
+  uscfExpiration: z.date().optional(),
+  regularRating: z.preprocess(
+    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
+    z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
+  ),
+  grade: z.string().optional(),
+  section: z.string().optional(),
+  email: z.string().email({ message: "Please enter a valid email." }).optional().or(z.literal('')),
+  phone: z.string().optional(),
+  dob: z.date().optional(),
+  zipCode: z.string().optional(),
+  studentType: z.string().optional(),
+  state: z.string().optional(),
+  school: z.string().min(1, { message: "School name is required."}),
+  district: z.string().min(1, { message: "District name is required."}),
+}).refine(data => {
+    if (data.uscfId.toUpperCase() !== 'NEW') { return data.uscfExpiration !== undefined; }
+    return true;
+}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] })
+.refine((data) => {
+    if (!data.grade || !data.section || data.section === 'Championship') return true;
+    const playerGradeLevel = gradeToNumber[data.grade];
+    const sectionMaxLevel = sectionMaxGrade[data.section];
+    if (playerGradeLevel === undefined || sectionMaxLevel === undefined) return true;
+    return playerGradeLevel <= sectionMaxLevel;
+  }, { message: "Player's grade is too high for this section.", path: ["section"] });
+
+type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
 type PlayerRegistration = {
   byes: {
@@ -117,7 +160,7 @@ type ChangeRequestInputs = {
 export default function ConfirmationsPage() {
   const { toast } = useToast();
   const { profile: sponsorProfile } = useSponsorProfile();
-  const { database: allPlayers, isDbLoaded: isPlayersLoaded } = useMasterDb();
+  const { database: allPlayers, isDbLoaded: isPlayersLoaded, updatePlayer } = useMasterDb();
   const { events } = useEvents();
 
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
@@ -136,7 +179,6 @@ export default function ConfirmationsPage() {
   const [changeAction, setChangeAction] = useState<(() => void) | null>(null);
 
   const [selectedPlayersForWithdraw, setSelectedPlayersForWithdraw] = useState<Record<string, string[]>>({});
-
   
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [confToRequestChange, setConfToRequestChange] = useState<Confirmation | null>(null);
@@ -148,6 +190,13 @@ export default function ConfirmationsPage() {
   const [confToAddPlayer, setConfToAddPlayer] = useState<Confirmation | null>(null);
   const [playersToAdd, setPlayersToAdd] = useState<string[]>([]);
   const [isCreatingAddonInvoice, setIsCreatingAddonInvoice] = useState(false);
+  
+  const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
+  const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
+
+  const playerForm = useForm<PlayerFormValues>({
+    resolver: zodResolver(playerFormSchema),
+  });
 
   const playersMap = useMemo(() => {
     return new Map(allPlayers.map(p => [p.id, p]));
@@ -469,7 +518,7 @@ export default function ConfirmationsPage() {
         const approvalTimestamp = new Date().toISOString();
 
         const updatedRequests = changeRequests.map(req => {
-            if (req.confirmationId === confId && req.player === `${player.firstName} ${player.lastName}` && req.type === 'Bye Request') {
+            if (req.confirmationId === confId && req.player === `${player.firstName} ${player.lastName}` && req.type === 'Bye Request' && req.status === 'Pending') {
                 return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
             }
             return req;
@@ -500,7 +549,6 @@ export default function ConfirmationsPage() {
         status: 'Pending',
     };
     
-    // If organizer, auto-approve and perform action
     if (sponsorProfile.role === 'organizer') {
         const actionMap: Record<string, { title: string; description: string; action: () => void }> = {
             'Withdraw Player': {
@@ -537,7 +585,6 @@ export default function ConfirmationsPage() {
         }
 
     } else {
-      // If sponsor, just submit the request
       const updatedRequests = [newRequest, ...changeRequests];
       setChangeRequests(updatedRequests);
       localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
@@ -545,6 +592,38 @@ export default function ConfirmationsPage() {
     }
 
     setIsRequestDialogOpen(false);
+  };
+  
+  const handleOpenEditPlayerDialog = (player: MasterPlayer) => {
+    setPlayerToEdit(player);
+    playerForm.reset({
+      ...player,
+      dob: player.dob ? new Date(player.dob) : undefined,
+      uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+    });
+    setIsEditPlayerDialogOpen(true);
+  };
+  
+  const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
+    if (!playerToEdit) return;
+
+    const { uscfExpiration, dob, ...restOfValues } = values;
+    
+    const updatedPlayerRecord: MasterPlayer = {
+        ...playerToEdit,
+        ...restOfValues,
+        dob: dob ? dob.toISOString() : undefined,
+        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+    };
+    
+    await updatePlayer(updatedPlayerRecord);
+    
+    // Also update the local map for immediate UI feedback
+    playersMap.set(playerToEdit.id, updatedPlayerRecord);
+
+    toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
+    setIsEditPlayerDialogOpen(false);
+    setPlayerToEdit(null);
   };
 
   const handlePlayerToggle = (playerId: string) => {
@@ -576,7 +655,6 @@ export default function ConfirmationsPage() {
 
         const addedPlayersInfo = playersToAdd.map(id => getPlayerById(id)!);
 
-        // This logic should be identical to the one in `events/page.tsx`
         let registrationFeePerPlayer = eventDetails.regularFee;
         const eventDate = new Date(eventDetails.date);
         const now = new Date();
@@ -611,13 +689,12 @@ export default function ConfirmationsPage() {
         addedPlayersInfo.forEach(p => {
              const isExpired = !p.uscfExpiration || new Date(p.uscfExpiration) < eventDate;
              newSelections[p.id] = {
-                 byes: { round1: 'none', round2: 'none' }, // Default byes
-                 section: p.section, // Assume section is correct on player profile
+                 byes: { round1: 'none', round2: 'none' },
+                 section: p.section,
                  uscfStatus: p.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
              }
         });
 
-        // Add to original confirmation in local storage
         const updatedConfirmations = confirmations.map(c => {
             if (c.id === confToAddPlayer.id) {
                 return { ...c, selections: { ...c.selections, ...newSelections } };
@@ -626,7 +703,7 @@ export default function ConfirmationsPage() {
         });
         
         localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-        loadAllData(); // Reload all data to reflect the change
+        loadAllData();
 
         toast({
             title: "Players Added & New Invoice Created",
@@ -700,7 +777,7 @@ export default function ConfirmationsPage() {
                         <div className="flex justify-between items-center flex-wrap gap-2">
                             <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
                             <div className="flex items-center gap-2">
-                                {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => handleOpenAddPlayerDialog(conf)} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
+                                {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => setIsAddPlayerDialogOpen(true)} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
                                 <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)} disabled={isLoading}> <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change </Button>
                                 {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
                                     <Button variant="secondary" size="sm" onClick={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
@@ -722,6 +799,7 @@ export default function ConfirmationsPage() {
                               <TableHead>Section</TableHead>
                               <TableHead>USCF Status</TableHead>
                               <TableHead>Byes Requested</TableHead>
+                              {sponsorProfile?.role === 'organizer' && <TableHead className='text-right'>Actions</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -773,6 +851,14 @@ export default function ConfirmationsPage() {
                                   <TableCell>
                                     {[details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None'}
                                   </TableCell>
+                                  {sponsorProfile?.role === 'organizer' && (
+                                    <TableCell className='text-right'>
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditPlayerDialog(player)}>
+                                        <FilePenLine className="h-4 w-4" />
+                                        <span className='sr-only'>Edit Player</span>
+                                      </Button>
+                                    </TableCell>
+                                  )}
                                 </TableRow>
                               );
                             })}
@@ -907,6 +993,53 @@ export default function ConfirmationsPage() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Edit Player Dialog */}
+      <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-6 pb-4 border-b shrink-0">
+                <DialogTitle>Edit Player Information</DialogTitle>
+                <DialogDescription>Update the details for {playerToEdit?.firstName} {playerToEdit?.lastName}. This will update the master player record.</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6">
+                <Form {...playerForm}>
+                    <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Date of Birth</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()} initialFocus/></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                             <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>USCF Expiration</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 2} toYear={new Date().getFullYear() + 10} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        </div>
+                    </form>
+                </Form>
+            </div>
+            <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                <Button type="button" variant="ghost" onClick={() => setIsEditPlayerDialogOpen(false)}>Cancel</Button>
+                <Button type="submit" form="edit-player-form">Save Changes</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
+
+    
