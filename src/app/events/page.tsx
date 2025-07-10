@@ -643,6 +643,27 @@ export default function EventsPage() {
         toast({ title: 'Download Complete', description: `${newlyDownloadedIds.length} new registrations have been downloaded.`});
     };
     
+    const handleMarkAllAsNew = () => {
+        if (!selectedEvent) return;
+        const updatedDownloads = { ...downloadedPlayers };
+        delete updatedDownloads[selectedEvent.id];
+        setDownloadedPlayers(updatedDownloads);
+        localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
+        toast({ title: 'Status Reset', description: 'All players for this event are marked as new.' });
+    };
+
+    const handleClearAllNew = () => {
+        if (!selectedEvent) return;
+        const allPlayerIdsForEvent = allRegisteredPlayersForSelectedEvent.map(p => p.player.id);
+        const updatedDownloads = {
+            ...downloadedPlayers,
+            [selectedEvent.id]: allPlayerIdsForEvent
+        };
+        setDownloadedPlayers(updatedDownloads);
+        localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
+        toast({ title: 'Status Cleared', description: 'All new registration indicators have been cleared.' });
+    };
+    
     const requestPlayerSort = (key: string) => {
         let direction: 'ascending' | 'descending' = 'ascending';
         if (playerSortConfig && playerSortConfig.key === key && playerSortConfig.direction === 'ascending') {
@@ -929,11 +950,16 @@ export default function EventsPage() {
                     A total of {allRegisteredPlayersForSelectedEvent.length} players are registered for this event.
                 </DialogDescription>
             </DialogHeader>
-            <div className="my-4">
+            <div className="my-4 flex justify-between items-center">
                  <Button onClick={handleDownload} disabled={newPlayersForDownload.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
                     Download New Registrations ({newPlayersForDownload.length})
                 </Button>
+                <div className="text-xs text-muted-foreground space-x-2">
+                    <button onClick={handleMarkAllAsNew} className="hover:underline">Mark all as new</button>
+                    <span>|</span>
+                    <button onClick={handleClearAllNew} className="hover:underline">Clear all new</button>
+                </div>
             </div>
             <ScrollArea className="h-96 w-full">
                 <Table>
