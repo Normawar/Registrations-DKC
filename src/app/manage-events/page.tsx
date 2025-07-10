@@ -238,12 +238,18 @@ export default function ManageEventsPage() {
       let errors = 0;
       data.forEach((row: any) => {
         try {
-          const dateStr = row['date'] || row['Date'];
+          let dateStr = row['date'] || row['Date'];
           if (!dateStr) {
               console.warn("Skipping row due to missing date:", row);
               errors++;
               return;
           }
+
+          // Handle date ranges by taking the start date
+          if (dateStr.includes('-')) {
+            dateStr = dateStr.split('-')[0].trim();
+          }
+
           const date = new Date(dateStr);
           if (!isValid(date)) throw new Error(`Invalid date format for value: "${dateStr}"`);
           
