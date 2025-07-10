@@ -88,9 +88,9 @@ const eventFormSchema = z.object({
   date: z.date({ required_error: "An event date is required." }),
   location: z.string().min(3, { message: "Location is required." }),
   rounds: z.coerce.number().int().min(1, { message: "Must be at least 1 round." }),
-  earlyFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   regularFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   lateFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
+  veryLateFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   dayOfFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
   imageUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   imageName: z.string().optional(),
@@ -138,10 +138,10 @@ export default function ManageEventsPage() {
       date: new Date(),
       location: '',
       rounds: 5,
-      earlyFee: 20,
       regularFee: 25,
       lateFee: 30,
-      dayOfFee: 35,
+      veryLateFee: 35,
+      dayOfFee: 40,
       imageUrl: '',
       imageName: '',
       pdfUrl: '',
@@ -157,13 +157,11 @@ export default function ManageEventsPage() {
     const sortableEvents = [...events];
     if (sortConfig !== null) {
       sortableEvents.sort((a, b) => {
-        // Primary sort: "Open" events before "Completed" events
         const aStatus = getEventStatus(a);
         const bStatus = getEventStatus(b);
         if (aStatus === 'Open' && bStatus === 'Completed') return -1;
         if (aStatus === 'Completed' && bStatus === 'Open') return 1;
 
-        // Secondary sort: based on user's choice (sortConfig)
         let aValue: any = a[sortConfig.key as keyof Event];
         let bValue: any = b[sortConfig.key as keyof Event];
         
@@ -218,10 +216,10 @@ export default function ManageEventsPage() {
           date: new Date(),
           location: '',
           rounds: 5,
-          earlyFee: 20,
           regularFee: 25,
           lateFee: 30,
-          dayOfFee: 35,
+          veryLateFee: 35,
+          dayOfFee: 40,
           imageUrl: '',
           imageName: '',
           pdfUrl: '',
@@ -239,7 +237,7 @@ export default function ManageEventsPage() {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const requiredFields = ['name', 'date', 'location', 'rounds', 'earlyFee', 'regularFee', 'lateFee', 'dayOfFee'];
+        const requiredFields = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
         const headers = results.meta.fields;
         if (!headers || !requiredFields.every(field => headers.includes(field))) {
             toast({
@@ -263,9 +261,9 @@ export default function ManageEventsPage() {
               date: date.toISOString(),
               location: row.location,
               rounds: parseInt(row.rounds, 10),
-              earlyFee: parseFloat(row.earlyFee),
               regularFee: parseFloat(row.regularFee),
               lateFee: parseFloat(row.lateFee),
+              veryLateFee: parseFloat(row.veryLateFee),
               dayOfFee: parseFloat(row.dayOfFee),
               imageUrl: row.imageUrl || undefined,
               imageName: row.imageName || undefined,
@@ -273,7 +271,7 @@ export default function ManageEventsPage() {
               pdfName: row.pdfName || undefined,
             };
 
-            if (isNaN(event.rounds) || isNaN(event.earlyFee) || isNaN(event.regularFee) || isNaN(event.lateFee) || isNaN(event.dayOfFee)) {
+            if (isNaN(event.rounds) || isNaN(event.regularFee) || isNaN(event.lateFee) || isNaN(event.veryLateFee) || isNaN(event.dayOfFee)) {
                 throw new Error('Numeric fields contain non-numeric values.');
             }
             
@@ -411,7 +409,7 @@ export default function ManageEventsPage() {
                   </TableHead>
                   <TableHead className="p-0">
                     <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>
-                        Fees (Early, Reg., Late, Day of) {getSortIcon('regularFee')}
+                        Fees (Reg, Late, V.Late, Day of) {getSortIcon('regularFee')}
                     </Button>
                   </TableHead>
                   <TableHead className="p-0">
@@ -430,7 +428,7 @@ export default function ManageEventsPage() {
                     <TableCell className="font-medium">{event.name}</TableCell>
                     <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                     <TableCell>{event.location}</TableCell>
-                    <TableCell>{`$${event.earlyFee} / $${event.regularFee} / $${event.lateFee} / $${event.dayOfFee}`}</TableCell>
+                    <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
                     <TableCell>
                       <Badge variant={getEventStatus(event) === 'Open' ? 'default' : 'secondary'} className={cn(getEventStatus(event) === 'Open' ? 'bg-green-600 text-white' : '')}>
                         {getEventStatus(event)}
@@ -549,14 +547,7 @@ export default function ManageEventsPage() {
                 <Label>Registration Fees</Label>
                 <Card className="p-4 mt-2 bg-muted/50">
                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <FormField control={form.control} name="earlyFee" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Early Fee ($)</FormLabel>
-                        <FormControl><Input type="number" placeholder="20" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                     <FormField control={form.control} name="regularFee" render={({ field }) => (
+                    <FormField control={form.control} name="regularFee" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Regular Fee ($)</FormLabel>
                         <FormControl><Input type="number" placeholder="25" {...field} /></FormControl>
@@ -570,10 +561,17 @@ export default function ManageEventsPage() {
                         <FormMessage />
                       </FormItem>
                     )} />
+                     <FormField control={form.control} name="veryLateFee" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Very Late Fee ($)</FormLabel>
+                        <FormControl><Input type="number" placeholder="35" {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                     )} />
                      <FormField control={form.control} name="dayOfFee" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Day of Fee ($)</FormLabel>
-                        <FormControl><Input type="number" placeholder="35" {...field} /></FormControl>
+                        <FormControl><Input type="number" placeholder="40" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
