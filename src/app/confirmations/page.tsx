@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, type ReactNode, useMemo, useCallback } from 'react';
-import { format } from 'date-fns';
+import { format, differenceInHours, isSameDay } from 'date-fns';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
@@ -442,7 +442,7 @@ export default function ConfirmationsPage() {
         else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
         
         const playersToInvoice = addedPlayersInfo.map(player => {
-            const isExpired = !player.uscfExpiration || player.uscfExpiration < eventDate;
+            const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < eventDate;
             const uscfStatus = player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
             const lateFeeAmount = registrationFeePerPlayer - eventDetails.regularFee;
             return {
@@ -467,7 +467,7 @@ export default function ConfirmationsPage() {
 
         const newSelections: RegistrationSelections = {};
         addedPlayersInfo.forEach(p => {
-             const isExpired = !p.uscfExpiration || p.uscfExpiration < eventDate;
+             const isExpired = !p.uscfExpiration || new Date(p.uscfExpiration) < eventDate;
              newSelections[p.id] = {
                  byes: { round1: 'none', round2: 'none' }, // Default byes
                  section: p.section, // Assume section is correct on player profile
@@ -625,7 +625,10 @@ export default function ConfirmationsPage() {
                                               variant="ghost"
                                               size="sm"
                                               className="text-destructive hover:text-destructive"
-                                              onClick={() => setPlayerToWithdraw({ confId: conf.id, playerId: playerId, playerName: `${player.firstName} ${player.lastName}`, invoiceId: conf.invoiceId! })}
+                                              onClick={() => {
+                                                  setPlayerToWithdraw({ confId: conf.id, playerId: playerId, playerName: `${player.firstName} ${player.lastName}`, invoiceId: conf.invoiceId! });
+                                                  setIsWithdrawAlertOpen(true);
+                                              }}
                                               disabled={isLoading || !conf.invoiceId}
                                           >
                                               <UserMinus className="mr-2 h-4 w-4" /> Withdraw
