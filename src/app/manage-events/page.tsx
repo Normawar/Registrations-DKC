@@ -233,10 +233,23 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
-  const processImportData = (data: any[]) => {
+  const processImportData = (data: any[], hasHeaders: boolean) => {
       const newEvents: Event[] = [];
       let errors = 0;
-      data.forEach((row: any) => {
+
+      const dataToProcess = hasHeaders ? data : data.map(arr => ({
+          'Date': arr[0],
+          'Tournament': arr[1],
+          'Location': arr[2],
+          // Assume defaults for other fields when no headers are present
+          'Rounds': 5,
+          'Regular Fee': 25,
+          'Late Fee': 30,
+          'Very Late Fee': 35,
+          'Day of Fee': 40
+      }));
+
+      dataToProcess.forEach((row: any) => {
         try {
           let dateStr = row['date'] || row['Date'];
           if (!dateStr) {
@@ -245,7 +258,6 @@ export default function ManageEventsPage() {
               return;
           }
 
-          // Handle date ranges by taking the start date
           if (dateStr.includes('-')) {
             dateStr = dateStr.split('-')[0].trim();
           }
@@ -259,10 +271,10 @@ export default function ManageEventsPage() {
             date: date.toISOString(),
             location: row['location'] || row['Location'],
             rounds: row['rounds'] || row['Rounds'],
-            regularFee: row['regularFee'] || row['Regular Fee'] || row['Regular EF'],
-            lateFee: row['lateFee'] || row['Late Fee'] || row['Late EF'],
+            regularFee: row['regularFee'] || row['Regular Fee'],
+            lateFee: row['lateFee'] || row['Late Fee'],
             veryLateFee: row['veryLateFee'] || row['Very Late Fee'],
-            dayOfFee: row['dayOfFee'] || row['Day of Fee'] || row['On-site EF'],
+            dayOfFee: row['dayOfFee'] || row['Day of Fee'],
             imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
             imageName: row['imageName'] || row['Image Name'] || undefined,
             pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
@@ -323,7 +335,7 @@ export default function ManageEventsPage() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => processImportData(results.data),
+      complete: (results) => processImportData(results.data, true),
       error: (error) => {
         toast({
           variant: 'destructive',
@@ -347,8 +359,27 @@ export default function ManageEventsPage() {
     Papa.parse(pasteData, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => {
-            processImportData(results.data);
+        complete: (resultsWithHeader) => {
+            // Heuristic to check if the first row is a header or data
+            if (resultsWithHeader.data.length > 0 && resultsWithHeader.meta.fields) {
+                const firstRowIsLikelyData = resultsWithHeader.meta.fields.some(field => field && (field.includes('/') || !isNaN(Date.parse(field))));
+                
+                if (firstRowIsLikelyData) {
+                    // Re-parse without headers if it looks like data
+                    Papa.parse(pasteData, {
+                        header: false,
+                        skipEmptyLines: true,
+                        complete: (resultsWithoutHeader) => {
+                            processImportData(resultsWithoutHeader.data, false);
+                        }
+                    });
+                } else {
+                    processImportData(resultsWithHeader.data, true);
+                }
+            } else {
+                 toast({ variant: 'destructive', title: 'Import Failed', description: 'No data could be parsed from your input.' });
+            }
+
             setIsPasteDialogOpen(false);
             setPasteData('');
         },
@@ -471,7 +502,7 @@ export default function ManageEventsPage() {
                   </TableHead>
                   <TableHead className="p-0">
                     <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>
-                        Fees (Early, Reg., Late, Day of) {getSortIcon('regularFee')}
+                        Fees (Regular, Late, V.Late, Day of) {getSortIcon('regularFee')}
                     </Button>
                   </TableHead>
                   <TableHead className="p-0">
@@ -755,7 +786,7 @@ export default function ManageEventsPage() {
           <DialogHeader>
             <DialogTitle>Paste from Spreadsheet</DialogTitle>
             <DialogDescription>
-              Copy the data from your Google Sheet or Excel file (including the header row) and paste it into the text area below.
+              Copy the data from your Google Sheet or Excel file (with or without a header row) and paste it into the text area below.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
