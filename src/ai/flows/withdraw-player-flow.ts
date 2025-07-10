@@ -92,54 +92,46 @@ const withdrawPlayerFlow = ai.defineFlow(
         throw new Error(`Could not retrieve order or order has no line items for ID: ${orderId}`);
       }
 
-      const updatedLineItems: OrderLineItem[] = [];
       let playerFound = false;
+      const sparseLineItemUpdates: OrderLineItem[] = [];
 
-      const itemsToUpdate: OrderLineItem[] = [];
+      // Find all line items that might be associated with this player
+      const registrationItem = order.lineItems.find(item => item.name?.toLowerCase().includes('tournament registration'));
+      const lateFeeItem = order.lineItems.find(item => item.name?.toLowerCase().includes('late fee'));
+      const uscfItem = order.lineItems.find(item => item.name?.toLowerCase().includes('uscf membership'));
+      
+      // Check if the player is mentioned in any of the notes, which indicates they are part of that line item
+      const isPlayerInRegistrationNotes = registrationItem?.note?.toLowerCase().includes(playerName.toLowerCase());
+      const isPlayerInLateFeeNotes = lateFeeItem?.note?.toLowerCase().includes(playerName.toLowerCase());
+      const isPlayerInUscfNotes = uscfItem?.note?.toLowerCase().includes(playerName.toLowerCase());
 
-      for (const item of order.lineItems) {
-          const notes = item.note || '';
-          if (notes.toLowerCase().includes(playerName.toLowerCase())) {
-              playerFound = true;
+      if (registrationItem && (isPlayerInRegistrationNotes || registrationItem.quantity > '0')) {
+          playerFound = true;
+          const newQuantity = parseInt(registrationItem.quantity, 10) - 1;
+          if (newQuantity >= 0) {
+              sparseLineItemUpdates.push({ uid: registrationItem.uid!, quantity: String(newQuantity) });
+          }
+      }
 
-              const newQuantity = parseInt(item.quantity, 10) - 1;
-              
-              // We can't modify the note, just the quantity.
-              // To remove, we must send the uid and quantity 0.
-              // To update quantity, we send uid and new quantity.
-              const updatedItem: OrderLineItem = {
-                  uid: item.uid!,
-                  quantity: String(newQuantity),
-              };
+      if (lateFeeItem && isPlayerInLateFeeNotes) {
+          const newQuantity = parseInt(lateFeeItem.quantity, 10) - 1;
+          if (newQuantity >= 0) {
+              sparseLineItemUpdates.push({ uid: lateFeeItem.uid!, quantity: String(newQuantity) });
+          }
+      }
 
-              // If the line item is for a specific player (e.g. late fee), and its quantity becomes 0,
-              // it should be removed. The main registration item should just have its quantity reduced.
-              if (item.name?.toLowerCase() !== 'tournament registration' && newQuantity <= 0) {
-                  itemsToUpdate.push({ uid: item.uid!, quantity: '0' });
-              } else if (item.name?.toLowerCase() === 'tournament registration') {
-                  itemsToUpdate.push(updatedItem);
-              }
+      if (uscfItem && isPlayerInUscfNotes) {
+          const newQuantity = parseInt(uscfItem.quantity, 10) - 1;
+          if (newQuantity >= 0) {
+              sparseLineItemUpdates.push({ uid: uscfItem.uid!, quantity: String(newQuantity) });
           }
       }
 
       if (!playerFound) {
-        // If the player isn't found in any note, check the main registration item.
-        const registrationItem = order.lineItems.find(item => item.name?.toLowerCase() === 'tournament registration');
-        if(registrationItem) {
-            const newQuantity = parseInt(registrationItem.quantity, 10) - 1;
-            itemsToUpdate.push({
-                uid: registrationItem.uid!,
-                quantity: String(newQuantity),
-            });
-            playerFound = true;
-        }
-      }
-      
-      if (!playerFound) {
         throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
       }
 
-      if (itemsToUpdate.length === 0) {
+      if (sparseLineItemUpdates.length === 0) {
           console.warn(`No line item quantities needed to be changed for player ${playerName}.`);
           return {
             invoiceId: invoice.id!,
@@ -150,12 +142,12 @@ const withdrawPlayerFlow = ai.defineFlow(
           };
       }
       
-      console.log(`Updating order ${orderId} for invoice ${invoiceId} with sparse line item changes...`, JSON.stringify(itemsToUpdate));
+      console.log(`Updating order ${orderId} for invoice ${invoiceId} with sparse line item changes...`, JSON.stringify(sparseLineItemUpdates));
       
       const { result: { order: updatedOrder } } = await ordersApi.updateOrder(orderId, {
         order: {
           locationId: order.locationId!,
-          lineItems: itemsToUpdate, // Send only the sparse update
+          lineItems: sparseLineItemUpdates, // Send only the sparse update
           version: order.version,
         },
       });
