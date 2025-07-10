@@ -241,33 +241,55 @@ export default function ManageEventsPage() {
         let errors = 0;
         results.data.forEach((row: any) => {
           try {
-            const date = new Date(row.date);
-            if (!isValid(date)) throw new Error('Invalid date format');
+            const dateStr = row['date'] || row['Date'];
+            if (!dateStr) {
+                console.warn("Skipping row due to missing date:", row);
+                errors++;
+                return;
+            }
+            const date = new Date(dateStr);
+            if (!isValid(date)) throw new Error(`Invalid date format for value: "${dateStr}"`);
             
-            const event: Event = {
+            const eventData = {
               id: `evt-${Date.now()}-${Math.random()}`,
-              name: row.name,
+              name: row['name'] || row['Name'],
               date: date.toISOString(),
-              location: row.location,
-              rounds: parseInt(row.rounds, 10),
-              regularFee: parseFloat(row.regularFee),
-              lateFee: parseFloat(row.lateFee),
-              veryLateFee: parseFloat(row.veryLateFee),
-              dayOfFee: parseFloat(row.dayOfFee),
-              imageUrl: row.imageUrl || undefined,
-              imageName: row.imageName || undefined,
-              pdfUrl: row.pdfUrl || undefined,
-              pdfName: row.pdfName || undefined,
+              location: row['location'] || row['Location'],
+              rounds: row['rounds'] || row['Rounds'],
+              regularFee: row['regularFee'] || row['Regular Fee'],
+              lateFee: row['lateFee'] || row['Late Fee'],
+              veryLateFee: row['veryLateFee'] || row['Very Late Fee'],
+              dayOfFee: row['dayOfFee'] || row['Day of Fee'],
+              imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
+              imageName: row['imageName'] || row['Image Name'] || undefined,
+              pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
+              pdfName: row['pdfName'] || row['PDF Name'] || undefined,
             };
 
-            const requiredFields: (keyof Event)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
+            const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
             for (const field of requiredFields) {
-              if (event[field] === undefined || event[field] === null || (typeof event[field] === 'number' && isNaN(event[field]))) {
+              if (eventData[field] === undefined || eventData[field] === null || (typeof eventData[field] === 'number' && isNaN(eventData[field]))) {
                 throw new Error(`Missing or invalid required field: ${field}`);
               }
             }
             
-            newEvents.push(event);
+            const finalEvent: Event = {
+                id: eventData.id,
+                name: String(eventData.name),
+                date: eventData.date,
+                location: String(eventData.location),
+                rounds: parseInt(String(eventData.rounds), 10),
+                regularFee: parseFloat(String(eventData.regularFee)),
+                lateFee: parseFloat(String(eventData.lateFee)),
+                veryLateFee: parseFloat(String(eventData.veryLateFee)),
+                dayOfFee: parseFloat(String(eventData.dayOfFee)),
+                imageUrl: eventData.imageUrl ? String(eventData.imageUrl) : undefined,
+                imageName: eventData.imageName ? String(eventData.imageName) : undefined,
+                pdfUrl: eventData.pdfUrl ? String(eventData.pdfUrl) : undefined,
+                pdfName: eventData.pdfName ? String(eventData.pdfName) : undefined,
+            };
+            
+            newEvents.push(finalEvent);
           } catch(e) {
             errors++;
             console.error("Error parsing event row:", row, e);
@@ -278,7 +300,7 @@ export default function ManageEventsPage() {
             toast({
                 variant: 'destructive',
                 title: 'Import Failed',
-                description: `Could not import any events. Please ensure your CSV has the required headers: name, date, location, rounds, regularFee, lateFee, veryLateFee, dayOfFee.`
+                description: `Could not import any events. Please ensure your CSV has the required headers and valid data.`
             });
             return;
         }
