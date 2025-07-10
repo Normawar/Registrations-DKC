@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Withdraws a player from an invoice with the Square API by updating the underlying order.
+ * @fileOverview Withdraws a player from an invoice with the Square API by updating the invoice line items directly.
  *
  * - withdrawPlayerFromInvoice - A function that handles the player withdrawal process.
  * - WithdrawPlayerInput - The input type for the withdrawPlayerFromInvoice function.
@@ -10,10 +10,11 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { ApiError, type Order, type OrderLineItem } from 'square';
+import { ApiError, type LineItem } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 import { differenceInHours } from 'date-fns';
+import { randomUUID } from 'crypto';
 
 const WithdrawPlayerInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to update.'),
@@ -24,7 +25,7 @@ export type WithdrawPlayerInput = z.infer<typeof WithdrawPlayerInputSchema>;
 
 const WithdrawPlayerOutputSchema = z.object({
   invoiceId: z.string(),
-  orderId: z.string(),
+  orderId: z.string().optional(),
   totalAmount: z.number(),
   status: z.string(),
   wasInvoiceModified: z.boolean(),
@@ -55,18 +56,16 @@ const withdrawPlayerFlow = ai.defineFlow(
     }
 
     const squareClient = await getSquareClient();
-    const { invoicesApi, ordersApi } = squareClient;
+    const { invoicesApi } = squareClient;
       
     try {
-      console.log(`Fetching invoice ${invoiceId} to get its order ID...`);
+      console.log(`Fetching invoice ${invoiceId} to get its details...`);
       const { result: { invoice } } = await invoicesApi.getInvoice(invoiceId);
       
-      if (!invoice?.orderId) {
-        throw new Error(`Invoice ${invoiceId} does not have an associated order ID.`);
+      if (!invoice?.id) {
+        throw new Error(`Invoice ${invoiceId} not found.`);
       }
-      
-      const orderId = invoice.orderId;
-      
+
       const hoursUntilEvent = differenceInHours(new Date(eventDate), new Date());
 
       // If withdrawal is within 48 hours, do not modify the invoice.
@@ -74,91 +73,70 @@ const withdrawPlayerFlow = ai.defineFlow(
         console.log(`Withdrawal for ${playerName} is within 48 hours of the event. Invoice ${invoiceId} will not be modified.`);
         return {
           invoiceId: invoice.id!,
-          orderId: orderId,
+          orderId: invoice.orderId,
           totalAmount: Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount ?? 0) / 100,
           status: invoice.status!,
           wasInvoiceModified: false,
         };
       }
-
-      if (invoice.status !== 'DRAFT' && invoice.status !== 'PUBLISHED' && invoice.status !== 'UNPAID' && invoice.status !== 'PARTIALLY_PAID') {
+      
+      const updatableStatuses = ['DRAFT', 'PUBLISHED', 'UNPAID', 'PARTIALLY_PAID'];
+      if (!updatableStatuses.includes(invoice.status!)) {
         throw new Error(`Invoice is in status ${invoice.status} and cannot be modified. Player must be withdrawn manually and a credit/refund issued if applicable.`);
       }
-      
-      console.log(`Fetching order ${orderId} to update line items...`);
-      const { result: { order } } = await ordersApi.retrieveOrder(orderId);
 
-      if (!order || !order.lineItems) {
-        throw new Error(`Could not retrieve order or order has no line items for ID: ${orderId}`);
-      }
+      const originalLineItems: LineItem[] = invoice.lineItems || [];
+      const updatedLineItems: LineItem[] = JSON.parse(JSON.stringify(originalLineItems)); // Deep copy
 
-      const sparseLineItemUpdates: OrderLineItem[] = [];
       let playerFound = false;
 
-      // Find all line items that might be associated with this player
-      const registrationItem = order.lineItems.find(item => 
-        item.name?.toLowerCase().includes('tournament registration') && item.note?.toLowerCase().includes(playerName.toLowerCase())
-      );
-      const lateFeeItem = order.lineItems.find(item => 
-        item.name?.toLowerCase().includes('late fee') && item.note?.toLowerCase().includes(playerName.toLowerCase())
-      );
-      const uscfItem = order.lineItems.find(item => 
-        item.name?.toLowerCase().includes('uscf membership') && item.note?.toLowerCase().includes(playerName.toLowerCase())
-      );
-      
-      if (registrationItem) {
-          playerFound = true;
-          const newQuantity = Math.max(0, parseInt(registrationItem.quantity, 10) - 1);
-          sparseLineItemUpdates.push({ uid: registrationItem.uid!, quantity: String(newQuantity) });
-      }
+      // Iterate through the line items to find and update the withdrawn player's items
+      for (const item of updatedLineItems) {
+          const isRegistration = item.name?.toLowerCase().includes('tournament registration');
+          const isLateFee = item.name?.toLowerCase().includes('late fee');
+          const isUscf = item.name?.toLowerCase().includes('uscf membership');
+          
+          if ((isRegistration || isLateFee || isUscf) && item.note?.toLowerCase().includes(playerName.toLowerCase())) {
+              playerFound = true;
+              const currentQuantity = parseInt(item.quantity!, 10);
+              if (currentQuantity > 0) {
+                  item.quantity = String(currentQuantity - 1);
+              }
 
-      if (lateFeeItem) {
-          const newQuantity = Math.max(0, parseInt(lateFeeItem.quantity, 10) - 1);
-          sparseLineItemUpdates.push({ uid: lateFeeItem.uid!, quantity: String(newQuantity) });
+              // Update the note for the registration item
+              if (isRegistration && item.note) {
+                  const playerLines = item.note.split('\n');
+                  const updatedLines = playerLines.map(line => {
+                      if (line.toLowerCase().includes(playerName.toLowerCase())) {
+                          return `${line} (Withdrawn)`;
+                      }
+                      return line;
+                  });
+                  item.note = updatedLines.join('\n');
+              }
+          }
       }
-
-      if (uscfItem) {
-          const newQuantity = Math.max(0, parseInt(uscfItem.quantity, 10) - 1);
-          sparseLineItemUpdates.push({ uid: uscfItem.uid!, quantity: String(newQuantity) });
-      }
-
 
       if (!playerFound) {
         throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
       }
-
-      if (sparseLineItemUpdates.length === 0) {
-          console.warn(`No line item quantities needed to be changed for player ${playerName}.`);
-          return {
-            invoiceId: invoice.id!,
-            orderId: orderId,
-            totalAmount: Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100,
-            status: invoice.status!,
-            wasInvoiceModified: false,
-          };
-      }
       
-      console.log(`Updating order ${orderId} for invoice ${invoiceId} with sparse line item changes...`, JSON.stringify(sparseLineItemUpdates));
-      
-      const { result: { order: updatedOrder } } = await ordersApi.updateOrder(orderId, {
-        order: {
-          locationId: order.locationId!,
-          lineItems: sparseLineItemUpdates, // Send only the sparse update
-          version: order.version,
+      const { result: { invoice: updatedInvoice } } = await invoicesApi.updateInvoice(invoiceId, {
+        invoice: {
+          ...invoice,
+          lineItems: updatedLineItems.filter(item => parseInt(item.quantity!, 10) > 0), // Filter out zero-quantity items
+          version: invoice.version!,
         },
+        idempotencyKey: randomUUID(),
       });
-
-      console.log("Successfully updated order:", updatedOrder);
       
-      // Fetch the invoice again to get the final updated state
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(invoiceId);
+      console.log("Successfully updated invoice:", updatedInvoice);
 
       return {
-        invoiceId: finalInvoice!.id!,
-        orderId: updatedOrder!.id!,
-        totalAmount: Number(finalInvoice!.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100,
-        status: finalInvoice!.status!,
+        invoiceId: updatedInvoice!.id!,
+        orderId: updatedInvoice!.orderId,
+        totalAmount: Number(updatedInvoice!.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100,
+        status: updatedInvoice!.status!,
         wasInvoiceModified: true,
       };
 
