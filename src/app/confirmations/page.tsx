@@ -29,7 +29,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -47,6 +47,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
+import { withdrawPlayerFromInvoice } from '@/ai/flows/withdraw-player-flow';
 import { useMasterDb } from '@/context/master-db-context';
 import type { ChangeRequest } from '@/lib/data/requests-data';
 import { requestsData as initialRequestsData } from '@/lib/data/requests-data';
@@ -120,6 +121,9 @@ export default function ConfirmationsPage() {
   
   const [isCompAlertOpen, setIsCompAlertOpen] = useState(false);
   const [confToComp, setConfToComp] = useState<Confirmation | null>(null);
+  const [isWithdrawAlertOpen, setIsWithdrawAlertOpen] = useState(false);
+  const [playerToWithdraw, setPlayerToWithdraw] = useState<{ confId: string; playerId: string; playerName: string; invoiceId: string } | null>(null);
+
   
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [confToRequestChange, setConfToRequestChange] = useState<Confirmation | null>(null);
@@ -312,6 +316,47 @@ export default function ConfirmationsPage() {
         setConfToComp(null);
     }
   };
+
+   const handleWithdrawPlayer = async () => {
+    if (!playerToWithdraw) return;
+
+    setIsUpdating(prev => ({ ...prev, [playerToWithdraw.confId]: true }));
+    setIsWithdrawAlertOpen(false);
+
+    try {
+      await withdrawPlayerFromInvoice({
+        invoiceId: playerToWithdraw.invoiceId,
+        playerName: playerToWithdraw.playerName,
+      });
+
+      // Update local state
+      const updatedConfirmations = confirmations.map(c => {
+        if (c.id === playerToWithdraw.confId) {
+          const newSelections = { ...c.selections };
+          delete newSelections[playerToWithdraw.playerId];
+          return { ...c, selections: newSelections };
+        }
+        return c;
+      });
+      localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+      setConfirmations(updatedConfirmations);
+
+      // Refresh invoice status after a short delay
+      setTimeout(() => fetchInvoiceStatus(playerToWithdraw.confId, playerToWithdraw.invoiceId), 1000);
+
+      toast({
+        title: "Player Withdrawn",
+        description: `${playerToWithdraw.playerName} has been removed from the registration and the invoice has been updated.`,
+      });
+    } catch (error) {
+      console.error("Failed to withdraw player:", error);
+      const description = error instanceof Error ? error.message : "An unknown error occurred.";
+      toast({ variant: "destructive", title: "Withdrawal Failed", description });
+    } finally {
+      setIsUpdating(prev => ({ ...prev, [playerToWithdraw.confId]: false }));
+      setPlayerToWithdraw(null);
+    }
+  };
   
   const handleOpenRequestDialog = (conf: Confirmation) => {
     setConfToRequestChange(conf);
@@ -420,6 +465,7 @@ export default function ConfirmationsPage() {
                               <TableHead>Section</TableHead>
                               <TableHead>USCF Status</TableHead>
                               <TableHead>Byes Requested</TableHead>
+                              {sponsorProfile?.role === 'organizer' && <TableHead className="text-right">Actions</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -449,6 +495,19 @@ export default function ConfirmationsPage() {
                                   <TableCell>{details.section}</TableCell>
                                   <TableCell><Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge></TableCell>
                                   <TableCell>{byeText}</TableCell>
+                                  {sponsorProfile?.role === 'organizer' && (
+                                      <TableCell className="text-right">
+                                          <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="text-destructive hover:text-destructive"
+                                              onClick={() => setPlayerToWithdraw({ confId: conf.id, playerId: playerId, playerName: `${player.firstName} ${player.lastName}`, invoiceId: conf.invoiceId! })}
+                                              disabled={isLoading || !conf.invoiceId}
+                                          >
+                                              <UserMinus className="mr-2 h-4 w-4" /> Withdraw
+                                          </Button>
+                                      </TableCell>
+                                  )}
                                 </TableRow>
                               );
                             })}
@@ -487,7 +546,9 @@ export default function ConfirmationsPage() {
       </div>
 
       <AlertDialog open={isCompAlertOpen} onOpenChange={setIsCompAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will cancel the **entire invoice** for this registration. All players on this submission will be marked as complimentary, and no payment will be due. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setConfToComp(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleCompRegistration} className="bg-primary hover:bg-primary/90">Confirm & Comp</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={isWithdrawAlertOpen} onOpenChange={setIsWithdrawAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Withdraw Player?</AlertDialogTitle><AlertDialogDescription>This will remove {playerToWithdraw?.playerName} from the registration and update the invoice amount. This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setPlayerToWithdraw(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleWithdrawPlayer} className="bg-destructive hover:bg-destructive/90">Yes, Withdraw</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}><DialogContent><DialogHeader><DialogTitle>Request a Change</DialogTitle><DialogDescription>Submit a request to the tournament organizer regarding this registration for "{confToRequestChange?.eventName}".</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="request-player">Player</Label><Select value={changeRequestInputs.playerId} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, playerId: value}))}><SelectTrigger id="request-player"><SelectValue placeholder="Select a player..." /></SelectTrigger><SelectContent>{confToRequestChange && Object.keys(confToRequestChange.selections).map(playerId => { const player = getPlayerById(playerId); return player ? <SelectItem key={playerId} value={playerId}>{player.firstName} {player.lastName}</SelectItem> : null; })}</SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-type">Request Type</Label><Select value={changeRequestInputs.requestType} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, requestType: value}))}><SelectTrigger id="request-type"><SelectValue placeholder="Select a request type..." /></SelectTrigger><SelectContent><SelectItem value="Withdraw Player">Withdraw Player</SelectItem><SelectItem value="Section Change">Section Change</SelectItem><SelectItem value="Bye Request">Bye Request</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-details">Details</Label><Textarea id="request-details" placeholder="Provide any additional details for the organizer..." value={changeRequestInputs.details || ''} onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))} /></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button><Button onClick={handleSubmitChangeRequest}>Submit Request</Button></DialogFooter></DialogContent></Dialog>
     </AppLayout>
   );
 }
+
