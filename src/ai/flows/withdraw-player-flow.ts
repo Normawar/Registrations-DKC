@@ -68,7 +68,6 @@ const withdrawPlayerFlow = ai.defineFlow(
 
       const hoursUntilEvent = differenceInHours(new Date(eventDate), new Date());
 
-      // If withdrawal is within 48 hours, do not modify the invoice.
       if (hoursUntilEvent <= 48) {
         console.log(`Withdrawal for ${playerName} is within 48 hours of the event. Invoice ${invoiceId} will not be modified.`);
         return {
@@ -85,30 +84,40 @@ const withdrawPlayerFlow = ai.defineFlow(
         throw new Error(`Invoice is in status ${invoice.status} and cannot be modified. Player must be withdrawn manually and a credit/refund issued if applicable.`);
       }
 
-      const updatedLineItems: LineItem[] = JSON.parse(JSON.stringify(invoice.lineItems || [])); // Deep copy
+      const updatedLineItems: LineItem[] = JSON.parse(JSON.stringify(invoice.lineItems || []));
 
       let playerFound = false;
+      const lowerPlayerName = playerName.toLowerCase();
 
-      // Iterate through the line items to find and update the withdrawn player's items
       for (const item of updatedLineItems) {
-        // Simplified logic: If the player's name is in the note, we assume it's an item to modify.
-        if (item.note?.toLowerCase().includes(playerName.toLowerCase())) {
+        if (!item.note) continue;
+
+        const noteLines = item.note.split('\n');
+        let playerNoteLineIndex = -1;
+
+        // Find the player's line in the note (e.g., "1. John Doe (12345678)")
+        for (let i = 0; i < noteLines.length; i++) {
+            const line = noteLines[i];
+            const namePartMatch = line.match(/^\d+\.\s*([^()]+)/);
+            if (namePartMatch && namePartMatch[1].trim().toLowerCase() === lowerPlayerName) {
+                playerNoteLineIndex = i;
+                break;
+            }
+        }
+
+        if (playerNoteLineIndex !== -1) {
             playerFound = true;
+            
+            // Decrease quantity
             const currentQuantity = parseInt(item.quantity!, 10);
             if (currentQuantity > 0) {
                 item.quantity = String(currentQuantity - 1);
             }
 
-            // Update the note for the line item to reflect withdrawal
-            if (item.note) {
-                const playerLines = item.note.split('\n');
-                const updatedLines = playerLines.map(line => {
-                    if (line.toLowerCase().includes(playerName.toLowerCase()) && !line.toLowerCase().includes('(withdrawn)')) {
-                        return `${line} (Withdrawn)`;
-                    }
-                    return line;
-                });
-                item.note = updatedLines.join('\n');
+            // Mark player as withdrawn in the note
+            if (!noteLines[playerNoteLineIndex].toLowerCase().includes('(withdrawn)')) {
+                noteLines[playerNoteLineIndex] += ' (Withdrawn)';
+                item.note = noteLines.join('\n');
             }
         }
       }
