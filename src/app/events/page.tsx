@@ -27,7 +27,8 @@ import {
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
-    Download
+    Download,
+    Check
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -558,6 +559,15 @@ export default function EventsPage() {
     }
     const appliedPenalty = selectedEvent ? registrationFeePerPlayer - selectedEvent.regularFee : 0;
     
+    const [downloadedPlayers, setDownloadedPlayers] = useState<StoredDownloads>({});
+    
+    useEffect(() => {
+        const stored = localStorage.getItem('downloaded_registrations');
+        if (stored) {
+            setDownloadedPlayers(JSON.parse(stored));
+        }
+    }, []);
+    
     const allRegisteredPlayersForSelectedEvent = useMemo(() => {
         if (!selectedEvent) return [];
         const playerMap = new Map(allPlayers.map(p => [p.id, p]));
@@ -569,30 +579,29 @@ export default function EventsPage() {
             }))
         ).filter(item => item.player) as { player: Player; details: { section: string } }[];
         
+        const eventDownloads = downloadedPlayers[selectedEvent.id] || [];
+        
         if (playerSortConfig) {
             players.sort((a, b) => {
-                const key = playerSortConfig.key as keyof Player;
-                let aValue: any = a.player[key];
-                let bValue: any = b.player[key];
-
-                if (aValue < bValue) return playerSortConfig.direction === 'ascending' ? -1 : 1;
-                if (aValue > bValue) return playerSortConfig.direction === 'ascending' ? 1 : -1;
-                return 0;
+                let result = 0;
+                if (playerSortConfig.key === 'new') {
+                    const aIsNew = !eventDownloads.includes(a.player.id);
+                    const bIsNew = !eventDownloads.includes(b.player.id);
+                    if (aIsNew && !bIsNew) result = -1;
+                    else if (!aIsNew && bIsNew) result = 1;
+                } else {
+                    const key = playerSortConfig.key as keyof Player;
+                    let aValue: any = a.player[key];
+                    let bValue: any = b.player[key];
+                    if (aValue < bValue) result = -1;
+                    else if (aValue > bValue) result = 1;
+                }
+                return playerSortConfig.direction === 'ascending' ? result : -result;
             });
         }
-
         return players;
-    }, [selectedEvent, eventRegistrations, allPlayers, playerSortConfig]);
+    }, [selectedEvent, eventRegistrations, allPlayers, playerSortConfig, downloadedPlayers]);
     
-    const [downloadedPlayers, setDownloadedPlayers] = useState<StoredDownloads>({});
-    
-    useEffect(() => {
-        const stored = localStorage.getItem('downloaded_registrations');
-        if (stored) {
-            setDownloadedPlayers(JSON.parse(stored));
-        }
-    }, []);
-
     const newPlayersForDownload = useMemo(() => {
         if (!selectedEvent) return [];
         const alreadyDownloaded = downloadedPlayers[selectedEvent.id] || [];
@@ -933,17 +942,24 @@ export default function EventsPage() {
                             <TableHead><button onClick={() => requestPlayerSort('school')} className="flex items-center">School <ArrowUpDown className="ml-2 h-4 w-4" /></button></TableHead>
                             <TableHead><button onClick={() => requestPlayerSort('regularRating')} className="flex items-center">Rating <ArrowUpDown className="ml-2 h-4 w-4" /></button></TableHead>
                             <TableHead><button onClick={() => requestPlayerSort('section')} className="flex items-center">Section <ArrowUpDown className="ml-2 h-4 w-4" /></button></TableHead>
+                             <TableHead><button onClick={() => requestPlayerSort('new')} className="flex items-center">New <ArrowUpDown className="ml-2 h-4 w-4" /></button></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {allRegisteredPlayersForSelectedEvent.map(({ player, details }) => (
-                            <TableRow key={player.id}>
-                                <TableCell>{player.firstName} {player.lastName}</TableCell>
-                                <TableCell>{player.school}</TableCell>
-                                <TableCell>{player.regularRating || 'UNR'}</TableCell>
-                                <TableCell>{details.section}</TableCell>
-                            </TableRow>
-                        ))}
+                        {allRegisteredPlayersForSelectedEvent.map(({ player, details }) => {
+                             const isNew = selectedEvent && !(downloadedPlayers[selectedEvent.id] || []).includes(player.id);
+                             return (
+                                <TableRow key={player.id}>
+                                    <TableCell>{player.firstName} {player.lastName}</TableCell>
+                                    <TableCell>{player.school}</TableCell>
+                                    <TableCell>{player.regularRating || 'UNR'}</TableCell>
+                                    <TableCell>{details.section}</TableCell>
+                                    <TableCell>
+                                        {isNew && <Check className="h-4 w-4 text-green-600" />}
+                                    </TableCell>
+                                </TableRow>
+                            )
+                        })}
                     </TableBody>
                 </Table>
             </ScrollArea>
@@ -1047,3 +1063,4 @@ export default function EventsPage() {
     </AppLayout>
   );
 }
+
