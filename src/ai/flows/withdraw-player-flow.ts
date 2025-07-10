@@ -95,74 +95,67 @@ const withdrawPlayerFlow = ai.defineFlow(
       const updatedLineItems: OrderLineItem[] = [];
       let playerFound = false;
 
-      // Find all line items for the withdrawn player
-      const registrationItem = order.lineItems.find(item => item.name === 'Tournament Registration');
-      const lateFeeItem = order.lineItems.find(item => item.name === 'Late Fee');
-      const uscfItem = order.lineItems.find(item => item.name === 'USCF Membership (New/Renew)');
-      
-      const playerNotes = [registrationItem?.note, lateFeeItem?.note, uscfItem?.note].join('\n');
-      if (playerNotes.toLowerCase().includes(playerName.toLowerCase())) {
-        playerFound = true;
+      const itemsToUpdate: OrderLineItem[] = [];
+
+      for (const item of order.lineItems) {
+          const notes = item.note || '';
+          if (notes.toLowerCase().includes(playerName.toLowerCase())) {
+              playerFound = true;
+
+              const newQuantity = parseInt(item.quantity, 10) - 1;
+              
+              // We can't modify the note, just the quantity.
+              // To remove, we must send the uid and quantity 0.
+              // To update quantity, we send uid and new quantity.
+              const updatedItem: OrderLineItem = {
+                  uid: item.uid!,
+                  quantity: String(newQuantity),
+              };
+
+              // If the line item is for a specific player (e.g. late fee), and its quantity becomes 0,
+              // it should be removed. The main registration item should just have its quantity reduced.
+              if (item.name?.toLowerCase() !== 'tournament registration' && newQuantity <= 0) {
+                  itemsToUpdate.push({ uid: item.uid!, quantity: '0' });
+              } else if (item.name?.toLowerCase() === 'tournament registration') {
+                  itemsToUpdate.push(updatedItem);
+              }
+          }
+      }
+
+      if (!playerFound) {
+        // If the player isn't found in any note, check the main registration item.
+        const registrationItem = order.lineItems.find(item => item.name?.toLowerCase() === 'tournament registration');
+        if(registrationItem) {
+            const newQuantity = parseInt(registrationItem.quantity, 10) - 1;
+            itemsToUpdate.push({
+                uid: registrationItem.uid!,
+                quantity: String(newQuantity),
+            });
+            playerFound = true;
+        }
       }
       
       if (!playerFound) {
         throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
       }
 
-      order.lineItems.forEach(item => {
-        let newItem = { ...item };
-        let keepItem = true;
-        
-        // Handle registration item
-        if (newItem.name === 'Tournament Registration') {
-            newItem.quantity = String(parseInt(newItem.quantity, 10) - 1);
-            if(newItem.note) {
-              newItem.note = newItem.note.split('\n').map(line => {
-                if (line.toLowerCase().includes(playerName.toLowerCase())) {
-                  return `${line.trim()} (Withdrawn)`;
-                }
-                return line;
-              }).join('\n');
-            }
-            if(parseInt(newItem.quantity) <= 0) keepItem = false;
-        }
-
-        // Handle late fee item
-        if (newItem.name === 'Late Fee' && newItem.note?.toLowerCase().includes(playerName.toLowerCase())) {
-            newItem.quantity = String(parseInt(newItem.quantity, 10) - 1);
-            if(newItem.note) {
-               newItem.note = newItem.note.split('\n').filter(line => !line.toLowerCase().includes(playerName.toLowerCase())).join('\n');
-            }
-            if(parseInt(newItem.quantity) <= 0) keepItem = false;
-        }
-
-        // Handle USCF membership item
-        if (newItem.name === 'USCF Membership (New/Renew)' && newItem.note?.toLowerCase().includes(playerName.toLowerCase())) {
-            newItem.quantity = String(parseInt(newItem.quantity, 10) - 1);
-             if(newItem.note) {
-               newItem.note = newItem.note.split('\n').filter(line => !line.toLowerCase().includes(playerName.toLowerCase())).join('\n');
-            }
-            if(parseInt(newItem.quantity) <= 0) keepItem = false;
-        }
-
-        if (keepItem) {
-          updatedLineItems.push({
-            uid: newItem.uid,
-            quantity: newItem.quantity,
-            note: newItem.note || undefined, // Important: ensure note is not null
-          });
-        } else {
-           // To remove an item, we must include its UID and set quantity to "0"
-           updatedLineItems.push({ uid: newItem.uid, quantity: "0" });
-        }
-      });
+      if (itemsToUpdate.length === 0) {
+          console.warn(`No line item quantities needed to be changed for player ${playerName}.`);
+          return {
+            invoiceId: invoice.id!,
+            orderId: orderId,
+            totalAmount: Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount || invoice.total?.amount || 0) / 100,
+            status: invoice.status!,
+            wasInvoiceModified: false,
+          };
+      }
       
-      console.log(`Updating order ${orderId} for invoice ${invoiceId}...`);
+      console.log(`Updating order ${orderId} for invoice ${invoiceId} with sparse line item changes...`, JSON.stringify(itemsToUpdate));
       
       const { result: { order: updatedOrder } } = await ordersApi.updateOrder(orderId, {
         order: {
           locationId: order.locationId!,
-          lineItems: updatedLineItems.filter(item => parseInt(item.quantity) > 0), // Filter out items that are fully removed
+          lineItems: itemsToUpdate, // Send only the sparse update
           version: order.version,
         },
       });
