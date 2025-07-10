@@ -128,7 +128,8 @@ export default function ConfirmationsPage() {
   const [isCompAlertOpen, setIsCompAlertOpen] = useState(false);
   const [confToComp, setConfToComp] = useState<Confirmation | null>(null);
   const [isWithdrawAlertOpen, setIsWithdrawAlertOpen] = useState(false);
-  const [playerToWithdraw, setPlayerToWithdraw] = useState<{ confId: string; playerId: string; playerName: string; } | null>(null);
+  const [playersToWithdraw, setPlayersToWithdraw] = useState<{ confId: string; playerIds: string[] } | null>(null);
+  const [selectedPlayersForWithdraw, setSelectedPlayersForWithdraw] = useState<Record<string, string[]>>({});
 
   
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
@@ -338,8 +339,8 @@ export default function ConfirmationsPage() {
   };
 
    const handleWithdrawPlayer = async () => {
-    if (!playerToWithdraw || !sponsorProfile) return;
-    const { confId, playerId } = playerToWithdraw;
+    if (!playersToWithdraw || !sponsorProfile) return;
+    const { confId, playerIds } = playersToWithdraw;
 
     const originalConfirmation = confirmations.find(c => c.id === confId);
     if (!originalConfirmation || !originalConfirmation.invoiceId) {
@@ -350,8 +351,7 @@ export default function ConfirmationsPage() {
     setIsUpdating(prev => ({ ...prev, [confId]: true }));
     setIsWithdrawAlertOpen(false);
     
-    // Create the updated player list for the flow
-    const remainingPlayerIds = Object.keys(originalConfirmation.selections).filter(id => id !== playerId);
+    const remainingPlayerIds = Object.keys(originalConfirmation.selections).filter(id => !playerIds.includes(id));
     const events: Event[] = JSON.parse(localStorage.getItem('chess_events') || '[]');
     const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
 
@@ -361,7 +361,6 @@ export default function ConfirmationsPage() {
         return;
     }
 
-    // This logic must exactly match how fees are calculated in events/page.tsx
     const eventDate = new Date(eventDetails.date);
     let registrationFeePerPlayer = eventDetails.regularFee;
     const now = new Date();
@@ -390,45 +389,49 @@ export default function ConfirmationsPage() {
             teamCode: originalConfirmation.teamCode,
             eventName: originalConfirmation.eventName,
             eventDate: originalConfirmation.eventDate,
-            uscfFee: 24, // Assuming standard fee
+            uscfFee: 24,
             players: updatedPlayersForInvoice
         });
 
-      // Update local confirmation state by removing the player from the selections
       const updatedConfirmations = confirmations.map(c => {
         if (c.id === confId) {
           const newSelections = { ...c.selections };
-          delete newSelections[playerId];
+          playerIds.forEach(id => delete newSelections[id]);
           return { ...c, selections: newSelections, invoiceUrl: result.invoiceUrl, totalInvoiced: result.totalAmount };
         }
         return c;
       });
       localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
       
-      // Update the change request status to "Approved"
+      const withdrawnPlayerNames = playerIds.map(id => {
+          const p = getPlayerById(id);
+          return p ? `${p.firstName} ${p.lastName}` : 'Unknown Player';
+      });
+
       const updatedRequests = changeRequests.map(req => {
-        if (req.confirmationId === confId && req.player === playerToWithdraw.playerName && req.type.includes('Withdraw')) {
+        if (req.confirmationId === confId && withdrawnPlayerNames.includes(req.player) && req.type.includes('Withdraw')) {
           return { ...req, status: 'Approved' as const };
         }
         return req;
       });
       localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
       
-      loadAllData(); // Reload all data to reflect the change
-      window.dispatchEvent(new Event('storage')); // Notify other tabs/pages
+      loadAllData();
+      window.dispatchEvent(new Event('storage'));
 
       toast({
-        title: "Player Withdrawn",
-        description: `${playerToWithdraw.playerName} has been removed and the invoice has been updated.`
+        title: "Player(s) Withdrawn",
+        description: `${withdrawnPlayerNames.join(', ')} has/have been removed and the invoice has been updated.`
       });
 
     } catch (error) {
-      console.error("Failed to withdraw player:", error);
+      console.error("Failed to withdraw player(s):", error);
       const description = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({ variant: "destructive", title: "Withdrawal Failed", description });
     } finally {
       setIsUpdating(prev => ({ ...prev, [confId]: false }));
-      setPlayerToWithdraw(null);
+      setPlayersToWithdraw(null);
+      setSelectedPlayersForWithdraw(prev => ({...prev, [confId]: [] }));
     }
   };
   
@@ -473,6 +476,16 @@ export default function ConfirmationsPage() {
     setPlayersToAdd(prev => 
       prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
     );
+  };
+
+  const handleWithdrawPlayerSelect = (confId: string, playerId: string) => {
+      setSelectedPlayersForWithdraw(prev => {
+          const currentSelection = prev[confId] || [];
+          const newSelection = currentSelection.includes(playerId)
+              ? currentSelection.filter(id => id !== playerId)
+              : [...currentSelection, playerId];
+          return { ...prev, [confId]: newSelection };
+      });
   };
 
   const handleAddPlayersToRegistration = async () => {
@@ -586,6 +599,7 @@ export default function ConfirmationsPage() {
                   const currentStatus = statuses[conf.id];
                   const isLoading = isUpdating[conf.id] || !isAuthReady;
                   const pendingRequestForConf = changeRequests.find(req => req.confirmationId === conf.id && req.status === 'Pending');
+                  const selectedWithdrawalIds = selectedPlayersForWithdraw[conf.id] || [];
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
@@ -618,7 +632,7 @@ export default function ConfirmationsPage() {
                                 </AlertDescription>
                             </Alert>
                         )}
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center flex-wrap gap-2">
                             <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
                             <div className="flex items-center gap-2">
                                 {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => handleOpenAddPlayerDialog(conf)} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
@@ -638,11 +652,13 @@ export default function ConfirmationsPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
+                              <TableHead className="w-10">
+                                {sponsorProfile?.role === 'organizer' && <span className="sr-only">Select</span>}
+                              </TableHead>
                               <TableHead>Player</TableHead>
                               <TableHead>Section</TableHead>
                               <TableHead>USCF Status</TableHead>
                               <TableHead>Byes Requested</TableHead>
-                              {sponsorProfile?.role === 'organizer' && <TableHead className="text-right">Actions</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -650,10 +666,20 @@ export default function ConfirmationsPage() {
                               const player = getPlayerById(playerId);
                               if (!player) return null;
                               const pendingRequestForPlayer = changeRequests.find(req => req.confirmationId === conf.id && req.player === `${player.firstName} ${player.lastName}` && req.status === 'Pending');
-
                               const byeText = [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None';
+                              
                               return (
-                                <TableRow key={playerId}>
+                                <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) ? 'selected' : undefined}>
+                                  <TableCell>
+                                      {sponsorProfile?.role === 'organizer' && (
+                                          <Checkbox
+                                              checked={selectedWithdrawalIds.includes(playerId)}
+                                              onCheckedChange={() => handleWithdrawPlayerSelect(conf.id, playerId)}
+                                              aria-label={`Select ${player.firstName} ${player.lastName} for withdrawal`}
+                                              disabled={isLoading || !conf.invoiceId}
+                                          />
+                                      )}
+                                  </TableCell>
                                   <TableCell className="font-medium flex items-center gap-2">
                                     {player.firstName} {player.lastName}
                                     {pendingRequestForPlayer && (
@@ -673,27 +699,26 @@ export default function ConfirmationsPage() {
                                   <TableCell>{details.section}</TableCell>
                                   <TableCell><Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge></TableCell>
                                   <TableCell>{byeText}</TableCell>
-                                  {sponsorProfile?.role === 'organizer' && (
-                                      <TableCell className="text-right">
-                                          <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="text-destructive hover:text-destructive"
-                                              onClick={() => {
-                                                  setPlayerToWithdraw({ confId: conf.id, playerId: playerId, playerName: `${player.firstName} ${player.lastName}` });
-                                                  setIsWithdrawAlertOpen(true);
-                                              }}
-                                              disabled={isLoading || !conf.invoiceId}
-                                          >
-                                              <UserMinus className="mr-2 h-4 w-4" /> Withdraw
-                                          </Button>
-                                      </TableCell>
-                                  )}
                                 </TableRow>
                               );
                             })}
                           </TableBody>
                         </Table>
+                         {sponsorProfile?.role === 'organizer' && (
+                              <div className="flex justify-end pt-2">
+                                  <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={() => {
+                                          setPlayersToWithdraw({ confId: conf.id, playerIds: selectedWithdrawalIds });
+                                          setIsWithdrawAlertOpen(true);
+                                      }}
+                                      disabled={isLoading || !conf.invoiceId || selectedWithdrawalIds.length === 0}
+                                  >
+                                      <UserMinus className="mr-2 h-4 w-4" /> Withdraw Selected ({selectedWithdrawalIds.length})
+                                  </Button>
+                              </div>
+                          )}
                       </div>
                       
                       {currentStatus?.status === 'COMPED' ? (
@@ -727,7 +752,7 @@ export default function ConfirmationsPage() {
       </div>
 
       <AlertDialog open={isCompAlertOpen} onOpenChange={setIsCompAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will cancel the **entire invoice** for this registration. All players on this submission will be marked as complimentary, and no payment will be due. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setConfToComp(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleCompRegistration} className="bg-primary hover:bg-primary/90">Confirm & Comp</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={isWithdrawAlertOpen} onOpenChange={setIsWithdrawAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Withdraw Player?</AlertDialogTitle><AlertDialogDescription>This will remove {playerToWithdraw?.playerName} from the registration and update the invoice. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setPlayerToWithdraw(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleWithdrawPlayer} className="bg-destructive hover:bg-destructive/90">Yes, Withdraw</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={isWithdrawAlertOpen} onOpenChange={setIsWithdrawAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Withdraw Player(s)?</AlertDialogTitle><AlertDialogDescription>This will remove the selected {playersToWithdraw?.playerIds.length} player(s) from the registration and update the invoice. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setPlayersToWithdraw(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleWithdrawPlayer} className="bg-destructive hover:bg-destructive/90">Yes, Withdraw</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}><DialogContent><DialogHeader><DialogTitle>Request a Change</DialogTitle><DialogDescription>Submit a request to the tournament organizer regarding this registration for "{confToRequestChange?.eventName}".</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="request-player">Player</Label><Select value={changeRequestInputs.playerId} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, playerId: value}))}><SelectTrigger id="request-player"><SelectValue placeholder="Select a player..." /></SelectTrigger><SelectContent>{confToRequestChange && Object.keys(confToRequestChange.selections).map(playerId => { const player = getPlayerById(playerId); return player ? <SelectItem key={playerId} value={playerId}>{player.firstName} {player.lastName}</SelectItem> : null; })}</SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-type">Request Type</Label><Select value={changeRequestInputs.requestType} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, requestType: value}))}><SelectTrigger id="request-type"><SelectValue placeholder="Select a request type..." /></SelectTrigger><SelectContent><SelectItem value="Withdraw Player">Withdraw Player</SelectItem><SelectItem value="Section Change">Section Change</SelectItem><SelectItem value="Bye Request">Bye Request</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-details">Details</Label><Textarea id="request-details" placeholder="Provide any additional details for the organizer..." value={changeRequestInputs.details || ''} onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))} /></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button><Button onClick={handleSubmitChangeRequest}>Submit Request</Button></DialogFooter></DialogContent></Dialog>
       
       <Dialog open={isAddPlayerDialogOpen} onOpenChange={setIsAddPlayerDialogOpen}>
