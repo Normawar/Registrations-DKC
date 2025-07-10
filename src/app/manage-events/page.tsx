@@ -213,6 +213,10 @@ export default function ManageEventsPage() {
         form.reset({
           ...editingEvent,
           date: new Date(editingEvent.date),
+          imageUrl: editingEvent.imageUrl || '',
+          imageName: editingEvent.imageName || '',
+          pdfUrl: editingEvent.pdfUrl || '',
+          pdfName: editingEvent.pdfName || '',
         });
       } else {
         form.reset({
