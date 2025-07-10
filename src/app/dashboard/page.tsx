@@ -24,18 +24,44 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
-import { useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { format } from "date-fns";
-import { FileText, ImageIcon, Info } from "lucide-react";
+import { FileText, ImageIcon, Info, Bell } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useMasterDb } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
+import type { ChangeRequest } from '@/lib/data/requests-data';
+import { requestsData as initialRequestsData } from '@/lib/data/requests-data';
 
 
 export default function DashboardPage() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
   const { profile } = useSponsorProfile();
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
+  const [confirmations, setConfirmations] = useState<any[]>([]);
+
+  const loadData = useCallback(() => {
+    try {
+      const storedRequests = localStorage.getItem('change_requests');
+      setChangeRequests(storedRequests ? JSON.parse(storedRequests) : initialRequestsData);
+      
+      const storedConfirmations = localStorage.getItem('confirmations');
+      setConfirmations(storedConfirmations ? JSON.parse(storedConfirmations) : []);
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+      setChangeRequests(initialRequestsData);
+      setConfirmations([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener('storage', loadData);
+    return () => {
+      window.removeEventListener('storage', loadData);
+    };
+  }, [loadData]);
 
   const rosterPlayers = useMemo(() => {
     if (!profile || profile.role !== 'sponsor') return [];
@@ -53,6 +79,30 @@ export default function DashboardPage() {
       return !player.uscfId || !player.grade || !player.section || !player.email || !player.dob || !player.zipCode;
     });
   }, [rosterPlayers]);
+  
+  const sponsorConfirmationIds = useMemo(() => {
+    if (!profile) return new Set();
+    const ids = confirmations
+      .filter(c => c.schoolName === profile.school)
+      .map(c => c.id);
+    return new Set(ids);
+  }, [confirmations, profile]);
+
+  const pendingRequests = useMemo(() => {
+    return changeRequests.filter(req => req.status === 'Pending' && sponsorConfirmationIds.has(req.confirmationId));
+  }, [changeRequests, sponsorConfirmationIds]);
+
+  const pendingRequestsByEvent = useMemo(() => {
+    const map = new Map<string, number>();
+    pendingRequests.forEach(req => {
+      const confirmation = confirmations.find(c => c.id === req.confirmationId);
+      if (confirmation) {
+          const eventId = confirmation.eventId;
+          map.set(eventId, (map.get(eventId) || 0) + 1);
+      }
+    });
+    return map;
+  }, [pendingRequests, confirmations]);
 
 
   return (
@@ -64,6 +114,16 @@ export default function DashboardPage() {
             An overview of your sponsored activities.
           </p>
         </div>
+
+        {pendingRequests.length > 0 && (
+          <Alert>
+            <Bell className="h-4 w-4" />
+            <AlertTitle>You have {pendingRequests.length} pending request(s)!</AlertTitle>
+            <AlertDescription>
+              The tournament organizer is reviewing your request(s). Check the <Link href="/requests" className="font-bold underline">Change Requests</Link> page for status updates.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {playersWithMissingInfo.length > 0 && (
           <Alert variant="destructive">
@@ -83,33 +143,44 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {upcomingEvents.map((event) => (
-                  <div key={event.id} className="flex justify-between items-center">
-                     <div className="flex items-center gap-4">
-                        <div className="flex flex-col items-start gap-1">
-                            {event.imageUrl && (
-                                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
-                                  <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title={event.imageName}>
-                                    <ImageIcon className="mr-2 h-4 w-4" /> {event.imageName || 'Image'}
-                                  </a>
-                                </Button>
-                            )}
-                            {event.pdfUrl && event.pdfUrl !== '#' && (
-                                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
-                                  <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title={event.pdfName}>
-                                    <FileText className="mr-2 h-4 w-4" /> {event.pdfName || 'PDF'}
-                                  </a>
-                                </Button>
-                            )}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{event.name}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(event.date), 'PPP')}</p>
-                        </div>
+                {upcomingEvents.map((event) => {
+                  const pendingCount = pendingRequestsByEvent.get(event.id) || 0;
+                  return (
+                    <div key={event.id} className="flex justify-between items-center">
+                       <div className="flex items-center gap-4">
+                          <div className="flex flex-col items-start gap-1">
+                              {event.imageUrl && (
+                                  <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                    <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title={event.imageName}>
+                                      <ImageIcon className="mr-2 h-4 w-4" /> {event.imageName || 'Image'}
+                                    </a>
+                                  </Button>
+                              )}
+                              {event.pdfUrl && event.pdfUrl !== '#' && (
+                                  <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                    <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title={event.pdfName}>
+                                      <FileText className="mr-2 h-4 w-4" /> {event.pdfName || 'PDF'}
+                                    </a>
+                                  </Button>
+                              )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{event.name}</p>
+                            <p className="text-xs text-muted-foreground">{format(new Date(event.date), 'PPP')}</p>
+                          </div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {pendingCount > 0 ? (
+                          <Link href="/requests">
+                            <Badge variant="destructive">{pendingCount} pending request(s)</Badge>
+                          </Link>
+                        ) : (
+                          <span>No pending requests</span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">No pending requests</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
