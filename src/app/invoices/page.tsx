@@ -461,9 +461,9 @@ export default function InvoicesPage() {
                                                         <ExternalLink className="mr-2 h-4 w-4" /> View Invoice
                                                     </a>
                                                   </DropdownMenuItem>
-                                                  {profile.role === 'organizer' && inv.type === 'organizer' && isCancelable && (
-                                                    <DropdownMenuItem onClick={() => handleEditInvoice(inv)}>
-                                                        <FilePenLine className="mr-2 h-4 w-4" /> Edit
+                                                  {profile.role === 'organizer' && inv.type === 'organizer' && (
+                                                    <DropdownMenuItem onClick={() => handleEditInvoice(inv)} disabled={!isCancelable}>
+                                                      <FilePenLine className="mr-2 h-4 w-4" /> Edit
                                                     </DropdownMenuItem>
                                                   )}
                                                   {profile.role === 'organizer' && isCancelable && (
