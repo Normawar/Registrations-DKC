@@ -241,7 +241,6 @@ export default function ManageEventsPage() {
           'Date': arr[0],
           'Tournament': arr[1],
           'Location': arr[2],
-          // Assume defaults for other fields when no headers are present
           'Rounds': 5,
           'Regular Fee': 25,
           'Late Fee': 30,
@@ -360,12 +359,10 @@ export default function ManageEventsPage() {
         header: true,
         skipEmptyLines: true,
         complete: (resultsWithHeader) => {
-            // Heuristic to check if the first row is a header or data
             if (resultsWithHeader.data.length > 0 && resultsWithHeader.meta.fields) {
                 const firstRowIsLikelyData = resultsWithHeader.meta.fields.some(field => field && (field.includes('/') || !isNaN(Date.parse(field))));
                 
                 if (firstRowIsLikelyData) {
-                    // Re-parse without headers if it looks like data
                     Papa.parse(pasteData, {
                         header: false,
                         skipEmptyLines: true,
@@ -502,7 +499,7 @@ export default function ManageEventsPage() {
                   </TableHead>
                   <TableHead className="p-0">
                     <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>
-                        Fees (Regular, Late, V.Late, Day of) {getSortIcon('regularFee')}
+                        Fees (Early, Reg., Late, Day of) {getSortIcon('regularFee')}
                     </Button>
                   </TableHead>
                   <TableHead className="p-0">
@@ -563,160 +560,161 @@ export default function ManageEventsPage() {
       </div>
 
        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle>{editingEvent ? 'Edit Event' : 'Add New Event'}</DialogTitle>
             <DialogDescription>
               {editingEvent ? 'Update the event details below.' : 'Fill in the form to create a new event.'}
             </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Event Name</FormLabel>
-                    <FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="location" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="date"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Event Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                            captionLayout="dropdown-buttons"
-                            fromYear={new Date().getFullYear()}
-                            toYear={new Date().getFullYear() + 10}
-                          />
-                        </PopoverContent>
-                      </Popover>
+          <div className="flex-1 overflow-y-auto p-6">
+            <Form {...form}>
+              <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event Name</FormLabel>
+                      <FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
-                  )}
-                />
-                 <FormField control={form.control} name="rounds" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Rounds</FormLabel>
-                    <FormControl><Input type="number" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              
-              <div>
-                <Label>Registration Fees</Label>
-                <Card className="p-4 mt-2 bg-muted/50">
-                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <FormField control={form.control} name="regularFee" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Regular Fee ($)</FormLabel>
-                        <FormControl><Input type="number" placeholder="25" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                     <FormField control={form.control} name="lateFee" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Late Fee ($)</FormLabel>
-                        <FormControl><Input type="number" placeholder="30" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                     <FormField control={form.control} name="veryLateFee" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Very Late Fee ($)</FormLabel>
-                        <FormControl><Input type="number" placeholder="35" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                     )} />
-                     <FormField control={form.control} name="dayOfFee" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Day of Fee ($)</FormLabel>
-                        <FormControl><Input type="number" placeholder="40" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                   </div>
-                </Card>
-              </div>
+                  )} />
+                  <FormField control={form.control} name="location" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
 
-              <div className="space-y-4">
-                <FormField control={form.control} name="imageUrl" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Image URL (Optional)</FormLabel>
-                    <FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="imageName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Image Name (Optional)</FormLabel>
-                    <FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl>
-                    <FormDescription>A descriptive name for the image attachment.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <div className="space-y-4">
-                 <FormField control={form.control} name="pdfUrl" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>PDF Flyer URL (Optional)</FormLabel>
-                    <FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                 <FormField control={form.control} name="pdfName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>PDF Name (Optional)</FormLabel>
-                    <FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl>
-                     <FormDescription>A descriptive name for the PDF attachment.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="date"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Event Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={new Date().getFullYear()}
+                              toYear={new Date().getFullYear() + 10}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField control={form.control} name="rounds" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rounds</FormLabel>
+                      <FormControl><Input type="number" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                
+                <div>
+                  <Label>Registration Fees</Label>
+                  <Card className="p-4 mt-2 bg-muted/50">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <FormField control={form.control} name="regularFee" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Regular Fee ($)</FormLabel>
+                          <FormControl><Input type="number" placeholder="25" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="lateFee" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Late Fee ($)</FormLabel>
+                          <FormControl><Input type="number" placeholder="30" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="veryLateFee" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Very Late Fee ($)</FormLabel>
+                          <FormControl><Input type="number" placeholder="35" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="dayOfFee" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Day of Fee ($)</FormLabel>
+                          <FormControl><Input type="number" placeholder="40" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                  </Card>
+                </div>
 
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost">Cancel</Button>
-                </DialogClose>
-                <Button type="submit">
-                  {editingEvent ? 'Save Changes' : 'Create Event'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+                <div className="space-y-4">
+                  <FormField control={form.control} name="imageUrl" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Image URL (Optional)</FormLabel>
+                      <FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="imageName" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Image Name (Optional)</FormLabel>
+                      <FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl>
+                      <FormDescription>A descriptive name for the image attachment.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <div className="space-y-4">
+                  <FormField control={form.control} name="pdfUrl" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PDF Flyer URL (Optional)</FormLabel>
+                      <FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="pdfName" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PDF Name (Optional)</FormLabel>
+                      <FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl>
+                      <FormDescription>A descriptive name for the PDF attachment.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              </form>
+            </Form>
+          </div>
+          <DialogFooter className="p-6 pt-4 border-t shrink-0">
+            <DialogClose asChild>
+              <Button type="button" variant="ghost">Cancel</Button>
+            </DialogClose>
+            <Button type="submit" form="event-form">
+              {editingEvent ? 'Save Changes' : 'Create Event'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
