@@ -61,8 +61,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { createMembershipInvoice } from '@/ai/flows/create-membership-invoice-flow';
 import { checkSquareConfig } from '@/lib/actions/check-config';
-import { useMasterDb } from '@/context/master-db-context';
-import type { MasterPlayer as Player } from '@/context/master-db-context';
+import { useMasterDb, type MasterPlayer as Player } from '@/context/master-db-context';
 import Papa from 'papaparse';
 
 
@@ -78,8 +77,10 @@ type PlayerRegistration = {
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
 type Confirmation = {
-  eventId?: string;
+  eventId: string;
   selections: Record<string, { section: string }>;
+  invoiceId?: string;
+  invoiceUrl?: string;
 };
 
 type StoredDownloads = {

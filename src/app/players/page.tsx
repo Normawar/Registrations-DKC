@@ -172,7 +172,7 @@ const playerFormSchema = z.object({
   });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
-type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state' | 'uscfExpiration';
+type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state' | 'uscfExpiration' | 'events';
 
 
 export default function PlayersPage() {
@@ -426,6 +426,9 @@ export default function PlayersPage() {
         } else if (key === 'uscfExpiration') {
           aVal = a.uscfExpiration ? new Date(a.uscfExpiration).getTime() : 0;
           bVal = b.uscfExpiration ? new Date(b.uscfExpiration).getTime() : 0;
+        } else if (key === 'events') {
+          aVal = a.events;
+          bVal = b.events;
         }
 
         if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -656,9 +659,9 @@ export default function PlayersPage() {
                                         Rating {getSortIcon('regularRating')}
                                     </Button>
                                 </TableHead>
-                                <TableHead className="p-0">
-                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('state')}>
-                                        State {getSortIcon('state')}
+                                 <TableHead className="p-0">
+                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('events')}>
+                                        Events {getSortIcon('events')}
                                     </Button>
                                 </TableHead>
                                 <TableHead>
@@ -690,7 +693,7 @@ export default function PlayersPage() {
                                 <TableCell>{player.uscfId}</TableCell>
                                 <TableCell>{player.uscfExpiration ? format(new Date(player.uscfExpiration), 'PPP') : 'N/A'}</TableCell>
                                 <TableCell>{player.regularRating === undefined ? 'UNR' : player.regularRating}</TableCell>
-                                <TableCell>{player.state}</TableCell>
+                                <TableCell>{player.events}</TableCell>
                                 <TableCell className="text-right">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
