@@ -119,7 +119,7 @@ const playerFormSchema = z.object({
   uscfId: z.string().min(1, { message: "USCF ID is required." }),
   uscfExpiration: z.date().optional(),
   regularRating: z.preprocess(
-    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
+    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : Number(val)),
     z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
   ),
   quickRating: z.string().optional(),
@@ -706,18 +706,9 @@ export default function RosterPage() {
                                   <FormLabel>Rating</FormLabel>
                                   <FormControl>
                                     <Input
-                                      type="text"
                                       placeholder="1500 or UNR"
-                                      {...field}
-                                      value={field.value === undefined ? '' : String(field.value).toUpperCase() === 'NAN' ? 'UNR' : String(field.value)}
-                                      onChange={(e) => {
-                                        const value = e.target.value;
-                                        if (value.toUpperCase() === 'UNR' || value === '') {
-                                          field.onChange(undefined);
-                                        } else if (!isNaN(Number(value))) {
-                                          field.onChange(Number(value));
-                                        }
-                                      }}
+                                      value={field.value === undefined ? 'UNR' : String(field.value)}
+                                      onChange={(e) => field.onChange(e.target.value)}
                                       disabled={isUscfNew}
                                     />
                                   </FormControl>
@@ -733,37 +724,31 @@ export default function RosterPage() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Date of Birth</FormLabel>
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      placeholder="MM/DD/YYYY"
-                                      value={field.value ? format(field.value, 'MM/dd/yyyy') : ''}
-                                      onChange={(e) => {
-                                        const parsedDate = parse(e.target.value, 'MM/dd/yyyy', new Date());
-                                        if (isValid(parsedDate)) {
-                                          field.onChange(parsedDate);
-                                        }
-                                      }}
-                                    />
                                     <Popover>
-                                      <PopoverTrigger asChild>
-                                        <Button variant="outline" size="icon">
-                                          <CalendarIcon className="h-4 w-4" />
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                          mode="single"
-                                          selected={field.value}
-                                          onSelect={field.onChange}
-                                          disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                          captionLayout="dropdown-buttons"
-                                          fromYear={new Date().getFullYear() - 100}
-                                          toYear={new Date().getFullYear()}
-                                          initialFocus
-                                        />
-                                      </PopoverContent>
+                                        <PopoverTrigger asChild>
+                                            <FormControl>
+                                                <Button
+                                                    variant={"outline"}
+                                                    className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                </Button>
+                                            </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                mode="single"
+                                                selected={field.value}
+                                                onSelect={field.onChange}
+                                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                captionLayout="dropdown-buttons"
+                                                fromYear={new Date().getFullYear() - 100}
+                                                toYear={new Date().getFullYear()}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
                                     </Popover>
-                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -774,25 +759,20 @@ export default function RosterPage() {
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>USCF Expiration</FormLabel>
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      placeholder="MM/DD/YYYY"
-                                      value={field.value ? format(field.value, 'MM/dd/yyyy') : ''}
-                                      onChange={(e) => {
-                                        const parsedDate = parse(e.target.value, 'MM/dd/yyyy', new Date());
-                                        if (isValid(parsedDate)) {
-                                          field.onChange(parsedDate);
-                                        }
-                                      }}
-                                      disabled={isUscfNew}
-                                    />
                                     <Popover>
                                       <PopoverTrigger asChild>
-                                        <Button variant="outline" size="icon" disabled={isUscfNew}>
-                                          <CalendarIcon className="h-4 w-4" />
-                                        </Button>
+                                        <FormControl>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                                                disabled={isUscfNew}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                            </Button>
+                                        </FormControl>
                                       </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0">
+                                      <PopoverContent className="w-auto p-0" align="start">
                                         <Calendar
                                           mode="single"
                                           selected={field.value}
@@ -805,7 +785,6 @@ export default function RosterPage() {
                                         />
                                       </PopoverContent>
                                     </Popover>
-                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
