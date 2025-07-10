@@ -52,6 +52,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { requestsData } from '@/lib/data/requests-data';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 type PlayerRegistration = {
@@ -549,6 +550,11 @@ export default function ConfirmationsPage() {
                               const player = getPlayerById(playerId);
                               if (!player) return null;
 
+                              const playerName = `${player.firstName} ${player.lastName}`;
+                              const hasPendingRequest = requestsData.some(
+                                req => req.player === playerName && req.event === conf.eventName && req.status === 'Pending'
+                              );
+
                               const byeText = [details.byes.round1, details.byes.round2]
                                 .filter(b => b !== 'none')
                                 .map(b => `R${b}`)
@@ -556,7 +562,23 @@ export default function ConfirmationsPage() {
 
                               return (
                                 <TableRow key={playerId}>
-                                  <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
+                                  <TableCell className="font-medium">
+                                    <div className="flex items-center gap-2">
+                                      <span>{playerName}</span>
+                                      {hasPendingRequest && (
+                                        <TooltipProvider>
+                                          <Tooltip>
+                                            <TooltipTrigger>
+                                              <Info className="h-4 w-4 text-blue-500" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>This player has a pending change request.</p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </TooltipProvider>
+                                      )}
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="font-mono">
                                     {sponsorProfile ? generateTeamCode({
                                       schoolName: sponsorProfile.school,
