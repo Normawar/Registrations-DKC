@@ -92,40 +92,77 @@ const withdrawPlayerFlow = ai.defineFlow(
         throw new Error(`Could not retrieve order or order has no line items for ID: ${orderId}`);
       }
 
+      const updatedLineItems: OrderLineItem[] = [];
       let playerFound = false;
-      
-      const newOrderLineItems = order.lineItems.map(item => {
-        const itemCopy = { ...item };
-        const isPlayerItem = (itemCopy.note || '').toLowerCase().includes(playerName.toLowerCase());
-        
-        if (isPlayerItem) {
-          playerFound = true;
-          itemCopy.basePriceMoney = { amount: 0n, currency: itemCopy.basePriceMoney?.currency || 'USD' };
-          
-          if (itemCopy.note) {
-              const notes = itemCopy.note.split('\n');
-              const newNotes = notes.map(noteLine => {
-                  if (noteLine.toLowerCase().includes(playerName.toLowerCase())) {
-                      return `${noteLine.trim()} (Withdrawn)`;
-                  }
-                  return noteLine;
-              });
-              itemCopy.note = newNotes.join('\n');
-          }
-        }
-        return itemCopy;
-      });
 
-      if (!playerFound) {
-          throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
+      // Find all line items for the withdrawn player
+      const registrationItem = order.lineItems.find(item => item.name === 'Tournament Registration');
+      const lateFeeItem = order.lineItems.find(item => item.name === 'Late Fee');
+      const uscfItem = order.lineItems.find(item => item.name === 'USCF Membership (New/Renew)');
+      
+      const playerNotes = [registrationItem?.note, lateFeeItem?.note, uscfItem?.note].join('\n');
+      if (playerNotes.toLowerCase().includes(playerName.toLowerCase())) {
+        playerFound = true;
       }
       
-      console.log(`Updating order ${orderId} for invoice ${invoiceId}...`);
+      if (!playerFound) {
+        throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
+      }
 
+      order.lineItems.forEach(item => {
+        let newItem = { ...item };
+        let keepItem = true;
+        
+        // Handle registration item
+        if (newItem.name === 'Tournament Registration') {
+            newItem.quantity = String(parseInt(newItem.quantity, 10) - 1);
+            if(newItem.note) {
+              newItem.note = newItem.note.split('\n').map(line => {
+                if (line.toLowerCase().includes(playerName.toLowerCase())) {
+                  return `${line.trim()} (Withdrawn)`;
+                }
+                return line;
+              }).join('\n');
+            }
+            if(parseInt(newItem.quantity) <= 0) keepItem = false;
+        }
+
+        // Handle late fee item
+        if (newItem.name === 'Late Fee' && newItem.note?.toLowerCase().includes(playerName.toLowerCase())) {
+            newItem.quantity = String(parseInt(newItem.quantity, 10) - 1);
+            if(newItem.note) {
+               newItem.note = newItem.note.split('\n').filter(line => !line.toLowerCase().includes(playerName.toLowerCase())).join('\n');
+            }
+            if(parseInt(newItem.quantity) <= 0) keepItem = false;
+        }
+
+        // Handle USCF membership item
+        if (newItem.name === 'USCF Membership (New/Renew)' && newItem.note?.toLowerCase().includes(playerName.toLowerCase())) {
+            newItem.quantity = String(parseInt(newItem.quantity, 10) - 1);
+             if(newItem.note) {
+               newItem.note = newItem.note.split('\n').filter(line => !line.toLowerCase().includes(playerName.toLowerCase())).join('\n');
+            }
+            if(parseInt(newItem.quantity) <= 0) keepItem = false;
+        }
+
+        if (keepItem) {
+          updatedLineItems.push({
+            uid: newItem.uid,
+            quantity: newItem.quantity,
+            note: newItem.note || undefined, // Important: ensure note is not null
+          });
+        } else {
+           // To remove an item, we must include its UID and set quantity to "0"
+           updatedLineItems.push({ uid: newItem.uid, quantity: "0" });
+        }
+      });
+      
+      console.log(`Updating order ${orderId} for invoice ${invoiceId}...`);
+      
       const { result: { order: updatedOrder } } = await ordersApi.updateOrder(orderId, {
         order: {
           locationId: order.locationId!,
-          lineItems: newOrderLineItems,
+          lineItems: updatedLineItems.filter(item => parseInt(item.quantity) > 0), // Filter out items that are fully removed
           version: order.version,
         },
       });
