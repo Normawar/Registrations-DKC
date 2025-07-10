@@ -93,16 +93,15 @@ const withdrawPlayerFlow = ai.defineFlow(
       }
 
       let playerFound = false;
-      const updatedLineItems = order.lineItems.map(item => {
-        const itemCopy: OrderLineItem = { ...item };
+      
+      const newOrderLineItems = order.lineItems.map(item => {
+        const itemCopy = { ...item };
         const isPlayerItem = (itemCopy.note || '').toLowerCase().includes(playerName.toLowerCase());
         
         if (isPlayerItem) {
           playerFound = true;
-          // Zero out the base cost for this player's items. Square will recalculate totals.
           itemCopy.basePriceMoney = { amount: 0n, currency: itemCopy.basePriceMoney?.currency || 'USD' };
           
-          // Update the note to reflect withdrawal
           if (itemCopy.note) {
               const notes = itemCopy.note.split('\n');
               const newNotes = notes.map(noteLine => {
@@ -116,16 +115,17 @@ const withdrawPlayerFlow = ai.defineFlow(
         }
         return itemCopy;
       });
-      
+
       if (!playerFound) {
           throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
       }
       
       console.log(`Updating order ${orderId} for invoice ${invoiceId}...`);
+
       const { result: { order: updatedOrder } } = await ordersApi.updateOrder(orderId, {
         order: {
           locationId: order.locationId!,
-          lineItems: updatedLineItems,
+          lineItems: newOrderLineItems,
           version: order.version,
         },
       });
