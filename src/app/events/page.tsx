@@ -27,6 +27,7 @@ import {
     ArrowUpDown,
     ArrowUp,
     ArrowDown,
+    Download
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,8 @@ import { createMembershipInvoice } from '@/ai/flows/create-membership-invoice-fl
 import { checkSquareConfig } from '@/lib/actions/check-config';
 import { useMasterDb } from '@/context/master-db-context';
 import type { MasterPlayer as Player } from '@/context/master-db-context';
+import Papa from 'papaparse';
+
 
 type PlayerRegistration = {
   byes: {
@@ -72,6 +75,15 @@ type PlayerRegistration = {
   studentType?: 'gt' | 'independent';
 };
 type RegistrationSelections = Record<string, PlayerRegistration>;
+
+type Confirmation = {
+  eventId?: string;
+  selections: Record<string, { section: string }>;
+};
+
+type StoredDownloads = {
+  [eventId: string]: string[]; // Array of player IDs that have been downloaded
+};
 
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
 
@@ -100,6 +112,7 @@ export default function EventsPage() {
     const { database: allPlayers } = useMasterDb();
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+    const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [selections, setSelections] = useState<RegistrationSelections>({});
     const [calculatedFees, setCalculatedFees] = useState({ total: 0, registration: 0, uscf: 0 });
@@ -108,17 +121,36 @@ export default function EventsPage() {
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
     const [isSquareConfigured, setIsSquareConfigured] = useState(true);
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
+    const [eventRegistrations, setEventRegistrations] = useState<Confirmation[]>([]);
+    
+    const [playerSortConfig, setPlayerSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
 
     const rosterPlayers = useMemo(() => {
         if (!sponsorProfile || sponsorProfile.role !== 'sponsor') return [];
         return allPlayers.filter(p => p.district === sponsorProfile.district && p.school === sponsorProfile.school);
     }, [allPlayers, sponsorProfile]);
+    
+    const eventRegistrationsMap = useMemo(() => {
+        const map = new Map<string, number>();
+        eventRegistrations.forEach(conf => {
+            if (conf.eventId) {
+                const count = map.get(conf.eventId) || 0;
+                map.set(conf.eventId, count + Object.keys(conf.selections).length);
+            }
+        });
+        return map;
+    }, [eventRegistrations]);
+
 
     useEffect(() => {
         setClientReady(true);
         checkSquareConfig().then(({ isConfigured }) => {
             setIsSquareConfigured(isConfigured);
         });
+        const storedConfirmations = localStorage.getItem('confirmations');
+        if (storedConfirmations) {
+            setEventRegistrations(JSON.parse(storedConfirmations));
+        }
     }, []);
 
     const getEventStatus = (event: Event): "Open" | "Upcoming" | "Closed" | "Completed" => {
@@ -229,6 +261,11 @@ export default function EventsPage() {
             setSelections({});
         }
     }
+    
+    const handleEventNameClick = (event: Event) => {
+        setSelectedEvent(event);
+        setIsRegistrationsOpen(true);
+    };
 
     const handlePlayerSelect = (playerId: string, isSelected: boolean | string) => {
         setSelections(prev => {
@@ -520,13 +557,95 @@ export default function EventsPage() {
         }
     }
     const appliedPenalty = selectedEvent ? registrationFeePerPlayer - selectedEvent.regularFee : 0;
+    
+    const allRegisteredPlayersForSelectedEvent = useMemo(() => {
+        if (!selectedEvent) return [];
+        const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+        const registrations = eventRegistrations.filter(c => c.eventId === selectedEvent.id);
+        const players = registrations.flatMap(c => 
+            Object.entries(c.selections).map(([playerId, details]) => ({
+                player: playerMap.get(playerId),
+                details
+            }))
+        ).filter(item => item.player) as { player: Player; details: { section: string } }[];
+        
+        if (playerSortConfig) {
+            players.sort((a, b) => {
+                const key = playerSortConfig.key as keyof Player;
+                let aValue: any = a.player[key];
+                let bValue: any = b.player[key];
 
+                if (aValue < bValue) return playerSortConfig.direction === 'ascending' ? -1 : 1;
+                if (aValue > bValue) return playerSortConfig.direction === 'ascending' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return players;
+    }, [selectedEvent, eventRegistrations, allPlayers, playerSortConfig]);
+    
+    const [downloadedPlayers, setDownloadedPlayers] = useState<StoredDownloads>({});
+    
+    useEffect(() => {
+        const stored = localStorage.getItem('downloaded_registrations');
+        if (stored) {
+            setDownloadedPlayers(JSON.parse(stored));
+        }
+    }, []);
+
+    const newPlayersForDownload = useMemo(() => {
+        if (!selectedEvent) return [];
+        const alreadyDownloaded = downloadedPlayers[selectedEvent.id] || [];
+        return allRegisteredPlayersForSelectedEvent.filter(p => !alreadyDownloaded.includes(p.player.id));
+    }, [allRegisteredPlayersForSelectedEvent, downloadedPlayers, selectedEvent]);
+    
+    const handleDownload = () => {
+        if (!selectedEvent || newPlayersForDownload.length === 0) return;
+        
+        const csvData = newPlayersForDownload.map(p => ({
+            "USCF ID": p.player.uscfId,
+            "First Name": p.player.firstName,
+            "Last Name": p.player.lastName,
+            "Rating": p.player.regularRating || 'UNR',
+            "Grade": p.player.grade,
+            "Section": p.details.section,
+            "School": p.player.school,
+        }));
+
+        const csv = Papa.unparse(csvData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${selectedEvent.name.replace(/\s+/g, '_')}_new_registrations.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Mark these players as downloaded
+        const newlyDownloadedIds = newPlayersForDownload.map(p => p.player.id);
+        const updatedDownloads = {
+            ...downloadedPlayers,
+            [selectedEvent.id]: [...(downloadedPlayers[selectedEvent.id] || []), ...newlyDownloadedIds]
+        };
+        setDownloadedPlayers(updatedDownloads);
+        localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
+        toast({ title: 'Download Complete', description: `${newlyDownloadedIds.length} new registrations have been downloaded.`});
+    };
+    
+    const requestPlayerSort = (key: string) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (playerSortConfig && playerSortConfig.key === key && playerSortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setPlayerSortConfig({ key, direction });
+    };
 
   return (
     <AppLayout>
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Register for event</h1>
+          <h1 className="text-3xl font-bold font-headline">Upcoming Events</h1>
           <p className="text-muted-foreground">
             Browse upcoming tournaments and register your players.
           </p>
@@ -574,9 +693,14 @@ export default function EventsPage() {
               <TableBody>
                 {sortedEvents.map((event) => {
                   const status = getEventStatus(event);
+                  const registrationCountForEvent = eventRegistrationsMap.get(event.id) || 0;
                   return (
                     <TableRow key={event.id}>
-                      <TableCell className="font-medium">{event.name}</TableCell>
+                        <TableCell className="font-medium">
+                            <button onClick={() => handleEventNameClick(event)} className="text-left hover:underline">
+                                {event.name} ({registrationCountForEvent})
+                            </button>
+                        </TableCell>
                       <TableCell>{clientReady ? format(new Date(event.date), 'PPP') : ''}</TableCell>
                       <TableCell>{event.location}</TableCell>
                       <TableCell>
@@ -786,6 +910,45 @@ export default function EventsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <Dialog open={isRegistrationsOpen} onOpenChange={setIsRegistrationsOpen}>
+        <DialogContent className="sm:max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Registrations for {selectedEvent?.name}</DialogTitle>
+                <DialogDescription>
+                    A total of {allRegisteredPlayersForSelectedEvent.length} players are registered for this event.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="my-4">
+                 <Button onClick={handleDownload} disabled={newPlayersForDownload.length === 0}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download New Registrations ({newPlayersForDownload.length})
+                </Button>
+            </div>
+            <ScrollArea className="h-96 w-full">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead><button onClick={() => requestPlayerSort('lastName')} className="flex items-center">Player <ArrowUpDown className="ml-2 h-4 w-4" /></button></TableHead>
+                            <TableHead><button onClick={() => requestPlayerSort('school')} className="flex items-center">School <ArrowUpDown className="ml-2 h-4 w-4" /></button></TableHead>
+                            <TableHead><button onClick={() => requestPlayerSort('regularRating')} className="flex items-center">Rating <ArrowUpDown className="ml-2 h-4 w-4" /></button></TableHead>
+                            <TableHead><button onClick={() => requestPlayerSort('section')} className="flex items-center">Section <ArrowUpDown className="ml-2 h-4 w-4" /></button></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {allRegisteredPlayersForSelectedEvent.map(({ player, details }) => (
+                            <TableRow key={player.id}>
+                                <TableCell>{player.firstName} {player.lastName}</TableCell>
+                                <TableCell>{player.school}</TableCell>
+                                <TableCell>{player.regularRating || 'UNR'}</TableCell>
+                                <TableCell>{details.section}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
           <DialogContent>
@@ -884,4 +1047,3 @@ export default function EventsPage() {
     </AppLayout>
   );
 }
-
