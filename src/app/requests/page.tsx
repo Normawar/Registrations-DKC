@@ -7,6 +7,9 @@ import { AppLayout } from "@/components/app-layout";
 import {
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
 import {
   Table,
@@ -23,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { ClipboardList } from 'lucide-react';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
@@ -71,56 +75,68 @@ export default function RequestsPage() {
         </div>
 
         <Card>
-          <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Player</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead>Request Type</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Status</TableHead>
-                  {profile?.role === 'organizer' && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requests.map((request, index) => (
-                  <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`}>
-                    <TableCell className="font-medium">{request.player}</TableCell>
-                    <TableCell>{request.event}</TableCell>
-                    <TableCell>{request.type}</TableCell>
-                    <TableCell>{request.details || '—'}</TableCell>
-                    <TableCell>{request.submitted}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          request.status === "Pending" ? "secondary" :
-                          request.status === "Approved" ? "default" :
-                          request.status === "Denied" ? "destructive" : "secondary"
-                        }
-                         className={request.status === 'Approved' ? 'bg-green-600 text-white' : ''}
-                      >
-                        {request.status}
-                      </Badge>
-                    </TableCell>
-                    {profile?.role === 'organizer' && (
-                        <TableCell className="text-right">
-                            {request.status === 'Pending' ? (
-                                <div className="flex gap-2 justify-end">
-                                    <Button asChild variant="outline" size="sm">
-                                      <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
-                                    </Button>
-                                </div>
-                            ) : (
-                                <span className="text-xs text-muted-foreground">Actioned</span>
-                            )}
+           <CardHeader>
+            <CardTitle>All Submitted Requests</CardTitle>
+            <CardDescription>Review requests submitted by sponsors.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {requests.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center gap-4 text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
+                    <ClipboardList className="h-12 w-12" />
+                    <p className="font-semibold">No Change Requests</p>
+                    <p className="text-sm">There are currently no change requests from sponsors.</p>
+                </div>
+            ) : (
+                <Table>
+                <TableHeader>
+                    <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Request Type</TableHead>
+                    <TableHead>Details</TableHead>
+                    <TableHead>Submitted</TableHead>
+                    <TableHead>Status</TableHead>
+                    {profile?.role === 'organizer' && <TableHead className="text-right">Actions</TableHead>}
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {requests.map((request, index) => (
+                    <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`}>
+                        <TableCell className="font-medium">{request.player}</TableCell>
+                        <TableCell>{request.event}</TableCell>
+                        <TableCell>{request.type}</TableCell>
+                        <TableCell>{request.details || '—'}</TableCell>
+                        <TableCell>{request.submitted}</TableCell>
+                        <TableCell>
+                        <Badge
+                            variant={
+                            request.status === "Pending" ? "secondary" :
+                            request.status === "Approved" ? "default" :
+                            request.status === "Denied" ? "destructive" : "secondary"
+                            }
+                            className={request.status === 'Approved' ? 'bg-green-600 text-white' : ''}
+                        >
+                            {request.status}
+                        </Badge>
                         </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        {profile?.role === 'organizer' && (
+                            <TableCell className="text-right">
+                                {request.status === 'Pending' ? (
+                                    <div className="flex gap-2 justify-end">
+                                        <Button asChild variant="outline" size="sm">
+                                        <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <span className="text-xs text-muted-foreground">Actioned</span>
+                                )}
+                            </TableCell>
+                        )}
+                    </TableRow>
+                    ))}
+                </TableBody>
+                </Table>
+            )}
           </CardContent>
         </Card>
       </div>
