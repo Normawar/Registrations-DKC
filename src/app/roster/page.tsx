@@ -701,17 +701,24 @@ export default function RosterPage() {
                             <FormField
                               control={form.control}
                               name="regularRating"
-                              render={({ field: { onChange, value, ...rest } }) => (
+                              render={({ field }) => (
                                 <FormItem>
                                   <FormLabel>Rating</FormLabel>
                                   <FormControl>
                                     <Input
                                       type="text"
                                       placeholder="1500 or UNR"
-                                      onChange={onChange}
-                                      value={value === undefined ? '' : String(value).toUpperCase() === 'NAN' ? 'UNR' : String(value)}
+                                      {...field}
+                                      value={field.value === undefined ? '' : String(field.value).toUpperCase() === 'NAN' ? 'UNR' : String(field.value)}
+                                      onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (value.toUpperCase() === 'UNR' || value === '') {
+                                          field.onChange(undefined);
+                                        } else if (!isNaN(Number(value))) {
+                                          field.onChange(Number(value));
+                                        }
+                                      }}
                                       disabled={isUscfNew}
-                                      {...rest}
                                     />
                                   </FormControl>
                                   <FormMessage />
@@ -724,36 +731,39 @@ export default function RosterPage() {
                               control={form.control}
                               name="dob"
                               render={({ field }) => (
-                                <FormItem className="flex flex-col">
+                                <FormItem>
                                   <FormLabel>Date of Birth</FormLabel>
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <FormControl>
-                                        <Button
-                                          variant={"outline"}
-                                          className={cn(
-                                            "pl-3 text-left font-normal",
-                                            !field.value && "text-muted-foreground"
-                                          )}
-                                        >
-                                          {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      placeholder="MM/DD/YYYY"
+                                      value={field.value ? format(field.value, 'MM/dd/yyyy') : ''}
+                                      onChange={(e) => {
+                                        const parsedDate = parse(e.target.value, 'MM/dd/yyyy', new Date());
+                                        if (isValid(parsedDate)) {
+                                          field.onChange(parsedDate);
+                                        }
+                                      }}
+                                    />
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button variant="outline" size="icon">
+                                          <CalendarIcon className="h-4 w-4" />
                                         </Button>
-                                      </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                      <Calendar
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={field.onChange}
-                                        disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                        captionLayout="dropdown-buttons"
-                                        fromYear={new Date().getFullYear() - 100}
-                                        toYear={new Date().getFullYear()}
-                                        initialFocus
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                          mode="single"
+                                          selected={field.value}
+                                          onSelect={field.onChange}
+                                          disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                          captionLayout="dropdown-buttons"
+                                          fromYear={new Date().getFullYear() - 100}
+                                          toYear={new Date().getFullYear()}
+                                          initialFocus
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
@@ -762,37 +772,40 @@ export default function RosterPage() {
                               control={form.control}
                               name="uscfExpiration"
                               render={({ field }) => (
-                                <FormItem className="flex flex-col">
+                                <FormItem>
                                   <FormLabel>USCF Expiration</FormLabel>
-                                  <Popover>
-                                    <PopoverTrigger asChild>
-                                      <FormControl>
-                                        <Button
-                                          variant={"outline"}
-                                          className={cn(
-                                            "pl-3 text-left font-normal",
-                                            !field.value && "text-muted-foreground"
-                                          )}
-                                          disabled={isUscfNew}
-                                        >
-                                          {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      placeholder="MM/DD/YYYY"
+                                      value={field.value ? format(field.value, 'MM/dd/yyyy') : ''}
+                                      onChange={(e) => {
+                                        const parsedDate = parse(e.target.value, 'MM/dd/yyyy', new Date());
+                                        if (isValid(parsedDate)) {
+                                          field.onChange(parsedDate);
+                                        }
+                                      }}
+                                      disabled={isUscfNew}
+                                    />
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button variant="outline" size="icon" disabled={isUscfNew}>
+                                          <CalendarIcon className="h-4 w-4" />
                                         </Button>
-                                      </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                      <Calendar
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={field.onChange}
-                                        disabled={isUscfNew}
-                                        captionLayout="dropdown-buttons"
-                                        fromYear={new Date().getFullYear() - 2}
-                                        toYear={new Date().getFullYear() + 10}
-                                        initialFocus
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                          mode="single"
+                                          selected={field.value}
+                                          onSelect={field.onChange}
+                                          disabled={isUscfNew}
+                                          captionLayout="dropdown-buttons"
+                                          fromYear={new Date().getFullYear() - 2}
+                                          toYear={new Date().getFullYear() + 10}
+                                          initialFocus
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )}
