@@ -27,8 +27,10 @@ export default function RequestsPage() {
       try {
         const storedRequests = localStorage.getItem('change_requests');
         const parsedRequests = storedRequests ? JSON.parse(storedRequests) : initialRequestsData;
-        // Ensure data is always an array
-        setRequests(Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData);
+        // Ensure data is always an array and sort it
+        const sortedRequests = (Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData)
+            .sort((a, b) => new Date(b.submitted).getTime() - new Date(a.submitted).getTime());
+        setRequests(sortedRequests);
       } catch (e) {
         console.error("Failed to parse change requests from localStorage", e);
         setRequests(initialRequestsData);
@@ -37,15 +39,17 @@ export default function RequestsPage() {
 
     loadRequests();
 
-    // Listen for changes from other tabs/windows
-    window.addEventListener('storage', (event) => {
-      if (event.key === 'change_requests') {
+    const handleStorageChange = (event: Event) => {
+      // Custom 'storage' event or browser's 'storage' event for cross-tab sync
+      if ((event as StorageEvent).key === 'change_requests' || event.type === 'storage') {
         loadRequests();
       }
-    });
+    };
 
+    window.addEventListener('storage', handleStorageChange);
+    
     return () => {
-      window.removeEventListener('storage', loadRequests);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 

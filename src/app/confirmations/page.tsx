@@ -426,7 +426,7 @@ export default function ConfirmationsPage() {
     
     const player = getPlayerById(changeRequestInputs.playerId);
     
-    const newRequest = {
+    const newRequest: ChangeRequest = {
         player: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
         event: confToRequestChange.eventName,
         type: changeRequestInputs.requestType,
@@ -438,6 +438,9 @@ export default function ConfirmationsPage() {
     const updatedRequests = [newRequest, ...changeRequests];
     setChangeRequests(updatedRequests);
     localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+
+    // Dispatch a custom event to notify other components (like the requests page)
+    window.dispatchEvent(new Event('storage'));
 
     toast({ title: 'Request Submitted', description: 'Your change request has been sent to the organizer for review.' });
     setIsRequestDialogOpen(false);
