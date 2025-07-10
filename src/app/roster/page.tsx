@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
@@ -125,10 +126,7 @@ const playerFormSchema = z.object({
     if (arg instanceof Date) return arg;
     return undefined;
   }, z.date().optional()),
-  regularRating: z.preprocess(
-    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
-    z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
-  ),
+  regularRating: z.union([z.string(), z.number()]).optional(),
   quickRating: z.string().optional(),
   grade: z.string().min(1, { message: "Please select a grade." }),
   section: z.string().min(1, { message: "Please select a section." }),
@@ -158,7 +156,8 @@ const playerFormSchema = z.object({
 })
 .refine(data => {
   if (data.uscfId.toUpperCase() !== 'NEW') {
-    return data.regularRating !== undefined;
+    const rating = data.regularRating;
+    return rating !== undefined && rating !== '';
   }
   return true;
 }, {
@@ -473,11 +472,19 @@ export default function RosterPage() {
         eventIds: [],
     };
 
+    let ratingValue;
+    if (typeof values.regularRating === 'string' && values.regularRating.toUpperCase() === 'UNR') {
+        ratingValue = undefined;
+    } else {
+        ratingValue = values.regularRating ? Number(values.regularRating) : undefined;
+    }
+
     const playerRecord: MasterPlayer = {
         ...baseRecord,
         ...formValues,
         school: profile.school,
         district: profile.district,
+        regularRating: ratingValue,
         dob: dob instanceof Date ? dob.toISOString() : undefined,
         uscfExpiration: uscfExpiration instanceof Date ? uscfExpiration.toISOString() : undefined,
     };
@@ -730,80 +737,78 @@ export default function RosterPage() {
                                 <FormMessage />
                               </FormItem>
                             )} />
-                            <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input placeholder="1500 or UNR" disabled={isUscfNew} {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={form.control} name="regularRating" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Rating</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            placeholder="1500 or UNR"
+                                            disabled={isUscfNew}
+                                            {...field}
+                                            value={field.value ?? ''}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                           <FormField
-                              control={form.control}
-                              name="dob"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Date of Birth</FormLabel>
-                                  <div className="flex gap-2">
-                                    <FormControl>
-                                      <Input
-                                        placeholder="MM/DD/YYYY"
-                                        value={field.value instanceof Date ? format(field.value, 'MM/dd/yyyy') : field.value || ''}
-                                        onChange={(e) => field.onChange(e.target.value)}
-                                      />
-                                    </FormControl>
+                           <FormField control={form.control} name="dob" render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Date of Birth</FormLabel>
                                     <Popover>
                                         <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className="px-3">
-                                            <span className="sr-only">Open calendar</span>
-                                            <CalendarIcon className="h-4 w-4" />
+                                            <Button
+                                            variant={"outline"}
+                                            className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                                            >
+                                            {field.value instanceof Date ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value instanceof Date ? field.value : undefined}
+                                            onSelect={(date) => field.onChange(date)}
+                                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                            captionLayout="dropdown-buttons"
+                                            fromYear={new Date().getFullYear() - 100}
+                                            toYear={new Date().getFullYear()}
+                                            initialFocus
+                                        />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                             <FormField control={form.control} name="uscfExpiration" render={({ field }) => (
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>USCF Expiration</FormLabel>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                                            disabled={isUscfNew}
+                                        >
+                                            {field.value instanceof Date ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                         </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar
-                                                mode="single"
-                                                selected={field.value instanceof Date ? field.value : undefined}
-                                                onSelect={(date) => field.onChange(date)}
-                                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                                captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()}
-                                                initialFocus
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                             <FormField
-                              control={form.control}
-                              name="uscfExpiration"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>USCF Expiration</FormLabel>
-                                   <div className="flex gap-2">
-                                    <FormControl>
-                                      <Input
-                                        placeholder="MM/DD/YYYY"
-                                        disabled={isUscfNew}
-                                        value={field.value instanceof Date ? format(field.value, 'MM/dd/yyyy') : field.value || ''}
-                                        onChange={(e) => field.onChange(e.target.value)}
-                                      />
-                                    </FormControl>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                          <Button variant={"outline"} className="px-3" disabled={isUscfNew}>
-                                            <span className="sr-only">Open calendar</span>
-                                            <CalendarIcon className="h-4 w-4" />
-                                          </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                          <Calendar
+                                        <Calendar
                                             mode="single"
                                             selected={field.value instanceof Date ? field.value : undefined}
                                             onSelect={(date) => field.onChange(date)}
                                             disabled={isUscfNew}
-                                            captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 2} toYear={new Date().getFullYear() + 10}
+                                            captionLayout="dropdown-buttons"
+                                            fromYear={new Date().getFullYear() - 2}
+                                            toYear={new Date().getFullYear() + 10}
                                             initialFocus
-                                          />
+                                        />
                                         </PopoverContent>
                                     </Popover>
-                                   </div>
                                   <FormMessage />
                                 </FormItem>
                                 )
@@ -889,3 +894,4 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
+
