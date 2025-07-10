@@ -99,9 +99,8 @@ const withdrawPlayerFlow = ai.defineFlow(
         
         if (isPlayerItem) {
           playerFound = true;
-          // Zero out the cost for this player's items
+          // Zero out the base cost for this player's items. Square will recalculate totals.
           itemCopy.basePriceMoney = { amount: 0n, currency: itemCopy.basePriceMoney?.currency || 'USD' };
-          itemCopy.totalMoney = { amount: 0n, currency: itemCopy.totalMoney?.currency || 'USD' };
           
           // Update the note to reflect withdrawal
           if (itemCopy.note) {
