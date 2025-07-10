@@ -54,7 +54,7 @@ import { requestsData as initialRequestsData } from '@/lib/data/requests-data';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
@@ -116,6 +116,7 @@ export default function ConfirmationsPage() {
   const { toast } = useToast();
   const { profile: sponsorProfile } = useSponsorProfile();
   const { database: allPlayers, isDbLoaded: isPlayersLoaded } = useMasterDb();
+  const { events } = useEvents();
 
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
   const [confInputs, setConfInputs] = useState<Record<string, Partial<ConfirmationInputs>>>({});
@@ -354,7 +355,6 @@ export default function ConfirmationsPage() {
     setIsWithdrawAlertOpen(false);
     
     const remainingPlayerIds = Object.keys(originalConfirmation.selections).filter(id => !playerIds.includes(id));
-    const events: Event[] = JSON.parse(localStorage.getItem('chess_events') || '[]');
     const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
 
     if (!eventDetails) {
@@ -493,6 +493,28 @@ export default function ConfirmationsPage() {
     setIsRequestDialogOpen(false);
   };
 
+  const handleByeChange = (confId: string, playerId: string, byeKey: 'round1' | 'round2', value: string) => {
+    setConfirmations(prevConfirmations => {
+      const newConfirmations = prevConfirmations.map(conf => {
+        if (conf.id === confId) {
+          const newSelections = { ...conf.selections };
+          if (newSelections[playerId]) {
+            newSelections[playerId].byes[byeKey] = value;
+            // Logic to handle cascading bye resets if needed
+            if (byeKey === 'round1' && value === 'none') {
+              newSelections[playerId].byes.round2 = 'none';
+            }
+          }
+          return { ...conf, selections: newSelections };
+        }
+        return conf;
+      });
+      localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
+      return newConfirmations;
+    });
+    toast({ title: "Bye Updated", description: "The bye request has been updated locally." });
+  };
+
 
   const handleOpenAddPlayerDialog = (conf: Confirmation) => {
     setConfToAddPlayer(conf);
@@ -627,6 +649,17 @@ export default function ConfirmationsPage() {
                   const currentStatus = statuses[conf.id];
                   const isLoading = isUpdating[conf.id] || !isAuthReady;
                   const selectedWithdrawalIds = selectedPlayersForWithdraw[conf.id] || [];
+                  const eventDetails = events.find(e => e.id === conf.eventId);
+
+                  const roundOptions = (maxRounds: number, exclude?: string) => {
+                    const options = [<SelectItem key="none" value="none">No Bye</SelectItem>];
+                    for (let i = 1; i <= maxRounds; i++) {
+                      if (String(i) !== exclude) {
+                        options.push(<SelectItem key={i} value={String(i)}>Round {i}</SelectItem>);
+                      }
+                    }
+                    return options;
+                  };
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
@@ -670,9 +703,7 @@ export default function ConfirmationsPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead className="w-10">
-                                {sponsorProfile?.role === 'organizer' && <span className="sr-only">Select</span>}
-                              </TableHead>
+                              {sponsorProfile?.role === 'organizer' && <TableHead className="w-10"><span className="sr-only">Select</span></TableHead>}
                               <TableHead>Player</TableHead>
                               <TableHead>Section</TableHead>
                               <TableHead>USCF Status</TableHead>
@@ -686,21 +717,19 @@ export default function ConfirmationsPage() {
                               
                               const relevantRequests = changeRequests.filter(req => req.confirmationId === conf.id && req.player === `${player.firstName} ${player.lastName}`);
                               const latestRequest = relevantRequests.length > 0 ? relevantRequests[0] : null;
-
-                              const byeText = [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None';
                               
                               return (
                                 <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) ? 'selected' : undefined}>
-                                  <TableCell>
-                                      {sponsorProfile?.role === 'organizer' && (
+                                  {sponsorProfile?.role === 'organizer' && (
+                                      <TableCell>
                                           <Checkbox
                                               checked={selectedWithdrawalIds.includes(playerId)}
                                               onCheckedChange={() => handleWithdrawPlayerSelect(conf.id, playerId)}
                                               aria-label={`Select ${player.firstName} ${player.lastName} for withdrawal`}
                                               disabled={isLoading || !conf.invoiceId}
                                           />
-                                      )}
-                                  </TableCell>
+                                      </TableCell>
+                                  )}
                                   <TableCell className="font-medium flex items-center gap-2">
                                     {player.firstName} {player.lastName}
                                     {latestRequest && (
@@ -727,7 +756,33 @@ export default function ConfirmationsPage() {
                                   </TableCell>
                                   <TableCell>{details.section}</TableCell>
                                   <TableCell><Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge></TableCell>
-                                  <TableCell>{byeText}</TableCell>
+                                  <TableCell>
+                                    {sponsorProfile?.role === 'organizer' && eventDetails ? (
+                                      <div className="flex gap-2">
+                                        <Select
+                                          value={details.byes.round1}
+                                          onValueChange={(value) => handleByeChange(conf.id, playerId, 'round1', value)}
+                                        >
+                                          <SelectTrigger className="w-28 h-8 text-xs">
+                                            <SelectValue placeholder="Bye 1" />
+                                          </SelectTrigger>
+                                          <SelectContent>{roundOptions(eventDetails.rounds)}</SelectContent>
+                                        </Select>
+                                        <Select
+                                          value={details.byes.round2}
+                                          onValueChange={(value) => handleByeChange(conf.id, playerId, 'round2', value)}
+                                          disabled={details.byes.round1 === 'none'}
+                                        >
+                                          <SelectTrigger className="w-28 h-8 text-xs">
+                                            <SelectValue placeholder="Bye 2" />
+                                          </SelectTrigger>
+                                          <SelectContent>{roundOptions(eventDetails.rounds, details.byes.round1)}</SelectContent>
+                                        </Select>
+                                      </div>
+                                    ) : (
+                                      [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None'
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               );
                             })}
@@ -844,5 +899,3 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
-
-    
