@@ -85,46 +85,44 @@ const withdrawPlayerFlow = ai.defineFlow(
         throw new Error(`Invoice is in status ${invoice.status} and cannot be modified. Player must be withdrawn manually and a credit/refund issued if applicable.`);
       }
 
-      const originalLineItems: LineItem[] = invoice.lineItems || [];
-      const updatedLineItems: LineItem[] = JSON.parse(JSON.stringify(originalLineItems)); // Deep copy
+      const updatedLineItems: LineItem[] = JSON.parse(JSON.stringify(invoice.lineItems || [])); // Deep copy
 
       let playerFound = false;
 
       // Iterate through the line items to find and update the withdrawn player's items
       for (const item of updatedLineItems) {
-          const isRegistration = item.name?.toLowerCase().includes('tournament registration');
-          const isLateFee = item.name?.toLowerCase().includes('late fee');
-          const isUscf = item.name?.toLowerCase().includes('uscf membership');
-          
-          if ((isRegistration || isLateFee || isUscf) && item.note?.toLowerCase().includes(playerName.toLowerCase())) {
-              playerFound = true;
-              const currentQuantity = parseInt(item.quantity!, 10);
-              if (currentQuantity > 0) {
-                  item.quantity = String(currentQuantity - 1);
-              }
+        // Simplified logic: If the player's name is in the note, we assume it's an item to modify.
+        if (item.note?.toLowerCase().includes(playerName.toLowerCase())) {
+            playerFound = true;
+            const currentQuantity = parseInt(item.quantity!, 10);
+            if (currentQuantity > 0) {
+                item.quantity = String(currentQuantity - 1);
+            }
 
-              // Update the note for the registration item
-              if (isRegistration && item.note) {
-                  const playerLines = item.note.split('\n');
-                  const updatedLines = playerLines.map(line => {
-                      if (line.toLowerCase().includes(playerName.toLowerCase())) {
-                          return `${line} (Withdrawn)`;
-                      }
-                      return line;
-                  });
-                  item.note = updatedLines.join('\n');
-              }
-          }
+            // Update the note for the line item to reflect withdrawal
+            if (item.note) {
+                const playerLines = item.note.split('\n');
+                const updatedLines = playerLines.map(line => {
+                    if (line.toLowerCase().includes(playerName.toLowerCase()) && !line.toLowerCase().includes('(withdrawn)')) {
+                        return `${line} (Withdrawn)`;
+                    }
+                    return line;
+                });
+                item.note = updatedLines.join('\n');
+            }
+        }
       }
 
       if (!playerFound) {
         throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
       }
       
+      const finalLineItems = updatedLineItems.filter(item => parseInt(item.quantity || '0', 10) > 0);
+
       const { result: { invoice: updatedInvoice } } = await invoicesApi.updateInvoice(invoiceId, {
         invoice: {
           ...invoice,
-          lineItems: updatedLineItems.filter(item => parseInt(item.quantity!, 10) > 0), // Filter out zero-quantity items
+          lineItems: finalLineItems,
           version: invoice.version!,
         },
         idempotencyKey: randomUUID(),
