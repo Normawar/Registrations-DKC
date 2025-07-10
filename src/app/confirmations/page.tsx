@@ -110,6 +110,8 @@ type ChangeRequestInputs = {
   playerId: string;
   requestType: string;
   details: string;
+  byeRound1?: string;
+  byeRound2?: string;
 };
 
 export default function ConfirmationsPage() {
@@ -129,9 +131,9 @@ export default function ConfirmationsPage() {
   const [isCompAlertOpen, setIsCompAlertOpen] = useState(false);
   const [confToComp, setConfToComp] = useState<Confirmation | null>(null);
   
-  const [isWithdrawAlertOpen, setIsWithdrawAlertOpen] = useState(false);
-  const [withdrawAlertContent, setWithdrawAlertContent] = useState({ title: '', description: '' });
-  const [withdrawAction, setWithdrawAction] = useState<(() => void) | null>(null);
+  const [isChangeAlertOpen, setIsChangeAlertOpen] = useState(false);
+  const [changeAlertContent, setChangeAlertContent] = useState({ title: '', description: '' });
+  const [changeAction, setChangeAction] = useState<(() => void) | null>(null);
 
   const [selectedPlayersForWithdraw, setSelectedPlayersForWithdraw] = useState<Record<string, string[]>>({});
 
@@ -352,7 +354,7 @@ export default function ConfirmationsPage() {
     }
 
     setIsUpdating(prev => ({ ...prev, [confId]: true }));
-    setIsWithdrawAlertOpen(false);
+    setIsChangeAlertOpen(false);
     
     const remainingPlayerIds = Object.keys(originalConfirmation.selections).filter(id => !playerIds.includes(id));
     const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
@@ -440,10 +442,46 @@ export default function ConfirmationsPage() {
   
   const handleOpenRequestDialog = (conf: Confirmation) => {
     setConfToRequestChange(conf);
-    setChangeRequestInputs({});
+    setChangeRequestInputs({ requestType: '' });
     setIsRequestDialogOpen(true);
   };
   
+  const handleByeChangeAction = (confId: string, playerId: string, newByes: { round1: string; round2: string }) => {
+    setIsChangeAlertOpen(false);
+    setIsUpdating(prev => ({ ...prev, [confId]: true }));
+    const player = getPlayerById(playerId);
+
+    const newConfirmations = confirmations.map(conf => {
+        if (conf.id === confId) {
+            const newSelections = JSON.parse(JSON.stringify(conf.selections));
+            if (newSelections[playerId]) {
+                newSelections[playerId].byes = newByes;
+            }
+            return { ...conf, selections: newSelections };
+        }
+        return conf;
+    });
+    localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
+    setConfirmations(newConfirmations);
+    
+    if (sponsorProfile?.role === 'organizer' && player) {
+        const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+        const approvalTimestamp = new Date().toISOString();
+
+        const updatedRequests = changeRequests.map(req => {
+            if (req.confirmationId === confId && req.player === `${player.firstName} ${player.lastName}` && req.type === 'Bye Request') {
+                return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
+            }
+            return req;
+        });
+        localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+        setChangeRequests(updatedRequests);
+    }
+    
+    toast({ title: "Bye Updated", description: `Bye request for ${player?.firstName} has been updated.` });
+    setIsUpdating(prev => ({ ...prev, [confId]: false }));
+  };
+
   const handleSubmitChangeRequest = () => {
     if (!confToRequestChange || !changeRequestInputs.playerId || !changeRequestInputs.requestType || !sponsorProfile) {
         toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select a player and request type.' });
@@ -464,87 +502,49 @@ export default function ConfirmationsPage() {
     
     // If organizer, auto-approve and perform action
     if (sponsorProfile.role === 'organizer') {
-        if (newRequest.type === 'Withdraw Player') {
-            setWithdrawAlertContent({
+        const actionMap: Record<string, { title: string; description: string; action: () => void }> = {
+            'Withdraw Player': {
                 title: `Withdraw ${newRequest.player}?`,
-                description: `This will remove ${newRequest.player} from the registration for "${newRequest.event}" and update the invoice. This action cannot be undone.`
-            });
-            setWithdrawAction(() => () => handleWithdrawPlayerAction(newRequest.confirmationId, [changeRequestInputs.playerId!]));
-            setIsWithdrawAlertOpen(true);
-        } else {
-            // Auto-approve non-withdrawal changes for organizers (e.g., "Other")
-            const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-            const approvalTimestamp = new Date().toISOString();
-            const approvedRequest = { ...newRequest, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
-            const updatedRequests = [approvedRequest, ...changeRequests];
-            setChangeRequests(updatedRequests);
-            localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-            window.dispatchEvent(new Event('storage'));
-            toast({ title: 'Change Logged', description: `Your change for ${newRequest.player} has been approved and logged.` });
+                description: `This will remove ${newRequest.player} from the registration for "${newRequest.event}" and update the invoice. This action cannot be undone.`,
+                action: () => handleWithdrawPlayerAction(newRequest.confirmationId, [changeRequestInputs.playerId!])
+            },
+            'Bye Request': {
+                title: `Update Byes for ${newRequest.player}?`,
+                description: `This will update the bye requests for ${newRequest.player}. This change will not affect the invoice.`,
+                action: () => handleByeChangeAction(newRequest.confirmationId, changeRequestInputs.playerId!, { round1: changeRequestInputs.byeRound1 || 'none', round2: changeRequestInputs.byeRound2 || 'none' })
+            },
+            'Other': {
+                title: `Log Change for ${newRequest.player}?`,
+                description: `This will log the following note for the player: "${newRequest.details}". This is for record-keeping and will not alter the invoice.`,
+                action: () => {
+                    setIsChangeAlertOpen(false);
+                    const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+                    const approvalTimestamp = new Date().toISOString();
+                    const approvedRequest = { ...newRequest, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
+                    const updatedRequests = [approvedRequest, ...changeRequests];
+                    setChangeRequests(updatedRequests);
+                    localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+                    toast({ title: 'Change Logged', description: `Your change for ${newRequest.player} has been approved and logged.` });
+                }
+            }
+        };
+
+        const changeDetails = actionMap[newRequest.type];
+        if (changeDetails) {
+            setChangeAlertContent({ title: changeDetails.title, description: changeDetails.description });
+            setChangeAction(() => changeDetails.action);
+            setIsChangeAlertOpen(true);
         }
+
     } else {
       // If sponsor, just submit the request
       const updatedRequests = [newRequest, ...changeRequests];
       setChangeRequests(updatedRequests);
       localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-      window.dispatchEvent(new Event('storage'));
       toast({ title: 'Request Submitted', description: 'Your change request has been sent to the organizer for review.' });
     }
 
     setIsRequestDialogOpen(false);
-  };
-
-  const handleByeChange = (confId: string, playerId: string, byeKey: 'round1' | 'round2', value: string) => {
-    const player = getPlayerById(playerId);
-
-    setConfirmations(prevConfirmations => {
-      const newConfirmations = prevConfirmations.map(conf => {
-        if (conf.id === confId) {
-          const newSelections = JSON.parse(JSON.stringify(conf.selections));
-          if (newSelections[playerId]) {
-            const playerByes = newSelections[playerId].byes;
-            playerByes[byeKey] = value;
-
-            if (byeKey === 'round2' && value !== 'none' && playerByes.round1 === 'none') {
-              playerByes.round1 = '1';
-            } else if (byeKey === 'round1' && value === 'none') {
-              playerByes.round2 = 'none';
-            }
-          }
-          return { ...conf, selections: newSelections };
-        }
-        return conf;
-      });
-      localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
-      return newConfirmations;
-    });
-
-    if (sponsorProfile?.role === 'organizer' && player) {
-        setChangeRequests(prevRequests => {
-            const newRequests = prevRequests.map(req => {
-                if (req.confirmationId === confId && req.player === `${player.firstName} ${player.lastName}` && req.type === 'Bye Request' && req.status === 'Pending') {
-                    return {
-                        ...req,
-                        status: 'Approved' as const,
-                        approvedBy: `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`,
-                        approvedAt: new Date().toISOString()
-                    };
-                }
-                return req;
-            });
-            localStorage.setItem('change_requests', JSON.stringify(newRequests));
-            return newRequests;
-        });
-    }
-
-    toast({ title: "Bye Updated", description: `Bye request for ${player?.firstName} has been updated.` });
-  };
-
-
-  const handleOpenAddPlayerDialog = (conf: Confirmation) => {
-    setConfToAddPlayer(conf);
-    setPlayersToAdd([]);
-    setIsAddPlayerDialogOpen(true);
   };
 
   const handlePlayerToggle = (playerId: string) => {
@@ -674,17 +674,6 @@ export default function ConfirmationsPage() {
                   const currentStatus = statuses[conf.id];
                   const isLoading = isUpdating[conf.id] || !isAuthReady;
                   const selectedWithdrawalIds = selectedPlayersForWithdraw[conf.id] || [];
-                  const eventDetails = events.find(e => e.id === conf.eventId);
-
-                  const roundOptions = (maxRounds: number, exclude?: string) => {
-                    const options = [<SelectItem key="none" value="none">No Bye</SelectItem>];
-                    for (let i = 1; i <= maxRounds; i++) {
-                      if (String(i) !== exclude) {
-                        options.push(<SelectItem key={i} value={String(i)}>Round {i}</SelectItem>);
-                      }
-                    }
-                    return options;
-                  };
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
@@ -782,31 +771,7 @@ export default function ConfirmationsPage() {
                                   <TableCell>{details.section}</TableCell>
                                   <TableCell><Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge></TableCell>
                                   <TableCell>
-                                    {sponsorProfile?.role === 'organizer' && eventDetails ? (
-                                      <div className="flex gap-2">
-                                        <Select
-                                          value={details.byes.round1}
-                                          onValueChange={(value) => handleByeChange(conf.id, playerId, 'round1', value)}
-                                        >
-                                          <SelectTrigger className="w-28 h-8 text-xs">
-                                            <SelectValue placeholder="Bye 1" />
-                                          </SelectTrigger>
-                                          <SelectContent>{roundOptions(eventDetails.rounds)}</SelectContent>
-                                        </Select>
-                                        <Select
-                                          value={details.byes.round2}
-                                          onValueChange={(value) => handleByeChange(conf.id, playerId, 'round2', value)}
-                                          disabled={details.byes.round1 === 'none'}
-                                        >
-                                          <SelectTrigger className="w-28 h-8 text-xs">
-                                            <SelectValue placeholder="Bye 2" />
-                                          </SelectTrigger>
-                                          <SelectContent>{roundOptions(eventDetails.rounds, details.byes.round1)}</SelectContent>
-                                        </Select>
-                                      </div>
-                                    ) : (
-                                      [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None'
-                                    )}
+                                    {[details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None'}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -819,12 +784,12 @@ export default function ConfirmationsPage() {
                                       variant="destructive"
                                       size="sm"
                                       onClick={() => {
-                                          setWithdrawAlertContent({
+                                          setChangeAlertContent({
                                               title: `Withdraw ${selectedWithdrawalIds.length} Player(s)?`,
                                               description: `This will remove the selected player(s) and update the invoice. This action cannot be undone.`
                                           });
-                                          setWithdrawAction(() => () => handleWithdrawPlayerAction(conf.id, selectedWithdrawalIds));
-                                          setIsWithdrawAlertOpen(true);
+                                          setChangeAction(() => () => handleWithdrawPlayerAction(conf.id, selectedWithdrawalIds));
+                                          setIsChangeAlertOpen(true);
                                       }}
                                       disabled={isLoading || !conf.invoiceId || selectedWithdrawalIds.length === 0}
                                   >
@@ -865,20 +830,41 @@ export default function ConfirmationsPage() {
       </div>
 
       <AlertDialog open={isCompAlertOpen} onOpenChange={setIsCompAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will cancel the **entire invoice** for this registration. All players on this submission will be marked as complimentary, and no payment will be due. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setConfToComp(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleCompRegistration} className="bg-primary hover:bg-primary/90">Confirm & Comp</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={isWithdrawAlertOpen} onOpenChange={setIsWithdrawAlertOpen}>
+      <AlertDialog open={isChangeAlertOpen} onOpenChange={setIsChangeAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{withdrawAlertContent.title}</AlertDialogTitle>
-            <AlertDialogDescription>{withdrawAlertContent.description}</AlertDialogDescription>
+            <AlertDialogTitle>{changeAlertContent.title}</AlertDialogTitle>
+            <AlertDialogDescription>{changeAlertContent.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setWithdrawAction(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => withdrawAction && withdrawAction()} className="bg-destructive hover:bg-destructive/90">Yes, Continue</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setChangeAction(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => changeAction && changeAction()} className="bg-destructive hover:bg-destructive/90">Yes, Continue</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}><DialogContent><DialogHeader><DialogTitle>Request a Change</DialogTitle><DialogDescription>Submit a request to the tournament organizer regarding this registration for "{confToRequestChange?.eventName}".</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="request-player">Player</Label><Select value={changeRequestInputs.playerId} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, playerId: value}))}><SelectTrigger id="request-player"><SelectValue placeholder="Select a player..." /></SelectTrigger><SelectContent>{confToRequestChange && Object.keys(confToRequestChange.selections).map(playerId => { const player = getPlayerById(playerId); return player ? <SelectItem key={playerId} value={playerId}>{player.firstName} {player.lastName}</SelectItem> : null; })}</SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-type">Request Type</Label><Select value={changeRequestInputs.requestType} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, requestType: value}))}><SelectTrigger id="request-type"><SelectValue placeholder="Select a request type..." /></SelectTrigger><SelectContent><SelectItem value="Withdraw Player">Withdraw Player</SelectItem><SelectItem value="Section Change">Section Change</SelectItem><SelectItem value="Bye Request">Bye Request</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-details">Details</Label><Textarea id="request-details" placeholder="Provide any additional details for the organizer..." value={changeRequestInputs.details || ''} onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))} /></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button><Button onClick={handleSubmitChangeRequest}>Submit Request</Button></DialogFooter></DialogContent></Dialog>
+      <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}><DialogContent><DialogHeader><DialogTitle>Request a Change</DialogTitle><DialogDescription>Submit a request to the tournament organizer regarding this registration for "{confToRequestChange?.eventName}".</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="request-player">Player</Label><Select value={changeRequestInputs.playerId} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, playerId: value, requestType: ''}))}><SelectTrigger id="request-player"><SelectValue placeholder="Select a player..." /></SelectTrigger><SelectContent>{confToRequestChange && Object.keys(confToRequestChange.selections).map(playerId => { const player = getPlayerById(playerId); return player ? <SelectItem key={playerId} value={playerId}>{player.firstName} {player.lastName}</SelectItem> : null; })}</SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-type">Request Type</Label><Select value={changeRequestInputs.requestType} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, requestType: value}))}><SelectTrigger id="request-type"><SelectValue placeholder="Select a request type..." /></SelectTrigger><SelectContent><SelectItem value="Withdraw Player">Withdraw Player</SelectItem><SelectItem value="Section Change">Section Change</SelectItem><SelectItem value="Bye Request">Bye Request</SelectItem><SelectItem value="Other">Other (Note)</SelectItem></SelectContent></Select></div>
+      
+      {changeRequestInputs.requestType === 'Bye Request' && confToRequestChange && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-2">
+            <Label>Bye 1</Label>
+            <Select value={changeRequestInputs.byeRound1} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, byeRound1: value}))}>
+                <SelectTrigger><SelectValue placeholder="No Bye" /></SelectTrigger>
+                <SelectContent>{events.find(e => e.id === confToRequestChange.eventId)?.rounds && Array.from({length: events.find(e => e.id === confToRequestChange.eventId)!.rounds}).map((_, i) => <SelectItem key={i+1} value={String(i+1)}>Round {i+1}</SelectItem>)}<SelectItem value="none">No Bye</SelectItem></SelectContent>
+            </Select>
+          </div>
+           <div className="grid gap-2">
+            <Label>Bye 2</Label>
+            <Select value={changeRequestInputs.byeRound2} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, byeRound2: value}))} disabled={!changeRequestInputs.byeRound1 || changeRequestInputs.byeRound1 === 'none'}>
+                <SelectTrigger><SelectValue placeholder="No Bye" /></SelectTrigger>
+                <SelectContent>{events.find(e => e.id === confToRequestChange.eventId)?.rounds && Array.from({length: events.find(e => e.id === confToRequestChange.eventId)!.rounds}).map((_, i) => changeRequestInputs.byeRound1 !== String(i+1) && <SelectItem key={i+1} value={String(i+1)}>Round {i+1}</SelectItem>)}<SelectItem value="none">No Bye</SelectItem></SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-2"><Label htmlFor="request-details">Details</Label><Textarea id="request-details" placeholder="Provide any additional details for the organizer..." value={changeRequestInputs.details || ''} onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))} /></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button><Button onClick={handleSubmitChangeRequest}>Submit Request</Button></DialogFooter></DialogContent></Dialog>
       
       <Dialog open={isAddPlayerDialogOpen} onOpenChange={setIsAddPlayerDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
