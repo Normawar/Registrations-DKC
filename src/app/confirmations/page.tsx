@@ -452,6 +452,7 @@ export default function ConfirmationsPage() {
     
     const player = getPlayerById(changeRequestInputs.playerId);
     const newRequest: ChangeRequest = {
+        id: `req-${Date.now()}`,
         confirmationId: confToRequestChange.id,
         player: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
         event: confToRequestChange.eventName,
@@ -471,7 +472,7 @@ export default function ConfirmationsPage() {
             setWithdrawAction(() => () => handleWithdrawPlayerAction(newRequest.confirmationId, [changeRequestInputs.playerId!]));
             setIsWithdrawAlertOpen(true);
         } else {
-            // Auto-approve non-withdrawal changes for organizers
+            // Auto-approve non-withdrawal changes for organizers (e.g., "Other")
             const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
             const approvalTimestamp = new Date().toISOString();
             const approvedRequest = { ...newRequest, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
@@ -502,17 +503,10 @@ export default function ConfirmationsPage() {
             const playerByes = newSelections[playerId].byes;
             playerByes[byeKey] = value;
 
-            // Handle bye dependencies
-            if (byeKey === 'round1') {
-              // If round 1 is set to none, round 2 must also be none
-              if (value === 'none') {
-                playerByes.round2 = 'none';
-              }
-            } else if (byeKey === 'round2') {
-              // If round 2 is selected, but round 1 is none, set round 1 to the first available round (e.g., '1')
-              if (value !== 'none' && playerByes.round1 === 'none') {
-                playerByes.round1 = '1'; 
-              }
+            if (byeKey === 'round2' && value !== 'none' && playerByes.round1 === 'none') {
+              playerByes.round1 = '1';
+            } else if (byeKey === 'round1' && value === 'none') {
+              playerByes.round2 = 'none';
             }
           }
           return { ...conf, selections: newSelections };
@@ -522,7 +516,9 @@ export default function ConfirmationsPage() {
       localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
       return newConfirmations;
     });
-    toast({ title: "Bye Updated", description: "The bye request has been updated locally." });
+
+    const player = getPlayerById(playerId);
+    toast({ title: "Bye Updated", description: `Bye request for ${player?.firstName} has been updated.` });
   };
 
 
