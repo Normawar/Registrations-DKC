@@ -127,7 +127,6 @@ export default function RequestsPage() {
                                     <Button asChild variant="outline" size="sm">
                                       <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
                                     </Button>
-                                    <Button variant="destructive" size="sm" onClick={() => handleRequestStatusUpdate(request.id!, 'Denied')}>Deny</Button>
                                 </div>
                             ) : (
                                 <span className="text-xs text-muted-foreground">Actioned</span>

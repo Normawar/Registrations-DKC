@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, type ReactNode, useMemo, useCallback } from 'react';
-import { format, isSameDay, differenceInHours } from 'date-fns';
+import { format } from 'date-fns';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
@@ -29,7 +29,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserPlus, Trash2, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -47,40 +47,36 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
-import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { useMasterDb } from '@/context/master-db-context';
 import type { ChangeRequest } from '@/lib/data/requests-data';
 import { requestsData as initialRequestsData } from '@/lib/data/requests-data';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useEvents, type Event } from '@/hooks/use-events';
-import { createInvoice } from '@/ai/flows/create-invoice-flow';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
 
 
 type PlayerRegistration = {
-  byes: { round1: string; round2: string; };
+  byes: {
+    round1: string;
+    round2: string;
+  };
   section: string;
   uscfStatus: 'current' | 'new' | 'renewing';
-  studentType?: 'gt' | 'independent';
 };
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
 type PaymentMethod = 'po' | 'check' | 'cashapp' | 'zelle';
 
 type Confirmation = {
-  id: string; // confirmation ID, usually the initial invoice ID
-  eventId: string;
+  id: string;
   eventName: string;
   eventDate: string;
   submissionTimestamp: string;
   selections: RegistrationSelections;
   totalInvoiced: number;
-  invoiceId?: string; // current invoiceId, can change
+  invoiceId?: string;
   invoiceUrl?: string;
-  invoiceNumber?: string;
   teamCode: string;
   paymentMethod?: PaymentMethod;
   poNumber?: string;
@@ -109,14 +105,10 @@ type ChangeRequestInputs = {
   details: string;
 };
 
-const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
-
-
 export default function ConfirmationsPage() {
   const { toast } = useToast();
   const { profile: sponsorProfile } = useSponsorProfile();
   const { database: allPlayers, isDbLoaded: isPlayersLoaded } = useMasterDb();
-  const { events } = useEvents();
 
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
   const [confInputs, setConfInputs] = useState<Record<string, Partial<ConfirmationInputs>>>({});
@@ -133,21 +125,9 @@ export default function ConfirmationsPage() {
   const [confToRequestChange, setConfToRequestChange] = useState<Confirmation | null>(null);
   const [changeRequestInputs, setChangeRequestInputs] = useState<Partial<ChangeRequestInputs>>({});
 
-  // States for adding players
-  const [isAddPlayerDialogOpen, setIsAddPlayerDialogOpen] = useState(false);
-  const [confToAddPlayer, setConfToAddPlayer] = useState<Confirmation | null>(null);
-  const [playersToAdd, setPlayersToAdd] = useState<RegistrationSelections>({});
-
-  const [isUpdatingInvoice, setIsUpdatingInvoice] = useState<string | null>(null);
-
   const playersMap = useMemo(() => {
     return new Map(allPlayers.map(p => [p.id, p]));
   }, [allPlayers]);
-
-  const rosterPlayers = useMemo(() => {
-    if (!sponsorProfile || !isPlayersLoaded || sponsorProfile.role !== 'sponsor') return [];
-    return allPlayers.filter(p => p.district === sponsorProfile.district && p.school === sponsorProfile.school);
-  }, [allPlayers, sponsorProfile, isPlayersLoaded]);
 
   const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
     confirmationsToFetch.forEach(conf => {
@@ -162,22 +142,8 @@ export default function ConfirmationsPage() {
           setStatuses(prev => ({ ...prev, [confId]: { ...prev[confId], isLoading: true } }));
       }
       try {
-          const { status, invoiceNumber } = await getInvoiceStatus({ invoiceId });
-          setStatuses(prev => ({ ...prev, [confId]: { status: status, isLoading: false } }));
-
-          setConfirmations(prevConfirmations => {
-              const newConfirmations = prevConfirmations.map(conf => {
-                  if (conf.id === confId && conf.invoiceNumber !== invoiceNumber) {
-                      return { ...conf, invoiceNumber: invoiceNumber ?? undefined };
-                  }
-                  return conf;
-              });
-              if (JSON.stringify(newConfirmations) !== JSON.stringify(prevConfirmations)) {
-                  localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
-              }
-              return newConfirmations;
-          });
-
+          const { status } = await getInvoiceStatus({ invoiceId });
+          setStatuses(prev => ({ ...prev, [confId]: { status, isLoading: false } }));
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
           setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
@@ -243,10 +209,8 @@ export default function ConfirmationsPage() {
   useEffect(() => {
     loadAllData();
     window.addEventListener('storage', loadAllData);
-    window.addEventListener('confirmationsUpdated', loadAllData);
     return () => {
         window.removeEventListener('storage', loadAllData);
-        window.removeEventListener('confirmationsUpdated', loadAllData);
     };
   }, [loadAllData]);
 
@@ -380,117 +344,12 @@ export default function ConfirmationsPage() {
     setIsRequestDialogOpen(false);
   };
 
-  // --- Functions for adding/removing players ---
-  
-  const handleOpenAddPlayerDialog = (conf: Confirmation) => {
-    setConfToAddPlayer(conf);
-    setIsAddPlayerDialogOpen(true);
-  };
-  
-  const handleAddPlayerSelect = (playerId: string, isSelected: boolean | string) => {
-    setPlayersToAdd(prev => {
-        const newSelections = {...prev};
-        const player = rosterPlayers.find(p => p.id === playerId);
-        const event = events.find(e => e.id === confToAddPlayer?.eventId);
-        if (isSelected && player && event) {
-            const expDate = player.uscfExpiration ? new Date(player.uscfExpiration) : null;
-            const isExpired = !expDate || expDate < new Date(event.date);
-            newSelections[playerId] = { 
-                byes: { round1: 'none', round2: 'none' }, section: player.section!, 
-                uscfStatus: player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current', 
-                studentType: player.studentType,
-            };
-        } else { delete newSelections[playerId]; }
-        return newSelections;
-    });
-  };
-  
-  const handlePlayerChange = (playerId: string, field: 'section' | 'uscfStatus', value: string) => {
-      setPlayersToAdd(prev => {
-          const newSelections = {...prev};
-          if (newSelections[playerId]) {
-              (newSelections[playerId] as any)[field] = value;
-          }
-          return newSelections;
-      });
-  };
-
-  const handleUpdateRegistration = async (conf: Confirmation, newSelections: RegistrationSelections, updatedRequestId?: string) => {
-      const event = events.find(e => e.id === conf.eventId);
-      if (!event || !sponsorProfile) return;
-      
-      setIsUpdatingInvoice(conf.id);
-      
-      try {
-          // 1. Cancel old invoice if it exists
-          if (conf.invoiceId) {
-              await cancelInvoice({ invoiceId: conf.invoiceId });
-          }
-
-          // 2. Create new invoice with updated selections
-          let registrationFeePerPlayer = event.regularFee;
-          const now = new Date();
-          const eventDate = new Date(event.date);
-          if (isSameDay(eventDate, now)) { registrationFeePerPlayer = event.dayOfFee; }
-          else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = event.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = event.lateFee; } }
-
-          const playersToInvoice = Object.entries(newSelections).map(([playerId, registration]) => {
-              const player = getPlayerById(playerId)!;
-              const lateFeeAmount = registrationFeePerPlayer - event.regularFee;
-              return { playerName: `${player.firstName} ${player.lastName}`, uscfId: player.uscfId, baseRegistrationFee: event.regularFee, lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0, uscfAction: registration.uscfStatus !== 'current', };
-          });
-          
-          const result = await createInvoice({
-              sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, sponsorEmail: sponsorProfile.email, schoolName: sponsorProfile.school, teamCode: conf.teamCode,
-              eventName: event.name, eventDate: event.date, uscfFee: 24, players: playersToInvoice
-          });
-
-          // 3. Update confirmation in local storage
-          const totalInvoiced = playersToInvoice.reduce((acc, p) => acc + p.baseRegistrationFee + p.lateFee + (p.uscfAction ? 24 : 0), 0);
-          const updatedConf: Confirmation = { ...conf, selections: newSelections, invoiceId: result.invoiceId, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, totalInvoiced, invoiceStatus: result.status };
-          
-          const updatedConfirmations = confirmations.map(c => c.id === conf.id ? updatedConf : c);
-          localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-
-          // 4. Update change request status if applicable
-          if (updatedRequestId) {
-              const updatedRequests = changeRequests.map(req => req.id === updatedRequestId ? { ...req, status: 'Approved' } : req);
-              setChangeRequests(updatedRequests);
-              localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-          }
-          
-          window.dispatchEvent(new Event('confirmationsUpdated'));
-          toast({ title: "Registration Updated", description: `The registration has been updated and a new invoice (${result.invoiceNumber}) has been created.` });
-
-      } catch (error) {
-          console.error("Failed to update registration:", error);
-          const description = error instanceof Error ? error.message : "An unknown error occurred.";
-          toast({ variant: "destructive", title: "Update Failed", description });
-      } finally {
-          setIsUpdatingInvoice(null);
-          setIsAddPlayerDialogOpen(false);
-          setPlayersToAdd({});
-      }
-  };
-  
-  const handleRemovePlayer = (conf: Confirmation, playerIdToRemove: string, requestId?: string) => {
-    const newSelections = { ...conf.selections };
-    delete newSelections[playerIdToRemove];
-    handleUpdateRegistration(conf, newSelections, requestId);
-  };
-
-  const handleConfirmAddPlayers = () => {
-      if (!confToAddPlayer) return;
-      const combinedSelections = { ...confToAddPlayer.selections, ...playersToAdd };
-      handleUpdateRegistration(confToAddPlayer, combinedSelections);
-  };
-
   return (
     <AppLayout>
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold font-headline">Registration Confirmations</h1>
-          <p className="text-muted-foreground"> A history of all your event registration submissions. You can add or remove players from existing registrations here.</p>
+          <p className="text-muted-foreground"> A history of all your event registration submissions. Attach your PO here.</p>
         </div>
 
         {authError && ( <Alert variant="destructive"><AlertTitle>File Uploads Disabled</AlertTitle><AlertDescription>{authError}</AlertDescription></Alert> )}
@@ -513,19 +372,15 @@ export default function ConfirmationsPage() {
                   const currentInputs = confInputs[conf.id] || {};
                   const selectedMethod = currentInputs.paymentMethod || 'po';
                   const currentStatus = statuses[conf.id];
-                  const isLoading = isUpdating[conf.id] || !isAuthReady || isUpdatingInvoice === conf.id;
-                  const showStudentTypeColumn = sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
+                  const isLoading = isUpdating[conf.id] || !isAuthReady;
                   const pendingRequest = changeRequests.find(req => req.confirmationId === conf.id && req.status === 'Pending');
 
                   return (
-                  <AccordionItem key={conf.id} value={conf.id} id={conf.id}>
+                  <AccordionItem key={conf.id} value={conf.id}>
                     <AccordionTrigger>
                       <div className="flex justify-between items-center w-full pr-4">
                         <div className="flex flex-col items-start text-left">
-                          <div className="flex items-baseline gap-2">
-                            <span className="font-semibold">{conf.eventName}</span>
-                            {conf.invoiceNumber && ( <span className="text-sm font-normal text-muted-foreground">(Inv. {conf.invoiceNumber})</span> )}
-                          </div>
+                          <span className="font-semibold">{conf.eventName}</span>
                           <span className="text-sm text-muted-foreground"> Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')} </span>
                         </div>
                         <div className="flex items-center gap-4">
@@ -542,11 +397,9 @@ export default function ConfirmationsPage() {
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center flex-wrap gap-2">
+                        <div className="flex justify-between items-center">
                             <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                {isUpdatingInvoice === conf.id && ( <div className="flex items-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Updating Invoice...</div> )}
-                                {sponsorProfile?.role === 'sponsor' && ( <Button variant="secondary" size="sm" onClick={() => handleOpenAddPlayerDialog(conf)} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button> )}
+                            <div className="flex items-center gap-2">
                                 <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)} disabled={isLoading}> <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change </Button>
                                 {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
                                     <Button variant="secondary" size="sm" onClick={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
@@ -560,52 +413,42 @@ export default function ConfirmationsPage() {
                             </div>
                         </div>
                         
-                        {pendingRequest && (
-                            <Alert variant='destructive'>
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertTitle>Pending Change Request</AlertTitle>
-                                <AlertDescription>
-                                    Player: <strong>{pendingRequest.player}</strong> | Request: <strong>{pendingRequest.type}</strong>
-                                    <br/>Details: {pendingRequest.details || "No additional details."}
-                                    {sponsorProfile?.role === 'organizer' && (
-                                        <div className="mt-2">
-                                            <Button size="sm" onClick={() => handleRemovePlayer(conf, playersMap.get(changeRequestInputs.playerId!)!.id, pendingRequest.id)}>Approve Withdrawal</Button>
-                                        </div>
-                                    )}
-                                </AlertDescription>
-                            </Alert>
-                        )}
-                        
                         <Table>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Player</TableHead>
-                              <TableHead>Team Code</TableHead>
                               <TableHead>Section</TableHead>
                               <TableHead>USCF Status</TableHead>
-                              {showStudentTypeColumn && <TableHead>Student Type</TableHead>}
-                              <TableHead>Byes</TableHead>
-                              {sponsorProfile?.role === 'organizer' && <TableHead className="text-right">Actions</TableHead>}
+                              <TableHead>Byes Requested</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {Object.entries(conf.selections).map(([playerId, details]) => {
                               const player = getPlayerById(playerId);
                               if (!player) return null;
+                              const isPendingChange = pendingRequest && pendingRequest.player === `${player.firstName} ${player.lastName}`;
+
                               const byeText = [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None';
                               return (
                                 <TableRow key={playerId}>
-                                  <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
-                                  <TableCell className="font-mono">{sponsorProfile ? generateTeamCode({ schoolName: sponsorProfile.school, district: sponsorProfile.district, studentType: details.studentType }) : '...'}</TableCell>
+                                  <TableCell className="font-medium flex items-center gap-2">
+                                    {player.firstName} {player.lastName}
+                                    {isPendingChange && (
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger>
+                                            <Info className="h-4 w-4 text-blue-500" />
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>This player has a pending change request.</p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    )}
+                                  </TableCell>
                                   <TableCell>{details.section}</TableCell>
                                   <TableCell><Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge></TableCell>
-                                  {showStudentTypeColumn && (<TableCell>{details.studentType === 'gt' ? 'GT Student' : details.studentType === 'independent' ? 'Independent' : <span className="text-muted-foreground">N/A</span>}</TableCell>)}
                                   <TableCell>{byeText}</TableCell>
-                                  {sponsorProfile?.role === 'organizer' && (
-                                    <TableCell className="text-right">
-                                        <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleRemovePlayer(conf, playerId)} disabled={isLoading}><Trash2 className="h-4 w-4" /></Button>
-                                    </TableCell>
-                                  )}
                                 </TableRow>
                               );
                             })}
@@ -645,21 +488,6 @@ export default function ConfirmationsPage() {
 
       <AlertDialog open={isCompAlertOpen} onOpenChange={setIsCompAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will cancel the **entire invoice** for this registration. All players on this submission will be marked as complimentary, and no payment will be due. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setConfToComp(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleCompRegistration} className="bg-primary hover:bg-primary/90">Confirm & Comp</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}><DialogContent><DialogHeader><DialogTitle>Request a Change</DialogTitle><DialogDescription>Submit a request to the tournament organizer regarding this registration for "{confToRequestChange?.eventName}".</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="request-player">Player</Label><Select value={changeRequestInputs.playerId} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, playerId: value}))}><SelectTrigger id="request-player"><SelectValue placeholder="Select a player..." /></SelectTrigger><SelectContent>{confToRequestChange && Object.keys(confToRequestChange.selections).map(playerId => { const player = getPlayerById(playerId); return player ? <SelectItem key={playerId} value={playerId}>{player.firstName} {player.lastName}</SelectItem> : null; })}</SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-type">Request Type</Label><Select value={changeRequestInputs.requestType} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, requestType: value}))}><SelectTrigger id="request-type"><SelectValue placeholder="Select a request type..." /></SelectTrigger><SelectContent><SelectItem value="Withdraw Player">Withdraw Player</SelectItem><SelectItem value="Section Change">Section Change</SelectItem><SelectItem value="Bye Request">Bye Request</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-details">Details</Label><Textarea id="request-details" placeholder="Provide any additional details for the organizer..." value={changeRequestInputs.details || ''} onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))} /></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button><Button onClick={handleSubmitChangeRequest}>Submit Request</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={isAddPlayerDialogOpen} onOpenChange={setIsAddPlayerDialogOpen}><DialogContent className="sm:max-w-3xl"><DialogHeader><DialogTitle>Add Players to Registration</DialogTitle><DialogDescription>Select players from your roster to add to "{confToAddPlayer?.eventName}".</DialogDescription></DialogHeader>
-        <div className="py-4">
-          <ScrollArea className="h-72"><div className="pr-4 space-y-2">
-            {rosterPlayers.filter(p => confToAddPlayer && !confToAddPlayer.selections[p.id]).map(player => (
-                <div key={player.id} className="items-start gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr]">
-                    <Checkbox id={`add-${player.id}`} checked={!!playersToAdd[player.id]} onCheckedChange={(checked) => handleAddPlayerSelect(player.id, checked)} className="mt-1" />
-                    <div className="grid gap-2">
-                        <Label htmlFor={`add-${player.id}`} className="font-medium cursor-pointer">{player.firstName} {player.lastName}</Label>
-                        {!!playersToAdd[player.id] && (<div className="grid grid-cols-2 gap-4"><div className="grid gap-1.5"><Label className="text-xs">Section</Label><Select onValueChange={(value) => handlePlayerChange(player.id, 'section', value)} defaultValue={player.section}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-1.5"><Label className="text-xs">USCF Status</Label><Select onValueChange={(value) => handlePlayerChange(player.id, 'uscfStatus', value)} defaultValue={playersToAdd[player.id]?.uscfStatus}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="current">Current</SelectItem><SelectItem value="new">New (+$24)</SelectItem><SelectItem value="renewing">Renew (+$24)</SelectItem></SelectContent></Select></div></div> )}
-                    </div>
-                </div>
-            ))}
-          </div></ScrollArea>
-        </div>
-      <DialogFooter><DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose><Button onClick={handleConfirmAddPlayers}>Add Players and Update Invoice</Button></DialogFooter></DialogContent></Dialog>
     </AppLayout>
   );
 }
