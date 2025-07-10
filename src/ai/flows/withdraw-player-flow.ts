@@ -83,42 +83,41 @@ const withdrawPlayerFlow = ai.defineFlow(
       if (!updatableStatuses.includes(invoice.status!)) {
         throw new Error(`Invoice is in status ${invoice.status} and cannot be modified. Player must be withdrawn manually and a credit/refund issued if applicable.`);
       }
-
-      const updatedInvoice: Invoice = JSON.parse(JSON.stringify(invoice));
+      
       let playerFound = false;
       const lowerPlayerName = playerName.toLowerCase();
 
-      if (!updatedInvoice.lineItems) {
-        updatedInvoice.lineItems = [];
+      if (!invoice.lineItems) {
+        invoice.lineItems = [];
       }
-
-      for (const item of updatedInvoice.lineItems) {
+      
+      // Directly modify the line items from the fetched invoice
+      for (const item of invoice.lineItems) {
         if (!item.note) continue;
 
         const noteLines = item.note.split('\n');
-        const originalNoteLines = [...noteLines];
         let noteWasModified = false;
         
         for (let i = 0; i < noteLines.length; i++) {
-          const line = noteLines[i];
-          // Use a flexible search that doesn't rely on strict formatting
-          if (line.toLowerCase().includes(lowerPlayerName)) {
-            playerFound = true;
-            
-            // Decrease quantity
-            const currentQuantity = parseInt(item.quantity || '1', 10);
-            if (currentQuantity > 0) {
-              item.quantity = String(currentQuantity - 1);
-            }
+            const line = noteLines[i];
+            // Use a flexible search that doesn't rely on strict formatting
+            if (line.toLowerCase().includes(lowerPlayerName)) {
+                playerFound = true;
+                
+                // Decrease quantity
+                const currentQuantity = parseInt(item.quantity || '1', 10);
+                if (currentQuantity > 0) {
+                    item.quantity = String(currentQuantity - 1);
+                }
 
-            // Mark player as withdrawn in the note
-            if (!noteLines[i].toLowerCase().includes('(withdrawn)')) {
-              noteLines[i] += ' (Withdrawn)';
-              noteWasModified = true;
+                // Mark player as withdrawn in the note
+                if (!noteLines[i].toLowerCase().includes('(withdrawn)')) {
+                    noteLines[i] += ' (Withdrawn)';
+                    noteWasModified = true;
+                }
+                // A player can only appear once in the notes, so we can break
+                break;
             }
-            // A player can only appear once in the notes, so we can break
-            break; 
-          }
         }
         
         if (noteWasModified) {
@@ -126,26 +125,28 @@ const withdrawPlayerFlow = ai.defineFlow(
         }
       }
 
+
       if (!playerFound) {
         throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
       }
       
       // Filter out any line items that now have a quantity of 0.
-      updatedInvoice.lineItems = updatedInvoice.lineItems.filter(item => parseInt(item.quantity || '0', 10) > 0);
+      invoice.lineItems = invoice.lineItems.filter(item => parseInt(item.quantity || '0', 10) > 0);
       
       // We must delete these fields as they are read-only and will cause an error if sent back.
-      delete (updatedInvoice as any).createdAt;
-      delete (updatedInvoice as any).updatedAt;
-      if (updatedInvoice.paymentRequests) {
-          updatedInvoice.paymentRequests.forEach(pr => {
-              delete (pr as any).computedAmountMoney;
-              delete (pr as any).totalCompletedAmountMoney;
+      // This is a critical step for updating invoices.
+      const invoiceToUpdate: any = invoice;
+      delete invoiceToUpdate.createdAt;
+      delete invoiceToUpdate.updatedAt;
+      if (invoiceToUpdate.paymentRequests) {
+          invoiceToUpdate.paymentRequests.forEach((pr: any) => {
+              delete pr.computedAmountMoney;
+              delete pr.totalCompletedAmountMoney;
           });
       }
 
-
       const { result: { invoice: finalInvoice } } = await invoicesApi.updateInvoice(invoiceId, {
-        invoice: updatedInvoice,
+        invoice: invoiceToUpdate,
         idempotencyKey: randomUUID(),
       });
       
