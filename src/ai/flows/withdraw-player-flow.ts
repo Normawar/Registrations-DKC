@@ -13,10 +13,12 @@ import {z} from 'genkit';
 import { ApiError, type Order, type OrderLineItem } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
+import { differenceInHours } from 'date-fns';
 
 const WithdrawPlayerInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to update.'),
   playerName: z.string().describe('The full name of the player to withdraw.'),
+  eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
 });
 export type WithdrawPlayerInput = z.infer<typeof WithdrawPlayerInputSchema>;
 
@@ -25,6 +27,7 @@ const WithdrawPlayerOutputSchema = z.object({
   orderId: z.string(),
   totalAmount: z.number(),
   status: z.string(),
+  wasInvoiceModified: z.boolean(),
 });
 export type WithdrawPlayerOutput = z.infer<typeof WithdrawPlayerOutputSchema>;
 
@@ -38,7 +41,7 @@ const withdrawPlayerFlow = ai.defineFlow(
     inputSchema: WithdrawPlayerInputSchema,
     outputSchema: WithdrawPlayerOutputSchema,
   },
-  async ({ invoiceId, playerName }) => {
+  async ({ invoiceId, playerName, eventDate }) => {
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       console.log(`Square not configured. Mock-withdrawing ${playerName} from invoice ${invoiceId}.`);
@@ -47,6 +50,7 @@ const withdrawPlayerFlow = ai.defineFlow(
         orderId: 'MOCK_ORDER_ID',
         totalAmount: 0,
         status: 'DRAFT',
+        wasInvoiceModified: true,
       };
     }
 
@@ -60,12 +64,27 @@ const withdrawPlayerFlow = ai.defineFlow(
       if (!invoice?.orderId) {
         throw new Error(`Invoice ${invoiceId} does not have an associated order ID.`);
       }
+      
+      const orderId = invoice.orderId;
+      
+      const hoursUntilEvent = differenceInHours(new Date(eventDate), new Date());
+
+      // If withdrawal is within 48 hours, do not modify the invoice.
+      if (hoursUntilEvent <= 48) {
+        console.log(`Withdrawal for ${playerName} is within 48 hours of the event. Invoice ${invoiceId} will not be modified.`);
+        return {
+          invoiceId: invoice.id!,
+          orderId: orderId,
+          totalAmount: Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount || invoice.total?.amount || 0) / 100,
+          status: invoice.status!,
+          wasInvoiceModified: false,
+        };
+      }
 
       if (invoice.status !== 'DRAFT' && invoice.status !== 'PUBLISHED' && invoice.status !== 'UNPAID' && invoice.status !== 'PARTIALLY_PAID') {
         throw new Error(`Invoice is in status ${invoice.status} and cannot be modified. Player must be withdrawn manually and a credit/refund issued if applicable.`);
       }
       
-      const orderId = invoice.orderId;
       console.log(`Fetching order ${orderId} to update line items...`);
       const { result: { order } } = await ordersApi.retrieveOrder(orderId);
 
@@ -123,6 +142,7 @@ const withdrawPlayerFlow = ai.defineFlow(
         orderId: updatedOrder!.id!,
         totalAmount: Number(finalInvoice!.paymentRequests?.[0].computedAmountMoney?.amount || finalInvoice!.total?.amount || 0) / 100,
         status: finalInvoice!.status!,
+        wasInvoiceModified: true,
       };
 
     } catch (error) {

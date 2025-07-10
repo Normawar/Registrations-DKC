@@ -128,7 +128,7 @@ export default function ConfirmationsPage() {
   const [isCompAlertOpen, setIsCompAlertOpen] = useState(false);
   const [confToComp, setConfToComp] = useState<Confirmation | null>(null);
   const [isWithdrawAlertOpen, setIsWithdrawAlertOpen] = useState(false);
-  const [playerToWithdraw, setPlayerToWithdraw] = useState<{ confId: string; playerId: string; playerName: string; invoiceId: string } | null>(null);
+  const [playerToWithdraw, setPlayerToWithdraw] = useState<{ confId: string; playerId: string; playerName: string; invoiceId: string; eventDate: string } | null>(null);
 
   
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
@@ -344,9 +344,10 @@ export default function ConfirmationsPage() {
     setIsWithdrawAlertOpen(false);
 
     try {
-      await withdrawPlayerFromInvoice({
+      const { wasInvoiceModified } = await withdrawPlayerFromInvoice({
         invoiceId: playerToWithdraw.invoiceId,
         playerName: playerToWithdraw.playerName,
+        eventDate: playerToWithdraw.eventDate,
       });
 
       // Update local confirmation state by removing the player from the selections
@@ -374,10 +375,17 @@ export default function ConfirmationsPage() {
 
       // Refresh invoice status after a short delay
       setTimeout(() => fetchInvoiceStatus(playerToWithdraw.confId, playerToWithdraw.invoiceId), 2000);
-
+      
+      let toastDescription = `${playerToWithdraw.playerName} has been marked as withdrawn and the request has been approved.`;
+      if (wasInvoiceModified) {
+          toastDescription += ` The invoice has been updated.`;
+      } else {
+          toastDescription += ` The invoice was not modified due to the 48-hour non-refundable window.`;
+      }
+      
       toast({
         title: "Player Withdrawn",
-        description: `${playerToWithdraw.playerName} has been removed from the registration, the invoice has been updated, and the request has been approved.`,
+        description: toastDescription
       });
     } catch (error) {
       console.error("Failed to withdraw player:", error);
@@ -637,7 +645,7 @@ export default function ConfirmationsPage() {
                                               size="sm"
                                               className="text-destructive hover:text-destructive"
                                               onClick={() => {
-                                                  setPlayerToWithdraw({ confId: conf.id, playerId: playerId, playerName: `${player.firstName} ${player.lastName}`, invoiceId: conf.invoiceId! });
+                                                  setPlayerToWithdraw({ confId: conf.id, playerId: playerId, playerName: `${player.firstName} ${player.lastName}`, invoiceId: conf.invoiceId!, eventDate: conf.eventDate });
                                                   setIsWithdrawAlertOpen(true);
                                               }}
                                               disabled={isLoading || !conf.invoiceId}
@@ -684,7 +692,7 @@ export default function ConfirmationsPage() {
       </div>
 
       <AlertDialog open={isCompAlertOpen} onOpenChange={setIsCompAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will cancel the **entire invoice** for this registration. All players on this submission will be marked as complimentary, and no payment will be due. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setConfToComp(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleCompRegistration} className="bg-primary hover:bg-primary/90">Confirm & Comp</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      <AlertDialog open={isWithdrawAlertOpen} onOpenChange={setIsWithdrawAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Withdraw Player?</AlertDialogTitle><AlertDialogDescription>This will remove {playerToWithdraw?.playerName} from the registration and update the invoice amount. This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setPlayerToWithdraw(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleWithdrawPlayer} className="bg-destructive hover:bg-destructive/90">Yes, Withdraw</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      <AlertDialog open={isWithdrawAlertOpen} onOpenChange={setIsWithdrawAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Withdraw Player?</AlertDialogTitle><AlertDialogDescription>This will remove {playerToWithdraw?.playerName} from the registration and update the invoice amount if outside the 48-hour non-refundable window. This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setPlayerToWithdraw(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleWithdrawPlayer} className="bg-destructive hover:bg-destructive/90">Yes, Withdraw</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       <Dialog open={isRequestDialogOpen} onOpenChange={setIsRequestDialogOpen}><DialogContent><DialogHeader><DialogTitle>Request a Change</DialogTitle><DialogDescription>Submit a request to the tournament organizer regarding this registration for "{confToRequestChange?.eventName}".</DialogDescription></DialogHeader><div className="grid gap-4 py-4"><div className="grid gap-2"><Label htmlFor="request-player">Player</Label><Select value={changeRequestInputs.playerId} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, playerId: value}))}><SelectTrigger id="request-player"><SelectValue placeholder="Select a player..." /></SelectTrigger><SelectContent>{confToRequestChange && Object.keys(confToRequestChange.selections).map(playerId => { const player = getPlayerById(playerId); return player ? <SelectItem key={playerId} value={playerId}>{player.firstName} {player.lastName}</SelectItem> : null; })}</SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-type">Request Type</Label><Select value={changeRequestInputs.requestType} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, requestType: value}))}><SelectTrigger id="request-type"><SelectValue placeholder="Select a request type..." /></SelectTrigger><SelectContent><SelectItem value="Withdraw Player">Withdraw Player</SelectItem><SelectItem value="Section Change">Section Change</SelectItem><SelectItem value="Bye Request">Bye Request</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select></div><div className="grid gap-2"><Label htmlFor="request-details">Details</Label><Textarea id="request-details" placeholder="Provide any additional details for the organizer..." value={changeRequestInputs.details || ''} onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))} /></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button><Button onClick={handleSubmitChangeRequest}>Submit Request</Button></DialogFooter></DialogContent></Dialog>
       
       <Dialog open={isAddPlayerDialogOpen} onOpenChange={setIsAddPlayerDialogOpen}>
