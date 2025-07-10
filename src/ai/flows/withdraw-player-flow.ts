@@ -75,7 +75,7 @@ const withdrawPlayerFlow = ai.defineFlow(
         return {
           invoiceId: invoice.id!,
           orderId: orderId,
-          totalAmount: Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount || invoice.total?.amount || 0) / 100,
+          totalAmount: Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount ?? 0) / 100,
           status: invoice.status!,
           wasInvoiceModified: false,
         };
@@ -92,40 +92,36 @@ const withdrawPlayerFlow = ai.defineFlow(
         throw new Error(`Could not retrieve order or order has no line items for ID: ${orderId}`);
       }
 
-      let playerFound = false;
       const sparseLineItemUpdates: OrderLineItem[] = [];
+      let playerFound = false;
 
       // Find all line items that might be associated with this player
-      const registrationItem = order.lineItems.find(item => item.name?.toLowerCase().includes('tournament registration'));
-      const lateFeeItem = order.lineItems.find(item => item.name?.toLowerCase().includes('late fee'));
-      const uscfItem = order.lineItems.find(item => item.name?.toLowerCase().includes('uscf membership'));
+      const registrationItem = order.lineItems.find(item => 
+        item.name?.toLowerCase().includes('tournament registration') && item.note?.toLowerCase().includes(playerName.toLowerCase())
+      );
+      const lateFeeItem = order.lineItems.find(item => 
+        item.name?.toLowerCase().includes('late fee') && item.note?.toLowerCase().includes(playerName.toLowerCase())
+      );
+      const uscfItem = order.lineItems.find(item => 
+        item.name?.toLowerCase().includes('uscf membership') && item.note?.toLowerCase().includes(playerName.toLowerCase())
+      );
       
-      // Check if the player is mentioned in any of the notes, which indicates they are part of that line item
-      const isPlayerInRegistrationNotes = registrationItem?.note?.toLowerCase().includes(playerName.toLowerCase());
-      const isPlayerInLateFeeNotes = lateFeeItem?.note?.toLowerCase().includes(playerName.toLowerCase());
-      const isPlayerInUscfNotes = uscfItem?.note?.toLowerCase().includes(playerName.toLowerCase());
-
-      if (registrationItem && (isPlayerInRegistrationNotes || registrationItem.quantity > '0')) {
+      if (registrationItem) {
           playerFound = true;
-          const newQuantity = parseInt(registrationItem.quantity, 10) - 1;
-          if (newQuantity >= 0) {
-              sparseLineItemUpdates.push({ uid: registrationItem.uid!, quantity: String(newQuantity) });
-          }
+          const newQuantity = Math.max(0, parseInt(registrationItem.quantity, 10) - 1);
+          sparseLineItemUpdates.push({ uid: registrationItem.uid!, quantity: String(newQuantity) });
       }
 
-      if (lateFeeItem && isPlayerInLateFeeNotes) {
-          const newQuantity = parseInt(lateFeeItem.quantity, 10) - 1;
-          if (newQuantity >= 0) {
-              sparseLineItemUpdates.push({ uid: lateFeeItem.uid!, quantity: String(newQuantity) });
-          }
+      if (lateFeeItem) {
+          const newQuantity = Math.max(0, parseInt(lateFeeItem.quantity, 10) - 1);
+          sparseLineItemUpdates.push({ uid: lateFeeItem.uid!, quantity: String(newQuantity) });
       }
 
-      if (uscfItem && isPlayerInUscfNotes) {
-          const newQuantity = parseInt(uscfItem.quantity, 10) - 1;
-          if (newQuantity >= 0) {
-              sparseLineItemUpdates.push({ uid: uscfItem.uid!, quantity: String(newQuantity) });
-          }
+      if (uscfItem) {
+          const newQuantity = Math.max(0, parseInt(uscfItem.quantity, 10) - 1);
+          sparseLineItemUpdates.push({ uid: uscfItem.uid!, quantity: String(newQuantity) });
       }
+
 
       if (!playerFound) {
         throw new Error(`Could not find a line item for player "${playerName}" to withdraw.`);
@@ -136,7 +132,7 @@ const withdrawPlayerFlow = ai.defineFlow(
           return {
             invoiceId: invoice.id!,
             orderId: orderId,
-            totalAmount: Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount || invoice.total?.amount || 0) / 100,
+            totalAmount: Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100,
             status: invoice.status!,
             wasInvoiceModified: false,
           };
@@ -161,7 +157,7 @@ const withdrawPlayerFlow = ai.defineFlow(
       return {
         invoiceId: finalInvoice!.id!,
         orderId: updatedOrder!.id!,
-        totalAmount: Number(finalInvoice!.paymentRequests?.[0].computedAmountMoney?.amount || finalInvoice!.total?.amount || 0) / 100,
+        totalAmount: Number(finalInvoice!.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100,
         status: finalInvoice!.status!,
         wasInvoiceModified: true,
       };
