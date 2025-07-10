@@ -349,7 +349,7 @@ export default function ConfirmationsPage() {
         playerName: playerToWithdraw.playerName,
       });
 
-      // Update local state by removing the player from the selections
+      // Update local confirmation state by removing the player from the selections
       const updatedConfirmations = confirmations.map(c => {
         if (c.id === playerToWithdraw.confId) {
           const newSelections = { ...c.selections };
@@ -360,13 +360,24 @@ export default function ConfirmationsPage() {
       });
       localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
       setConfirmations(updatedConfirmations);
+      
+      // Update the change request status to "Approved"
+      const updatedRequests = changeRequests.map(req => {
+        if (req.confirmationId === playerToWithdraw.confId && req.player === playerToWithdraw.playerName && req.type.includes('Withdraw')) {
+          return { ...req, status: 'Approved' as const };
+        }
+        return req;
+      });
+      localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+      setChangeRequests(updatedRequests);
+      window.dispatchEvent(new Event('storage')); // Notify other tabs/pages
 
       // Refresh invoice status after a short delay
       setTimeout(() => fetchInvoiceStatus(playerToWithdraw.confId, playerToWithdraw.invoiceId), 2000);
 
       toast({
         title: "Player Withdrawn",
-        description: `${playerToWithdraw.playerName} has been removed from the registration and the invoice has been updated.`,
+        description: `${playerToWithdraw.playerName} has been removed from the registration, the invoice has been updated, and the request has been approved.`,
       });
     } catch (error) {
       console.error("Failed to withdraw player:", error);
