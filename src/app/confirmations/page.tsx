@@ -222,27 +222,27 @@ export default function ConfirmationsPage() {
         const lowercasedQuery = searchQuery.toLowerCase();
         
         filtered = filtered.filter(conf => {
-            // Search by event name or invoice number
             if (conf.eventName.toLowerCase().includes(lowercasedQuery) ||
                 (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery))) {
                 return true;
             }
 
-            // Check if search query is JUST a month name
             const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
             const isMonthQuery = monthNames.includes(lowercasedQuery);
-            
-            if (isMonthQuery && conf.eventDate) {
-                const eventDate = new Date(conf.eventDate);
-                if (isValid(eventDate) && format(eventDate, 'MMMM').toLowerCase() === lowercasedQuery) {
-                    return true;
+
+            if (isMonthQuery) {
+                if (conf.submissionTimestamp) {
+                    const submissionDate = new Date(conf.submissionTimestamp);
+                    if (isValid(submissionDate) && format(submissionDate, 'MMMM').toLowerCase() === lowercasedQuery) {
+                        return true;
+                    }
                 }
-            } else if (conf.eventDate) { // If not just a month name, try to parse as a full date.
+            } else {
                 try {
                     const parsedDate = new Date(searchQuery);
                     if (isValid(parsedDate)) {
-                        const eventDate = new Date(conf.eventDate);
-                        if (isValid(eventDate) && isSameDay(parsedDate, eventDate)) {
+                        const submissionDate = new Date(conf.submissionTimestamp);
+                        if (isValid(submissionDate) && isSameDay(parsedDate, submissionDate)) {
                             return true;
                         }
                     }
@@ -1446,3 +1446,6 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
     );
 }
 
+
+
+    
