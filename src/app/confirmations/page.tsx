@@ -790,6 +790,15 @@ export default function ConfirmationsPage() {
             setChangeAlertContent({ title: changeDetails.title, description: changeDetails.description });
             setChangeAction(() => changeDetails.action);
             setIsChangeAlertOpen(true);
+        } else {
+            // Default action for other types like "Section Change" is to just log it
+             const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+            const approvalTimestamp = new Date().toISOString();
+            const approvedRequest = { ...newRequest, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
+            const updatedRequests = [approvedRequest, ...changeRequests];
+            setChangeRequests(updatedRequests);
+            localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+            toast({ title: 'Change Logged', description: `Your change for ${newRequest.player} has been approved and logged.` });
         }
 
     } else {
