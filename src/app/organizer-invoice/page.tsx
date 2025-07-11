@@ -76,24 +76,26 @@ export default function OrganizerInvoicePage() {
       const allInvoicesRaw = localStorage.getItem('all_invoices');
       if (allInvoicesRaw) {
         const allInvoices = JSON.parse(allInvoicesRaw);
-        const invoiceToEdit = allInvoices.find((inv: any) => inv.invoiceId === editId);
+        const invoiceToEdit = allInvoices.find((inv: any) => inv.id === editId);
         
         if (invoiceToEdit) {
           setIsEditing(true);
           let lineItems: z.infer<typeof lineItemSchema>[] = [];
           
-          if (invoiceToEdit.lineItems) {
-            // It's a custom organizer invoice
+          if (invoiceToEdit.type === 'organizer' && invoiceToEdit.lineItems) {
             lineItems = invoiceToEdit.lineItems;
           } else if (invoiceToEdit.type === 'event' && invoiceToEdit.eventId) {
-            // It's an event registration, so we need to generate line items
             const eventDetails = events.find(e => e.id === invoiceToEdit.eventId);
             if (eventDetails) {
-              let registrationFeePerPlayer = eventDetails.regularFee;
+              const submissionDate = new Date(invoiceToEdit.submissionTimestamp);
               const eventDate = new Date(eventDetails.date);
-              const now = new Date();
-              if (isSameDay(eventDate, now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
-              else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
+              
+              let registrationFeePerPlayer = eventDetails.regularFee;
+              const hoursUntilEvent = differenceInHours(eventDate, submissionDate);
+              
+              if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } 
+              else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; }
+              if (isSameDay(eventDate, submissionDate)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
               
               const uscfFee = 24;
               
@@ -101,10 +103,8 @@ export default function OrganizerInvoicePage() {
                 const player = allPlayers.find(p => p.id === playerId);
                 const playerName = player ? `${player.firstName} ${player.lastName}` : `Player ${playerId}`;
                 
-                // Add registration fee
                 lineItems.push({ name: `Registration for ${playerName}`, amount: registrationFeePerPlayer, note: `Event: ${eventDetails.name}, Section: ${details.section}` });
                 
-                // Add USCF fee if applicable
                 if (details.uscfStatus === 'new' || details.uscfStatus === 'renewing') {
                   lineItems.push({ name: `USCF Membership for ${playerName}`, amount: uscfFee, note: `Status: ${details.uscfStatus}` });
                 }
@@ -137,7 +137,6 @@ export default function OrganizerInvoicePage() {
     try {
       let result;
       if (isEditing && originalInvoiceId) {
-        // Handle editing by recreating the invoice
         result = await recreateOrganizerInvoice({
           originalInvoiceId: originalInvoiceId,
           sponsorName: values.sponsorName,
@@ -147,7 +146,6 @@ export default function OrganizerInvoicePage() {
           lineItems: values.lineItems,
         });
       } else {
-        // Handle new invoice creation
         result = await createOrganizerInvoice({
           sponsorName: values.sponsorName,
           sponsorEmail: values.sponsorEmail,
@@ -158,8 +156,8 @@ export default function OrganizerInvoicePage() {
       }
       
       const newOrganizerInvoice = {
-        id: result.invoiceId,
-        invoiceId: result.invoiceId,
+        id: result.newInvoiceId || result.invoiceId, // Use the new ID if it exists
+        invoiceId: result.newInvoiceId || result.invoiceId,
         type: 'organizer',
         invoiceTitle: values.invoiceTitle,
         description: values.invoiceTitle,
@@ -179,9 +177,8 @@ export default function OrganizerInvoicePage() {
       
       let finalInvoices;
       if (isEditing && originalInvoiceId) {
-        // Mark the old one as canceled and add the new one.
         finalInvoices = existingInvoices.map((inv: any) => 
-            inv.invoiceId === originalInvoiceId ? { ...inv, invoiceStatus: 'CANCELED', status: 'CANCELED' } : inv
+            inv.id === originalInvoiceId ? { ...inv, invoiceStatus: 'CANCELED', status: 'CANCELED' } : inv
         );
         finalInvoices.push(newOrganizerInvoice);
       } else {
@@ -376,4 +373,3 @@ export default function OrganizerInvoicePage() {
     </AppLayout>
   );
 }
-
