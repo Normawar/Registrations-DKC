@@ -32,7 +32,7 @@ const flow = ai.defineFlow(
     outputSchema: DeprecatedOutputSchema,
   },
   async () => {
-    const errorMsg = "This flow is deprecated. Use recreate-invoice-from-roster-flow instead.";
+    const errorMsg = "This flow is deprecated. Use recreate-invoice-from-roster-flow instead. The Square API does not allow editing line items on a published invoice.";
     console.error(errorMsg);
     throw new Error(errorMsg);
   }

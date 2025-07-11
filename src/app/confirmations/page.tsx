@@ -139,6 +139,10 @@ type Confirmation = {
   paymentFileName?: string;
   paymentFileUrl?: string;
   invoiceStatus?: string;
+  // Fields needed to recreate invoice
+  sponsorName: string; 
+  sponsorEmail: string;
+  schoolName: string;
 };
 
 type ConfirmationInputs = {
@@ -397,107 +401,117 @@ export default function ConfirmationsPage() {
   };
 
    const handleWithdrawPlayerAction = async (confId: string, playerIds: string[]) => {
-    if (!sponsorProfile) return;
-
-    const originalConfirmation = confirmations.find(c => c.id === confId);
-    if (!originalConfirmation || !originalConfirmation.invoiceId) {
-        toast({ variant: "destructive", title: "Error", description: "Could not find original confirmation or invoice ID." });
-        return;
-    }
-
-    setIsUpdating(prev => ({ ...prev, [confId]: true }));
-    setIsChangeAlertOpen(false);
-    
-    const activePlayerIds = Object.keys(originalConfirmation.selections)
-      .filter(id => !playerIds.includes(id) && originalConfirmation.selections[id].status !== 'withdrawn');
-    
-    const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
-
-    if (!eventDetails) {
-        toast({ variant: "destructive", title: "Event Error", description: "Could not find event details to rebuild invoice." });
-        setIsUpdating(prev => ({ ...prev, [confId]: false }));
-        return;
-    }
-
-    let registrationFeePerPlayer = eventDetails.regularFee;
-    const now = new Date();
-    if (isSameDay(new Date(eventDetails.date), now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
-    else { const hoursUntilEvent = differenceInHours(new Date(eventDetails.date), now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
-
-    const updatedPlayersForInvoice = activePlayerIds.map(id => {
-        const player = getPlayerById(id)!;
-        const registrationDetails = originalConfirmation.selections[id];
-        const lateFeeAmount = registrationFeePerPlayer - eventDetails.regularFee;
-        return {
-            playerName: `${player.firstName} ${player.lastName}`,
-            uscfId: player.uscfId,
-            baseRegistrationFee: eventDetails.regularFee,
-            lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-            uscfAction: registrationDetails.uscfStatus !== 'current',
-        };
-    });
-    
-    try {
-        const result = await recreateInvoiceFromRoster({
-            originalInvoiceId: originalConfirmation.invoiceId,
-            players: updatedPlayersForInvoice,
-            uscfFee: 24,
-            sponsorEmail: sponsorProfile.email,
-            sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
-            schoolName: sponsorProfile.school,
-            teamCode: originalConfirmation.teamCode,
-            eventName: originalConfirmation.eventName,
-            eventDate: originalConfirmation.eventDate,
-        });
-
-      const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-      const approvalTimestamp = new Date().toISOString();
-
-      const updatedConfirmations = confirmations.map(c => {
-        if (c.id === confId) {
-          const newSelections = { ...c.selections };
-          playerIds.forEach(id => {
-            if (newSelections[id]) {
-                newSelections[id] = { ...newSelections[id], status: 'withdrawn', withdrawnBy: initials, withdrawnAt: approvalTimestamp };
-            }
-          });
-          // Update the existing confirmation with the NEW invoice details, but keep the original ID for the accordion
-          return { ...c, selections: newSelections, invoiceId: result.newInvoiceId, invoiceUrl: result.newInvoiceUrl, totalInvoiced: result.newTotalAmount, invoiceNumber: result.newInvoiceNumber, invoiceStatus: result.newStatus };
+        if (!sponsorProfile || sponsorProfile.role !== 'organizer') {
+            toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to perform this action." });
+            return;
         }
-        return c;
-      });
-      localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-      
-      const withdrawnPlayerNames = playerIds.map(id => {
-          const p = getPlayerById(id);
-          return p ? `${p.firstName} ${p.lastName}` : 'Unknown Player';
-      });
 
-      const updatedRequests = changeRequests.map(req => {
-        if (req.confirmationId === confId && withdrawnPlayerNames.includes(req.player) && req.type.includes('Withdraw')) {
-          return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
+        setIsUpdating(prev => ({ ...prev, [confId]: true }));
+        setIsChangeAlertOpen(false);
+        const confToUpdate = confirmations.find(c => c.id === confId);
+        const eventDetails = events.find(e => e.id === confToUpdate?.eventId);
+        if (!confToUpdate || !eventDetails || !confToUpdate.invoiceId) {
+            toast({ variant: "destructive", title: "Error", description: "Could not find necessary information to update the invoice." });
+            setIsUpdating(prev => ({ ...prev, [confId]: false }));
+            return;
         }
-        return req;
-      });
-      localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-      
-      loadAllData();
-      window.dispatchEvent(new Event('storage'));
 
-      toast({
-        title: "Player(s) Withdrawn & New Invoice Created",
-        description: `The old invoice was canceled and a new one (${result.newInvoiceNumber}) was created for the remaining players.`
-      });
+        try {
+            const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+            const approvalTimestamp = new Date().toISOString();
 
-    } catch (error) {
-      console.error("Failed to withdraw player(s):", error);
-      const description = error instanceof Error ? error.message : "An unknown error occurred.";
-      toast({ variant: "destructive", title: "Withdrawal Failed", description });
-    } finally {
-      setIsUpdating(prev => ({ ...prev, [confId]: false }));
-      setSelectedPlayersForWithdraw(prev => ({...prev, [confId]: [] }));
-    }
-  };
+            // Mark players as withdrawn locally first for UI update
+            const updatedSelections = { ...confToUpdate.selections };
+            playerIds.forEach(id => {
+                if (updatedSelections[id]) {
+                    updatedSelections[id] = { ...updatedSelections[id], status: 'withdrawn', withdrawnBy: initials, withdrawnAt: approvalTimestamp };
+                }
+            });
+
+            // Re-create the invoice with the remaining active players
+            const activePlayers = Object.entries(updatedSelections)
+                .filter(([_, details]) => details.status !== 'withdrawn')
+                .map(([playerId]) => getPlayerById(playerId)!);
+            
+            let registrationFeePerPlayer = eventDetails.regularFee;
+            const eventDate = new Date(eventDetails.date);
+            const now = new Date();
+            if (isSameDay(eventDate, now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
+            else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
+
+            const newInvoicePlayers = activePlayers.map(player => {
+                const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < eventDate;
+                const uscfStatus = player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
+                const lateFeeAmount = registrationFeePerPlayer - eventDetails.regularFee;
+                return {
+                    playerName: `${player.firstName} ${player.lastName}`,
+                    uscfId: player.uscfId,
+                    baseRegistrationFee: eventDetails.regularFee,
+                    lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+                    uscfAction: uscfStatus !== 'current',
+                };
+            });
+
+            const result = await recreateInvoiceFromRoster({
+                originalInvoiceId: confToUpdate.invoiceId!,
+                players: newInvoicePlayers,
+                uscfFee: 24, // Assuming a standard fee
+                sponsorName: confToUpdate.sponsorName,
+                sponsorEmail: confToUpdate.sponsorEmail,
+                schoolName: confToUpdate.schoolName,
+                teamCode: confToUpdate.teamCode,
+                eventName: confToUpdate.eventName,
+                eventDate: confToUpdate.eventDate,
+            });
+
+            // Update the main confirmations array with the new invoice data and withdrawn players
+            const finalConfirmations = confirmations.map(c => {
+                if (c.id === confId) {
+                    return {
+                        ...c,
+                        id: result.newInvoiceId, // The ID of the confirmation now becomes the new invoice ID
+                        invoiceId: result.newInvoiceId,
+                        invoiceNumber: result.newInvoiceNumber,
+                        invoiceUrl: result.newInvoiceUrl,
+                        invoiceStatus: result.newStatus,
+                        totalInvoiced: result.newTotalAmount,
+                        selections: updatedSelections,
+                    };
+                }
+                return c;
+            });
+            localStorage.setItem('confirmations', JSON.stringify(finalConfirmations));
+
+            const withdrawnPlayerNames = playerIds.map(id => {
+                const p = getPlayerById(id);
+                return p ? `${p.firstName} ${p.lastName}` : 'Unknown Player';
+            });
+            const updatedRequests = changeRequests.map(req => {
+                if (req.confirmationId === confId && withdrawnPlayerNames.includes(req.player) && req.type.includes('Withdraw')) {
+                    return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
+                }
+                return req;
+            });
+            localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+
+            loadAllData(); // Reload all data to ensure UI consistency
+            window.dispatchEvent(new Event('storage'));
+
+            toast({
+                title: "Player(s) Withdrawn & Invoice Recreated",
+                description: `A new invoice (${result.newInvoiceNumber}) has been created.`
+            });
+
+        } catch (error) {
+            console.error("Failed to withdraw player(s) and recreate invoice:", error);
+            const description = error instanceof Error ? error.message : "An unknown error occurred during withdrawal.";
+            toast({ variant: "destructive", title: "Withdrawal Failed", description });
+            loadAllData(); // Reload to revert optimistic UI changes on failure
+        } finally {
+            setIsUpdating(prev => ({ ...prev, [confId]: false }));
+            setSelectedPlayersForWithdraw(prev => ({...prev, [confId]: [] }));
+        }
+    };
   
   const handleOpenRequestDialog = (conf: Confirmation) => {
     setConfToRequestChange(conf);
@@ -573,7 +587,7 @@ export default function ConfirmationsPage() {
         const actionMap: Record<string, { title: string; description: string; action: () => void }> = {
             'Withdraw Player': {
                 title: `Withdraw ${newRequest.player}?`,
-                description: `This will remove ${newRequest.player} from the registration for "${newRequest.event}" and update the invoice. This action cannot be undone.`,
+                description: `This will mark ${newRequest.player} as withdrawn and recreate the invoice with an updated total. This action cannot be undone.`,
                 action: () => handleWithdrawPlayerAction(newRequest.confirmationId, [changeRequestInputs.playerId!])
             },
             'Bye Request': {
@@ -939,14 +953,14 @@ export default function ConfirmationsPage() {
                                       onClick={() => {
                                           setChangeAlertContent({
                                               title: `Withdraw ${selectedWithdrawalIds.length} Player(s)?`,
-                                              description: `This will remove the selected player(s) and update the invoice. This action cannot be undone.`
+                                              description: `This action will recreate the invoice to remove the selected players and update the total amount due. The original invoice will be canceled. This cannot be undone.`
                                           });
                                           setChangeAction(() => () => handleWithdrawPlayerAction(conf.id, selectedWithdrawalIds));
                                           setIsChangeAlertOpen(true);
                                       }}
-                                      disabled={isLoading || !conf.invoiceId || selectedWithdrawalIds.length === 0}
+                                      disabled={isLoading || selectedWithdrawalIds.length === 0}
                                   >
-                                      <UserMinus className="mr-2 h-4 w-4" /> Withdraw Selected ({selectedWithdrawalIds.length})
+                                      <UserMinus className="mr-2 h-4 w-4" /> Withdraw Selected & Recreate Invoice ({selectedWithdrawalIds.length})
                                   </Button>
                               </div>
                           )}
