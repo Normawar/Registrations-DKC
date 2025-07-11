@@ -32,7 +32,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -165,6 +165,8 @@ type ChangeRequestInputs = {
   byeRound2?: string;
 };
 
+type SortableColumnKey = 'eventName' | 'submissionTimestamp' | 'totalInvoiced';
+
 export default function ConfirmationsPage() {
   const { toast } = useToast();
   const { profile: sponsorProfile } = useSponsorProfile();
@@ -203,6 +205,8 @@ export default function ConfirmationsPage() {
   const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
 
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'submissionTimestamp', direction: 'descending' });
+
   const playerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
   });
@@ -210,6 +214,48 @@ export default function ConfirmationsPage() {
   const playersMap = useMemo(() => {
     return new Map(allPlayers.map(p => [p.id, p]));
   }, [allPlayers]);
+
+  const sortedConfirmations = useMemo(() => {
+    const sortableConfirmations = [...confirmations];
+    if (sortConfig) {
+      sortableConfirmations.sort((a, b) => {
+        let aValue: any = a[sortConfig.key];
+        let bValue: any = b[sortConfig.key];
+        
+        if (sortConfig.key === 'submissionTimestamp') {
+            aValue = new Date(a.submissionTimestamp).getTime();
+            bValue = new Date(b.submissionTimestamp).getTime();
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableConfirmations;
+  }, [confirmations, sortConfig]);
+
+  const requestSort = (key: SortableColumnKey) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnKey: SortableColumnKey) => {
+    if (!sortConfig || sortConfig.key !== columnKey) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    if (sortConfig.direction === 'ascending') {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
 
   const confirmationsMap = useMemo(() => {
     return new Map(confirmations.map(c => [c.id, c]));
@@ -275,7 +321,6 @@ export default function ConfirmationsPage() {
   const loadAllData = useCallback(() => {
     try {
       const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      storedConfirmations.sort((a: Confirmation, b: Confirmation) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
       setConfirmations(storedConfirmations);
 
       const storedRequests = localStorage.getItem('change_requests');
@@ -470,7 +515,7 @@ export default function ConfirmationsPage() {
               };
           });
           
-          const sponsorNameForInvoice = confToUpdate.sponsorName || sponsorProfile.firstName + ' ' + sponsorProfile.lastName;
+          const sponsorNameForInvoice = confToUpdate.sponsorName || `${sponsorProfile.firstName} ${sponsorProfile.lastName}`;
           const sponsorEmailForInvoice = confToUpdate.sponsorEmail || sponsorProfile.email;
 
           const result = await recreateInvoiceFromRoster({
@@ -617,6 +662,7 @@ export default function ConfirmationsPage() {
         type: changeRequestInputs.requestType,
         details: changeRequestInputs.details || '',
         submitted: new Date().toISOString(),
+        submittedBy: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
         status: 'Pending',
     };
     
@@ -826,7 +872,7 @@ export default function ConfirmationsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Registration Confirmations</CardTitle>
-            <CardDescription>Click on a submission to view its details.</CardDescription>
+            <CardDescription>Click on a submission to view its details. Column headers are sortable.</CardDescription>
           </CardHeader>
           <CardContent>
             {confirmations.length === 0 ? (
@@ -837,7 +883,7 @@ export default function ConfirmationsPage() {
               </div>
             ) : (
               <Accordion type="single" collapsible className="w-full" value={openAccordionItem} onValueChange={setOpenAccordionItem}>
-                {confirmations.map((conf) => {
+                {sortedConfirmations.map((conf) => {
                   const currentInputs = confInputs[conf.id] || {};
                   const selectedMethod = currentInputs.paymentMethod || 'po';
                   const currentStatus = statuses[conf.id];
@@ -938,7 +984,7 @@ export default function ConfirmationsPage() {
                                               <p className="font-semibold">{latestRequest.type} - {latestRequest.status}</p>
                                               {latestRequest.details && <p className="italic text-muted-foreground">"{latestRequest.details}"</p>}
                                               <p className="text-xs text-muted-foreground mt-1 pt-1 border-t">
-                                                  Submitted: {format(new Date(latestRequest.submitted), 'MM/dd/yy, p')}
+                                                  Submitted: {format(new Date(latestRequest.submitted), 'MM/dd/yy, p')} by {latestRequest.submittedBy}
                                               </p>
                                               {latestRequest.status !== 'Pending' && latestRequest.approvedBy && latestRequest.approvedAt && (
                                                   <p className="text-xs text-muted-foreground">

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -26,12 +26,15 @@ import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
+
+type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
   const { profile } = useSponsorProfile();
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'submitted', direction: 'descending' });
 
   const loadRequests = useCallback(() => {
     try {
@@ -43,13 +46,54 @@ export default function RequestsPage() {
         id: req.id || `${req.confirmationId}-${req.player.replace(/\s/g, '')}-${index}` 
       }));
 
-      const sortedRequests = allRequests.sort((a, b) => new Date(b.submitted).getTime() - new Date(a.submitted).getTime());
-      setRequests(sortedRequests);
+      setRequests(allRequests);
     } catch (e) {
       console.error("Failed to parse change requests from localStorage", e);
       setRequests(initialRequestsData);
     }
   }, []);
+
+  const sortedRequests = useMemo(() => {
+    const sortableRequests = [...requests];
+    if (sortConfig) {
+      sortableRequests.sort((a, b) => {
+        let aValue: any = a[sortConfig.key];
+        let bValue: any = b[sortConfig.key];
+
+        if (sortConfig.key === 'submitted') {
+            aValue = new Date(a.submitted).getTime();
+            bValue = new Date(b.submitted).getTime();
+        }
+        
+        if (aValue < bValue) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableRequests;
+  }, [requests, sortConfig]);
+
+  const requestSort = (key: SortableColumnKey) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (columnKey: SortableColumnKey) => {
+    if (!sortConfig || sortConfig.key !== columnKey) {
+      return <ArrowUpDown className="ml-2 h-4 w-4" />;
+    }
+    if (sortConfig.direction === 'ascending') {
+      return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
 
   useEffect(() => {
     loadRequests();
@@ -91,22 +135,24 @@ export default function RequestsPage() {
                 <Table>
                 <TableHeader>
                     <TableRow>
-                    <TableHead>Player</TableHead>
-                    <TableHead>Event</TableHead>
-                    <TableHead>Request Type</TableHead>
-                    <TableHead>Details</TableHead>
-                    <TableHead>Submitted</TableHead>
-                    <TableHead>Status</TableHead>
-                    {profile?.role === 'organizer' && <TableHead>Action</TableHead>}
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('player')} className="w-full justify-start px-4">Player {getSortIcon('player')}</Button></TableHead>
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('event')} className="w-full justify-start px-4">Event {getSortIcon('event')}</Button></TableHead>
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('type')} className="w-full justify-start px-4">Request Type {getSortIcon('type')}</Button></TableHead>
+                        <TableHead>Details</TableHead>
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('submittedBy')} className="w-full justify-start px-4">Submitted By {getSortIcon('submittedBy')}</Button></TableHead>
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('submitted')} className="w-full justify-start px-4">Submitted Date {getSortIcon('submitted')}</Button></TableHead>
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('status')} className="w-full justify-start px-4">Status {getSortIcon('status')}</Button></TableHead>
+                        {profile?.role === 'organizer' && <TableHead>Action</TableHead>}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {requests.map((request, index) => (
+                    {sortedRequests.map((request, index) => (
                     <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`}>
                         <TableCell className="font-medium">{request.player}</TableCell>
                         <TableCell>{request.event}</TableCell>
                         <TableCell>{request.type}</TableCell>
                         <TableCell>{request.details || '—'}</TableCell>
+                        <TableCell>{request.submittedBy || 'N/A'}</TableCell>
                         <TableCell>{format(new Date(request.submitted), 'MM/dd/yy, p')}</TableCell>
                         <TableCell>
                         <Badge
@@ -145,5 +191,3 @@ export default function RequestsPage() {
     </AppLayout>
   );
 }
-
-    
