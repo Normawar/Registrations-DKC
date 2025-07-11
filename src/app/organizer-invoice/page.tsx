@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { schoolData } from '@/lib/data/school-data';
 import { createOrganizerInvoice } from '@/ai/flows/create-organizer-invoice-flow';
+import { recreateOrganizerInvoice } from '@/ai/flows/recreate-organizer-invoice-flow';
 import { Loader2, PlusCircle, Trash2, ExternalLink, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
@@ -43,6 +44,7 @@ export default function OrganizerInvoicePage() {
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [originalInvoiceId, setOriginalInvoiceId] = useState<string | null>(null);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
@@ -64,18 +66,19 @@ export default function OrganizerInvoicePage() {
   useEffect(() => {
     const editId = searchParams.get('edit');
     if (editId) {
+      setOriginalInvoiceId(editId);
       const allInvoicesRaw = localStorage.getItem('all_invoices');
       if (allInvoicesRaw) {
         const allInvoices = JSON.parse(allInvoicesRaw);
-        const invoiceToEdit = allInvoices.find((inv: any) => inv.id === editId && inv.lineItems);
+        const invoiceToEdit = allInvoices.find((inv: any) => inv.invoiceId === editId && inv.lineItems);
         if (invoiceToEdit) {
           setIsEditing(true);
           form.reset({
             invoiceId: invoiceToEdit.invoiceId,
             schoolName: invoiceToEdit.schoolName,
-            sponsorName: invoiceToEdit.purchaserName,
+            sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName,
             sponsorEmail: invoiceToEdit.sponsorEmail || '',
-            invoiceTitle: invoiceToEdit.description,
+            invoiceTitle: invoiceToEdit.description.split('-rev.')[0].trim(), // Remove revision part
             lineItems: invoiceToEdit.lineItems,
           });
         }
@@ -91,31 +94,32 @@ export default function OrganizerInvoicePage() {
 
   async function onSubmit(values: InvoiceFormValues) {
     setIsLoading(true);
-    
-    // For edits, we cancel the old invoice and create a new one.
-    if (isEditing && values.invoiceId) {
-        // This flow is now just used for creation. Editing will be handled by canceling and creating a new one.
-        // For simplicity, we assume editing means creating a new invoice and the user will handle the old one.
-        // A more robust solution might involve an `updateInvoice` flow.
-        toast({
-            title: "Edits as New Invoice",
-            description: "To edit, please cancel the old invoice and create a new one with the updated details.",
-            variant: "default"
-        });
-    }
 
     try {
-      // Always create a new invoice
-      const result = await createOrganizerInvoice({
-        sponsorName: values.sponsorName,
-        sponsorEmail: values.sponsorEmail,
-        schoolName: values.schoolName,
-        invoiceTitle: values.invoiceTitle,
-        lineItems: values.lineItems,
-      });
+      let result;
+      if (isEditing && originalInvoiceId) {
+        // Handle editing by recreating the invoice
+        result = await recreateOrganizerInvoice({
+          originalInvoiceId: originalInvoiceId,
+          sponsorName: values.sponsorName,
+          sponsorEmail: values.sponsorEmail,
+          schoolName: values.schoolName,
+          invoiceTitle: values.invoiceTitle,
+          lineItems: values.lineItems,
+        });
+      } else {
+        // Handle new invoice creation
+        result = await createOrganizerInvoice({
+          sponsorName: values.sponsorName,
+          sponsorEmail: values.sponsorEmail,
+          schoolName: values.schoolName,
+          invoiceTitle: values.invoiceTitle,
+          lineItems: values.lineItems,
+        });
+      }
       
       const newOrganizerInvoice = {
-        id: result.invoiceId, // Use invoiceId as the unique ID
+        id: result.invoiceId,
         invoiceId: result.invoiceId,
         type: 'organizer',
         invoiceTitle: values.invoiceTitle,
@@ -134,17 +138,27 @@ export default function OrganizerInvoicePage() {
       
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       
-      // If editing, remove the old one.
-      const filteredInvoices = isEditing ? existingInvoices.filter((inv: any) => inv.invoiceId !== values.invoiceId) : existingInvoices;
+      let finalInvoices;
+      if (isEditing && originalInvoiceId) {
+        // Mark the old one as canceled and add the new one.
+        finalInvoices = existingInvoices.map((inv: any) => 
+            inv.invoiceId === originalInvoiceId ? { ...inv, invoiceStatus: 'CANCELED', status: 'CANCELED' } : inv
+        );
+        finalInvoices.push(newOrganizerInvoice);
+      } else {
+        finalInvoices = [...existingInvoices, newOrganizerInvoice];
+      }
 
-      localStorage.setItem('all_invoices', JSON.stringify([...filteredInvoices, newOrganizerInvoice]));
+      localStorage.setItem('all_invoices', JSON.stringify(finalInvoices));
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('all_invoices_updated'));
+
 
       toast({
         title: `Invoice ${isEditing ? 'Updated' : 'Created'} Successfully!`,
         description: (
             <p>
-              Invoice {result.invoiceNumber || result.invoiceId} has been {isEditing ? 'updated' : 'created'}.
+              Invoice {result.invoiceNumber || result.invoiceId} has been {isEditing ? 'recreated' : 'created'}.
               <a href={result.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
                 View Invoice
               </a>
@@ -153,11 +167,11 @@ export default function OrganizerInvoicePage() {
       });
       router.push('/invoices');
     } catch (error) {
-      console.error('Failed to create invoice:', error);
+      console.error('Failed to process invoice:', error);
       const description = error instanceof Error ? error.message : 'An unknown error occurred.';
       toast({
         variant: 'destructive',
-        title: 'Invoice Creation Failed',
+        title: 'Invoice Processing Failed',
         description,
       });
     } finally {
@@ -171,7 +185,7 @@ export default function OrganizerInvoicePage() {
         <div>
           <h1 className="text-3xl font-bold font-headline">{isEditing ? 'Edit Invoice' : 'Create Invoice'}</h1>
           <p className="text-muted-foreground">
-            {isEditing ? 'Modify the details of an existing invoice.' : 'Generate a custom invoice for a school.'}
+            {isEditing ? 'Modify the details of an existing invoice. This will cancel the original and create a new, revised version.' : 'Generate a custom invoice for a school.'}
           </p>
         </div>
         
