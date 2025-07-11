@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect, type ReactNode, useMemo, useCallback, Fragment } from 'react';
@@ -333,12 +331,21 @@ export default function ConfirmationsPage() {
         const storedConfirmationsRaw: Confirmation[] = JSON.parse(localStorage.getItem('confirmations') || '[]');
         
         const latestConfirmationsMap = new Map<string, Confirmation>();
-        for (const conf of storedConfirmationsRaw) {
-            const key = conf.invoiceId || conf.id;
-            const existing = latestConfirmationsMap.get(key);
-            if (!existing || new Date(conf.submissionTimestamp) > new Date(existing.submissionTimestamp)) {
-                latestConfirmationsMap.set(key, conf);
+        // Group confirmations by invoice ID to find the latest version
+        const groupedByInvoice = storedConfirmationsRaw.reduce((acc, conf) => {
+            const key = conf.invoiceId || conf.id; // Use invoiceId as primary key, fallback to confirmation id
+            if (!acc[key]) {
+                acc[key] = [];
             }
+            acc[key].push(conf);
+            return acc;
+        }, {} as Record<string, Confirmation[]>);
+
+        // Get only the most recent confirmation for each invoice
+        for (const key in groupedByInvoice) {
+            const group = groupedByInvoice[key];
+            group.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+            latestConfirmationsMap.set(key, group[0]);
         }
         const latestConfirmations = Array.from(latestConfirmationsMap.values());
         
@@ -725,6 +732,27 @@ export default function ConfirmationsPage() {
     setIsUpdating(prev => ({ ...prev, [confId]: false }));
   };
 
+  const handleSectionChange = (confId: string, playerId: string, newSection: string) => {
+    setConfirmations(prevConf => {
+      const newConfirmations = prevConf.map(conf => {
+        if (conf.id === confId) {
+          const newSelections = { ...conf.selections };
+          if (newSelections[playerId]) {
+            newSelections[playerId].section = newSection;
+          }
+          return { ...conf, selections: newSelections };
+        }
+        return conf;
+      });
+      localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
+      window.dispatchEvent(new Event('storage'));
+      return newConfirmations;
+    });
+
+    const player = getPlayerById(playerId);
+    toast({ title: "Section Updated", description: `Section for ${player?.firstName} has been changed to ${newSection}.` });
+  };
+  
   const handleSubmitChangeRequest = () => {
     if (!confToRequestChange || !changeRequestInputs.playerId || !changeRequestInputs.requestType || !sponsorProfile) {
         toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select a player and request type.' });
@@ -769,18 +797,19 @@ export default function ConfirmationsPage() {
                   setIsChangeAlertOpen(false);
                 }
             },
+            'Section Change': {
+                title: `Change Section for ${newRequest.player}?`,
+                description: `This will update the player's section to "${newRequest.details}". This will not affect the invoice.`,
+                action: () => {
+                    handleSectionChange(newRequest.confirmationId, changeRequestInputs.playerId!, newRequest.details);
+                    setIsChangeAlertOpen(false);
+                }
+            },
             'Other': {
                 title: `Log Change for ${newRequest.player}?`,
                 description: `This will log the following note for the player: "${newRequest.details}". This is for record-keeping and will not alter the invoice.`,
                 action: () => {
                     setIsChangeAlertOpen(false);
-                    const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-                    const approvalTimestamp = new Date().toISOString();
-                    const approvedRequest = { ...newRequest, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
-                    const updatedRequests = [approvedRequest, ...changeRequests];
-                    setChangeRequests(updatedRequests);
-                    localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-                    toast({ title: 'Change Logged', description: `Your change for ${newRequest.player} has been approved and logged.` });
                 }
             }
         };
@@ -788,17 +817,17 @@ export default function ConfirmationsPage() {
         const changeDetails = actionMap[newRequest.type];
         if (changeDetails) {
             setChangeAlertContent({ title: changeDetails.title, description: changeDetails.description });
-            setChangeAction(() => changeDetails.action);
+            setChangeAction(() => () => {
+              changeDetails.action();
+              const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+              const approvalTimestamp = new Date().toISOString();
+              const approvedRequest = { ...newRequest, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
+              const updatedRequests = [approvedRequest, ...changeRequests];
+              setChangeRequests(updatedRequests);
+              localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+              toast({ title: 'Change Approved & Applied', description: `Your change for ${newRequest.player} has been approved and logged.` });
+            });
             setIsChangeAlertOpen(true);
-        } else {
-            // Default action for other types like "Section Change" is to just log it
-             const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-            const approvalTimestamp = new Date().toISOString();
-            const approvedRequest = { ...newRequest, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
-            const updatedRequests = [approvedRequest, ...changeRequests];
-            setChangeRequests(updatedRequests);
-            localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-            toast({ title: 'Change Logged', description: `Your change for ${newRequest.player} has been approved and logged.` });
         }
 
     } else {
@@ -1063,6 +1092,7 @@ export default function ConfirmationsPage() {
                                                     setIsChangeAlertOpen,
                                                     handlePlayerStatusChangeAction,
                                                     handleByeChange,
+                                                    handleSectionChange,
                                                     handleOpenEditPlayerDialog,
                                                     getPlayerById,
                                                     getStatusBadgeVariant,
@@ -1116,7 +1146,24 @@ export default function ConfirmationsPage() {
         </div>
       )}
 
-      <div className="grid gap-2"><Label htmlFor="request-details">Details</Label><Textarea id="request-details" placeholder="Provide any additional details for the organizer..." value={changeRequestInputs.details || ''} onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))} /></div></div><DialogFooter><Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button><Button onClick={handleSubmitChangeRequest}>Submit Request</Button></DialogFooter></DialogContent></Dialog>
+      {changeRequestInputs.requestType === 'Section Change' && (
+          <div className="grid gap-2">
+            <Label htmlFor="request-details">New Section</Label>
+            <Select onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, details: value}))}>
+              <SelectTrigger id="request-details">
+                <SelectValue placeholder="Select new section..." />
+              </SelectTrigger>
+              <SelectContent>
+                {sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+      )}
+
+      {changeRequestInputs.requestType !== 'Section Change' && (
+        <div className="grid gap-2"><Label htmlFor="request-details">Details</Label><Textarea id="request-details" placeholder="Provide any additional details for the organizer..." value={changeRequestInputs.details || ''} onChange={(e) => setChangeRequestInputs(prev => ({...prev, details: e.target.value}))} /></div>
+      )}
+      </div><DialogFooter><Button variant="ghost" onClick={() => setIsRequestDialogOpen(false)}>Cancel</Button><Button onClick={handleSubmitChangeRequest}>Submit Request</Button></DialogFooter></DialogContent></Dialog>
       
       <Dialog open={isAddPlayerDialogOpen} onOpenChange={setIsAddPlayerDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
@@ -1208,7 +1255,7 @@ export default function ConfirmationsPage() {
 }
 
 function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore, events, changeRequests, confirmationsMap, sponsorProfile, handlers }: any) {
-    const { getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleOpenEditPlayerDialog, getStatusBadgeVariant, handlePlayerStatusChangeAction } = handlers;
+    const { getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleSectionChange, handleOpenEditPlayerDialog, getStatusBadgeVariant, handlePlayerStatusChangeAction } = handlers;
     
     type SortablePlayerKey = 'lastName' | 'section';
     const [playerSortConfig, setPlayerSortConfig] = useState<{ key: SortablePlayerKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending'});
