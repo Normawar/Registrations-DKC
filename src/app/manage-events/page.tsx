@@ -104,6 +104,9 @@ type EventFormValues = z.infer<typeof eventFormSchema>;
 type SortableColumnKey = 'name' | 'date' | 'location' | 'regularFee' | 'status';
 
 type StoredConfirmation = {
+  id: string;
+  invoiceId?: string;
+  submissionTimestamp: string;
   eventId?: string;
   selections: Record<string, { section: string; uscfStatus: 'current' | 'new' | 'renewing' }>;
 };
@@ -411,11 +414,27 @@ export default function ManageEventsPage() {
 
   const handleViewRegistrations = (event: Event) => {
     const rawConfirmations = localStorage.getItem('confirmations');
-    const confirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
+    const allConfirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
+    
+    // Group confirmations by invoiceId to handle revisions
+    const groupedByInvoice = allConfirmations.reduce((acc, conf) => {
+        if (!conf.invoiceId) {
+            // Keep non-invoiced (e.g., comped) registrations separate
+            acc[conf.id] = conf;
+            return acc;
+        }
+        if (!acc[conf.invoiceId] || new Date(conf.submissionTimestamp) > new Date(acc[conf.invoiceId].submissionTimestamp)) {
+            acc[conf.invoiceId] = conf;
+        }
+        return acc;
+    }, {} as Record<string, StoredConfirmation>);
+
+    const latestConfirmations = Object.values(groupedByInvoice);
+    
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     
     const eventRegistrations: RegistrationInfo[] = [];
-    for (const conf of confirmations) {
+    for (const conf of latestConfirmations) {
         if (conf.eventId === event.id) {
             for (const playerId in conf.selections) {
                 const player = playerMap.get(playerId);
@@ -425,6 +444,7 @@ export default function ManageEventsPage() {
             }
         }
     }
+    
     setRegistrations(eventRegistrations);
     setSelectedEventForReg(event);
     setIsRegistrationsOpen(true);
