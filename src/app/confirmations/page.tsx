@@ -299,9 +299,6 @@ export default function ConfirmationsPage() {
           setStatuses(prev => ({ ...prev, [confId]: { status, isLoading: false } }));
           
           setConfirmations(prevConfs => {
-            const newConfs = prevConfs.map(c => 
-              c.id === confId ? { ...c, invoiceStatus: status, invoiceNumber: invoiceNumber } : c
-            );
             const allConfsRaw = localStorage.getItem('confirmations') || '[]';
             const allConfsParsed = JSON.parse(allConfsRaw);
             const updatedConfs = allConfsParsed.map((c: any) => {
@@ -311,7 +308,15 @@ export default function ConfirmationsPage() {
                 return c;
             });
             localStorage.setItem('confirmations', JSON.stringify(updatedConfs));
-            return newConfs;
+            
+            // Only update state if change is detected to avoid loops
+            const currentConf = prevConfs.find(c => c.id === confId);
+            if (currentConf && (currentConf.invoiceStatus !== status || currentConf.invoiceNumber !== invoiceNumber)) {
+                return prevConfs.map(c => 
+                  c.id === confId ? { ...c, invoiceStatus: status, invoiceNumber: invoiceNumber } : c
+                );
+            }
+            return prevConfs;
           });
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
@@ -327,20 +332,16 @@ export default function ConfirmationsPage() {
     try {
         const storedConfirmationsRaw: Confirmation[] = JSON.parse(localStorage.getItem('confirmations') || '[]');
         
-        // Group by invoiceId to find the latest version of each registration
-        const groupedByInvoice = storedConfirmationsRaw.reduce((acc, conf) => {
-            if (conf.invoiceId) {
-                if (!acc[conf.invoiceId] || new Date(conf.submissionTimestamp) > new Date(acc[conf.invoiceId].submissionTimestamp)) {
-                    acc[conf.invoiceId] = conf;
-                }
-            } else {
-                // For confirmations without an invoiceId (like comped ones), use their own ID as the key
-                acc[conf.id] = conf;
+        const latestConfirmationsMap = new Map<string, Confirmation>();
+        for (const conf of storedConfirmationsRaw) {
+            const key = conf.invoiceId || conf.id;
+            const existing = latestConfirmationsMap.get(key);
+            if (!existing || new Date(conf.submissionTimestamp) > new Date(existing.submissionTimestamp)) {
+                latestConfirmationsMap.set(key, conf);
             }
-            return acc;
-        }, {} as Record<string, Confirmation>);
+        }
+        const latestConfirmations = Array.from(latestConfirmationsMap.values());
         
-        const latestConfirmations = Object.values(groupedByInvoice);
         setConfirmations(latestConfirmations);
         
         const storedRequests = localStorage.getItem('change_requests');
@@ -533,18 +534,18 @@ export default function ConfirmationsPage() {
   const handlePlayerStatusChangeAction = async (confId: string, playerIds: string[], newStatus: 'withdrawn' | 'active') => {
       setIsUpdating(prev => ({ ...prev, [confId]: true }));
       setIsChangeAlertOpen(false);
-
+  
       try {
           const confToUpdate = confirmations.find(c => c.id === confId);
           if (!confToUpdate || !confToUpdate.invoiceId) throw new Error("Could not find the confirmation or invoice to update.");
           if (!sponsorProfile) throw new Error("You must have a sponsor profile to perform this action.");
-
+  
           const eventDetails = events.find(e => e.id === confToUpdate.eventId);
           if (!eventDetails) throw new Error("Could not find necessary event details.");
           
           const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
           const approvalTimestamp = new Date().toISOString();
-
+  
           const updatedSelections = { ...confToUpdate.selections };
           playerIds.forEach(id => {
               if (updatedSelections[id]) {
@@ -557,16 +558,30 @@ export default function ConfirmationsPage() {
                   }
               }
           });
-
+  
           const activePlayerIds = Object.keys(updatedSelections).filter(id => updatedSelections[id].status !== 'withdrawn');
+          
+          // If all players are withdrawn, just cancel the invoice.
+          if (activePlayerIds.length === 0) {
+              await cancelInvoice({ invoiceId: confToUpdate.invoiceId });
+              
+              const updatedConfRecord = { ...confToUpdate, selections: updatedSelections, invoiceStatus: 'CANCELED' };
+              const allConfsRaw = JSON.parse(localStorage.getItem('confirmations') || '[]');
+              const updatedConfs = allConfsRaw.map((c: any) => c.id === confId ? updatedConfRecord : c);
+              localStorage.setItem('confirmations', JSON.stringify(updatedConfs));
+              loadAllData();
+              toast({ title: "All Players Withdrawn", description: `Invoice ${confToUpdate.invoiceNumber} has been canceled.` });
+              return;
+          }
+  
+          // If there are still active players, recreate the invoice.
           const activePlayers = activePlayerIds.map(id => getPlayerById(id)).filter((p): p is MasterPlayer => !!p);
-
           let registrationFeePerPlayer = eventDetails.regularFee;
           const eventDate = new Date(eventDetails.date);
           const now = new Date();
           if (isSameDay(eventDate, now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
           else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) registrationFeePerPlayer = eventDetails.veryLateFee; else if (hoursUntilEvent <= 48) registrationFeePerPlayer = eventDetails.lateFee; }
-
+  
           const newInvoicePlayers = activePlayers.map(player => {
               const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < eventDate;
               const uscfStatus = player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
@@ -582,7 +597,7 @@ export default function ConfirmationsPage() {
           
           const sponsorNameForInvoice = confToUpdate.sponsorName || `${sponsorProfile.firstName} ${sponsorProfile.lastName}`;
           const sponsorEmailForInvoice = confToUpdate.sponsorEmail || sponsorProfile.email;
-
+  
           const result = await recreateInvoiceFromRoster({
               originalInvoiceId: confToUpdate.invoiceId,
               players: newInvoicePlayers,
@@ -619,9 +634,9 @@ export default function ConfirmationsPage() {
               c.id === confToUpdate.id ? { ...c, invoiceStatus: 'CANCELED' } : c
           );
           finalConfirmations.push(newConfirmationRecord); 
-
+  
           localStorage.setItem('confirmations', JSON.stringify(finalConfirmations));
-
+  
           const changedPlayerNames = playerIds.map(id => {
               const p = getPlayerById(id);
               return p ? `${p.firstName} ${p.lastName}` : 'Unknown Player';
@@ -636,9 +651,9 @@ export default function ConfirmationsPage() {
               return req;
           });
           localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-
+  
           loadAllData();
-
+  
           toast({
               title: `Player(s) ${newStatus === 'active' ? 'Restored' : 'Withdrawn'} & Invoice Recreated`,
               description: `A new invoice (${result.newInvoiceNumber}) has been created.`
