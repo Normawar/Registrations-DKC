@@ -13,6 +13,8 @@ export type ChangeRequest = {
   status: 'Pending' | 'Approved' | 'Denied';
   approvedBy?: string; // Organizer's initials
   approvedAt?: string; // ISO String
+  byeRound1?: string;
+  byeRound2?: string;
 };
 
 

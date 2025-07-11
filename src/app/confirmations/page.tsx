@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, type ReactNode, useMemo, useCallback, Fragment } from 'react';
@@ -30,7 +31,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Search, CheckCircle } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -331,17 +332,13 @@ export default function ConfirmationsPage() {
         const storedConfirmationsRaw: Confirmation[] = JSON.parse(localStorage.getItem('confirmations') || '[]');
         
         const latestConfirmationsMap = new Map<string, Confirmation>();
-        // Group confirmations by invoice ID to find the latest version
         const groupedByInvoice = storedConfirmationsRaw.reduce((acc, conf) => {
-            const key = conf.invoiceId || conf.id; // Use invoiceId as primary key, fallback to confirmation id
-            if (!acc[key]) {
-                acc[key] = [];
-            }
+            const key = conf.invoiceId || conf.id; 
+            if (!acc[key]) acc[key] = [];
             acc[key].push(conf);
             return acc;
         }, {} as Record<string, Confirmation[]>);
 
-        // Get only the most recent confirmation for each invoice
         for (const key in groupedByInvoice) {
             const group = groupedByInvoice[key];
             group.sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
@@ -388,7 +385,7 @@ export default function ConfirmationsPage() {
         });
 
         invoicesToFetch.forEach(conf => fetchInvoiceStatus(conf.id, conf.invoiceId!, true));
-        setIsDataLoaded(true); // Signal that initial data load is complete
+        setIsDataLoaded(true); 
     } catch (error) {
         console.error("Failed to load or parse data from localStorage", error);
         setConfirmations([]);
@@ -568,7 +565,6 @@ export default function ConfirmationsPage() {
   
           const activePlayerIds = Object.keys(updatedSelections).filter(id => updatedSelections[id].status !== 'withdrawn');
           
-          // If all players are withdrawn, just cancel the invoice.
           if (activePlayerIds.length === 0) {
               await cancelInvoice({ invoiceId: confToUpdate.invoiceId });
               
@@ -581,7 +577,6 @@ export default function ConfirmationsPage() {
               return;
           }
   
-          // If there are still active players, recreate the invoice.
           const activePlayers = activePlayerIds.map(id => getPlayerById(id)).filter((p): p is MasterPlayer => !!p);
           let registrationFeePerPlayer = eventDetails.regularFee;
           const eventDate = new Date(eventDetails.date);
@@ -773,69 +768,10 @@ export default function ConfirmationsPage() {
         status: 'Pending',
     };
     
-    if (sponsorProfile.role === 'organizer') {
-        const actionMap: Record<string, { title: string; description: string; action: () => void }> = {
-            'Withdraw Player': {
-                title: `Withdraw ${newRequest.player}?`,
-                description: `This will mark ${newRequest.player} as withdrawn and recreate the invoice with an updated total. This action cannot be undone.`,
-                action: () => handlePlayerStatusChangeAction(newRequest.confirmationId, [changeRequestInputs.playerId!], 'withdrawn')
-            },
-            'Restore Player': {
-                title: `Restore ${newRequest.player}?`,
-                description: `This will mark ${newRequest.player} as active and recreate the invoice.`,
-                action: () => handlePlayerStatusChangeAction(newRequest.confirmationId, [changeRequestInputs.playerId!], 'active')
-            },
-            'Bye Request': {
-                title: `Update Byes for ${newRequest.player}?`,
-                description: `This will update the bye requests for ${newRequest.player}. This change will not affect the invoice.`,
-                action: () => {
-                  const newByes = { round1: changeRequestInputs.byeRound1 || 'none', round2: changeRequestInputs.byeRound2 || 'none' };
-                  handleByeChange(newRequest.confirmationId, changeRequestInputs.playerId!, 'round1', newByes.round1);
-                  if (newByes.round1 !== 'none') {
-                    handleByeChange(newRequest.confirmationId, changeRequestInputs.playerId!, 'round2', newByes.round2);
-                  }
-                  setIsChangeAlertOpen(false);
-                }
-            },
-            'Section Change': {
-                title: `Change Section for ${newRequest.player}?`,
-                description: `This will update the player's section to "${newRequest.details}". This will not affect the invoice.`,
-                action: () => {
-                    handleSectionChange(newRequest.confirmationId, changeRequestInputs.playerId!, newRequest.details);
-                    setIsChangeAlertOpen(false);
-                }
-            },
-            'Other': {
-                title: `Log Change for ${newRequest.player}?`,
-                description: `This will log the following note for the player: "${newRequest.details}". This is for record-keeping and will not alter the invoice.`,
-                action: () => {
-                    setIsChangeAlertOpen(false);
-                }
-            }
-        };
-
-        const changeDetails = actionMap[newRequest.type];
-        if (changeDetails) {
-            setChangeAlertContent({ title: changeDetails.title, description: changeDetails.description });
-            setChangeAction(() => () => {
-              changeDetails.action();
-              const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-              const approvalTimestamp = new Date().toISOString();
-              const approvedRequest = { ...newRequest, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
-              const updatedRequests = [approvedRequest, ...changeRequests];
-              setChangeRequests(updatedRequests);
-              localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-              toast({ title: 'Change Approved & Applied', description: `Your change for ${newRequest.player} has been approved and logged.` });
-            });
-            setIsChangeAlertOpen(true);
-        }
-
-    } else {
-      const updatedRequests = [newRequest, ...changeRequests];
-      setChangeRequests(updatedRequests);
-      localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-      toast({ title: 'Request Submitted', description: 'Your change request has been sent to the organizer for review.' });
-    }
+    const updatedRequests = [newRequest, ...changeRequests];
+    setChangeRequests(updatedRequests);
+    localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+    toast({ title: 'Request Submitted', description: 'Your change request has been sent to the organizer for review.' });
 
     setIsRequestDialogOpen(false);
   };
@@ -1309,6 +1245,54 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
         return playerDetailsList;
 
     }, [conf.selections, getPlayerById, playerSortConfig]);
+    
+    const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
+        if (!sponsorProfile) return;
+        
+        let title = '';
+        let description = '';
+        let action = () => {};
+
+        switch (request.type) {
+            case 'Section Change':
+                title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
+                description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
+                action = () => handleSectionChange(conf.id, player.id, request.details);
+                break;
+            case 'Bye Request':
+                const byes = (request.details || 'none|none').split('|');
+                const byeR1 = byes[0];
+                const byeR2 = byes[1];
+                title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
+                description = `This will set the player's bye requests to Round 1: ${byeR1}, Round 2: ${byeR2}.`;
+                action = () => {
+                    handleByeChange(conf.id, player.id, 'round1', byeR1);
+                    handleByeChange(conf.id, player.id, 'round2', byeR2);
+                };
+                break;
+            default:
+                title = 'Approve This Request?';
+                description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
+                action = () => { /* No specific action for 'Other' */ };
+        }
+
+        setChangeAlertContent({ title, description });
+        setChangeAction(() => () => {
+            action();
+            // Mark request as approved
+            const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+            const approvalTimestamp = new Date().toISOString();
+            const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
+            const updatedRequests = allRequests.map((r: ChangeRequest) =>
+                r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
+            );
+            localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+            window.dispatchEvent(new Event('storage'));
+            toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
+            setIsChangeAlertOpen(false);
+        });
+        setIsChangeAlertOpen(true);
+    };
 
     const currentInputs = confInputs[conf.id] || {};
     const selectedMethod = currentInputs.paymentMethod || 'po';
@@ -1361,6 +1345,7 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
                         const playerId = player.id;
                         
                         const relevantRequests = changeRequests.filter((req: ChangeRequest) => req.confirmationId === conf.id && req.player === `${player.firstName} ${player.lastName}`);
+                        const pendingRequest = relevantRequests.find(req => req.status === 'Pending');
                         const latestRequest = relevantRequests.length > 0 ? relevantRequests[0] : null;
 
                         const isWithdrawn = details.status === 'withdrawn';
@@ -1383,12 +1368,19 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
                             {latestRequest && !isWithdrawn && (
                                 <TooltipProvider>
                                 <Tooltip>
-                                    <TooltipTrigger>
-                                    <Info className="h-4 w-4 text-blue-500" />
+                                    <TooltipTrigger asChild>
+                                        <div className="flex items-center gap-1">
+                                            <Info className={cn("h-4 w-4", latestRequest.status === 'Pending' ? 'text-yellow-500' : 'text-blue-500')} />
+                                            {sponsorProfile?.role === 'organizer' && pendingRequest && (
+                                                <Button size="sm" variant="ghost" className="h-auto p-0 text-xs text-primary hover:bg-transparent" onClick={() => handleApproveRequest(pendingRequest, player)}>
+                                                    Review & Approve
+                                                </Button>
+                                            )}
+                                        </div>
                                     </TooltipTrigger>
                                     <TooltipContent className="max-w-xs">
                                         <p className="font-semibold">{latestRequest.type} - {latestRequest.status}</p>
-                                        {latestRequest.details && <p className="italic text-muted-foreground">"{latestRequest.details}"</p>}
+                                        <p className="italic text-muted-foreground">"{latestRequest.details}"</p>
                                         <p className="text-xs text-muted-foreground mt-1 pt-1 border-t">
                                             Submitted: {format(new Date(latestRequest.submitted), 'MM/dd/yy, p')} by {latestRequest.submittedBy}
                                         </p>
@@ -1539,3 +1531,4 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
         </div>
     );
 }
+
