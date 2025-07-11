@@ -108,6 +108,7 @@ type SortableColumnKey = 'name' | 'date' | 'location' | 'regularFee' | 'status';
 type StoredConfirmation = {
   id: string;
   invoiceId?: string;
+  invoiceNumber?: string;
   submissionTimestamp: string;
   eventId?: string;
   selections: Record<string, { section: string; uscfStatus: 'current' | 'new' | 'renewing', status?: 'active' | 'withdrawn' }>;
@@ -119,7 +120,9 @@ type RegistrationInfo = {
     section: string;
     uscfStatus: 'current' | 'new' | 'renewing';
     status?: 'active' | 'withdrawn';
-  }
+  };
+  invoiceId?: string;
+  invoiceNumber?: string;
 };
 
 type StoredDownloads = {
@@ -455,7 +458,7 @@ export default function ManageEventsPage() {
             const player = playerMap.get(playerId);
             if (player) {
                 // This ensures each player ID appears only once, with their latest registration details.
-                uniquePlayerRegistrations.set(playerId, { player, details: registrationDetails });
+                uniquePlayerRegistrations.set(playerId, { player, details: registrationDetails, invoiceId: conf.invoiceId, invoiceNumber: conf.invoiceNumber });
             }
         }
       }
@@ -888,6 +891,7 @@ export default function ManageEventsPage() {
                   <TableHead>USCF ID</TableHead>
                   <TableHead>School</TableHead>
                   <TableHead>Section</TableHead>
+                  <TableHead>Invoice #</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -899,7 +903,7 @@ export default function ManageEventsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  registrations.map(({ player, details }) => {
+                  registrations.map(({ player, details, invoiceId, invoiceNumber }) => {
                     const isWithdrawn = details.status === 'withdrawn';
                     const isDownloaded = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
                     let status: 'Withdrawn' | 'Active' | 'Registered' = 'Registered';
@@ -915,6 +919,11 @@ export default function ManageEventsPage() {
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
+                            <TableCell>
+                                <Button variant="link" asChild className="p-0 h-auto font-mono">
+                                    <Link href={`/confirmations#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link>
+                                </Button>
+                            </TableCell>
                             <TableCell>
                                 <Badge variant={
                                     status === 'Withdrawn' ? 'destructive' :
@@ -963,4 +972,3 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
-
