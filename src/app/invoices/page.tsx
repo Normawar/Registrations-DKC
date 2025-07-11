@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -95,7 +95,6 @@ const INVOICE_STATUSES = [
 
 export default function InvoicesPage() {
   const { profile } = useSponsorProfile();
-  const router = useRouter();
   const { toast } = useToast();
 
   const [allInvoices, setAllInvoices] = useState<CombinedInvoice[]>([]);
@@ -121,7 +120,7 @@ export default function InvoicesPage() {
     }
 
     const normalizedInvoices: CombinedInvoice[] = storedData.map((inv: any) => ({
-        id: inv.invoiceId || inv.id,
+        id: inv.id,
         description: inv.invoiceTitle || inv.eventName || (inv.membershipType ? `USCF Membership (${inv.membershipType})` : 'Invoice'),
         submissionTimestamp: inv.submissionTimestamp,
         totalInvoiced: parseFloat(String(inv.totalInvoiced)) || 0,
@@ -293,10 +292,6 @@ export default function InvoicesPage() {
     return status.replace(/_/g, ' ').toLowerCase();
   };
 
-  const handleEditInvoice = (invoice: CombinedInvoice) => {
-    router.push(`/organizer-invoice?edit=${invoice.id}`);
-  };
-
   const handleCancelInvoice = (invoice: CombinedInvoice) => {
     setInvoiceToCancel(invoice);
     setIsAlertOpen(true);
@@ -458,8 +453,10 @@ export default function InvoicesPage() {
                                                   </DropdownMenuItem>
                                                   {profile.role === 'organizer' && (
                                                     <>
-                                                        <DropdownMenuItem onClick={() => handleEditInvoice(inv)}>
-                                                            <FilePenLine className="mr-2 h-4 w-4" /> Edit
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/confirmations#${inv.id}`}>
+                                                                <FilePenLine className="mr-2 h-4 w-4" /> Edit
+                                                            </Link>
                                                         </DropdownMenuItem>
                                                         {isCancelable && (
                                                             <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
