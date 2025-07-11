@@ -35,7 +35,9 @@ import {
   ArrowDown,
   Users,
   Upload,
-  ClipboardPaste
+  ClipboardPaste,
+  Download,
+  Check
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -119,6 +121,10 @@ type RegistrationInfo = {
   }
 };
 
+type StoredDownloads = {
+  [eventId: string]: string[]; // Array of player IDs that have been downloaded
+};
+
 export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent } = useEvents();
@@ -135,6 +141,7 @@ export default function ManageEventsPage() {
   const [selectedEventForReg, setSelectedEventForReg] = useState<Event | null>(null);
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pasteData, setPasteData] = useState('');
+  const [downloadedPlayers, setDownloadedPlayers] = useState<StoredDownloads>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -209,6 +216,13 @@ export default function ManageEventsPage() {
     }
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
+
+  useEffect(() => {
+    const stored = localStorage.getItem('downloaded_registrations');
+    if (stored) {
+        setDownloadedPlayers(JSON.parse(stored));
+    }
+  }, []);
 
   useEffect(() => {
     if (isDialogOpen) {
@@ -415,39 +429,40 @@ export default function ManageEventsPage() {
   const handleViewRegistrations = (event: Event) => {
     const rawConfirmations = localStorage.getItem('confirmations');
     const allConfirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
-
-    // Group confirmations by invoiceId to handle revisions
-    const groupedByInvoice = allConfirmations.reduce((acc, conf) => {
-      if (!conf.invoiceId) {
-        acc[conf.id] = conf; // Keep non-invoiced registrations
-        return acc;
-      }
-      if (!acc[conf.invoiceId] || new Date(conf.submissionTimestamp) > new Date(acc[conf.invoiceId].submissionTimestamp)) {
-        acc[conf.invoiceId] = conf;
-      }
-      return acc;
-    }, {} as Record<string, StoredConfirmation>);
-    
-    const latestConfirmations = Object.values(groupedByInvoice);
-    const playerMap = new Map(allPlayers.map(p => [p.id, p]));
-    
-    // De-duplicate players, keeping only their latest registration for this event
-    const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
-    
-    for (const conf of latestConfirmations) {
-        if (conf.eventId === event.id) {
-            for (const playerId in conf.selections) {
-                const player = playerMap.get(playerId);
-                if (player) {
-                    // Always overwrite with the latest registration found
-                    uniquePlayerRegistrations.set(playerId, { player, details: conf.selections[playerId] });
-                }
-            }
+  
+    // De-duplicate confirmations by invoiceId, keeping only the latest version of each
+    const latestConfirmationsByInvoice = Object.values(
+      allConfirmations.reduce((acc, conf) => {
+        if (conf.invoiceId) {
+          if (!acc[conf.invoiceId] || new Date(conf.submissionTimestamp) > new Date(acc[conf.invoiceId].submissionTimestamp)) {
+            acc[conf.invoiceId] = conf;
+          }
+        } else {
+          // For non-invoiced registrations (e.g., comped), use their own ID
+          acc[conf.id] = conf;
         }
+        return acc;
+      }, {} as Record<string, StoredConfirmation>)
+    );
+  
+    // Now, create a final list of unique players for the selected event
+    const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+    const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
+  
+    for (const conf of latestConfirmationsByInvoice) {
+      if (conf.eventId === event.id) {
+        for (const playerId in conf.selections) {
+          const player = playerMap.get(playerId);
+          if (player) {
+            // This ensures only one entry per player, based on their latest appearance
+            uniquePlayerRegistrations.set(playerId, { player, details: conf.selections[playerId] });
+          }
+        }
+      }
     }
-    
+  
     const eventRegistrations = Array.from(uniquePlayerRegistrations.values());
-
+    
     setRegistrations(eventRegistrations);
     setSelectedEventForReg(event);
     setIsRegistrationsOpen(true);
@@ -473,6 +488,64 @@ export default function ManageEventsPage() {
     }
     setIsDialogOpen(false);
   }
+  
+  const newPlayersForDownload = useMemo(() => {
+    if (!selectedEventForReg) return [];
+    const alreadyDownloaded = downloadedPlayers[selectedEventForReg.id] || [];
+    return registrations.filter(p => !alreadyDownloaded.includes(p.player.id));
+  }, [registrations, downloadedPlayers, selectedEventForReg]);
+  
+  const handleDownload = (downloadAll: boolean = false) => {
+    if (!selectedEventForReg) return;
+    
+    const playersToDownload = downloadAll ? registrations : newPlayersForDownload;
+    if (playersToDownload.length === 0) {
+      toast({ title: 'No Players to Download', description: downloadAll ? 'There are no registered players for this event.' : 'There are no new registrations to download.' });
+      return;
+    }
+    
+    const csvData = playersToDownload.map(p => ({
+        "USCF ID": p.player.uscfId,
+        "First Name": p.player.firstName,
+        "Last Name": p.player.lastName,
+        "Rating": p.player.regularRating || 'UNR',
+        "Grade": p.player.grade,
+        "Section": p.details.section,
+        "School": p.player.school,
+    }));
+
+    const csv = Papa.unparse(csvData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_registrations';
+    link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, '_')}_${fileNameSuffix}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    if (!downloadAll) {
+      const newlyDownloadedIds = newPlayersForDownload.map(p => p.player.id);
+      const updatedDownloads = {
+          ...downloadedPlayers,
+          [selectedEventForReg.id]: [...(downloadedPlayers[selectedEventForReg.id] || []), ...newlyDownloadedIds]
+      };
+      setDownloadedPlayers(updatedDownloads);
+      localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
+    }
+    
+    toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations have been downloaded.`});
+  };
+  
+  const handleMarkAllAsNew = () => {
+    if (!selectedEventForReg) return;
+    const updatedDownloads = { ...downloadedPlayers };
+    delete updatedDownloads[selectedEventForReg.id];
+    setDownloadedPlayers(updatedDownloads);
+    localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
+    toast({ title: 'Status Reset', description: 'All players for this event are marked as new.' });
+  };
 
   return (
     <AppLayout>
@@ -769,6 +842,19 @@ export default function ManageEventsPage() {
               {registrations.length} player(s) registered for this event.
             </DialogDescription>
           </DialogHeader>
+          <div className='my-4 flex items-center justify-end gap-2'>
+              <Button onClick={() => handleDownload(false)} disabled={newPlayersForDownload.length === 0} variant="outline" size="sm">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download New ({newPlayersForDownload.length})
+              </Button>
+               <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">
+                  Download All ({registrations.length})
+              </Button>
+              <div className="text-xs text-muted-foreground">|</div>
+              <button onClick={handleMarkAllAsNew} className="text-xs text-muted-foreground hover:underline">
+                  Mark all as new
+              </button>
+          </div>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
               <TableHeader>
@@ -778,29 +864,36 @@ export default function ManageEventsPage() {
                   <TableHead>School</TableHead>
                   <TableHead>Section</TableHead>
                   <TableHead>USCF Status</TableHead>
+                  <TableHead>New</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {registrations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       No players registered yet.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  registrations.map(({ player, details }) => (
-                    <TableRow key={player.id}>
-                      <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
-                      <TableCell>{player.uscfId}</TableCell>
-                      <TableCell>{player.school}</TableCell>
-                      <TableCell>{details.section}</TableCell>
-                      <TableCell>
-                        <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={cn(details.uscfStatus === 'current' ? 'bg-green-600 text-white' : '', 'capitalize')}>
-                          {details.uscfStatus}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  registrations.map(({ player, details }) => {
+                    const isNew = selectedEventForReg && !(downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
+                    return (
+                        <TableRow key={player.id}>
+                            <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
+                            <TableCell>{player.uscfId}</TableCell>
+                            <TableCell>{player.school}</TableCell>
+                            <TableCell>{details.section}</TableCell>
+                            <TableCell>
+                            <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={cn(details.uscfStatus === 'current' ? 'bg-green-600 text-white' : '', 'capitalize')}>
+                                {details.uscfStatus}
+                            </Badge>
+                            </TableCell>
+                            <TableCell>
+                                {isNew && <Check className="h-4 w-4 text-green-600" />}
+                            </TableCell>
+                        </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
