@@ -174,6 +174,7 @@ export default function ConfirmationsPage() {
   const { events } = useEvents();
 
   const [confirmations, setConfirmations] = useState<Confirmation[]>([]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [confInputs, setConfInputs] = useState<Record<string, Partial<ConfirmationInputs>>>({});
   const [isUpdating, setIsUpdating] = useState<Record<string, boolean>>({});
   const [authError, setAuthError] = useState<string | null>(null);
@@ -213,8 +214,9 @@ export default function ConfirmationsPage() {
   });
 
   const playersMap = useMemo(() => {
+    if (!isPlayersLoaded) return new Map();
     return new Map(allPlayers.map(p => [p.id, p]));
-  }, [allPlayers]);
+  }, [allPlayers, isPlayersLoaded]);
 
   const confirmationsMap = useMemo(() => {
     return new Map(confirmations.map(c => [c.id, c]));
@@ -321,14 +323,6 @@ export default function ConfirmationsPage() {
       }
   }, [toast]);
 
-  const fetchAllInvoiceStatuses = useCallback((confirmationsToFetch: Confirmation[]) => {
-    confirmationsToFetch.forEach(conf => {
-        if (conf.invoiceId) {
-            fetchInvoiceStatus(conf.id, conf.invoiceId, true);
-        }
-    });
-  }, [fetchInvoiceStatus]);
-
   const loadAllData = useCallback(() => {
     try {
       const storedConfirmations: Confirmation[] = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -352,25 +346,45 @@ export default function ConfirmationsPage() {
       setConfInputs(initialInputs);
       setStatuses(initialStatuses);
       
-      fetchAllInvoiceStatuses(storedConfirmations.filter((c: Confirmation) => c.invoiceId));
-      
-      if (window.location.hash) {
-        const hashId = window.location.hash.substring(1);
-        const matchingConfs = storedConfirmations
-            .filter(c => c.invoiceId === hashId)
-            .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+      const invoicesToFetch = storedConfirmations.filter(c => {
+          if (!c.invoiceId) return false;
+          const status = c.invoiceStatus?.toUpperCase();
+          const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'COMPED'].includes(status || '');
+          return !isFinalState;
+      });
 
-        if (matchingConfs.length > 0) {
-            setOpenCollapsibleRow(matchingConfs[0].id);
-        }
-      }
-
+      invoicesToFetch.forEach(conf => fetchInvoiceStatus(conf.id, conf.invoiceId!, true));
+      setIsDataLoaded(true); // Signal that initial data load is complete
     } catch (error) {
         console.error("Failed to load or parse data from localStorage", error);
         setConfirmations([]);
         setChangeRequests(initialRequestsData);
     }
-  }, [fetchAllInvoiceStatuses]);
+  }, [fetchInvoiceStatus]);
+  
+  useEffect(() => {
+    loadAllData();
+    const handleStorageChange = () => { loadAllData(); };
+    window.addEventListener('storage', handleStorageChange);
+    return () => { window.removeEventListener('storage', handleStorageChange); };
+  }, [loadAllData]);
+  
+  // This effect specifically handles opening a row from a URL hash.
+  // It runs only when the main data has been loaded.
+  useEffect(() => {
+    if (isDataLoaded && window.location.hash) {
+      const hashId = window.location.hash.substring(1);
+      
+      // Find the most recent confirmation with the matching invoiceId
+      const matchingConfs = confirmations
+        .filter(c => c.invoiceId === hashId)
+        .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+
+      if (matchingConfs.length > 0) {
+        setOpenCollapsibleRow(matchingConfs[0].id);
+      }
+    }
+  }, [isDataLoaded, confirmations]);
 
   useEffect(() => {
     if (!auth || !storage) {
@@ -390,18 +404,8 @@ export default function ConfirmationsPage() {
         }
     });
 
-    const handleStorageChange = () => {
-        loadAllData();
-    };
-
-    loadAllData();
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-        unsubscribe();
-        window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [loadAllData]);
+    return () => { unsubscribe(); };
+  }, []);
 
   const getPlayerById = (id: string) => playersMap.get(id);
 
@@ -464,7 +468,7 @@ export default function ConfirmationsPage() {
             fetchInvoiceStatus(conf.id, conf.invoiceId);
         }
 
-        const updatedConfirmations = confirmations.map(c => c.id === conf.id ? { ...c, teamCode, paymentMethod, poNumber: inputs.poNumber, checkNumber: inputs.checkNumber, checkDate: inputs.checkDate ? inputs.checkDate.toISOString() : undefined, amountPaid: inputs.amountPaid, paymentFileName, paymentFileUrl, } : c);
+        const updatedConfirmations = confirmations.map(c => c.id === conf.id ? { ...c, teamCode, paymentMethod, poNumber: inputs.poNumber, checkNumber: inputs.checkNumber, checkDate: inputs.checkDate ? new Date(inputs.checkDate) : undefined, amountPaid: inputs.amountPaid, paymentFileName, paymentFileUrl, } : c);
         localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
         setConfirmations(updatedConfirmations);
         setConfInputs(prev => ({ ...prev, [conf.id]: { ...prev[conf.id], file: null, paymentFileName, paymentFileUrl } }));
