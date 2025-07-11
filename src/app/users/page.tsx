@@ -50,7 +50,7 @@ export default function UsersPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
-    const allSchoolNames = useMemo(() => ['Homeschool', ...schoolData.map(s => s.schoolName).sort()], []);
+    const allSchoolNames = useMemo(() => ['Homeschool', ...[...new Set(schoolData.map(s => s.schoolName))].sort()], []);
 
 
     useEffect(() => {
@@ -93,30 +93,27 @@ export default function UsersPage() {
                 .filter((school) => school.district === district)
                 .map((school) => school.schoolName)
                 .sort();
-            setSchoolsForDistrict(filteredSchools);
+            setSchoolsForDistrict([...new Set(filteredSchools)]);
         }
     };
     
     useEffect(() => {
       if (isDialogOpen && editingUser) {
-        if (editingUser.district) {
-          handleDistrictChange(editingUser.district, false);
-        } else {
-          setSchoolsForDistrict([]);
-        }
+        const initialDistrict = editingUser.district || 'None';
+        form.reset({
+            email: editingUser.email,
+            role: editingUser.role,
+            firstName: editingUser.firstName || '',
+            lastName: editingUser.lastName || '',
+            school: editingUser.school || '',
+            district: initialDistrict,
+        });
+        handleDistrictChange(initialDistrict, false);
       }
     }, [isDialogOpen, editingUser]);
 
     const handleEditUser = (user: User) => {
         setEditingUser(user);
-        form.reset({
-            email: user.email,
-            role: user.role,
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            school: user.school || '',
-            district: user.district || '',
-        });
         setIsDialogOpen(true);
     };
 

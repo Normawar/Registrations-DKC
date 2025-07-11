@@ -56,7 +56,7 @@ const SponsorSignUpForm = () => {
   const router = useRouter();
   const { updateProfile } = useSponsorProfile();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
-  const allSchoolNames = useMemo(() => ['Homeschool', ...schoolData.map(s => s.schoolName).sort()], []);
+  const allSchoolNames = useMemo(() => ['Homeschool', ...[...new Set(schoolData.map(s => s.schoolName))].sort()], []);
   
   const form = useForm<z.infer<typeof sponsorFormSchema>>({
     resolver: zodResolver(sponsorFormSchema),
@@ -92,7 +92,7 @@ const SponsorSignUpForm = () => {
         .filter((school) => school.district === district)
         .map((school) => school.schoolName)
         .sort();
-      setSchoolsForDistrict(filteredSchools);
+      setSchoolsForDistrict([...new Set(filteredSchools)]);
     }
   };
   

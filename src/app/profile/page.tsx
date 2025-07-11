@@ -166,7 +166,7 @@ export default function ProfilePage() {
       },
   });
 
-  const allSchoolNames = useMemo(() => ['Homeschool', ...schoolData.map(s => s.schoolName).sort()], []);
+  const allSchoolNames = useMemo(() => ['Homeschool', ...[...new Set(schoolData.map(s => s.schoolName))].sort()], []);
 
   useEffect(() => {
     if (!auth || !storage) {
@@ -205,7 +205,7 @@ export default function ProfilePage() {
             .filter((school) => school.district === district)
             .map((school) => school.schoolName)
             .sort();
-        setSchoolsForDistrict(filteredSchools);
+        setSchoolsForDistrict([...new Set(filteredSchools)]);
     }
   };
 
@@ -228,7 +228,7 @@ export default function ProfilePage() {
           .filter((school) => school.district === profile.district)
           .map((school) => school.schoolName)
           .sort();
-        setSchoolsForDistrict(initialSchools);
+        setSchoolsForDistrict([...new Set(initialSchools)]);
       }
       
       setActiveTab(profile.avatarType);
