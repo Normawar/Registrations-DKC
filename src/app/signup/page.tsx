@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -72,6 +72,15 @@ const SponsorSignUpForm = () => {
     },
   });
 
+  const selectedDistrict = form.watch('district');
+
+  useEffect(() => {
+    // Initialize school list on first render based on default district
+    if (form.getValues('district') === 'None') {
+      setSchoolsForDistrict(allSchoolNames);
+    }
+  }, [allSchoolNames, form]);
+
   const handleDistrictChange = (district: string) => {
     form.setValue('district', district);
     if (district === 'None') {
@@ -112,20 +121,16 @@ const SponsorSignUpForm = () => {
       avatarValue: 'KingIcon',
     };
     
-    // Save the detailed profile to the master list of profiles
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
     profiles[values.email] = profileData;
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
     
-    // Set current session user
     localStorage.setItem('user_role', 'sponsor');
     localStorage.setItem('current_user_profile', JSON.stringify(profileData));
     
     router.push('/dashboard');
   }
-
-  const selectedDistrict = form.watch('district');
 
   return (
     <Form {...form}>
@@ -335,7 +340,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         avatarValue: 'PawnIcon',
     };
     
-    // Save the detailed profile to the master list
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
     profiles[values.email] = profileData;

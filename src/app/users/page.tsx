@@ -63,7 +63,6 @@ export default function UsersPage() {
         const allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
         const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
 
-        // Use the profile as the main source of truth, falling back to user list
         const enrichedUsers = allUsers.map(user => {
             const profile = profiles[user.email];
             return {
@@ -97,6 +96,16 @@ export default function UsersPage() {
             setSchoolsForDistrict(filteredSchools);
         }
     };
+    
+    useEffect(() => {
+      if (isDialogOpen && editingUser) {
+        if (editingUser.district) {
+          handleDistrictChange(editingUser.district, false);
+        } else {
+          setSchoolsForDistrict([]);
+        }
+      }
+    }, [isDialogOpen, editingUser]);
 
     const handleEditUser = (user: User) => {
         setEditingUser(user);
@@ -108,12 +117,6 @@ export default function UsersPage() {
             school: user.school || '',
             district: user.district || '',
         });
-        // Pre-populate schools for the current district
-        if (user.district) {
-            handleDistrictChange(user.district, false);
-        } else {
-            setSchoolsForDistrict([]);
-        }
         setIsDialogOpen(true);
     };
 
@@ -125,19 +128,17 @@ export default function UsersPage() {
     const confirmDelete = () => {
         if (!userToDelete) return;
 
-        // Delete from 'users' (auth list)
         const usersRaw = localStorage.getItem('users');
         let allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
         allUsers = allUsers.filter(u => u.email !== userToDelete.email);
         localStorage.setItem('users', JSON.stringify(allUsers));
         
-        // Delete from 'sponsor_profile' (details list)
         const profilesRaw = localStorage.getItem('sponsor_profile');
         let profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
         delete profiles[userToDelete.email];
         localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
-        loadUsers(); // Reload state from localStorage
+        loadUsers(); 
         toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
         setIsAlertOpen(false);
     };
@@ -145,7 +146,6 @@ export default function UsersPage() {
     const onSubmit = (values: UserFormValues) => {
         if (!editingUser) return;
 
-        // 1. Update the 'users' (auth) list with the potentially new role
         const usersRaw = localStorage.getItem('users');
         let allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
         allUsers = allUsers.map(u => 
@@ -153,17 +153,14 @@ export default function UsersPage() {
         );
         localStorage.setItem('users', JSON.stringify(allUsers));
 
-        // 2. Update the 'sponsor_profile' (details) list with all new values
         const profilesRaw = localStorage.getItem('sponsor_profile');
         const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
         
-        // Ensure we merge with existing profile data, not overwrite it
         const existingProfile = profiles[values.email] || {};
         profiles[values.email] = { ...existingProfile, ...values };
         
         localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
-        // 3. Reload the local state from the updated localStorage
         loadUsers();
 
         toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
@@ -248,7 +245,7 @@ export default function UsersPage() {
                                     <FormField control={form.control} name="district" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>District</FormLabel>
-                                            <Select onValueChange={handleDistrictChange} value={field.value}>
+                                            <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     {uniqueDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
