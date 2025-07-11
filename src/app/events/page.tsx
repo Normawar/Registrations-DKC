@@ -846,7 +846,9 @@ export default function EventsPage() {
                                 <>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 items-start">
                                     <div className="grid gap-1.5">
-                                      <Label className="text-xs">USCF Membership</Label>
+                                      <Label className="text-xs">
+                                        USCF Membership (current for {format(new Date(selectedEvent.date), 'MM/dd/yyyy')})
+                                      </Label>
                                       <RadioGroup
                                         value={uscfStatus}
                                         onValueChange={(value) => handleUscfStatusChange(player.id, value as any)}
@@ -1119,3 +1121,4 @@ export default function EventsPage() {
     </AppLayout>
   );
 }
+
