@@ -415,36 +415,39 @@ export default function ManageEventsPage() {
   const handleViewRegistrations = (event: Event) => {
     const rawConfirmations = localStorage.getItem('confirmations');
     const allConfirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
-    
+
     // Group confirmations by invoiceId to handle revisions
     const groupedByInvoice = allConfirmations.reduce((acc, conf) => {
-        if (!conf.invoiceId) {
-            // Keep non-invoiced (e.g., comped) registrations separate
-            acc[conf.id] = conf;
-            return acc;
-        }
-        if (!acc[conf.invoiceId] || new Date(conf.submissionTimestamp) > new Date(acc[conf.invoiceId].submissionTimestamp)) {
-            acc[conf.invoiceId] = conf;
-        }
+      if (!conf.invoiceId) {
+        acc[conf.id] = conf; // Keep non-invoiced registrations
         return acc;
+      }
+      if (!acc[conf.invoiceId] || new Date(conf.submissionTimestamp) > new Date(acc[conf.invoiceId].submissionTimestamp)) {
+        acc[conf.invoiceId] = conf;
+      }
+      return acc;
     }, {} as Record<string, StoredConfirmation>);
-
-    const latestConfirmations = Object.values(groupedByInvoice);
     
+    const latestConfirmations = Object.values(groupedByInvoice);
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     
-    const eventRegistrations: RegistrationInfo[] = [];
+    // De-duplicate players, keeping only their latest registration for this event
+    const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
+    
     for (const conf of latestConfirmations) {
         if (conf.eventId === event.id) {
             for (const playerId in conf.selections) {
                 const player = playerMap.get(playerId);
                 if (player) {
-                    eventRegistrations.push({ player, details: conf.selections[playerId] });
+                    // Always overwrite with the latest registration found
+                    uniquePlayerRegistrations.set(playerId, { player, details: conf.selections[playerId] });
                 }
             }
         }
     }
     
+    const eventRegistrations = Array.from(uniquePlayerRegistrations.values());
+
     setRegistrations(eventRegistrations);
     setSelectedEventForReg(event);
     setIsRegistrationsOpen(true);
@@ -771,6 +774,7 @@ export default function ManageEventsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Player</TableHead>
+                  <TableHead>USCF ID</TableHead>
                   <TableHead>School</TableHead>
                   <TableHead>Section</TableHead>
                   <TableHead>USCF Status</TableHead>
@@ -779,7 +783,7 @@ export default function ManageEventsPage() {
               <TableBody>
                 {registrations.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
+                    <TableCell colSpan={5} className="h-24 text-center">
                       No players registered yet.
                     </TableCell>
                   </TableRow>
@@ -787,6 +791,7 @@ export default function ManageEventsPage() {
                   registrations.map(({ player, details }) => (
                     <TableRow key={player.id}>
                       <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
+                      <TableCell>{player.uscfId}</TableCell>
                       <TableCell>{player.school}</TableCell>
                       <TableCell>{details.section}</TableCell>
                       <TableCell>
