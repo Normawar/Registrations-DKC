@@ -25,19 +25,19 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { 
-  PlusCircle, 
-  MoreHorizontal,
-  CalendarIcon,
-  Trash2,
-  FilePenLine,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Users,
-  Upload,
-  ClipboardPaste,
-  Download,
-  Check
+    PlusCircle, 
+    MoreHorizontal,
+    CalendarIcon,
+    Trash2,
+    FilePenLine,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+    Users,
+    Upload,
+    ClipboardPaste,
+    Download,
+    Check
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -430,7 +430,6 @@ export default function ManageEventsPage() {
     const rawConfirmations = localStorage.getItem('confirmations');
     const allConfirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
   
-    // De-duplicate confirmations by invoiceId, keeping only the latest version of each
     const latestConfirmationsByInvoice = Object.values(
       allConfirmations.reduce((acc, conf) => {
         if (conf.invoiceId) {
@@ -438,14 +437,12 @@ export default function ManageEventsPage() {
             acc[conf.invoiceId] = conf;
           }
         } else {
-          // For non-invoiced registrations (e.g., comped), use their own ID
           acc[conf.id] = conf;
         }
         return acc;
       }, {} as Record<string, StoredConfirmation>)
     );
   
-    // Now, create a final list of unique players for the selected event
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
   
@@ -454,7 +451,6 @@ export default function ManageEventsPage() {
         for (const playerId in conf.selections) {
           const player = playerMap.get(playerId);
           if (player) {
-            // This ensures only one entry per player, based on their latest appearance
             uniquePlayerRegistrations.set(playerId, { player, details: conf.selections[playerId] });
           }
         }
@@ -545,6 +541,18 @@ export default function ManageEventsPage() {
     setDownloadedPlayers(updatedDownloads);
     localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
     toast({ title: 'Status Reset', description: 'All players for this event are marked as new.' });
+  };
+
+  const handleClearAllNew = () => {
+    if (!selectedEventForReg) return;
+    const allPlayerIdsForEvent = registrations.map(p => p.player.id);
+    const updatedDownloads = {
+        ...downloadedPlayers,
+        [selectedEventForReg.id]: allPlayerIdsForEvent
+    };
+    setDownloadedPlayers(updatedDownloads);
+    localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
+    toast({ title: 'Status Cleared', description: 'All new registration indicators have been cleared.' });
   };
 
   return (
@@ -850,10 +858,12 @@ export default function ManageEventsPage() {
                <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">
                   Download All ({registrations.length})
               </Button>
-              <div className="text-xs text-muted-foreground">|</div>
-              <button onClick={handleMarkAllAsNew} className="text-xs text-muted-foreground hover:underline">
-                  Mark all as new
-              </button>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <span className="mx-1">|</span>
+                <button onClick={handleMarkAllAsNew} className="hover:underline">Mark all as new</button>
+                <span className="mx-1">|</span>
+                <button onClick={handleClearAllNew} className="hover:underline">Clear all new</button>
+              </div>
           </div>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
