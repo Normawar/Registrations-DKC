@@ -221,14 +221,6 @@ export default function ConfirmationsPage() {
     if (searchQuery) {
         const lowercasedQuery = searchQuery.toLowerCase();
         
-        let parsedDate: Date | null = null;
-        try {
-            const tempDate = new Date(lowercasedQuery);
-            if (isValid(tempDate) && lowercasedQuery.match(/\d/)) { // Only treat as a full date if it has numbers
-                parsedDate = tempDate;
-            }
-        } catch(e) { /* ignore */ }
-
         filtered = filtered.filter(conf => {
             // Search by event name or invoice number
             if (conf.eventName.toLowerCase().includes(lowercasedQuery) ||
@@ -236,19 +228,26 @@ export default function ConfirmationsPage() {
                 return true;
             }
 
-            // Search by full parsed date
-            if (parsedDate && conf.eventDate) {
-                const eventDate = new Date(conf.eventDate);
-                if (isValid(eventDate) && isSameDay(parsedDate, eventDate)) {
-                    return true;
-                }
-            } 
-            // Search by month name if not a full date
-            else if (!parsedDate && conf.eventDate) {
+            // Check if search query is just a month name
+            const isMonthQuery = !/\d/.test(lowercasedQuery);
+            if (isMonthQuery && conf.eventDate) {
                 const eventDate = new Date(conf.eventDate);
                 if (isValid(eventDate) && format(eventDate, 'MMMM').toLowerCase().startsWith(lowercasedQuery)) {
                     return true;
                 }
+            }
+
+            // Try to parse as a full date if it's not just a month name
+            if (!isMonthQuery && conf.eventDate) {
+                try {
+                    const parsedDate = new Date(lowercasedQuery);
+                    if (isValid(parsedDate)) {
+                        const eventDate = new Date(conf.eventDate);
+                        if (isValid(eventDate) && isSameDay(parsedDate, eventDate)) {
+                            return true;
+                        }
+                    }
+                } catch(e) { /* ignore invalid date strings */ }
             }
             
             return false;
