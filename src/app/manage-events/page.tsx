@@ -118,6 +118,7 @@ type RegistrationInfo = {
   details: {
     section: string;
     uscfStatus: 'current' | 'new' | 'renewing';
+    status?: 'active' | 'withdrawn';
   }
 };
 
@@ -451,11 +452,6 @@ export default function ManageEventsPage() {
       if (conf.eventId === event.id) {
         for (const playerId in conf.selections) {
             const registrationDetails = conf.selections[playerId];
-            if (registrationDetails.status === 'withdrawn') {
-                uniquePlayerRegistrations.delete(playerId);
-                continue;
-            }
-
             const player = playerMap.get(playerId);
             if (player) {
                 // This ensures each player ID appears only once, with their latest registration details.
@@ -493,18 +489,28 @@ export default function ManageEventsPage() {
     setIsDialogOpen(false);
   }
   
-  const newPlayersForDownload = useMemo(() => {
+  const playersForDownload = useMemo(() => {
     if (!selectedEventForReg) return [];
-    const alreadyDownloaded = downloadedPlayers[selectedEventForReg.id] || [];
-    return registrations.filter(p => !alreadyDownloaded.includes(p.player.id));
+    const downloadedIds = new Set(downloadedPlayers[selectedEventForReg.id] || []);
+    return registrations.filter(p => {
+        // Include if player is newly registered and not downloaded
+        if (!downloadedIds.has(p.player.id) && p.details.status !== 'withdrawn') {
+            return true;
+        }
+        // Include if player was withdrawn after they were already downloaded
+        if (downloadedIds.has(p.player.id) && p.details.status === 'withdrawn') {
+            return true;
+        }
+        return false;
+    });
   }, [registrations, downloadedPlayers, selectedEventForReg]);
   
   const handleDownload = (downloadAll: boolean = false) => {
     if (!selectedEventForReg) return;
     
-    const playersToDownload = downloadAll ? registrations : newPlayersForDownload;
+    const playersToDownload = downloadAll ? registrations : playersForDownload;
     if (playersToDownload.length === 0) {
-      toast({ title: 'No Players to Download', description: downloadAll ? 'There are no registered players for this event.' : 'There are no new registrations to download.' });
+      toast({ title: 'No Players to Download', description: downloadAll ? 'There are no registered players for this event.' : 'There are no new registrations or withdrawals to download.' });
       return;
     }
     
@@ -516,6 +522,7 @@ export default function ManageEventsPage() {
         "Grade": p.player.grade,
         "Section": p.details.section,
         "School": p.player.school,
+        "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : 'Registered'
     }));
 
     const csv = Papa.unparse(csvData);
@@ -523,14 +530,14 @@ export default function ManageEventsPage() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_registrations';
+    const fileNameSuffix = downloadAll ? 'all_registrations' : 'registered_and_withdrawn';
     link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, '_')}_${fileNameSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
     if (!downloadAll) {
-      const newlyDownloadedIds = newPlayersForDownload.map(p => p.player.id);
+      const newlyDownloadedIds = playersToDownload.map(p => p.player.id);
       const updatedDownloads = {
           ...downloadedPlayers,
           [selectedEventForReg.id]: [...(downloadedPlayers[selectedEventForReg.id] || []), ...newlyDownloadedIds]
@@ -859,9 +866,9 @@ export default function ManageEventsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className='my-4 flex items-center justify-end gap-2'>
-              <Button onClick={() => handleDownload(false)} disabled={newPlayersForDownload.length === 0} variant="outline" size="sm">
+              <Button onClick={() => handleDownload(false)} disabled={playersForDownload.length === 0} variant="outline" size="sm">
                   <Download className="mr-2 h-4 w-4" />
-                  Download New ({newPlayersForDownload.length})
+                  Download Registered ({playersForDownload.length})
               </Button>
                <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">
                   Download All ({registrations.length})
@@ -893,16 +900,26 @@ export default function ManageEventsPage() {
                   </TableRow>
                 ) : (
                   registrations.map(({ player, details }) => {
+                    const isWithdrawn = details.status === 'withdrawn';
                     const isDownloaded = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
-                    const status = isDownloaded ? 'Active' : 'Registered';
+                    let status: 'Withdrawn' | 'Active' | 'Registered' = 'Registered';
+                    if (isWithdrawn) {
+                        status = 'Withdrawn';
+                    } else if (isDownloaded) {
+                        status = 'Active';
+                    }
+                    
                     return (
-                        <TableRow key={player.id}>
-                            <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
+                        <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
+                            <TableCell className={cn("font-medium", isWithdrawn && "line-through")}>{player.firstName} {player.lastName}</TableCell>
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
                             <TableCell>
-                                <Badge variant={status === 'Active' ? 'default' : 'secondary'} className={cn(status === 'Active' ? 'bg-green-600 text-white' : '')}>
+                                <Badge variant={
+                                    status === 'Withdrawn' ? 'destructive' :
+                                    status === 'Active' ? 'default' : 'secondary'
+                                } className={cn(status === 'Active' ? 'bg-green-600 text-white' : '')}>
                                     {status}
                                 </Badge>
                             </TableCell>
@@ -946,3 +963,4 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
+
