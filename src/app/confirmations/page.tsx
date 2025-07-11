@@ -325,42 +325,69 @@ export default function ConfirmationsPage() {
 
   const loadAllData = useCallback(() => {
     try {
-      const storedConfirmations: Confirmation[] = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      setConfirmations(storedConfirmations);
+        const storedConfirmationsRaw: Confirmation[] = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        
+        // Group by invoiceId to find the latest version of each registration
+        const groupedByInvoice = storedConfirmationsRaw.reduce((acc, conf) => {
+            if (conf.invoiceId) {
+                if (!acc[conf.invoiceId] || new Date(conf.submissionTimestamp) > new Date(acc[conf.invoiceId].submissionTimestamp)) {
+                    acc[conf.invoiceId] = conf;
+                }
+            } else {
+                // For confirmations without an invoiceId (like comped ones), use their own ID as the key
+                acc[conf.id] = conf;
+            }
+            return acc;
+        }, {} as Record<string, Confirmation>);
+        
+        const latestConfirmations = Object.values(groupedByInvoice);
+        setConfirmations(latestConfirmations);
+        
+        const storedRequests = localStorage.getItem('change_requests');
+        setChangeRequests(storedRequests ? JSON.parse(storedRequests) : initialRequestsData);
+        
+        const initialInputs: Record<string, Partial<ConfirmationInputs>> = {};
+        const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
+        
+        for (const conf of latestConfirmations) {
+            initialInputs[conf.id] = {
+                paymentMethod: conf.paymentMethod || 'po',
+                poNumber: conf.poNumber || '',
+                checkNumber: conf.checkNumber || '',
+                amountPaid: conf.amountPaid || '',
+                checkDate: conf.checkDate ? new Date(conf.checkDate) : undefined,
+                file: null,
+                paymentFileName: conf.paymentFileName,
+                paymentFileUrl: conf.paymentFileUrl,
+            };
+            if (conf.invoiceId) {
+                initialStatuses[conf.id] = { status: conf.invoiceStatus || 'LOADING', isLoading: true };
+            } else if (conf.invoiceStatus === 'COMPED') {
+                initialStatuses[conf.id] = { status: 'COMPED', isLoading: false };
+            } else {
+                initialStatuses[conf.id] = { status: 'NO_SQ_INV', isLoading: false };
+            }
+        }
+        
+        setConfInputs(initialInputs);
+        setStatuses(initialStatuses);
+        
+        const invoicesToFetch = latestConfirmations.filter(c => {
+            if (!c.invoiceId) return false;
+            const status = c.invoiceStatus?.toUpperCase();
+            const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'COMPED'].includes(status || '');
+            return !isFinalState;
+        });
 
-      const storedRequests = localStorage.getItem('change_requests');
-      setChangeRequests(storedRequests ? JSON.parse(storedRequests) : initialRequestsData);
-
-      const initialInputs: Record<string, Partial<ConfirmationInputs>> = {};
-      const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
-      for (const conf of storedConfirmations) {
-          initialInputs[conf.id] = { paymentMethod: conf.paymentMethod || 'po', poNumber: conf.poNumber || '', checkNumber: conf.checkNumber || '', amountPaid: conf.amountPaid || '', checkDate: conf.checkDate ? new Date(conf.checkDate) : undefined, file: null, paymentFileName: conf.paymentFileName, paymentFileUrl: conf.paymentFileUrl, };
-          if (conf.invoiceId) {
-            initialStatuses[conf.id] = { status: conf.invoiceStatus || 'LOADING', isLoading: true };
-          } else if (conf.invoiceStatus === 'COMPED') {
-            initialStatuses[conf.id] = { status: 'COMPED', isLoading: false };
-          } else {
-            initialStatuses[conf.id] = { status: 'NO_SQ_INV', isLoading: false };
-          }
-      }
-      setConfInputs(initialInputs);
-      setStatuses(initialStatuses);
-      
-      const invoicesToFetch = storedConfirmations.filter(c => {
-          if (!c.invoiceId) return false;
-          const status = c.invoiceStatus?.toUpperCase();
-          const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'COMPED'].includes(status || '');
-          return !isFinalState;
-      });
-
-      invoicesToFetch.forEach(conf => fetchInvoiceStatus(conf.id, conf.invoiceId!, true));
-      setIsDataLoaded(true); // Signal that initial data load is complete
+        invoicesToFetch.forEach(conf => fetchInvoiceStatus(conf.id, conf.invoiceId!, true));
+        setIsDataLoaded(true); // Signal that initial data load is complete
     } catch (error) {
         console.error("Failed to load or parse data from localStorage", error);
         setConfirmations([]);
         setChangeRequests(initialRequestsData);
+        setIsDataLoaded(true);
     }
-  }, [fetchInvoiceStatus]);
+}, [fetchInvoiceStatus]);
   
   useEffect(() => {
     loadAllData();
