@@ -25,6 +25,7 @@ const RecreateOrganizerInvoiceInputSchema = z.object({
     sponsorEmail: z.string().email().describe('The email of the invoice recipient.'),
     schoolName: z.string().describe('The school associated with this invoice.'),
     invoiceTitle: z.string().describe('The main title for the invoice.'),
+    invoiceNumber: z.string().optional().describe('The new invoice number, including revision.'),
     lineItems: z.array(LineItemSchema).min(1).describe('An array of items to be included in the invoice.'),
 });
 export type RecreateOrganizerInvoiceInput = z.infer<typeof RecreateOrganizerInvoiceInputSchema>;
@@ -52,34 +53,19 @@ const recreateOrganizerInvoiceFlow = ai.defineFlow(
     const squareClient = await getSquareClient();
 
     try {
-      // Step 1: Get original invoice to fetch its number
-      console.log(`Fetching original invoice: ${input.originalInvoiceId}`);
-      const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(input.originalInvoiceId);
-      
-      if (!originalInvoice) {
-        throw new Error(`Could not find original invoice with ID: ${input.originalInvoiceId}`);
-      }
-
-      // Step 2: Cancel the original invoice.
+      // Step 1: Cancel the original invoice.
       console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
       await cancelInvoice({ invoiceId: input.originalInvoiceId });
       console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
 
-      // Step 3: Determine the new title with revision number.
-      const baseTitle = input.invoiceTitle.split('-rev.')[0].trim();
-      const currentRevisionMatch = originalInvoice.title?.match(/-rev\.(\d+)$/);
-      const currentRevision = currentRevisionMatch ? parseInt(currentRevisionMatch[1], 10) : 1;
-      const newRevisedTitle = `${baseTitle}-rev.${currentRevision + 1}`;
-      console.log(`Generated new revised title: ${newRevisedTitle}`);
-      
-      // Step 4: Create a new invoice with the updated details and revised title.
+      // Step 2: Create a new invoice with the updated details and revised title.
       console.log(`Creating new organizer invoice.`);
       
       const newInvoiceResult = await createOrganizerInvoice({
           sponsorName: input.sponsorName,
           sponsorEmail: input.sponsorEmail,
           schoolName: input.schoolName,
-          invoiceTitle: newRevisedTitle,
+          invoiceTitle: input.invoiceTitle,
           lineItems: input.lineItems,
       });
 

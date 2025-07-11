@@ -50,7 +50,7 @@ export default function OrganizerInvoicePage() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [originalInvoiceId, setOriginalInvoiceId] = useState<string | null>(null);
+  const [originalInvoice, setOriginalInvoice] = useState<any>(null);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
@@ -72,13 +72,13 @@ export default function OrganizerInvoicePage() {
   useEffect(() => {
     const editId = searchParams.get('edit');
     if (editId) {
-      setOriginalInvoiceId(editId);
       const allInvoicesRaw = localStorage.getItem('all_invoices');
       if (allInvoicesRaw) {
         const allInvoices = JSON.parse(allInvoicesRaw);
         const invoiceToEdit = allInvoices.find((inv: any) => inv.id === editId);
         
         if (invoiceToEdit) {
+          setOriginalInvoice(invoiceToEdit);
           setIsEditing(true);
           let lineItems: z.infer<typeof lineItemSchema>[] = [];
           
@@ -136,13 +136,21 @@ export default function OrganizerInvoicePage() {
 
     try {
       let result;
-      if (isEditing && originalInvoiceId) {
+      if (isEditing && originalInvoice) {
+        
+        // Determine the new invoice number for the revision.
+        const baseInvoiceNumber = originalInvoice.invoiceNumber?.split('-rev.')[0] || originalInvoice.invoiceNumber || originalInvoice.id;
+        const currentRevisionMatch = originalInvoice.invoiceNumber?.match(/-rev\.(\d+)$/);
+        const currentRevision = currentRevisionMatch ? parseInt(currentRevisionMatch[1], 10) : 1;
+        const newRevisionNumber = `${baseInvoiceNumber}-rev.${currentRevision + 1}`;
+        
         result = await recreateOrganizerInvoice({
-          originalInvoiceId: originalInvoiceId,
+          originalInvoiceId: originalInvoice.id,
           sponsorName: values.sponsorName,
           sponsorEmail: values.sponsorEmail,
           schoolName: values.schoolName,
           invoiceTitle: values.invoiceTitle,
+          invoiceNumber: newRevisionNumber,
           lineItems: values.lineItems,
         });
       } else {
@@ -176,9 +184,9 @@ export default function OrganizerInvoicePage() {
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       
       let finalInvoices;
-      if (isEditing && originalInvoiceId) {
+      if (isEditing && originalInvoice) {
         finalInvoices = existingInvoices.map((inv: any) => 
-            inv.id === originalInvoiceId ? { ...inv, invoiceStatus: 'CANCELED', status: 'CANCELED' } : inv
+            inv.id === originalInvoice.id ? { ...inv, invoiceStatus: 'CANCELED', status: 'CANCELED' } : inv
         );
         finalInvoices.push(newOrganizerInvoice);
       } else {
