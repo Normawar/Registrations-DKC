@@ -59,7 +59,7 @@ export default function UsersPage() {
 
         // Use the profile as the main source of truth, falling back to user list
         const enrichedUsers = allUsers.map(user => {
-            const profile = Object.values(profiles).find((p: any) => p.email === user.email);
+            const profile = profiles[user.email];
             return {
                 ...user,
                 ...(profile || {}),
@@ -103,11 +103,8 @@ export default function UsersPage() {
         // Delete from 'sponsor_profile' (details list)
         const profilesRaw = localStorage.getItem('sponsor_profile');
         let profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-        const profileKeyToDelete = Object.keys(profiles).find(key => profiles[key].email === userToDelete.email);
-        if (profileKeyToDelete) {
-            delete profiles[profileKeyToDelete];
-            localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
-        }
+        delete profiles[userToDelete.email];
+        localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
         loadUsers(); // Reload state from localStorage
         toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
