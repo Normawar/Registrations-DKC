@@ -18,6 +18,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { schoolData } from '@/lib/data/school-data';
+import { districts as uniqueDistricts } from '@/lib/data/districts';
 
 type User = {
     email: string;
@@ -46,6 +48,7 @@ export default function UsersPage() {
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
+    const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
 
     useEffect(() => {
         loadUsers();
@@ -83,6 +86,12 @@ export default function UsersPage() {
             school: user.school || '',
             district: user.district || '',
         });
+        // Pre-populate schools for the current district
+        if (user.district) {
+            handleDistrictChange(user.district, false);
+        } else {
+            setSchoolsForDistrict([]);
+        }
         setIsDialogOpen(true);
     };
 
@@ -114,8 +123,6 @@ export default function UsersPage() {
     const onSubmit = (values: UserFormValues) => {
         if (!editingUser) return;
 
-        // --- Start of Fix ---
-
         // 1. Update the 'users' (auth) list with the potentially new role
         const usersRaw = localStorage.getItem('users');
         let allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
@@ -137,12 +144,24 @@ export default function UsersPage() {
         // 3. Reload the local state from the updated localStorage
         loadUsers();
 
-        // --- End of Fix ---
-
         toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
         setIsDialogOpen(false);
         setEditingUser(null);
     };
+    
+    const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
+        form.setValue('district', district);
+        if (resetSchool) {
+            form.setValue('school', '');
+        }
+        const filteredSchools = schoolData
+            .filter((school) => school.district === district)
+            .map((school) => school.schoolName)
+            .sort();
+        setSchoolsForDistrict(filteredSchools);
+    };
+
+    const selectedDistrict = form.watch('district');
 
     return (
         <AppLayout>
@@ -216,8 +235,30 @@ export default function UsersPage() {
                                         </Select><FormMessage />
                                         </FormItem>
                                     )} />
-                                    <FormField control={form.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="district" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>District</FormLabel>
+                                            <Select onValueChange={handleDistrictChange} value={field.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    {uniqueDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={form.control} name="school" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>School</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
+                                                <SelectContent>
+                                                    {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )} />
                                 </form>
                             </Form>
                         </div>
