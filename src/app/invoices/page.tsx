@@ -454,7 +454,7 @@ export default function InvoicesPage() {
                                                   {profile.role === 'organizer' && (
                                                     <>
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/confirmations#${inv.id}`}>
+                                                            <Link href={`/confirmations#${inv.invoiceId}`}>
                                                                 <FilePenLine className="mr-2 h-4 w-4" /> Edit
                                                             </Link>
                                                         </DropdownMenuItem>
@@ -499,4 +499,5 @@ export default function InvoicesPage() {
     </AppLayout>
   );
 }
+
 
