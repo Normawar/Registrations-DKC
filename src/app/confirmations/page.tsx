@@ -32,7 +32,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -143,6 +143,7 @@ type Confirmation = {
   sponsorEmail: string;
   schoolName: string;
   district: string;
+  previousVersionId?: string; // For linking revised invoices
 };
 
 type ConfirmationInputs = {
@@ -209,6 +210,10 @@ export default function ConfirmationsPage() {
   const playersMap = useMemo(() => {
     return new Map(allPlayers.map(p => [p.id, p]));
   }, [allPlayers]);
+
+  const confirmationsMap = useMemo(() => {
+    return new Map(confirmations.map(c => [c.id, c]));
+  }, [confirmations]);
 
   const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
     confirmationsToFetch.forEach(conf => {
@@ -490,6 +495,7 @@ export default function ConfirmationsPage() {
               invoiceStatus: result.newStatus,
               totalInvoiced: result.newTotalAmount,
               selections: updatedSelections, // Use the locally updated selections
+              previousVersionId: confToUpdate.id,
           };
 
           const finalConfirmations = confirmations.map(c => c.id === confToUpdate.id ? updatedConfirmationData : c);
@@ -828,6 +834,7 @@ export default function ConfirmationsPage() {
                   const selectedRestoreIds = selectedPlayersForRestore[conf.id] || [];
                   const eventDetails = events.find(e => e.id === conf.eventId);
                   const hasWithdrawnPlayers = Object.values(conf.selections).some(p => p.status === 'withdrawn');
+                  const previousVersion = conf.previousVersionId ? confirmationsMap.get(conf.previousVersionId) : null;
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
@@ -1021,6 +1028,30 @@ export default function ConfirmationsPage() {
                           )}
                       </div>
                       
+                      {previousVersion && (
+                          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-dashed opacity-75">
+                              <h4 className="font-semibold text-muted-foreground flex items-center gap-2">
+                                  <History className="h-4 w-4" />
+                                  Previous Version (Canceled Invoice #{previousVersion.invoiceNumber})
+                              </h4>
+                              <Table className="mt-2">
+                                  <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Section</TableHead><TableHead>USCF Status</TableHead></TableRow></TableHeader>
+                                  <TableBody>
+                                    {Object.entries(previousVersion.selections).map(([playerId, details]) => {
+                                        const player = getPlayerById(playerId);
+                                        return (
+                                            <TableRow key={playerId} className={details.status === 'withdrawn' ? 'text-muted-foreground line-through' : ''}>
+                                                <TableCell>{player ? `${player.firstName} ${player.lastName}` : 'Unknown Player'}</TableCell>
+                                                <TableCell>{details.section}</TableCell>
+                                                <TableCell>{details.uscfStatus}</TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                  </TableBody>
+                              </Table>
+                          </div>
+                      )}
+
                       {currentStatus?.status === 'COMPED' ? (
                         <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200"><Award className="h-4 w-4 text-sky-600" /><AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle><AlertDescription className="text-sky-700">This registration was completed at no charge. No payment is required.</AlertDescription></Alert> ) : (
                         <div className="space-y-6 pt-6 mt-6 border-t">

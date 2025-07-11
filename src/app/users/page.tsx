@@ -17,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type User = {
     email: string;
@@ -52,16 +53,19 @@ export default function UsersPage() {
 
     const loadUsers = () => {
         const usersRaw = localStorage.getItem('users');
-        const profilesRaw = localStorage.getItem('sponsor_profile'); // Use this for names etc.
+        const profilesRaw = localStorage.getItem('sponsor_profile');
         const allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
-        const allProfiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
-        
-        // Combine user data with profile data
-        const enrichedUsers = allUsers.map(user => {
-            const profile = Object.values(allProfiles).find((p: any) => p.email === user.email);
-            return { ...user, ...profile };
-        });
+        const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
 
+        // Use the profile as the main source of truth, falling back to user list
+        const enrichedUsers = allUsers.map(user => {
+            const profile = Object.values(profiles).find((p: any) => p.email === user.email);
+            return {
+                ...user,
+                ...(profile || {}),
+            };
+        });
+        
         setUsers(enrichedUsers);
     };
 
@@ -89,13 +93,23 @@ export default function UsersPage() {
 
     const confirmDelete = () => {
         if (!userToDelete) return;
-        const updatedUsers = users.filter(u => u.email !== userToDelete.email);
-        setUsers(updatedUsers);
-        localStorage.setItem('users', JSON.stringify(updatedUsers.map(({email, role}) => ({email, role}))));
 
-        // Note: This does not delete the detailed profile from 'sponsor_profile', just the user record.
-        // A more complex system would handle this more gracefully.
+        // Delete from 'users' (auth list)
+        const usersRaw = localStorage.getItem('users');
+        let allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
+        allUsers = allUsers.filter(u => u.email !== userToDelete.email);
+        localStorage.setItem('users', JSON.stringify(allUsers));
+        
+        // Delete from 'sponsor_profile' (details list)
+        const profilesRaw = localStorage.getItem('sponsor_profile');
+        let profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
+        const profileKeyToDelete = Object.keys(profiles).find(key => profiles[key].email === userToDelete.email);
+        if (profileKeyToDelete) {
+            delete profiles[profileKeyToDelete];
+            localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
+        }
 
+        loadUsers(); // Reload state from localStorage
         toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
         setIsAlertOpen(false);
     };
@@ -114,11 +128,9 @@ export default function UsersPage() {
         // Update the detailed profile in 'sponsor_profile'
         const profilesRaw = localStorage.getItem('sponsor_profile');
         const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-        const profileKey = Object.keys(profiles).find(k => profiles[k].email === values.email);
-        if (profileKey) {
-            profiles[profileKey] = { ...profiles[profileKey], ...values };
-            localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
-        }
+        // The key for the profile is the email. In a real DB this would be a UUID.
+        profiles[values.email] = { ...(profiles[values.email] || {}), ...values };
+        localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
         toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
         setIsDialogOpen(false);
@@ -173,35 +185,39 @@ export default function UsersPage() {
             </div>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0">
+                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
                         <DialogTitle>Edit User</DialogTitle>
                         <DialogDescription>Modify the user's details below.</DialogDescription>
                     </DialogHeader>
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-                            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={form.control} name="role" render={({ field }) => (
-                                <FormItem><FormLabel>Role</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="sponsor">Sponsor</SelectItem>
-                                        <SelectItem value="organizer">Organizer</SelectItem>
-                                        <SelectItem value="individual">Individual</SelectItem>
-                                    </SelectContent>
-                                </Select><FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <DialogFooter>
-                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                                <Button type="submit">Save Changes</Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
+                    <ScrollArea className="flex-1 overflow-y-auto">
+                        <div className="p-6">
+                            <Form {...form}>
+                                <form id="user-edit-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                                    <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="role" render={({ field }) => (
+                                        <FormItem><FormLabel>Role</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="sponsor">Sponsor</SelectItem>
+                                                <SelectItem value="organizer">Organizer</SelectItem>
+                                                <SelectItem value="individual">Individual</SelectItem>
+                                            </SelectContent>
+                                        </Select><FormMessage />
+                                        </FormItem>
+                                    )} />
+                                    <FormField control={form.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                </form>
+                            </Form>
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                        <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                        <Button type="submit" form="user-edit-form">Save Changes</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
