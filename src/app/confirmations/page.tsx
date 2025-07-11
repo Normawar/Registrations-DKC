@@ -499,7 +499,7 @@ export default function ConfirmationsPage() {
     setIsChangeAlertOpen(false);
     setIsUpdating(prev => ({ ...prev, [confId]: true }));
     const player = getPlayerById(playerId);
-
+  
     const newConfirmations = confirmations.map(conf => {
         if (conf.id === confId) {
             const newSelections = JSON.parse(JSON.stringify(conf.selections));
@@ -523,8 +523,9 @@ export default function ConfirmationsPage() {
             }
             return req;
         });
-        localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
         setChangeRequests(updatedRequests);
+        localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+        window.dispatchEvent(new Event('storage'));
     }
     
     toast({ title: "Bye Updated", description: `Bye request for ${player?.firstName} has been updated.` });
@@ -757,7 +758,10 @@ export default function ConfirmationsPage() {
                     <AccordionTrigger>
                       <div className="flex justify-between items-center w-full pr-4">
                         <div className="flex flex-col items-start text-left">
-                          <span className="font-semibold">{conf.eventName}</span>
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold">{conf.eventName}</span>
+                                <span className="text-sm font-normal text-muted-foreground">({Object.keys(conf.selections).length} Player(s))</span>
+                            </div>
                           <span className="text-sm text-muted-foreground"> Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')} </span>
                         </div>
                         <div className="flex items-center gap-4">
@@ -767,7 +771,6 @@ export default function ConfirmationsPage() {
                             )}
                             <div className="text-right">
                                 <span className="font-semibold">${conf.totalInvoiced.toFixed(2)}</span>
-                                <span className="text-sm text-muted-foreground block"> {Object.keys(conf.selections).length} Player(s) </span>
                             </div>
                         </div>
                       </div>
@@ -775,7 +778,7 @@ export default function ConfirmationsPage() {
                     <AccordionContent>
                       <div className="space-y-4">
                         <div className="flex justify-between items-center flex-wrap gap-2">
-                            <h4 className="font-semibold">Registered Players ({Object.keys(conf.selections).length})</h4>
+                            <h4 className="font-semibold">Registered Players</h4>
                             <div className="flex items-center gap-2">
                                 {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => setIsAddPlayerDialogOpen(true)} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
                                 <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)} disabled={isLoading}> <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change </Button>
