@@ -32,7 +32,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -111,6 +111,9 @@ type PlayerRegistration = {
   };
   section: string;
   uscfStatus: 'current' | 'new' | 'renewing';
+  status?: 'active' | 'withdrawn';
+  withdrawnBy?: string;
+  withdrawnAt?: string;
 };
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
@@ -405,7 +408,9 @@ export default function ConfirmationsPage() {
     setIsUpdating(prev => ({ ...prev, [confId]: true }));
     setIsChangeAlertOpen(false);
     
-    const remainingPlayerIds = Object.keys(originalConfirmation.selections).filter(id => !playerIds.includes(id));
+    const activePlayerIds = Object.keys(originalConfirmation.selections)
+      .filter(id => !playerIds.includes(id) && originalConfirmation.selections[id].status !== 'withdrawn');
+    
     const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
 
     if (!eventDetails) {
@@ -414,13 +419,12 @@ export default function ConfirmationsPage() {
         return;
     }
 
-    const eventDate = new Date(eventDetails.date);
     let registrationFeePerPlayer = eventDetails.regularFee;
     const now = new Date();
-    if (isSameDay(eventDate, now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
-    else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
+    if (isSameDay(new Date(eventDetails.date), now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
+    else { const hoursUntilEvent = differenceInHours(new Date(eventDetails.date), now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
 
-    const updatedPlayersForInvoice = remainingPlayerIds.map(id => {
+    const updatedPlayersForInvoice = activePlayerIds.map(id => {
         const player = getPlayerById(id)!;
         const registrationDetails = originalConfirmation.selections[id];
         const lateFeeAmount = registrationFeePerPlayer - eventDetails.regularFee;
@@ -436,20 +440,21 @@ export default function ConfirmationsPage() {
     try {
         const result = await rebuildInvoiceFromRoster({
             invoiceId: originalConfirmation.invoiceId,
-            sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
-            sponsorEmail: sponsorProfile.email,
-            schoolName: sponsorProfile.school,
-            teamCode: originalConfirmation.teamCode,
-            eventName: originalConfirmation.eventName,
-            eventDate: originalConfirmation.eventDate,
+            players: updatedPlayersForInvoice,
             uscfFee: 24,
-            players: updatedPlayersForInvoice
         });
+
+      const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+      const approvalTimestamp = new Date().toISOString();
 
       const updatedConfirmations = confirmations.map(c => {
         if (c.id === confId) {
           const newSelections = { ...c.selections };
-          playerIds.forEach(id => delete newSelections[id]);
+          playerIds.forEach(id => {
+            if (newSelections[id]) {
+                newSelections[id] = { ...newSelections[id], status: 'withdrawn', withdrawnBy: initials, withdrawnAt: approvalTimestamp };
+            }
+          });
           return { ...c, selections: newSelections, invoiceUrl: result.invoiceUrl, totalInvoiced: result.totalAmount };
         }
         return c;
@@ -461,8 +466,6 @@ export default function ConfirmationsPage() {
           return p ? `${p.firstName} ${p.lastName}` : 'Unknown Player';
       });
 
-      const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-      const approvalTimestamp = new Date().toISOString();
       const updatedRequests = changeRequests.map(req => {
         if (req.confirmationId === confId && withdrawnPlayerNames.includes(req.player) && req.type.includes('Withdraw')) {
           return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
@@ -476,7 +479,7 @@ export default function ConfirmationsPage() {
 
       toast({
         title: "Player(s) Withdrawn",
-        description: `${withdrawnPlayerNames.join(', ')} has/have been removed and the invoice has been updated.`
+        description: `${withdrawnPlayerNames.join(', ')} has/have been withdrawn and the invoice has been updated.`
       });
 
     } catch (error) {
@@ -505,11 +508,9 @@ export default function ConfirmationsPage() {
           const newSelections = { ...conf.selections };
           if (newSelections[playerId]) {
             newSelections[playerId].byes = { ...newSelections[playerId].byes, [round]: value };
-            // Ensure round 1 is set if round 2 is set.
             if (round === 'round2' && value !== 'none' && newSelections[playerId].byes.round1 === 'none') {
                 newSelections[playerId].byes.round1 = '1';
             }
-            // Ensure round 2 is none if round 1 is none.
             if (round === 'round1' && value === 'none') {
                 newSelections[playerId].byes.round2 = 'none';
             }
@@ -574,7 +575,9 @@ export default function ConfirmationsPage() {
                 action: () => {
                   const newByes = { round1: changeRequestInputs.byeRound1 || 'none', round2: changeRequestInputs.byeRound2 || 'none' };
                   handleByeChange(newRequest.confirmationId, changeRequestInputs.playerId!, 'round1', newByes.round1);
-                  handleByeChange(newRequest.confirmationId, changeRequestInputs.playerId!, 'round2', newByes.round2);
+                  if (newByes.round1 !== 'none') {
+                    handleByeChange(newRequest.confirmationId, changeRequestInputs.playerId!, 'round2', newByes.round2);
+                  }
                   setIsChangeAlertOpen(false);
                 }
             },
@@ -829,22 +832,25 @@ export default function ConfirmationsPage() {
                               
                               const relevantRequests = changeRequests.filter(req => req.confirmationId === conf.id && req.player === `${player.firstName} ${player.lastName}`);
                               const latestRequest = relevantRequests.length > 0 ? relevantRequests[0] : null;
+
+                              const isWithdrawn = details.status === 'withdrawn';
                               
                               return (
-                                <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) ? 'selected' : undefined}>
+                                <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) ? 'selected' : undefined} className={cn(isWithdrawn && 'bg-muted/50')}>
                                   {sponsorProfile?.role === 'organizer' && (
                                       <TableCell>
                                           <Checkbox
                                               checked={selectedWithdrawalIds.includes(playerId)}
                                               onCheckedChange={() => handleWithdrawPlayerSelect(conf.id, playerId)}
                                               aria-label={`Select ${player.firstName} ${player.lastName} for withdrawal`}
-                                              disabled={isLoading || !conf.invoiceId}
+                                              disabled={isLoading || !conf.invoiceId || isWithdrawn}
                                           />
                                       </TableCell>
                                   )}
-                                  <TableCell className="font-medium flex items-center gap-2">
+                                  <TableCell className={cn("font-medium flex items-center gap-2", isWithdrawn && "line-through text-muted-foreground")}>
+                                    {isWithdrawn && <UserX className="h-4 w-4 text-destructive shrink-0" />}
                                     {player.firstName} {player.lastName}
-                                    {latestRequest && (
+                                    {latestRequest && !isWithdrawn && (
                                       <TooltipProvider>
                                         <Tooltip>
                                           <TooltipTrigger>
@@ -866,15 +872,18 @@ export default function ConfirmationsPage() {
                                       </TooltipProvider>
                                     )}
                                   </TableCell>
-                                  <TableCell>{details.section}</TableCell>
-                                  <TableCell><Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge></TableCell>
-                                  <TableCell>
-                                    {sponsorProfile?.role === 'organizer' ? (
+                                  <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>{details.section}</TableCell>
+                                  <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>
+                                    {isWithdrawn ? <Badge variant="destructive">Withdrawn</Badge> : <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge>}
+                                    {isWithdrawn && details.withdrawnAt && <span className="text-xs block text-muted-foreground">on {format(new Date(details.withdrawnAt), 'MM/dd, p')} by {details.withdrawnBy}</span>}
+                                  </TableCell>
+                                  <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>
+                                    {sponsorProfile?.role === 'organizer' && !isWithdrawn ? (
                                         <div className="flex gap-2">
                                             <Select
                                                 value={details.byes.round1}
                                                 onValueChange={(value) => handleByeChange(conf.id, playerId, 'round1', value)}
-                                                disabled={!eventDetails}
+                                                disabled={!eventDetails || isWithdrawn}
                                             >
                                                 <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
@@ -887,7 +896,7 @@ export default function ConfirmationsPage() {
                                             <Select
                                                 value={details.byes.round2}
                                                 onValueChange={(value) => handleByeChange(conf.id, playerId, 'round2', value)}
-                                                disabled={!eventDetails || details.byes.round1 === 'none'}
+                                                disabled={!eventDetails || details.byes.round1 === 'none' || isWithdrawn}
                                             >
                                                 <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
@@ -904,7 +913,7 @@ export default function ConfirmationsPage() {
                                   </TableCell>
                                   {sponsorProfile?.role === 'organizer' && (
                                     <TableCell className='text-right'>
-                                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditPlayerDialog(player)}>
+                                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditPlayerDialog(player)} disabled={isWithdrawn}>
                                         <FilePenLine className="h-4 w-4" />
                                         <span className='sr-only'>Edit Player</span>
                                       </Button>

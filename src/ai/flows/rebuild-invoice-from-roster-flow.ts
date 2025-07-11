@@ -9,7 +9,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type OrderLineItem, type Invoice } from 'square';
+import { ApiError, type Order, type Invoice, type OrderLineItem, type UpdateOrderRequest } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 
@@ -23,14 +23,8 @@ const PlayerToInvoiceSchema = z.object({
 
 const RebuildInvoiceInputSchema = z.object({
     invoiceId: z.string().describe('The ID of the invoice to rebuild.'),
-    sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
-    sponsorEmail: z.string().email().describe('The email of the sponsor.'),
-    schoolName: z.string().describe('The name of the school associated with the sponsor.'),
-    teamCode: z.string().describe('The team code of the sponsor.'),
-    eventName: z.string().describe('The name of the event.'),
-    eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
-    uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
     players: z.array(PlayerToInvoiceSchema).describe('The complete list of players who should be on the invoice.'),
+    uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
 });
 export type RebuildInvoiceInput = z.infer<typeof RebuildInvoiceInputSchema>;
 
@@ -66,14 +60,14 @@ const rebuildInvoiceFlow = ai.defineFlow(
     }
 
     const squareClient = await getSquareClient();
-    const { invoicesApi } = squareClient;
+    const { invoicesApi, ordersApi } = squareClient;
       
     try {
       console.log(`Fetching invoice ${input.invoiceId} to get its details...`);
       const { result: { invoice: originalInvoice } } = await invoicesApi.getInvoice(input.invoiceId);
       
-      if (!originalInvoice?.id) {
-        throw new Error(`Invoice ${input.invoiceId} not found.`);
+      if (!originalInvoice?.id || !originalInvoice.orderId) {
+        throw new Error(`Invoice ${input.invoiceId} not found or has no associated order.`);
       }
 
       const updatableStatuses = ['DRAFT', 'PUBLISHED', 'UNPAID', 'PARTIALLY_PAID'];
@@ -129,40 +123,51 @@ const rebuildInvoiceFlow = ai.defineFlow(
               note: uscfPlayerNotes,
           });
       }
-
-      // --- Prepare the invoice object for update ---
-      const invoiceToUpdate: any = { ...originalInvoice };
       
-      // Replace old line items with the newly constructed ones
-      invoiceToUpdate.lineItems = newLineItems;
+      console.log("Fetching original order to get version:", originalInvoice.orderId);
+      const { result: { order: originalOrder }} = await ordersApi.retrieveOrder(originalInvoice.orderId);
 
-      // Delete read-only fields to prevent API errors
-      delete invoiceToUpdate.createdAt;
-      delete invoiceToUpdate.updatedAt;
-      delete invoiceToUpdate.publicUrl;
-      delete invoiceToUpdate.scheduledAt;
-      delete invoiceToUpdate.location;
-      if (invoiceToUpdate.paymentRequests) {
-          invoiceToUpdate.paymentRequests.forEach((pr: any) => {
-              delete pr.computedAmountMoney;
-              delete pr.totalCompletedAmountMoney;
-          });
+      if (!originalOrder || !originalOrder.version) {
+          throw new Error(`Could not retrieve order or order version for ID: ${originalInvoice.orderId}`);
       }
 
-      // Update the invoice
-      const { result: { invoice: finalInvoice } } = await invoicesApi.updateInvoice(input.invoiceId, {
-        invoice: invoiceToUpdate,
-        idempotencyKey: randomUUID(),
-      });
+      const updateOrderRequest: UpdateOrderRequest = {
+          idempotencyKey: randomUUID(),
+          order: {
+            locationId: originalOrder.locationId!,
+            lineItems: newLineItems,
+            version: originalOrder.version,
+          }
+      };
       
-      console.log("Successfully rebuilt invoice:", finalInvoice);
+      // Clear all existing line items before adding new ones
+      if (originalOrder.lineItems && originalOrder.lineItems.length > 0) {
+        updateOrderRequest.fieldsToClear = ['line_items'];
+      }
+      
+      console.log("Updating order with new line items:", JSON.stringify(updateOrderRequest, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
+      
+      const { result: { order: updatedOrder } } = await ordersApi.updateOrder(originalInvoice.orderId, updateOrderRequest);
+      
+      console.log("Successfully updated order:", updatedOrder);
+
+      // Now fetch the final invoice to get the updated totals and status
+      // A small delay helps ensure Square's systems have processed the order update before we fetch the invoice.
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(input.invoiceId);
+
+      console.log("Successfully retrieved final invoice:", finalInvoice);
+
+      if (!finalInvoice) {
+        throw new Error("Failed to retrieve final invoice after update.");
+      }
 
       return {
-        invoiceId: finalInvoice!.id!,
-        orderId: finalInvoice!.orderId,
-        totalAmount: Number(finalInvoice!.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100,
-        status: finalInvoice!.status!,
-        invoiceUrl: finalInvoice!.publicUrl!,
+        invoiceId: finalInvoice.id!,
+        orderId: finalInvoice.orderId,
+        totalAmount: Number(finalInvoice.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100,
+        status: finalInvoice.status!,
+        invoiceUrl: finalInvoice.publicUrl!,
       };
 
     } catch (error) {
