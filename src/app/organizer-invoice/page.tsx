@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -19,15 +20,18 @@ import { useToast } from '@/hooks/use-toast';
 import { schoolData } from '@/lib/data/school-data';
 import { createOrganizerInvoice } from '@/ai/flows/create-organizer-invoice-flow';
 import { recreateOrganizerInvoice } from '@/ai/flows/recreate-organizer-invoice-flow';
+import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
 import { Loader2, PlusCircle, Trash2, ExternalLink, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 
 const lineItemSchema = z.object({
+  id: z.string().optional(), // Hold player ID if applicable
   name: z.string().min(1, 'Item name is required.'),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   note: z.string().optional(),
+  isUscf: z.boolean().default(false), // Flag for USCF membership items
 });
 
 const invoiceFormSchema = z.object({
@@ -82,34 +86,27 @@ export default function OrganizerInvoicePage() {
           setIsEditing(true);
           let lineItems: z.infer<typeof lineItemSchema>[] = [];
           
-          if (invoiceToEdit.type === 'organizer' && invoiceToEdit.lineItems) {
-            lineItems = invoiceToEdit.lineItems;
-          } else if (invoiceToEdit.type === 'event' && invoiceToEdit.eventId) {
+          if (invoiceToEdit.type === 'event' && invoiceToEdit.eventId && invoiceToEdit.selections) {
             const eventDetails = events.find(e => e.id === invoiceToEdit.eventId);
             if (eventDetails) {
-              const submissionDate = new Date(invoiceToEdit.submissionTimestamp);
-              const eventDate = new Date(eventDetails.date);
-              
-              let registrationFeePerPlayer = eventDetails.regularFee;
-              const hoursUntilEvent = differenceInHours(eventDate, submissionDate);
-              
-              if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } 
-              else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; }
-              if (isSameDay(eventDate, submissionDate)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
-              
               const uscfFee = 24;
               
               Object.entries(invoiceToEdit.selections as Record<string, any>).forEach(([playerId, details]) => {
+                if(details.status === 'withdrawn') return;
+
                 const player = allPlayers.find(p => p.id === playerId);
                 const playerName = player ? `${player.firstName} ${player.lastName}` : `Player ${playerId}`;
-                
-                lineItems.push({ name: `Registration for ${playerName}`, amount: registrationFeePerPlayer, note: `Event: ${eventDetails.name}, Section: ${details.section}` });
+                const registrationFee = invoiceToEdit.totalInvoiced / Object.keys(invoiceToEdit.selections).length;
+
+                lineItems.push({ id: playerId, name: `Registration for ${playerName}`, amount: registrationFee, note: `Event: ${eventDetails.name}, Section: ${details.section}` });
                 
                 if (details.uscfStatus === 'new' || details.uscfStatus === 'renewing') {
-                  lineItems.push({ name: `USCF Membership for ${playerName}`, amount: uscfFee, note: `Status: ${details.uscfStatus}` });
+                  lineItems.push({ id: playerId, name: `USCF Membership for ${playerName}`, amount: uscfFee, note: `Status: ${details.uscfStatus}`, isUscf: true });
                 }
               });
             }
+          } else if (invoiceToEdit.type === 'organizer' && invoiceToEdit.lineItems) {
+            lineItems = invoiceToEdit.lineItems;
           }
           
           form.reset({
@@ -133,94 +130,174 @@ export default function OrganizerInvoicePage() {
 
   async function onSubmit(values: InvoiceFormValues) {
     setIsLoading(true);
-
     try {
-      let result;
-      if (isEditing && originalInvoice) {
-        
-        // Determine the new invoice number for the revision.
-        const baseInvoiceNumber = originalInvoice.invoiceNumber?.split('-rev.')[0] || originalInvoice.invoiceNumber || originalInvoice.id;
-        const currentRevisionMatch = originalInvoice.invoiceNumber?.match(/-rev\.(\d+)$/);
-        const currentRevision = currentRevisionMatch ? parseInt(currentRevisionMatch[1], 10) : 1;
-        const newRevisionNumber = `${baseInvoiceNumber}-rev.${currentRevision + 1}`;
-        
-        result = await recreateOrganizerInvoice({
+        if (isEditing && originalInvoice?.type === 'event') {
+            await handleRecreateEventInvoice(values);
+        } else if (isEditing && originalInvoice) {
+            await handleRecreateOrganizerInvoice(values);
+        } else {
+            await handleCreateNewOrganizerInvoice(values);
+        }
+    } catch (error) {
+        console.error('Failed to process invoice:', error);
+        const description = error instanceof Error ? error.message : 'An unknown error occurred.';
+        toast({ variant: 'destructive', title: 'Invoice Processing Failed', description });
+    } finally {
+        setIsLoading(false);
+    }
+  }
+
+  async function handleRecreateEventInvoice(values: InvoiceFormValues) {
+    if (!originalInvoice?.eventId) throw new Error("Original event information is missing.");
+    const eventDetails = events.find(e => e.id === originalInvoice.eventId);
+    if (!eventDetails) throw new Error("Could not find original event details.");
+
+    const playerItems = values.lineItems.filter(item => !item.isUscf);
+    const uscfPlayerIds = new Set(values.lineItems.filter(item => item.isUscf).map(item => item.id));
+
+    const playersToInvoice = playerItems.map(item => {
+        const player = allPlayers.find(p => p.id === item.id);
+        if (!player) throw new Error(`Could not find player data for ${item.name}`);
+        const lateFee = item.amount - eventDetails.regularFee;
+        return {
+            playerName: `${player.firstName} ${player.lastName}`,
+            uscfId: player.uscfId,
+            baseRegistrationFee: eventDetails.regularFee,
+            lateFee: lateFee > 0 ? lateFee : 0,
+            uscfAction: uscfPlayerIds.has(player.id),
+        };
+    });
+
+    const result = await recreateInvoiceFromRoster({
+        originalInvoiceId: originalInvoice.id,
+        players: playersToInvoice,
+        uscfFee: 24,
+        sponsorName: values.sponsorName,
+        sponsorEmail: values.sponsorEmail,
+        schoolName: values.schoolName,
+        teamCode: originalInvoice.teamCode,
+        eventName: values.invoiceTitle,
+        eventDate: eventDetails.date,
+    });
+    
+    const newConfirmationRecord = {
+        id: result.newInvoiceId, 
+        eventId: originalInvoice.eventId,
+        eventName: values.invoiceTitle,
+        eventDate: eventDetails.date,
+        submissionTimestamp: new Date().toISOString(),
+        invoiceId: result.newInvoiceId,
+        invoiceNumber: result.newInvoiceNumber,
+        invoiceUrl: result.newInvoiceUrl,
+        invoiceStatus: result.newStatus,
+        totalInvoiced: result.newTotalAmount,
+        selections: playerItems.reduce((acc, item) => {
+            const player = allPlayers.find(p => p.id === item.id);
+            if (player) {
+                const originalSelection = originalInvoice.selections[player.id] || {};
+                acc[player.id] = { ...originalSelection, uscfStatus: uscfPlayerIds.has(player.id) ? 'renewing' : 'current' };
+            }
+            return acc;
+        }, {} as any),
+        previousVersionId: originalInvoice.id, 
+        teamCode: originalInvoice.teamCode,
+        schoolName: values.schoolName,
+        district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
+        sponsorName: values.sponsorName,
+        sponsorEmail: values.sponsorEmail,
+    };
+    
+    updateLocalStorageWithNewInvoice(newConfirmationRecord, originalInvoice.id);
+
+    toast({
+        title: "Event Invoice Recreated",
+        description: `Invoice ${result.newInvoiceNumber} has been created to replace the old one.`
+    });
+    router.push('/confirmations');
+  }
+
+  async function handleRecreateOrganizerInvoice(values: InvoiceFormValues) {
+      const result = await recreateOrganizerInvoice({
           originalInvoiceId: originalInvoice.id,
           sponsorName: values.sponsorName,
           sponsorEmail: values.sponsorEmail,
           schoolName: values.schoolName,
           invoiceTitle: values.invoiceTitle,
-          invoiceNumber: newRevisionNumber,
           lineItems: values.lineItems,
-        });
-      } else {
-        result = await createOrganizerInvoice({
+      });
+      const newInvoiceRecord = createOrganizerInvoiceRecord(values, result);
+      updateLocalStorageWithNewInvoice(newInvoiceRecord, originalInvoice.id);
+      toastSuccess(newInvoiceRecord, true);
+      router.push('/invoices');
+  }
+
+  async function handleCreateNewOrganizerInvoice(values: InvoiceFormValues) {
+      const result = await createOrganizerInvoice({
           sponsorName: values.sponsorName,
           sponsorEmail: values.sponsorEmail,
           schoolName: values.schoolName,
           invoiceTitle: values.invoiceTitle,
           lineItems: values.lineItems,
-        });
-      }
-      
-      const newOrganizerInvoice = {
-        id: result.newInvoiceId || result.invoiceId, // Use the new ID if it exists
-        invoiceId: result.newInvoiceId || result.invoiceId,
-        type: 'organizer',
-        invoiceTitle: values.invoiceTitle,
-        description: values.invoiceTitle,
-        submissionTimestamp: new Date().toISOString(),
-        totalInvoiced: values.lineItems.reduce((acc, item) => acc + item.amount, 0),
-        invoiceUrl: result.invoiceUrl,
-        invoiceNumber: result.invoiceNumber,
-        purchaserName: values.sponsorName,
-        sponsorEmail: values.sponsorEmail,
-        invoiceStatus: result.status,
-        schoolName: values.schoolName,
-        district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
-        lineItems: values.lineItems,
-      };
-      
+      });
+      const newInvoiceRecord = createOrganizerInvoiceRecord(values, result);
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      
-      let finalInvoices;
-      if (isEditing && originalInvoice) {
-        finalInvoices = existingInvoices.map((inv: any) => 
-            inv.id === originalInvoice.id ? { ...inv, invoiceStatus: 'CANCELED', status: 'CANCELED' } : inv
-        );
-        finalInvoices.push(newOrganizerInvoice);
-      } else {
-        finalInvoices = [...existingInvoices, newOrganizerInvoice];
+      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newInvoiceRecord]));
+      toastSuccess(newInvoiceRecord, false);
+      router.push('/invoices');
+  }
+
+  const createOrganizerInvoiceRecord = (values: InvoiceFormValues, result: any) => ({
+      id: result.newInvoiceId || result.invoiceId,
+      invoiceId: result.newInvoiceId || result.invoiceId,
+      type: 'organizer',
+      invoiceTitle: values.invoiceTitle,
+      description: values.invoiceTitle,
+      submissionTimestamp: new Date().toISOString(),
+      totalInvoiced: values.lineItems.reduce((acc, item) => acc + item.amount, 0),
+      invoiceUrl: result.invoiceUrl,
+      invoiceNumber: result.invoiceNumber,
+      purchaserName: values.sponsorName,
+      sponsorEmail: values.sponsorEmail,
+      invoiceStatus: result.status,
+      schoolName: values.schoolName,
+      district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
+      lineItems: values.lineItems,
+  });
+
+  const updateLocalStorageWithNewInvoice = (newRecord: any, oldInvoiceId: string) => {
+      const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+      const finalInvoices = existingInvoices.map((inv: any) => 
+          inv.id === oldInvoiceId ? { ...inv, invoiceStatus: 'CANCELED', status: 'CANCELED' } : inv
+      );
+      finalInvoices.push(newRecord);
+      localStorage.setItem('all_invoices', JSON.stringify(finalInvoices));
+
+      // Also update confirmations if it was an event invoice
+      if (newRecord.type === 'event') {
+          const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+          const finalConfirmations = existingConfirmations.map((c: any) =>
+              c.id === oldInvoiceId ? { ...c, invoiceStatus: 'CANCELED' } : c
+          );
+          finalConfirmations.push(newRecord);
+          localStorage.setItem('confirmations', JSON.stringify(finalConfirmations));
       }
 
-      localStorage.setItem('all_invoices', JSON.stringify(finalInvoices));
       window.dispatchEvent(new Event('storage'));
       window.dispatchEvent(new Event('all_invoices_updated'));
-
-
+  };
+  
+  const toastSuccess = (result: any, isUpdate: boolean) => {
       toast({
-        title: `Invoice ${isEditing ? 'Updated' : 'Created'} Successfully!`,
+        title: `Invoice ${isUpdate ? 'Updated' : 'Created'} Successfully!`,
         description: (
             <p>
-              Invoice {result.invoiceNumber || result.invoiceId} has been {isEditing ? 'recreated' : 'created'}.
+              Invoice {result.invoiceNumber || result.invoiceId} has been {isUpdate ? 'recreated' : 'created'}.
               <a href={result.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
                 View Invoice
               </a>
             </p>
         ),
       });
-      router.push('/invoices');
-    } catch (error) {
-      console.error('Failed to process invoice:', error);
-      const description = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast({
-        variant: 'destructive',
-        title: 'Invoice Processing Failed',
-        description,
-      });
-    } finally {
-      setIsLoading(false);
-    }
   }
 
   return (
@@ -381,3 +458,4 @@ export default function OrganizerInvoicePage() {
     </AppLayout>
   );
 }
+
