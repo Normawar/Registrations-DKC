@@ -28,7 +28,8 @@ import {
     ArrowUp,
     ArrowDown,
     Download,
-    Check
+    Check,
+    Search
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -51,6 +52,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
@@ -130,6 +132,7 @@ export default function EventsPage() {
     const [eventRegistrations, setEventRegistrations] = useState<Confirmation[]>([]);
     
     const [playerSortConfig, setPlayerSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
+    const [registrationsSearchQuery, setRegistrationsSearchQuery] = useState('');
 
     const rosterPlayers = useMemo(() => {
         if (!sponsorProfile || sponsorProfile.role !== 'sponsor') return [];
@@ -270,6 +273,7 @@ export default function EventsPage() {
     
     const handleEventNameClick = (event: Event) => {
         setSelectedEvent(event);
+        setRegistrationsSearchQuery(''); // Reset search when opening
         setIsRegistrationsOpen(true);
     };
 
@@ -586,8 +590,18 @@ export default function EventsPage() {
         
         const eventDownloads = downloadedPlayers[selectedEvent.id] || [];
         
+        let filteredPlayers = players;
+
+        if (registrationsSearchQuery) {
+            const lowerQuery = registrationsSearchQuery.toLowerCase();
+            filteredPlayers = players.filter(({player}) => 
+                player.uscfId.toLowerCase().includes(lowerQuery) ||
+                `${player.firstName} ${player.lastName}`.toLowerCase().includes(lowerQuery)
+            );
+        }
+
         if (playerSortConfig) {
-            players.sort((a, b) => {
+            filteredPlayers.sort((a, b) => {
                 let result = 0;
                 if (playerSortConfig.key === 'new') {
                     const aIsNew = !eventDownloads.includes(a.player.id);
@@ -604,8 +618,8 @@ export default function EventsPage() {
                 return playerSortConfig.direction === 'ascending' ? result : -result;
             });
         }
-        return players;
-    }, [selectedEvent, eventRegistrations, allPlayers, playerSortConfig, downloadedPlayers]);
+        return filteredPlayers;
+    }, [selectedEvent, eventRegistrations, allPlayers, playerSortConfig, downloadedPlayers, registrationsSearchQuery]);
     
     const newPlayersForDownload = useMemo(() => {
         if (!selectedEvent) return [];
@@ -954,15 +968,26 @@ export default function EventsPage() {
                     A total of {allRegisteredPlayersForSelectedEvent.length} players are registered for this event.
                 </DialogDescription>
             </DialogHeader>
-            <div className="my-4 flex justify-between items-center">
-                 <Button onClick={handleDownload} disabled={newPlayersForDownload.length === 0}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download New Registrations ({newPlayersForDownload.length})
-                </Button>
-                <div className="text-xs text-muted-foreground space-x-2">
-                    <button onClick={handleMarkAllAsNew} className="hover:underline">Mark all as new</button>
-                    <span>|</span>
-                    <button onClick={handleClearAllNew} className="hover:underline">Clear all new</button>
+            <div className="my-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+                 <div className="relative w-full sm:w-auto">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search by Name or USCF ID..." 
+                        className="pl-10"
+                        value={registrationsSearchQuery}
+                        onChange={(e) => setRegistrationsSearchQuery(e.target.value)}
+                    />
+                 </div>
+                <div className="flex items-center gap-2">
+                    <Button onClick={handleDownload} disabled={newPlayersForDownload.length === 0} variant="outline" size="sm">
+                        <Download className="mr-2 h-4 w-4" />
+                        Download New ({newPlayersForDownload.length})
+                    </Button>
+                    <div className="text-xs text-muted-foreground space-x-2">
+                        <button onClick={handleMarkAllAsNew} className="hover:underline">Mark all as new</button>
+                        <span>|</span>
+                        <button onClick={handleClearAllNew} className="hover:underline">Clear all new</button>
+                    </div>
                 </div>
             </div>
             <ScrollArea className="h-96 w-full">

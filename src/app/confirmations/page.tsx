@@ -220,11 +220,33 @@ export default function ConfirmationsPage() {
 
     if (searchQuery) {
         const lowercasedQuery = searchQuery.toLowerCase();
-        filtered = filtered.filter(conf => 
-            conf.eventName.toLowerCase().includes(lowercasedQuery) ||
-            (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery)) ||
-            (conf.eventDate && conf.eventDate.toLowerCase().includes(lowercasedQuery))
-        );
+        
+        // Try parsing the query as a date
+        let parsedDate: Date | null = null;
+        try {
+            const tempDate = new Date(lowercasedQuery);
+            if (isValid(tempDate)) {
+                parsedDate = tempDate;
+            }
+        } catch(e) { /* ignore parse errors */ }
+
+        filtered = filtered.filter(conf => {
+            // Existing searches by event name or invoice number
+            if (conf.eventName.toLowerCase().includes(lowercasedQuery) ||
+                (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery))) {
+                return true;
+            }
+
+            // New date search
+            if (parsedDate && conf.eventDate) {
+                const eventDate = new Date(conf.eventDate);
+                if (isValid(eventDate) && isSameDay(parsedDate, eventDate)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        });
     }
     
     if (sortConfig) {
