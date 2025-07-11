@@ -245,7 +245,7 @@ export default function InvoicesPage() {
                 fetchInvoiceStatus(inv.id, inv.invoiceId!);
             });
         }
-    }, [filteredInvoices, statuses, fetchInvoiceStatus]);
+    }, [filteredInvoices, fetchInvoiceStatus]);
   
   if (!profile) {
     return (
@@ -459,9 +459,9 @@ export default function InvoicesPage() {
                                                             </Link>
                                                         </DropdownMenuItem>
                                                         {isCancelable && (
-                                                            <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
-                                                                <Trash2 className="mr-2 h-4 w-4" /> Cancel
-                                                            </DropdownMenuItem>
+                                                          <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
+                                                              <Trash2 className="mr-2 h-4 w-4" /> Cancel
+                                                          </DropdownMenuItem>
                                                         )}
                                                     </>
                                                   )}
@@ -499,5 +499,6 @@ export default function InvoicesPage() {
     </AppLayout>
   );
 }
+
 
 
