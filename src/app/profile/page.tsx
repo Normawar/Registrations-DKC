@@ -125,7 +125,7 @@ const ProfilePageSkeleton = () => (
 
 export default function ProfilePage() {
   const { toast } = useToast();
-  const { profile, updateProfile } = useSponsorProfile();
+  const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
   
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   
@@ -318,7 +318,7 @@ export default function ProfilePage() {
   const selectedDistrict = profileForm.watch('district');
   const SelectedIconComponent = selectedIconName ? icons[selectedIconName] : null;
 
-  if (!profile) {
+  if (!isProfileLoaded) {
     return (
         <AppLayout>
             <ProfilePageSkeleton />
@@ -382,7 +382,7 @@ export default function ProfilePage() {
                             <div className="w-full h-full flex items-center justify-center bg-muted rounded-full">
                                 <SelectedIconComponent className="w-20 h-20 text-muted-foreground" />
                             </div>
-                        ) : profile.avatarType === 'upload' ? (
+                        ) : profile?.avatarType === 'upload' ? (
                             <AvatarImage src={profile.avatarValue} alt="Sponsor Profile" />
                         ) : (
                             <AvatarFallback className="text-4xl">
@@ -627,11 +627,11 @@ export default function ProfilePage() {
           </Form>
         </Card>
         
-        {profile?.role !== 'individual' && (
+        {profile?.role === 'organizer' && (
             <Card>
                 <CardHeader>
-                    <CardTitle>Account Settings</CardTitle>
-                    <CardDescription>Manage your account role and permissions.</CardDescription>
+                    <CardTitle>Account Role</CardTitle>
+                    <CardDescription>Change the role and permissions for this account.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-2">

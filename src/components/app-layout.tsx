@@ -27,7 +27,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { requestsData } from "@/lib/data/requests-data";
@@ -53,6 +53,7 @@ const organizerMenuItems = [
   { href: "/confirmations", icon: ClipboardCheck, label: "Registration Confirmations" },
   { href: "/players", icon: PawnIcon, label: "Master Player Database" },
   { href: "/schools", icon: School, label: "Schools & Districts" },
+  { href: "/users", icon: Users, label: "User Management" },
   { href: "/invoices", icon: Receipt, label: "All Invoices" },
   { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
   { href: "/events", icon: RookIcon, label: "Upcoming Events" },

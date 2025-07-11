@@ -1,0 +1,222 @@
+
+'use client';
+
+import { useState, useMemo, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { AppLayout } from "@/components/app-layout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { useToast } from '@/hooks/use-toast';
+import { MoreHorizontal, Trash2, FilePenLine } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type User = {
+    email: string;
+    role: 'sponsor' | 'organizer' | 'individual';
+    firstName?: string;
+    lastName?: string;
+    school?: string;
+    district?: string;
+};
+
+const userFormSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['sponsor', 'organizer', 'individual']),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  school: z.string().optional(),
+  district: z.string().optional(),
+});
+
+type UserFormValues = z.infer<typeof userFormSchema>;
+
+export default function UsersPage() {
+    const { toast } = useToast();
+    const [users, setUsers] = useState<User[]>([]);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<User | null>(null);
+
+    useEffect(() => {
+        loadUsers();
+    }, []);
+
+    const loadUsers = () => {
+        const usersRaw = localStorage.getItem('users');
+        const profilesRaw = localStorage.getItem('sponsor_profile'); // Use this for names etc.
+        const allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
+        const allProfiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
+        
+        // Combine user data with profile data
+        const enrichedUsers = allUsers.map(user => {
+            const profile = Object.values(allProfiles).find((p: any) => p.email === user.email);
+            return { ...user, ...profile };
+        });
+
+        setUsers(enrichedUsers);
+    };
+
+    const form = useForm<UserFormValues>({
+        resolver: zodResolver(userFormSchema),
+    });
+
+    const handleEditUser = (user: User) => {
+        setEditingUser(user);
+        form.reset({
+            email: user.email,
+            role: user.role,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            school: user.school || '',
+            district: user.district || '',
+        });
+        setIsDialogOpen(true);
+    };
+
+    const handleDeleteUser = (user: User) => {
+        setUserToDelete(user);
+        setIsAlertOpen(true);
+    };
+
+    const confirmDelete = () => {
+        if (!userToDelete) return;
+        const updatedUsers = users.filter(u => u.email !== userToDelete.email);
+        setUsers(updatedUsers);
+        localStorage.setItem('users', JSON.stringify(updatedUsers.map(({email, role}) => ({email, role}))));
+
+        // Note: This does not delete the detailed profile from 'sponsor_profile', just the user record.
+        // A more complex system would handle this more gracefully.
+
+        toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
+        setIsAlertOpen(false);
+    };
+
+    const onSubmit = (values: UserFormValues) => {
+        if (!editingUser) return;
+        
+        const updatedUsers = users.map(u => 
+            u.email === editingUser.email ? { ...u, ...values } : u
+        );
+        setUsers(updatedUsers);
+
+        // Update the 'users' list (auth-like)
+        localStorage.setItem('users', JSON.stringify(updatedUsers.map(({email, role}) => ({email, role}))));
+        
+        // Update the detailed profile in 'sponsor_profile'
+        const profilesRaw = localStorage.getItem('sponsor_profile');
+        const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
+        const profileKey = Object.keys(profiles).find(k => profiles[k].email === values.email);
+        if (profileKey) {
+            profiles[profileKey] = { ...profiles[profileKey], ...values };
+            localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
+        }
+
+        toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
+        setIsDialogOpen(false);
+    };
+
+    return (
+        <AppLayout>
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-3xl font-bold font-headline">User Management</h1>
+                    <p className="text-muted-foreground">View, edit, and manage all system users.</p>
+                </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>All System Users</CardTitle>
+                        <CardDescription>A list of all registered users in the system.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>School / District</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {users.map(user => (
+                                    <TableRow key={user.email}>
+                                        <TableCell className="font-mono">{user.email}</TableCell>
+                                        <TableCell>{user.firstName} {user.lastName}</TableCell>
+                                        <TableCell className='capitalize'>{user.role}</TableCell>
+                                        <TableCell>{user.school || 'N/A'}{user.district ? ` / ${user.district}`: ''}</TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent>
+                                                    <DropdownMenuItem onClick={() => handleEditUser(user)}><FilePenLine className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleDeleteUser(user)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit User</DialogTitle>
+                        <DialogDescription>Modify the user's details below.</DialogDescription>
+                    </DialogHeader>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+                            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={form.control} name="role" render={({ field }) => (
+                                <FormItem><FormLabel>Role</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="sponsor">Sponsor</SelectItem>
+                                        <SelectItem value="organizer">Organizer</SelectItem>
+                                        <SelectItem value="individual">Individual</SelectItem>
+                                    </SelectContent>
+                                </Select><FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <DialogFooter>
+                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                                <Button type="submit">Save Changes</Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>This action cannot be undone. This will permanently delete the user account for {userToDelete?.email}.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </AppLayout>
+    );
+}

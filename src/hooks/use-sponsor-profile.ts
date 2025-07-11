@@ -31,6 +31,7 @@ const defaultSponsorData: SponsorProfile = {
 
 export function useSponsorProfile() {
   const [profile, setProfile] = useState<SponsorProfile | null>(null);
+  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
 
   const loadProfile = useCallback(() => {
     try {
@@ -46,10 +47,12 @@ export function useSponsorProfile() {
         }
         
         setProfile(profileData);
+        setIsProfileLoaded(true);
         
     } catch (error) {
         console.error("Failed to load sponsor profile from localStorage", error);
         setProfile(defaultSponsorData);
+        setIsProfileLoaded(true);
     }
   }, []);
 
@@ -93,5 +96,5 @@ export function useSponsorProfile() {
     });
   }, []);
   
-  return { profile, updateProfile };
+  return { profile, updateProfile, isProfileLoaded };
 }
