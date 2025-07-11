@@ -166,7 +166,14 @@ export default function ProfilePage() {
       },
   });
 
-  const allSchoolNames = useMemo(() => ['Homeschool', ...[...new Set(schoolData.map(s => s.schoolName))].sort()], []);
+  const allSchoolNames = useMemo(() => {
+    const schoolNames = schoolData.map(s => s.schoolName);
+    const uniqueSchoolNames = [...new Set(schoolNames)].sort();
+    if (!uniqueSchoolNames.includes('Homeschool')) {
+        return ['Homeschool', ...uniqueSchoolNames];
+    }
+    return uniqueSchoolNames;
+  }, []);
 
   useEffect(() => {
     if (!auth || !storage) {

@@ -56,7 +56,14 @@ const SponsorSignUpForm = () => {
   const router = useRouter();
   const { updateProfile } = useSponsorProfile();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
-  const allSchoolNames = useMemo(() => ['Homeschool', ...[...new Set(schoolData.map(s => s.schoolName))].sort()], []);
+  const allSchoolNames = useMemo(() => {
+    const schoolNames = schoolData.map(s => s.schoolName);
+    const uniqueSchoolNames = [...new Set(schoolNames)].sort();
+    if (!uniqueSchoolNames.includes('Homeschool')) {
+        return ['Homeschool', ...uniqueSchoolNames];
+    }
+    return uniqueSchoolNames;
+  }, []);
   
   const form = useForm<z.infer<typeof sponsorFormSchema>>({
     resolver: zodResolver(sponsorFormSchema),
@@ -75,9 +82,15 @@ const SponsorSignUpForm = () => {
   const selectedDistrict = form.watch('district');
 
   useEffect(() => {
-    // Initialize school list on first render based on default district
-    if (form.getValues('district') === 'None') {
+    const initialDistrict = form.getValues('district');
+    if (initialDistrict === 'None') {
       setSchoolsForDistrict(allSchoolNames);
+    } else {
+        const filteredSchools = schoolData
+            .filter((school) => school.district === initialDistrict)
+            .map((school) => school.schoolName)
+            .sort();
+        setSchoolsForDistrict([...new Set(filteredSchools)]);
     }
   }, [allSchoolNames, form]);
 

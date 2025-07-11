@@ -460,7 +460,5 @@ export const schoolData: School[] = [
   { "district": "LOS FRESNOS CISD", "schoolName": "LOS FRESNOS H S", "streetAddress": "P O BOX 309", "city": "LOS FRESNOS", "zip": "78566", "zip4": "399", "phone": "(956)254-5300", "charter": "No", "students": "3291", "state": "TX", "county": "Cameron County" },
   { "district": "BROWNSVILLE ISD", "schoolName": "LUCIO MIDDLE", "streetAddress": "300 N VERMILLION RD", "city": "BROWNSVILLE", "zip": "78521", "zip4": "6820", "phone": "(956)831-4550", "charter": "No", "students": "653", "state": "TX", "county": "Cameron County" },
   { "district": "BROWNSVILLE ISD", "schoolName": "MANZANO MIDDLE", "streetAddress": "2580 W ALTON GLOOR BLVD", "city": "BROWNSVILLE", "zip": "78521", "zip4": "", "phone": "(956)548-9800", "charter": "No", "students": "850", "state": "TX", "county": "Cameron County" },
-  { "district": "BROWNSVILLE ISD", "schoolName": "MARTIN EL", "streetAddress": "1701 STANFORD AVE", "city": "BROWNSVILLE", "zip": "78520", "zip4": "8199", "phone": "(982)273-0", "charter": "No", "students": "414", "state": "TX", "county": "Cameron County" },
-  { "district": "Homeschool", "schoolName": "Homeschool", "streetAddress": "", "city": "", "zip": "", "zip4": "", "phone": "", "charter": "No", "students": "", "state": "TX", "county": "" }
+  { "district": "BROWNSVILLE ISD", "schoolName": "MARTIN EL", "streetAddress": "1701 STANFORD AVE", "city": "BROWNSVILLE", "zip": "78520", "zip4": "8199", "phone": "(982)273-0", "charter": "No", "students": "414", "state": "TX", "county": "Cameron County" }
 ]
-

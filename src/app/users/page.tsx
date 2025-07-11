@@ -50,7 +50,14 @@ export default function UsersPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
-    const allSchoolNames = useMemo(() => ['Homeschool', ...[...new Set(schoolData.map(s => s.schoolName))].sort()], []);
+    const allSchoolNames = useMemo(() => {
+        const schoolNames = schoolData.map(s => s.schoolName);
+        const uniqueSchoolNames = [...new Set(schoolNames)].sort();
+        if (!uniqueSchoolNames.includes('Homeschool')) {
+            return ['Homeschool', ...uniqueSchoolNames];
+        }
+        return uniqueSchoolNames;
+    }, []);
 
 
     useEffect(() => {
@@ -110,7 +117,7 @@ export default function UsersPage() {
         });
         handleDistrictChange(initialDistrict, false);
       }
-    }, [isDialogOpen, editingUser]);
+    }, [isDialogOpen, editingUser, form]);
 
     const handleEditUser = (user: User) => {
         setEditingUser(user);
