@@ -33,6 +33,7 @@ const CreateInvoiceInputSchema = z.object({
     eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
     uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
     players: z.array(PlayerInvoiceInfoSchema).describe('An array of players to be invoiced.'),
+    invoiceNumber: z.string().optional().describe('A custom invoice number to assign. If not provided, Square will generate one.'),
 });
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
 
@@ -61,7 +62,7 @@ const createInvoiceFlow = ai.defineFlow(
       const mockInvoiceId = `MOCK_INV_${randomUUID()}`;
       return {
         invoiceId: mockInvoiceId,
-        invoiceNumber: mockInvoiceId.substring(0, 8),
+        invoiceNumber: input.invoiceNumber || mockInvoiceId.substring(0, 8),
         status: 'DRAFT',
         invoiceUrl: `/#mock-invoice/${mockInvoiceId}`,
       };
@@ -198,6 +199,7 @@ const createInvoiceFlow = ai.defineFlow(
             squareGiftCard: true,
             bankAccount: true, // For ACH payments
           },
+          invoiceNumber: input.invoiceNumber,
           title: `${input.teamCode} @ ${formattedEventDate} ${input.eventName}`,
           description: `Thank you for your registration.`,
         }

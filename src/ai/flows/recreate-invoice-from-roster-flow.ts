@@ -9,8 +9,8 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type Order, type Invoice, type OrderLineItem, type UpdateOrderRequest } from 'square';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
+import { ApiError } from 'square';
+import { getSquareClient } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
@@ -63,19 +63,36 @@ const recreateInvoiceFlow = ai.defineFlow(
       return {
         oldInvoiceId: input.originalInvoiceId,
         newInvoiceId: `MOCK_RECREATED_${randomUUID()}`,
+        newInvoiceNumber: 'MOCK-rev.2',
         newTotalAmount: 0,
         newStatus: 'DRAFT',
         newInvoiceUrl: `/#mock-invoice/new`,
       };
     }
+    const squareClient = await getSquareClient();
 
     try {
-      // Step 1: Cancel the original invoice.
+      // Step 1: Get original invoice to fetch its number
+      console.log(`Fetching original invoice: ${input.originalInvoiceId}`);
+      const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(input.originalInvoiceId);
+      
+      if (!originalInvoice) {
+        throw new Error(`Could not find original invoice with ID: ${input.originalInvoiceId}`);
+      }
+
+      // Step 2: Cancel the original invoice.
       console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
       await cancelInvoice({ invoiceId: input.originalInvoiceId });
       console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
 
-      // Step 2: Create a new invoice with the updated roster.
+      // Step 3: Determine the new invoice number for the revision.
+      const baseInvoiceNumber = originalInvoice.invoiceNumber?.split('-rev.')[0] || originalInvoice.invoiceNumber || originalInvoice.id;
+      const currentRevisionMatch = originalInvoice.invoiceNumber?.match(/-rev\.(\d+)$/);
+      const currentRevision = currentRevisionMatch ? parseInt(currentRevisionMatch[1], 10) : 1;
+      const newRevisionNumber = `${baseInvoiceNumber}-rev.${currentRevision + 1}`;
+      console.log(`Generated new revision invoice number: ${newRevisionNumber}`);
+      
+      // Step 4: Create a new invoice with the updated roster and new invoice number.
       console.log(`Creating new invoice with ${input.players.length} players.`);
       
       const newInvoiceResult = await createInvoice({
@@ -87,13 +104,13 @@ const recreateInvoiceFlow = ai.defineFlow(
           eventDate: input.eventDate,
           uscfFee: input.uscfFee,
           players: input.players,
+          invoiceNumber: newRevisionNumber,
       });
 
       console.log("Successfully created new invoice:", newInvoiceResult);
 
       let newTotal = 0;
       if (newInvoiceResult.invoiceId) {
-          const squareClient = await getSquareClient();
           const { result: { invoice } } = await squareClient.invoicesApi.getInvoice(newInvoiceResult.invoiceId);
           newTotal = Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100;
       }
