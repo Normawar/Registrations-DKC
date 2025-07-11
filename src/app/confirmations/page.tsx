@@ -66,7 +66,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
 const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3, '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7, '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11, '12th Grade': 12, };
-const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12, 'Championship': 12 };
+const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12 };
 
 const playerFormSchema = z.object({
   id: z.string().optional(),
@@ -133,7 +133,7 @@ type Confirmation = {
   paymentMethod?: PaymentMethod;
   poNumber?: string;
   checkNumber?: string;
-  checkDate?: string;
+  checkDate?: Date;
   amountPaid?: string;
   paymentFileName?: string;
   paymentFileUrl?: string;
@@ -222,30 +222,26 @@ export default function ConfirmationsPage() {
         const lowercasedQuery = searchQuery.toLowerCase();
         
         filtered = filtered.filter(conf => {
-            // Search by Event Name or Invoice Number
             if (conf.eventName.toLowerCase().includes(lowercasedQuery) || (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery))) {
                 return true;
             }
 
-            // Search by Month Name
             const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-            const matchingMonth = monthNames.find(m => m.startsWith(lowercasedQuery));
+            const matchingMonth = monthNames.find(m => m.toLowerCase().startsWith(lowercasedQuery));
             if (matchingMonth) {
                 if (conf.submissionTimestamp) {
                     const submissionDate = new Date(conf.submissionTimestamp);
-                    if (isValid(submissionDate) && format(submissionDate, 'MMMM').toLowerCase() === matchingMonth) {
+                    if (isValid(submissionDate) && format(submissionDate, 'MMMM').toLowerCase() === matchingMonth.toLowerCase()) {
                         return true;
                     }
                 }
             }
 
-            // Search by specific date (e.g., mm/dd/yyyy)
             try {
                 const parsedDate = new Date(searchQuery);
-                if (isValid(parsedDate)) {
+                if (isValid(parsedDate) && searchQuery.includes('/') && !isNaN(parsedDate.getTime())) {
                     const submissionDate = new Date(conf.submissionTimestamp);
-                    // Check if it's a valid date and not just a year which can be a false positive
-                    if (isValid(submissionDate) && searchQuery.includes('/') && isSameDay(parsedDate, submissionDate)) {
+                    if (isValid(submissionDate) && isSameDay(parsedDate, submissionDate)) {
                         return true;
                     }
                 }
@@ -391,7 +387,6 @@ export default function ConfirmationsPage() {
     loadAllData();
     window.addEventListener('storage', loadAllData);
     
-    // Check for a hash in the URL on initial load
     if (window.location.hash) {
       const hashId = window.location.hash.substring(1);
       setOpenCollapsibleRow(hashId);
@@ -516,7 +511,6 @@ export default function ConfirmationsPage() {
           const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
           const approvalTimestamp = new Date().toISOString();
 
-          // First, update the selections locally to determine the final roster
           const updatedSelections = { ...confToUpdate.selections };
           playerIds.forEach(id => {
               if (updatedSelections[id]) {
@@ -530,7 +524,6 @@ export default function ConfirmationsPage() {
               }
           });
 
-          // Determine the final list of active players for the new invoice
           const activePlayerIds = Object.keys(updatedSelections).filter(id => updatedSelections[id].status !== 'withdrawn');
           const activePlayers = activePlayerIds.map(id => getPlayerById(id)).filter((p): p is MasterPlayer => !!p);
 
@@ -568,9 +561,8 @@ export default function ConfirmationsPage() {
               eventDate: confToUpdate.eventDate,
           });
           
-          // Create the new confirmation object
           const newConfirmationRecord: Confirmation = {
-              id: result.newInvoiceId, // The ID of the confirmation record is the new invoice ID
+              id: result.newInvoiceId, 
               eventId: confToUpdate.eventId,
               eventName: confToUpdate.eventName,
               eventDate: confToUpdate.eventDate,
@@ -581,7 +573,7 @@ export default function ConfirmationsPage() {
               invoiceStatus: result.newStatus,
               totalInvoiced: result.newTotalAmount,
               selections: updatedSelections,
-              previousVersionId: confToUpdate.id, // Link back to the original confirmation
+              previousVersionId: confToUpdate.id, 
               teamCode: confToUpdate.teamCode,
               schoolName: confToUpdate.schoolName,
               district: confToUpdate.district,
@@ -592,7 +584,7 @@ export default function ConfirmationsPage() {
           const finalConfirmations = confirmations.map(c => 
               c.id === confToUpdate.id ? { ...c, invoiceStatus: 'CANCELED' } : c
           );
-          finalConfirmations.push(newConfirmationRecord); // Add the new one
+          finalConfirmations.push(newConfirmationRecord); 
 
           localStorage.setItem('confirmations', JSON.stringify(finalConfirmations));
 
@@ -601,7 +593,6 @@ export default function ConfirmationsPage() {
               return p ? `${p.firstName} ${p.lastName}` : 'Unknown Player';
           });
           
-          // Update the status of the original change request
           const updatedRequests = changeRequests.map(req => {
               if (req.confirmationId === confId && changedPlayerNames.includes(req.player)) {
                   if ((newStatus === 'withdrawn' && req.type.includes('Withdraw')) || (newStatus === 'active' && req.type.includes('Restore'))) {
@@ -612,7 +603,7 @@ export default function ConfirmationsPage() {
           });
           localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
 
-          loadAllData(); // Reload all data to ensure consistency
+          loadAllData();
 
           toast({
               title: `Player(s) ${newStatus === 'active' ? 'Restored' : 'Withdrawn'} & Invoice Recreated`,
@@ -786,7 +777,6 @@ export default function ConfirmationsPage() {
     
     await updatePlayer(updatedPlayerRecord);
     
-    // Also update the local map for immediate UI feedback
     playersMap.set(playerToEdit.id, updatedPlayerRecord);
 
     toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
@@ -1112,7 +1102,6 @@ export default function ConfirmationsPage() {
         </DialogContent>
       </Dialog>
       
-      {/* Edit Player Dialog */}
       <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
             <DialogHeader className="p-6 pb-4 border-b shrink-0">
@@ -1160,8 +1149,6 @@ export default function ConfirmationsPage() {
   );
 }
 
-
-// Sub-component for details to keep main component cleaner
 function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore, events, changeRequests, confirmationsMap, sponsorProfile, handlers }: any) {
     const { getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleOpenEditPlayerDialog, getStatusBadgeVariant } = handlers;
     
@@ -1237,7 +1224,7 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
                         {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => { setConfToAddPlayer(conf); setIsAddPlayerDialogOpen(true); }} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
                         <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)} disabled={isLoading}> <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change </Button>
                         {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
-                            <Button variant="secondary" size="sm" onClick={()={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
+                            <Button variant="secondary" size="sm" onClick={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
                         )}
                         <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId || isLoading}>
                             <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} /> Refresh Status
@@ -1447,5 +1434,3 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
         </div>
     );
 }
-
-    
