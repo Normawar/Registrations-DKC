@@ -29,7 +29,8 @@ import {
     ArrowDown,
     Download,
     Check,
-    Search
+    Search,
+    UserCheck
 } from "lucide-react";
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -79,10 +80,11 @@ type PlayerRegistration = {
 type RegistrationSelections = Record<string, PlayerRegistration>;
 
 type Confirmation = {
+  id: string; // Unique ID for the confirmation record itself
   eventId: string;
   eventName: string;
   eventDate: string;
-  selections: Record<string, { section: string }>;
+  selections: RegistrationSelections;
   invoiceId?: string;
   invoiceUrl?: string;
   sponsorName: string;
@@ -130,6 +132,7 @@ export default function EventsPage() {
     const [isSquareConfigured, setIsSquareConfigured] = useState(true);
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
     const [eventRegistrations, setEventRegistrations] = useState<Confirmation[]>([]);
+    const [alreadyRegisteredIds, setAlreadyRegisteredIds] = useState<Set<string>>(new Set());
     
     const [playerSortConfig, setPlayerSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
     const [registrationsSearchQuery, setRegistrationsSearchQuery] = useState('');
@@ -265,7 +268,18 @@ export default function EventsPage() {
     const handleRegisterClick = (event: Event) => {
         const status = getEventStatus(event);
         if (status === 'Open' || status === 'Upcoming') {
+            // Find players already registered for this event
+            const registeredIds = new Set<string>();
+            eventRegistrations.forEach(conf => {
+                if (conf.eventId === event.id) {
+                    Object.keys(conf.selections).forEach(playerId => {
+                        registeredIds.add(playerId);
+                    });
+                }
+            });
+
             setSelectedEvent(event);
+            setAlreadyRegisteredIds(registeredIds);
             setIsDialogOpen(true);
             setSelections({});
         }
@@ -437,7 +451,7 @@ export default function EventsPage() {
                     eventName: selectedEvent.name, eventDate: selectedEvent.date, uscfFee: 24, players: playersToInvoice
                 });
 
-                const newConfirmation = {
+                const newConfirmation: Confirmation = {
                     id: result.invoiceId, eventId: selectedEvent.id, invoiceId: result.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(), selections,
                     totalInvoiced: calculatedFees.total, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: teamCode, invoiceStatus: result.status,
                     sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, sponsorEmail: sponsorProfile.email, schoolName: sponsorProfile.school, district: sponsorProfile.district,
@@ -689,6 +703,11 @@ export default function EventsPage() {
         }
         setPlayerSortConfig({ key, direction });
     };
+    
+    const alreadyRegisteredRosterPlayers = useMemo(() => {
+        return rosterPlayers.filter(p => alreadyRegisteredIds.has(p.id));
+    }, [rosterPlayers, alreadyRegisteredIds]);
+
 
   return (
     <AppLayout>
@@ -812,10 +831,19 @@ export default function EventsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {alreadyRegisteredRosterPlayers.length > 0 && (
+                <div className="p-4 border rounded-md bg-muted/50">
+                    <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><UserCheck className="h-4 w-4 text-green-600" /> Already Registered ({alreadyRegisteredRosterPlayers.length})</h4>
+                    <p className="text-xs text-muted-foreground">
+                        {alreadyRegisteredRosterPlayers.map(p => `${p.firstName} ${p.lastName}`).join(', ')}
+                    </p>
+                </div>
+            )}
             <ScrollArea className="h-96 w-full">
               <div className="space-y-4 pr-6">
                 {rosterPlayers.map((player) => {
                   const isSelected = !!selections[player.id];
+                  const isAlreadyRegistered = alreadyRegisteredIds.has(player.id);
                   const firstBye = selections[player.id]?.byes.round1;
                   const isSectionInvalid = isSelected && !isSectionValid(player, selections[player.id]!.section);
                   const uscfStatus = selections[player.id]?.uscfStatus;
@@ -830,10 +858,11 @@ export default function EventsPage() {
                           checked={isSelected}
                           onCheckedChange={(checked) => handlePlayerSelect(player.id, checked)}
                           className="mt-1"
+                          disabled={isAlreadyRegistered}
                         />
                         <div className="grid gap-2">
-                            <Label htmlFor={`player-${player.id}`} className="font-medium cursor-pointer">
-                                {player.firstName} {player.lastName}
+                            <Label htmlFor={`player-${player.id}`} className={cn("font-medium", isAlreadyRegistered ? "text-muted-foreground" : "cursor-pointer")}>
+                                {player.firstName} {player.lastName} {isAlreadyRegistered && <span className="font-normal text-green-600">(Registered)</span>}
                             </Label>
                             <p className="text-sm text-muted-foreground">
                                 Grade: {player.grade} &bull; Section: {player.section} &bull; Rating: {player.regularRating || 'N/A'}
@@ -1121,4 +1150,3 @@ export default function EventsPage() {
     </AppLayout>
   );
 }
-
