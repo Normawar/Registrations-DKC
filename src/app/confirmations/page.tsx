@@ -416,28 +416,22 @@ export default function ConfirmationsPage() {
       setIsUpdating(prev => ({ ...prev, [confId]: true }));
       setIsChangeAlertOpen(false);
 
-      const confToUpdate = confirmations.find(c => c.id === confId);
-
-      if (!confToUpdate) {
-          toast({ variant: "destructive", title: "Error", description: "Could not find the confirmation to update." });
-          setIsUpdating(prev => ({ ...prev, [confId]: false }));
-          return;
-      }
-
-      if (!sponsorProfile) {
-          toast({ variant: "destructive", title: "Authorization Failed", description: "You must have a sponsor profile to perform this action." });
-          setIsUpdating(prev => ({ ...prev, [confId]: false }));
-          return;
-      }
-
-      const eventDetails = events.find(e => e.id === confToUpdate.eventId);
-      if (!eventDetails || !confToUpdate.invoiceId) {
-          toast({ variant: "destructive", title: "Error", description: "Could not find necessary event or invoice details." });
-          setIsUpdating(prev => ({ ...prev, [confId]: false }));
-          return;
-      }
-      
       try {
+          const confToUpdate = confirmations.find(c => c.id === confId);
+
+          if (!confToUpdate) {
+              throw new Error("Could not find the confirmation to update.");
+          }
+
+          if (!sponsorProfile) {
+              throw new Error("You must have a sponsor profile to perform this action.");
+          }
+
+          const eventDetails = events.find(e => e.id === confToUpdate.eventId);
+          if (!eventDetails || !confToUpdate.invoiceId) {
+              throw new Error("Could not find necessary event or invoice details.");
+          }
+          
           const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
           const approvalTimestamp = new Date().toISOString();
 
@@ -980,6 +974,7 @@ export default function ConfirmationsPage() {
                                               description: `This action will recreate the invoice to remove the selected players and update the total amount due. The original invoice will be canceled. This cannot be undone.`
                                           });
                                           setChangeAction(() => () => handleWithdrawPlayerAction(conf.id, selectedWithdrawalIds));
+                                          setIsChangeAlertOpen(true);
                                       }}
                                       disabled={isLoading || selectedWithdrawalIds.length === 0}
                                   >
