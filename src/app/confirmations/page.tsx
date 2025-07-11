@@ -369,13 +369,10 @@ export default function ConfirmationsPage() {
     return () => { window.removeEventListener('storage', handleStorageChange); };
   }, [loadAllData]);
   
-  // This effect specifically handles opening a row from a URL hash.
-  // It runs only when the main data has been loaded.
   useEffect(() => {
     if (isDataLoaded && window.location.hash) {
       const hashId = window.location.hash.substring(1);
       
-      // Find the most recent confirmation with the matching invoiceId
       const matchingConfs = confirmations
         .filter(c => c.invoiceId === hashId)
         .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
@@ -1160,7 +1157,7 @@ export default function ConfirmationsPage() {
 }
 
 function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore, events, changeRequests, confirmationsMap, sponsorProfile, handlers }: any) {
-    const { getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleOpenEditPlayerDialog, getStatusBadgeVariant } = handlers;
+    const { getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleOpenEditPlayerDialog, getStatusBadgeVariant, handlePlayerStatusChangeAction } = handlers;
     
     type SortablePlayerKey = 'lastName' | 'section';
     const [playerSortConfig, setPlayerSortConfig] = useState<{ key: SortablePlayerKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending'});
