@@ -222,8 +222,20 @@ export default function ConfirmationsPage() {
           setStatuses(prev => ({ ...prev, [confId]: { ...prev[confId], isLoading: true } }));
       }
       try {
-          const { status } = await getInvoiceStatus({ invoiceId });
+          const { status, invoiceNumber } = await getInvoiceStatus({ invoiceId });
           setStatuses(prev => ({ ...prev, [confId]: { status, isLoading: false } }));
+          setConfirmations(prevConfs => prevConfs.map(c => 
+            c.id === confId ? { ...c, invoiceStatus: status, invoiceNumber: invoiceNumber } : c
+          ));
+          const allConfsRaw = localStorage.getItem('confirmations') || '[]';
+          const allConfsParsed = JSON.parse(allConfsRaw);
+          const updatedConfs = allConfsParsed.map((c: any) => {
+              if (c.id === confId) {
+                  return { ...c, invoiceStatus: status, invoiceNumber: invoiceNumber };
+              }
+              return c;
+          });
+          localStorage.setItem('confirmations', JSON.stringify(updatedConfs));
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
           setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
@@ -812,10 +824,13 @@ export default function ConfirmationsPage() {
                           <span className="text-sm text-muted-foreground"> Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')} </span> 
                         </div>
                         <div className="flex items-center gap-4">
-                            {currentStatus && ( <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus.status))}>
-                                    {currentStatus.isLoading && currentStatus.status === 'LOADING' ? 'Loading...' : currentStatus.status?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
-                                </Badge>
-                            )}
+                            <div className="flex flex-col items-end">
+                              {conf.invoiceNumber && <span className="text-xs font-mono text-muted-foreground">{conf.invoiceNumber}</span>}
+                              {currentStatus && ( <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus.status))}>
+                                      {currentStatus.isLoading && currentStatus.status === 'LOADING' ? 'Loading...' : currentStatus.status?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
+                                  </Badge>
+                              )}
+                            </div>
                             <div className="text-right">
                                 <span className="font-semibold">${conf.totalInvoiced.toFixed(2)}</span>
                             </div>

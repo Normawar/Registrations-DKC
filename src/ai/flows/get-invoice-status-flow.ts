@@ -11,6 +11,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { ApiError } from 'square';
 import { getSquareClient } from '@/lib/square-client';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const GetInvoiceStatusInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to get the status for.'),
@@ -34,6 +35,15 @@ const getInvoiceStatusFlow = ai.defineFlow(
     outputSchema: GetInvoiceStatusOutputSchema,
   },
   async (input) => {
+    const { isConfigured } = await checkSquareConfig();
+    if (!isConfigured) {
+      // In mock mode, we just return a "PAID" status as an example.
+      return {
+        status: 'PAID',
+        invoiceNumber: `MOCK-${input.invoiceId.substring(0, 4)}`,
+      };
+    }
+    
     const squareClient = await getSquareClient();
     const { invoicesApi } = squareClient;
       
