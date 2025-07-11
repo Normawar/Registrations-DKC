@@ -112,7 +112,7 @@ const recreateInvoiceFlow = ai.defineFlow(
       let newTotal = 0;
       if (newInvoiceResult.invoiceId) {
           const { result: { invoice } } = await squareClient.invoicesApi.getInvoice(newInvoiceResult.invoiceId);
-          newTotal = Number(invoice.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100;
+          newTotal = Number(invoice?.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
       }
       
       return {
