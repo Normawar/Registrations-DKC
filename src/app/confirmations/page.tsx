@@ -486,8 +486,8 @@ export default function ConfirmationsPage() {
           });
           
           // Create the new confirmation object
-          const updatedConfirmationData: Confirmation = {
-              id: result.newInvoiceId, // Use the new ID from the result
+          const newConfirmationRecord: Confirmation = {
+              id: result.newInvoiceId, // The ID of the confirmation record is the new invoice ID
               eventId: confToUpdate.eventId,
               eventName: confToUpdate.eventName,
               eventDate: confToUpdate.eventDate,
@@ -506,11 +506,10 @@ export default function ConfirmationsPage() {
               sponsorEmail: sponsorEmailForInvoice,
           };
           
-          // Mark the old one as canceled but keep it for history
           const finalConfirmations = confirmations.map(c => 
               c.id === confToUpdate.id ? { ...c, invoiceStatus: 'CANCELED' } : c
           );
-          finalConfirmations.push(updatedConfirmationData); // Add the new one
+          finalConfirmations.push(newConfirmationRecord); // Add the new one
 
           localStorage.setItem('confirmations', JSON.stringify(finalConfirmations));
 
@@ -1220,5 +1219,3 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
-
-    
