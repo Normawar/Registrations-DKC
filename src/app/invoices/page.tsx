@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -451,15 +452,15 @@ export default function InvoicesPage() {
                                                         <ExternalLink className="mr-2 h-4 w-4" /> View Invoice
                                                     </a>
                                                   </DropdownMenuItem>
-                                                  {profile.role === 'organizer' && inv.type === 'organizer' && (
-                                                    <DropdownMenuItem onClick={() => handleEditInvoice(inv)} disabled={!isCancelable}>
-                                                      <FilePenLine className="mr-2 h-4 w-4" /> Edit
-                                                    </DropdownMenuItem>
-                                                  )}
                                                   {profile.role === 'organizer' && isCancelable && (
-                                                      <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
-                                                          <Trash2 className="mr-2 h-4 w-4" /> Cancel
-                                                      </DropdownMenuItem>
+                                                    <>
+                                                        <DropdownMenuItem onClick={() => handleEditInvoice(inv)}>
+                                                            <FilePenLine className="mr-2 h-4 w-4" /> Edit
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Cancel
+                                                        </DropdownMenuItem>
+                                                    </>
                                                   )}
                                                 </DropdownMenuContent>
                                              </DropdownMenu>
@@ -495,3 +496,4 @@ export default function InvoicesPage() {
     </AppLayout>
   );
 }
+
