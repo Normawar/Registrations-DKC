@@ -221,26 +221,32 @@ export default function ConfirmationsPage() {
     if (searchQuery) {
         const lowercasedQuery = searchQuery.toLowerCase();
         
-        // Try parsing the query as a date
         let parsedDate: Date | null = null;
         try {
             const tempDate = new Date(lowercasedQuery);
-            if (isValid(tempDate)) {
+            if (isValid(tempDate) && lowercasedQuery.match(/\d/)) { // Only treat as a full date if it has numbers
                 parsedDate = tempDate;
             }
-        } catch(e) { /* ignore parse errors */ }
+        } catch(e) { /* ignore */ }
 
         filtered = filtered.filter(conf => {
-            // Existing searches by event name or invoice number
+            // Search by event name or invoice number
             if (conf.eventName.toLowerCase().includes(lowercasedQuery) ||
                 (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery))) {
                 return true;
             }
 
-            // New date search
+            // Search by full parsed date
             if (parsedDate && conf.eventDate) {
                 const eventDate = new Date(conf.eventDate);
                 if (isValid(eventDate) && isSameDay(parsedDate, eventDate)) {
+                    return true;
+                }
+            } 
+            // Search by month name if not a full date
+            else if (!parsedDate && conf.eventDate) {
+                const eventDate = new Date(conf.eventDate);
+                if (isValid(eventDate) && format(eventDate, 'MMMM').toLowerCase().startsWith(lowercasedQuery)) {
                     return true;
                 }
             }
