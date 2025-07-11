@@ -166,6 +166,8 @@ export default function ProfilePage() {
       },
   });
 
+  const allSchoolNames = useMemo(() => ['Homeschool', ...schoolData.map(s => s.schoolName).sort()], []);
+
   useEffect(() => {
     if (!auth || !storage) {
         setIsAuthReady(false);
@@ -192,6 +194,21 @@ export default function ProfilePage() {
     return () => unsubscribe();
   }, []);
 
+  const handleDistrictChange = (district: string) => {
+    profileForm.setValue('district', district);
+    if (district === 'None') {
+        profileForm.setValue('school', 'Homeschool');
+        setSchoolsForDistrict(allSchoolNames);
+    } else {
+        profileForm.setValue('school', '');
+        const filteredSchools = schoolData
+            .filter((school) => school.district === district)
+            .map((school) => school.schoolName)
+            .sort();
+        setSchoolsForDistrict(filteredSchools);
+    }
+  };
+
   useEffect(() => {
     if (profile) {
       profileForm.reset({
@@ -204,11 +221,15 @@ export default function ProfilePage() {
         gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
       });
 
-      const initialSchools = schoolData
-        .filter((school) => school.district === profile.district)
-        .map((school) => school.schoolName)
-        .sort();
-      setSchoolsForDistrict(initialSchools);
+      if (profile.district === 'None') {
+        setSchoolsForDistrict(allSchoolNames);
+      } else {
+        const initialSchools = schoolData
+          .filter((school) => school.district === profile.district)
+          .map((school) => school.schoolName)
+          .sort();
+        setSchoolsForDistrict(initialSchools);
+      }
       
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
@@ -219,7 +240,7 @@ export default function ProfilePage() {
         setSelectedIconName('');
       }
     }
-  }, [profile, profileForm]);
+  }, [profile, profileForm, allSchoolNames]);
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -258,7 +279,7 @@ export default function ProfilePage() {
       if (activeTab === 'upload' && imageFile) {
         const sanitizedFileName = imageFile.name.replace(/\s+/g, '_');
         const storageRef = ref(storage, `avatars/${currentUser!.uid}/${sanitizedFileName}`);
-        await uploadBytes(storageRef, imageFile);
+        const snapshot = await uploadBytes(storageRef, imageFile);
         const downloadUrl = await getDownloadURL(snapshot.ref);
 
         updateProfile({ avatarType: 'upload', avatarValue: downloadUrl });
@@ -281,21 +302,6 @@ export default function ProfilePage() {
       toast({ variant: 'destructive', title: "Save Failed", description: description });
     } finally {
       setIsSavingPicture(false);
-    }
-  };
-
-  const handleDistrictChange = (district: string) => {
-    profileForm.setValue('district', district);
-    if (district === 'None') {
-        profileForm.setValue('school', 'Independent');
-        setSchoolsForDistrict(['Independent']);
-    } else {
-        profileForm.setValue('school', '');
-        const filteredSchools = schoolData
-        .filter((school) => school.district === district)
-        .map((school) => school.schoolName)
-        .sort();
-        setSchoolsForDistrict(filteredSchools);
     }
   };
   

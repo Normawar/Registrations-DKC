@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -56,6 +56,7 @@ const SponsorSignUpForm = () => {
   const router = useRouter();
   const { updateProfile } = useSponsorProfile();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+  const allSchoolNames = useMemo(() => ['Homeschool', ...schoolData.map(s => s.schoolName).sort()], []);
   
   const form = useForm<z.infer<typeof sponsorFormSchema>>({
     resolver: zodResolver(sponsorFormSchema),
@@ -63,7 +64,7 @@ const SponsorSignUpForm = () => {
       firstName: "",
       lastName: "",
       district: "None",
-      school: "Independent",
+      school: "Homeschool",
       email: "",
       phone: "",
       password: "",
@@ -74,8 +75,8 @@ const SponsorSignUpForm = () => {
   const handleDistrictChange = (district: string) => {
     form.setValue('district', district);
     if (district === 'None') {
-      form.setValue('school', 'Independent');
-      setSchoolsForDistrict(['Independent']);
+      form.setValue('school', 'Homeschool');
+      setSchoolsForDistrict(allSchoolNames);
     } else {
       form.setValue('school', '');
       const filteredSchools = schoolData
@@ -327,7 +328,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         email: values.email,
         phone: '',
         district: 'None',
-        school: 'Independent',
+        school: 'Homeschool',
         gtCoordinatorEmail: '',
         role: role,
         avatarType: 'icon' as const,

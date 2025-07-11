@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -49,6 +50,8 @@ export default function UsersPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+    const allSchoolNames = useMemo(() => ['Homeschool', ...schoolData.map(s => s.schoolName).sort()], []);
+
 
     useEffect(() => {
         loadUsers();
@@ -75,6 +78,25 @@ export default function UsersPage() {
     const form = useForm<UserFormValues>({
         resolver: zodResolver(userFormSchema),
     });
+
+    const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
+        form.setValue('district', district);
+        if (resetSchool) {
+            form.setValue('school', '');
+        }
+        if (district === 'None') {
+            setSchoolsForDistrict(allSchoolNames);
+            if (resetSchool) {
+              form.setValue('school', 'Homeschool');
+            }
+        } else {
+            const filteredSchools = schoolData
+                .filter((school) => school.district === district)
+                .map((school) => school.schoolName)
+                .sort();
+            setSchoolsForDistrict(filteredSchools);
+        }
+    };
 
     const handleEditUser = (user: User) => {
         setEditingUser(user);
@@ -147,18 +169,6 @@ export default function UsersPage() {
         toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
         setIsDialogOpen(false);
         setEditingUser(null);
-    };
-    
-    const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
-        form.setValue('district', district);
-        if (resetSchool) {
-            form.setValue('school', '');
-        }
-        const filteredSchools = schoolData
-            .filter((school) => school.district === district)
-            .map((school) => school.schoolName)
-            .sort();
-        setSchoolsForDistrict(filteredSchools);
     };
 
     const selectedDistrict = form.watch('district');
