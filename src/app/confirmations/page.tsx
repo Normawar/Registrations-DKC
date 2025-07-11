@@ -484,21 +484,34 @@ export default function ConfirmationsPage() {
               eventName: confToUpdate.eventName,
               eventDate: confToUpdate.eventDate,
           });
-
-          // Create the new confirmation object using the result from the API
+          
+          // Create the new confirmation object
           const updatedConfirmationData: Confirmation = {
-              ...confToUpdate,
               id: result.newInvoiceId, // Use the new ID from the result
+              eventId: confToUpdate.eventId,
+              eventName: confToUpdate.eventName,
+              eventDate: confToUpdate.eventDate,
+              submissionTimestamp: new Date().toISOString(),
               invoiceId: result.newInvoiceId,
               invoiceNumber: result.newInvoiceNumber,
               invoiceUrl: result.newInvoiceUrl,
               invoiceStatus: result.newStatus,
               totalInvoiced: result.newTotalAmount,
-              selections: updatedSelections, // Use the locally updated selections
-              previousVersionId: confToUpdate.id,
+              selections: updatedSelections,
+              previousVersionId: confToUpdate.id, // Link back to the original confirmation
+              teamCode: confToUpdate.teamCode,
+              schoolName: confToUpdate.schoolName,
+              district: confToUpdate.district,
+              sponsorName: sponsorNameForInvoice,
+              sponsorEmail: sponsorEmailForInvoice,
           };
+          
+          // Mark the old one as canceled but keep it for history
+          const finalConfirmations = confirmations.map(c => 
+              c.id === confToUpdate.id ? { ...c, invoiceStatus: 'CANCELED' } : c
+          );
+          finalConfirmations.push(updatedConfirmationData); // Add the new one
 
-          const finalConfirmations = confirmations.map(c => c.id === confToUpdate.id ? updatedConfirmationData : c);
           localStorage.setItem('confirmations', JSON.stringify(finalConfirmations));
 
           const changedPlayerNames = playerIds.map(id => {
@@ -1207,3 +1220,5 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
+
+    
