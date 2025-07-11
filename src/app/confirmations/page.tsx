@@ -222,32 +222,34 @@ export default function ConfirmationsPage() {
         const lowercasedQuery = searchQuery.toLowerCase();
         
         filtered = filtered.filter(conf => {
-            if (conf.eventName.toLowerCase().includes(lowercasedQuery) ||
-                (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery))) {
+            // Search by Event Name or Invoice Number
+            if (conf.eventName.toLowerCase().includes(lowercasedQuery) || (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery))) {
                 return true;
             }
 
+            // Search by Month Name
             const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-            const isMonthQuery = monthNames.includes(lowercasedQuery);
-
-            if (isMonthQuery) {
+            const matchingMonth = monthNames.find(m => m.startsWith(lowercasedQuery));
+            if (matchingMonth) {
                 if (conf.submissionTimestamp) {
                     const submissionDate = new Date(conf.submissionTimestamp);
-                    if (isValid(submissionDate) && format(submissionDate, 'MMMM').toLowerCase() === lowercasedQuery) {
+                    if (isValid(submissionDate) && format(submissionDate, 'MMMM').toLowerCase() === matchingMonth) {
                         return true;
                     }
                 }
-            } else {
-                try {
-                    const parsedDate = new Date(searchQuery);
-                    if (isValid(parsedDate)) {
-                        const submissionDate = new Date(conf.submissionTimestamp);
-                        if (isValid(submissionDate) && isSameDay(parsedDate, submissionDate)) {
-                            return true;
-                        }
-                    }
-                } catch(e) { /* ignore invalid date strings */ }
             }
+
+            // Search by specific date (e.g., mm/dd/yyyy)
+            try {
+                const parsedDate = new Date(searchQuery);
+                if (isValid(parsedDate)) {
+                    const submissionDate = new Date(conf.submissionTimestamp);
+                    // Check if it's a valid date and not just a year which can be a false positive
+                    if (isValid(submissionDate) && searchQuery.includes('/') && isSameDay(parsedDate, submissionDate)) {
+                        return true;
+                    }
+                }
+            } catch(e) { /* ignore invalid date strings */ }
             
             return false;
         });
@@ -1235,7 +1237,7 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
                         {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => { setConfToAddPlayer(conf); setIsAddPlayerDialogOpen(true); }} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
                         <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)} disabled={isLoading}> <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change </Button>
                         {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
-                            <Button variant="secondary" size="sm" onClick={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
+                            <Button variant="secondary" size="sm" onClick={()={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
                         )}
                         <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId || isLoading}>
                             <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} /> Refresh Status
@@ -1445,7 +1447,5 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
         </div>
     );
 }
-
-
 
     
