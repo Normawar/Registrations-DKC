@@ -186,6 +186,7 @@ export default function ConfirmationsPage() {
   const [changeAction, setChangeAction] = useState<(() => void) | null>(null);
 
   const [selectedPlayersForWithdraw, setSelectedPlayersForWithdraw] = useState<Record<string, string[]>>({});
+  const [selectedPlayersForRestore, setSelectedPlayersForRestore] = useState<Record<string, string[]>>({});
   
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [confToRequestChange, setConfToRequestChange] = useState<Confirmation | null>(null);
@@ -525,6 +526,8 @@ export default function ConfirmationsPage() {
           setIsUpdating(prev => ({ ...prev, [confId]: false }));
           if (newStatus === 'withdrawn') {
             setSelectedPlayersForWithdraw(prev => ({ ...prev, [confId]: [] }));
+          } else {
+            setSelectedPlayersForRestore(prev => ({...prev, [confId]: [] }));
           }
       }
   };
@@ -704,6 +707,16 @@ export default function ConfirmationsPage() {
       });
   };
 
+  const handleRestorePlayerSelect = (confId: string, playerId: string) => {
+    setSelectedPlayersForRestore(prev => {
+        const currentSelection = prev[confId] || [];
+        const newSelection = currentSelection.includes(playerId)
+            ? currentSelection.filter(id => id !== playerId)
+            : [...currentSelection, playerId];
+        return { ...prev, [confId]: newSelection };
+    });
+  };
+
   const handleAddPlayersToRegistration = async () => {
     if (!confToAddPlayer || playersToAdd.length === 0 || !sponsorProfile) return;
     setIsCreatingAddonInvoice(true);
@@ -812,6 +825,7 @@ export default function ConfirmationsPage() {
                   const currentStatus = statuses[conf.id];
                   const isLoading = isUpdating[conf.id] || !isAuthReady;
                   const selectedWithdrawalIds = selectedPlayersForWithdraw[conf.id] || [];
+                  const selectedRestoreIds = selectedPlayersForRestore[conf.id] || [];
                   const eventDetails = events.find(e => e.id === conf.eventId);
                   const hasWithdrawnPlayers = Object.values(conf.selections).some(p => p.status === 'withdrawn');
 
@@ -881,14 +895,14 @@ export default function ConfirmationsPage() {
                               const isWithdrawn = details.status === 'withdrawn';
                               
                               return (
-                                <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) ? 'selected' : undefined} className={cn(isWithdrawn && 'bg-muted/50')}>
+                                <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) || selectedRestoreIds.includes(playerId) ? 'selected' : undefined} className={cn(isWithdrawn && 'bg-muted/50')}>
                                   {sponsorProfile?.role === 'organizer' && (
                                       <TableCell>
                                           <Checkbox
-                                              checked={selectedWithdrawalIds.includes(playerId)}
-                                              onCheckedChange={() => handleWithdrawPlayerSelect(conf.id, playerId)}
-                                              aria-label={`Select ${player.firstName} ${player.lastName} for withdrawal`}
-                                              disabled={isLoading || !conf.invoiceId || isWithdrawn}
+                                              checked={isWithdrawn ? selectedRestoreIds.includes(playerId) : selectedWithdrawalIds.includes(playerId)}
+                                              onCheckedChange={() => isWithdrawn ? handleRestorePlayerSelect(conf.id, playerId) : handleWithdrawPlayerSelect(conf.id, playerId)}
+                                              aria-label={`Select ${player.firstName} ${player.lastName}`}
+                                              disabled={isLoading || !conf.invoiceId}
                                           />
                                       </TableCell>
                                   )}
@@ -970,7 +984,24 @@ export default function ConfirmationsPage() {
                           </TableBody>
                         </Table>
                          {sponsorProfile?.role === 'organizer' && (
-                              <div className="flex justify-end pt-2">
+                              <div className="flex justify-end pt-2 gap-2">
+                                  {hasWithdrawnPlayers && (
+                                      <Button
+                                          variant="secondary"
+                                          size="sm"
+                                          onClick={() => {
+                                              setChangeAlertContent({
+                                                  title: `Restore ${selectedRestoreIds.length} Player(s)?`,
+                                                  description: `This action will recreate the invoice to add back the selected players and update the total amount due. The original invoice will be canceled. This cannot be undone.`
+                                              });
+                                              setChangeAction(() => () => handlePlayerStatusChangeAction(conf.id, selectedRestoreIds, 'active'));
+                                              setIsChangeAlertOpen(true);
+                                          }}
+                                          disabled={isLoading || selectedRestoreIds.length === 0}
+                                      >
+                                          <UserPlus className="mr-2 h-4 w-4" /> Restore Selected & Recreate Invoice ({selectedRestoreIds.length})
+                                      </Button>
+                                  )}
                                   <Button
                                       variant="destructive"
                                       size="sm"
