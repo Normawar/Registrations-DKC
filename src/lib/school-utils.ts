@@ -18,8 +18,13 @@ import type { School } from './data/school-data';
  * School: "KELLY-PHARR EL", District: "PHARR-SAN JUAN-ALAMO ISD", Type: "independent"
  * Result: "PHINDKPKELL"
  */
-export function generateTeamCode(options: { schoolName: string; district: string; studentType?: 'gt' | 'independent' }): string {
+export function generateTeamCode(options: { schoolName?: string; district?: string; studentType?: 'gt' | 'independent' }): string {
   const { schoolName, district, studentType } = options;
+
+  if (!district || !schoolName) {
+    return '';
+  }
+
   const districtCode = district.substring(0, 2).toUpperCase();
   
   const exclusionList = ["EL", "ELEMENTARY", "MIDDLE", "HIGH", "SCHOOL", "H", "S", "J", "SR", "JR", "ISD"];
