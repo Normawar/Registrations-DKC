@@ -222,30 +222,29 @@ export default function ConfirmationsPage() {
         const lowercasedQuery = searchQuery.toLowerCase();
         
         filtered = filtered.filter(conf => {
+            // Search by Event Name or Invoice Number (always included)
             if (conf.eventName.toLowerCase().includes(lowercasedQuery) || (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery))) {
                 return true;
             }
 
+            // More robust date search
+            const submissionDate = new Date(conf.submissionTimestamp);
+            if (!isValid(submissionDate)) return false;
+
+            // Check for partial month name (e.g., "jun" for "june")
             const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
-            const matchingMonth = monthNames.find(m => m.toLowerCase().startsWith(lowercasedQuery));
-            if (matchingMonth) {
-                if (conf.submissionTimestamp) {
-                    const submissionDate = new Date(conf.submissionTimestamp);
-                    if (isValid(submissionDate) && format(submissionDate, 'MMMM').toLowerCase() === matchingMonth.toLowerCase()) {
-                        return true;
-                    }
-                }
+            const submissionMonthName = format(submissionDate, 'MMMM').toLowerCase();
+            if (submissionMonthName.startsWith(lowercasedQuery)) {
+                return true;
             }
 
+            // Check for full date match (e.g., "06/15/2024" or "june 15 2024")
             try {
-                const parsedDate = new Date(searchQuery);
-                if (isValid(parsedDate) && searchQuery.includes('/') && !isNaN(parsedDate.getTime())) {
-                    const submissionDate = new Date(conf.submissionTimestamp);
-                    if (isValid(submissionDate) && isSameDay(parsedDate, submissionDate)) {
-                        return true;
-                    }
+                const parsedQueryDate = new Date(searchQuery);
+                if (isValid(parsedQueryDate) && isSameDay(parsedQueryDate, submissionDate)) {
+                    return true;
                 }
-            } catch(e) { /* ignore invalid date strings */ }
+            } catch(e) { /* ignore */ }
             
             return false;
         });
