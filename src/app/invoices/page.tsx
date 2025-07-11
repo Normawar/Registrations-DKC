@@ -148,6 +148,12 @@ export default function InvoicesPage() {
         .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
 
     setAllInvoices(allUniqueInvoices);
+
+    const initialStatuses: Record<string, { status?: string; isLoading: boolean }> = {};
+    for (const inv of allUniqueInvoices) {
+        initialStatuses[inv.id] = { status: inv.invoiceStatus || 'UNKNOWN', isLoading: false };
+    }
+    setStatuses(initialStatuses);
   }, []);
 
   const fetchInvoiceStatus = useCallback(async (confId: string, invoiceId: string) => {
@@ -165,14 +171,15 @@ export default function InvoicesPage() {
               return inv;
           });
           localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
+          setAllInvoices(prev => prev.map(i => i.invoiceId === invoiceId ? {...i, invoiceStatus: status} : i));
 
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
+          let errorStatus = 'ERROR';
           if (error instanceof Error && (error.message.includes('404') || error.message.includes("Not Found"))) {
-              setStatuses(prev => ({ ...prev, [confId]: { status: 'NOT_FOUND', isLoading: false } }));
-          } else {
-              setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
+              errorStatus = 'NOT_FOUND';
           }
+          setStatuses(prev => ({ ...prev, [confId]: { status: errorStatus, isLoading: false } }));
       }
   }, []);
   
@@ -225,28 +232,6 @@ export default function InvoicesPage() {
         return true;
     });
   }, [allInvoices, profile, schoolFilter, statusFilter, statuses]);
-
-    useEffect(() => {
-        const invoicesToFetchStatus = filteredInvoices.filter(inv => {
-            if (!inv.invoiceId) return false;
-            const currentStatusInfo = statuses[inv.id];
-            
-            if (currentStatusInfo?.isLoading) return false;
-
-            const status = currentStatusInfo?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
-            const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND', 'COMPED'].includes(status);
-            
-            return !isFinalState;
-        });
-
-        if (invoicesToFetchStatus.length > 0) {
-            invoicesToFetchStatus.forEach(inv => {
-                if (inv.invoiceId) {
-                  fetchInvoiceStatus(inv.id, inv.invoiceId);
-                }
-            });
-        }
-    }, [filteredInvoices, fetchInvoiceStatus]);
   
   if (!profile) {
     return (
@@ -415,9 +400,9 @@ export default function InvoicesPage() {
                     </TableHeader>
                     <TableBody>
                         {filteredInvoices.map((inv) => {
-                            const currentStatus = statuses[inv.id];
-                            const isStatusLoading = currentStatus?.isLoading;
-                            const status = currentStatus?.status || inv.invoiceStatus;
+                            const currentStatusInfo = statuses[inv.id];
+                            const isStatusLoading = currentStatusInfo?.isLoading;
+                            const status = currentStatusInfo?.status || inv.invoiceStatus;
                             const isCancelable = status && !['PAID', 'CANCELED', 'REFUNDED', 'VOIDED', 'COMPED', 'NOT_FOUND'].includes(status.toUpperCase());
                             
                             return (
@@ -455,7 +440,7 @@ export default function InvoicesPage() {
                                                   {profile.role === 'organizer' && (
                                                     <>
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={inv.type === 'event' ? `/confirmations#${inv.invoiceId}` : `/organizer-invoice?edit=${inv.id}`}>
+                                                             <Link href={inv.type === 'event' ? `/confirmations#${inv.invoiceId}` : `/organizer-invoice?edit=${inv.id}`}>
                                                                 <FilePenLine className="mr-2 h-4 w-4" /> Edit
                                                             </Link>
                                                         </DropdownMenuItem>
@@ -500,4 +485,5 @@ export default function InvoicesPage() {
     </AppLayout>
   );
 }
+
 
