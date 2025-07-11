@@ -403,7 +403,8 @@ export default function ConfirmationsPage() {
   const handleWithdrawPlayerAction = async (confId: string, playerIdsToWithdraw: string[]) => {
       setIsUpdating(prev => ({ ...prev, [confId]: true }));
       setIsChangeAlertOpen(false);
-      let confToUpdate = confirmations.find(c => c.id === confId);
+      
+      const confToUpdate = confirmations.find(c => c.id === confId);
 
       if (!confToUpdate) {
           toast({ variant: "destructive", title: "Error", description: "Could not find the confirmation to update." });
@@ -423,7 +424,7 @@ export default function ConfirmationsPage() {
           setIsUpdating(prev => ({ ...prev, [confId]: false }));
           return;
       }
-      
+
       try {
           const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
           const approvalTimestamp = new Date().toISOString();
@@ -473,7 +474,7 @@ export default function ConfirmationsPage() {
               eventName: confToUpdate.eventName,
               eventDate: confToUpdate.eventDate,
           });
-
+          
           const updatedConfirmationData: Confirmation = {
               ...confToUpdate,
               id: result.newInvoiceId,
@@ -767,7 +768,6 @@ export default function ConfirmationsPage() {
     }
   };
 
-
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -827,7 +827,7 @@ export default function ConfirmationsPage() {
                         <div className="flex justify-between items-center flex-wrap gap-2">
                             <h4 className="font-semibold">Registered Players</h4>
                             <div className="flex items-center gap-2">
-                                {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => setIsAddPlayerDialogOpen(true)} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
+                                {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => { setConfToAddPlayer(conf); setIsAddPlayerDialogOpen(true); }} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
                                 <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)} disabled={isLoading}> <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change </Button>
                                 {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
                                     <Button variant="secondary" size="sm" onClick={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
@@ -973,8 +973,7 @@ export default function ConfirmationsPage() {
                       </div>
                       
                       {currentStatus?.status === 'COMPED' ? (
-                        <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200"><Award className="h-4 w-4 text-sky-600" /><AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle><AlertDescription className="text-sky-700">This registration was completed at no charge. No payment is required.</AlertDescription></Alert> )}
-                      ) : (
+                        <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200"><Award className="h-4 w-4 text-sky-600" /><AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle><AlertDescription className="text-sky-700">This registration was completed at no charge. No payment is required.</AlertDescription></Alert> ) : (
                         <div className="space-y-6 pt-6 mt-6 border-t">
                           <h4 className="font-semibold">Payment Information</h4>
                           <RadioGroup value={selectedMethod} onValueChange={(value) => handleInputChange(conf.id, 'paymentMethod', value as PaymentMethod)} className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={isLoading}>
