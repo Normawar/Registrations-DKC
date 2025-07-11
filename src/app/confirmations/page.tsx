@@ -495,39 +495,50 @@ export default function ConfirmationsPage() {
     setIsRequestDialogOpen(true);
   };
   
-  const handleByeChangeAction = (confId: string, playerId: string, newByes: { round1: string; round2: string }) => {
-    setIsChangeAlertOpen(false);
+  const handleByeChange = (confId: string, playerId: string, round: 'round1' | 'round2', value: string) => {
     setIsUpdating(prev => ({ ...prev, [confId]: true }));
     const player = getPlayerById(playerId);
-  
-    const newConfirmations = confirmations.map(conf => {
+
+    setConfirmations(prevConf => {
+      const newConfirmations = prevConf.map(conf => {
         if (conf.id === confId) {
-            const newSelections = JSON.parse(JSON.stringify(conf.selections));
-            if (newSelections[playerId]) {
-                newSelections[playerId].byes = newByes;
+          const newSelections = { ...conf.selections };
+          if (newSelections[playerId]) {
+            newSelections[playerId].byes = { ...newSelections[playerId].byes, [round]: value };
+            // Ensure round 1 is set if round 2 is set.
+            if (round === 'round2' && value !== 'none' && newSelections[playerId].byes.round1 === 'none') {
+                newSelections[playerId].byes.round1 = '1';
             }
-            return { ...conf, selections: newSelections };
+            // Ensure round 2 is none if round 1 is none.
+            if (round === 'round1' && value === 'none') {
+                newSelections[playerId].byes.round2 = 'none';
+            }
+          }
+          return { ...conf, selections: newSelections };
         }
         return conf;
+      });
+      localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
+      return newConfirmations;
     });
-    localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
-    setConfirmations(newConfirmations);
-    
-    if (sponsorProfile?.role === 'organizer' && player) {
-        const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-        const approvalTimestamp = new Date().toISOString();
 
-        const updatedRequests = changeRequests.map(req => {
-            if (req.confirmationId === confId && req.player === `${player.firstName} ${player.lastName}` && req.type === 'Bye Request' && req.status === 'Pending') {
-                return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
-            }
-            return req;
+    if (sponsorProfile?.role === 'organizer' && player) {
+      const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+      const approvalTimestamp = new Date().toISOString();
+
+      setChangeRequests(prevReqs => {
+        const updatedRequests = prevReqs.map(req => {
+          if (req.confirmationId === confId && req.player === `${player.firstName} ${player.lastName}` && req.type === 'Bye Request' && req.status === 'Pending') {
+            return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
+          }
+          return req;
         });
-        setChangeRequests(updatedRequests);
         localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-        window.dispatchEvent(new Event('storage'));
+        return updatedRequests;
+      });
+      window.dispatchEvent(new Event('storage'));
     }
-    
+
     toast({ title: "Bye Updated", description: `Bye request for ${player?.firstName} has been updated.` });
     setIsUpdating(prev => ({ ...prev, [confId]: false }));
   };
@@ -560,7 +571,12 @@ export default function ConfirmationsPage() {
             'Bye Request': {
                 title: `Update Byes for ${newRequest.player}?`,
                 description: `This will update the bye requests for ${newRequest.player}. This change will not affect the invoice.`,
-                action: () => handleByeChangeAction(newRequest.confirmationId, changeRequestInputs.playerId!, { round1: changeRequestInputs.byeRound1 || 'none', round2: changeRequestInputs.byeRound2 || 'none' })
+                action: () => {
+                  const newByes = { round1: changeRequestInputs.byeRound1 || 'none', round2: changeRequestInputs.byeRound2 || 'none' };
+                  handleByeChange(newRequest.confirmationId, changeRequestInputs.playerId!, 'round1', newByes.round1);
+                  handleByeChange(newRequest.confirmationId, changeRequestInputs.playerId!, 'round2', newByes.round2);
+                  setIsChangeAlertOpen(false);
+                }
             },
             'Other': {
                 title: `Log Change for ${newRequest.player}?`,
@@ -734,7 +750,7 @@ export default function ConfirmationsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Submission History</CardTitle>
+            <CardTitle>Registration Confirmations</CardTitle>
             <CardDescription>Click on a submission to view its details.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -752,6 +768,7 @@ export default function ConfirmationsPage() {
                   const currentStatus = statuses[conf.id];
                   const isLoading = isUpdating[conf.id] || !isAuthReady;
                   const selectedWithdrawalIds = selectedPlayersForWithdraw[conf.id] || [];
+                  const eventDetails = events.find(e => e.id === conf.eventId);
 
                   return (
                   <AccordionItem key={conf.id} value={conf.id}>
@@ -852,7 +869,38 @@ export default function ConfirmationsPage() {
                                   <TableCell>{details.section}</TableCell>
                                   <TableCell><Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge></TableCell>
                                   <TableCell>
-                                    {[details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None'}
+                                    {sponsorProfile?.role === 'organizer' ? (
+                                        <div className="flex gap-2">
+                                            <Select
+                                                value={details.byes.round1}
+                                                onValueChange={(value) => handleByeChange(conf.id, playerId, 'round1', value)}
+                                                disabled={!eventDetails}
+                                            >
+                                                <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">R1: None</SelectItem>
+                                                    {eventDetails && Array.from({ length: eventDetails.rounds }).map((_, i) => (
+                                                        <SelectItem key={i + 1} value={String(i + 1)}>R1: Bye</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Select
+                                                value={details.byes.round2}
+                                                onValueChange={(value) => handleByeChange(conf.id, playerId, 'round2', value)}
+                                                disabled={!eventDetails || details.byes.round1 === 'none'}
+                                            >
+                                                <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">R2: None</SelectItem>
+                                                    {eventDetails && Array.from({ length: eventDetails.rounds }).map((_, i) => (
+                                                       details.byes.round1 !== String(i + 1) && <SelectItem key={i + 1} value={String(i + 1)}>R2: Bye</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    ) : (
+                                        [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None'
+                                    )}
                                   </TableCell>
                                   {sponsorProfile?.role === 'organizer' && (
                                     <TableCell className='text-right'>
