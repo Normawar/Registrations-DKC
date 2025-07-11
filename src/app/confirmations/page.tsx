@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, type ReactNode, useMemo, useCallback, Fragment } from 'react';
@@ -215,6 +216,10 @@ export default function ConfirmationsPage() {
     return new Map(allPlayers.map(p => [p.id, p]));
   }, [allPlayers]);
 
+  const confirmationsMap = useMemo(() => {
+    return new Map(confirmations.map(c => [c.id, c]));
+  }, [confirmations]);
+
   const sortedAndFilteredConfirmations = useMemo(() => {
     let filtered = [...confirmations];
 
@@ -222,23 +227,16 @@ export default function ConfirmationsPage() {
         const lowercasedQuery = searchQuery.toLowerCase();
         
         filtered = filtered.filter(conf => {
-            // Search by Event Name or Invoice Number (always included)
             if (conf.eventName.toLowerCase().includes(lowercasedQuery) || (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery))) {
                 return true;
             }
-
-            // More robust date search
             const submissionDate = new Date(conf.submissionTimestamp);
             if (!isValid(submissionDate)) return false;
-
-            // Check for partial month name (e.g., "jun" for "june")
             const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
             const submissionMonthName = format(submissionDate, 'MMMM').toLowerCase();
             if (submissionMonthName.startsWith(lowercasedQuery)) {
                 return true;
             }
-
-            // Check for full date match (e.g., "06/15/2024" or "june 15 2024")
             try {
                 const parsedQueryDate = new Date(searchQuery);
                 if (isValid(parsedQueryDate) && isSameDay(parsedQueryDate, submissionDate)) {
@@ -290,37 +288,29 @@ export default function ConfirmationsPage() {
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
-  const confirmationsMap = useMemo(() => {
-    return new Map(confirmations.map(c => [c.id, c]));
-  }, [confirmations]);
-
-  const fetchAllInvoiceStatuses = (confirmationsToFetch: Confirmation[]) => {
-    confirmationsToFetch.forEach(conf => {
-        if (conf.invoiceId) {
-            fetchInvoiceStatus(conf.id, conf.invoiceId, true);
-        }
-    });
-  };
-
-  const fetchInvoiceStatus = async (confId: string, invoiceId: string, silent = false) => {
+  const fetchInvoiceStatus = useCallback(async (confId: string, invoiceId: string, silent = false) => {
       if (!silent) {
           setStatuses(prev => ({ ...prev, [confId]: { ...prev[confId], isLoading: true } }));
       }
       try {
           const { status, invoiceNumber } = await getInvoiceStatus({ invoiceId });
           setStatuses(prev => ({ ...prev, [confId]: { status, isLoading: false } }));
-          setConfirmations(prevConfs => prevConfs.map(c => 
-            c.id === confId ? { ...c, invoiceStatus: status, invoiceNumber: invoiceNumber } : c
-          ));
-          const allConfsRaw = localStorage.getItem('confirmations') || '[]';
-          const allConfsParsed = JSON.parse(allConfsRaw);
-          const updatedConfs = allConfsParsed.map((c: any) => {
-              if (c.id === confId) {
-                  return { ...c, invoiceStatus: status, invoiceNumber: invoiceNumber };
-              }
-              return c;
+          
+          setConfirmations(prevConfs => {
+            const newConfs = prevConfs.map(c => 
+              c.id === confId ? { ...c, invoiceStatus: status, invoiceNumber: invoiceNumber } : c
+            );
+            const allConfsRaw = localStorage.getItem('confirmations') || '[]';
+            const allConfsParsed = JSON.parse(allConfsRaw);
+            const updatedConfs = allConfsParsed.map((c: any) => {
+                if (c.id === confId) {
+                    return { ...c, invoiceStatus: status, invoiceNumber: invoiceNumber };
+                }
+                return c;
+            });
+            localStorage.setItem('confirmations', JSON.stringify(updatedConfs));
+            return newConfs;
           });
-          localStorage.setItem('confirmations', JSON.stringify(updatedConfs));
       } catch (error) {
           console.error(`Failed to fetch status for invoice ${invoiceId}:`, error);
           setStatuses(prev => ({ ...prev, [confId]: { status: 'ERROR', isLoading: false } }));
@@ -329,27 +319,15 @@ export default function ConfirmationsPage() {
             toast({ variant: "destructive", title: "Could not refresh status", description });
           }
       }
-  };
+  }, [toast]);
 
-  useEffect(() => {
-    if (!auth || !storage) {
-        setIsAuthReady(false);
-        setAuthError("Firebase is not configured, so file uploads are disabled. Please check your .env file.");
-        return;
-    }
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) { setIsAuthReady(true); setAuthError(null); } 
-        else { signInAnonymously(auth).catch((error) => {
-                console.error("Anonymous sign-in failed:", error);
-                if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
-                    setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console. Please contact your administrator.");
-                }
-                setIsAuthReady(false);
-            });
+  const fetchAllInvoiceStatuses = useCallback((confirmationsToFetch: Confirmation[]) => {
+    confirmationsToFetch.forEach(conf => {
+        if (conf.invoiceId) {
+            fetchInvoiceStatus(conf.id, conf.invoiceId, true);
         }
     });
-    return () => unsubscribe();
-  }, []);
+  }, [fetchInvoiceStatus]);
 
   const loadAllData = useCallback(() => {
     try {
@@ -392,14 +370,36 @@ export default function ConfirmationsPage() {
         setConfirmations([]);
         setChangeRequests(initialRequestsData);
     }
-  }, []);
-  
+  }, [fetchAllInvoiceStatuses]);
+
   useEffect(() => {
+    if (!auth || !storage) {
+        setIsAuthReady(false);
+        setAuthError("Firebase is not configured, so file uploads are disabled. Please check your .env file.");
+        return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) { setIsAuthReady(true); setAuthError(null); } 
+        else { signInAnonymously(auth).catch((error) => {
+                console.error("Anonymous sign-in failed:", error);
+                if (error instanceof Error && (error as any).code === 'auth/admin-restricted-operation') {
+                    setAuthError("File uploads are disabled. Anonymous sign-in is not enabled in the Firebase console. Please contact your administrator.");
+                }
+                setIsAuthReady(false);
+            });
+        }
+    });
+
+    const handleStorageChange = () => {
+        loadAllData();
+    };
+
     loadAllData();
-    window.addEventListener('storage', loadAllData);
+    window.addEventListener('storage', handleStorageChange);
     
     return () => {
-        window.removeEventListener('storage', loadAllData);
+        unsubscribe();
+        window.removeEventListener('storage', handleStorageChange);
     };
   }, [loadAllData]);
 

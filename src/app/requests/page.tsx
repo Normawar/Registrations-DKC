@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -102,12 +103,11 @@ export default function RequestsPage() {
   };
 
   useEffect(() => {
-    loadRequests();
-
     const handleStorageChange = () => {
       loadRequests();
     };
 
+    loadRequests();
     window.addEventListener('storage', handleStorageChange);
     
     return () => {

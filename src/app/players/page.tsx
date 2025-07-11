@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -186,7 +187,7 @@ export default function PlayersPage() {
   const [searchFirstName, setSearchFirstName] = useState('');
   const [searchLastName, setSearchLastName] = useState('');
   const [searchUscfId, setSearchUscfId] = useState('');
-  const [searchState, setSearchState] = useState('TX');
+  const [searchState, setSearchState] = useState('ALL');
 
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
@@ -389,6 +390,8 @@ export default function PlayersPage() {
   }, [searchFirstName, searchLastName, searchUscfId, searchState]);
   
   const filteredPlayers = useMemo(() => {
+    if (!isDbLoaded) return [];
+
     const lowerFirstName = searchFirstName.toLowerCase();
     const lowerLastName = searchLastName.toLowerCase();
 
@@ -396,6 +399,7 @@ export default function PlayersPage() {
         return allPlayers;
     }
 
+    // Debounced search can be implemented here if performance is an issue
     return allPlayers.filter(player => {
         const stateMatch = searchState === 'ALL' 
             || (searchState === 'NO_STATE' && !player.state)
@@ -406,7 +410,7 @@ export default function PlayersPage() {
 
         return stateMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
     });
-  }, [allPlayers, searchFirstName, searchLastName, searchUscfId, searchState]);
+  }, [isDbLoaded, allPlayers, searchFirstName, searchLastName, searchUscfId, searchState]);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...filteredPlayers];

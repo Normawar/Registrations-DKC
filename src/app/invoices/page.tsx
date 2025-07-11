@@ -1,5 +1,6 @@
 
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -177,12 +178,11 @@ export default function InvoicesPage() {
   }, []);
   
   useEffect(() => {
-    loadAndProcessInvoices();
-    
     const handleStorageChange = () => {
         loadAndProcessInvoices();
     };
     
+    loadAndProcessInvoices();
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('all_invoices_updated', handleStorageChange);
     
@@ -242,7 +242,9 @@ export default function InvoicesPage() {
 
         if (invoicesToFetchStatus.length > 0) {
             invoicesToFetchStatus.forEach(inv => {
-                fetchInvoiceStatus(inv.id, inv.invoiceId!);
+                if (inv.invoiceId) {
+                  fetchInvoiceStatus(inv.id, inv.invoiceId);
+                }
             });
         }
     }, [filteredInvoices, fetchInvoiceStatus]);
@@ -417,7 +419,7 @@ export default function InvoicesPage() {
                             const currentStatus = statuses[inv.id];
                             const isStatusLoading = currentStatus?.isLoading;
                             const status = currentStatus?.status || inv.invoiceStatus;
-                            const isCancelable = status && !['PAID', 'CANCELED', 'REFUNDED', 'VOIDED', 'COMPED'].includes(status.toUpperCase());
+                            const isCancelable = status && !['PAID', 'CANCELED', 'REFUNDED', 'VOIDED', 'COMPED', 'NOT_FOUND'].includes(status.toUpperCase());
                             
                             return (
                                 <TableRow key={inv.id}>
@@ -454,7 +456,7 @@ export default function InvoicesPage() {
                                                   {profile.role === 'organizer' && (
                                                     <>
                                                         <DropdownMenuItem asChild>
-                                                            <Link href={`/confirmations#${inv.invoiceId}`}>
+                                                            <Link href={inv.type === 'event' ? `/confirmations#${inv.invoiceId}` : `/organizer-invoice?edit=${inv.id}`}>
                                                                 <FilePenLine className="mr-2 h-4 w-4" /> Edit
                                                             </Link>
                                                         </DropdownMenuItem>
@@ -499,6 +501,7 @@ export default function InvoicesPage() {
     </AppLayout>
   );
 }
+
 
 
 
