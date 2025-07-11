@@ -10,3 +10,4 @@ import '@/ai/flows/create-membership-invoice-flow.ts';
 import '@/ai/flows/create-organizer-invoice-flow.ts';
 import '@/ai/flows/cancel-invoice-flow.ts';
 import '@/ai/flows/rebuild-invoice-from-roster-flow.ts';
+import '@/ai/flows/recreate-invoice-from-roster-flow.ts';

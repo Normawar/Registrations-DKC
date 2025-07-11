@@ -1,187 +1,39 @@
 
 'use server';
 /**
- * @fileOverview Rebuilds a Square invoice from a given player roster.
- * This flow is designed to be the single source of truth for updating an event registration invoice,
- * ensuring that the invoice always reflects the current state of the application's roster.
+ * @fileOverview This flow is DEPRECATED. Use `recreate-invoice-from-roster-flow.ts` instead.
+ * The Square API does not allow direct modification of line items on an invoiced order.
+ * The correct approach is to cancel the old invoice and create a new one.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { randomUUID } from 'crypto';
-import { ApiError, type Order, type Invoice, type OrderLineItem, type UpdateOrderRequest } from 'square';
-import { getSquareClient } from '@/lib/square-client';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
-const PlayerToInvoiceSchema = z.object({
-  playerName: z.string().describe('The full name of the player.'),
-  uscfId: z.string().describe('The USCF ID of the player.'),
-  baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
-  lateFee: z.number().describe('The late fee applied, if any.'),
-  uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
-});
-
-const RebuildInvoiceInputSchema = z.object({
-    invoiceId: z.string().describe('The ID of the invoice to rebuild.'),
-    players: z.array(PlayerToInvoiceSchema).describe('The complete list of players who should be on the invoice.'),
-    uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
-});
-export type RebuildInvoiceInput = z.infer<typeof RebuildInvoiceInputSchema>;
-
-const RebuildInvoiceOutputSchema = z.object({
+const DeprecatedInputSchema = z.object({
   invoiceId: z.string(),
-  orderId: z.string().optional(),
-  totalAmount: z.number(),
-  status: z.string(),
-  invoiceUrl: z.string().url(),
+  players: z.array(z.any()),
+  uscfFee: z.number(),
 });
-export type RebuildInvoiceOutput = z.infer<typeof RebuildInvoiceOutputSchema>;
+export type DeprecatedInput = z.infer<typeof DeprecatedInputSchema>;
 
-export async function rebuildInvoiceFromRoster(input: RebuildInvoiceInput): Promise<RebuildInvoiceOutput> {
-  return rebuildInvoiceFlow(input);
+const DeprecatedOutputSchema = z.object({
+  error: z.string(),
+});
+export type DeprecatedOutput = z.infer<typeof DeprecatedOutputSchema>;
+
+export async function rebuildInvoiceFromRoster(input: DeprecatedInput): Promise<DeprecatedOutput> {
+  return flow(input);
 }
 
-const rebuildInvoiceFlow = ai.defineFlow(
+const flow = ai.defineFlow(
   {
-    name: 'rebuildInvoiceFlow',
-    inputSchema: RebuildInvoiceInputSchema,
-    outputSchema: RebuildInvoiceOutputSchema,
+    name: 'rebuildInvoiceFlow_DEPRECATED',
+    inputSchema: DeprecatedInputSchema,
+    outputSchema: DeprecatedOutputSchema,
   },
-  async (input) => {
-    const { isConfigured } = await checkSquareConfig();
-    if (!isConfigured) {
-      console.log(`Square not configured. Mock-rebuilding invoice ${input.invoiceId}.`);
-      return {
-        invoiceId: input.invoiceId,
-        totalAmount: 0,
-        status: 'DRAFT',
-        invoiceUrl: `/#mock-invoice/${input.invoiceId}`,
-      };
-    }
-
-    const squareClient = await getSquareClient();
-    const { invoicesApi, ordersApi } = squareClient;
-      
-    try {
-      console.log(`Fetching invoice ${input.invoiceId} to get its details...`);
-      const { result: { invoice: originalInvoice } } = await invoicesApi.getInvoice(input.invoiceId);
-      
-      if (!originalInvoice?.id || !originalInvoice.orderId) {
-        throw new Error(`Invoice ${input.invoiceId} not found or has no associated order.`);
-      }
-
-      const updatableStatuses = ['DRAFT', 'PUBLISHED', 'UNPAID', 'PARTIALLY_PAID'];
-      if (!updatableStatuses.includes(originalInvoice.status!)) {
-        throw new Error(`Invoice is in status ${originalInvoice.status} and cannot be modified.`);
-      }
-
-      // --- Reconstruct Line Items based on the provided player list ---
-      const newLineItems: OrderLineItem[] = [];
-
-      // 1. Registration Line Item
-      if (input.players.length > 0) {
-          const registrationFee = input.players[0].baseRegistrationFee;
-          const playerNotes = input.players.map((p, index) => `${index + 1}. ${p.playerName} (${p.uscfId})`).join('\n');
-          newLineItems.push({
-              name: `Tournament Registration`,
-              quantity: String(input.players.length),
-              basePriceMoney: {
-                  amount: BigInt(Math.round(registrationFee * 100)),
-                  currency: 'USD',
-              },
-              note: playerNotes,
-          });
-      }
-
-      // 2. Late Fee Line Item
-      const lateFeePlayers = input.players.filter(p => p.lateFee > 0);
-      if (lateFeePlayers.length > 0) {
-          const lateFee = lateFeePlayers[0].lateFee;
-          const lateFeePlayerNotes = lateFeePlayers.map((p, index) => `${index + 1}. ${p.playerName}`).join('\n');
-          newLineItems.push({
-              name: 'Late Fee',
-              quantity: String(lateFeePlayers.length),
-              basePriceMoney: {
-                  amount: BigInt(Math.round(lateFee * 100)),
-                  currency: 'USD',
-              },
-              note: lateFeePlayerNotes,
-          });
-      }
-
-      // 3. USCF Membership Line Item
-      const uscfActionPlayers = input.players.filter(p => p.uscfAction);
-      if (uscfActionPlayers.length > 0) {
-          const uscfPlayerNotes = uscfActionPlayers.map((p, index) => `${index + 1}. ${p.playerName}`).join('\n');
-          newLineItems.push({
-              name: 'USCF Membership (New/Renew)',
-              quantity: String(uscfActionPlayers.length),
-              basePriceMoney: {
-                  amount: BigInt(Math.round(input.uscfFee * 100)),
-                  currency: 'USD',
-              },
-              note: uscfPlayerNotes,
-          });
-      }
-      
-      console.log("Fetching original order to get version:", originalInvoice.orderId);
-      const { result: { order: originalOrder }} = await ordersApi.retrieveOrder(originalInvoice.orderId);
-
-      if (!originalOrder || !originalOrder.version) {
-          throw new Error(`Could not retrieve order or order version for ID: ${originalInvoice.orderId}`);
-      }
-
-      const updateOrderRequest: UpdateOrderRequest = {
-          idempotencyKey: randomUUID(),
-          order: {
-            locationId: originalOrder.locationId!,
-            lineItems: newLineItems,
-            version: originalOrder.version,
-          }
-      };
-      
-      // Clear all existing line items before adding new ones
-      if (originalOrder.lineItems && originalOrder.lineItems.length > 0) {
-        updateOrderRequest.fieldsToClear = ['line_items'];
-      }
-      
-      console.log("Updating order with new line items:", JSON.stringify(updateOrderRequest, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
-      
-      const { result: { order: updatedOrder } } = await ordersApi.updateOrder(originalInvoice.orderId, updateOrderRequest);
-      
-      console.log("Successfully updated order:", updatedOrder);
-
-      // Now fetch the final invoice to get the updated totals and status
-      // A small delay helps ensure Square's systems have processed the order update before we fetch the invoice.
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(input.invoiceId);
-
-      console.log("Successfully retrieved final invoice:", finalInvoice);
-
-      if (!finalInvoice) {
-        throw new Error("Failed to retrieve final invoice after update.");
-      }
-
-      return {
-        invoiceId: finalInvoice.id!,
-        orderId: finalInvoice.orderId,
-        totalAmount: Number(finalInvoice.paymentRequests?.[0].computedAmountMoney?.amount || 0) / 100,
-        status: finalInvoice.status!,
-        invoiceUrl: finalInvoice.publicUrl!,
-      };
-
-    } catch (error) {
-      if (error instanceof ApiError) {
-        console.error('Square API Error in rebuildInvoiceFlow:', JSON.stringify(error.result, null, 2));
-        const errorMessage = error.result.errors?.[0]?.detail || JSON.stringify(error.result);
-        throw new Error(`Square Error: ${errorMessage}`);
-      } else {
-        console.error('An unexpected error occurred during invoice rebuild:', error);
-        if (error instanceof Error) {
-            throw new Error(`${error.message}`);
-        }
-        throw new Error('An unexpected error occurred during invoice rebuild.');
-      }
-    }
+  async () => {
+    const errorMsg = "This flow is deprecated. Use recreate-invoice-from-roster-flow instead.";
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
 );

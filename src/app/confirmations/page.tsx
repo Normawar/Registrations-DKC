@@ -50,7 +50,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
-import { rebuildInvoiceFromRoster } from '@/ai/flows/rebuild-invoice-from-roster-flow';
+import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import type { ChangeRequest } from '@/lib/data/requests-data';
 import { requestsData as initialRequestsData } from '@/lib/data/requests-data';
@@ -438,10 +438,16 @@ export default function ConfirmationsPage() {
     });
     
     try {
-        const result = await rebuildInvoiceFromRoster({
-            invoiceId: originalConfirmation.invoiceId,
+        const result = await recreateInvoiceFromRoster({
+            originalInvoiceId: originalConfirmation.invoiceId,
             players: updatedPlayersForInvoice,
             uscfFee: 24,
+            sponsorEmail: sponsorProfile.email,
+            sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
+            schoolName: sponsorProfile.school,
+            teamCode: originalConfirmation.teamCode,
+            eventName: originalConfirmation.eventName,
+            eventDate: originalConfirmation.eventDate,
         });
 
       const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
@@ -455,7 +461,8 @@ export default function ConfirmationsPage() {
                 newSelections[id] = { ...newSelections[id], status: 'withdrawn', withdrawnBy: initials, withdrawnAt: approvalTimestamp };
             }
           });
-          return { ...c, selections: newSelections, invoiceUrl: result.invoiceUrl, totalInvoiced: result.totalAmount };
+          // Update the existing confirmation with the NEW invoice details, but keep the original ID for the accordion
+          return { ...c, selections: newSelections, invoiceId: result.newInvoiceId, invoiceUrl: result.newInvoiceUrl, totalInvoiced: result.newTotalAmount, invoiceNumber: result.newInvoiceNumber, invoiceStatus: result.newStatus };
         }
         return c;
       });
@@ -478,8 +485,8 @@ export default function ConfirmationsPage() {
       window.dispatchEvent(new Event('storage'));
 
       toast({
-        title: "Player(s) Withdrawn",
-        description: `${withdrawnPlayerNames.join(', ')} has/have been withdrawn and the invoice has been updated.`
+        title: "Player(s) Withdrawn & New Invoice Created",
+        description: `The old invoice was canceled and a new one (${result.newInvoiceNumber}) was created for the remaining players.`
       });
 
     } catch (error) {
@@ -946,7 +953,7 @@ export default function ConfirmationsPage() {
                       </div>
                       
                       {currentStatus?.status === 'COMPED' ? (
-                        <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200"><Award className="h-4 w-4 text-sky-600" /><AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle><AlertDescription className="text-sky-700">This registration was completed at no charge. No payment is required.</AlertDescription></Alert>
+                        <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200"><Award className="h-4 w-4 text-sky-600" /><AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle><AlertDescription className="text-sky-700">This registration was completed at no charge. No payment is required.</AlertDescription></Alert> )}
                       ) : (
                         <div className="space-y-6 pt-6 mt-6 border-t">
                           <h4 className="font-semibold">Payment Information</h4>
