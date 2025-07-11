@@ -1107,6 +1107,59 @@ export default function ConfirmationsPage() {
 // Sub-component for details to keep main component cleaner
 function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore, events, changeRequests, confirmationsMap, sponsorProfile, handlers }: any) {
     const { getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleOpenEditPlayerDialog, getStatusBadgeVariant } = handlers;
+    
+    type SortablePlayerKey = 'lastName' | 'section';
+    const [playerSortConfig, setPlayerSortConfig] = useState<{ key: SortablePlayerKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending'});
+    
+    const requestPlayerSort = (key: SortablePlayerKey) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (playerSortConfig && playerSortConfig.key === key && playerSortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setPlayerSortConfig({ key, direction });
+    };
+
+    const getPlayerSortIcon = (columnKey: SortablePlayerKey) => {
+        if (!playerSortConfig || playerSortConfig.key !== columnKey) {
+        return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+        }
+        if (playerSortConfig.direction === 'ascending') {
+        return <ArrowUp className="ml-2 h-4 w-4" />;
+        }
+        return <ArrowDown className="ml-2 h-4 w-4" />;
+    };
+    
+    const sortedPlayers = useMemo(() => {
+        const playerDetailsList = Object.entries(conf.selections).map(([playerId, details]) => ({
+            player: getPlayerById(playerId),
+            details,
+        })).filter(item => !!item.player);
+
+        if (playerSortConfig) {
+            playerDetailsList.sort((a, b) => {
+                let aValue: any;
+                let bValue: any;
+
+                if (playerSortConfig.key === 'lastName') {
+                    aValue = a.player?.lastName || '';
+                    bValue = b.player?.lastName || '';
+                } else {
+                    aValue = a.details[playerSortConfig.key] || '';
+                    bValue = b.details[playerSortConfig.key] || '';
+                }
+
+                if (aValue < bValue) {
+                    return playerSortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return playerSortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return playerDetailsList;
+
+    }, [conf.selections, getPlayerById, playerSortConfig]);
 
     const currentInputs = confInputs[conf.id] || {};
     const selectedMethod = currentInputs.paymentMethod || 'po';
@@ -1142,17 +1195,21 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
                     <TableHeader>
                     <TableRow>
                         {sponsorProfile?.role === 'organizer' && <TableHead className="w-10"><span className="sr-only">Select</span></TableHead>}
-                        <TableHead>Player</TableHead>
-                        <TableHead>Section</TableHead>
+                        <TableHead>
+                            <Button variant="ghost" className="px-0" onClick={() => requestPlayerSort('lastName')}>Player {getPlayerSortIcon('lastName')}</Button>
+                        </TableHead>
+                        <TableHead>
+                            <Button variant="ghost" className="px-0" onClick={() => requestPlayerSort('section')}>Section {getPlayerSortIcon('section')}</Button>
+                        </TableHead>
                         <TableHead>USCF Status</TableHead>
                         <TableHead>Byes Requested</TableHead>
                         {sponsorProfile?.role === 'organizer' && <TableHead className='text-right'>Actions</TableHead>}
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {Object.entries(conf.selections).map(([playerId, details]: [string, any]) => {
-                        const player = getPlayerById(playerId);
+                    {sortedPlayers.map(({ player, details }) => {
                         if (!player) return null;
+                        const playerId = player.id;
                         
                         const relevantRequests = changeRequests.filter((req: ChangeRequest) => req.confirmationId === conf.id && req.player === `${player.firstName} ${player.lastName}`);
                         const latestRequest = relevantRequests.length > 0 ? relevantRequests[0] : null;
@@ -1333,4 +1390,3 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
         </div>
     );
 }
-
