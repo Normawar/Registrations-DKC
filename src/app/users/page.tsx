@@ -113,24 +113,35 @@ export default function UsersPage() {
 
     const onSubmit = (values: UserFormValues) => {
         if (!editingUser) return;
-        
-        const updatedUsers = users.map(u => 
-            u.email === editingUser.email ? { ...u, ...values } : u
-        );
-        setUsers(updatedUsers);
 
-        // Update the 'users' list (auth-like)
-        localStorage.setItem('users', JSON.stringify(updatedUsers.map(({email, role}) => ({email, role}))));
-        
-        // Update the detailed profile in 'sponsor_profile'
+        // --- Start of Fix ---
+
+        // 1. Update the 'users' (auth) list with the potentially new role
+        const usersRaw = localStorage.getItem('users');
+        let allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
+        allUsers = allUsers.map(u => 
+            u.email === editingUser.email ? { ...u, role: values.role } : u
+        );
+        localStorage.setItem('users', JSON.stringify(allUsers));
+
+        // 2. Update the 'sponsor_profile' (details) list with all new values
         const profilesRaw = localStorage.getItem('sponsor_profile');
-        const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-        // The key for the profile is the email. In a real DB this would be a UUID.
-        profiles[values.email] = { ...(profiles[values.email] || {}), ...values };
+        const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
+        
+        // Ensure we merge with existing profile data, not overwrite it
+        const existingProfile = profiles[values.email] || {};
+        profiles[values.email] = { ...existingProfile, ...values };
+        
         localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
+
+        // 3. Reload the local state from the updated localStorage
+        loadUsers();
+
+        // --- End of Fix ---
 
         toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
         setIsDialogOpen(false);
+        setEditingUser(null);
     };
 
     return (
