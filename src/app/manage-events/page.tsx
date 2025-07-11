@@ -430,6 +430,7 @@ export default function ManageEventsPage() {
     const rawConfirmations = localStorage.getItem('confirmations');
     const allConfirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
   
+    // De-duplicate confirmations by invoice ID, keeping only the latest one
     const latestConfirmationsByInvoice = Object.values(
       allConfirmations.reduce((acc, conf) => {
         if (conf.invoiceId) {
@@ -437,6 +438,7 @@ export default function ManageEventsPage() {
             acc[conf.invoiceId] = conf;
           }
         } else {
+          // For non-invoiced (e.g., comped) registrations, use their own ID
           acc[conf.id] = conf;
         }
         return acc;
@@ -446,11 +448,13 @@ export default function ManageEventsPage() {
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
   
+    // Iterate over the latest confirmations to build the unique player list for the event
     for (const conf of latestConfirmationsByInvoice) {
       if (conf.eventId === event.id) {
         for (const playerId in conf.selections) {
           const player = playerMap.get(playerId);
           if (player) {
+            // This ensures each player ID appears only once, with their latest registration details.
             uniquePlayerRegistrations.set(playerId, { player, details: conf.selections[playerId] });
           }
         }
@@ -873,8 +877,7 @@ export default function ManageEventsPage() {
                   <TableHead>USCF ID</TableHead>
                   <TableHead>School</TableHead>
                   <TableHead>Section</TableHead>
-                  <TableHead>USCF Status</TableHead>
-                  <TableHead>New</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -886,7 +889,8 @@ export default function ManageEventsPage() {
                   </TableRow>
                 ) : (
                   registrations.map(({ player, details }) => {
-                    const isNew = selectedEventForReg && !(downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
+                    const isDownloaded = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
+                    const status = isDownloaded ? 'Active' : 'Registered';
                     return (
                         <TableRow key={player.id}>
                             <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
@@ -894,12 +898,9 @@ export default function ManageEventsPage() {
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
                             <TableCell>
-                            <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={cn(details.uscfStatus === 'current' ? 'bg-green-600 text-white' : '', 'capitalize')}>
-                                {details.uscfStatus}
-                            </Badge>
-                            </TableCell>
-                            <TableCell>
-                                {isNew && <Check className="h-4 w-4 text-green-600" />}
+                                <Badge variant={status === 'Active' ? 'default' : 'secondary'} className={cn(status === 'Active' ? 'bg-green-600 text-white' : '')}>
+                                    {status}
+                                </Badge>
                             </TableCell>
                         </TableRow>
                     )
