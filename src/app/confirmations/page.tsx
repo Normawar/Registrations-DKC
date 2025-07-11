@@ -228,19 +228,18 @@ export default function ConfirmationsPage() {
                 return true;
             }
 
-            // Check if search query is just a month name
-            const isMonthQuery = !/\d/.test(lowercasedQuery);
+            // Check if search query is JUST a month name
+            const monthNames = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+            const isMonthQuery = monthNames.includes(lowercasedQuery);
+            
             if (isMonthQuery && conf.eventDate) {
                 const eventDate = new Date(conf.eventDate);
-                if (isValid(eventDate) && format(eventDate, 'MMMM').toLowerCase().startsWith(lowercasedQuery)) {
+                if (isValid(eventDate) && format(eventDate, 'MMMM').toLowerCase() === lowercasedQuery) {
                     return true;
                 }
-            }
-
-            // Try to parse as a full date if it's not just a month name
-            if (!isMonthQuery && conf.eventDate) {
+            } else if (conf.eventDate) { // If not just a month name, try to parse as a full date.
                 try {
-                    const parsedDate = new Date(lowercasedQuery);
+                    const parsedDate = new Date(searchQuery);
                     if (isValid(parsedDate)) {
                         const eventDate = new Date(conf.eventDate);
                         if (isValid(eventDate) && isSameDay(parsedDate, eventDate)) {
@@ -1200,8 +1199,8 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
                     aValue = a.player?.lastName || '';
                     bValue = b.player?.lastName || '';
                 } else {
-                    aValue = a.details[playerSortConfig.key] || '';
-                    bValue = b.details[playerSortConfig.key] || '';
+                    aValue = (a.details as any)[playerSortConfig.key] || '';
+                    bValue = (b.details as any)[playerSortConfig.key] || '';
                 }
 
                 if (aValue < bValue) {
@@ -1446,3 +1445,4 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
         </div>
     );
 }
+
