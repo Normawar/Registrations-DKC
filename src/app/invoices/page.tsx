@@ -1,6 +1,5 @@
 
 
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -232,12 +231,12 @@ export default function InvoicesPage() {
             if (!inv.invoiceId) return false;
             const currentStatusInfo = statuses[inv.id];
             
-            if (!currentStatusInfo || !currentStatusInfo.isLoading) {
-                const status = currentStatusInfo?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
-                const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND', 'COMPED'].includes(status);
-                return !isFinalState;
-            }
-            return false;
+            if (currentStatusInfo?.isLoading) return false;
+
+            const status = currentStatusInfo?.status?.toUpperCase() || inv.invoiceStatus?.toUpperCase() || '';
+            const isFinalState = ['PAID', 'CANCELED', 'VOIDED', 'REFUNDED', 'FAILED', 'NOT_FOUND', 'COMPED'].includes(status);
+            
+            return !isFinalState;
         });
 
         if (invoicesToFetchStatus.length > 0) {
@@ -501,7 +500,4 @@ export default function InvoicesPage() {
     </AppLayout>
   );
 }
-
-
-
 
