@@ -35,23 +35,11 @@ export function useSponsorProfile() {
 
   const loadProfile = useCallback(() => {
     try {
-        const storedProfileRaw = localStorage.getItem('sponsor_profile');
+        const storedProfileRaw = localStorage.getItem('current_user_profile');
         let profileData: SponsorProfile | null = storedProfileRaw ? JSON.parse(storedProfileRaw) : null;
 
         // The 'user_role' from the session is the source of truth for the current role.
         const sessionRole = localStorage.getItem('user_role');
-
-        if (!profileData && sessionRole) {
-            // If there's a role but no profile, maybe it's a new login or from another machine.
-            // Look for the full profile details in the "all profiles" storage.
-            const allProfilesRaw = localStorage.getItem('all_profiles');
-            if (allProfilesRaw) {
-                const allProfiles = JSON.parse(allProfilesRaw);
-                // This assumes email is stored in a way we can find it.
-                // This part of the logic is weak as we don't have a session email.
-                // For this app, we will rely on sponsor_profile being the primary source.
-            }
-        }
 
         if (profileData) {
             if (sessionRole && (sessionRole === 'sponsor' || sessionRole === 'organizer' || sessionRole === 'individual')) {
@@ -77,7 +65,7 @@ export function useSponsorProfile() {
     loadProfile();
     
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'sponsor_profile' || event.key === 'user_role') {
+        if (event.key === 'current_user_profile' || event.key === 'user_role' || event.key === 'sponsor_profile') {
             loadProfile();
         }
     };
@@ -104,13 +92,13 @@ export function useSponsorProfile() {
         const updated = { ...(prev || defaultSponsorData), ...newProfileData };
         try {
             // This is the session profile
-            localStorage.setItem('sponsor_profile', JSON.stringify(updated));
+            localStorage.setItem('current_user_profile', JSON.stringify(updated));
 
             // Also update the master list of profiles
-            const allProfilesRaw = localStorage.getItem('all_profiles');
+            const allProfilesRaw = localStorage.getItem('sponsor_profile');
             const allProfiles = allProfilesRaw ? JSON.parse(allProfilesRaw) : {};
             allProfiles[updated.email] = updated;
-            localStorage.setItem('all_profiles', JSON.stringify(allProfiles));
+            localStorage.setItem('sponsor_profile', JSON.stringify(allProfiles));
             
             // Defer dispatch to avoid illegal cross-component updates during render.
             setTimeout(() => window.dispatchEvent(new Event('profileUpdate')), 0);

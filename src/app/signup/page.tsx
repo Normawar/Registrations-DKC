@@ -118,6 +118,7 @@ const SponsorSignUpForm = () => {
     
     // Set current session user
     localStorage.setItem('user_role', 'sponsor');
+    localStorage.setItem('current_user_profile', JSON.stringify(profileData));
     
     router.push('/dashboard');
   }
@@ -339,6 +340,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
     localStorage.setItem('user_role', role);
+    localStorage.setItem('current_user_profile', JSON.stringify(profileData));
 
     let path = '/dashboard';
     if (role === 'individual') {

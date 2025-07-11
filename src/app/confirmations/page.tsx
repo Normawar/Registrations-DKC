@@ -31,7 +31,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Search } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -205,6 +205,7 @@ export default function ConfirmationsPage() {
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
 
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'submissionTimestamp', direction: 'descending' });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const playerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -214,10 +215,20 @@ export default function ConfirmationsPage() {
     return new Map(allPlayers.map(p => [p.id, p]));
   }, [allPlayers]);
 
-  const sortedConfirmations = useMemo(() => {
-    const sortableConfirmations = [...confirmations];
+  const sortedAndFilteredConfirmations = useMemo(() => {
+    let filtered = [...confirmations];
+
+    if (searchQuery) {
+        const lowercasedQuery = searchQuery.toLowerCase();
+        filtered = filtered.filter(conf => 
+            conf.eventName.toLowerCase().includes(lowercasedQuery) ||
+            (conf.invoiceNumber && conf.invoiceNumber.toLowerCase().includes(lowercasedQuery)) ||
+            (conf.eventDate && conf.eventDate.toLowerCase().includes(lowercasedQuery))
+        );
+    }
+    
     if (sortConfig) {
-      sortableConfirmations.sort((a, b) => {
+      filtered.sort((a, b) => {
         let aValue: any = a[sortConfig.key];
         let bValue: any = b[sortConfig.key];
         
@@ -235,8 +246,8 @@ export default function ConfirmationsPage() {
         return 0;
       });
     }
-    return sortableConfirmations;
-  }, [confirmations, sortConfig]);
+    return filtered;
+  }, [confirmations, sortConfig, searchQuery]);
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -871,15 +882,33 @@ export default function ConfirmationsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Registration Confirmations</CardTitle>
-            <CardDescription>Click on a submission to view its details. Column headers are sortable.</CardDescription>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <CardTitle>Registration Confirmations</CardTitle>
+                    <CardDescription>Click on a submission to view its details. Column headers are sortable.</CardDescription>
+                </div>
+                <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search event, date, invoice..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {confirmations.length === 0 ? (
+            {sortedAndFilteredConfirmations.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-4 text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
                 <ClipboardCheck className="h-12 w-12" />
-                <p className="font-semibold">No Confirmations Yet</p>
-                <p className="text-sm">When you register for an event, a confirmation will appear here.</p>
+                <p className="font-semibold">{searchQuery ? "No Results Found" : "No Confirmations Yet"}</p>
+                <p className="text-sm">
+                    {searchQuery
+                      ? "Your search did not match any confirmations."
+                      : "When you register for an event, a confirmation will appear here."
+                    }
+                </p>
               </div>
             ) : (
               <Table>
@@ -899,7 +928,7 @@ export default function ConfirmationsPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {sortedConfirmations.map((conf) => {
+                    {sortedAndFilteredConfirmations.map((conf) => {
                         const isExpanded = openCollapsibleRow === conf.id;
                         const currentStatus = statuses[conf.id];
 

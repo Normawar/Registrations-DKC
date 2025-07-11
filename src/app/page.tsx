@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -43,16 +43,16 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
     // Role matches, proceed with login
     localStorage.setItem('user_role', role);
 
-    // Load the user's detailed profile
+    // Load the user's detailed profile from the master list
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    const userProfile = profiles[email];
+    const userProfile = Object.values(profiles).find((p: any) => p.email === email);
 
     if (userProfile) {
-        localStorage.setItem('sponsor_profile', JSON.stringify(userProfile));
+        localStorage.setItem('current_user_profile', JSON.stringify(userProfile));
     } else {
         // Fallback in case profile doesn't exist, create a minimal one.
-        localStorage.setItem('sponsor_profile', JSON.stringify({ email: email, role: role, firstName: 'User', lastName: ''}));
+        localStorage.setItem('current_user_profile', JSON.stringify({ email: email, role: role, firstName: 'User', lastName: ''}));
     }
     
     window.dispatchEvent(new Event('storage')); // Notify other tabs/components
@@ -113,6 +113,14 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
 };
 
 export default function LoginPage() {
+  const router = useRouter();
+  
+  // This effect logs out the user by clearing session storage when they land on the login page.
+  useEffect(() => {
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('current_user_profile');
+  }, [router]);
+
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
