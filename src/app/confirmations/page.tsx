@@ -353,7 +353,7 @@ export default function ConfirmationsPage() {
 
   const loadAllData = useCallback(() => {
     try {
-      const storedConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+      const storedConfirmations: Confirmation[] = JSON.parse(localStorage.getItem('confirmations') || '[]');
       setConfirmations(storedConfirmations);
 
       const storedRequests = localStorage.getItem('change_requests');
@@ -375,6 +375,15 @@ export default function ConfirmationsPage() {
       setStatuses(initialStatuses);
       
       fetchAllInvoiceStatuses(storedConfirmations.filter((c: Confirmation) => c.invoiceId));
+      
+      if (window.location.hash) {
+        const hashId = window.location.hash.substring(1);
+        const targetConf = storedConfirmations.find(c => c.invoiceId === hashId);
+        if (targetConf) {
+            setOpenCollapsibleRow(targetConf.id);
+        }
+      }
+
     } catch (error) {
         console.error("Failed to load or parse data from localStorage", error);
         setConfirmations([]);
@@ -386,11 +395,6 @@ export default function ConfirmationsPage() {
     loadAllData();
     window.addEventListener('storage', loadAllData);
     
-    if (window.location.hash) {
-      const hashId = window.location.hash.substring(1);
-      setOpenCollapsibleRow(hashId);
-    }
-
     return () => {
         window.removeEventListener('storage', loadAllData);
     };
