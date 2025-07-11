@@ -78,9 +78,13 @@ type RegistrationSelections = Record<string, PlayerRegistration>;
 
 type Confirmation = {
   eventId: string;
+  eventName: string;
+  eventDate: string;
   selections: Record<string, { section: string }>;
   invoiceId?: string;
   invoiceUrl?: string;
+  sponsorName: string;
+  sponsorEmail: string;
 };
 
 type StoredDownloads = {
@@ -376,7 +380,7 @@ export default function EventsPage() {
                 const regConfirmation = {
                     id: regResult.invoiceId, eventId: selectedEvent.id, invoiceId: regResult.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(),
                     selections, totalInvoiced: calculatedFees.registration, invoiceUrl: regResult.invoiceUrl, invoiceNumber: regResult.invoiceNumber, teamCode: teamCode,
-                    invoiceStatus: regResult.status, purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, schoolName: sponsorProfile.school, district: sponsorProfile.district,
+                    invoiceStatus: regResult.status, sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, sponsorEmail: sponsorProfile.email, schoolName: sponsorProfile.school, district: sponsorProfile.district,
                 };
 
                 const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -432,7 +436,7 @@ export default function EventsPage() {
                 const newConfirmation = {
                     id: result.invoiceId, eventId: selectedEvent.id, invoiceId: result.invoiceId, eventName: selectedEvent.name, eventDate: selectedEvent.date, submissionTimestamp: new Date().toISOString(), selections,
                     totalInvoiced: calculatedFees.total, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: teamCode, invoiceStatus: result.status,
-                    purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, schoolName: sponsorProfile.school, district: sponsorProfile.district,
+                    sponsorName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`, sponsorEmail: sponsorProfile.email, schoolName: sponsorProfile.school, district: sponsorProfile.district,
                 };
 
                 const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -1090,4 +1094,3 @@ export default function EventsPage() {
     </AppLayout>
   );
 }
-
