@@ -876,11 +876,11 @@ export default function ConfirmationsPage() {
                                                 onValueChange={(value) => handleByeChange(conf.id, playerId, 'round1', value)}
                                                 disabled={!eventDetails}
                                             >
-                                                <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="none">R1: None</SelectItem>
                                                     {eventDetails && Array.from({ length: eventDetails.rounds }).map((_, i) => (
-                                                        <SelectItem key={i + 1} value={String(i + 1)}>R1: Bye</SelectItem>
+                                                        <SelectItem key={i + 1} value={String(i + 1)}>Round {i + 1}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -889,11 +889,11 @@ export default function ConfirmationsPage() {
                                                 onValueChange={(value) => handleByeChange(conf.id, playerId, 'round2', value)}
                                                 disabled={!eventDetails || details.byes.round1 === 'none'}
                                             >
-                                                <SelectTrigger className="w-24 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="none">R2: None</SelectItem>
                                                     {eventDetails && Array.from({ length: eventDetails.rounds }).map((_, i) => (
-                                                       details.byes.round1 !== String(i + 1) && <SelectItem key={i + 1} value={String(i + 1)}>R2: Bye</SelectItem>
+                                                       details.byes.round1 !== String(i + 1) && <SelectItem key={i + 1} value={String(i + 1)}>Round {i + 1}</SelectItem>
                                                     ))}
                                                 </SelectContent>
                                             </Select>
@@ -1092,5 +1092,3 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
-
-    
