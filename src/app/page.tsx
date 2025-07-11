@@ -10,11 +10,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) => {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
+  const { updateProfile } = useSponsorProfile();
 
   const handleLogin = () => {
     setError('');
@@ -34,12 +36,26 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
     }
 
     if (existingUser.role !== role) {
-      setError(`This email is registered as an ${existingUser.role}. Please use the correct tab to sign in.`);
+      setError(`This email is registered as a ${existingUser.role}. Please use the correct tab to sign in.`);
       return;
     }
     
     // Role matches, proceed with login
     localStorage.setItem('user_role', role);
+
+    // Load the user's detailed profile
+    const profilesRaw = localStorage.getItem('sponsor_profile');
+    const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
+    const userProfile = profiles[email];
+
+    if (userProfile) {
+        localStorage.setItem('sponsor_profile', JSON.stringify(userProfile));
+    } else {
+        // Fallback in case profile doesn't exist, create a minimal one.
+        localStorage.setItem('sponsor_profile', JSON.stringify({ email: email, role: role, firstName: 'User', lastName: ''}));
+    }
+    
+    window.dispatchEvent(new Event('storage')); // Notify other tabs/components
 
     let path = '/dashboard';
     if (role === 'individual') {

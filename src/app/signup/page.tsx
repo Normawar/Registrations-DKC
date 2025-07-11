@@ -99,19 +99,28 @@ const SponsorSignUpForm = () => {
         return;
     }
 
-    // Add new user to the simulated user list
-    users.push({ email: values.email, role: 'sponsor' });
-    localStorage.setItem('users', JSON.stringify(users));
-
+    const newUser = { email: values.email, role: 'sponsor' as const };
+    const updatedUsers = [...users, newUser];
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
+    
     // Update the main profile object for the app to use
-    updateProfile({
+    const profileData = {
       ...values,
-      role: 'sponsor',
-      avatarType: 'icon',
+      role: 'sponsor' as const,
+      avatarType: 'icon' as const,
       avatarValue: 'KingIcon',
-    });
-
+    };
+    
+    // Save the detailed profile
+    const profilesRaw = localStorage.getItem('sponsor_profile');
+    const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
+    profiles[values.email] = profileData;
+    localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
+    
+    // Set current session user
     localStorage.setItem('user_role', 'sponsor');
+    localStorage.setItem('sponsor_profile', JSON.stringify(profileData)); // Prime the current profile
+
     router.push('/dashboard');
   }
 
@@ -308,12 +317,12 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         return;
     }
 
-    // Add new user to the simulated user list
-    users.push({ email: values.email, role });
-    localStorage.setItem('users', JSON.stringify(users));
-
+    const newUser = { email: values.email, role: role };
+    const updatedUsers = [...users, newUser];
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
+    
     // Update the main profile object for the app to use
-    updateProfile({
+    const profileData = {
         firstName: values.firstName,
         lastName: values.lastName,
         email: values.email,
@@ -322,11 +331,19 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         school: '',
         gtCoordinatorEmail: '',
         role: role,
-        avatarType: 'icon',
+        avatarType: 'icon' as const,
         avatarValue: 'PawnIcon',
-    });
+    };
+    
+    // Save the detailed profile
+    const profilesRaw = localStorage.getItem('sponsor_profile');
+    const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
+    profiles[values.email] = profileData;
+    localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
     localStorage.setItem('user_role', role);
+    localStorage.setItem('sponsor_profile', JSON.stringify(profileData)); // Prime the current profile
+
     let path = '/dashboard';
     if (role === 'individual') {
       path = '/individual-dashboard';
