@@ -132,7 +132,7 @@ type StoredDownloads = {
 export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent } = useEvents();
-  const { database: allPlayers } = useMasterDb();
+  const { database: allPlayers, isDbLoaded } = useMasterDb();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -431,33 +431,33 @@ export default function ManageEventsPage() {
   };
 
   const handleViewRegistrations = (event: Event) => {
+    if (!isDbLoaded) {
+      toast({ variant: 'destructive', title: 'Loading...', description: 'Player database is still loading, please try again in a moment.'});
+      return;
+    }
+
     const rawConfirmations = localStorage.getItem('confirmations');
     const allConfirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
   
-    // De-duplicate confirmations by invoice ID, keeping only the latest one
-    const latestConfirmationsByInvoice = Object.values(
-      allConfirmations.reduce((acc, conf) => {
+    const latestConfirmationsMap = new Map<string, StoredConfirmation>();
+    for (const conf of allConfirmations) {
         const key = conf.invoiceId || conf.id;
-        if (key) {
-          if (!acc[key] || new Date(conf.submissionTimestamp) > new Date(acc[key].submissionTimestamp)) {
-            acc[key] = conf;
-          }
+        const existing = latestConfirmationsMap.get(key);
+        if (!existing || new Date(conf.submissionTimestamp) > new Date(existing.submissionTimestamp)) {
+            latestConfirmationsMap.set(key, conf);
         }
-        return acc;
-      }, {} as Record<string, StoredConfirmation>)
-    );
+    }
+    const latestConfirmations = Array.from(latestConfirmationsMap.values());
   
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
   
-    // Iterate over the latest confirmations to build the unique player list for the event
-    for (const conf of latestConfirmationsByInvoice) {
+    for (const conf of latestConfirmations) {
       if (conf.eventId === event.id) {
         for (const playerId in conf.selections) {
             const registrationDetails = conf.selections[playerId];
             const player = playerMap.get(playerId);
             if (player) {
-                // This ensures each player ID appears only once, with their latest registration details.
                 uniquePlayerRegistrations.set(playerId, { player, details: registrationDetails, invoiceId: conf.invoiceId, invoiceNumber: conf.invoiceNumber });
             }
         }
