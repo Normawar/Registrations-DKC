@@ -831,148 +831,148 @@ export default function EventsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {alreadyRegisteredRosterPlayers.length > 0 && (
-                <div className="p-4 border rounded-md bg-muted/50">
-                    <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><UserCheck className="h-4 w-4 text-green-600" /> Already Registered ({alreadyRegisteredRosterPlayers.length})</h4>
-                    <p className="text-xs text-muted-foreground">
-                        {alreadyRegisteredRosterPlayers.map(p => `${p.firstName} ${p.lastName}`).join(', ')}
-                    </p>
-                </div>
-            )}
-            <ScrollArea className="h-96 w-full">
-              <div className="space-y-4 pr-6">
-                {rosterPlayers.map((player) => {
-                  const isSelected = !!selections[player.id];
-                  const isAlreadyRegistered = alreadyRegisteredIds.has(player.id);
-                  const firstBye = selections[player.id]?.byes.round1;
-                  const isSectionInvalid = isSelected && !isSectionValid(player, selections[player.id]!.section);
-                  const uscfStatus = selections[player.id]?.uscfStatus;
-                  const isUscfInvalid = isSelected && selectedEvent && uscfStatus === 'current' && !isUscfStatusValid(player, selections[player.id]!, selectedEvent);
-                  const isRenewingInvalid = isSelected && uscfStatus === 'renewing' && !isRenewingDataValid(player);
-                  const isNewInvalid = isSelected && uscfStatus === 'new' && !isPersonalDataComplete(player);
-
-                  return (
-                    <div key={player.id} className="items-start gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr]">
-                        <Checkbox
-                          id={`player-${player.id}`}
-                          checked={isSelected}
-                          onCheckedChange={(checked) => handlePlayerSelect(player.id, checked)}
-                          className="mt-1"
-                          disabled={isAlreadyRegistered}
-                        />
-                        <div className="grid gap-2">
-                            <Label htmlFor={`player-${player.id}`} className={cn("font-medium", isAlreadyRegistered ? "text-muted-foreground" : "cursor-pointer")}>
-                                {player.firstName} {player.lastName} {isAlreadyRegistered && <span className="font-normal text-green-600">(Registered)</span>}
-                            </Label>
-                            <p className="text-sm text-muted-foreground">
-                                Grade: {player.grade} &bull; Section: {player.section} &bull; Rating: {player.regularRating || 'N/A'}
+            <ScrollArea className="h-96 w-full pr-6">
+                <div className="space-y-4">
+                    {alreadyRegisteredRosterPlayers.length > 0 && (
+                        <div className="p-4 border rounded-md bg-muted/50">
+                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><UserCheck className="h-4 w-4 text-green-600" /> Already Registered ({alreadyRegisteredRosterPlayers.length})</h4>
+                            <p className="text-xs text-muted-foreground">
+                                {alreadyRegisteredRosterPlayers.map(p => `${p.firstName} ${p.lastName}`).join(', ')}
                             </p>
-                            <p className="text-sm text-muted-foreground">
-                                USCF ID: {player.uscfId} &bull; Expires: {player.uscfExpiration ? format(new Date(player.uscfExpiration), 'MM/dd/yyyy') : 'N/A'}
-                            </p>
-                            
-                            {isSelected && selectedEvent && (
-                                <>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 items-start">
-                                    <div className="grid gap-1.5">
-                                      <Label className="text-xs">
-                                        USCF Membership (current for {format(new Date(selectedEvent.date), 'MM/dd/yyyy')})
-                                      </Label>
-                                      <RadioGroup
-                                        value={uscfStatus}
-                                        onValueChange={(value) => handleUscfStatusChange(player.id, value as any)}
-                                        className="mt-1"
-                                      >
-                                        <div className="flex items-center space-x-2">
-                                          <RadioGroupItem value="current" id={`current-${player.id}`} />
-                                          <Label htmlFor={`current-${player.id}`} className="font-normal text-sm">Current</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                          <RadioGroupItem value="new" id={`new-${player.id}`} />
-                                          <Label htmlFor={`new-${player.id}`} className="font-normal text-sm">New (+$24)</Label>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                          <RadioGroupItem value="renewing" id={`renewing-${player.id}`} />
-                                          <Label htmlFor={`renewing-${player.id}`} className="font-normal text-sm">Renewing (+$24)</Label>
-                                        </div>
-                                      </RadioGroup>
-                                      {isUscfInvalid && (
-                                          <p className="text-xs text-destructive">
-                                              Player must have a valid, unexpired USCF membership for this event to be 'Current'.
-                                          </p>
-                                      )}
-                                      {(isRenewingInvalid || isNewInvalid) && (
-                                          <div className="mt-2 text-xs text-destructive p-2 bg-destructive/10 rounded-md">
-                                              Player data is incomplete for this action. Please update DOB, Zip, and Email in the{' '}
-                                              <Link href="/roster" className="underline font-semibold hover:text-destructive/80" target="_blank" rel="noopener noreferrer">
-                                                  Roster Page
-                                              </Link>.
-                                          </div>
-                                      )}
-                                    </div>
-                                    <div className="grid gap-1.5">
-                                      <Label htmlFor={`section-${player.id}`} className="text-xs">Section</Label>
-                                      <Select onValueChange={(value) => handleSectionChange(player.id, value)} value={selections[player.id]?.section}>
-                                        <SelectTrigger id={`section-${player.id}`} className={cn("w-full", isSectionInvalid && "border-destructive ring-1 ring-destructive")}>
-                                          <SelectValue placeholder="Select Section" />
-                                        </SelectTrigger>
-                                        <SelectContent position="item-aligned">{sectionOptions}</SelectContent>
-                                      </Select>
-                                      {isSectionInvalid && (
-                                          <p className="text-xs text-destructive">Grade level too high for this section.</p>
-                                      )}
-                                    </div>
-                                    <div className="grid gap-1.5">
-                                      <Label htmlFor={`bye1-${player.id}`} className="text-xs">Bye 1</Label>
-                                      <Select onValueChange={(value) => handleByeChange(player.id, 'round1', value)} defaultValue="none">
-                                        <SelectTrigger id={`bye1-${player.id}`} className="w-full">
-                                          <SelectValue placeholder="Select Bye" />
-                                        </SelectTrigger>
-                                        <SelectContent position="item-aligned">{roundOptions(selectedEvent.rounds)}</SelectContent>
-                                      </Select>
-                                    </div>
-                                     <div className="grid gap-1.5">
-                                      <Label htmlFor={`bye2-${player.id}`} className="text-xs">Bye 2</Label>
-                                      <Select onValueChange={(value) => handleByeChange(player.id, 'round2', value)} value={selections[player.id]?.byes.round2 || 'none'} disabled={!firstBye || firstBye === 'none'}>
-                                        <SelectTrigger id={`bye2-${player.id}`} className="w-full">
-                                          <SelectValue placeholder="Select Bye" />
-                                        </SelectTrigger>
-                                        <SelectContent position="item-aligned">{roundOptions(selectedEvent.rounds, firstBye)}</SelectContent>
-                                      </Select>
-                                    </div>
-                                </div>
-
-                                {sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                                    <div className="grid gap-1.5 mt-4">
-                                        <Label className="text-xs">Student Type (PSJA Only)</Label>
-                                        <RadioGroup
-                                            value={selections[player.id]?.studentType}
-                                            onValueChange={(value) => handleStudentTypeChange(player.id, value as any)}
-                                            className="flex items-center gap-4"
-                                        >
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="gt" id={`gt-${player.id}`} />
-                                                <Label htmlFor={`gt-${player.id}`} className="font-normal text-sm cursor-pointer">GT Student</Label>
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <RadioGroupItem value="independent" id={`independent-${player.id}`} />
-                                                <Label htmlFor={`independent-${player.id}`} className="font-normal text-sm cursor-pointer">Independent</Label>
-                                            </div>
-                                        </RadioGroup>
-                                    </div>
-                                )}
-                                
-                                <p className="text-xs text-muted-foreground mt-2">
-                                    Scholastic - .5 pts bye available<br />
-                                    Open - .5 pt bye available only Rds 1-4
-                                </p>
-                                </>
-                            )}
                         </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    )}
+                    {rosterPlayers.map((player) => {
+                      const isSelected = !!selections[player.id];
+                      const isAlreadyRegistered = alreadyRegisteredIds.has(player.id);
+                      const firstBye = selections[player.id]?.byes.round1;
+                      const isSectionInvalid = isSelected && !isSectionValid(player, selections[player.id]!.section);
+                      const uscfStatus = selections[player.id]?.uscfStatus;
+                      const isUscfInvalid = isSelected && selectedEvent && uscfStatus === 'current' && !isUscfStatusValid(player, selections[player.id]!, selectedEvent);
+                      const isRenewingInvalid = isSelected && uscfStatus === 'renewing' && !isRenewingDataValid(player);
+                      const isNewInvalid = isSelected && uscfStatus === 'new' && !isPersonalDataComplete(player);
+
+                      return (
+                        <div key={player.id} className="items-start gap-4 rounded-md border p-4 grid grid-cols-[auto,1fr]">
+                            <Checkbox
+                              id={`player-${player.id}`}
+                              checked={isSelected}
+                              onCheckedChange={(checked) => handlePlayerSelect(player.id, checked)}
+                              className="mt-1"
+                              disabled={isAlreadyRegistered}
+                            />
+                            <div className="grid gap-2">
+                                <Label htmlFor={`player-${player.id}`} className={cn("font-medium", isAlreadyRegistered ? "text-muted-foreground" : "cursor-pointer")}>
+                                    {player.firstName} {player.lastName} {isAlreadyRegistered && <span className="font-normal text-green-600">(Registered)</span>}
+                                </Label>
+                                <p className="text-sm text-muted-foreground">
+                                    Grade: {player.grade} &bull; Section: {player.section} &bull; Rating: {player.regularRating || 'N/A'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                    USCF ID: {player.uscfId} &bull; Expires: {player.uscfExpiration ? format(new Date(player.uscfExpiration), 'MM/dd/yyyy') : 'N/A'}
+                                </p>
+                                
+                                {isSelected && selectedEvent && (
+                                    <>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-2 items-start">
+                                        <div className="grid gap-1.5">
+                                          <Label className="text-xs">
+                                            USCF Membership (current for {format(new Date(selectedEvent.date), 'MM/dd/yyyy')})
+                                          </Label>
+                                          <RadioGroup
+                                            value={uscfStatus}
+                                            onValueChange={(value) => handleUscfStatusChange(player.id, value as any)}
+                                            className="mt-1"
+                                          >
+                                            <div className="flex items-center space-x-2">
+                                              <RadioGroupItem value="current" id={`current-${player.id}`} />
+                                              <Label htmlFor={`current-${player.id}`} className="font-normal text-sm">Current</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                              <RadioGroupItem value="new" id={`new-${player.id}`} />
+                                              <Label htmlFor={`new-${player.id}`} className="font-normal text-sm">New (+$24)</Label>
+                                            </div>
+                                            <div className="flex items-center space-x-2">
+                                              <RadioGroupItem value="renewing" id={`renewing-${player.id}`} />
+                                              <Label htmlFor={`renewing-${player.id}`} className="font-normal text-sm">Renewing (+$24)</Label>
+                                            </div>
+                                          </RadioGroup>
+                                          {isUscfInvalid && (
+                                              <p className="text-xs text-destructive">
+                                                  Player must have a valid, unexpired USCF membership for this event to be 'Current'.
+                                              </p>
+                                          )}
+                                          {(isRenewingInvalid || isNewInvalid) && (
+                                              <div className="mt-2 text-xs text-destructive p-2 bg-destructive/10 rounded-md">
+                                                  Player data is incomplete for this action. Please update DOB, Zip, and Email in the{' '}
+                                                  <Link href="/roster" className="underline font-semibold hover:text-destructive/80" target="_blank" rel="noopener noreferrer">
+                                                      Roster Page
+                                                  </Link>.
+                                              </div>
+                                          )}
+                                        </div>
+                                        <div className="grid gap-1.5">
+                                          <Label htmlFor={`section-${player.id}`} className="text-xs">Section</Label>
+                                          <Select onValueChange={(value) => handleSectionChange(player.id, value)} value={selections[player.id]?.section}>
+                                            <SelectTrigger id={`section-${player.id}`} className={cn("w-full", isSectionInvalid && "border-destructive ring-1 ring-destructive")}>
+                                              <SelectValue placeholder="Select Section" />
+                                            </SelectTrigger>
+                                            <SelectContent position="item-aligned">{sectionOptions}</SelectContent>
+                                          </Select>
+                                          {isSectionInvalid && (
+                                              <p className="text-xs text-destructive">Grade level too high for this section.</p>
+                                          )}
+                                        </div>
+                                        <div className="grid gap-1.5">
+                                          <Label htmlFor={`bye1-${player.id}`} className="text-xs">Bye 1</Label>
+                                          <Select onValueChange={(value) => handleByeChange(player.id, 'round1', value)} defaultValue="none">
+                                            <SelectTrigger id={`bye1-${player.id}`} className="w-full">
+                                              <SelectValue placeholder="Select Bye" />
+                                            </SelectTrigger>
+                                            <SelectContent position="item-aligned">{roundOptions(selectedEvent.rounds)}</SelectContent>
+                                          </Select>
+                                        </div>
+                                         <div className="grid gap-1.5">
+                                          <Label htmlFor={`bye2-${player.id}`} className="text-xs">Bye 2</Label>
+                                          <Select onValueChange={(value) => handleByeChange(player.id, 'round2', value)} value={selections[player.id]?.byes.round2 || 'none'} disabled={!firstBye || firstBye === 'none'}>
+                                            <SelectTrigger id={`bye2-${player.id}`} className="w-full">
+                                              <SelectValue placeholder="Select Bye" />
+                                            </SelectTrigger>
+                                            <SelectContent position="item-aligned">{roundOptions(selectedEvent.rounds, firstBye)}</SelectContent>
+                                          </Select>
+                                        </div>
+                                    </div>
+
+                                    {sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                        <div className="grid gap-1.5 mt-4">
+                                            <Label className="text-xs">Student Type (PSJA Only)</Label>
+                                            <RadioGroup
+                                                value={selections[player.id]?.studentType}
+                                                onValueChange={(value) => handleStudentTypeChange(player.id, value as any)}
+                                                className="flex items-center gap-4"
+                                            >
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="gt" id={`gt-${player.id}`} />
+                                                    <Label htmlFor={`gt-${player.id}`} className="font-normal text-sm cursor-pointer">GT Student</Label>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <RadioGroupItem value="independent" id={`independent-${player.id}`} />
+                                                    <Label htmlFor={`independent-${player.id}`} className="font-normal text-sm cursor-pointer">Independent</Label>
+                                                </div>
+                                            </RadioGroup>
+                                        </div>
+                                    )}
+                                    
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        Scholastic - .5 pts bye available<br />
+                                        Open - .5 pt bye available only Rds 1-4
+                                    </p>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                      );
+                    })}
+                </div>
             </ScrollArea>
           </div>
           <DialogFooter className="sm:justify-between items-center pt-2 border-t">
