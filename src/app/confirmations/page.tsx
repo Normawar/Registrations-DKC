@@ -378,9 +378,12 @@ export default function ConfirmationsPage() {
       
       if (window.location.hash) {
         const hashId = window.location.hash.substring(1);
-        const targetConf = storedConfirmations.find(c => c.invoiceId === hashId);
-        if (targetConf) {
-            setOpenCollapsibleRow(targetConf.id);
+        const matchingConfs = storedConfirmations
+            .filter(c => c.invoiceId === hashId)
+            .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime());
+
+        if (matchingConfs.length > 0) {
+            setOpenCollapsibleRow(matchingConfs[0].id);
         }
       }
 
