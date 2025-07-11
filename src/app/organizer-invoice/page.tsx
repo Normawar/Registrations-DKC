@@ -117,7 +117,7 @@ export default function OrganizerInvoicePage() {
             schoolName: invoiceToEdit.schoolName,
             sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName,
             sponsorEmail: invoiceToEdit.sponsorEmail || '',
-            invoiceTitle: (invoiceToEdit.description || invoiceToEdit.invoiceTitle).split('-rev.')[0].trim(),
+            invoiceTitle: (invoiceToEdit.description || invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim(),
             lineItems: lineItems.length > 0 ? lineItems : [{ name: '', amount: 0, note: '' }],
           });
         }
