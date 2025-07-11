@@ -5,6 +5,7 @@ export type ChangeRequest = {
   confirmationId: string;
   player: string;
   event: string;
+  eventDate?: string; // ISO String
   type: string;
   details: string;
   submitted: string; // ISO String

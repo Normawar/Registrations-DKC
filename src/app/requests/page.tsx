@@ -29,7 +29,7 @@ import Link from 'next/link';
 import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
 
-type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy';
+type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy' | 'eventDate' | 'action';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
@@ -57,12 +57,18 @@ export default function RequestsPage() {
     const sortableRequests = [...requests];
     if (sortConfig) {
       sortableRequests.sort((a, b) => {
-        let aValue: any = a[sortConfig.key];
-        let bValue: any = b[sortConfig.key];
-
-        if (sortConfig.key === 'submitted') {
-            aValue = new Date(a.submitted).getTime();
-            bValue = new Date(b.submitted).getTime();
+        let aValue: any;
+        let bValue: any;
+        
+        if (sortConfig.key === 'action') {
+            aValue = a.status === 'Pending' ? 0 : 1;
+            bValue = b.status === 'Pending' ? 0 : 1;
+        } else if (sortConfig.key === 'submitted' || sortConfig.key === 'eventDate') {
+            aValue = a[sortConfig.key] ? new Date(a[sortConfig.key]!).getTime() : 0;
+            bValue = b[sortConfig.key] ? new Date(b[sortConfig.key]!).getTime() : 0;
+        } else {
+            aValue = a[sortConfig.key];
+            bValue = b[sortConfig.key];
         }
         
         if (aValue < bValue) {
@@ -137,12 +143,13 @@ export default function RequestsPage() {
                     <TableRow>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('player')} className="w-full justify-start px-4">Player {getSortIcon('player')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('event')} className="w-full justify-start px-4">Event {getSortIcon('event')}</Button></TableHead>
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('eventDate')} className="w-full justify-start px-4">Event Date {getSortIcon('eventDate')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('type')} className="w-full justify-start px-4">Request Type {getSortIcon('type')}</Button></TableHead>
                         <TableHead>Details</TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('submittedBy')} className="w-full justify-start px-4">Submitted By {getSortIcon('submittedBy')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('submitted')} className="w-full justify-start px-4">Submitted Date {getSortIcon('submitted')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('status')} className="w-full justify-start px-4">Status {getSortIcon('status')}</Button></TableHead>
-                        {profile?.role === 'organizer' && <TableHead>Action</TableHead>}
+                        {profile?.role === 'organizer' && <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('action')} className="w-full justify-start px-4">Action {getSortIcon('action')}</Button></TableHead>}
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -150,6 +157,7 @@ export default function RequestsPage() {
                     <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`}>
                         <TableCell className="font-medium">{request.player}</TableCell>
                         <TableCell>{request.event}</TableCell>
+                        <TableCell>{request.eventDate ? format(new Date(request.eventDate), 'PPP') : 'N/A'}</TableCell>
                         <TableCell>{request.type}</TableCell>
                         <TableCell>{request.details || '—'}</TableCell>
                         <TableCell>{request.submittedBy || 'N/A'}</TableCell>

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, type ReactNode, useMemo, useCallback } from 'react';
+import { useState, useEffect, type ReactNode, useMemo, useCallback, Fragment } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -27,12 +27,11 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -195,7 +194,7 @@ export default function ConfirmationsPage() {
   const [confToRequestChange, setConfToRequestChange] = useState<Confirmation | null>(null);
   const [changeRequestInputs, setChangeRequestInputs] = useState<Partial<ChangeRequestInputs>>({});
 
-  const [openAccordionItem, setOpenAccordionItem] = useState<string | undefined>(undefined);
+  const [openCollapsibleRow, setOpenCollapsibleRow] = useState<string | null>(null);
   
   const [isAddPlayerDialogOpen, setIsAddPlayerDialogOpen] = useState(false);
   const [confToAddPlayer, setConfToAddPlayer] = useState<Confirmation | null>(null);
@@ -356,7 +355,7 @@ export default function ConfirmationsPage() {
     // Check for a hash in the URL on initial load
     if (window.location.hash) {
       const hashId = window.location.hash.substring(1);
-      setOpenAccordionItem(hashId);
+      setOpenCollapsibleRow(hashId);
     }
 
     return () => {
@@ -657,6 +656,7 @@ export default function ConfirmationsPage() {
     const newRequest: ChangeRequest = {
         id: `req-${Date.now()}`,
         confirmationId: confToRequestChange.id,
+        eventDate: confToRequestChange.eventDate,
         player: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
         event: confToRequestChange.eventName,
         type: changeRequestInputs.requestType,
@@ -882,258 +882,95 @@ export default function ConfirmationsPage() {
                 <p className="text-sm">When you register for an event, a confirmation will appear here.</p>
               </div>
             ) : (
-              <Accordion type="single" collapsible className="w-full" value={openAccordionItem} onValueChange={setOpenAccordionItem}>
-                {sortedConfirmations.map((conf) => {
-                  const currentInputs = confInputs[conf.id] || {};
-                  const selectedMethod = currentInputs.paymentMethod || 'po';
-                  const currentStatus = statuses[conf.id];
-                  const isLoading = isUpdating[conf.id] || !isAuthReady;
-                  const selectedWithdrawalIds = selectedPlayersForWithdraw[conf.id] || [];
-                  const selectedRestoreIds = selectedPlayersForRestore[conf.id] || [];
-                  const eventDetails = events.find(e => e.id === conf.eventId);
-                  const hasWithdrawnPlayers = Object.values(conf.selections).some(p => p.status === 'withdrawn');
-                  const previousVersion = conf.previousVersionId ? confirmationsMap.get(conf.previousVersionId) : null;
+              <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead className="w-[50px]"><span className="sr-only">Expand</span></TableHead>
+                        <TableHead>
+                            <Button variant="ghost" className="px-0" onClick={() => requestSort('eventName')}>Event {getSortIcon('eventName')}</Button>
+                        </TableHead>
+                        <TableHead>
+                            <Button variant="ghost" className="px-0" onClick={() => requestSort('submissionTimestamp')}>Submission Date {getSortIcon('submissionTimestamp')}</Button>
+                        </TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">
+                             <Button variant="ghost" className="px-0" onClick={() => requestSort('totalInvoiced')}>Amount {getSortIcon('totalInvoiced')}</Button>
+                        </TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {sortedConfirmations.map((conf) => {
+                        const isExpanded = openCollapsibleRow === conf.id;
+                        const currentStatus = statuses[conf.id];
 
-                  return (
-                  <AccordionItem key={conf.id} value={conf.id}>
-                    <AccordionTrigger>
-                      <div className="flex justify-between items-center w-full pr-4">
-                        <div className="flex flex-col items-start text-left">
-                            <div className="flex items-center gap-2">
-                                <span className="font-semibold">{conf.eventName}</span>
-                                <span className="text-sm font-normal text-muted-foreground">({Object.keys(conf.selections).length} Player(s))</span>
-                            </div>
-                          <span className="text-sm text-muted-foreground"> Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')} </span> 
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div className="flex flex-col items-end">
-                              {conf.invoiceNumber && <span className="text-xs font-mono text-muted-foreground">{conf.invoiceNumber}</span>}
-                              {currentStatus && ( <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus.status))}>
-                                      {currentStatus.isLoading && currentStatus.status === 'LOADING' ? 'Loading...' : currentStatus.status?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
-                                  </Badge>
-                              )}
-                            </div>
-                            <div className="text-right">
-                                <span className="font-semibold">${conf.totalInvoiced.toFixed(2)}</span>
-                            </div>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center flex-wrap gap-2">
-                            <h4 className="font-semibold">Registered Players</h4>
-                            <div className="flex items-center gap-2">
-                                {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => { setConfToAddPlayer(conf); setIsAddPlayerDialogOpen(true); }} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
-                                <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)} disabled={isLoading}> <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change </Button>
-                                {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
-                                    <Button variant="secondary" size="sm" onClick={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
-                                )}
-                                <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId || isLoading}>
-                                    <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} /> Refresh Status
-                                </Button>
-                                <Button asChild variant="outline" size="sm" disabled={!conf.invoiceUrl}>
-                                    <a href={conf.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!conf.invoiceUrl && 'pointer-events-none')}> <ExternalLink className="mr-2 h-4 w-4" /> View Invoice </a>
-                                </Button>
-                            </div>
-                        </div>
-                        
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              {sponsorProfile?.role === 'organizer' && <TableHead className="w-10"><span className="sr-only">Select</span></TableHead>}
-                              <TableHead>Player</TableHead>
-                              <TableHead>Section</TableHead>
-                              <TableHead>USCF Status</TableHead>
-                              <TableHead>Byes Requested</TableHead>
-                              {sponsorProfile?.role === 'organizer' && <TableHead className='text-right'>Actions</TableHead>}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {Object.entries(conf.selections).map(([playerId, details]) => {
-                              const player = getPlayerById(playerId);
-                              if (!player) return null;
-                              
-                              const relevantRequests = changeRequests.filter(req => req.confirmationId === conf.id && req.player === `${player.firstName} ${player.lastName}`);
-                              const latestRequest = relevantRequests.length > 0 ? relevantRequests[0] : null;
-
-                              const isWithdrawn = details.status === 'withdrawn';
-                              
-                              return (
-                                <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) || selectedRestoreIds.includes(playerId) ? 'selected' : undefined} className={cn(isWithdrawn && 'bg-muted/50')}>
-                                  {sponsorProfile?.role === 'organizer' && (
-                                      <TableCell>
-                                          <Checkbox
-                                              checked={isWithdrawn ? selectedRestoreIds.includes(playerId) : selectedWithdrawalIds.includes(playerId)}
-                                              onCheckedChange={() => isWithdrawn ? handleRestorePlayerSelect(conf.id, playerId) : handleWithdrawPlayerSelect(conf.id, playerId)}
-                                              aria-label={`Select ${player.firstName} ${player.lastName}`}
-                                              disabled={isLoading || !conf.invoiceId}
-                                          />
-                                      </TableCell>
-                                  )}
-                                  <TableCell className={cn("font-medium flex items-center gap-2", isWithdrawn && "line-through text-muted-foreground")}>
-                                    {isWithdrawn ? <UserX className="h-4 w-4 text-destructive shrink-0" /> : <UserCheck className="h-4 w-4 text-green-600 shrink-0" />}
-                                    {player.firstName} {player.lastName}
-                                    {latestRequest && !isWithdrawn && (
-                                      <TooltipProvider>
-                                        <Tooltip>
-                                          <TooltipTrigger>
-                                            <Info className="h-4 w-4 text-blue-500" />
-                                          </TooltipTrigger>
-                                          <TooltipContent className="max-w-xs">
-                                              <p className="font-semibold">{latestRequest.type} - {latestRequest.status}</p>
-                                              {latestRequest.details && <p className="italic text-muted-foreground">"{latestRequest.details}"</p>}
-                                              <p className="text-xs text-muted-foreground mt-1 pt-1 border-t">
-                                                  Submitted: {format(new Date(latestRequest.submitted), 'MM/dd/yy, p')} by {latestRequest.submittedBy}
-                                              </p>
-                                              {latestRequest.status !== 'Pending' && latestRequest.approvedBy && latestRequest.approvedAt && (
-                                                  <p className="text-xs text-muted-foreground">
-                                                      Approved by {latestRequest.approvedBy} at {format(new Date(latestRequest.approvedAt), 'MM/dd/yy, p')}
-                                                  </p>
-                                              )}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </TooltipProvider>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>{details.section}</TableCell>
-                                  <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>
-                                    {isWithdrawn ? <Badge variant="destructive">Withdrawn</Badge> : <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge>}
-                                    {isWithdrawn && details.withdrawnAt && <span className="text-xs block text-muted-foreground">on {format(new Date(details.withdrawnAt), 'MM/dd, p')} by {details.withdrawnBy}</span>}
-                                  </TableCell>
-                                  <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>
-                                    {sponsorProfile?.role === 'organizer' && !isWithdrawn ? (
-                                        <div className="flex gap-2">
-                                            <Select
-                                                value={details.byes.round1}
-                                                onValueChange={(value) => handleByeChange(conf.id, playerId, 'round1', value)}
-                                                disabled={!eventDetails || isWithdrawn}
-                                            >
-                                                <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none">No Bye</SelectItem>
-                                                    {eventDetails && Array.from({ length: eventDetails.rounds }).map((_, i) => (
-                                                        <SelectItem key={i + 1} value={String(i + 1)}>Round {i + 1}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <Select
-                                                value={details.byes.round2}
-                                                onValueChange={(value) => handleByeChange(conf.id, playerId, 'round2', value)}
-                                                disabled={!eventDetails || details.byes.round1 === 'none' || isWithdrawn}
-                                            >
-                                                <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="none">No Bye</SelectItem>
-                                                    {eventDetails && Array.from({ length: eventDetails.rounds }).map((_, i) => (
-                                                       details.byes.round1 !== String(i + 1) && <SelectItem key={i + 1} value={String(i + 1)}>Round {i + 1}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    ) : (
-                                        [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None'
-                                    )}
-                                  </TableCell>
-                                  {sponsorProfile?.role === 'organizer' && (
-                                    <TableCell className='text-right'>
-                                      <Button variant="ghost" size="icon" onClick={() => handleOpenEditPlayerDialog(player)}>
-                                        <FilePenLine className="h-4 w-4" />
-                                        <span className='sr-only'>Edit Player</span>
-                                      </Button>
+                        return (
+                            <Fragment key={conf.id}>
+                                <TableRow onClick={() => setOpenCollapsibleRow(isExpanded ? null : conf.id)} className="cursor-pointer">
+                                    <TableCell>
+                                        <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
                                     </TableCell>
-                                  )}
+                                    <TableCell className="font-medium">
+                                        <p>{conf.eventName}</p>
+                                        <p className="text-sm text-muted-foreground">{Object.keys(conf.selections).length} Player(s)</p>
+                                    </TableCell>
+                                    <TableCell>{format(new Date(conf.submissionTimestamp), 'PPP p')}</TableCell>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            {conf.invoiceNumber && <span className="text-xs font-mono text-muted-foreground">{conf.invoiceNumber}</span>}
+                                            {currentStatus && (
+                                                <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus.status))}>
+                                                    {currentStatus.isLoading && currentStatus.status === 'LOADING' ? 'Loading...' : currentStatus.status?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right font-semibold">${conf.totalInvoiced.toFixed(2)}</TableCell>
                                 </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                         {sponsorProfile?.role === 'organizer' && (
-                              <div className="flex justify-end pt-2 gap-2">
-                                  {hasWithdrawnPlayers && (
-                                      <Button
-                                          variant="secondary"
-                                          size="sm"
-                                          onClick={() => {
-                                              setChangeAlertContent({
-                                                  title: `Restore ${selectedRestoreIds.length} Player(s)?`,
-                                                  description: `This action will recreate the invoice to add back the selected players and update the total amount due. The original invoice will be canceled. This cannot be undone.`
-                                              });
-                                              setChangeAction(() => () => handlePlayerStatusChangeAction(conf.id, selectedRestoreIds, 'active'));
-                                              setIsChangeAlertOpen(true);
-                                          }}
-                                          disabled={isLoading || selectedRestoreIds.length === 0}
-                                      >
-                                          <UserPlus className="mr-2 h-4 w-4" /> Restore Selected & Recreate Invoice ({selectedRestoreIds.length})
-                                      </Button>
-                                  )}
-                                  <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() => {
-                                          setChangeAlertContent({
-                                              title: `Withdraw ${selectedWithdrawalIds.length} Player(s)?`,
-                                              description: `This action will recreate the invoice to remove the selected players and update the total amount due. The original invoice will be canceled. This cannot be undone.`
-                                          });
-                                          setChangeAction(() => () => handlePlayerStatusChangeAction(conf.id, selectedWithdrawalIds, 'withdrawn'));
-                                          setIsChangeAlertOpen(true);
-                                      }}
-                                      disabled={isLoading || selectedWithdrawalIds.length === 0}
-                                  >
-                                      <UserMinus className="mr-2 h-4 w-4" /> Withdraw Selected & Recreate Invoice ({selectedWithdrawalIds.length})
-                                  </Button>
-                              </div>
-                          )}
-                      </div>
-                      
-                      {previousVersion && (
-                          <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-dashed opacity-75">
-                              <h4 className="font-semibold text-muted-foreground flex items-center gap-2">
-                                  <History className="h-4 w-4" />
-                                  Previous Version (Canceled Invoice #{previousVersion.invoiceNumber})
-                              </h4>
-                              <Table className="mt-2">
-                                  <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Section</TableHead><TableHead>USCF Status</TableHead></TableRow></TableHeader>
-                                  <TableBody>
-                                    {Object.entries(previousVersion.selections).map(([playerId, details]) => {
-                                        const player = getPlayerById(playerId);
-                                        return (
-                                            <TableRow key={playerId} className={details.status === 'withdrawn' ? 'text-muted-foreground line-through' : ''}>
-                                                <TableCell>{player ? `${player.firstName} ${player.lastName}` : 'Unknown Player'}</TableCell>
-                                                <TableCell>{details.section}</TableCell>
-                                                <TableCell>{details.uscfStatus}</TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                  </TableBody>
-                              </Table>
-                          </div>
-                      )}
-
-                      {currentStatus?.status === 'COMPED' ? (
-                        <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200"><Award className="h-4 w-4 text-sky-600" /><AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle><AlertDescription className="text-sky-700">This registration was completed at no charge. No payment is required.</AlertDescription></Alert> ) : (
-                        <div className="space-y-6 pt-6 mt-6 border-t">
-                          <h4 className="font-semibold">Payment Information</h4>
-                          <RadioGroup value={selectedMethod} onValueChange={(value) => handleInputChange(conf.id, 'paymentMethod', value as PaymentMethod)} className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={isLoading}>
-                              <div><RadioGroupItem value="po" id={`po-${conf.id}`} className="peer sr-only" /><Label htmlFor={`po-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Purchase Order</Label></div>
-                              <div><RadioGroupItem value="check" id={`check-${conf.id}`} className="peer sr-only" /><Label htmlFor={`check-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Pay with Check</Label></div>
-                              <div><RadioGroupItem value="cashapp" id={`cashapp-${conf.id}`} className="peer sr-only" /><Label htmlFor={`cashapp-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Cash App</Label></div>
-                              <div><RadioGroupItem value="zelle" id={`zelle-${conf.id}`} className="peer sr-only" /><Label htmlFor={`zelle-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Zelle</Label></div>
-                          </RadioGroup>
-                          {selectedMethod === 'po' && ( <div className="grid md:grid-cols-2 gap-4 items-start"><div className="space-y-2"><Label htmlFor={`po-number-${conf.id}`}>PO Number</Label><Input id={`po-number-${conf.id}`} placeholder="Enter PO Number" value={currentInputs.poNumber || ''} onChange={(e) => handleInputChange(conf.id, 'poNumber', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label htmlFor={`po-file-${conf.id}`}>Upload PO Document</Label><Input id={`po-file-${conf.id}`} type="file" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />{currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div> ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'po' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div> ) : null }</div></div> )}
-                          {selectedMethod === 'check' && ( <div className="grid md:grid-cols-3 gap-4 items-start"><div className="space-y-2"><Label htmlFor={`check-number-${conf.id}`}>Check Number</Label><Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label htmlFor={`check-amount-${conf.id}`}>Check Amount</Label><Input id={`check-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label>Check Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full justify-start text-left font-normal",!currentInputs.checkDate && "text-muted-foreground")} disabled={isLoading}><CalendarIcon className="mr-2 h-4 w-4" />{currentInputs.checkDate ? format(currentInputs.checkDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInputs.checkDate} onSelect={(date) => handleInputChange(conf.id, 'checkDate', date)} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 5} toYear={new Date().getFullYear() + 5} /></PopoverContent></Popover></div></div> )}
-                          {selectedMethod === 'cashapp' && ( <div className="p-4 rounded-md border bg-muted/50 space-y-4"><div className="flex flex-col sm:flex-row gap-4 items-center"><div><p className="font-semibold">Pay via Cash App</p><p className="text-sm text-muted-foreground">Scan the QR code and enter the total amount due. Upload a screenshot of the confirmation.</p><p className="font-bold text-lg mt-1">$DKChess</p></div><a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer"><Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" /></a></div><div className="grid md:grid-cols-2 gap-4 items-start"><div className="space-y-2"><Label htmlFor={`cashapp-amount-${conf.id}`}>Amount Paid</Label><Input id={`cashapp-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label htmlFor={`cashapp-file-${conf.id}`}>Upload Confirmation Screenshot</Label><Input id={`cashapp-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />{currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div> ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'cashapp' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div> ) : null }</div></div></div> )}
-                          {selectedMethod === 'zelle' && ( <div className="p-4 rounded-md border bg-muted/50 space-y-4"><div className="flex flex-col sm:flex-row gap-4 items-center"><div><p className="font-semibold">Pay via Zelle</p><p className="text-sm text-muted-foreground">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p><p className="font-bold text-lg mt-1">956-289-3418</p></div><a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer"><Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" /></a></div><div className="grid md:grid-cols-2 gap-4 items-start"><div className="space-y-2"><Label htmlFor={`zelle-amount-${conf.id}`}>Amount Paid</Label><Input id={`zelle-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label htmlFor={`zelle-file-${conf.id}`}>Upload Confirmation Screenshot</Label><Input id={`zelle-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />{currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div> ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'zelle' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div> ) : null }</div></div></div> )}
-                          <Button onClick={() => handleSavePayment(conf)} disabled={isLoading}>
-                              {isLoading ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<UploadCloud className="mr-2 h-4 w-4" />)}
-                              {isLoading ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Payment & Update Invoice'}
-                          </Button>
-                        </div>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
-                )})}
-              </Accordion>
+                                {isExpanded && (
+                                    <TableRow>
+                                        <TableCell colSpan={5}>
+                                            <ConfirmationDetails
+                                                conf={conf}
+                                                confInputs={confInputs}
+                                                statuses={statuses}
+                                                isUpdating={isUpdating}
+                                                isAuthReady={isAuthReady}
+                                                selectedPlayersForWithdraw={selectedPlayersForWithdraw}
+                                                selectedPlayersForRestore={selectedPlayersForRestore}
+                                                events={events}
+                                                changeRequests={changeRequests}
+                                                confirmationsMap={confirmationsMap}
+                                                sponsorProfile={sponsorProfile}
+                                                handlers={{
+                                                    handleInputChange,
+                                                    handleFileChange,
+                                                    handleSavePayment,
+                                                    setConfToComp,
+                                                    setIsCompAlertOpen,
+                                                    fetchInvoiceStatus,
+                                                    setConfToAddPlayer,
+                                                    setIsAddPlayerDialogOpen,
+                                                    handleOpenRequestDialog,
+                                                    handleWithdrawPlayerSelect,
+                                                    handleRestorePlayerSelect,
+                                                    setChangeAlertContent,
+                                                    setChangeAction,
+                                                    setIsChangeAlertOpen,
+                                                    handlePlayerStatusChangeAction,
+                                                    handleByeChange,
+                                                    handleOpenEditPlayerDialog,
+                                                    getPlayerById,
+                                                    getStatusBadgeVariant,
+                                                }}
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </Fragment>
+                        )
+                    })}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
@@ -1265,3 +1102,235 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
+
+
+// Sub-component for details to keep main component cleaner
+function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore, events, changeRequests, confirmationsMap, sponsorProfile, handlers }: any) {
+    const { getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleOpenEditPlayerDialog, getStatusBadgeVariant } = handlers;
+
+    const currentInputs = confInputs[conf.id] || {};
+    const selectedMethod = currentInputs.paymentMethod || 'po';
+    const currentStatus = statuses[conf.id];
+    const isLoading = isUpdating[conf.id] || !isAuthReady;
+    const selectedWithdrawalIds = selectedPlayersForWithdraw[conf.id] || [];
+    const selectedRestoreIds = selectedPlayersForRestore[conf.id] || [];
+    const eventDetails = events.find((e: Event) => e.id === conf.eventId);
+    const hasWithdrawnPlayers = Object.values(conf.selections).some((p: any) => p.status === 'withdrawn');
+    const previousVersion = conf.previousVersionId ? confirmationsMap.get(conf.previousVersionId) : null;
+
+    return (
+        <div className="p-4 bg-muted/50">
+             <div className="space-y-4">
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                    <h4 className="font-semibold">Registered Players</h4>
+                    <div className="flex items-center gap-2">
+                        {sponsorProfile?.role === 'sponsor' && <Button variant="secondary" size="sm" onClick={() => { setConfToAddPlayer(conf); setIsAddPlayerDialogOpen(true); }} disabled={isLoading}> <UserPlus className="mr-2 h-4 w-4" /> Add Player </Button>}
+                        <Button variant="secondary" size="sm" onClick={() => handleOpenRequestDialog(conf)} disabled={isLoading}> <MessageSquarePlus className="mr-2 h-4 w-4" /> Request Change </Button>
+                        {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
+                            <Button variant="secondary" size="sm" onClick={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId || isLoading}>
+                            <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} /> Refresh Status
+                        </Button>
+                        <Button asChild variant="outline" size="sm" disabled={!conf.invoiceUrl}>
+                            <a href={conf.invoiceUrl || '#'} target="_blank" rel="noopener noreferrer" className={cn(!conf.invoiceUrl && 'pointer-events-none')}> <ExternalLink className="mr-2 h-4 w-4" /> View Invoice </a>
+                        </Button>
+                    </div>
+                </div>
+                
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        {sponsorProfile?.role === 'organizer' && <TableHead className="w-10"><span className="sr-only">Select</span></TableHead>}
+                        <TableHead>Player</TableHead>
+                        <TableHead>Section</TableHead>
+                        <TableHead>USCF Status</TableHead>
+                        <TableHead>Byes Requested</TableHead>
+                        {sponsorProfile?.role === 'organizer' && <TableHead className='text-right'>Actions</TableHead>}
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {Object.entries(conf.selections).map(([playerId, details]: [string, any]) => {
+                        const player = getPlayerById(playerId);
+                        if (!player) return null;
+                        
+                        const relevantRequests = changeRequests.filter((req: ChangeRequest) => req.confirmationId === conf.id && req.player === `${player.firstName} ${player.lastName}`);
+                        const latestRequest = relevantRequests.length > 0 ? relevantRequests[0] : null;
+
+                        const isWithdrawn = details.status === 'withdrawn';
+                        
+                        return (
+                        <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) || selectedRestoreIds.includes(playerId) ? 'selected' : undefined} className={cn(isWithdrawn && 'bg-muted/50')}>
+                            {sponsorProfile?.role === 'organizer' && (
+                                <TableCell>
+                                    <Checkbox
+                                        checked={isWithdrawn ? selectedRestoreIds.includes(playerId) : selectedWithdrawalIds.includes(playerId)}
+                                        onCheckedChange={() => isWithdrawn ? handleRestorePlayerSelect(conf.id, playerId) : handleWithdrawPlayerSelect(conf.id, playerId)}
+                                        aria-label={`Select ${player.firstName} ${player.lastName}`}
+                                        disabled={isLoading || !conf.invoiceId}
+                                    />
+                                </TableCell>
+                            )}
+                            <TableCell className={cn("font-medium flex items-center gap-2", isWithdrawn && "line-through text-muted-foreground")}>
+                            {isWithdrawn ? <UserX className="h-4 w-4 text-destructive shrink-0" /> : <UserCheck className="h-4 w-4 text-green-600 shrink-0" />}
+                            {player.firstName} {player.lastName}
+                            {latestRequest && !isWithdrawn && (
+                                <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger>
+                                    <Info className="h-4 w-4 text-blue-500" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                        <p className="font-semibold">{latestRequest.type} - {latestRequest.status}</p>
+                                        {latestRequest.details && <p className="italic text-muted-foreground">"{latestRequest.details}"</p>}
+                                        <p className="text-xs text-muted-foreground mt-1 pt-1 border-t">
+                                            Submitted: {format(new Date(latestRequest.submitted), 'MM/dd/yy, p')} by {latestRequest.submittedBy}
+                                        </p>
+                                        {latestRequest.status !== 'Pending' && latestRequest.approvedBy && latestRequest.approvedAt && (
+                                            <p className="text-xs text-muted-foreground">
+                                                Approved by {latestRequest.approvedBy} at {format(new Date(latestRequest.approvedAt), 'MM/dd/yy, p')}
+                                            </p>
+                                        )}
+                                    </TooltipContent>
+                                </Tooltip>
+                                </TooltipProvider>
+                            )}
+                            </TableCell>
+                            <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>{details.section}</TableCell>
+                            <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>
+                            {isWithdrawn ? <Badge variant="destructive">Withdrawn</Badge> : <Badge variant={details.uscfStatus === 'current' ? 'default' : 'secondary'} className={details.uscfStatus === 'current' ? 'bg-green-600' : ''}>{details.uscfStatus.charAt(0).toUpperCase() + details.uscfStatus.slice(1)}</Badge>}
+                            {isWithdrawn && details.withdrawnAt && <span className="text-xs block text-muted-foreground">on {format(new Date(details.withdrawnAt), 'MM/dd, p')} by {details.withdrawnBy}</span>}
+                            </TableCell>
+                            <TableCell className={cn(isWithdrawn && "text-muted-foreground")}>
+                            {sponsorProfile?.role === 'organizer' && !isWithdrawn ? (
+                                <div className="flex gap-2">
+                                    <Select
+                                        value={details.byes.round1}
+                                        onValueChange={(value) => handleByeChange(conf.id, playerId, 'round1', value)}
+                                        disabled={!eventDetails || isWithdrawn}
+                                    >
+                                        <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">No Bye</SelectItem>
+                                            {eventDetails && Array.from({ length: eventDetails.rounds }).map((_, i) => (
+                                                <SelectItem key={i + 1} value={String(i + 1)}>Round {i + 1}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Select
+                                        value={details.byes.round2}
+                                        onValueChange={(value) => handleByeChange(conf.id, playerId, 'round2', value)}
+                                        disabled={!eventDetails || details.byes.round1 === 'none' || isWithdrawn}
+                                    >
+                                        <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">No Bye</SelectItem>
+                                            {eventDetails && Array.from({ length: eventDetails.rounds }).map((_, i) => (
+                                                details.byes.round1 !== String(i + 1) && <SelectItem key={i + 1} value={String(i + 1)}>Round {i + 1}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            ) : (
+                                [details.byes.round1, details.byes.round2].filter(b => b !== 'none').map(b => `R${b}`).join(', ') || 'None'
+                            )}
+                            </TableCell>
+                            {sponsorProfile?.role === 'organizer' && (
+                            <TableCell className='text-right'>
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenEditPlayerDialog(player)}>
+                                <FilePenLine className="h-4 w-4" />
+                                <span className='sr-only'>Edit Player</span>
+                                </Button>
+                            </TableCell>
+                            )}
+                        </TableRow>
+                        );
+                    })}
+                    </TableBody>
+                </Table>
+                    {sponsorProfile?.role === 'organizer' && (
+                        <div className="flex justify-end pt-2 gap-2">
+                            {hasWithdrawnPlayers && (
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                        setChangeAlertContent({
+                                            title: `Restore ${selectedRestoreIds.length} Player(s)?`,
+                                            description: `This action will recreate the invoice to add back the selected players and update the total amount due. The original invoice will be canceled. This cannot be undone.`
+                                        });
+                                        setChangeAction(() => () => handlePlayerStatusChangeAction(conf.id, selectedRestoreIds, 'active'));
+                                        setIsChangeAlertOpen(true);
+                                    }}
+                                    disabled={isLoading || selectedRestoreIds.length === 0}
+                                >
+                                    <UserPlus className="mr-2 h-4 w-4" /> Restore Selected & Recreate Invoice ({selectedRestoreIds.length})
+                                </Button>
+                            )}
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                    setChangeAlertContent({
+                                        title: `Withdraw ${selectedWithdrawalIds.length} Player(s)?`,
+                                        description: `This action will recreate the invoice to remove the selected players and update the total amount due. The original invoice will be canceled. This cannot be undone.`
+                                    });
+                                    setChangeAction(() => () => handlePlayerStatusChangeAction(conf.id, selectedWithdrawalIds, 'withdrawn'));
+                                    setIsChangeAlertOpen(true);
+                                }}
+                                disabled={isLoading || selectedWithdrawalIds.length === 0}
+                            >
+                                <UserMinus className="mr-2 h-4 w-4" /> Withdraw Selected & Recreate Invoice ({selectedWithdrawalIds.length})
+                            </Button>
+                        </div>
+                    )}
+            </div>
+            
+            {previousVersion && (
+                <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-dashed opacity-75">
+                    <h4 className="font-semibold text-muted-foreground flex items-center gap-2">
+                        <History className="h-4 w-4" />
+                        Previous Version (Canceled Invoice #{previousVersion.invoiceNumber})
+                    </h4>
+                    <Table className="mt-2">
+                        <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Section</TableHead><TableHead>USCF Status</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                        {Object.entries(previousVersion.selections).map(([playerId, details]: [string, any]) => {
+                            const player = getPlayerById(playerId);
+                            return (
+                                <TableRow key={playerId} className={details.status === 'withdrawn' ? 'text-muted-foreground line-through' : ''}>
+                                    <TableCell>{player ? `${player.firstName} ${player.lastName}` : 'Unknown Player'}</TableCell>
+                                    <TableCell>{details.section}</TableCell>
+                                    <TableCell>{details.uscfStatus}</TableCell>
+                                </TableRow>
+                            );
+                        })}
+                        </TableBody>
+                    </Table>
+                </div>
+            )}
+
+            {currentStatus?.status === 'COMPED' ? (
+            <Alert variant="default" className="mt-6 bg-sky-50 border-sky-200"><Award className="h-4 w-4 text-sky-600" /><AlertTitle className="text-sky-800">Complimentary Registration</AlertTitle><AlertDescription className="text-sky-700">This registration was completed at no charge. No payment is required.</AlertDescription></Alert> ) : (
+            <div className="space-y-6 pt-6 mt-6 border-t">
+                <h4 className="font-semibold">Payment Information</h4>
+                <RadioGroup value={selectedMethod} onValueChange={(value) => handleInputChange(conf.id, 'paymentMethod', value as PaymentMethod)} className="grid grid-cols-2 md:grid-cols-4 gap-4" disabled={isLoading}>
+                    <div><RadioGroupItem value="po" id={`po-${conf.id}`} className="peer sr-only" /><Label htmlFor={`po-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Purchase Order</Label></div>
+                    <div><RadioGroupItem value="check" id={`check-${conf.id}`} className="peer sr-only" /><Label htmlFor={`check-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Pay with Check</Label></div>
+                    <div><RadioGroupItem value="cashapp" id={`cashapp-${conf.id}`} className="peer sr-only" /><Label htmlFor={`cashapp-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Cash App</Label></div>
+                    <div><RadioGroupItem value="zelle" id={`zelle-${conf.id}`} className="peer sr-only" /><Label htmlFor={`zelle-${conf.id}`} className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary">Zelle</Label></div>
+                </RadioGroup>
+                {selectedMethod === 'po' && ( <div className="grid md:grid-cols-2 gap-4 items-start"><div className="space-y-2"><Label htmlFor={`po-number-${conf.id}`}>PO Number</Label><Input id={`po-number-${conf.id}`} placeholder="Enter PO Number" value={currentInputs.poNumber || ''} onChange={(e) => handleInputChange(conf.id, 'poNumber', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label htmlFor={`po-file-${conf.id}`}>Upload PO Document</Label><Input id={`po-file-${conf.id}`} type="file" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />{currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div> ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'po' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div> ) : null }</div></div> )}
+                {selectedMethod === 'check' && ( <div className="grid md:grid-cols-3 gap-4 items-start"><div className="space-y-2"><Label htmlFor={`check-number-${conf.id}`}>Check Number</Label><Input id={`check-number-${conf.id}`} placeholder="Enter Check Number" value={currentInputs.checkNumber || ''} onChange={(e) => handleInputChange(conf.id, 'checkNumber', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label htmlFor={`check-amount-${conf.id}`}>Check Amount</Label><Input id={`check-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label>Check Date</Label><Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-full justify-start text-left font-normal",!currentInputs.checkDate && "text-muted-foreground")} disabled={isLoading}><CalendarIcon className="mr-2 h-4 w-4" />{currentInputs.checkDate ? format(currentInputs.checkDate, "PPP") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInputs.checkDate} onSelect={(date) => handleInputChange(conf.id, 'checkDate', date)} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 5} toYear={new Date().getFullYear() + 5} /></PopoverContent></Popover></div></div> )}
+                {selectedMethod === 'cashapp' && ( <div className="p-4 rounded-md border bg-muted/50 space-y-4"><div className="flex flex-col sm:flex-row gap-4 items-center"><div><p className="font-semibold">Pay via Cash App</p><p className="text-sm text-muted-foreground">Scan the QR code and enter the total amount due. Upload a screenshot of the confirmation.</p><p className="font-bold text-lg mt-1">$DKChess</p></div><a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer"><Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" /></a></div><div className="grid md:grid-cols-2 gap-4 items-start"><div className="space-y-2"><Label htmlFor={`cashapp-amount-${conf.id}`}>Amount Paid</Label><Input id={`cashapp-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label htmlFor={`cashapp-file-${conf.id}`}>Upload Confirmation Screenshot</Label><Input id={`cashapp-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />{currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div> ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'cashapp' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div> ) : null }</div></div></div> )}
+                {selectedMethod === 'zelle' && ( <div className="p-4 rounded-md border bg-muted/50 space-y-4"><div className="flex flex-col sm:flex-row gap-4 items-center"><div><p className="font-semibold">Pay via Zelle</p><p className="text-sm text-muted-foreground">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p><p className="font-bold text-lg mt-1">956-289-3418</p></div><a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer"><Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" /></a></div><div className="grid md:grid-cols-2 gap-4 items-start"><div className="space-y-2"><Label htmlFor={`zelle-amount-${conf.id}`}>Amount Paid</Label><Input id={`zelle-amount-${conf.id}`} type="number" placeholder={conf.totalInvoiced.toFixed(2)} value={currentInputs.amountPaid || ''} onChange={(e) => handleInputChange(conf.id, 'amountPaid', e.target.value)} disabled={isLoading} /></div><div className="space-y-2"><Label htmlFor={`zelle-file-${conf.id}`}>Upload Confirmation Screenshot</Label><Input id={`zelle-file-${conf.id}`} type="file" accept="image/*" onChange={(e) => handleFileChange(conf.id, e)} disabled={isLoading} />{currentInputs.file ? ( <div className="text-sm text-muted-foreground flex items-center gap-2 pt-1"> <FileIcon className="h-4 w-4" /> <span>Selected: {currentInputs.file.name}</span></div> ) : currentInputs.paymentFileUrl && currentInputs.paymentMethod === 'zelle' ? ( <div className="pt-1"> <Button asChild variant="link" className="p-0 h-auto"> <a href={currentInputs.paymentFileUrl} target="_blank" rel="noopener noreferrer"> <Download className="mr-2 h-4 w-4" /> View {currentInputs.paymentFileName}</a></Button></div> ) : null }</div></div></div> )}
+                <Button onClick={() => handleSavePayment(conf)} disabled={isLoading}>
+                    {isLoading ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<UploadCloud className="mr-2 h-4 w-4" />)}
+                    {isLoading ? 'Saving...' : !isAuthReady ? 'Authenticating...' : 'Save Payment & Update Invoice'}
+                </Button>
+            </div>
+            )}
+        </div>
+    );
+}
+

@@ -103,7 +103,6 @@ const SponsorSignUpForm = () => {
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
-    // Update the main profile object for the app to use
     const profileData = {
       ...values,
       role: 'sponsor' as const,
@@ -111,7 +110,7 @@ const SponsorSignUpForm = () => {
       avatarValue: 'KingIcon',
     };
     
-    // Save the detailed profile
+    // Save the detailed profile to the master list of profiles
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
     profiles[values.email] = profileData;
@@ -119,8 +118,7 @@ const SponsorSignUpForm = () => {
     
     // Set current session user
     localStorage.setItem('user_role', 'sponsor');
-    localStorage.setItem('sponsor_profile', JSON.stringify(profileData)); // Prime the current profile
-
+    
     router.push('/dashboard');
   }
 
@@ -321,7 +319,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
-    // Update the main profile object for the app to use
     const profileData = {
         firstName: values.firstName,
         lastName: values.lastName,
@@ -335,14 +332,13 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         avatarValue: 'PawnIcon',
     };
     
-    // Save the detailed profile
+    // Save the detailed profile to the master list
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
     profiles[values.email] = profileData;
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
     localStorage.setItem('user_role', role);
-    localStorage.setItem('sponsor_profile', JSON.stringify(profileData)); // Prime the current profile
 
     let path = '/dashboard';
     if (role === 'individual') {
