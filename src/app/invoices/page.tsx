@@ -129,7 +129,7 @@ export default function InvoicesPage() {
         district: inv.district,
         purchaserName: inv.purchaserName || inv.sponsorName,
         invoiceStatus: inv.invoiceStatus || inv.status,
-        type: inv.lineItems ? 'organizer' : inv.membershipType ? 'membership' : 'event',
+        type: inv.type || (inv.lineItems ? 'organizer' : inv.membershipType ? 'membership' : 'event'),
         lineItems: inv.lineItems,
         sponsorEmail: inv.sponsorEmail || inv.purchaserEmail,
     })).filter(inv => inv.invoiceId);
