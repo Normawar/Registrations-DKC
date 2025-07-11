@@ -110,7 +110,7 @@ type StoredConfirmation = {
   invoiceId?: string;
   submissionTimestamp: string;
   eventId?: string;
-  selections: Record<string, { section: string; uscfStatus: 'current' | 'new' | 'renewing' }>;
+  selections: Record<string, { section: string; uscfStatus: 'current' | 'new' | 'renewing', status?: 'active' | 'withdrawn' }>;
 };
 
 type RegistrationInfo = {
@@ -433,13 +433,11 @@ export default function ManageEventsPage() {
     // De-duplicate confirmations by invoice ID, keeping only the latest one
     const latestConfirmationsByInvoice = Object.values(
       allConfirmations.reduce((acc, conf) => {
-        if (conf.invoiceId) {
-          if (!acc[conf.invoiceId] || new Date(conf.submissionTimestamp) > new Date(acc[conf.invoiceId].submissionTimestamp)) {
-            acc[conf.invoiceId] = conf;
+        const key = conf.invoiceId || conf.id;
+        if (key) {
+          if (!acc[key] || new Date(conf.submissionTimestamp) > new Date(acc[key].submissionTimestamp)) {
+            acc[key] = conf;
           }
-        } else {
-          // For non-invoiced (e.g., comped) registrations, use their own ID
-          acc[conf.id] = conf;
         }
         return acc;
       }, {} as Record<string, StoredConfirmation>)
@@ -452,11 +450,17 @@ export default function ManageEventsPage() {
     for (const conf of latestConfirmationsByInvoice) {
       if (conf.eventId === event.id) {
         for (const playerId in conf.selections) {
-          const player = playerMap.get(playerId);
-          if (player) {
-            // This ensures each player ID appears only once, with their latest registration details.
-            uniquePlayerRegistrations.set(playerId, { player, details: conf.selections[playerId] });
-          }
+            const registrationDetails = conf.selections[playerId];
+            if (registrationDetails.status === 'withdrawn') {
+                uniquePlayerRegistrations.delete(playerId);
+                continue;
+            }
+
+            const player = playerMap.get(playerId);
+            if (player) {
+                // This ensures each player ID appears only once, with their latest registration details.
+                uniquePlayerRegistrations.set(playerId, { player, details: registrationDetails });
+            }
         }
       }
     }
