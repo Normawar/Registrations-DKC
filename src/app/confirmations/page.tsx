@@ -400,44 +400,54 @@ export default function ConfirmationsPage() {
     }
   };
 
-  const handleWithdrawPlayerAction = async (confId: string, playerIds: string[]) => {
+  const handleWithdrawPlayerAction = async (confId: string, playerIdsToWithdraw: string[]) => {
+    setIsUpdating(prev => ({ ...prev, [confId]: true }));
+    setIsChangeAlertOpen(false);
+
+    const confToUpdate = confirmations.find(c => c.id === confId);
+    if (!confToUpdate) {
+        toast({ variant: "destructive", title: "Error", description: "Could not find the confirmation to update." });
+        setIsUpdating(prev => ({ ...prev, [confId]: false }));
+        return;
+    }
+    
     if (!sponsorProfile || sponsorProfile.role !== 'organizer') {
-        toast({ variant: "destructive", title: "Permission Denied", description: "You are not authorized to perform this action." });
+        toast({ variant: "destructive", title: "Authorization Failed", description: "You are not authorized to perform this action." });
+        setIsUpdating(prev => ({ ...prev, [confId]: false }));
+        return;
+    }
+    
+    const eventDetails = events.find(e => e.id === confToUpdate.eventId);
+    if (!eventDetails || !confToUpdate.invoiceId) {
+        toast({ variant: "destructive", title: "Error", description: "Could not find necessary event or invoice details." });
+        setIsUpdating(prev => ({ ...prev, [confId]: false }));
         return;
     }
 
-    setIsUpdating(prev => ({ ...prev, [confId]: true }));
-    setIsChangeAlertOpen(false);
-    
     try {
-        const confToUpdate = confirmations.find(c => c.id === confId);
-        const eventDetails = events.find(e => e.id === confToUpdate?.eventId);
-        if (!confToUpdate || !eventDetails || !confToUpdate.invoiceId) {
-            throw new Error("Could not find necessary information to update the invoice.");
-        }
-    
         const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
         const approvalTimestamp = new Date().toISOString();
 
-        // Create a new selections object with updated player statuses
         const updatedSelections = { ...confToUpdate.selections };
-        playerIds.forEach(id => {
+        playerIdsToWithdraw.forEach(id => {
             if (updatedSelections[id]) {
                 updatedSelections[id] = { ...updatedSelections[id], status: 'withdrawn', withdrawnBy: initials, withdrawnAt: approvalTimestamp };
             }
         });
 
-        // Get a list of players who are still active
-        const activePlayers = Object.entries(updatedSelections)
-            .filter(([_, details]) => details.status !== 'withdrawn')
-            .map(([playerId]) => getPlayerById(playerId)!);
+        const activePlayerIds = Object.keys(updatedSelections).filter(id => updatedSelections[id].status !== 'withdrawn');
+        const activePlayers = activePlayerIds.map(id => getPlayerById(id)).filter((p): p is MasterPlayer => !!p);
 
-        // Calculate fees for active players
         let registrationFeePerPlayer = eventDetails.regularFee;
         const eventDate = new Date(eventDetails.date);
         const now = new Date();
-        if (isSameDay(eventDate, now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
-        else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
+        if (isSameDay(eventDate, now)) {
+            registrationFeePerPlayer = eventDetails.dayOfFee;
+        } else {
+            const hoursUntilEvent = differenceInHours(eventDate, now);
+            if (hoursUntilEvent <= 24) registrationFeePerPlayer = eventDetails.veryLateFee;
+            else if (hoursUntilEvent <= 48) registrationFeePerPlayer = eventDetails.lateFee;
+        }
 
         const newInvoicePlayers = activePlayers.map(player => {
             const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < eventDate;
@@ -452,11 +462,10 @@ export default function ConfirmationsPage() {
             };
         });
 
-        // Call the correct recreate flow
         const result = await recreateInvoiceFromRoster({
-            originalInvoiceId: confToUpdate.invoiceId!,
+            originalInvoiceId: confToUpdate.invoiceId,
             players: newInvoicePlayers,
-            uscfFee: 24, // Assuming a standard fee
+            uscfFee: 24,
             sponsorName: confToUpdate.sponsorName,
             sponsorEmail: confToUpdate.sponsorEmail,
             schoolName: confToUpdate.schoolName,
@@ -465,33 +474,25 @@ export default function ConfirmationsPage() {
             eventDate: confToUpdate.eventDate,
         });
 
-        // Create the updated confirmation object.
-        // We will replace the old one in localStorage with this one.
-        const updatedConfirmationData = {
+        const updatedConfirmationData: Confirmation = {
             ...confToUpdate,
-            id: result.newInvoiceId, // The ID of the confirmation now becomes the new invoice ID
+            id: result.newInvoiceId,
             invoiceId: result.newInvoiceId,
             invoiceNumber: result.newInvoiceNumber,
             invoiceUrl: result.newInvoiceUrl,
             invoiceStatus: result.newStatus,
             totalInvoiced: result.newTotalAmount,
-            selections: updatedSelections, // This contains both active and withdrawn players
+            selections: updatedSelections,
         };
 
-        // Update local storage by replacing the old confirmation object with the new one
-        const finalConfirmations = confirmations.map(c => {
-            if (c.id === confToUpdate.id) {
-                return updatedConfirmationData;
-            }
-            return c;
-        });
+        const finalConfirmations = confirmations.map(c => c.id === confToUpdate.id ? updatedConfirmationData : c);
         localStorage.setItem('confirmations', JSON.stringify(finalConfirmations));
 
-        // Update the associated change requests
-        const withdrawnPlayerNames = playerIds.map(id => {
+        const withdrawnPlayerNames = playerIdsToWithdraw.map(id => {
             const p = getPlayerById(id);
             return p ? `${p.firstName} ${p.lastName}` : 'Unknown Player';
         });
+
         const updatedRequests = changeRequests.map(req => {
             if (req.confirmationId === confId && withdrawnPlayerNames.includes(req.player) && req.type.includes('Withdraw')) {
                 return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
@@ -500,7 +501,7 @@ export default function ConfirmationsPage() {
         });
         localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
 
-        loadAllData(); // Reload all data to ensure UI consistency
+        loadAllData();
         window.dispatchEvent(new Event('storage'));
 
         toast({
@@ -511,10 +512,10 @@ export default function ConfirmationsPage() {
         console.error("Failed to withdraw player(s) and recreate invoice:", error);
         const description = error instanceof Error ? error.message : "An unknown error occurred during withdrawal.";
         toast({ variant: "destructive", title: "Withdrawal Failed", description });
-        loadAllData(); // Reload to revert optimistic UI changes on failure
+        loadAllData(); // Reload data on failure to reset state
     } finally {
         setIsUpdating(prev => ({ ...prev, [confId]: false }));
-        setSelectedPlayersForWithdraw(prev => ({...prev, [confId]: [] }));
+        setSelectedPlayersForWithdraw(prev => ({ ...prev, [confId]: [] }));
     }
   };
   
@@ -808,7 +809,7 @@ export default function ConfirmationsPage() {
                                 <span className="font-semibold">{conf.eventName}</span>
                                 <span className="text-sm font-normal text-muted-foreground">({Object.keys(conf.selections).length} Player(s))</span>
                             </div>
-                          <span className="text-sm text-muted-foreground"> Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')} </span>
+                          <span className="text-sm text-muted-foreground"> Submitted on: {format(new Date(conf.submissionTimestamp), 'PPP p')} </span> 
                         </div>
                         <div className="flex items-center gap-4">
                             {currentStatus && ( <Badge variant="default" className={cn('capitalize w-28 justify-center', getStatusBadgeVariant(currentStatus.status))}>
@@ -961,7 +962,6 @@ export default function ConfirmationsPage() {
                                               description: `This action will recreate the invoice to remove the selected players and update the total amount due. The original invoice will be canceled. This cannot be undone.`
                                           });
                                           setChangeAction(() => () => handleWithdrawPlayerAction(conf.id, selectedWithdrawalIds));
-                                          setIsChangeAlertOpen(true);
                                       }}
                                       disabled={isLoading || selectedWithdrawalIds.length === 0}
                                   >
@@ -1127,3 +1127,5 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
+
+    
