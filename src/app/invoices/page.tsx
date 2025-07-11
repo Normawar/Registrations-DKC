@@ -72,6 +72,8 @@ type CombinedInvoice = {
   type: 'event' | 'membership' | 'organizer';
   lineItems?: { name: string; amount: number; note?: string }[];
   sponsorEmail?: string;
+  eventId?: string; // For event invoices
+  selections?: any; // For event invoices
 };
 
 
@@ -130,9 +132,11 @@ export default function InvoicesPage() {
         district: inv.district,
         purchaserName: inv.purchaserName || inv.sponsorName,
         invoiceStatus: inv.invoiceStatus || inv.status,
-        type: inv.type || (inv.lineItems ? 'organizer' : inv.membershipType ? 'membership' : 'event'),
+        type: inv.eventId ? 'event' : inv.lineItems ? 'organizer' : inv.membershipType ? 'membership' : 'organizer',
         lineItems: inv.lineItems,
         sponsorEmail: inv.sponsorEmail || inv.purchaserEmail,
+        eventId: inv.eventId,
+        selections: inv.selections,
     })).filter(inv => inv.invoiceId);
 
     const uniqueInvoicesMap = new Map<string, CombinedInvoice>();
@@ -452,14 +456,16 @@ export default function InvoicesPage() {
                                                         <ExternalLink className="mr-2 h-4 w-4" /> View Invoice
                                                     </a>
                                                   </DropdownMenuItem>
-                                                  {profile.role === 'organizer' && isCancelable && (
+                                                  {profile.role === 'organizer' && (
                                                     <>
                                                         <DropdownMenuItem onClick={() => handleEditInvoice(inv)}>
                                                             <FilePenLine className="mr-2 h-4 w-4" /> Edit
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
-                                                            <Trash2 className="mr-2 h-4 w-4" /> Cancel
-                                                        </DropdownMenuItem>
+                                                        {isCancelable && (
+                                                            <DropdownMenuItem onClick={() => handleCancelInvoice(inv)} className="text-destructive">
+                                                                <Trash2 className="mr-2 h-4 w-4" /> Cancel
+                                                            </DropdownMenuItem>
+                                                        )}
                                                     </>
                                                   )}
                                                 </DropdownMenuContent>

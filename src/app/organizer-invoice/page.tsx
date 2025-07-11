@@ -6,6 +6,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { differenceInHours, isSameDay } from 'date-fns';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,8 @@ import { createOrganizerInvoice } from '@/ai/flows/create-organizer-invoice-flow
 import { recreateOrganizerInvoice } from '@/ai/flows/recreate-organizer-invoice-flow';
 import { Loader2, PlusCircle, Trash2, ExternalLink, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { useEvents, type Event } from '@/hooks/use-events';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 
 const lineItemSchema = z.object({
   name: z.string().min(1, 'Item name is required.'),
@@ -42,6 +45,9 @@ export default function OrganizerInvoicePage() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { events } = useEvents();
+  const { database: allPlayers } = useMasterDb();
+  
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [originalInvoiceId, setOriginalInvoiceId] = useState<string | null>(null);
@@ -70,21 +76,54 @@ export default function OrganizerInvoicePage() {
       const allInvoicesRaw = localStorage.getItem('all_invoices');
       if (allInvoicesRaw) {
         const allInvoices = JSON.parse(allInvoicesRaw);
-        const invoiceToEdit = allInvoices.find((inv: any) => inv.invoiceId === editId && inv.lineItems);
+        const invoiceToEdit = allInvoices.find((inv: any) => inv.invoiceId === editId);
+        
         if (invoiceToEdit) {
           setIsEditing(true);
+          let lineItems: z.infer<typeof lineItemSchema>[] = [];
+          
+          if (invoiceToEdit.lineItems) {
+            // It's a custom organizer invoice
+            lineItems = invoiceToEdit.lineItems;
+          } else if (invoiceToEdit.type === 'event' && invoiceToEdit.eventId) {
+            // It's an event registration, so we need to generate line items
+            const eventDetails = events.find(e => e.id === invoiceToEdit.eventId);
+            if (eventDetails) {
+              let registrationFeePerPlayer = eventDetails.regularFee;
+              const eventDate = new Date(eventDetails.date);
+              const now = new Date();
+              if (isSameDay(eventDate, now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
+              else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
+              
+              const uscfFee = 24;
+              
+              Object.entries(invoiceToEdit.selections as Record<string, any>).forEach(([playerId, details]) => {
+                const player = allPlayers.find(p => p.id === playerId);
+                const playerName = player ? `${player.firstName} ${player.lastName}` : `Player ${playerId}`;
+                
+                // Add registration fee
+                lineItems.push({ name: `Registration for ${playerName}`, amount: registrationFeePerPlayer, note: `Event: ${eventDetails.name}, Section: ${details.section}` });
+                
+                // Add USCF fee if applicable
+                if (details.uscfStatus === 'new' || details.uscfStatus === 'renewing') {
+                  lineItems.push({ name: `USCF Membership for ${playerName}`, amount: uscfFee, note: `Status: ${details.uscfStatus}` });
+                }
+              });
+            }
+          }
+          
           form.reset({
             invoiceId: invoiceToEdit.invoiceId,
             schoolName: invoiceToEdit.schoolName,
             sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName,
             sponsorEmail: invoiceToEdit.sponsorEmail || '',
-            invoiceTitle: invoiceToEdit.description.split('-rev.')[0].trim(), // Remove revision part
-            lineItems: invoiceToEdit.lineItems,
+            invoiceTitle: (invoiceToEdit.description || invoiceToEdit.invoiceTitle).split('-rev.')[0].trim(),
+            lineItems: lineItems.length > 0 ? lineItems : [{ name: '', amount: 0, note: '' }],
           });
         }
       }
     }
-  }, [searchParams, form]);
+  }, [searchParams, form, events, allPlayers]);
 
 
   const uniqueSchools = useMemo(() => {
@@ -268,41 +307,43 @@ export default function OrganizerInvoicePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1fr,1fr,auto,auto] gap-4 items-start border p-4 rounded-lg">
-                    <FormField
-                      control={form.control}
-                      name={`lineItems.${index}.name`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Item Name</FormLabel>
-                          <FormControl><Input placeholder="e.g., Team T-Shirt" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`lineItems.${index}.amount`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Amount ($)</FormLabel>
-                          <FormControl><Input type="number" step="0.01" placeholder="25.00" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="col-span-full md:col-span-1">
-                        <FormField
-                            control={form.control}
-                            name={`lineItems.${index}.note`}
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Notes (Optional)</FormLabel>
-                                <FormControl><Textarea placeholder="Additional details..." {...field} /></FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1fr,auto] gap-4 items-start border p-4 rounded-lg">
+                    <div className='grid grid-cols-1 md:grid-cols-[1fr,1fr] gap-4'>
+                      <FormField
+                        control={form.control}
+                        name={`lineItems.${index}.name`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Item Name</FormLabel>
+                            <FormControl><Input placeholder="e.g., Team T-Shirt" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name={`lineItems.${index}.amount`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Amount ($)</FormLabel>
+                            <FormControl><Input type="number" step="0.01" placeholder="25.00" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="col-span-full">
+                          <FormField
+                              control={form.control}
+                              name={`lineItems.${index}.note`}
+                              render={({ field }) => (
+                                  <FormItem>
+                                  <FormLabel>Notes (Optional)</FormLabel>
+                                  <FormControl><Textarea placeholder="Additional details..." {...field} /></FormControl>
+                                  <FormMessage />
+                                  </FormItem>
+                              )}
+                          />
+                      </div>
                     </div>
                      <div className="flex items-end h-full">
                         <Button
@@ -335,3 +376,4 @@ export default function OrganizerInvoicePage() {
     </AppLayout>
   );
 }
+
