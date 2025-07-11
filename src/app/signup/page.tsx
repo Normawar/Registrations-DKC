@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState } from 'react';
@@ -61,8 +62,8 @@ const SponsorSignUpForm = () => {
     defaultValues: {
       firstName: "",
       lastName: "",
-      district: "",
-      school: "",
+      district: "None",
+      school: "Independent",
       email: "",
       phone: "",
       password: "",
@@ -163,7 +164,7 @@ const SponsorSignUpForm = () => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>District</FormLabel>
-                <Select onValueChange={handleDistrictChange} defaultValue={field.value}>
+                <Select onValueChange={handleDistrictChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a district" />
@@ -187,7 +188,7 @@ const SponsorSignUpForm = () => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>School</FormLabel>
-                 <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict || selectedDistrict === 'None'}>
+                 <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a school" />
@@ -325,8 +326,8 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         lastName: values.lastName,
         email: values.email,
         phone: '',
-        district: '',
-        school: '',
+        district: 'None',
+        school: 'Independent',
         gtCoordinatorEmail: '',
         role: role,
         avatarType: 'icon' as const,

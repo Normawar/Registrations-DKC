@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 'react';
@@ -258,7 +259,7 @@ export default function ProfilePage() {
         const sanitizedFileName = imageFile.name.replace(/\s+/g, '_');
         const storageRef = ref(storage, `avatars/${currentUser!.uid}/${sanitizedFileName}`);
         await uploadBytes(storageRef, imageFile);
-        const downloadUrl = await getDownloadURL(storageRef);
+        const downloadUrl = await getDownloadURL(snapshot.ref);
 
         updateProfile({ avatarType: 'upload', avatarValue: downloadUrl });
         setImageFile(null);
@@ -526,7 +527,7 @@ export default function ProfilePage() {
                                         render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>School</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict || selectedDistrict === 'None'}>
+                                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
                                             <FormControl>
                                                 <SelectTrigger>
                                                 <SelectValue placeholder="Select a school" />
