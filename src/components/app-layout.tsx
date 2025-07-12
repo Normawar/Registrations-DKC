@@ -30,7 +30,6 @@ import { Button } from "@/components/ui/button";
 import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
-import { requestsData } from "@/lib/data/requests-data";
 import { useState, useEffect, useMemo } from 'react';
 import type { ChangeRequest } from '@/lib/data/requests-data';
 
@@ -130,8 +129,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, [profile, changeRequests, confirmations]);
 
   const handleLogout = () => {
-    localStorage.removeItem('user_role');
-    localStorage.removeItem('sponsor_profile');
+    localStorage.removeItem('current_user_profile');
     router.push('/');
   };
 

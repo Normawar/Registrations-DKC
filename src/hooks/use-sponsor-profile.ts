@@ -17,12 +17,12 @@ export type SponsorProfile = {
 };
 
 const defaultSponsorData: SponsorProfile = {
-  firstName: 'Sponsor',
+  firstName: 'User',
   lastName: 'Name',
-  district: 'SHARYLAND ISD',
-  school: 'SHARYLAND PIONEER H S',
-  email: 'sponsor@chessmate.com',
-  phone: '(555) 555-5555',
+  district: '',
+  school: '',
+  email: '',
+  phone: '',
   gtCoordinatorEmail: '',
   avatarType: 'icon',
   avatarValue: 'KingIcon', 
@@ -36,27 +36,18 @@ export function useSponsorProfile() {
   const loadProfile = useCallback(() => {
     try {
         const storedProfileRaw = localStorage.getItem('current_user_profile');
-        let profileData: SponsorProfile | null = storedProfileRaw ? JSON.parse(storedProfileRaw) : null;
-
-        // The 'user_role' from the session is the source of truth for the current role.
-        const sessionRole = localStorage.getItem('user_role');
+        const profileData: SponsorProfile | null = storedProfileRaw ? JSON.parse(storedProfileRaw) : null;
 
         if (profileData) {
-            if (sessionRole && (sessionRole === 'sponsor' || sessionRole === 'organizer' || sessionRole === 'individual')) {
-                profileData.role = sessionRole as 'sponsor' | 'organizer' | 'individual';
-            }
             setProfile(profileData);
         } else {
-            // Fallback if nothing is stored
-            const role = (sessionRole as SponsorProfile['role']) || 'sponsor';
-            setProfile({ ...defaultSponsorData, role });
+            setProfile(null); // Explicitly set to null if no profile is found
         }
-        
-        setIsProfileLoaded(true);
         
     } catch (error) {
         console.error("Failed to load sponsor profile from localStorage", error);
-        setProfile(defaultSponsorData);
+        setProfile(null);
+    } finally {
         setIsProfileLoaded(true);
     }
   }, []);
@@ -64,44 +55,40 @@ export function useSponsorProfile() {
   useEffect(() => {
     loadProfile();
     
+    // This listener handles updates from other tabs and from the login page
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'current_user_profile' || event.key === 'user_role' || event.key === 'sponsor_profile') {
+        if (event.key === 'current_user_profile') {
             loadProfile();
         }
     };
     
-    // Custom event listener for same-tab updates
-    const handleProfileUpdate = () => {
-        loadProfile();
-    };
-
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('profileUpdate', handleProfileUpdate);
     
     return () => {
         window.removeEventListener('storage', handleStorageChange);
-        window.removeEventListener('profileUpdate', handleProfileUpdate);
     };
   }, [loadProfile]);
 
   const updateProfile = useCallback((newProfileData: Partial<SponsorProfile>) => {
+    // This function updates the profile in two places:
+    // 1. The current session profile (`current_user_profile`)
+    // 2. The master list of all profiles (`sponsor_profile`)
     setProfile(prev => {
-        if (newProfileData.role) {
-            localStorage.setItem('user_role', newProfileData.role);
-        }
-        const updated = { ...(prev || defaultSponsorData), ...newProfileData };
+        const currentProfile = prev || defaultSponsorData;
+        const updated = { ...currentProfile, ...newProfileData };
+        
         try {
-            // This is the session profile
+            // Update the session profile
             localStorage.setItem('current_user_profile', JSON.stringify(updated));
 
-            // Also update the master list of profiles
+            // Also update the master list of profiles, keyed by email
             const allProfilesRaw = localStorage.getItem('sponsor_profile');
             const allProfiles = allProfilesRaw ? JSON.parse(allProfilesRaw) : {};
-            allProfiles[updated.email] = updated;
+            allProfiles[updated.email.toLowerCase()] = updated;
             localStorage.setItem('sponsor_profile', JSON.stringify(allProfiles));
             
-            // Defer dispatch to avoid illegal cross-component updates during render.
-            setTimeout(() => window.dispatchEvent(new Event('profileUpdate')), 0);
+            // Dispatch custom event to notify other components in the same tab
+            window.dispatchEvent(new Event('storage'));
         } catch (error) {
             console.error("Failed to save sponsor profile to localStorage", error);
         }

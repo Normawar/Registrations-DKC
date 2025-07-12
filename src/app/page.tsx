@@ -42,22 +42,33 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
     }
     
     // Role matches, proceed with login
-    localStorage.setItem('user_role', role);
-
     // Load the user's detailed profile from the master list
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
     const userProfile = profiles[lowercasedEmail]; // Use lowercase email for lookup
 
     if (userProfile) {
+        // This is the key step: set the full profile for the current session.
         localStorage.setItem('current_user_profile', JSON.stringify(userProfile));
     } else {
-        // Fallback in case profile doesn't exist, create a minimal one.
-        // This case should ideally not be hit if signup is working correctly.
-        localStorage.setItem('current_user_profile', JSON.stringify({ email: lowercasedEmail, role: role, firstName: 'User', lastName: ''}));
+        // This case should not be hit if signup is working correctly.
+        // If it is, create a minimal profile to avoid crashing.
+        const minimalProfile: SponsorProfile = { 
+            email: lowercasedEmail, 
+            role: role, 
+            firstName: 'User', 
+            lastName: '', 
+            phone: '', 
+            district: '', 
+            school: '',
+            avatarType: 'icon',
+            avatarValue: 'PawnIcon'
+        };
+        localStorage.setItem('current_user_profile', JSON.stringify(minimalProfile));
     }
     
-    window.dispatchEvent(new Event('storage')); // Notify other tabs/components
+    // This event notifies other components (like the layout) that auth state has changed.
+    window.dispatchEvent(new Event('storage')); 
 
     let path = '/dashboard';
     if (role === 'individual') {
@@ -119,7 +130,6 @@ export default function LoginPage() {
   
   // This effect logs out the user by clearing session storage when they land on the login page.
   useEffect(() => {
-    localStorage.removeItem('user_role');
     localStorage.removeItem('current_user_profile');
     window.dispatchEvent(new Event('storage'));
   }, []);
