@@ -569,12 +569,13 @@ export default function ConfirmationsPage() {
           if (activePlayerIds.length === 0) {
               await cancelInvoice({ invoiceId: confToUpdate.invoiceId });
               
-              const updatedConfRecord = { ...confToUpdate, selections: updatedSelections, invoiceStatus: 'CANCELED' };
               const allConfsRaw = JSON.parse(localStorage.getItem('confirmations') || '[]');
+              const updatedConfRecord = { ...confToUpdate, selections: updatedSelections, invoiceStatus: 'CANCELED' };
               const updatedConfs = allConfsRaw.map((c: any) => c.id === confId ? updatedConfRecord : c);
               localStorage.setItem('confirmations', JSON.stringify(updatedConfs));
               loadAllData();
               toast({ title: "All Players Withdrawn", description: `Invoice ${confToUpdate.invoiceNumber} has been canceled.` });
+              setIsUpdating(prev => ({ ...prev, [confId]: false }));
               return;
           }
   
@@ -682,7 +683,7 @@ export default function ConfirmationsPage() {
     setIsRequestDialogOpen(true);
   };
   
-  const handleByeChange = (confId: string, playerId: string, round: 'round1' | 'round2', value: string) => {
+  const handleByeChange = (confId: string, playerId: string, valueR1?: string, valueR2?: string) => {
     setIsUpdating(prev => ({ ...prev, [confId]: true }));
     const player = getPlayerById(playerId);
 
@@ -691,13 +692,10 @@ export default function ConfirmationsPage() {
         if (conf.id === confId) {
           const newSelections = { ...conf.selections };
           if (newSelections[playerId]) {
-            newSelections[playerId].byes = { ...newSelections[playerId].byes, [round]: value };
-            if (round === 'round2' && value !== 'none' && newSelections[playerId].byes.round1 === 'none') {
-                newSelections[playerId].byes.round1 = '1';
-            }
-            if (round === 'round1' && value === 'none') {
-                newSelections[playerId].byes.round2 = 'none';
-            }
+            newSelections[playerId].byes = { 
+                round1: valueR1 || newSelections[playerId].byes.round1, 
+                round2: valueR2 || newSelections[playerId].byes.round2 
+            };
           }
           return { ...conf, selections: newSelections };
         }
@@ -707,26 +705,10 @@ export default function ConfirmationsPage() {
       return newConfirmations;
     });
 
-    if (sponsorProfile?.role === 'organizer' && player) {
-      const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-      const approvalTimestamp = new Date().toISOString();
-
-      setChangeRequests(prevReqs => {
-        const updatedRequests = prevReqs.map(req => {
-          if (req.confirmationId === confId && req.player === `${player.firstName} ${player.lastName}` && req.type === 'Bye Request' && req.status === 'Pending') {
-            return { ...req, status: 'Approved' as const, approvedBy: initials, approvedAt: approvalTimestamp };
-          }
-          return req;
-        });
-        localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-        return updatedRequests;
-      });
-      window.dispatchEvent(new Event('storage'));
-    }
-
     toast({ title: "Bye Updated", description: `Bye request for ${player?.firstName} has been updated.` });
     setIsUpdating(prev => ({ ...prev, [confId]: false }));
   };
+  
 
   const handleSectionChange = (confId: string, playerId: string, newSection: string) => {
     setConfirmations(prevConf => {
@@ -760,8 +742,7 @@ export default function ConfirmationsPage() {
       toast({ variant: 'destructive', title: 'Error', description: 'Could not find the selected player.'});
       return;
     }
-
-    // All requests from sponsors should create a pending request.
+    
     const newRequest: ChangeRequest = {
         id: `req-${Date.now()}`,
         confirmationId: confToRequestChange.id,
@@ -920,8 +901,10 @@ export default function ConfirmationsPage() {
     }
   };
 
-  function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore, events, changeRequests, confirmationsMap, sponsorProfile, handlers }: any) {
-      const { getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleSectionChange, handleOpenEditPlayerDialog, getStatusBadgeVariant, handlePlayerStatusChangeAction } = handlers;
+  const ConfirmationDetails = ({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore, events, changeRequests, confirmationsMap, sponsorProfile }: any) => {
+      const { handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleSectionChange, handleOpenEditPlayerDialog, getStatusBadgeVariant, handlePlayerStatusChangeAction } = {
+          getPlayerById, handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen, fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen, handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect, setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleSectionChange, handleOpenEditPlayerDialog, getStatusBadgeVariant, handlePlayerStatusChangeAction
+      };
       
       type SortablePlayerKey = 'lastName' | 'section';
       const [playerSortConfig, setPlayerSortConfig] = useState<{ key: SortablePlayerKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending'});
@@ -974,53 +957,50 @@ export default function ConfirmationsPage() {
           }
           return playerDetailsList;
   
-      }, [conf.selections, getPlayerById, playerSortConfig]);
+      }, [conf.selections, playerSortConfig]);
       
       const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
-          if (!sponsorProfile) return;
-          
-          let title = '';
-          let description = '';
-          let action = () => {};
-  
-          switch (request.type) {
-              case 'Section Change':
-                  title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
-                  description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
-                  action = () => handleSectionChange(conf.id, player.id, request.details);
-                  break;
-              case 'Bye Request':
-                  const byeR1 = request.byeRound1 || 'none';
-                  const byeR2 = request.byeRound2 || 'none';
-                  title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
-                  description = `This will set the player's bye requests to Round 1: ${byeR1 === 'none' ? 'None' : byeR1}, Round 2: ${byeR2 === 'none' ? 'None' : byeR2}.`;
-                  action = () => {
-                      handleByeChange(conf.id, player.id, 'round1', byeR1);
-                      handleByeChange(conf.id, player.id, 'round2', byeR2);
-                  };
-                  break;
-              default:
-                  title = 'Approve This Request?';
-                  description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
-                  action = () => { /* No specific action for 'Other' */ };
-          }
-  
-          setChangeAlertContent({ title, description });
-          setChangeAction(() => () => {
-              action();
-              const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-              const approvalTimestamp = new Date().toISOString();
-              const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
-              const updatedRequests = allRequests.map((r: ChangeRequest) =>
-                  r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
-              );
-              localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-              window.dispatchEvent(new Event('storage'));
-              toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
-              setIsChangeAlertOpen(false);
-          });
-          setIsChangeAlertOpen(true);
-      };
+        if (!sponsorProfile) return;
+        
+        let title = '';
+        let description = '';
+        let action = () => {};
+
+        switch (request.type) {
+            case 'Section Change':
+                title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
+                description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
+                action = () => handleSectionChange(conf.id, player.id, request.details);
+                break;
+            case 'Bye Request':
+                const byeR1 = request.byeRound1 || 'none';
+                const byeR2 = request.byeRound2 || 'none';
+                title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
+                description = `This will set the player's bye requests to Round 1: ${byeR1 === 'none' ? 'None' : byeR1}, Round 2: ${byeR2 === 'none' ? 'None' : byeR2}.`;
+                action = () => handleByeChange(conf.id, player.id, byeR1, byeR2);
+                break;
+            default:
+                title = 'Approve This Request?';
+                description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
+                action = () => { /* No specific action for 'Other' */ };
+        }
+
+        setChangeAlertContent({ title, description });
+        setChangeAction(() => () => {
+            action();
+            const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+            const approvalTimestamp = new Date().toISOString();
+            const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
+            const updatedRequests = allRequests.map((r: ChangeRequest) =>
+                r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
+            );
+            localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+            window.dispatchEvent(new Event('storage'));
+            toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
+            setIsChangeAlertOpen(false);
+        });
+        setIsChangeAlertOpen(true);
+    };
   
       const currentInputs = confInputs[conf.id] || {};
       const selectedMethod = currentInputs.paymentMethod || 'po';
@@ -1137,7 +1117,7 @@ export default function ConfirmationsPage() {
                                   <div className="flex gap-2">
                                       <Select
                                           value={details.byes.round1}
-                                          onValueChange={(value) => handleByeChange(conf.id, playerId, 'round1', value)}
+                                          onValueChange={(value) => handleByeChange(conf.id, playerId, value, details.byes.round2)}
                                           disabled={!eventDetails || isWithdrawn}
                                       >
                                           <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -1150,7 +1130,7 @@ export default function ConfirmationsPage() {
                                       </Select>
                                       <Select
                                           value={details.byes.round2}
-                                          onValueChange={(value) => handleByeChange(conf.id, playerId, 'round2', value)}
+                                          onValueChange={(value) => handleByeChange(conf.id, playerId, details.byes.round1, value)}
                                           disabled={!eventDetails || details.byes.round1 === 'none' || isWithdrawn}
                                       >
                                           <SelectTrigger className="w-32 h-8 text-xs"><SelectValue /></SelectTrigger>
@@ -1365,28 +1345,6 @@ export default function ConfirmationsPage() {
                                                 changeRequests={changeRequests}
                                                 confirmationsMap={confirmationsMap}
                                                 sponsorProfile={sponsorProfile}
-                                                handlers={{
-                                                    handleInputChange,
-                                                    handleFileChange,
-                                                    handleSavePayment,
-                                                    setConfToComp,
-                                                    setIsCompAlertOpen,
-                                                    fetchInvoiceStatus,
-                                                    setConfToAddPlayer,
-                                                    setIsAddPlayerDialogOpen,
-                                                    handleOpenRequestDialog,
-                                                    handleWithdrawPlayerSelect,
-                                                    handleRestorePlayerSelect,
-                                                    setChangeAlertContent,
-                                                    setChangeAction,
-                                                    setIsChangeAlertOpen,
-                                                    handleByeChange,
-                                                    handleSectionChange,
-                                                    handleOpenEditPlayerDialog,
-                                                    getPlayerById,
-                                                    getStatusBadgeVariant,
-                                                    handlePlayerStatusChangeAction,
-                                                }}
                                             />
                                         </TableCell>
                                     </TableRow>
