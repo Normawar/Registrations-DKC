@@ -193,48 +193,44 @@ export default function ProfilePage() {
     setSchoolsForDistrict([...new Set(filteredSchools)]);
   };
 
-  // Stage 1: When profile is loaded, determine the correct district and populate the school list.
+  // Stage 1: When profile loads, populate the schools list based on the district.
   useEffect(() => {
     if (isProfileLoaded && profile) {
-        const userTeamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
-        const schoolInfo = schoolData.find(s => generateTeamCode(s) === userTeamCode);
-        const district = schoolInfo?.district || profile.district;
-        
-        handleDistrictChange(district);
-
-        // Set avatar info
-        setActiveTab(profile.avatarType);
-        if (profile.avatarType === 'icon') {
-            setSelectedIconName(profile.avatarValue);
-            setImagePreview(null);
-        } else {
-            setImagePreview(profile.avatarValue);
-            setSelectedIconName('');
-        }
+      handleDistrictChange(profile.district);
+      // Set avatar info
+      setActiveTab(profile.avatarType);
+      if (profile.avatarType === 'icon') {
+          setSelectedIconName(profile.avatarValue);
+          setImagePreview(null);
+      } else {
+          setImagePreview(profile.avatarValue);
+          setSelectedIconName('');
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProfileLoaded, profile]);
 
-  // Stage 2: Once the school list is updated, reset the form with all the correct data.
+  // Stage 2: When the schools list is updated, reset the form with all profile data.
+  // This ensures the school dropdown is populated before we try to set its value.
   useEffect(() => {
-      if (isProfileLoaded && profile && schoolsForDistrict.length > 0) {
-          const userTeamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
-          const schoolInfo = schoolData.find(s => generateTeamCode(s) === userTeamCode);
-
-          const profileFormData = {
-              firstName: profile.firstName || '',
-              lastName: profile.lastName || '',
-              district: schoolInfo?.district || profile.district,
-              school: schoolInfo?.schoolName || profile.school,
-              email: profile.email || '',
-              phone: profile.phone || '',
-              schoolAddress: schoolInfo?.streetAddress || '',
-              schoolPhone: schoolInfo?.phone || '',
-              gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
-              bookkeeperEmail: profile.bookkeeperEmail || '',
-          };
-          
-          profileForm.reset(profileFormData);
-      }
+    if (isProfileLoaded && profile && schoolsForDistrict.length > 0) {
+      const schoolInfo = schoolData.find(s => generateTeamCode(s) === teamCode);
+      
+      const profileFormData = {
+          firstName: profile.firstName || '',
+          lastName: profile.lastName || '',
+          district: profile.district,
+          school: profile.school,
+          email: profile.email || '',
+          phone: profile.phone || '',
+          schoolAddress: schoolInfo?.streetAddress || '',
+          schoolPhone: schoolInfo?.phone || '',
+          gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
+          bookkeeperEmail: profile.bookkeeperEmail || '',
+      };
+      
+      profileForm.reset(profileFormData);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, isProfileLoaded, schoolsForDistrict]);
 
