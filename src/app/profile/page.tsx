@@ -215,28 +215,31 @@ export default function ProfilePage() {
   }, [isProfileLoaded, profile]);
 
   useEffect(() => {
-    if (isProfileLoaded && profile && schoolsForDistrict.length > 0) {
-      const schoolInfo = schoolData.find(s => generateTeamCode(s) === teamCode);
-      
-      const profileFormData = {
-          firstName: profile.firstName || '',
-          lastName: profile.lastName || '',
-          district: profile.district,
-          school: profile.school,
-          email: profile.email || '',
-          phone: profile.phone || '',
-          schoolAddress: schoolInfo?.streetAddress || '',
-          schoolPhone: schoolInfo?.phone || '',
-          city: schoolInfo?.city || '',
-          state: schoolInfo?.state || '',
-          zip: schoolInfo?.zip || '',
-          gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
-          bookkeeperEmail: profile.bookkeeperEmail || '',
-      };
-      
-      profileForm.reset(profileFormData);
+    if (isProfileLoaded && profile) {
+        // Find school info to prepopulate derived fields
+        const schoolInfo = schoolData.find(s => s.schoolName === profile.school && s.district === profile.district);
+        
+        // Use setValue for more reliable updates, especially with dependent fields.
+        profileForm.setValue('firstName', profile.firstName || '');
+        profileForm.setValue('lastName', profile.lastName || '');
+        profileForm.setValue('email', profile.email || '');
+        profileForm.setValue('phone', profile.phone || '');
+        profileForm.setValue('gtCoordinatorEmail', profile.gtCoordinatorEmail || '');
+        profileForm.setValue('bookkeeperEmail', profile.bookkeeperEmail || '');
+        
+        profileForm.setValue('district', profile.district || '');
+        // Trigger school list update
+        handleDistrictChange(profile.district || '');
+        
+        // Now set the school and its derived fields
+        profileForm.setValue('school', profile.school || '');
+        profileForm.setValue('schoolAddress', schoolInfo?.streetAddress || '');
+        profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
+        profileForm.setValue('city', schoolInfo?.city || '');
+        profileForm.setValue('state', schoolInfo?.state || '');
+        profileForm.setValue('zip', schoolInfo?.zip || '');
     }
-  }, [profile, isProfileLoaded, schoolsForDistrict, teamCode, profileForm]);
+  }, [isProfileLoaded, profile, profileForm]);
 
 
   useEffect(() => {
