@@ -192,48 +192,45 @@ export default function ProfilePage() {
     }
     setSchoolsForDistrict([...new Set(filteredSchools)]);
   };
-  
-  const handleSchoolChange = (schoolName: string) => {
-      profileForm.setValue('school', schoolName);
-      const schoolInfo = schoolData.find(s => s.schoolName === schoolName);
-      profileForm.setValue('schoolAddress', schoolInfo?.streetAddress || '');
-      profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
-  }
-  
-  useEffect(() => {
-    if (profile && isProfileLoaded) {
-      handleDistrictChange(profile.district || 'None');
-    }
-  }, [profile, isProfileLoaded]);
 
   useEffect(() => {
-    if (profile && isProfileLoaded && schoolsForDistrict.length > 0) {
-        const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
-        profileForm.reset({
-            firstName: profile.firstName || '',
-            lastName: profile.lastName || '',
-            district: profile.district || '',
-            school: profile.school || '',
-            email: profile.email || '',
-            phone: profile.phone || '',
-            schoolAddress: schoolInfo?.streetAddress || profile.schoolAddress || '',
-            schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
-            gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
-            bookkeeperEmail: profile.bookkeeperEmail || '',
-        });
+    if (isProfileLoaded && profile) {
+      // Find the definitive school info using the saved teamCode as a key
+      const userTeamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
+      const schoolInfo = schoolData.find(s => generateTeamCode(s) === userTeamCode);
+      
+      const district = schoolInfo?.district || profile.district;
+      
+      // Step 1: Populate the school dropdown options based on the found district
+      handleDistrictChange(district);
 
-        setActiveTab(profile.avatarType);
-        if (profile.avatarType === 'icon') {
-            setSelectedIconName(profile.avatarValue);
-            setImagePreview(null);
-        } else {
-            setImagePreview(profile.avatarValue);
-            setSelectedIconName('');
-        }
+      // Step 2: Reset the form with all the correct data
+      const profileFormData = {
+          firstName: profile.firstName || '',
+          lastName: profile.lastName || '',
+          district: district,
+          school: schoolInfo?.schoolName || profile.school,
+          email: profile.email || '',
+          phone: profile.phone || '',
+          schoolAddress: schoolInfo?.streetAddress || '',
+          schoolPhone: schoolInfo?.phone || '',
+          gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
+          bookkeeperEmail: profile.bookkeeperEmail || '',
+      };
+      
+      profileForm.reset(profileFormData);
+      
+      setActiveTab(profile.avatarType);
+      if (profile.avatarType === 'icon') {
+        setSelectedIconName(profile.avatarValue);
+        setImagePreview(null);
+      } else {
+        setImagePreview(profile.avatarValue);
+        setSelectedIconName('');
+      }
     }
-  }, [profile, isProfileLoaded, schoolsForDistrict, profileForm]);
+  }, [isProfileLoaded, profile, profileForm]);
 
-  
   useEffect(() => {
     if (!auth || !storage) {
         setIsAuthReady(false);
@@ -473,8 +470,8 @@ export default function ProfilePage() {
                         {profile?.role === 'sponsor' && (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleSchoolChange(value); }} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={profileForm.control} name="schoolAddress" render={({ field }) => ( <FormItem><FormLabel>School Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
