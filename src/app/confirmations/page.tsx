@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, type ReactNode, useMemo, useCallback, Fragment } from 'react';
@@ -754,24 +755,46 @@ export default function ConfirmationsPage() {
         return;
     }
     
-    const player = getPlayerById(changeRequestInputs.playerId);
-    const newRequest: ChangeRequest = {
-        id: `req-${Date.now()}`,
-        confirmationId: confToRequestChange.id,
-        eventDate: confToRequestChange.eventDate,
-        player: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
-        event: confToRequestChange.eventName,
-        type: changeRequestInputs.requestType,
-        details: changeRequestInputs.details || '',
-        submitted: new Date().toISOString(),
-        submittedBy: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
-        status: 'Pending',
-    };
-    
-    const updatedRequests = [newRequest, ...changeRequests];
-    setChangeRequests(updatedRequests);
-    localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-    toast({ title: 'Request Submitted', description: 'Your change request has been sent to the organizer for review.' });
+    if (sponsorProfile.role === 'organizer') {
+        // Organizer is directly approving the change.
+        const player = getPlayerById(changeRequestInputs.playerId);
+        if (!player) return;
+        
+        switch (changeRequestInputs.requestType) {
+            case 'Section Change':
+                if (changeRequestInputs.details) {
+                    handleSectionChange(confToRequestChange.id, player.id, changeRequestInputs.details);
+                }
+                break;
+            case 'Bye Request':
+                handleByeChange(confToRequestChange.id, player.id, 'round1', changeRequestInputs.byeRound1 || 'none');
+                handleByeChange(confToRequestChange.id, player.id, 'round2', changeRequestInputs.byeRound2 || 'none');
+                break;
+        }
+
+    } else {
+        // Sponsor is submitting a request for approval.
+        const player = getPlayerById(changeRequestInputs.playerId);
+        const newRequest: ChangeRequest = {
+            id: `req-${Date.now()}`,
+            confirmationId: confToRequestChange.id,
+            eventDate: confToRequestChange.eventDate,
+            player: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
+            event: confToRequestChange.eventName,
+            type: changeRequestInputs.requestType,
+            details: changeRequestInputs.details || '',
+            submitted: new Date().toISOString(),
+            submittedBy: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
+            status: 'Pending',
+            byeRound1: changeRequestInputs.byeRound1,
+            byeRound2: changeRequestInputs.byeRound2,
+        };
+        
+        const updatedRequests = [newRequest, ...changeRequests];
+        setChangeRequests(updatedRequests);
+        localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+        toast({ title: 'Request Submitted', description: 'Your change request has been sent to the organizer for review.' });
+    }
 
     setIsRequestDialogOpen(false);
   };
@@ -1026,12 +1049,12 @@ export default function ConfirmationsPage() {
                                                     setChangeAlertContent,
                                                     setChangeAction,
                                                     setIsChangeAlertOpen,
-                                                    handlePlayerStatusChangeAction,
                                                     handleByeChange,
                                                     handleSectionChange,
                                                     handleOpenEditPlayerDialog,
                                                     getPlayerById,
                                                     getStatusBadgeVariant,
+                                                    handlePlayerStatusChangeAction,
                                                 }}
                                             />
                                         </TableCell>
@@ -1134,7 +1157,7 @@ export default function ConfirmationsPage() {
                 </ScrollArea>
             </div>
             <DialogFooter>
-                <Button variant="ghost" onClick={() => setIsAddPlayerDialogOpen(false)}>Cancel</Button>
+                <Button variant="ghost" onClick={()={() => setIsAddPlayerDialogOpen(false)}>Cancel</Button>
                 <Button onClick={handleAddPlayersToRegistration} disabled={playersToAdd.length === 0 || isCreatingAddonInvoice}>
                     {isCreatingAddonInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Add {playersToAdd.length} Player(s) & Create Invoice
@@ -1260,11 +1283,10 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
                 action = () => handleSectionChange(conf.id, player.id, request.details);
                 break;
             case 'Bye Request':
-                const byes = (request.details || 'none|none').split('|');
-                const byeR1 = byes[0];
-                const byeR2 = byes[1];
+                const byeR1 = request.byeRound1 || 'none';
+                const byeR2 = request.byeRound2 || 'none';
                 title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
-                description = `This will set the player's bye requests to Round 1: ${byeR1}, Round 2: ${byeR2}.`;
+                description = `This will set the player's bye requests to Round 1: ${byeR1 === 'none' ? 'None' : byeR1}, Round 2: ${byeR2 === 'none' ? 'None' : byeR2}.`;
                 action = () => {
                     handleByeChange(conf.id, player.id, 'round1', byeR1);
                     handleByeChange(conf.id, player.id, 'round2', byeR2);
@@ -1279,7 +1301,6 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
         setChangeAlertContent({ title, description });
         setChangeAction(() => () => {
             action();
-            // Mark request as approved
             const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
             const approvalTimestamp = new Date().toISOString();
             const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
@@ -1380,7 +1401,12 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
                                     </TooltipTrigger>
                                     <TooltipContent className="max-w-xs">
                                         <p className="font-semibold">{latestRequest.type} - {latestRequest.status}</p>
-                                        <p className="italic text-muted-foreground">"{latestRequest.details}"</p>
+                                        <p className="italic text-muted-foreground">
+                                            {latestRequest.type === 'Bye Request'
+                                              ? `Requested Byes: R${latestRequest.byeRound1 || 'None'}, R${latestRequest.byeRound2 || 'None'}`
+                                              : `"${latestRequest.details}"`
+                                            }
+                                        </p>
                                         <p className="text-xs text-muted-foreground mt-1 pt-1 border-t">
                                             Submitted: {format(new Date(latestRequest.submitted), 'MM/dd/yy, p')} by {latestRequest.submittedBy}
                                         </p>
@@ -1532,3 +1558,4 @@ function ConfirmationDetails({ conf, confInputs, statuses, isUpdating, isAuthRea
     );
 }
 
+    
