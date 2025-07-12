@@ -469,6 +469,8 @@ export default function RosterPage() {
     setEditingPlayer(null);
   }
   
+  const showStudentType = profile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -700,7 +702,7 @@ export default function RosterPage() {
                                 </FormControl>
                                 <FormDescription>
                                     <Link
-                                        href={/^\d{8}$/.test(form.watch('uscfId')) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${form.watch('uscfId')}` : 'https://new.uschess.org/player-search'}
+                                        href={/^\d{8}$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-sm font-bold text-primary underline-offset-4 hover:text-primary/80"
@@ -839,7 +841,7 @@ export default function RosterPage() {
                                 </FormItem>
                               )}
                             />
-                            {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                            {showStudentType && (
                               <FormField control={form.control} name="studentType" render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Student Type</FormLabel>
@@ -888,3 +890,4 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
+

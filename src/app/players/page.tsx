@@ -557,6 +557,10 @@ export default function PlayersPage() {
   }
   
   const playerDistrict = form.watch('district');
+  const showStudentType = profile?.role === 'organizer'
+      ? playerDistrict === 'PHARR-SAN JUAN-ALAMO ISD'
+      : profile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
+
 
   return (
     <AppLayout>
@@ -891,7 +895,7 @@ export default function PlayersPage() {
                                 </FormItem>
                               )}
                             />
-                             {playerDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                             {showStudentType && (
                                 <FormField control={form.control} name="studentType" render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Student Type</FormLabel>
@@ -940,3 +944,4 @@ export default function PlayersPage() {
     </AppLayout>
   );
 }
+
