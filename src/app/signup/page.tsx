@@ -148,6 +148,8 @@ const SponsorSignUpForm = () => {
     
     localStorage.setItem('current_user_profile', JSON.stringify(profileData));
     
+    window.dispatchEvent(new Event('storage'));
+    
     router.push('/dashboard');
   }
 
@@ -370,6 +372,8 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         school: 'Homeschool',
         gtCoordinatorEmail: '',
         bookkeeperEmail: '',
+        schoolAddress: '',
+        schoolPhone: '',
         role: role,
         avatarType: 'icon' as const,
         avatarValue: 'PawnIcon',
@@ -381,6 +385,8 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
     localStorage.setItem('current_user_profile', JSON.stringify(profileData));
+    
+    window.dispatchEvent(new Event('storage'));
 
     let path = '/dashboard';
     if (role === 'individual') {
