@@ -201,8 +201,12 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
-    if (profile) {
-      // 1. Reset the form with all available profile data first.
+    if (profile && isProfileLoaded) {
+      // 1. First, ensure the school dropdown is populated
+      handleDistrictChange(profile.district || 'None');
+      
+      // 2. Then, reset the form with all profile data.
+      // This ensures the school select has the correct options before its value is set.
       profileForm.reset({
         firstName: profile.firstName || '',
         lastName: profile.lastName || '',
@@ -216,9 +220,6 @@ export default function ProfilePage() {
         bookkeeperEmail: profile.bookkeeperEmail || '',
       });
       
-      // 2. Populate the school list based on the district from the profile.
-      handleDistrictChange(profile.district || 'None');
-      
       // 3. Set avatar state.
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
@@ -229,7 +230,7 @@ export default function ProfilePage() {
         setSelectedIconName('');
       }
     }
-  }, [profile, profileForm]);
+  }, [profile, isProfileLoaded, profileForm]);
   
   useEffect(() => {
     if (!auth || !storage) {
