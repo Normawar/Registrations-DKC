@@ -212,10 +212,10 @@ export default function ProfilePage() {
     }
     setSchoolsForDistrict([...new Set(filteredSchools)]);
   };
-
+  
   useEffect(() => {
     if (isProfileLoaded && profile) {
-        setIsSchoolListReady(false);
+        setIsSchoolListReady(false); // Reset flag
         handleDistrictChange(profile.district);
         setActiveTab(profile.avatarType);
         if (profile.avatarType === 'icon') {

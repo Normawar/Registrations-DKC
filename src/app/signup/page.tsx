@@ -341,6 +341,12 @@ const individualFormSchema = z.object({
 const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) => {
   const router = useRouter();
   const { updateProfile } = useSponsorProfile();
+  const [schoolData, setSchoolData] = useState<School[]>([]);
+
+  useEffect(() => {
+    const storedSchoolData = localStorage.getItem('school_data');
+    setSchoolData(storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData);
+  }, []);
   
   const form = useForm<z.infer<typeof individualFormSchema>>({
     resolver: zodResolver(individualFormSchema),
