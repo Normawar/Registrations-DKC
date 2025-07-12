@@ -180,9 +180,7 @@ export default function ProfilePage() {
     return uniqueSchoolNames;
   }, []);
   
-  const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
-    profileForm.setValue('district', district);
-    
+  const handleDistrictChange = (district: string) => {
     let filteredSchools: string[];
     if (district === 'None') {
         filteredSchools = allSchoolNames;
@@ -193,16 +191,6 @@ export default function ProfilePage() {
             .sort();
     }
     setSchoolsForDistrict([...new Set(filteredSchools)]);
-
-    if (resetSchool) {
-      if (filteredSchools.length === 1) {
-          handleSchoolChange(filteredSchools[0]);
-      } else {
-          profileForm.setValue('school', '');
-          profileForm.setValue('schoolAddress', '');
-          profileForm.setValue('schoolPhone', '');
-      }
-    }
   };
   
   const handleSchoolChange = (schoolName: string) => {
@@ -214,11 +202,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (profile) {
-      // First, set the district and populate the school list. This is crucial.
-      handleDistrictChange(profile.district || 'None', false);
-
-      // Now, reset the form with all the profile data.
-      // The school dropdown will now have the correct options to choose from.
+      // 1. Reset the form with all profile data first.
       profileForm.reset({
         firstName: profile.firstName || '',
         lastName: profile.lastName || '',
@@ -232,6 +216,10 @@ export default function ProfilePage() {
         bookkeeperEmail: profile.bookkeeperEmail || '',
       });
       
+      // 2. Populate the dependent school list based on the now-set district.
+      handleDistrictChange(profile.district || 'None');
+      
+      // 3. Set avatar state.
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
         setSelectedIconName(profile.avatarValue);
@@ -241,7 +229,6 @@ export default function ProfilePage() {
         setSelectedIconName('');
       }
     }
-  // We only want to run this effect when the main profile object changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
   
@@ -484,8 +471,8 @@ export default function ProfilePage() {
                         {profile?.role === 'sponsor' && (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={handleSchoolChange} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleSchoolChange(value); }} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={profileForm.control} name="schoolAddress" render={({ field }) => ( <FormItem><FormLabel>School Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
