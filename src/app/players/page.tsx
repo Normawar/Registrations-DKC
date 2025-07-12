@@ -784,7 +784,7 @@ export default function PlayersPage() {
                                         href={/^\d{8}$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
                                         target="_blank" 
                                         rel="noopener noreferrer" 
-                                        className="text-sm text-primary underline-offset-4 hover:text-primary/80"
+                                        className="text-sm text-primary-foreground underline-offset-4 hover:text-primary-foreground/80"
                                     >
                                         Use the USCF Player Search to verify an ID.
                                     </Link>
