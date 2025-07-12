@@ -202,10 +202,10 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (profile && isProfileLoaded) {
-      // Set the school list based on the profile's district first.
+      // 1. Populate the school dropdown based on the loaded profile's district.
       handleDistrictChange(profile.district || 'None');
       
-      // Then, reset the form with all profile data.
+      // 2. Reset the form with all profile data.
       // This ensures the school select has the correct options before its value is set.
       profileForm.reset({
         firstName: profile.firstName || '',
