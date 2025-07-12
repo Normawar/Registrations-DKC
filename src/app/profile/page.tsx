@@ -200,13 +200,25 @@ export default function ProfilePage() {
       profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
   }
 
-  // Effect to handle populating form when profile data is loaded
   useEffect(() => {
     if (profile && isProfileLoaded) {
-      // Step 1: Populate the school dropdown based on the loaded profile's district
       handleDistrictChange(profile.district || 'None');
       
-      // Step 2: Set avatar state
+      const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
+
+      profileForm.reset({
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        district: profile.district || '',
+        school: profile.school || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        schoolAddress: schoolInfo?.streetAddress || profile.schoolAddress || '',
+        schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
+        gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
+        bookkeeperEmail: profile.bookkeeperEmail || '',
+      });
+
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
         setSelectedIconName(profile.avatarValue);
@@ -216,28 +228,7 @@ export default function ProfilePage() {
         setSelectedIconName('');
       }
     }
-  }, [profile, isProfileLoaded]);
-
-  // Effect to reset the form once the school list is ready.
-  // This ensures the school dropdown has options before we try to set its value.
-  useEffect(() => {
-      if (profile && isProfileLoaded && schoolsForDistrict.length > 0) {
-          const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
-          const profileFormData = {
-              firstName: profile.firstName || '',
-              lastName: profile.lastName || '',
-              district: profile.district || '',
-              school: profile.school || '',
-              email: profile.email || '',
-              phone: profile.phone || '',
-              schoolAddress: schoolInfo?.streetAddress || profile.schoolAddress || '',
-              schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
-              gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
-              bookkeeperEmail: profile.bookkeeperEmail || '',
-          };
-          profileForm.reset(profileFormData);
-      }
-  }, [profile, isProfileLoaded, schoolsForDistrict, profileForm]);
+  }, [profile, isProfileLoaded, profileForm]);
   
   useEffect(() => {
     if (!auth || !storage) {
