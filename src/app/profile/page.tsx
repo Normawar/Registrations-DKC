@@ -179,7 +179,72 @@ export default function ProfilePage() {
     }
     return uniqueSchoolNames;
   }, []);
+  
+  const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
+    profileForm.setValue('district', district);
+    
+    let filteredSchools: string[];
+    if (district === 'None') {
+        filteredSchools = allSchoolNames;
+    } else {
+        filteredSchools = schoolData
+            .filter((school) => school.district === district)
+            .map((school) => school.schoolName)
+            .sort();
+    }
+    setSchoolsForDistrict([...new Set(filteredSchools)]);
 
+    if (resetSchool) {
+      if (filteredSchools.length === 1) {
+          handleSchoolChange(filteredSchools[0]);
+      } else {
+          profileForm.setValue('school', '');
+          profileForm.setValue('schoolAddress', '');
+          profileForm.setValue('schoolPhone', '');
+      }
+    }
+  };
+  
+  const handleSchoolChange = (schoolName: string) => {
+      profileForm.setValue('school', schoolName);
+      const schoolInfo = schoolData.find(s => s.schoolName === schoolName);
+      profileForm.setValue('schoolAddress', schoolInfo?.streetAddress || '');
+      profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
+  }
+
+  useEffect(() => {
+    if (profile) {
+      // First, set the district and populate the school list. This is crucial.
+      handleDistrictChange(profile.district || 'None', false);
+
+      // Now, reset the form with all the profile data.
+      // The school dropdown will now have the correct options to choose from.
+      profileForm.reset({
+        firstName: profile.firstName || '',
+        lastName: profile.lastName || '',
+        district: profile.district || '',
+        school: profile.school || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        schoolAddress: profile.schoolAddress || '',
+        schoolPhone: profile.schoolPhone || '',
+        gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
+        bookkeeperEmail: profile.bookkeeperEmail || '',
+      });
+      
+      setActiveTab(profile.avatarType);
+      if (profile.avatarType === 'icon') {
+        setSelectedIconName(profile.avatarValue);
+        setImagePreview(null);
+      } else {
+        setImagePreview(profile.avatarValue);
+        setSelectedIconName('');
+      }
+    }
+  // We only want to run this effect when the main profile object changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile]);
+  
   useEffect(() => {
     if (!auth || !storage) {
         setIsAuthReady(false);
@@ -205,66 +270,6 @@ export default function ProfilePage() {
     });
     return () => unsubscribe();
   }, []);
-
-  const handleSchoolChange = (schoolName: string) => {
-      profileForm.setValue('school', schoolName);
-      const schoolInfo = schoolData.find(s => s.schoolName === schoolName);
-      profileForm.setValue('schoolAddress', schoolInfo?.streetAddress || '');
-      profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
-  }
-
-  const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
-    profileForm.setValue('district', district);
-    
-    let filteredSchools: string[];
-    if (district === 'None') {
-        filteredSchools = allSchoolNames;
-    } else {
-        filteredSchools = schoolData
-            .filter((school) => school.district === district)
-            .map((school) => school.schoolName)
-            .sort();
-    }
-    setSchoolsForDistrict([...new Set(filteredSchools)]);
-
-    if (resetSchool) {
-        if (filteredSchools.length === 1) {
-            handleSchoolChange(filteredSchools[0]);
-        } else {
-            profileForm.setValue('school', '');
-            profileForm.setValue('schoolAddress', '');
-            profileForm.setValue('schoolPhone', '');
-        }
-    }
-  };
-
-  useEffect(() => {
-    if (profile) {
-      profileForm.reset({
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        district: profile.district,
-        school: profile.school,
-        email: profile.email,
-        phone: profile.phone,
-        schoolAddress: profile.schoolAddress || '',
-        schoolPhone: profile.schoolPhone || '',
-        gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
-        bookkeeperEmail: profile.bookkeeperEmail || '',
-      });
-
-      handleDistrictChange(profile.district || 'None', false);
-      
-      setActiveTab(profile.avatarType);
-      if (profile.avatarType === 'icon') {
-        setSelectedIconName(profile.avatarValue);
-        setImagePreview(null);
-      } else {
-        setImagePreview(profile.avatarValue);
-        setSelectedIconName('');
-      }
-    }
-  }, [profile, profileForm]);
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
