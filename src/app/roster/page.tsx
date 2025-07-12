@@ -712,7 +712,7 @@ export default function RosterPage() {
                                         href={/^\d{8}$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
                                         target="_blank" 
                                         rel="noopener noreferrer" 
-                                        className="text-sm text-accent-foreground underline-offset-4 hover:underline"
+                                        className="text-sm text-accent underline-offset-4 hover:text-accent/80"
                                     >
                                         Use the USCF Player Search to verify an ID.
                                     </Link>
