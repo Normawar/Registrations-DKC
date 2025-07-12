@@ -203,34 +203,36 @@ export default function ProfilePage() {
   useEffect(() => {
     if (profile && isProfileLoaded) {
       handleDistrictChange(profile.district || 'None');
-      
-      const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
-      
-      const profileFormData = {
-        firstName: profile.firstName || '',
-        lastName: profile.lastName || '',
-        district: profile.district || '',
-        school: profile.school || '',
-        email: profile.email || '',
-        phone: profile.phone || '',
-        schoolAddress: schoolInfo?.streetAddress || profile.schoolAddress || '',
-        schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
-        gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
-        bookkeeperEmail: profile.bookkeeperEmail || '',
-      };
-      
-      profileForm.reset(profileFormData);
-
-      setActiveTab(profile.avatarType);
-      if (profile.avatarType === 'icon') {
-        setSelectedIconName(profile.avatarValue);
-        setImagePreview(null);
-      } else {
-        setImagePreview(profile.avatarValue);
-        setSelectedIconName('');
-      }
     }
-  }, [profile, isProfileLoaded, profileForm]);
+  }, [profile, isProfileLoaded]);
+
+  useEffect(() => {
+    if (profile && isProfileLoaded && schoolsForDistrict.length > 0) {
+        const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
+        profileForm.reset({
+            firstName: profile.firstName || '',
+            lastName: profile.lastName || '',
+            district: profile.district || '',
+            school: profile.school || '',
+            email: profile.email || '',
+            phone: profile.phone || '',
+            schoolAddress: schoolInfo?.streetAddress || profile.schoolAddress || '',
+            schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
+            gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
+            bookkeeperEmail: profile.bookkeeperEmail || '',
+        });
+
+        setActiveTab(profile.avatarType);
+        if (profile.avatarType === 'icon') {
+            setSelectedIconName(profile.avatarValue);
+            setImagePreview(null);
+        } else {
+            setImagePreview(profile.avatarValue);
+            setSelectedIconName('');
+        }
+    }
+  }, [profile, isProfileLoaded, schoolsForDistrict, profileForm]);
+
   
   useEffect(() => {
     if (!auth || !storage) {
@@ -584,4 +586,3 @@ export default function ProfilePage() {
     </AppLayout>
   );
 }
-
