@@ -126,7 +126,10 @@ const playerFormSchema = z.object({
     if (arg instanceof Date) return arg;
     return undefined;
   }, z.date().optional()),
-  regularRating: z.union([z.string(), z.number()]).optional(),
+  regularRating: z.preprocess(
+    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
+    z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
+  ),
   quickRating: z.string().optional(),
   grade: z.string().min(1, { message: "Please select a grade." }),
   section: z.string().min(1, { message: "Please select a section." }),
@@ -153,18 +156,6 @@ const playerFormSchema = z.object({
 }, {
   message: "USCF Expiration is required unless ID is NEW.",
   path: ["uscfExpiration"],
-})
-.refine(data => {
-  if (data.uscfId.toUpperCase() !== 'NEW') {
-    const rating = data.regularRating;
-    // Allow UNR even if ID is not new.
-    if (typeof rating === 'string' && rating.toUpperCase() === 'UNR') return true;
-    return rating !== undefined && rating !== '';
-  }
-  return true;
-}, {
-  message: "Rating is required (or UNR) unless USCF ID is NEW.",
-  path: ["regularRating"],
 })
 .refine((data) => {
     if (!data.grade || !data.section) {
@@ -439,7 +430,7 @@ export default function RosterPage() {
         }
     }
     
-    const { uscfExpiration, dob, ...formValues } = values;
+    const { uscfExpiration, dob, regularRating, ...formValues } = values;
     const existingPlayerInDb = idToUpdate ? allPlayers.find(p => p.id === idToUpdate) : null;
     
     const baseRecord = existingPlayerInDb || {
@@ -449,10 +440,10 @@ export default function RosterPage() {
     };
 
     let ratingValue;
-    if (typeof values.regularRating === 'string' && values.regularRating.toUpperCase() === 'UNR') {
+    if (typeof regularRating === 'string' && regularRating.toUpperCase() === 'UNR') {
         ratingValue = undefined;
     } else {
-        ratingValue = values.regularRating ? Number(values.regularRating) : undefined;
+        ratingValue = regularRating ? Number(regularRating) : undefined;
     }
 
     const playerRecord: MasterPlayer = {
