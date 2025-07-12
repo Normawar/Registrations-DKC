@@ -556,6 +556,8 @@ export default function PlayersPage() {
     setEditingPlayer(null);
   }
   
+  const playerDistrict = form.watch('district');
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -889,7 +891,7 @@ export default function PlayersPage() {
                                 </FormItem>
                               )}
                             />
-                             {form.getValues('district') === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                             {playerDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
                                 <FormField control={form.control} name="studentType" render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Student Type</FormLabel>
