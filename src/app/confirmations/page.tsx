@@ -327,8 +327,16 @@ export default function ConfirmationsPage() {
     try {
         const storedConfirmationsRaw: Confirmation[] = JSON.parse(localStorage.getItem('confirmations') || '[]');
         
+        let filteredConfirmations = storedConfirmationsRaw;
+        
+        if (sponsorProfile && sponsorProfile.role === 'sponsor') {
+            filteredConfirmations = storedConfirmationsRaw.filter(c => 
+                c.schoolName === sponsorProfile.school && c.district === sponsorProfile.district
+            );
+        }
+
         const latestConfirmationsMap = new Map<string, Confirmation>();
-        const groupedByInvoice = storedConfirmationsRaw.reduce((acc, conf) => {
+        const groupedByInvoice = filteredConfirmations.reduce((acc, conf) => {
             const key = conf.invoiceId || conf.id; 
             if (!acc[key]) acc[key] = [];
             acc[key].push(conf);
@@ -388,14 +396,16 @@ export default function ConfirmationsPage() {
         setChangeRequests(initialRequestsData);
         setIsDataLoaded(true);
     }
-}, [fetchInvoiceStatus]);
+}, [fetchInvoiceStatus, sponsorProfile]);
   
   useEffect(() => {
-    loadAllData();
+    if (sponsorProfile) {
+        loadAllData();
+    }
     const handleStorageChange = () => { loadAllData(); };
     window.addEventListener('storage', handleStorageChange);
     return () => { window.removeEventListener('storage', handleStorageChange); };
-  }, [loadAllData]);
+  }, [loadAllData, sponsorProfile]);
   
   useEffect(() => {
     if (isDataLoaded && window.location.hash) {
@@ -1566,4 +1576,3 @@ const ConfirmationDetails = ({ conf, confInputs, statuses, isUpdating, isAuthRea
     </AppLayout>
   );
 }
-
