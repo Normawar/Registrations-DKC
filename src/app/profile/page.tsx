@@ -50,6 +50,9 @@ const profileFormSchema = z.object({
   phone: z.string().min(10, { message: 'Please enter a valid 10-digit phone number.' }),
   schoolAddress: z.string().optional(),
   schoolPhone: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zip: z.string().optional(),
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
   bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 }).refine(data => {
@@ -157,6 +160,9 @@ export default function ProfilePage() {
       phone: '',
       schoolAddress: '',
       schoolPhone: '',
+      city: '',
+      state: '',
+      zip: '',
       gtCoordinatorEmail: '',
       bookkeeperEmail: '',
     },
@@ -193,11 +199,10 @@ export default function ProfilePage() {
     setSchoolsForDistrict([...new Set(filteredSchools)]);
   };
 
-  // Stage 1: When profile loads, populate the schools list based on the district.
   useEffect(() => {
     if (isProfileLoaded && profile) {
       handleDistrictChange(profile.district);
-      // Set avatar info
+      
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
           setSelectedIconName(profile.avatarValue);
@@ -207,11 +212,8 @@ export default function ProfilePage() {
           setSelectedIconName('');
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProfileLoaded, profile]);
 
-  // Stage 2: When the schools list is updated, reset the form with all profile data.
-  // This ensures the school dropdown is populated before we try to set its value.
   useEffect(() => {
     if (isProfileLoaded && profile && schoolsForDistrict.length > 0) {
       const schoolInfo = schoolData.find(s => generateTeamCode(s) === teamCode);
@@ -225,14 +227,16 @@ export default function ProfilePage() {
           phone: profile.phone || '',
           schoolAddress: schoolInfo?.streetAddress || '',
           schoolPhone: schoolInfo?.phone || '',
+          city: schoolInfo?.city || '',
+          state: schoolInfo?.state || '',
+          zip: schoolInfo?.zip || '',
           gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
           bookkeeperEmail: profile.bookkeeperEmail || '',
       };
       
       profileForm.reset(profileFormData);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, isProfileLoaded, schoolsForDistrict]);
+  }, [profile, isProfileLoaded, schoolsForDistrict, teamCode, profileForm]);
 
 
   useEffect(() => {
@@ -475,11 +479,16 @@ export default function ProfilePage() {
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict} key={schoolsForDistrict.join(',')}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={profileForm.control} name="schoolAddress" render={({ field }) => ( <FormItem><FormLabel>School Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={profileForm.control} name="schoolPhone" render={({ field }) => ( <FormItem><FormLabel>School Phone</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <FormField control={profileForm.control} name="city" render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="zip" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                      <FormField control={profileForm.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )} />
