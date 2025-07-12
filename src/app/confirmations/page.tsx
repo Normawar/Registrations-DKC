@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, type ReactNode, useMemo, useCallback, Fragment } from 'react';
@@ -923,9 +924,7 @@ export default function ConfirmationsPage() {
         handleOpenRequestDialog: typeof handleOpenRequestDialog,
         handleWithdrawPlayerSelect: typeof handleWithdrawPlayerSelect,
         handleRestorePlayerSelect: typeof handleRestorePlayerSelect,
-        setChangeAlertContent: typeof setChangeAlertContent,
-        setChangeAction: typeof setChangeAction,
-        setIsChangeAlertOpen: typeof setIsChangeAlertOpen,
+        handleApproveRequest: (request: ChangeRequest, player: MasterPlayer) => void;
         handleByeChange: typeof handleByeChange,
         handleSectionChange: typeof handleSectionChange,
         handleOpenEditPlayerDialog: typeof handleOpenEditPlayerDialog,
@@ -939,7 +938,8 @@ export default function ConfirmationsPage() {
         handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen,
         fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen,
         handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect,
-        setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleSectionChange,
+        handleApproveRequest,
+        handleByeChange, handleSectionChange,
         handleOpenEditPlayerDialog, getPlayerById, handlePlayerStatusChangeAction
     } = props;
 
@@ -995,52 +995,6 @@ export default function ConfirmationsPage() {
         return playerDetailsList;
 
     }, [conf.selections, playerSortConfig, getPlayerById]);
-    
-    const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
-      if (!sponsorProfile) return;
-      
-      let title = '';
-      let description = '';
-      let action = () => {};
-
-      switch (request.type) {
-          case 'Section Change':
-              title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
-              description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
-              action = () => handleSectionChange(conf.id, player.id, request.details);
-              break;
-          case 'Bye Request':
-              const byeR1 = request.byeRound1 || 'none';
-              const byeR2 = request.byeRound2 || 'none';
-              const byeR1Text = byeR1 === 'none' ? 'None' : `Round ${byeR1}`;
-              const byeR2Text = byeR2 === 'none' ? 'None' : `Round ${byeR2}`;
-
-              title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
-              description = `This will set the player's bye requests to ${byeR1Text}, ${byeR2Text}.`;
-              action = () => handleByeChange(conf.id, player.id, byeR1, byeR2);
-              break;
-          default:
-              title = 'Approve This Request?';
-              description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
-              action = () => { /* No specific action for 'Other' */ };
-      }
-
-      setChangeAlertContent({ title, description });
-      setChangeAction(() => () => {
-          action();
-          const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-          const approvalTimestamp = new Date().toISOString();
-          const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
-          const updatedRequests = allRequests.map((r: ChangeRequest) =>
-              r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
-          );
-          localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-          window.dispatchEvent(new Event('storage'));
-          toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
-          setIsChangeAlertOpen(false);
-      });
-      setIsChangeAlertOpen(true);
-  };
 
     const currentInputs = confInputs[conf.id] || {};
     const selectedMethod = currentInputs.paymentMethod || 'po';
@@ -1284,6 +1238,52 @@ export default function ConfirmationsPage() {
         </div>
     );
   };
+  
+    const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
+      if (!sponsorProfile) return;
+      
+      let title = '';
+      let description = '';
+      let action = () => {};
+
+      switch (request.type) {
+          case 'Section Change':
+              title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
+              description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
+              action = () => handleSectionChange(confToRequestChange!.id, player.id, request.details);
+              break;
+          case 'Bye Request':
+              const byeR1 = request.byeRound1 || 'none';
+              const byeR2 = request.byeRound2 || 'none';
+              const byeR1Text = byeR1 === 'none' ? 'None' : `Round ${byeR1}`;
+              const byeR2Text = byeR2 === 'none' ? 'None' : `Round ${byeR2}`;
+
+              title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
+              description = `This will set the player's bye requests to ${byeR1Text}, ${byeR2Text}.`;
+              action = () => handleByeChange(confToRequestChange!.id, player.id, byeR1, byeR2);
+              break;
+          default:
+              title = 'Approve This Request?';
+              description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
+              action = () => { /* No specific action for 'Other' */ };
+      }
+
+      setChangeAlertContent({ title, description });
+      setChangeAction(() => () => {
+          action();
+          const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+          const approvalTimestamp = new Date().toISOString();
+          const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
+          const updatedRequests = allRequests.map((r: ChangeRequest) =>
+              r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
+          );
+          localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+          window.dispatchEvent(new Event('storage'));
+          toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
+          setIsChangeAlertOpen(false);
+      });
+      setIsChangeAlertOpen(true);
+  };
 
   return (
     <AppLayout>
@@ -1396,9 +1396,7 @@ export default function ConfirmationsPage() {
                                                 handleOpenRequestDialog={handleOpenRequestDialog}
                                                 handleWithdrawPlayerSelect={handleWithdrawPlayerSelect}
                                                 handleRestorePlayerSelect={handleRestorePlayerSelect}
-                                                setChangeAlertContent={setChangeAlertContent}
-                                                setChangeAction={setChangeAction}
-                                                setIsChangeAlertOpen={setIsChangeAlertOpen}
+                                                handleApproveRequest={handleApproveRequest}
                                                 handleByeChange={handleByeChange}
                                                 handleSectionChange={handleSectionChange}
                                                 handleOpenEditPlayerDialog={handleOpenEditPlayerDialog}
