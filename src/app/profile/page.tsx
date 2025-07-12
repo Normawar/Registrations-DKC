@@ -202,7 +202,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (profile) {
-      // 1. Reset the form with all profile data first.
+      // 1. Reset the form with all available profile data first.
       profileForm.reset({
         firstName: profile.firstName || '',
         lastName: profile.lastName || '',
@@ -216,7 +216,7 @@ export default function ProfilePage() {
         bookkeeperEmail: profile.bookkeeperEmail || '',
       });
       
-      // 2. Populate the dependent school list based on the now-set district.
+      // 2. Populate the school list based on the district from the profile.
       handleDistrictChange(profile.district || 'None');
       
       // 3. Set avatar state.
@@ -229,8 +229,7 @@ export default function ProfilePage() {
         setSelectedIconName('');
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile]);
+  }, [profile, profileForm]);
   
   useEffect(() => {
     if (!auth || !storage) {

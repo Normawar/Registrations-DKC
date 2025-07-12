@@ -106,8 +106,7 @@ const SponsorSignUpForm = () => {
   };
 
   useEffect(() => {
-    const initialDistrict = form.getValues('district');
-    handleDistrictChange(initialDistrict, false); 
+    handleDistrictChange(form.getValues('district'), false); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
