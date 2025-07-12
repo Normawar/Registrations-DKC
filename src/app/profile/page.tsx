@@ -27,8 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { districts as uniqueDistricts } from '@/lib/data/districts';
-import { schoolData } from '@/lib/data/school-data';
+import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -132,6 +131,9 @@ const ProfilePageSkeleton = () => (
 export default function ProfilePage() {
   const { toast } = useToast();
   const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
+
+  const [schoolData, setSchoolData] = useState<School[]>([]);
+  const [uniqueDistricts, setUniqueDistricts] = useState<string[]>([]);
   
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const [isSchoolListReady, setIsSchoolListReady] = useState(false);
@@ -177,6 +179,17 @@ export default function ProfilePage() {
           confirmPassword: "",
       },
   });
+  
+  useEffect(() => {
+    const storedSchoolData = localStorage.getItem('school_data');
+    const data = storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData;
+    setSchoolData(data);
+    const districts = [...new Set(data.map((s: School) => s.district))].sort();
+    if (!districts.includes('None')) {
+      districts.unshift('None');
+    }
+    setUniqueDistricts(districts);
+  }, []);
 
   const allSchoolNames = useMemo(() => {
     const schoolNames = schoolData.map(s => s.schoolName);
@@ -185,7 +198,7 @@ export default function ProfilePage() {
         return ['Homeschool', ...uniqueSchoolNames];
     }
     return uniqueSchoolNames;
-  }, []);
+  }, [schoolData]);
   
   const handleDistrictChange = (district: string) => {
     let filteredSchools: string[];
@@ -233,7 +246,7 @@ export default function ProfilePage() {
             zip: schoolInfo?.zip || '',
         });
     }
-  }, [isSchoolListReady, profile, profileForm]);
+  }, [isSchoolListReady, profile, profileForm, schoolData]);
 
 
   useEffect(() => {

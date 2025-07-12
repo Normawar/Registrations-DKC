@@ -27,8 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { schoolData } from "@/lib/data/school-data";
-import { districts as uniqueDistricts } from "@/lib/data/districts";
+import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 
@@ -56,6 +55,20 @@ const SponsorSignUpForm = () => {
   const router = useRouter();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
+  
+  const [schoolData, setSchoolData] = useState<School[]>([]);
+  const [uniqueDistricts, setUniqueDistricts] = useState<string[]>([]);
+
+  useEffect(() => {
+    const storedSchoolData = localStorage.getItem('school_data');
+    const data = storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData;
+    setSchoolData(data);
+    const districts = [...new Set(data.map((s: School) => s.district))].sort();
+    if (!districts.includes('None')) {
+      districts.unshift('None');
+    }
+    setUniqueDistricts(districts);
+  }, []);
 
   const allSchoolNames = useMemo(() => {
     const schoolNames = schoolData.map(s => s.schoolName);
@@ -64,7 +77,7 @@ const SponsorSignUpForm = () => {
         return ['Homeschool', ...uniqueSchoolNames];
     }
     return uniqueSchoolNames;
-  }, []);
+  }, [schoolData]);
   
   const form = useForm<z.infer<typeof sponsorFormSchema>>({
     resolver: zodResolver(sponsorFormSchema),
@@ -108,7 +121,7 @@ const SponsorSignUpForm = () => {
   useEffect(() => {
     handleDistrictChange(form.getValues('district'), false); 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [schoolData]); // Depend on schoolData to re-run when it loads
   
   function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     const lowercasedEmail = values.email.toLowerCase();

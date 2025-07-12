@@ -23,9 +23,9 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { schoolData, type School } from "@/lib/data/school-data";
+import { schoolData as initialSchoolData, type School } from "@/lib/data/school-data";
 import { generateTeamCode } from '@/lib/school-utils';
-import { PlusCircle, MoreHorizontal, Upload } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Upload, Trash2, FilePenLine } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -68,6 +68,7 @@ const schoolFormSchema = z.object({
   zip: z.string().min(5, "A valid ZIP code is required."),
   phone: z.string().min(10, "A valid phone number is required."),
   county: z.string().min(1, "County is required."),
+  state: z.string().optional(),
 });
 
 type SchoolFormValues = z.infer<typeof schoolFormSchema>;
@@ -75,6 +76,7 @@ type SchoolFormValues = z.infer<typeof schoolFormSchema>;
 export default function SchoolsPage() {
   const { toast } = useToast();
   const [schools, setSchools] = useState<SchoolWithTeamCode[]>([]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState<SchoolWithTeamCode | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -82,13 +84,34 @@ export default function SchoolsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const initialSchools = schoolData.map((school, index) => ({
-      ...school,
-      id: `school-${index}`,
-      teamCode: generateTeamCode(school)
-    }));
-    setSchools(initialSchools);
+    try {
+        const storedSchools = localStorage.getItem('school_data');
+        if (storedSchools) {
+            setSchools(JSON.parse(storedSchools));
+        } else {
+            const initialSchoolsWithIds = initialSchoolData.map((school, index) => ({
+                ...school,
+                id: `school-${index}-${Date.now()}`,
+                teamCode: generateTeamCode(school)
+            }));
+            setSchools(initialSchoolsWithIds);
+        }
+    } catch (error) {
+        console.error("Failed to load schools from localStorage", error);
+        setSchools([]);
+    }
+    setIsDataLoaded(true);
   }, []);
+
+  useEffect(() => {
+    if (isDataLoaded) {
+        try {
+            localStorage.setItem('school_data', JSON.stringify(schools));
+        } catch (error) {
+            console.error("Failed to save schools to localStorage", error);
+        }
+    }
+  }, [schools, isDataLoaded]);
 
   const form = useForm<SchoolFormValues>({
     resolver: zodResolver(schoolFormSchema),
@@ -100,6 +123,7 @@ export default function SchoolsPage() {
       zip: '',
       phone: '',
       county: '',
+      state: 'TX',
     },
   });
 
@@ -115,7 +139,6 @@ export default function SchoolsPage() {
             let errors = 0;
             results.data.forEach((row: any) => {
                 try {
-                    // Map common CSV header variations to our internal model properties
                     const school: SchoolWithTeamCode = {
                         id: `sch-${Date.now()}-${Math.random()}`,
                         schoolName: row['School Name'] || row['schoolName'],
@@ -177,22 +200,22 @@ export default function SchoolsPage() {
 
   const handleAddSchool = () => {
     setEditingSchool(null);
-    form.reset();
+    form.reset({
+      schoolName: '',
+      district: '',
+      streetAddress: '',
+      city: '',
+      zip: '',
+      phone: '',
+      county: '',
+      state: 'TX',
+    });
     setIsDialogOpen(true);
   };
 
   const handleEditSchool = (school: SchoolWithTeamCode) => {
     setEditingSchool(school);
-    form.reset({
-      id: school.id,
-      schoolName: school.schoolName,
-      district: school.district,
-      streetAddress: school.streetAddress,
-      city: school.city,
-      zip: school.zip,
-      phone: school.phone,
-      county: school.county,
-    });
+    form.reset(school);
     setIsDialogOpen(true);
   };
 
@@ -217,13 +240,11 @@ export default function SchoolsPage() {
       toast({ title: "School Updated", description: `${values.schoolName} has been updated.` });
     } else {
       const newSchool: SchoolWithTeamCode = {
-        ...(values as Omit<School, 'charter'|'students'|'state'|'zip4'>), // This is a safe cast because zod schema matches
+        ...(values as Omit<School, 'charter'|'students'|'zip4'>), // This is a safe cast because zod schema matches
         id: `school-${Date.now()}`,
         teamCode,
-        // Add default/empty values for other School properties if needed
         charter: '',
         students: '',
-        state: 'TX',
         zip4: '',
       };
       setSchools([...schools, newSchool]);
@@ -289,7 +310,7 @@ export default function SchoolsPage() {
                     <TableCell>{school.district}</TableCell>
                     <TableCell>{school.city}</TableCell>
                     <TableCell>{school.county}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button aria-haspopup="true" size="icon" variant="ghost">
@@ -299,10 +320,8 @@ export default function SchoolsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleEditSchool(school)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteSchool(school)} className="text-destructive">
-                            Delete
-                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditSchool(school)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteSchool(school)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -347,10 +366,17 @@ export default function SchoolsPage() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField control={form.control} name="city" render={({ field }) => (
                   <FormItem>
                     <FormLabel>City</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="state" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>State</FormLabel>
                     <FormControl><Input {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
