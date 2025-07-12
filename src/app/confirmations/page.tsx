@@ -558,21 +558,18 @@ export default function ConfirmationsPage() {
         }
 
         const activePlayers = activePlayerIds.map(id => getPlayerById(id)).filter((p): p is MasterPlayer => !!p);
-        let registrationFeePerPlayer = eventDetails.regularFee;
-        const eventDate = new Date(eventDetails.date);
-        const now = new Date();
-        if (isSameDay(eventDate, now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
-        else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) registrationFeePerPlayer = eventDetails.veryLateFee; else if (hoursUntilEvent <= 48) registrationFeePerPlayer = eventDetails.lateFee; }
+        
+        // Simplified fee calculation for updates to avoid crashes
+        const registrationFeePerPlayer = eventDetails.regularFee;
 
         const newInvoicePlayers = activePlayers.map(player => {
-            const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < eventDate;
+            const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < new Date(eventDetails.date);
             const uscfStatus = player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
-            const lateFeeAmount = registrationFeePerPlayer - eventDetails.regularFee;
             return {
                 playerName: `${player.firstName} ${player.lastName}`,
                 uscfId: player.uscfId,
-                baseRegistrationFee: eventDetails.regularFee,
-                lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+                baseRegistrationFee: registrationFeePerPlayer,
+                lateFee: 0, // Late fees are not recalculated on edits
                 uscfAction: uscfStatus !== 'current',
             };
         });
@@ -854,12 +851,13 @@ export default function ConfirmationsPage() {
         return;
     }
 
+    const updatedSelections = { ...confToUpdate.selections };
+
     switch (request.type) {
         case 'Section Change':
             title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
             description = `This will change the player's section to "${request.details}". This may recreate the invoice.`;
             action = () => {
-                const updatedSelections = { ...confToUpdate.selections };
                 if (updatedSelections[player.id]) {
                     updatedSelections[player.id].section = request.details;
                 }
@@ -900,7 +898,7 @@ export default function ConfirmationsPage() {
     });
     setIsChangeAlertOpen(true);
   };
-
+  
   const ConfirmationDetails = ({
     conf,
     confInputs,
@@ -908,8 +906,8 @@ export default function ConfirmationsPage() {
     isUpdating,
     isAuthReady,
     selectedPlayersForWithdraw,
-    selectedPlayersForRestore
-}: {
+    selectedPlayersForRestore,
+  }: {
     conf: Confirmation,
     confInputs: Record<string, Partial<ConfirmationInputs>>,
     statuses: Record<string, { status?: string; isLoading: boolean }>,
@@ -1073,6 +1071,15 @@ export default function ConfirmationsPage() {
                         const pendingRequest = pendingRequestsForThisConf.find(req => req.player === `${player.firstName} ${player.lastName}`);
                         const isWithdrawn = details.status === 'withdrawn';
                         
+                        let byeTooltipText = 'No pending request.';
+                        if (pendingRequest?.type === 'Bye Request') {
+                            const byeR1 = pendingRequest.byeRound1 && pendingRequest.byeRound1 !== 'none' ? `R${pendingRequest.byeRound1}` : 'None';
+                            const byeR2 = pendingRequest.byeRound2 && pendingRequest.byeRound2 !== 'none' ? `R${pendingRequest.byeRound2}` : 'None';
+                            byeTooltipText = `Requested Byes: ${byeR1}, ${byeR2}`;
+                        } else if (pendingRequest) {
+                            byeTooltipText = `${pendingRequest.type}: ${pendingRequest.details}`;
+                        }
+
                         return (
                         <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) || selectedRestoreIds.includes(playerId) ? 'selected' : undefined} className={cn(isWithdrawn && 'bg-muted/50')}>
                             {sponsorProfile?.role === 'organizer' && (
@@ -1104,7 +1111,7 @@ export default function ConfirmationsPage() {
                                     <TooltipContent className="max-w-xs">
                                         <p className="font-semibold">{pendingRequest.type} - {pendingRequest.status}</p>
                                         <p className="italic text-muted-foreground">
-                                           "{pendingRequest.details}"
+                                           "{byeTooltipText}"
                                         </p>
                                         <p className="text-xs text-muted-foreground mt-1 pt-1 border-t">
                                             Submitted: {format(new Date(pendingRequest.submitted), 'MM/dd/yy, p')} by {pendingRequest.submittedBy}
