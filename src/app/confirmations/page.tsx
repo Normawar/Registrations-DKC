@@ -896,51 +896,51 @@ export default function ConfirmationsPage() {
     }
   };
 
-    const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
-      if (!sponsorProfile) return;
-      
-      let title = '';
-      let description = '';
-      let action = () => {};
+  const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
+    if (!sponsorProfile) return;
 
-      switch (request.type) {
-          case 'Section Change':
-              title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
-              description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
-              action = () => handleSectionChange(request.confirmationId, player.id, request.details);
-              break;
-          case 'Bye Request':
-              const byeR1 = request.byeRound1 || 'none';
-              const byeR2 = request.byeRound2 || 'none';
-              const byeR1Text = byeR1 === 'none' ? 'None' : `Round ${byeR1}`;
-              const byeR2Text = byeR2 === 'none' ? 'None' : `Round ${byeR2}`;
+    let title = '';
+    let description = '';
+    let action = () => { };
 
-              title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
-              description = `This will set the player's bye requests to ${byeR1Text}, ${byeR2Text}.`;
-              action = () => handleByeChange(request.confirmationId, player.id, byeR1, byeR2);
-              break;
-          default:
-              title = 'Approve This Request?';
-              description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
-              action = () => { /* No specific action for 'Other' */ };
-      }
+    switch (request.type) {
+        case 'Section Change':
+            title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
+            description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
+            action = () => handleSectionChange(request.confirmationId, player.id, request.details);
+            break;
+        case 'Bye Request':
+            const byeR1Val = request.byeRound1 && request.byeRound1 !== 'none' ? request.byeRound1 : 'None';
+            const byeR2Val = request.byeRound2 && request.byeRound2 !== 'none' ? request.byeRound2 : 'None';
+            const byeR1Text = byeR1Val !== 'None' ? `Round ${byeR1Val}` : 'None';
+            const byeR2Text = byeR2Val !== 'None' ? `Round ${byeR2Val}` : 'None';
 
-      setChangeAlertContent({ title, description });
-      setChangeAction(() => () => {
-          action();
-          const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-          const approvalTimestamp = new Date().toISOString();
-          const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
-          const updatedRequests = allRequests.map((r: ChangeRequest) =>
-              r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
-          );
-          localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-          window.dispatchEvent(new Event('storage'));
-          toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
-          setIsChangeAlertOpen(false);
-      });
-      setIsChangeAlertOpen(true);
-  };
+            title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
+            description = `This will set the player's bye requests to ${byeR1Text}, ${byeR2Text}.`;
+            action = () => handleByeChange(request.confirmationId, player.id, byeR1Val, byeR2Val);
+            break;
+        default:
+            title = 'Approve This Request?';
+            description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
+            action = () => { /* No specific action for 'Other' */ };
+    }
+
+    setChangeAlertContent({ title, description });
+    setChangeAction(() => () => {
+        action();
+        const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+        const approvalTimestamp = new Date().toISOString();
+        const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
+        const updatedRequests = allRequests.map((r: ChangeRequest) =>
+            r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
+        );
+        localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+        window.dispatchEvent(new Event('storage'));
+        toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
+        setIsChangeAlertOpen(false);
+    });
+    setIsChangeAlertOpen(true);
+};
   
 const ConfirmationDetails = ({
     conf,
@@ -1141,9 +1141,9 @@ const ConfirmationDetails = ({
                                     <TooltipContent className="max-w-xs">
                                         <p className="font-semibold">{latestRequest.type} - {latestRequest.status}</p>
                                         <p className="italic text-muted-foreground">
-                                            {latestRequest.type === 'Bye Request'
-                                              ? `Requested Byes: ${latestRequest.byeRound1 && latestRequest.byeRound1 !== 'none' ? `R${latestRequest.byeRound1}` : 'None'}, ${latestRequest.byeRound2 && latestRequest.byeRound2 !== 'none' ? `R${latestRequest.byeRound2}` : 'None'}`
-                                              : `"${latestRequest.details}"`
+                                            {latestRequest.type === 'Bye Request' ?
+                                                `Requested Byes: ${latestRequest.byeRound1 && latestRequest.byeRound1 !== 'none' ? `R${latestRequest.byeRound1}` : 'None'}, ${latestRequest.byeRound2 && latestRequest.byeRound2 !== 'none' ? `R${latestRequest.byeRound2}` : 'None'}`
+                                                : `"${latestRequest.details}"`
                                             }
                                         </p>
                                         <p className="text-xs text-muted-foreground mt-1 pt-1 border-t">
@@ -1295,7 +1295,8 @@ const ConfirmationDetails = ({
             )}
         </div>
     );
-  };
+};
+
   return (
     <AppLayout>
       <div className="space-y-8">
