@@ -202,25 +202,28 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (profile && isProfileLoaded) {
-      // 1. Populate the school dropdown based on the loaded profile's district.
+      // Step 1: Ensure the school dropdown is populated correctly
       handleDistrictChange(profile.district || 'None');
       
-      // 2. Reset the form with all profile data.
-      // This ensures the school select has the correct options before its value is set.
-      profileForm.reset({
+      // Step 2: Construct the full data object for the form, including looked-up school details
+      const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
+      const profileFormData = {
         firstName: profile.firstName || '',
         lastName: profile.lastName || '',
         district: profile.district || '',
         school: profile.school || '',
         email: profile.email || '',
         phone: profile.phone || '',
-        schoolAddress: profile.schoolAddress || '',
-        schoolPhone: profile.schoolPhone || '',
+        schoolAddress: schoolInfo?.streetAddress || profile.schoolAddress || '',
+        schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
         gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
         bookkeeperEmail: profile.bookkeeperEmail || '',
-      });
+      };
       
-      // Set avatar state.
+      // Step 3: Reset the form with the complete data object
+      profileForm.reset(profileFormData);
+      
+      // Step 4: Set avatar state
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
         setSelectedIconName(profile.avatarValue);
