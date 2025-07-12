@@ -699,10 +699,10 @@ export default function RosterPage() {
                                     <Input placeholder="12345678 or NEW" {...field} />
                                 </FormControl>
                                 <FormDescription>
-                                    <Link 
-                                        href={/^\d{8}$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
+                                    <Link
+                                        href={/^\d{8}$/.test(form.watch('uscfId')) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${form.watch('uscfId')}` : 'https://new.uschess.org/player-search'}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
                                         className="text-sm font-bold text-primary underline-offset-4 hover:text-primary/80"
                                     >
                                         Use the USCF Player Search to verify an ID.
