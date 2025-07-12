@@ -83,33 +83,33 @@ const SponsorSignUpForm = () => {
 
   const selectedDistrict = form.watch('district');
 
-  useEffect(() => {
-    const initialDistrict = form.getValues('district');
-    if (initialDistrict === 'None') {
-      setSchoolsForDistrict(allSchoolNames);
+  const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
+    form.setValue('district', district);
+    let filteredSchools: string[];
+    if (district === 'None') {
+      filteredSchools = allSchoolNames;
     } else {
-        const filteredSchools = schoolData
-            .filter((school) => school.district === initialDistrict)
+        filteredSchools = schoolData
+            .filter((school) => school.district === district)
             .map((school) => school.schoolName)
             .sort();
-        setSchoolsForDistrict([...new Set(filteredSchools)]);
     }
-  }, [allSchoolNames, form]);
+    setSchoolsForDistrict([...new Set(filteredSchools)]);
 
-  const handleDistrictChange = (district: string) => {
-    form.setValue('district', district);
-    if (district === 'None') {
-      form.setValue('school', 'Homeschool');
-      setSchoolsForDistrict(allSchoolNames);
-    } else {
-      form.setValue('school', '');
-      const filteredSchools = schoolData
-        .filter((school) => school.district === district)
-        .map((school) => school.schoolName)
-        .sort();
-      setSchoolsForDistrict([...new Set(filteredSchools)]);
+    if (resetSchool) {
+        if (district === 'None') {
+            form.setValue('school', 'Homeschool');
+        } else {
+            form.setValue('school', '');
+        }
     }
   };
+
+  useEffect(() => {
+    // This is the critical fix: ensure the school list is populated on initial form load.
+    const initialDistrict = form.getValues('district');
+    handleDistrictChange(initialDistrict, false); 
+  }, []);
   
   function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     const lowercasedEmail = values.email.toLowerCase();
@@ -143,10 +143,9 @@ const SponsorSignUpForm = () => {
       schoolPhone: schoolInfo?.phone || '',
     };
     
-    // Use the hook to set the profile, which updates state and localStorage
     updateProfile(profileData);
     
-    router.push('/dashboard');
+    router.push('/profile');
   }
 
   return (
@@ -187,7 +186,7 @@ const SponsorSignUpForm = () => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>District</FormLabel>
-                <Select onValueChange={handleDistrictChange} value={field.value}>
+                <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a district" />
@@ -377,7 +376,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         avatarValue: 'PawnIcon',
     };
     
-    // Use the hook to set the profile, which updates state and localStorage
     updateProfile(profileData);
 
     let path = '/dashboard';
@@ -469,6 +467,12 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
 };
 
 export default function SignUpPage() {
+  const { updateProfile } = useSponsorProfile();
+
+  useEffect(() => {
+    updateProfile(null);
+  }, [updateProfile]);
+
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">

@@ -63,7 +63,7 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
         updateProfile(minimalProfile);
     }
 
-    let path = '/dashboard';
+    let path = '/profile'; // Default redirect to profile page
     if (role === 'individual') {
       path = '/individual-dashboard';
     } else if (role === 'organizer') {
@@ -162,4 +162,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
