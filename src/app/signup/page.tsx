@@ -234,21 +234,6 @@ const SponsorSignUpForm = () => {
               </FormItem>
             )}
           />
-          {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-              <FormField
-                  control={form.control}
-                  name="gtCoordinatorEmail"
-                  render={({ field }) => (
-                  <FormItem>
-                      <FormLabel>GT Coordinator Email</FormLabel>
-                      <FormControl>
-                      <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                  </FormItem>
-                  )}
-              />
-          )}
           <FormField
             control={form.control}
             name="email"
@@ -276,6 +261,22 @@ const SponsorSignUpForm = () => {
               </FormItem>
             )}
           />
+          {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+              <FormField
+                  control={form.control}
+                  name="gtCoordinatorEmail"
+                  render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>GT Coordinator Email</FormLabel>
+                      <FormControl>
+                      <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
+                      </FormControl>
+                      <FormDescription>This email will receive a copy of all invoices for this district.</FormDescription>
+                      <FormMessage />
+                  </FormItem>
+                  )}
+              />
+          )}
           <FormField
             control={form.control}
             name="phone"

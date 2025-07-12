@@ -24,7 +24,11 @@ const RecreateOrganizerInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the person or entity to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the invoice recipient.'),
     bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
+    gtCoordinatorEmail: z.string().email().optional().describe('The email of the GT Coordinator to be CCed.'),
     schoolName: z.string().describe('The school associated with this invoice.'),
+    schoolAddress: z.string().optional().describe('The address of the school.'),
+    schoolPhone: z.string().optional().describe('The phone number of the school.'),
+    district: z.string().optional().describe('The school district.'),
     invoiceTitle: z.string().describe('The main title for the invoice.'),
     invoiceNumber: z.string().optional().describe('The new invoice number, including revision.'),
     lineItems: z.array(LineItemSchema).min(1).describe('An array of items to be included in the invoice.'),
@@ -63,12 +67,7 @@ const recreateOrganizerInvoiceFlow = ai.defineFlow(
       console.log(`Creating new organizer invoice.`);
       
       const newInvoiceResult = await createOrganizerInvoice({
-          sponsorName: input.sponsorName,
-          sponsorEmail: input.sponsorEmail,
-          bookkeeperEmail: input.bookkeeperEmail,
-          schoolName: input.schoolName,
-          invoiceTitle: input.invoiceTitle,
-          lineItems: input.lineItems,
+          ...input,
       });
 
       console.log("Successfully created new revised invoice:", newInvoiceResult);

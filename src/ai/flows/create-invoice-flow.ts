@@ -28,6 +28,7 @@ const CreateInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
     bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
+    gtCoordinatorEmail: z.string().email().optional().describe('The email of the GT Coordinator to be CCed, if applicable.'),
     schoolName: z.string().describe('The name of the school associated with the sponsor.'),
     schoolAddress: z.string().optional().describe('The street address of the school.'),
     schoolPhone: z.string().optional().describe('The phone number of the school.'),
@@ -202,6 +203,9 @@ const createInvoiceFlow = ai.defineFlow(
       const ccRecipients: InvoiceRecipient[] = [];
       if (input.bookkeeperEmail) {
           ccRecipients.push({ emailAddress: input.bookkeeperEmail });
+      }
+      if (input.gtCoordinatorEmail) {
+          ccRecipients.push({ emailAddress: input.gtCoordinatorEmail });
       }
 
       console.log(`Creating invoice for order ID: ${orderId}`);

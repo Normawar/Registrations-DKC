@@ -490,8 +490,10 @@ export default function ProfilePage() {
                                     <FormField control={profileForm.control} name="schoolPhone" render={({ field }) => ( <FormItem><FormLabel>School Phone</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={profileForm.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={profileForm.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )} />
+                                     <FormField control={profileForm.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )} />
+                                    {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                        <FormField control={profileForm.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} /></FormControl><FormDescription>This email will be CC'd on invoices for this district.</FormDescription><FormMessage /></FormItem> )} />
+                                    )}
                                 </div>
                             </>
                         )}

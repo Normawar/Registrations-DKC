@@ -64,6 +64,7 @@ export function useSponsorProfile() {
     // This event listener ensures that if the profile changes in another tab (e.g., login/logout),
     // this hook will re-run and update its state.
     const handleStorageChange = (event: StorageEvent) => {
+        // Only reload if the key is for the current user profile, or if all users/profiles are changed.
         if (event.key === 'current_user_profile' || event.key === 'sponsor_profile' || event.key === 'users') {
             loadProfile();
         }
@@ -89,7 +90,7 @@ export function useSponsorProfile() {
             const allProfiles = allProfilesRaw ? JSON.parse(allProfilesRaw) : {};
             allProfiles[updated.email.toLowerCase()] = updated;
             localStorage.setItem('sponsor_profile', JSON.stringify(allProfiles));
-            
+
         } catch (error) {
             console.error("Failed to save sponsor profile to localStorage", error);
         }
