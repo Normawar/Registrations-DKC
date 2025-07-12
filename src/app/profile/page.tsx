@@ -199,14 +199,14 @@ export default function ProfilePage() {
       profileForm.setValue('schoolAddress', schoolInfo?.streetAddress || '');
       profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
   }
-
+  
   useEffect(() => {
     if (profile && isProfileLoaded) {
-      const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
-      
       handleDistrictChange(profile.district || 'None');
       
-      profileForm.reset({
+      const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
+      
+      const profileFormData = {
         firstName: profile.firstName || '',
         lastName: profile.lastName || '',
         district: profile.district || '',
@@ -217,7 +217,9 @@ export default function ProfilePage() {
         schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
         gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
         bookkeeperEmail: profile.bookkeeperEmail || '',
-      });
+      };
+      
+      profileForm.reset(profileFormData);
 
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
@@ -582,3 +584,4 @@ export default function ProfilePage() {
     </AppLayout>
   );
 }
+
