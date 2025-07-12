@@ -900,12 +900,47 @@ export default function ConfirmationsPage() {
     }
   };
 
-  // Helper component to avoid prop-drilling hell and keep logic contained
-  const ConfirmationDetails = (props: any) => {
+  const ConfirmationDetails = (props: {
+        conf: Confirmation,
+        confInputs: Record<string, Partial<ConfirmationInputs>>,
+        statuses: Record<string, { status?: string; isLoading: boolean }>,
+        isUpdating: Record<string, boolean>,
+        isAuthReady: boolean,
+        selectedPlayersForWithdraw: Record<string, string[]>,
+        selectedPlayersForRestore: Record<string, string[]>,
+        events: Event[],
+        changeRequests: ChangeRequest[],
+        confirmationsMap: Map<string, Confirmation>,
+        sponsorProfile: ReturnType<typeof useSponsorProfile>['profile'],
+        handleInputChange: typeof handleInputChange,
+        handleFileChange: typeof handleFileChange,
+        handleSavePayment: typeof handleSavePayment,
+        setConfToComp: typeof setConfToComp,
+        setIsCompAlertOpen: typeof setIsCompAlertOpen,
+        fetchInvoiceStatus: typeof fetchInvoiceStatus,
+        setConfToAddPlayer: typeof setConfToAddPlayer,
+        setIsAddPlayerDialogOpen: typeof setIsAddPlayerDialogOpen,
+        handleOpenRequestDialog: typeof handleOpenRequestDialog,
+        handleWithdrawPlayerSelect: typeof handleWithdrawPlayerSelect,
+        handleRestorePlayerSelect: typeof handleRestorePlayerSelect,
+        setChangeAlertContent: typeof setChangeAlertContent,
+        setChangeAction: typeof setChangeAction,
+        setIsChangeAlertOpen: typeof setIsChangeAlertOpen,
+        handleByeChange: typeof handleByeChange,
+        handleSectionChange: typeof handleSectionChange,
+        handleOpenEditPlayerDialog: typeof handleOpenEditPlayerDialog,
+        getPlayerById: typeof getPlayerById,
+        handlePlayerStatusChangeAction: typeof handlePlayerStatusChangeAction,
+    }) => {
     const { 
         conf, confInputs, statuses, isUpdating, isAuthReady, 
         selectedPlayersForWithdraw, selectedPlayersForRestore, 
-        events, changeRequests, confirmationsMap, sponsorProfile 
+        events, changeRequests, confirmationsMap, sponsorProfile,
+        handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen,
+        fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen,
+        handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect,
+        setChangeAlertContent, setChangeAction, setIsChangeAlertOpen, handleByeChange, handleSectionChange,
+        handleOpenEditPlayerDialog, getPlayerById, handlePlayerStatusChangeAction
     } = props;
 
     type SortablePlayerKey = 'lastName' | 'section';
@@ -977,8 +1012,9 @@ export default function ConfirmationsPage() {
           case 'Bye Request':
               const byeR1 = request.byeRound1 || 'none';
               const byeR2 = request.byeRound2 || 'none';
-              const byeR1Text = `Round 1: ${byeR1 === 'none' ? 'None' : byeR1}`;
-              const byeR2Text = `Round 2: ${byeR2 === 'none' ? 'None' : byeR2}`;
+              const byeR1Text = byeR1 === 'none' ? 'None' : `Round ${byeR1}`;
+              const byeR2Text = byeR2 === 'none' ? 'None' : `Round ${byeR2}`;
+
               title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
               description = `This will set the player's bye requests to ${byeR1Text}, ${byeR2Text}.`;
               action = () => handleByeChange(conf.id, player.id, byeR1, byeR2);
@@ -1027,7 +1063,7 @@ export default function ConfirmationsPage() {
                         {sponsorProfile?.role === 'organizer' && currentStatus?.status !== 'COMPED' && (
                             <Button variant="secondary" size="sm" onClick={() => { setConfToComp(conf); setIsCompAlertOpen(true); }} disabled={isLoading}> <Award className="mr-2 h-4 w-4" /> Comp Registration </Button>
                         )}
-                        <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!)} disabled={currentStatus?.isLoading || !conf.invoiceId || isLoading}>
+                        <Button variant="ghost" size="sm" onClick={() => fetchInvoiceStatus(conf.id, conf.invoiceId!, false)} disabled={currentStatus?.isLoading || !conf.invoiceId || isLoading}>
                             <RefreshCw className={cn("mr-2 h-4 w-4", currentStatus?.isLoading && "animate-spin")} /> Refresh Status
                         </Button>
                         <Button asChild variant="outline" size="sm" disabled={!conf.invoiceUrl}>
@@ -1094,7 +1130,7 @@ export default function ConfirmationsPage() {
                                         <p className="font-semibold">{latestRequest.type} - {latestRequest.status}</p>
                                         <p className="italic text-muted-foreground">
                                             {latestRequest.type === 'Bye Request'
-                                              ? `Requested Byes: R${latestRequest.byeRound1 || 'None'}, R${latestRequest.byeRound2 || 'None'}`
+                                              ? `Requested Byes: ${latestRequest.byeRound1 && latestRequest.byeRound1 !== 'none' ? `R${latestRequest.byeRound1}` : 'None'}, ${latestRequest.byeRound2 && latestRequest.byeRound2 !== 'none' ? `R${latestRequest.byeRound2}` : 'None'}`
                                               : `"${latestRequest.details}"`
                                             }
                                         </p>
@@ -1247,7 +1283,7 @@ export default function ConfirmationsPage() {
             )}
         </div>
     );
-  }
+  };
 
   return (
     <AppLayout>
