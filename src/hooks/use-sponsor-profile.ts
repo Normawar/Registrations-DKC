@@ -55,7 +55,6 @@ export function useSponsorProfile() {
   useEffect(() => {
     loadProfile();
     
-    // This listener handles updates from other tabs and from the login page
     const handleStorageChange = (event: StorageEvent) => {
         if (event.key === 'current_user_profile') {
             loadProfile();
@@ -70,25 +69,18 @@ export function useSponsorProfile() {
   }, [loadProfile]);
 
   const updateProfile = useCallback((newProfileData: Partial<SponsorProfile>) => {
-    // This function updates the profile in two places:
-    // 1. The current session profile (`current_user_profile`)
-    // 2. The master list of all profiles (`sponsor_profile`)
     setProfile(prev => {
         const currentProfile = prev || defaultSponsorData;
         const updated = { ...currentProfile, ...newProfileData };
         
         try {
-            // Update the session profile
             localStorage.setItem('current_user_profile', JSON.stringify(updated));
 
-            // Also update the master list of profiles, keyed by email
             const allProfilesRaw = localStorage.getItem('sponsor_profile');
             const allProfiles = allProfilesRaw ? JSON.parse(allProfilesRaw) : {};
             allProfiles[updated.email.toLowerCase()] = updated;
             localStorage.setItem('sponsor_profile', JSON.stringify(allProfiles));
             
-            // Dispatch custom event to notify other components in the same tab
-            window.dispatchEvent(new Event('storage'));
         } catch (error) {
             console.error("Failed to save sponsor profile to localStorage", error);
         }

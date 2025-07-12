@@ -104,6 +104,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       };
 
       loadData();
+      // Listen for changes from other tabs.
       window.addEventListener('storage', loadData);
       return () => {
           window.removeEventListener('storage', loadData);
@@ -130,6 +131,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     localStorage.removeItem('current_user_profile');
+    // We dispatch a storage event so all tabs know to log out.
+    window.dispatchEvent(new Event('storage'));
     router.push('/');
   };
 
