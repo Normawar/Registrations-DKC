@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 
 export type SponsorProfile = {
   firstName: string;
@@ -38,6 +39,7 @@ const defaultSponsorData: SponsorProfile = {
 export function useSponsorProfile() {
   const [profile, setProfile] = useState<SponsorProfile | null>(null);
   const [isProfileLoaded, setIsProfileLoaded] = useState(false);
+  const pathname = usePathname();
 
   const loadProfile = useCallback(() => {
     try {
@@ -64,8 +66,7 @@ export function useSponsorProfile() {
     // This event listener ensures that if the profile changes in another tab (e.g., login/logout),
     // this hook will re-run and update its state.
     const handleStorageChange = (event: StorageEvent) => {
-        // Only reload if the key is for the current user profile, or if all users/profiles are changed.
-        if (event.key === 'current_user_profile' || event.key === 'sponsor_profile' || event.key === 'users') {
+        if (event.key === 'current_user_profile' || event.key === null) {
             loadProfile();
         }
     };
@@ -75,7 +76,7 @@ export function useSponsorProfile() {
     return () => {
         window.removeEventListener('storage', handleStorageChange);
     };
-  }, [loadProfile]);
+  }, [loadProfile, pathname]);
 
   const updateProfile = useCallback((newProfileData: Partial<SponsorProfile>) => {
     setProfile(prev => {
