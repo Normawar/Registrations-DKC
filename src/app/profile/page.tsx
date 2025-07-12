@@ -202,10 +202,10 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (profile && isProfileLoaded) {
-      // 1. First, ensure the school dropdown is populated
+      // Set the school list based on the profile's district first.
       handleDistrictChange(profile.district || 'None');
       
-      // 2. Then, reset the form with all profile data.
+      // Then, reset the form with all profile data.
       // This ensures the school select has the correct options before its value is set.
       profileForm.reset({
         firstName: profile.firstName || '',
@@ -220,7 +220,7 @@ export default function ProfilePage() {
         bookkeeperEmail: profile.bookkeeperEmail || '',
       });
       
-      // 3. Set avatar state.
+      // Set avatar state.
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
         setSelectedIconName(profile.avatarValue);

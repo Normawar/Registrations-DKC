@@ -125,7 +125,7 @@ const SponsorSignUpForm = () => {
         return;
     }
 
-    const newUser = { email: lowercasedEmail, role: 'sponsor' };
+    const newUser = { email: lowercasedEmail, role: 'sponsor' as const };
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
