@@ -27,11 +27,6 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Search, CheckCircle } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -901,48 +896,111 @@ export default function ConfirmationsPage() {
     }
   };
 
-  const ConfirmationDetails = (props: {
-        conf: Confirmation,
-        confInputs: Record<string, Partial<ConfirmationInputs>>,
-        statuses: Record<string, { status?: string; isLoading: boolean }>,
-        isUpdating: Record<string, boolean>,
-        isAuthReady: boolean,
-        selectedPlayersForWithdraw: Record<string, string[]>,
-        selectedPlayersForRestore: Record<string, string[]>,
-        events: Event[],
-        changeRequests: ChangeRequest[],
-        confirmationsMap: Map<string, Confirmation>,
-        sponsorProfile: ReturnType<typeof useSponsorProfile>['profile'],
-        handleInputChange: typeof handleInputChange,
-        handleFileChange: typeof handleFileChange,
-        handleSavePayment: typeof handleSavePayment,
-        setConfToComp: typeof setConfToComp,
-        setIsCompAlertOpen: typeof setIsCompAlertOpen,
-        fetchInvoiceStatus: typeof fetchInvoiceStatus,
-        setConfToAddPlayer: typeof setConfToAddPlayer,
-        setIsAddPlayerDialogOpen: typeof setIsAddPlayerDialogOpen,
-        handleOpenRequestDialog: typeof handleOpenRequestDialog,
-        handleWithdrawPlayerSelect: typeof handleWithdrawPlayerSelect,
-        handleRestorePlayerSelect: typeof handleRestorePlayerSelect,
-        handleApproveRequest: (request: ChangeRequest, player: MasterPlayer) => void;
-        handleByeChange: typeof handleByeChange,
-        handleSectionChange: typeof handleSectionChange,
-        handleOpenEditPlayerDialog: typeof handleOpenEditPlayerDialog,
-        getPlayerById: typeof getPlayerById,
-        handlePlayerStatusChangeAction: typeof handlePlayerStatusChangeAction,
-    }) => {
-    const { 
-        conf, confInputs, statuses, isUpdating, isAuthReady, 
-        selectedPlayersForWithdraw, selectedPlayersForRestore, 
-        events, changeRequests, confirmationsMap, sponsorProfile,
-        handleInputChange, handleFileChange, handleSavePayment, setConfToComp, setIsCompAlertOpen,
-        fetchInvoiceStatus, setConfToAddPlayer, setIsAddPlayerDialogOpen,
-        handleOpenRequestDialog, handleWithdrawPlayerSelect, handleRestorePlayerSelect,
-        handleApproveRequest,
-        handleByeChange, handleSectionChange,
-        handleOpenEditPlayerDialog, getPlayerById, handlePlayerStatusChangeAction
-    } = props;
+    const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
+      if (!sponsorProfile) return;
+      
+      let title = '';
+      let description = '';
+      let action = () => {};
 
+      switch (request.type) {
+          case 'Section Change':
+              title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
+              description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
+              action = () => handleSectionChange(request.confirmationId, player.id, request.details);
+              break;
+          case 'Bye Request':
+              const byeR1 = request.byeRound1 || 'none';
+              const byeR2 = request.byeRound2 || 'none';
+              const byeR1Text = byeR1 === 'none' ? 'None' : `Round ${byeR1}`;
+              const byeR2Text = byeR2 === 'none' ? 'None' : `Round ${byeR2}`;
+
+              title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
+              description = `This will set the player's bye requests to ${byeR1Text}, ${byeR2Text}.`;
+              action = () => handleByeChange(request.confirmationId, player.id, byeR1, byeR2);
+              break;
+          default:
+              title = 'Approve This Request?';
+              description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
+              action = () => { /* No specific action for 'Other' */ };
+      }
+
+      setChangeAlertContent({ title, description });
+      setChangeAction(() => () => {
+          action();
+          const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+          const approvalTimestamp = new Date().toISOString();
+          const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
+          const updatedRequests = allRequests.map((r: ChangeRequest) =>
+              r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
+          );
+          localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+          window.dispatchEvent(new Event('storage'));
+          toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
+          setIsChangeAlertOpen(false);
+      });
+      setIsChangeAlertOpen(true);
+  };
+  
+  const ConfirmationDetails = ({
+    conf,
+    confInputs,
+    statuses,
+    isUpdating,
+    isAuthReady,
+    selectedPlayersForWithdraw,
+    selectedPlayersForRestore,
+    events,
+    changeRequests,
+    confirmationsMap,
+    sponsorProfile,
+    handleInputChange,
+    handleFileChange,
+    handleSavePayment,
+    setConfToComp,
+    setIsCompAlertOpen,
+    fetchInvoiceStatus,
+    setConfToAddPlayer,
+    setIsAddPlayerDialogOpen,
+    handleOpenRequestDialog,
+    handleWithdrawPlayerSelect,
+    handleRestorePlayerSelect,
+    handleApproveRequest,
+    handleByeChange,
+    handleSectionChange,
+    handleOpenEditPlayerDialog,
+    getPlayerById,
+    handlePlayerStatusChangeAction
+}: {
+    conf: Confirmation,
+    confInputs: Record<string, Partial<ConfirmationInputs>>,
+    statuses: Record<string, { status?: string; isLoading: boolean }>,
+    isUpdating: Record<string, boolean>,
+    isAuthReady: boolean,
+    selectedPlayersForWithdraw: Record<string, string[]>,
+    selectedPlayersForRestore: Record<string, string[]>,
+    events: Event[],
+    changeRequests: ChangeRequest[],
+    confirmationsMap: Map<string, Confirmation>,
+    sponsorProfile: ReturnType<typeof useSponsorProfile>['profile'],
+    handleInputChange: typeof handleInputChange,
+    handleFileChange: typeof handleFileChange,
+    handleSavePayment: typeof handleSavePayment,
+    setConfToComp: typeof setConfToComp,
+    setIsCompAlertOpen: typeof setIsCompAlertOpen,
+    fetchInvoiceStatus: typeof fetchInvoiceStatus,
+    setConfToAddPlayer: typeof setConfToAddPlayer,
+    setIsAddPlayerDialogOpen: typeof setIsAddPlayerDialogOpen,
+    handleOpenRequestDialog: typeof handleOpenRequestDialog,
+    handleWithdrawPlayerSelect: typeof handleWithdrawPlayerSelect,
+    handleRestorePlayerSelect: typeof handleRestorePlayerSelect,
+    handleApproveRequest: (request: ChangeRequest, player: MasterPlayer) => void,
+    handleByeChange: typeof handleByeChange,
+    handleSectionChange: typeof handleSectionChange,
+    handleOpenEditPlayerDialog: typeof handleOpenEditPlayerDialog,
+    getPlayerById: typeof getPlayerById,
+    handlePlayerStatusChangeAction: typeof handlePlayerStatusChangeAction,
+}) => {
     type SortablePlayerKey = 'lastName' | 'section';
     const [playerSortConfig, setPlayerSortConfig] = useState<{ key: SortablePlayerKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending'});
     
@@ -1237,52 +1295,6 @@ export default function ConfirmationsPage() {
             )}
         </div>
     );
-  };
-  
-    const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
-      if (!sponsorProfile) return;
-      
-      let title = '';
-      let description = '';
-      let action = () => {};
-
-      switch (request.type) {
-          case 'Section Change':
-              title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
-              description = `This will change the player's section to "${request.details}". This will not affect the invoice amount.`;
-              action = () => handleSectionChange(confToRequestChange!.id, player.id, request.details);
-              break;
-          case 'Bye Request':
-              const byeR1 = request.byeRound1 || 'none';
-              const byeR2 = request.byeRound2 || 'none';
-              const byeR1Text = byeR1 === 'none' ? 'None' : `Round ${byeR1}`;
-              const byeR2Text = byeR2 === 'none' ? 'None' : `Round ${byeR2}`;
-
-              title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
-              description = `This will set the player's bye requests to ${byeR1Text}, ${byeR2Text}.`;
-              action = () => handleByeChange(confToRequestChange!.id, player.id, byeR1, byeR2);
-              break;
-          default:
-              title = 'Approve This Request?';
-              description = `Please review the details for this request: "${request.details}". Approving may have consequences not handled automatically.`
-              action = () => { /* No specific action for 'Other' */ };
-      }
-
-      setChangeAlertContent({ title, description });
-      setChangeAction(() => () => {
-          action();
-          const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-          const approvalTimestamp = new Date().toISOString();
-          const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
-          const updatedRequests = allRequests.map((r: ChangeRequest) =>
-              r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
-          );
-          localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
-          window.dispatchEvent(new Event('storage'));
-          toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
-          setIsChangeAlertOpen(false);
-      });
-      setIsChangeAlertOpen(true);
   };
 
   return (
