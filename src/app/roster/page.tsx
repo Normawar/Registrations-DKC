@@ -833,7 +833,7 @@ export default function RosterPage() {
                               name="state"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>State</FormLabel>
+                                  <FormLabel>State (Optional)</FormLabel>
                                   <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl>
                                       <SelectTrigger>
@@ -851,7 +851,7 @@ export default function RosterPage() {
                             {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
                               <FormField control={form.control} name="studentType" render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Student Type (PSJA Only)</FormLabel>
+                                    <FormLabel>Student Type</FormLabel>
                                     <FormControl>
                                       <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center gap-4 pt-2">
                                         <FormItem className="flex items-center space-x-2">

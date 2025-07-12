@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, ReactNode, useMemo } from 'react';
@@ -944,7 +945,7 @@ export default function EventsPage() {
 
                                     {sponsorProfile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
                                         <div className="grid gap-1.5 mt-4">
-                                            <Label className="text-xs">Student Type (PSJA Only)</Label>
+                                            <Label className="text-xs">Student Type</Label>
                                             <RadioGroup
                                                 value={selections[player.id]?.studentType}
                                                 onValueChange={(value) => handleStudentTypeChange(player.id, value as any)}

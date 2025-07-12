@@ -867,7 +867,7 @@ export default function PlayersPage() {
                             <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Player Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Player Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <FormField control={form.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Player Zip Code (Optional)</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField
                               control={form.control}
@@ -889,6 +889,26 @@ export default function PlayersPage() {
                                 </FormItem>
                               )}
                             />
+                             {form.getValues('district') === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                <FormField control={form.control} name="studentType" render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Student Type</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center gap-4 pt-2">
+                                        <FormItem className="flex items-center space-x-2">
+                                            <FormControl><RadioGroupItem value="gt" id={`gt-radio-org-${editingPlayer?.id || 'new'}`} /></FormControl>
+                                            <FormLabel htmlFor={`gt-radio-org-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">GT Student</FormLabel>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-2">
+                                            <FormControl><RadioGroupItem value="independent" id={`ind-radio-org-${editingPlayer?.id || 'new'}`} /></FormControl>
+                                            <FormLabel htmlFor={`ind-radio-org-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">Independent</FormLabel>
+                                        </FormItem>
+                                        </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )} />
+                            )}
                         </div>
                     </form>
                 </Form>
