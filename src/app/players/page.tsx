@@ -353,6 +353,16 @@ export default function PlayersPage() {
     }
   });
 
+  const watchUscfId = form.watch('uscfId');
+  
+  const uscfIdLink = useMemo(() => {
+    const isNumeric = watchUscfId && /^\d+$/.test(watchUscfId);
+    if (isNumeric) {
+      return `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}`;
+    }
+    return "https://new.uschess.org/player-search";
+  }, [watchUscfId]);
+
   useEffect(() => {
     if (isPlayerDialogOpen) {
       if (editingPlayer) {
@@ -488,16 +498,7 @@ export default function PlayersPage() {
     }
   };
 
-  const watchUscfId = form.watch('uscfId');
   const isUscfNew = watchUscfId.toUpperCase() === 'NEW';
-  const uscfIdLink = useMemo(() => {
-    const id = form.getValues('uscfId');
-    const isNumeric = id && /^\d+$/.test(id);
-    if (isNumeric) {
-        return `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${id}`;
-    }
-    return "https://new.uschess.org/player-search";
-  }, [form]);
 
 
   const handleAddPlayer = () => {
