@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/table";
 import { schoolData as initialSchoolData, type School } from "@/lib/data/school-data";
 import { generateTeamCode } from '@/lib/school-utils';
-import { PlusCircle, MoreHorizontal, Upload, Trash2, FilePenLine } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Upload, Trash2, FilePenLine, Edit } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -56,6 +56,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import Papa from 'papaparse';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export type SchoolWithTeamCode = School & { id: string; teamCode: string };
 
@@ -82,6 +84,14 @@ export default function SchoolsPage() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [schoolToDelete, setSchoolToDelete] = useState<SchoolWithTeamCode | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [selectedDistrictToEdit, setSelectedDistrictToEdit] = useState<string | null>(null);
+  const [newDistrictName, setNewDistrictName] = useState('');
+
+  const uniqueDistricts = useMemo(() => {
+    const districts = new Set(schools.map(s => s.district));
+    return Array.from(districts).sort();
+  }, [schools]);
 
   useEffect(() => {
     try {
@@ -254,6 +264,37 @@ export default function SchoolsPage() {
     setEditingSchool(null);
   }
 
+  const handleRenameDistrict = () => {
+    if (!selectedDistrictToEdit || !newDistrictName.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Input',
+        description: 'Please select a district and provide a new name.',
+      });
+      return;
+    }
+
+    const updatedSchools = schools.map(school => {
+      if (school.district === selectedDistrictToEdit) {
+        const updatedSchool = { ...school, district: newDistrictName.trim() };
+        // Also update team code since district name changed
+        updatedSchool.teamCode = generateTeamCode({ schoolName: updatedSchool.schoolName, district: updatedSchool.district });
+        return updatedSchool;
+      }
+      return school;
+    });
+
+    setSchools(updatedSchools);
+    toast({
+      title: 'District Renamed',
+      description: `All schools under "${selectedDistrictToEdit}" have been moved to "${newDistrictName.trim()}".`,
+    });
+    
+    // Reset fields
+    setSelectedDistrictToEdit(null);
+    setNewDistrictName('');
+  };
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -280,6 +321,42 @@ export default function SchoolsPage() {
             </Button>
           </div>
         </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Edit District Name</CardTitle>
+            <CardDescription>
+              Select a district to rename. This will update all schools associated with it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="grid gap-1.5 flex-1">
+              <Label htmlFor="district-to-edit">District to Rename</Label>
+              <Select onValueChange={setSelectedDistrictToEdit} value={selectedDistrictToEdit || ''}>
+                <SelectTrigger id="district-to-edit">
+                  <SelectValue placeholder="Select a district..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5 flex-1">
+              <Label htmlFor="new-district-name">New District Name</Label>
+              <Input
+                id="new-district-name"
+                value={newDistrictName}
+                onChange={(e) => setNewDistrictName(e.target.value)}
+                disabled={!selectedDistrictToEdit}
+                placeholder='Enter new name...'
+              />
+            </div>
+            <Button onClick={handleRenameDistrict} disabled={!selectedDistrictToEdit || !newDistrictName.trim()}>
+              <Edit className="mr-2 h-4 w-4" />
+              Rename District
+            </Button>
+          </CardContent>
+        </Card>
 
         <Card>
            <CardHeader>
