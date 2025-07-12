@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { districts as uniqueDistricts } from '@/lib/data/districts';
 import { schoolData } from '@/lib/data/school-data';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -50,6 +50,7 @@ const profileFormSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email.' }),
   phone: z.string().min(10, { message: 'Please enter a valid 10-digit phone number.' }),
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+  bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 }).refine(data => {
     if (data.district === 'PHARR-SAN JUAN-ALAMO ISD') {
         return data.gtCoordinatorEmail && data.gtCoordinatorEmail.length > 0;
@@ -154,6 +155,7 @@ export default function ProfilePage() {
       email: '',
       phone: '',
       gtCoordinatorEmail: '',
+      bookkeeperEmail: '',
     },
   });
   
@@ -226,6 +228,7 @@ export default function ProfilePage() {
         email: profile.email,
         phone: profile.phone,
         gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
+        bookkeeperEmail: profile.bookkeeperEmail || '',
       });
 
       if (profile.district === 'None') {
@@ -559,7 +562,7 @@ export default function ProfilePage() {
                                         )}
                                     />
                                 </div>
-                                {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField
                                         control={profileForm.control}
                                         name="gtCoordinatorEmail"
@@ -573,7 +576,21 @@ export default function ProfilePage() {
                                         </FormItem>
                                         )}
                                     />
-                                )}
+                                    <FormField
+                                        control={profileForm.control}
+                                        name="bookkeeperEmail"
+                                        render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Bookkeeper/Secretary Email</FormLabel>
+                                            <FormControl>
+                                            <Input type="email" placeholder="bookkeeper@example.com" {...field} />
+                                            </FormControl>
+                                            <FormDescription>This email will receive a copy of all invoices.</FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                        )}
+                                    />
+                                </div>
                             </>
                         )}
                     </CardContent>

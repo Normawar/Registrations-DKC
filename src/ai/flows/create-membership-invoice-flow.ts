@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError } from 'square';
+import { ApiError, type InvoiceRecipient } from 'square';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { format } from 'date-fns';
 import { checkSquareConfig } from '@/lib/actions/check-config';
@@ -29,6 +29,7 @@ const PlayerInfoSchema = z.object({
 const CreateMembershipInvoiceInputSchema = z.object({
     purchaserName: z.string().describe('The name of the person paying for the membership.'),
     purchaserEmail: z.string().email().describe('The email of the person paying for the membership.'),
+    bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
     schoolName: z.string().describe('The name of the school associated with the purchaser.'),
     membershipType: z.string().describe('The type of USCF membership being purchased.'),
     fee: z.number().describe('The cost of the membership.'),
@@ -162,6 +163,11 @@ const createMembershipInvoiceFlow = ai.defineFlow(
         ? `USCF Membership for ${input.players.length} players`
         : `USCF Membership for ${firstPlayerName}`;
 
+      const ccRecipients: InvoiceRecipient[] = [];
+      if (input.bookkeeperEmail) {
+          ccRecipients.push({ emailAddress: input.bookkeeperEmail });
+      }
+
       console.log(`Creating invoice for order ID: ${orderId}`);
       const createInvoiceResponse = await invoicesApi.createInvoice({
         idempotencyKey: randomUUID(),
@@ -170,6 +176,7 @@ const createMembershipInvoiceFlow = ai.defineFlow(
           primaryRecipient: {
             customerId: customerId,
           },
+          ccRecipients: ccRecipients,
           paymentRequests: [{
             requestType: 'BALANCE',
             dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD

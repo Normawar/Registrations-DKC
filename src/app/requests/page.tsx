@@ -3,7 +3,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { AppLayout } from "@/components/app-layout";
 import {
   Card,
@@ -25,7 +24,6 @@ import type { ChangeRequest } from "@/lib/data/requests-data";
 import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
@@ -42,26 +40,49 @@ export default function RequestsPage() {
   const loadData = useCallback(() => {
     try {
       const storedRequestsRaw = localStorage.getItem('change_requests');
-      const parsedRequests: ChangeRequest[] = storedRequestsRaw ? JSON.parse(storedRequestsRaw) : initialRequestsData;
+      const allParsedRequests: ChangeRequest[] = storedRequestsRaw ? JSON.parse(storedRequestsRaw) : initialRequestsData;
       
-      const allRequests = (Array.isArray(parsedRequests) ? parsedRequests : initialRequestsData).map((req, index) => ({
+      const allRequests = (Array.isArray(allParsedRequests) ? allParsedRequests : initialRequestsData).map((req, index) => ({
         ...req,
         id: req.id || `${req.confirmationId}-${req.player.replace(/\s/g, '')}-${index}` 
       }));
 
-      setRequests(allRequests);
-
       const storedConfirmationsRaw = localStorage.getItem('confirmations');
-      const storedConfirmations = storedConfirmationsRaw ? JSON.parse(storedConfirmationsRaw) : [];
-      const map = new Map();
-      storedConfirmations.forEach((conf: any) => map.set(conf.id, conf));
-      setConfirmationsMap(map);
+      const allConfirmations = storedConfirmationsRaw ? JSON.parse(storedConfirmationsRaw) : [];
+      const confirmationMap = new Map();
+      allConfirmations.forEach((conf: any) => confirmationMap.set(conf.id, conf));
+      setConfirmationsMap(confirmationMap);
+
+      if (profile?.role === 'sponsor') {
+          const sponsorConfirmationIds = new Set(
+              allConfirmations
+                  .filter((c: any) => c.schoolName === profile.school && c.district === profile.district)
+                  .map((c: any) => c.id)
+          );
+          const sponsorRequests = allRequests.filter(req => sponsorConfirmationIds.has(req.confirmationId));
+          setRequests(sponsorRequests);
+      } else {
+          setRequests(allRequests);
+      }
 
     } catch (e) {
       console.error("Failed to parse data from localStorage", e);
       setRequests(initialRequestsData);
     }
-  }, []);
+  }, [profile]);
+
+  useEffect(() => {
+    if (profile) {
+        loadData();
+    }
+    const handleStorageChange = () => {
+        if (profile) loadData();
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [loadData, profile]);
 
   const sortedRequests = useMemo(() => {
     const sortableRequests = [...requests];
@@ -114,18 +135,6 @@ export default function RequestsPage() {
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
-  useEffect(() => {
-    const handleStorageChange = () => {
-      loadData();
-    };
-
-    loadData();
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [loadData]);
 
   return (
     <AppLayout>

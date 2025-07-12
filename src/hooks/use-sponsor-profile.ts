@@ -11,6 +11,7 @@ export type SponsorProfile = {
   email: string;
   phone: string;
   gtCoordinatorEmail?: string;
+  bookkeeperEmail?: string;
   avatarType: 'icon' | 'upload';
   avatarValue: string; // Icon name or image URL
   role: 'sponsor' | 'organizer' | 'individual';
@@ -24,6 +25,7 @@ const defaultSponsorData: SponsorProfile = {
   email: '',
   phone: '',
   gtCoordinatorEmail: '',
+  bookkeeperEmail: '',
   avatarType: 'icon',
   avatarValue: 'KingIcon', 
   role: 'sponsor',
@@ -55,8 +57,10 @@ export function useSponsorProfile() {
   useEffect(() => {
     loadProfile();
     
+    // This event listener ensures that if the profile changes in another tab (e.g., login/logout),
+    // this hook will re-run and update its state.
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'current_user_profile') {
+        if (event.key === 'current_user_profile' || event.key === 'sponsor_profile' || event.key === 'users') {
             loadProfile();
         }
     };
@@ -76,6 +80,7 @@ export function useSponsorProfile() {
         try {
             localStorage.setItem('current_user_profile', JSON.stringify(updated));
 
+            // Also update the master list of profiles
             const allProfilesRaw = localStorage.getItem('sponsor_profile');
             const allProfiles = allProfilesRaw ? JSON.parse(allProfilesRaw) : {};
             allProfiles[updated.email.toLowerCase()] = updated;

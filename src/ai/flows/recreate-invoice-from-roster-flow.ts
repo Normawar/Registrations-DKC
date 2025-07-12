@@ -29,6 +29,7 @@ const RecreateInvoiceInputSchema = z.object({
     uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
+    bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
     schoolName: z.string().describe('The name of the school associated with the sponsor.'),
     teamCode: z.string().describe('The team code of the sponsor.'),
     eventName: z.string().describe('The name of the event.'),
@@ -98,6 +99,7 @@ const recreateInvoiceFlow = ai.defineFlow(
       const newInvoiceResult = await createInvoice({
           sponsorName: input.sponsorName,
           sponsorEmail: input.sponsorEmail,
+          bookkeeperEmail: input.bookkeeperEmail,
           schoolName: input.schoolName,
           teamCode: input.teamCode,
           eventName: input.eventName,

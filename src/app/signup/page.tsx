@@ -31,7 +31,6 @@ import {
 import { schoolData } from "@/lib/data/school-data";
 import { districts as uniqueDistricts } from "@/lib/data/districts";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -42,6 +41,7 @@ const sponsorFormSchema = z.object({
   phone: z.string().min(10, { message: "Please enter a valid 10-digit phone number." }),
   password: z.string().min(8, { message: "Password must be at least 8 characters." }),
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+  bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 }).refine(data => {
     if (data.district === 'PHARR-SAN JUAN-ALAMO ISD') {
         return data.gtCoordinatorEmail && data.gtCoordinatorEmail.length > 0;
@@ -54,7 +54,6 @@ const sponsorFormSchema = z.object({
 
 const SponsorSignUpForm = () => {
   const router = useRouter();
-  const { updateProfile } = useSponsorProfile();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const allSchoolNames = useMemo(() => {
     const schoolNames = schoolData.map(s => s.schoolName);
@@ -76,6 +75,7 @@ const SponsorSignUpForm = () => {
       phone: "",
       password: "",
       gtCoordinatorEmail: "",
+      bookkeeperEmail: "",
     },
   });
 
@@ -128,12 +128,11 @@ const SponsorSignUpForm = () => {
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
-    // Exclude password from the profile data object
     const { password, ...profileValues } = values;
 
     const profileData = {
       ...profileValues,
-      email: lowercasedEmail, // ensure email is saved in lowercase
+      email: lowercasedEmail,
       role: 'sponsor' as const,
       avatarType: 'icon' as const,
       avatarValue: 'KingIcon',
@@ -144,7 +143,6 @@ const SponsorSignUpForm = () => {
     profiles[lowercasedEmail] = profileData;
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
     
-    localStorage.setItem('user_role', 'sponsor');
     localStorage.setItem('current_user_profile', JSON.stringify(profileData));
     
     router.push('/dashboard');
@@ -258,6 +256,20 @@ const SponsorSignUpForm = () => {
               </FormItem>
             )}
           />
+           <FormField
+            control={form.control}
+            name="bookkeeperEmail"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Bookkeeper/Secretary Email (Optional)</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="bookkeeper@example.com" {...field} />
+                </FormControl>
+                <FormDescription>This email will receive a copy of all invoices.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
           <FormField
             control={form.control}
             name="phone"
@@ -345,7 +357,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
-    // Exclude password from the profile data object
     const { password, ...profileValues } = values;
 
     const profileData = {
@@ -355,6 +366,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         district: 'None',
         school: 'Homeschool',
         gtCoordinatorEmail: '',
+        bookkeeperEmail: '',
         role: role,
         avatarType: 'icon' as const,
         avatarValue: 'PawnIcon',
@@ -365,7 +377,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     profiles[lowercasedEmail] = profileData;
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
-    localStorage.setItem('user_role', role);
     localStorage.setItem('current_user_profile', JSON.stringify(profileData));
 
     let path = '/dashboard';

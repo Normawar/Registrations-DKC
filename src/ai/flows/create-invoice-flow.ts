@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type OrderLineItem } from 'square';
+import { ApiError, type OrderLineItem, type InvoiceRecipient } from 'square';
 import { format } from 'date-fns';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
@@ -27,6 +27,7 @@ const PlayerInvoiceInfoSchema = z.object({
 const CreateInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
+    bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
     schoolName: z.string().describe('The name of the school associated with the sponsor.'),
     teamCode: z.string().describe('The team code of the sponsor.'),
     eventName: z.string().describe('The name of the event.'),
@@ -181,6 +182,11 @@ const createInvoiceFlow = ai.defineFlow(
       dueDate.setDate(dueDate.getDate() + 7); // Invoice due in 7 days
       const formattedEventDate = format(new Date(input.eventDate), 'MM/dd/yyyy');
 
+      const ccRecipients: InvoiceRecipient[] = [];
+      if (input.bookkeeperEmail) {
+          ccRecipients.push({ emailAddress: input.bookkeeperEmail });
+      }
+
       console.log(`Creating invoice for order ID: ${orderId}`);
       const createInvoiceResponse = await invoicesApi.createInvoice({
         idempotencyKey: randomUUID(),
@@ -189,6 +195,7 @@ const createInvoiceFlow = ai.defineFlow(
           primaryRecipient: {
             customerId: customerId,
           },
+          ccRecipients: ccRecipients,
           paymentRequests: [{
             requestType: 'BALANCE',
             dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD

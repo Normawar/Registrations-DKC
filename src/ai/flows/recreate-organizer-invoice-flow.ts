@@ -23,6 +23,7 @@ const RecreateOrganizerInvoiceInputSchema = z.object({
     originalInvoiceId: z.string().describe('The ID of the invoice to cancel and replace.'),
     sponsorName: z.string().describe('The name of the person or entity to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the invoice recipient.'),
+    bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
     schoolName: z.string().describe('The school associated with this invoice.'),
     invoiceTitle: z.string().describe('The main title for the invoice.'),
     invoiceNumber: z.string().optional().describe('The new invoice number, including revision.'),
@@ -64,6 +65,7 @@ const recreateOrganizerInvoiceFlow = ai.defineFlow(
       const newInvoiceResult = await createOrganizerInvoice({
           sponsorName: input.sponsorName,
           sponsorEmail: input.sponsorEmail,
+          bookkeeperEmail: input.bookkeeperEmail,
           schoolName: input.schoolName,
           invoiceTitle: input.invoiceTitle,
           lineItems: input.lineItems,

@@ -48,21 +48,35 @@ export default function DashboardPage() {
       setChangeRequests(storedRequests ? JSON.parse(storedRequests) : initialRequestsData);
       
       const storedConfirmations = localStorage.getItem('confirmations');
-      setConfirmations(storedConfirmations ? JSON.parse(storedConfirmations) : []);
+      const allConfirmations = storedConfirmations ? JSON.parse(storedConfirmations) : [];
+
+      if (profile?.role === 'sponsor') {
+          const sponsorConfirmations = allConfirmations.filter((c: any) => 
+              c.schoolName === profile.school && c.district === profile.district
+          );
+          setConfirmations(sponsorConfirmations);
+      } else {
+          setConfirmations(allConfirmations);
+      }
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
       setChangeRequests(initialRequestsData);
       setConfirmations([]);
     }
-  }, []);
+  }, [profile]);
 
   useEffect(() => {
-    loadData();
-    window.addEventListener('storage', loadData);
-    return () => {
-      window.removeEventListener('storage', loadData);
+    if (profile) {
+        loadData();
+    }
+    const handleStorageChange = () => {
+        if (profile) loadData();
     };
-  }, [loadData]);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [loadData, profile]);
 
   const rosterPlayers = useMemo(() => {
     if (!profile || profile.role !== 'sponsor') return [];
@@ -83,9 +97,7 @@ export default function DashboardPage() {
   
   const sponsorConfirmationIds = useMemo(() => {
     if (!profile) return new Set();
-    const ids = confirmations
-      .filter(c => c.schoolName === profile.school)
-      .map(c => c.id);
+    const ids = confirmations.map(c => c.id);
     return new Set(ids);
   }, [confirmations, profile]);
 

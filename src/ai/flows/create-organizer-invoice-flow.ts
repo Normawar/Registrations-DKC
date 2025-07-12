@@ -5,13 +5,13 @@
  *
  * - createOrganizerInvoice - A function that handles the invoice creation process for organizers.
  * - CreateOrganizerInvoiceInput - The input type for the function.
- * - CreateOrganizerInvoiceOutput - The return type for the function.
+ * - CreateOrganizerInvoiceInvoiceOutput - The return type for the function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError } from 'square';
+import { ApiError, type InvoiceRecipient } from 'square';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 
@@ -24,6 +24,7 @@ const LineItemSchema = z.object({
 const CreateOrganizerInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the person or entity to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the invoice recipient.'),
+    bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
     schoolName: z.string().describe('The school associated with this invoice.'),
     invoiceTitle: z.string().describe('The main title for the invoice.'),
     lineItems: z.array(LineItemSchema).min(1).describe('An array of items to be included in the invoice.'),
@@ -135,6 +136,11 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 14); // Invoice due in 14 days
 
+      const ccRecipients: InvoiceRecipient[] = [];
+      if (input.bookkeeperEmail) {
+          ccRecipients.push({ emailAddress: input.bookkeeperEmail });
+      }
+
       console.log(`Creating invoice for order ID: ${orderId}`);
       const createInvoiceResponse = await invoicesApi.createInvoice({
         idempotencyKey: randomUUID(),
@@ -143,6 +149,7 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
           primaryRecipient: {
             customerId: customerId,
           },
+          ccRecipients: ccRecipients,
           paymentRequests: [{
             requestType: 'BALANCE',
             dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
