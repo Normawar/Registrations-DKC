@@ -125,7 +125,7 @@ const SponsorSignUpForm = () => {
         return;
     }
 
-    const newUser = { email: lowercasedEmail, role: 'sponsor' as const };
+    const newUser = { email: lowercasedEmail, role: 'sponsor' };
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
@@ -510,3 +510,5 @@ export default function SignUpPage() {
     </div>
   );
 }
+
+    
