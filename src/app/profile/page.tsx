@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef, type ChangeEvent, type ElementType } from 'react';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent, type ElementType } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
