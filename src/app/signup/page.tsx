@@ -106,9 +106,9 @@ const SponsorSignUpForm = () => {
   };
 
   useEffect(() => {
-    // This is the critical fix: ensure the school list is populated on initial form load.
     const initialDistrict = form.getValues('district');
     handleDistrictChange(initialDistrict, false); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
@@ -126,7 +126,7 @@ const SponsorSignUpForm = () => {
         return;
     }
 
-    const newUser = { email: lowercasedEmail, role: 'sponsor' as const };
+    const newUser = { email: lowercasedEmail, role: 'sponsor' };
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
@@ -511,3 +511,5 @@ export default function SignUpPage() {
     </div>
   );
 }
+
+    
