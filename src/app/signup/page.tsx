@@ -30,7 +30,7 @@ import {
 import { schoolData } from "@/lib/data/school-data";
 import { districts as uniqueDistricts } from "@/lib/data/districts";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -55,6 +55,8 @@ const sponsorFormSchema = z.object({
 const SponsorSignUpForm = () => {
   const router = useRouter();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+  const { updateProfile } = useSponsorProfile();
+
   const allSchoolNames = useMemo(() => {
     const schoolNames = schoolData.map(s => s.schoolName);
     const uniqueSchoolNames = [...new Set(schoolNames)].sort();
@@ -129,7 +131,6 @@ const SponsorSignUpForm = () => {
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
     const { password, ...profileValues } = values;
-
     const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
 
     const profileData: SponsorProfile = {
@@ -142,14 +143,8 @@ const SponsorSignUpForm = () => {
       schoolPhone: schoolInfo?.phone || '',
     };
     
-    const profilesRaw = localStorage.getItem('sponsor_profile');
-    const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    profiles[lowercasedEmail] = profileData;
-    localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
-    
-    localStorage.setItem('current_user_profile', JSON.stringify(profileData));
-    
-    window.dispatchEvent(new Event('storage'));
+    // Use the hook to set the profile, which updates state and localStorage
+    updateProfile(profileData);
     
     router.push('/dashboard');
   }
@@ -334,6 +329,7 @@ const individualFormSchema = z.object({
 
 const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) => {
   const router = useRouter();
+  const { updateProfile } = useSponsorProfile();
   
   const form = useForm<z.infer<typeof individualFormSchema>>({
     resolver: zodResolver(individualFormSchema),
@@ -381,14 +377,8 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         avatarValue: 'PawnIcon',
     };
     
-    const profilesRaw = localStorage.getItem('sponsor_profile');
-    const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    profiles[lowercasedEmail] = profileData;
-    localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
-
-    localStorage.setItem('current_user_profile', JSON.stringify(profileData));
-    
-    window.dispatchEvent(new Event('storage'));
+    // Use the hook to set the profile, which updates state and localStorage
+    updateProfile(profileData);
 
     let path = '/dashboard';
     if (role === 'individual') {
@@ -517,3 +507,4 @@ export default function SignUpPage() {
     </div>
   );
 }
+

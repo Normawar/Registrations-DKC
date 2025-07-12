@@ -15,6 +15,7 @@ import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-prof
 
 const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) => {
   const router = useRouter();
+  const { updateProfile } = useSponsorProfile();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   
@@ -41,18 +42,13 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
       return;
     }
     
-    // Role matches, proceed with login
-    // Load the user's detailed profile from the master list
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    const userProfile = profiles[lowercasedEmail]; // Use lowercase email for lookup
+    const userProfile = profiles[lowercasedEmail]; 
 
     if (userProfile) {
-        // This is the key step: set the full profile for the current session.
-        localStorage.setItem('current_user_profile', JSON.stringify(userProfile));
+        updateProfile(userProfile);
     } else {
-        // This case should not be hit if signup is working correctly.
-        // If it is, create a minimal profile to avoid crashing.
         const minimalProfile: SponsorProfile = { 
             email: lowercasedEmail, 
             role: role, 
@@ -64,11 +60,8 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
             avatarType: 'icon',
             avatarValue: 'PawnIcon'
         };
-        localStorage.setItem('current_user_profile', JSON.stringify(minimalProfile));
+        updateProfile(minimalProfile);
     }
-    
-    // This event notifies other components (like the layout) that auth state has changed.
-    window.dispatchEvent(new Event('storage')); 
 
     let path = '/dashboard';
     if (role === 'individual') {
@@ -126,13 +119,12 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
 };
 
 export default function LoginPage() {
-  const router = useRouter();
+  const { updateProfile } = useSponsorProfile();
   
-  // This effect logs out the user by clearing session storage when they land on the login page.
   useEffect(() => {
-    localStorage.removeItem('current_user_profile');
-    window.dispatchEvent(new Event('storage'));
-  }, []);
+    // A null profile effectively logs the user out.
+    updateProfile(null);
+  }, [updateProfile]);
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
@@ -170,3 +162,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

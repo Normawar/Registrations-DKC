@@ -63,8 +63,6 @@ export function useSponsorProfile() {
   useEffect(() => {
     loadProfile();
     
-    // This event listener ensures that if the profile changes in another tab (e.g., login/logout),
-    // this hook will re-run and update its state.
     const handleStorageChange = (event: StorageEvent) => {
         if (event.key === 'current_user_profile' || event.key === null) {
             loadProfile();
@@ -79,17 +77,20 @@ export function useSponsorProfile() {
   }, [loadProfile, pathname]);
 
   const updateProfile = useCallback((newProfileData: Partial<SponsorProfile>) => {
+    // This function now correctly updates the hook's internal state
+    // in addition to localStorage.
     setProfile(prev => {
         const currentProfile = prev || defaultSponsorData;
         const updated = { ...currentProfile, ...newProfileData };
         
         try {
+            const lowercasedEmail = updated.email.toLowerCase();
             localStorage.setItem('current_user_profile', JSON.stringify(updated));
 
             // Also update the master list of profiles
             const allProfilesRaw = localStorage.getItem('sponsor_profile');
             const allProfiles = allProfilesRaw ? JSON.parse(allProfilesRaw) : {};
-            allProfiles[updated.email.toLowerCase()] = updated;
+            allProfiles[lowercasedEmail] = updated;
             localStorage.setItem('sponsor_profile', JSON.stringify(allProfiles));
 
         } catch (error) {
@@ -101,3 +102,4 @@ export function useSponsorProfile() {
   
   return { profile, updateProfile, isProfileLoaded };
 }
+
