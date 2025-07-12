@@ -110,10 +110,11 @@ const SponsorSignUpForm = () => {
   };
   
   function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
+    const lowercasedEmail = values.email.toLowerCase();
     const usersRaw = localStorage.getItem('users');
     const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
     
-    const existingUser = users.find(user => user.email.toLowerCase() === values.email.toLowerCase());
+    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
 
     if (existingUser) {
         form.setError('email', {
@@ -123,7 +124,7 @@ const SponsorSignUpForm = () => {
         return;
     }
 
-    const newUser = { email: values.email, role: 'sponsor' as const };
+    const newUser = { email: lowercasedEmail, role: 'sponsor' as const };
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
@@ -132,6 +133,7 @@ const SponsorSignUpForm = () => {
 
     const profileData = {
       ...profileValues,
+      email: lowercasedEmail, // ensure email is saved in lowercase
       role: 'sponsor' as const,
       avatarType: 'icon' as const,
       avatarValue: 'KingIcon',
@@ -139,7 +141,7 @@ const SponsorSignUpForm = () => {
     
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    profiles[values.email] = profileData;
+    profiles[lowercasedEmail] = profileData;
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
     
     localStorage.setItem('user_role', 'sponsor');
@@ -325,10 +327,11 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
   });
 
   function onSubmit(values: z.infer<typeof individualFormSchema>) {
+    const lowercasedEmail = values.email.toLowerCase();
     const usersRaw = localStorage.getItem('users');
     const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
 
-    const existingUser = users.find(user => user.email.toLowerCase() === values.email.toLowerCase());
+    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
 
     if (existingUser) {
         form.setError('email', {
@@ -338,7 +341,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         return;
     }
 
-    const newUser = { email: values.email, role: role };
+    const newUser = { email: lowercasedEmail, role: role };
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
@@ -347,6 +350,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
 
     const profileData = {
         ...profileValues,
+        email: lowercasedEmail,
         phone: '',
         district: 'None',
         school: 'Homeschool',
@@ -358,7 +362,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    profiles[values.email] = profileData;
+    profiles[lowercasedEmail] = profileData;
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
 
     localStorage.setItem('user_role', role);

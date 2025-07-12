@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -27,7 +28,8 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
     const usersRaw = localStorage.getItem('users');
     const users: {email: string; role: string}[] = usersRaw ? JSON.parse(usersRaw) : [];
     
-    const existingUser = users.find(user => user.email.toLowerCase() === email.toLowerCase());
+    const lowercasedEmail = email.toLowerCase();
+    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
 
     if (!existingUser) {
         setError('This email is not registered. Please sign up.');
@@ -45,14 +47,14 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
     // Load the user's detailed profile from the master list
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    const userProfile = profiles[email];
+    const userProfile = profiles[lowercasedEmail]; // Use lowercase email for lookup
 
     if (userProfile) {
         localStorage.setItem('current_user_profile', JSON.stringify(userProfile));
     } else {
         // Fallback in case profile doesn't exist, create a minimal one.
         // This case should ideally not be hit if signup is working correctly.
-        localStorage.setItem('current_user_profile', JSON.stringify({ email: email, role: role, firstName: 'User', lastName: ''}));
+        localStorage.setItem('current_user_profile', JSON.stringify({ email: lowercasedEmail, role: role, firstName: 'User', lastName: ''}));
     }
     
     window.dispatchEvent(new Event('storage')); // Notify other tabs/components
