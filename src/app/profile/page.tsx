@@ -205,8 +205,8 @@ export default function ProfilePage() {
       handleDistrictChange(profile.district || 'None');
       
       const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
-
-      profileForm.reset({
+      
+      const profileFormData = {
         firstName: profile.firstName || '',
         lastName: profile.lastName || '',
         district: profile.district || '',
@@ -217,7 +217,9 @@ export default function ProfilePage() {
         schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
         gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
         bookkeeperEmail: profile.bookkeeperEmail || '',
-      });
+      };
+      
+      profileForm.reset(profileFormData);
 
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
@@ -469,8 +471,8 @@ export default function ProfilePage() {
                         {profile?.role === 'sponsor' && (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleSchoolChange(value); }} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger key={field.value}><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={(value) => { field.onChange(value); handleSchoolChange(value); }} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger key={field.value}><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={profileForm.control} name="schoolAddress" render={({ field }) => ( <FormItem><FormLabel>School Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
