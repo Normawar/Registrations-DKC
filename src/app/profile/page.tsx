@@ -242,8 +242,8 @@ export default function ProfilePage() {
         school: profile.school,
         email: profile.email,
         phone: profile.phone,
-        schoolAddress: profile.schoolAddress,
-        schoolPhone: profile.schoolPhone,
+        schoolAddress: profile.schoolAddress || '',
+        schoolPhone: profile.schoolPhone || '',
         gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
         bookkeeperEmail: profile.bookkeeperEmail || '',
       });
