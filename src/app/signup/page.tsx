@@ -146,6 +146,7 @@ const SponsorSignUpForm = () => {
     profiles[lowercasedEmail] = profileData;
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
     
+    // Save the complete profile to the current session
     localStorage.setItem('current_user_profile', JSON.stringify(profileData));
     
     window.dispatchEvent(new Event('storage'));
