@@ -134,6 +134,7 @@ export default function ProfilePage() {
   const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
   
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+  const [isSchoolListReady, setIsSchoolListReady] = useState(false);
   
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -201,45 +202,38 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (isProfileLoaded && profile) {
-      handleDistrictChange(profile.district);
-      
-      setActiveTab(profile.avatarType);
-      if (profile.avatarType === 'icon') {
-          setSelectedIconName(profile.avatarValue);
-          setImagePreview(null);
-      } else {
-          setImagePreview(profile.avatarValue);
-          setSelectedIconName('');
-      }
+        setIsSchoolListReady(false);
+        handleDistrictChange(profile.district);
+        setActiveTab(profile.avatarType);
+        if (profile.avatarType === 'icon') {
+            setSelectedIconName(profile.avatarValue);
+            setImagePreview(null);
+        } else {
+            setImagePreview(profile.avatarValue);
+            setSelectedIconName('');
+        }
     }
   }, [isProfileLoaded, profile]);
 
   useEffect(() => {
-    if (isProfileLoaded && profile) {
-        // Find school info to prepopulate derived fields
+      if (schoolsForDistrict.length > 0) {
+          setIsSchoolListReady(true);
+      }
+  }, [schoolsForDistrict]);
+
+  useEffect(() => {
+    if (isSchoolListReady && profile) {
         const schoolInfo = schoolData.find(s => s.schoolName === profile.school && s.district === profile.district);
-        
-        // Use setValue for more reliable updates, especially with dependent fields.
-        profileForm.setValue('firstName', profile.firstName || '');
-        profileForm.setValue('lastName', profile.lastName || '');
-        profileForm.setValue('email', profile.email || '');
-        profileForm.setValue('phone', profile.phone || '');
-        profileForm.setValue('gtCoordinatorEmail', profile.gtCoordinatorEmail || '');
-        profileForm.setValue('bookkeeperEmail', profile.bookkeeperEmail || '');
-        
-        profileForm.setValue('district', profile.district || '');
-        // Trigger school list update
-        handleDistrictChange(profile.district || '');
-        
-        // Now set the school and its derived fields
-        profileForm.setValue('school', profile.school || '');
-        profileForm.setValue('schoolAddress', schoolInfo?.streetAddress || '');
-        profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
-        profileForm.setValue('city', schoolInfo?.city || '');
-        profileForm.setValue('state', schoolInfo?.state || '');
-        profileForm.setValue('zip', schoolInfo?.zip || '');
+        profileForm.reset({
+            ...profile,
+            schoolAddress: schoolInfo?.streetAddress || '',
+            schoolPhone: schoolInfo?.phone || '',
+            city: schoolInfo?.city || '',
+            state: schoolInfo?.state || '',
+            zip: schoolInfo?.zip || '',
+        });
     }
-  }, [isProfileLoaded, profile, profileForm]);
+  }, [isSchoolListReady, profile, profileForm]);
 
 
   useEffect(() => {
@@ -482,7 +476,7 @@ export default function ProfilePage() {
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict} key={schoolsForDistrict.join(',')}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!isSchoolListReady}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={profileForm.control} name="schoolAddress" render={({ field }) => ( <FormItem><FormLabel>School Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
