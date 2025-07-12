@@ -16,8 +16,7 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-  const { updateProfile } = useSponsorProfile();
-
+  
   const handleLogin = () => {
     setError('');
     if (!email) {
@@ -46,12 +45,13 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
     // Load the user's detailed profile from the master list
     const profilesRaw = localStorage.getItem('sponsor_profile');
     const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    const userProfile = Object.values(profiles).find((p: any) => p.email === email);
+    const userProfile = profiles[email];
 
     if (userProfile) {
         localStorage.setItem('current_user_profile', JSON.stringify(userProfile));
     } else {
         // Fallback in case profile doesn't exist, create a minimal one.
+        // This case should ideally not be hit if signup is working correctly.
         localStorage.setItem('current_user_profile', JSON.stringify({ email: email, role: role, firstName: 'User', lastName: ''}));
     }
     
@@ -71,7 +71,7 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
       <CardContent className="grid gap-4">
         <div className="grid gap-2">
           <Label htmlFor={`email-${role}`}>Email</Label>
-          <Input id={`email-${role}`} type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Input id={`email-${role}`} type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div className="grid gap-2">
           <div className="flex items-center">
@@ -80,7 +80,7 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
               Forgot password?
             </Link>
           </div>
-          <Input id={`password-${role}`} type="password" />
+          <Input id={`password-${role}`} type="password" required />
         </div>
         {error && <p className="text-sm font-medium text-destructive px-1">{error}</p>}
         <Button type="button" className="w-full" onClick={handleLogin}>
@@ -119,7 +119,8 @@ export default function LoginPage() {
   useEffect(() => {
     localStorage.removeItem('user_role');
     localStorage.removeItem('current_user_profile');
-  }, [router]);
+    window.dispatchEvent(new Event('storage'));
+  }, []);
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">

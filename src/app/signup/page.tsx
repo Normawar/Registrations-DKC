@@ -127,8 +127,11 @@ const SponsorSignUpForm = () => {
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
+    // Exclude password from the profile data object
+    const { password, ...profileValues } = values;
+
     const profileData = {
-      ...values,
+      ...profileValues,
       role: 'sponsor' as const,
       avatarType: 'icon' as const,
       avatarValue: 'KingIcon',
@@ -310,7 +313,6 @@ const individualFormSchema = z.object({
 
 const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) => {
   const router = useRouter();
-  const { updateProfile } = useSponsorProfile();
   
   const form = useForm<z.infer<typeof individualFormSchema>>({
     resolver: zodResolver(individualFormSchema),
@@ -340,10 +342,11 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     const updatedUsers = [...users, newUser];
     localStorage.setItem('users', JSON.stringify(updatedUsers));
     
+    // Exclude password from the profile data object
+    const { password, ...profileValues } = values;
+
     const profileData = {
-        firstName: values.firstName,
-        lastName: values.lastName,
-        email: values.email,
+        ...profileValues,
         phone: '',
         district: 'None',
         school: 'Homeschool',
