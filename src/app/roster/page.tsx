@@ -709,10 +709,10 @@ export default function RosterPage() {
                                 </FormControl>
                                 <FormDescription>
                                     <Link 
-                                        href={/^\d+$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
+                                        href={/^\d{8}$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
                                         target="_blank" 
                                         rel="noopener noreferrer" 
-                                        className="text-sm text-primary underline-offset-4 hover:underline"
+                                        className="text-sm text-accent-foreground underline-offset-4 hover:underline"
                                     >
                                         Use the USCF Player Search to verify an ID.
                                     </Link>
