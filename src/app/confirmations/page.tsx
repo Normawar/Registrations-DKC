@@ -674,7 +674,7 @@ export default function ConfirmationsPage() {
   
   const handleOpenRequestDialog = (conf: Confirmation) => {
     setConfToRequestChange(conf);
-    setChangeRequestInputs({ requestType: '' });
+    setChangeRequestInputs({ requestType: '', byeRound1: 'none', byeRound2: 'none' });
     setIsRequestDialogOpen(true);
   };
   
@@ -942,7 +942,7 @@ export default function ConfirmationsPage() {
       setIsChangeAlertOpen(true);
   };
   
-  const ConfirmationDetails = ({
+const ConfirmationDetails = ({
     conf,
     confInputs,
     statuses,
@@ -1296,7 +1296,6 @@ export default function ConfirmationsPage() {
         </div>
     );
   };
-
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -1448,7 +1447,12 @@ export default function ConfirmationsPage() {
         <div className="grid grid-cols-2 gap-4">
           <div className="grid gap-2">
             <Label>Bye 1</Label>
-            <Select value={changeRequestInputs.byeRound1} onValueChange={(value) => setChangeRequestInputs(prev => ({...prev, byeRound1: value}))}>
+            <Select 
+              value={changeRequestInputs.byeRound1} 
+              onValueChange={(value) => {
+                setChangeRequestInputs(prev => ({ ...prev, byeRound1: value, byeRound2: 'none' }));
+              }}
+            >
                 <SelectTrigger><SelectValue placeholder="No Bye" /></SelectTrigger>
                 <SelectContent>{events.find(e => e.id === confToRequestChange.eventId)?.rounds && Array.from({length: events.find(e => e.id === confToRequestChange.eventId)!.rounds}).map((_, i) => <SelectItem key={i+1} value={String(i+1)}>Round {i+1}</SelectItem>)}<SelectItem value="none">No Bye</SelectItem></SelectContent>
             </Select>
