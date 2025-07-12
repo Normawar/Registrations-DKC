@@ -193,43 +193,51 @@ export default function ProfilePage() {
     setSchoolsForDistrict([...new Set(filteredSchools)]);
   };
 
+  // Stage 1: When profile is loaded, determine the correct district and populate the school list.
   useEffect(() => {
     if (isProfileLoaded && profile) {
-      // Find the definitive school info using the saved teamCode as a key
-      const userTeamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
-      const schoolInfo = schoolData.find(s => generateTeamCode(s) === userTeamCode);
-      
-      const district = schoolInfo?.district || profile.district;
-      
-      // Step 1: Populate the school dropdown options based on the found district
-      handleDistrictChange(district);
+        const userTeamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
+        const schoolInfo = schoolData.find(s => generateTeamCode(s) === userTeamCode);
+        const district = schoolInfo?.district || profile.district;
+        
+        handleDistrictChange(district);
 
-      // Step 2: Reset the form with all the correct data
-      const profileFormData = {
-          firstName: profile.firstName || '',
-          lastName: profile.lastName || '',
-          district: district,
-          school: schoolInfo?.schoolName || profile.school,
-          email: profile.email || '',
-          phone: profile.phone || '',
-          schoolAddress: schoolInfo?.streetAddress || '',
-          schoolPhone: schoolInfo?.phone || '',
-          gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
-          bookkeeperEmail: profile.bookkeeperEmail || '',
-      };
-      
-      profileForm.reset(profileFormData);
-      
-      setActiveTab(profile.avatarType);
-      if (profile.avatarType === 'icon') {
-        setSelectedIconName(profile.avatarValue);
-        setImagePreview(null);
-      } else {
-        setImagePreview(profile.avatarValue);
-        setSelectedIconName('');
-      }
+        // Set avatar info
+        setActiveTab(profile.avatarType);
+        if (profile.avatarType === 'icon') {
+            setSelectedIconName(profile.avatarValue);
+            setImagePreview(null);
+        } else {
+            setImagePreview(profile.avatarValue);
+            setSelectedIconName('');
+        }
     }
-  }, [isProfileLoaded, profile, profileForm]);
+  }, [isProfileLoaded, profile]);
+
+  // Stage 2: Once the school list is updated, reset the form with all the correct data.
+  useEffect(() => {
+      if (isProfileLoaded && profile && schoolsForDistrict.length > 0) {
+          const userTeamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
+          const schoolInfo = schoolData.find(s => generateTeamCode(s) === userTeamCode);
+
+          const profileFormData = {
+              firstName: profile.firstName || '',
+              lastName: profile.lastName || '',
+              district: schoolInfo?.district || profile.district,
+              school: schoolInfo?.schoolName || profile.school,
+              email: profile.email || '',
+              phone: profile.phone || '',
+              schoolAddress: schoolInfo?.streetAddress || '',
+              schoolPhone: schoolInfo?.phone || '',
+              gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
+              bookkeeperEmail: profile.bookkeeperEmail || '',
+          };
+          
+          profileForm.reset(profileFormData);
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, isProfileLoaded, schoolsForDistrict]);
+
 
   useEffect(() => {
     if (!auth || !storage) {
