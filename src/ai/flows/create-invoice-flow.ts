@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type OrderLineItem, type InvoiceRecipient } from 'square';
+import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
 import { format } from 'date-fns';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
@@ -29,6 +29,9 @@ const CreateInvoiceInputSchema = z.object({
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
     bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
     schoolName: z.string().describe('The name of the school associated with the sponsor.'),
+    schoolAddress: z.string().optional().describe('The street address of the school.'),
+    schoolPhone: z.string().optional().describe('The phone number of the school.'),
+    district: z.string().optional().describe('The school district.'),
     teamCode: z.string().describe('The team code of the sponsor.'),
     eventName: z.string().describe('The name of the event.'),
     eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
@@ -87,28 +90,42 @@ const createInvoiceFlow = ai.defineFlow(
           },
         },
       });
+      
+      const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
 
       let customerId: string;
       if (searchCustomersResponse.result.customers && searchCustomersResponse.result.customers.length > 0) {
         const customer = searchCustomersResponse.result.customers[0];
         customerId = customer.id!;
         console.log(`Found existing customer with ID: ${customerId}`);
-        // If the customer exists but doesn't have the school name, update them.
-        if (customer.companyName !== input.schoolName) {
-            console.log(`Updating customer ${customerId} with company name: ${input.schoolName}`);
-            await customersApi.updateCustomer(customerId, {
-                companyName: input.schoolName,
-            });
-        }
+        
+        const address: Address = {
+            addressLine1: input.schoolAddress,
+        };
+
+        console.log(`Updating customer ${customerId} with company name: ${companyName}`);
+        await customersApi.updateCustomer(customerId, {
+            companyName: companyName,
+            phoneNumber: input.schoolPhone,
+            address: address
+        });
+        
       } else {
         console.log("Customer not found, creating a new one...");
         const [firstName, ...lastNameParts] = input.sponsorName.split(' ');
+        
+        const address: Address = {
+            addressLine1: input.schoolAddress,
+        };
+
         const createCustomerResponse = await customersApi.createCustomer({
           idempotencyKey: randomUUID(),
           givenName: firstName,
           familyName: lastNameParts.join(' '),
           emailAddress: input.sponsorEmail,
-          companyName: input.schoolName,
+          companyName: companyName,
+          phoneNumber: input.schoolPhone,
+          address: address,
           note: `Team Code: ${input.teamCode}`,
         });
         customerId = createCustomerResponse.result.customer!.id!;

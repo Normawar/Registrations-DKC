@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, type ElementType } from 'react';
@@ -49,6 +48,8 @@ const profileFormSchema = z.object({
   school: z.string().optional(),
   email: z.string().email({ message: 'Please enter a valid email.' }),
   phone: z.string().min(10, { message: 'Please enter a valid 10-digit phone number.' }),
+  schoolAddress: z.string().optional(),
+  schoolPhone: z.string().optional(),
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
   bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 }).refine(data => {
@@ -154,6 +155,8 @@ export default function ProfilePage() {
       school: '',
       email: '',
       phone: '',
+      schoolAddress: '',
+      schoolPhone: '',
       gtCoordinatorEmail: '',
       bookkeeperEmail: '',
     },
@@ -218,6 +221,18 @@ export default function ProfilePage() {
     }
   };
 
+  const handleSchoolChange = (schoolName: string) => {
+      profileForm.setValue('school', schoolName);
+      const schoolInfo = schoolData.find(s => s.schoolName === schoolName);
+      if (schoolInfo) {
+          profileForm.setValue('schoolAddress', schoolInfo.streetAddress);
+          profileForm.setValue('schoolPhone', schoolInfo.phone);
+      } else {
+          profileForm.setValue('schoolAddress', '');
+          profileForm.setValue('schoolPhone', '');
+      }
+  }
+
   useEffect(() => {
     if (profile) {
       profileForm.reset({
@@ -227,13 +242,15 @@ export default function ProfilePage() {
         school: profile.school,
         email: profile.email,
         phone: profile.phone,
+        schoolAddress: profile.schoolAddress,
+        schoolPhone: profile.schoolPhone,
         gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
         bookkeeperEmail: profile.bookkeeperEmail || '',
       });
 
       if (profile.district === 'None') {
         setSchoolsForDistrict(allSchoolNames);
-      } else {
+      } else if (profile.district) {
         const initialSchools = schoolData
           .filter((school) => school.district === profile.district)
           .map((school) => school.schoolName)
@@ -455,141 +472,26 @@ export default function ProfilePage() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                            control={profileForm.control}
-                            name="firstName"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>First Name</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="John" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
-                            <FormField
-                            control={profileForm.control}
-                            name="lastName"
-                            render={({ field }) => (
-                                <FormItem>
-                                <FormLabel>Last Name</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Doe" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
+                            <FormField control={profileForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={profileForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                                control={profileForm.control}
-                                name="email"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Email</FormLabel>
-                                    <FormControl>
-                                    <Input type="email" placeholder="name@example.com" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={profileForm.control}
-                                name="phone"
-                                render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Cell Phone Number</FormLabel>
-                                    <FormControl>
-                                    <Input type="tel" placeholder="(555) 555-5555" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                                )}
-                            />
+                            <FormField control={profileForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={profileForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Cell Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         {profile?.role === 'sponsor' && (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField
-                                        control={profileForm.control}
-                                        name="district"
-                                        render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>District</FormLabel>
-                                            <Select onValueChange={handleDistrictChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                <SelectValue placeholder="Select a district" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {uniqueDistricts.map((district) => (
-                                                <SelectItem key={district} value={district}>
-                                                    {district}
-                                                </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={profileForm.control}
-                                        name="school"
-                                        render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>School</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                <SelectValue placeholder="Select a school" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {schoolsForDistrict.map((school) => (
-                                                <SelectItem key={school} value={school}>
-                                                    {school}
-                                                </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                            </Select>
-                                            <FormMessage />
-                                        </FormItem>
-                                        )}
-                                    />
+                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={handleDistrictChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={handleSchoolChange} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField
-                                        control={profileForm.control}
-                                        name="gtCoordinatorEmail"
-                                        render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>GT Coordinator Email</FormLabel>
-                                            <FormControl>
-                                            <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                        )}
-                                    />
-                                    <FormField
-                                        control={profileForm.control}
-                                        name="bookkeeperEmail"
-                                        render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Bookkeeper/Secretary Email</FormLabel>
-                                            <FormControl>
-                                            <Input type="email" placeholder="bookkeeper@example.com" {...field} />
-                                            </FormControl>
-                                            <FormDescription>This email will receive a copy of all invoices.</FormDescription>
-                                            <FormMessage />
-                                        </FormItem>
-                                        )}
-                                    />
+                                    <FormField control={profileForm.control} name="schoolAddress" render={({ field }) => ( <FormItem><FormLabel>School Address</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="schoolPhone" render={({ field }) => ( <FormItem><FormLabel>School Phone</FormLabel><FormControl><Input {...field} readOnly className="bg-muted" /></FormControl><FormMessage /></FormItem> )} />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField control={profileForm.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )} />
                                 </div>
                             </>
                         )}

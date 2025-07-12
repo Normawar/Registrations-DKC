@@ -10,6 +10,8 @@ export type SponsorProfile = {
   school: string;
   email: string;
   phone: string;
+  schoolAddress?: string;
+  schoolPhone?: string;
   gtCoordinatorEmail?: string;
   bookkeeperEmail?: string;
   avatarType: 'icon' | 'upload';
@@ -24,6 +26,8 @@ const defaultSponsorData: SponsorProfile = {
   school: '',
   email: '',
   phone: '',
+  schoolAddress: '',
+  schoolPhone: '',
   gtCoordinatorEmail: '',
   bookkeeperEmail: '',
   avatarType: 'icon',
