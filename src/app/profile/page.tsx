@@ -213,7 +213,7 @@ export default function ProfilePage() {
       profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
   }
 
-  const handleDistrictChange = (district: string) => {
+  const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
     profileForm.setValue('district', district);
     
     let filteredSchools: string[];
@@ -227,13 +227,14 @@ export default function ProfilePage() {
     }
     setSchoolsForDistrict([...new Set(filteredSchools)]);
 
-    // If only one school, auto-select it and populate info. Otherwise, clear school field.
-    if (filteredSchools.length === 1) {
-        handleSchoolChange(filteredSchools[0]);
-    } else {
-        profileForm.setValue('school', '');
-        profileForm.setValue('schoolAddress', '');
-        profileForm.setValue('schoolPhone', '');
+    if (resetSchool) {
+        if (filteredSchools.length === 1) {
+            handleSchoolChange(filteredSchools[0]);
+        } else {
+            profileForm.setValue('school', '');
+            profileForm.setValue('schoolAddress', '');
+            profileForm.setValue('schoolPhone', '');
+        }
     }
   };
 
@@ -252,15 +253,7 @@ export default function ProfilePage() {
         bookkeeperEmail: profile.bookkeeperEmail || '',
       });
 
-      if (profile.district === 'None') {
-        setSchoolsForDistrict(allSchoolNames);
-      } else if (profile.district) {
-        const initialSchools = schoolData
-          .filter((school) => school.district === profile.district)
-          .map((school) => school.schoolName)
-          .sort();
-        setSchoolsForDistrict([...new Set(initialSchools)]);
-      }
+      handleDistrictChange(profile.district || 'None', false);
       
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
@@ -271,7 +264,7 @@ export default function ProfilePage() {
         setSelectedIconName('');
       }
     }
-  }, [profile, profileForm, allSchoolNames]);
+  }, [profile, profileForm]);
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -486,7 +479,7 @@ export default function ProfilePage() {
                         {profile?.role === 'sponsor' && (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={handleDistrictChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                     <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={handleSchoolChange} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
