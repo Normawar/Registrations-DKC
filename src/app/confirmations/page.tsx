@@ -559,17 +559,21 @@ export default function ConfirmationsPage() {
 
         const activePlayers = activePlayerIds.map(id => getPlayerById(id)).filter((p): p is MasterPlayer => !!p);
         
-        // Simplified fee calculation for updates to avoid crashes
-        const registrationFeePerPlayer = eventDetails.regularFee;
-
+        const eventDate = new Date(eventDetails.date);
+        const now = new Date();
+        let registrationFeePerPlayer = eventDetails.regularFee;
+        if (isSameDay(eventDate, now)) { registrationFeePerPlayer = eventDetails.dayOfFee; }
+        else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = eventDetails.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = eventDetails.lateFee; } }
+        
         const newInvoicePlayers = activePlayers.map(player => {
             const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < new Date(eventDetails.date);
             const uscfStatus = player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
+            const lateFeeAmount = registrationFeePerPlayer - eventDetails.regularFee;
             return {
                 playerName: `${player.firstName} ${player.lastName}`,
                 uscfId: player.uscfId,
-                baseRegistrationFee: registrationFeePerPlayer,
-                lateFee: 0, // Late fees are not recalculated on edits
+                baseRegistrationFee: eventDetails.regularFee,
+                lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
                 uscfAction: uscfStatus !== 'current',
             };
         });
@@ -678,6 +682,29 @@ export default function ConfirmationsPage() {
     toast({ title: "Bye Updated", description: `Bye request for ${player?.firstName} has been updated.` });
     setIsUpdating(prev => ({ ...prev, [confId]: false }));
   }, [getPlayerById, toast]);
+
+  const handleSectionChange = useCallback((confId: string, playerId: string, newSection: string) => {
+    setIsUpdating(prev => ({ ...prev, [confId]: true }));
+    const player = getPlayerById(playerId);
+
+    setConfirmations(prevConf => {
+      const newConfirmations = prevConf.map(conf => {
+        if (conf.id === confId) {
+          const newSelections = { ...conf.selections };
+          if (newSelections[playerId]) {
+            newSelections[playerId].section = newSection;
+          }
+          return { ...conf, selections: newSelections };
+        }
+        return conf;
+      });
+      localStorage.setItem('confirmations', JSON.stringify(newConfirmations));
+      return newConfirmations;
+    });
+
+    toast({ title: "Section Updated", description: `Section for ${player?.firstName} has been changed.` });
+    setIsUpdating(prev => ({ ...prev, [confId]: false }));
+  }, [getPlayerById, toast]);
   
   const handleSubmitChangeRequest = () => {
     if (!confToRequestChange || !changeRequestInputs.playerId || !changeRequestInputs.requestType || !sponsorProfile) {
@@ -691,13 +718,11 @@ export default function ConfirmationsPage() {
       return;
     }
     
-    let details: string;
+    let details = changeRequestInputs.details || '';
     if (changeRequestInputs.requestType === 'Bye Request') {
         const byeR1 = changeRequestInputs.byeRound1 && changeRequestInputs.byeRound1 !== 'none' ? `R${changeRequestInputs.byeRound1}` : 'None';
         const byeR2 = changeRequestInputs.byeRound2 && changeRequestInputs.byeRound2 !== 'none' ? `R${changeRequestInputs.byeRound2}` : 'None';
         details = `Requested Byes: ${byeR1}, ${byeR2}`;
-    } else {
-        details = changeRequestInputs.details || '';
     }
 
     const newRequest: ChangeRequest = {
@@ -851,21 +876,11 @@ export default function ConfirmationsPage() {
         return;
     }
 
-    const updatedSelections = { ...confToUpdate.selections };
-
     switch (request.type) {
         case 'Section Change':
             title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
-            description = `This will change the player's section to "${request.details}". This may recreate the invoice.`;
-            action = () => {
-                if (updatedSelections[player.id]) {
-                    updatedSelections[player.id].section = request.details;
-                }
-                recreateInvoiceForConfirmation(request.confirmationId, updatedSelections, {
-                    title: 'Section Change Approved',
-                    description: `Section for ${player.firstName} has been changed to ${request.details}.`,
-                });
-            };
+            description = `This will change the player's section to "${request.details}".`;
+            action = () => handleSectionChange(request.confirmationId, player.id, request.details);
             break;
         case 'Bye Request':
             const byeR1Val = request.byeRound1 || 'none';
@@ -899,23 +914,7 @@ export default function ConfirmationsPage() {
     setIsChangeAlertOpen(true);
   };
   
-  const ConfirmationDetails = ({
-    conf,
-    confInputs,
-    statuses,
-    isUpdating,
-    isAuthReady,
-    selectedPlayersForWithdraw,
-    selectedPlayersForRestore,
-  }: {
-    conf: Confirmation,
-    confInputs: Record<string, Partial<ConfirmationInputs>>,
-    statuses: Record<string, { status?: string; isLoading: boolean }>,
-    isUpdating: Record<string, boolean>,
-    isAuthReady: boolean,
-    selectedPlayersForWithdraw: Record<string, string[]>,
-    selectedPlayersForRestore: Record<string, string[]>,
-}) => {
+const ConfirmationDetails = ({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore }: { conf: Confirmation; confInputs: Record<string, Partial<ConfirmationInputs>>; statuses: Record<string, { status?: string; isLoading: boolean }>; isUpdating: Record<string, boolean>; isAuthReady: boolean; selectedPlayersForWithdraw: Record<string, string[]>; selectedPlayersForRestore: Record<string, string[]>; }) => {
     type SortablePlayerKey = 'lastName' | 'section';
     const [playerSortConfig, setPlayerSortConfig] = useState<{ key: SortablePlayerKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending'});
     
@@ -1542,3 +1541,4 @@ export default function ConfirmationsPage() {
     </AppLayout>
   );
 }
+
