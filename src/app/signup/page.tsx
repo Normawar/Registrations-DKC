@@ -30,6 +30,7 @@ import {
 import { schoolData } from "@/lib/data/school-data";
 import { districts as uniqueDistricts } from "@/lib/data/districts";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -131,11 +132,11 @@ const SponsorSignUpForm = () => {
 
     const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
 
-    const profileData = {
+    const profileData: SponsorProfile = {
       ...profileValues,
       email: lowercasedEmail,
-      role: 'sponsor' as const,
-      avatarType: 'icon' as const,
+      role: 'sponsor',
+      avatarType: 'icon',
       avatarValue: 'KingIcon',
       schoolAddress: schoolInfo?.streetAddress || '',
       schoolPhone: schoolInfo?.phone || '',
@@ -146,7 +147,6 @@ const SponsorSignUpForm = () => {
     profiles[lowercasedEmail] = profileData;
     localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
     
-    // Save the complete profile to the current session
     localStorage.setItem('current_user_profile', JSON.stringify(profileData));
     
     window.dispatchEvent(new Event('storage'));
@@ -271,7 +271,7 @@ const SponsorSignUpForm = () => {
                       <FormControl>
                       <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
                       </FormControl>
-                      <FormDescription>This email will receive a copy of all invoices for this district.</FormDescription>
+                      <FormDescription>This email will be CC'd on invoices for this district.</FormDescription>
                       <FormMessage />
                   </FormItem>
                   )}
@@ -366,7 +366,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     
     const { password, ...profileValues } = values;
 
-    const profileData = {
+    const profileData: SponsorProfile = {
         ...profileValues,
         email: lowercasedEmail,
         phone: '',
@@ -377,7 +377,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         schoolAddress: '',
         schoolPhone: '',
         role: role,
-        avatarType: 'icon' as const,
+        avatarType: 'icon',
         avatarValue: 'PawnIcon',
     };
     

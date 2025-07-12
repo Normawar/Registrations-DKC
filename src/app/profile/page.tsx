@@ -206,32 +206,36 @@ export default function ProfilePage() {
     return () => unsubscribe();
   }, []);
 
-  const handleDistrictChange = (district: string) => {
-    profileForm.setValue('district', district);
-    if (district === 'None') {
-        profileForm.setValue('school', 'Homeschool');
-        setSchoolsForDistrict(allSchoolNames);
-    } else {
-        profileForm.setValue('school', '');
-        const filteredSchools = schoolData
-            .filter((school) => school.district === district)
-            .map((school) => school.schoolName)
-            .sort();
-        setSchoolsForDistrict([...new Set(filteredSchools)]);
-    }
-  };
-
   const handleSchoolChange = (schoolName: string) => {
       profileForm.setValue('school', schoolName);
       const schoolInfo = schoolData.find(s => s.schoolName === schoolName);
-      if (schoolInfo) {
-          profileForm.setValue('schoolAddress', schoolInfo.streetAddress);
-          profileForm.setValue('schoolPhone', schoolInfo.phone);
-      } else {
-          profileForm.setValue('schoolAddress', '');
-          profileForm.setValue('schoolPhone', '');
-      }
+      profileForm.setValue('schoolAddress', schoolInfo?.streetAddress || '');
+      profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
   }
+
+  const handleDistrictChange = (district: string) => {
+    profileForm.setValue('district', district);
+    
+    let filteredSchools: string[];
+    if (district === 'None') {
+        filteredSchools = allSchoolNames;
+    } else {
+        filteredSchools = schoolData
+            .filter((school) => school.district === district)
+            .map((school) => school.schoolName)
+            .sort();
+    }
+    setSchoolsForDistrict([...new Set(filteredSchools)]);
+
+    // If only one school, auto-select it and populate info. Otherwise, clear school field.
+    if (filteredSchools.length === 1) {
+        handleSchoolChange(filteredSchools[0]);
+    } else {
+        profileForm.setValue('school', '');
+        profileForm.setValue('schoolAddress', '');
+        profileForm.setValue('schoolPhone', '');
+    }
+  };
 
   useEffect(() => {
     if (profile) {
