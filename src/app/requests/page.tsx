@@ -30,14 +30,16 @@ import Link from 'next/link';
 import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
 
-type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy' | 'eventDate' | 'action';
+type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy' | 'eventDate' | 'action' | 'invoiceNumber';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
   const { profile } = useSponsorProfile();
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'submitted', direction: 'descending' });
+  const [confirmationsMap, setConfirmationsMap] = useState<Map<string, any>>(new Map());
 
-  const loadRequests = useCallback(() => {
+
+  const loadData = useCallback(() => {
     try {
       const storedRequestsRaw = localStorage.getItem('change_requests');
       const parsedRequests: ChangeRequest[] = storedRequestsRaw ? JSON.parse(storedRequestsRaw) : initialRequestsData;
@@ -48,8 +50,15 @@ export default function RequestsPage() {
       }));
 
       setRequests(allRequests);
+
+      const storedConfirmationsRaw = localStorage.getItem('confirmations');
+      const storedConfirmations = storedConfirmationsRaw ? JSON.parse(storedConfirmationsRaw) : [];
+      const map = new Map();
+      storedConfirmations.forEach((conf: any) => map.set(conf.id, conf));
+      setConfirmationsMap(map);
+
     } catch (e) {
-      console.error("Failed to parse change requests from localStorage", e);
+      console.error("Failed to parse data from localStorage", e);
       setRequests(initialRequestsData);
     }
   }, []);
@@ -67,6 +76,9 @@ export default function RequestsPage() {
         } else if (sortConfig.key === 'submitted' || sortConfig.key === 'eventDate') {
             aValue = a[sortConfig.key] ? new Date(a[sortConfig.key]!).getTime() : 0;
             bValue = b[sortConfig.key] ? new Date(b[sortConfig.key]!).getTime() : 0;
+        } else if (sortConfig.key === 'invoiceNumber') {
+            aValue = confirmationsMap.get(a.confirmationId)?.invoiceNumber || '';
+            bValue = confirmationsMap.get(b.confirmationId)?.invoiceNumber || '';
         } else {
             aValue = a[sortConfig.key];
             bValue = b[sortConfig.key];
@@ -82,7 +94,7 @@ export default function RequestsPage() {
       });
     }
     return sortableRequests;
-  }, [requests, sortConfig]);
+  }, [requests, sortConfig, confirmationsMap]);
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -104,16 +116,16 @@ export default function RequestsPage() {
 
   useEffect(() => {
     const handleStorageChange = () => {
-      loadRequests();
+      loadData();
     };
 
-    loadRequests();
+    loadData();
     window.addEventListener('storage', handleStorageChange);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, [loadRequests]);
+  }, [loadData]);
 
   return (
     <AppLayout>
@@ -144,6 +156,7 @@ export default function RequestsPage() {
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('player')} className="w-full justify-start px-4">Player {getSortIcon('player')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('event')} className="w-full justify-start px-4">Event {getSortIcon('event')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('eventDate')} className="w-full justify-start px-4">Event Date {getSortIcon('eventDate')}</Button></TableHead>
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('invoiceNumber')} className="w-full justify-start px-4">Invoice # {getSortIcon('invoiceNumber')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('type')} className="w-full justify-start px-4">Request Type {getSortIcon('type')}</Button></TableHead>
                         <TableHead>Details</TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('submittedBy')} className="w-full justify-start px-4">Submitted By {getSortIcon('submittedBy')}</Button></TableHead>
@@ -153,43 +166,47 @@ export default function RequestsPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {sortedRequests.map((request, index) => (
-                    <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`}>
-                        <TableCell className="font-medium">{request.player}</TableCell>
-                        <TableCell>{request.event}</TableCell>
-                        <TableCell>{request.eventDate ? format(new Date(request.eventDate), 'PPP') : 'N/A'}</TableCell>
-                        <TableCell>{request.type}</TableCell>
-                        <TableCell>{request.details || '—'}</TableCell>
-                        <TableCell>{request.submittedBy || 'N/A'}</TableCell>
-                        <TableCell>{format(new Date(request.submitted), 'MM/dd/yy, p')}</TableCell>
-                        <TableCell>
-                        <Badge
-                            variant={
-                            request.status === "Pending" ? "secondary" :
-                            request.status === "Approved" ? "default" :
-                            request.status === "Denied" ? "destructive" : "secondary"
-                            }
-                            className={request.status === 'Approved' ? 'bg-green-600 text-white' : ''}
-                        >
-                            {request.status}
-                        </Badge>
-                        </TableCell>
-                        {profile?.role === 'organizer' && (
-                            <TableCell>
-                                {request.status === 'Pending' ? (
-                                    <Button asChild variant="outline" size="sm">
-                                      <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
-                                    </Button>
-                                ) : (
-                                    <div className="text-xs text-muted-foreground">
-                                        <p>By {request.approvedBy || 'N/A'}</p>
-                                        <p>{request.approvedAt ? format(new Date(request.approvedAt), 'MM/dd/yy, p') : ''}</p>
-                                    </div>
+                    {sortedRequests.map((request, index) => {
+                        const confirmation = confirmationsMap.get(request.confirmationId);
+                        return (
+                            <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`}>
+                                <TableCell className="font-medium">{request.player}</TableCell>
+                                <TableCell>{request.event}</TableCell>
+                                <TableCell>{request.eventDate ? format(new Date(request.eventDate), 'PPP') : 'N/A'}</TableCell>
+                                <TableCell className="font-mono">{confirmation?.invoiceNumber || 'N/A'}</TableCell>
+                                <TableCell>{request.type}</TableCell>
+                                <TableCell>{request.details || '—'}</TableCell>
+                                <TableCell>{request.submittedBy || 'N/A'}</TableCell>
+                                <TableCell>{format(new Date(request.submitted), 'MM/dd/yy, p')}</TableCell>
+                                <TableCell>
+                                <Badge
+                                    variant={
+                                    request.status === "Pending" ? "secondary" :
+                                    request.status === "Approved" ? "default" :
+                                    request.status === "Denied" ? "destructive" : "secondary"
+                                    }
+                                    className={request.status === 'Approved' ? 'bg-green-600 text-white' : ''}
+                                >
+                                    {request.status}
+                                </Badge>
+                                </TableCell>
+                                {profile?.role === 'organizer' && (
+                                    <TableCell>
+                                        {request.status === 'Pending' ? (
+                                            <Button asChild variant="outline" size="sm">
+                                              <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
+                                            </Button>
+                                        ) : (
+                                            <div className="text-xs text-muted-foreground">
+                                                <p>By {request.approvedBy || 'N/A'}</p>
+                                                <p>{request.approvedAt ? format(new Date(request.approvedAt), 'MM/dd/yy, p') : ''}</p>
+                                            </div>
+                                        )}
+                                    </TableCell>
                                 )}
-                            </TableCell>
-                        )}
-                    </TableRow>
-                    ))}
+                            </TableRow>
+                        );
+                    })}
                 </TableBody>
                 </Table>
             )}

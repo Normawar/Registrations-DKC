@@ -27,7 +27,7 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Search, CheckCircle } from "lucide-react";
+import { ClipboardCheck, ExternalLink, UploadCloud, File as FileIcon, Loader2, Download, CalendarIcon, RefreshCw, Info, Award, MessageSquarePlus, UserMinus, UserPlus, FilePenLine, UserX, UserCheck, History, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Search, CheckCircle, Ban } from "lucide-react";
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -718,11 +718,13 @@ export default function ConfirmationsPage() {
       return;
     }
     
-    let details = changeRequestInputs.details || '';
+    let details = '';
     if (changeRequestInputs.requestType === 'Bye Request') {
         const byeR1 = changeRequestInputs.byeRound1 && changeRequestInputs.byeRound1 !== 'none' ? `R${changeRequestInputs.byeRound1}` : 'None';
         const byeR2 = changeRequestInputs.byeRound2 && changeRequestInputs.byeRound2 !== 'none' ? `R${changeRequestInputs.byeRound2}` : 'None';
         details = `Requested Byes: ${byeR1}, ${byeR2}`;
+    } else {
+        details = changeRequestInputs.details || '';
     }
 
     const newRequest: ChangeRequest = {
@@ -863,7 +865,7 @@ export default function ConfirmationsPage() {
     }
   };
 
-  const handleApproveRequest = (request: ChangeRequest, player: MasterPlayer) => {
+  const handleApproveRequest = useCallback((request: ChangeRequest, player: MasterPlayer) => {
     if (!sponsorProfile) return;
 
     let title = '';
@@ -876,6 +878,19 @@ export default function ConfirmationsPage() {
         return;
     }
 
+    const updateRequestStatus = (status: 'Approved' | 'Denied') => {
+        const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
+        const timestamp = new Date().toISOString();
+        const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]' );
+        const updatedRequests = allRequests.map((r: ChangeRequest) =>
+            r.id === request.id ? { ...r, status, approvedBy: initials, approvedAt: timestamp } : r
+        );
+        localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
+        window.dispatchEvent(new Event('storage'));
+        toast({ title: `Request ${status}`, description: `The change for ${player.firstName} has been ${status.toLowerCase()}.` });
+        setIsChangeAlertOpen(false);
+    }
+
     switch (request.type) {
         case 'Section Change':
             title = `Approve Section Change for ${player.firstName} ${player.lastName}?`;
@@ -883,13 +898,11 @@ export default function ConfirmationsPage() {
             action = () => handleSectionChange(request.confirmationId, player.id, request.details);
             break;
         case 'Bye Request':
-            const byeR1Val = request.byeRound1 || 'none';
-            const byeR2Val = request.byeRound2 || 'none';
-            const byeR1Text = byeR1Val !== 'none' ? `R${byeR1Val}` : 'None';
-            const byeR2Text = byeR2Val !== 'none' ? `R${byeR2Val}` : 'None';
+            const byeR1Text = request.byeRound1 && request.byeRound1 !== 'none' ? `R${request.byeRound1}` : 'None';
+            const byeR2Text = request.byeRound2 && request.byeRound2 !== 'none' ? `R${request.byeRound2}` : 'None';
             title = `Approve Bye Request for ${player.firstName} ${player.lastName}?`;
             description = `This will set the player's bye requests to ${byeR1Text}, ${byeR2Text}. This will not affect the invoice.`;
-            action = () => handleByeChange(request.confirmationId, player.id, byeR1Val, byeR2Val);
+            action = () => handleByeChange(request.confirmationId, player.id, request.byeRound1, request.byeRound2);
             break;
         default:
             title = 'Approve This Request?';
@@ -900,19 +913,34 @@ export default function ConfirmationsPage() {
     setChangeAlertContent({ title, description });
     setChangeAction(() => () => {
         action();
+        updateRequestStatus('Approved');
+    });
+    setIsChangeAlertOpen(true);
+  }, [sponsorProfile, confirmations, handleSectionChange, handleByeChange, toast]);
+
+  const handleDenyRequest = useCallback((request: ChangeRequest, player: MasterPlayer) => {
+    if (!sponsorProfile) return;
+
+    setChangeAlertContent({
+        title: `Deny Request for ${player.firstName}?`,
+        description: `This will mark the request as denied. This action cannot be undone.`
+    });
+
+    setChangeAction(() => () => {
         const initials = `${sponsorProfile.firstName.charAt(0)}${sponsorProfile.lastName.charAt(0)}`;
-        const approvalTimestamp = new Date().toISOString();
+        const timestamp = new Date().toISOString();
         const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]' );
         const updatedRequests = allRequests.map((r: ChangeRequest) =>
-            r.id === request.id ? { ...r, status: 'Approved', approvedBy: initials, approvedAt: approvalTimestamp } : r
+            r.id === request.id ? { ...r, status: 'Denied', approvedBy: initials, approvedAt: timestamp } : r
         );
         localStorage.setItem('change_requests', JSON.stringify(updatedRequests));
         window.dispatchEvent(new Event('storage'));
-        toast({ title: 'Request Approved', description: `The change for ${player.firstName} has been applied.` });
+        toast({ title: 'Request Denied', description: `The change for ${player.firstName} has been denied.` });
         setIsChangeAlertOpen(false);
     });
+
     setIsChangeAlertOpen(true);
-  };
+  }, [sponsorProfile, toast]);
   
 const ConfirmationDetails = ({ conf, confInputs, statuses, isUpdating, isAuthReady, selectedPlayersForWithdraw, selectedPlayersForRestore }: { conf: Confirmation; confInputs: Record<string, Partial<ConfirmationInputs>>; statuses: Record<string, { status?: string; isLoading: boolean }>; isUpdating: Record<string, boolean>; isAuthReady: boolean; selectedPlayersForWithdraw: Record<string, string[]>; selectedPlayersForRestore: Record<string, string[]>; }) => {
     type SortablePlayerKey = 'lastName' | 'section';
@@ -1070,15 +1098,6 @@ const ConfirmationDetails = ({ conf, confInputs, statuses, isUpdating, isAuthRea
                         const pendingRequest = pendingRequestsForThisConf.find(req => req.player === `${player.firstName} ${player.lastName}`);
                         const isWithdrawn = details.status === 'withdrawn';
                         
-                        let byeTooltipText = 'No pending request.';
-                        if (pendingRequest?.type === 'Bye Request') {
-                            const byeR1 = pendingRequest.byeRound1 && pendingRequest.byeRound1 !== 'none' ? `R${pendingRequest.byeRound1}` : 'None';
-                            const byeR2 = pendingRequest.byeRound2 && pendingRequest.byeRound2 !== 'none' ? `R${pendingRequest.byeRound2}` : 'None';
-                            byeTooltipText = `Requested Byes: ${byeR1}, ${byeR2}`;
-                        } else if (pendingRequest) {
-                            byeTooltipText = `${pendingRequest.type}: ${pendingRequest.details}`;
-                        }
-
                         return (
                         <TableRow key={playerId} data-state={selectedWithdrawalIds.includes(playerId) || selectedRestoreIds.includes(playerId) ? 'selected' : undefined} className={cn(isWithdrawn && 'bg-muted/50')}>
                             {sponsorProfile?.role === 'organizer' && (
@@ -1101,16 +1120,22 @@ const ConfirmationDetails = ({ conf, confInputs, statuses, isUpdating, isAuthRea
                                         <div className="flex items-center gap-1">
                                             <Info className={cn("h-4 w-4", "text-yellow-500")} />
                                             {sponsorProfile?.role === 'organizer' && (
-                                                <Button size="sm" variant="ghost" className="h-auto p-0 text-xs text-primary hover:bg-transparent" onClick={() => handleApproveRequest(pendingRequest, player)}>
-                                                    Review & Approve
-                                                </Button>
+                                                <div className="flex gap-1 items-center">
+                                                    <Button size="sm" variant="ghost" className="h-auto p-0 text-xs text-primary hover:bg-transparent" onClick={() => handleApproveRequest(pendingRequest, player)}>
+                                                        Review & Approve
+                                                    </Button>
+                                                    <span>/</span>
+                                                    <Button size="sm" variant="ghost" className="h-auto p-0 text-xs text-destructive hover:bg-transparent" onClick={() => handleDenyRequest(pendingRequest, player)}>
+                                                        Deny
+                                                    </Button>
+                                                </div>
                                             )}
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent className="max-w-xs">
                                         <p className="font-semibold">{pendingRequest.type} - {pendingRequest.status}</p>
                                         <p className="italic text-muted-foreground">
-                                           "{byeTooltipText}"
+                                           "{pendingRequest.details}"
                                         </p>
                                         <p className="text-xs text-muted-foreground mt-1 pt-1 border-t">
                                             Submitted: {format(new Date(pendingRequest.submitted), 'MM/dd/yy, p')} by {pendingRequest.submittedBy}
@@ -1417,7 +1442,7 @@ const ConfirmationDetails = ({ conf, confInputs, statuses, isUpdating, isAuthRea
             <Select 
               value={changeRequestInputs.byeRound1} 
               onValueChange={(value) => {
-                setChangeRequestInputs(prev => ({ ...prev, byeRound1: value, byeRound2: 'none' }));
+                setChangeRequestInputs(prev => ({ ...prev, byeRound1: value, byeRound2: value === 'none' ? 'none' : prev.byeRound2 }));
               }}
             >
                 <SelectTrigger><SelectValue placeholder="No Bye" /></SelectTrigger>
