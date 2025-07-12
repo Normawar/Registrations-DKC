@@ -200,30 +200,13 @@ export default function ProfilePage() {
       profileForm.setValue('schoolPhone', schoolInfo?.phone || '');
   }
 
+  // Effect to handle populating form when profile data is loaded
   useEffect(() => {
     if (profile && isProfileLoaded) {
-      // Step 1: Ensure the school dropdown is populated correctly
+      // Step 1: Populate the school dropdown based on the loaded profile's district
       handleDistrictChange(profile.district || 'None');
       
-      // Step 2: Construct the full data object for the form, including looked-up school details
-      const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
-      const profileFormData = {
-        firstName: profile.firstName || '',
-        lastName: profile.lastName || '',
-        district: profile.district || '',
-        school: profile.school || '',
-        email: profile.email || '',
-        phone: profile.phone || '',
-        schoolAddress: schoolInfo?.streetAddress || profile.schoolAddress || '',
-        schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
-        gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
-        bookkeeperEmail: profile.bookkeeperEmail || '',
-      };
-      
-      // Step 3: Reset the form with the complete data object
-      profileForm.reset(profileFormData);
-      
-      // Step 4: Set avatar state
+      // Step 2: Set avatar state
       setActiveTab(profile.avatarType);
       if (profile.avatarType === 'icon') {
         setSelectedIconName(profile.avatarValue);
@@ -233,7 +216,28 @@ export default function ProfilePage() {
         setSelectedIconName('');
       }
     }
-  }, [profile, isProfileLoaded, profileForm]);
+  }, [profile, isProfileLoaded]);
+
+  // Effect to reset the form once the school list is ready.
+  // This ensures the school dropdown has options before we try to set its value.
+  useEffect(() => {
+      if (profile && isProfileLoaded && schoolsForDistrict.length > 0) {
+          const schoolInfo = schoolData.find(s => s.schoolName === profile.school);
+          const profileFormData = {
+              firstName: profile.firstName || '',
+              lastName: profile.lastName || '',
+              district: profile.district || '',
+              school: profile.school || '',
+              email: profile.email || '',
+              phone: profile.phone || '',
+              schoolAddress: schoolInfo?.streetAddress || profile.schoolAddress || '',
+              schoolPhone: schoolInfo?.phone || profile.schoolPhone || '',
+              gtCoordinatorEmail: profile.gtCoordinatorEmail || '',
+              bookkeeperEmail: profile.bookkeeperEmail || '',
+          };
+          profileForm.reset(profileFormData);
+      }
+  }, [profile, isProfileLoaded, schoolsForDistrict, profileForm]);
   
   useEffect(() => {
     if (!auth || !storage) {
