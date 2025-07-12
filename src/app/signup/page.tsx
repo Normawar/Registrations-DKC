@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -130,12 +129,16 @@ const SponsorSignUpForm = () => {
     
     const { password, ...profileValues } = values;
 
+    const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
+
     const profileData = {
       ...profileValues,
       email: lowercasedEmail,
       role: 'sponsor' as const,
       avatarType: 'icon' as const,
       avatarValue: 'KingIcon',
+      schoolAddress: schoolInfo?.streetAddress || '',
+      schoolPhone: schoolInfo?.phone || '',
     };
     
     const profilesRaw = localStorage.getItem('sponsor_profile');
