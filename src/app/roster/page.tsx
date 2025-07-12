@@ -250,14 +250,6 @@ export default function RosterPage() {
   });
 
   const watchUscfId = form.watch('uscfId');
-  
-  const uscfIdLink = useMemo(() => {
-    const isNumeric = watchUscfId && /^\d+$/.test(watchUscfId);
-    if (isNumeric) {
-      return `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}`;
-    }
-    return "https://new.uschess.org/player-search";
-  }, [watchUscfId]);
 
   // Debounced search effect
   useEffect(() => {
@@ -716,7 +708,12 @@ export default function RosterPage() {
                                     <Input placeholder="12345678 or NEW" {...field} />
                                 </FormControl>
                                 <FormDescription>
-                                    <Link href={uscfIdLink} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline-offset-4 hover:underline">
+                                    <Link 
+                                        href={/^\d+$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="text-sm text-primary underline-offset-4 hover:underline"
+                                    >
                                         Use the USCF Player Search to verify an ID.
                                     </Link>
                                 </FormDescription>
