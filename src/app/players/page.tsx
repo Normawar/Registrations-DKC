@@ -490,9 +490,6 @@ export default function PlayersPage() {
     }
   };
 
-  const isUscfNew = watchUscfId.toUpperCase() === 'NEW';
-
-
   const handleAddPlayer = () => {
     setEditingPlayer(null);
     form.reset();
@@ -557,9 +554,7 @@ export default function PlayersPage() {
   }
   
   const playerDistrict = form.watch('district');
-  const showStudentType = profile?.role === 'organizer'
-      ? playerDistrict === 'PHARR-SAN JUAN-ALAMO ISD'
-      : profile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
+  const showStudentType = profile?.role === 'organizer' && playerDistrict === 'PHARR-SAN JUAN-ALAMO ISD';
 
 
   return (
@@ -790,7 +785,7 @@ export default function PlayersPage() {
                                         href={/^\d{8}$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-sm font-bold text-primary underline-offset-4 hover:text-primary/80"
+                                        className="text-sm font-bold text-primary hover:text-primary/80"
                                     >
                                         Use the USCF Player Search to verify an ID.
                                     </Link>
@@ -798,7 +793,7 @@ export default function PlayersPage() {
                                 <FormMessage />
                               </FormItem>
                             )} />
-                            <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} disabled={isUscfNew} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={form.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} disabled={watchUscfId.toUpperCase() === 'NEW'} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                            <FormField control={form.control} name="dob" render={({ field }) => (
@@ -841,7 +836,7 @@ export default function PlayersPage() {
                                             <Button
                                             variant={"outline"}
                                             className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                            disabled={isUscfNew}
+                                            disabled={watchUscfId.toUpperCase() === 'NEW'}
                                             >
                                             {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -853,7 +848,7 @@ export default function PlayersPage() {
                                             mode="single"
                                             selected={field.value}
                                             onSelect={field.onChange}
-                                            disabled={isUscfNew}
+                                            disabled={watchUscfId.toUpperCase() === 'NEW'}
                                             captionLayout="dropdown-buttons"
                                             fromYear={new Date().getFullYear() - 2}
                                             toYear={new Date().getFullYear() + 10}

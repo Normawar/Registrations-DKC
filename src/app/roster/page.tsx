@@ -373,8 +373,6 @@ export default function RosterPage() {
       return <ArrowDown className="ml-2 h-4 w-4" />;
     }
   };
-
-  const isUscfNew = watchUscfId.toUpperCase() === 'NEW';
   
   const handleAddPlayer = () => {
     setEditingPlayer(null);
@@ -705,7 +703,7 @@ export default function RosterPage() {
                                         href={/^\d{8}$/.test(watchUscfId) ? `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${watchUscfId}` : 'https://new.uschess.org/player-search'}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-sm font-bold text-primary underline-offset-4 hover:text-primary/80"
+                                        className="text-sm font-bold text-primary hover:text-primary/80"
                                     >
                                         Use the USCF Player Search to verify an ID.
                                     </Link>
@@ -722,7 +720,7 @@ export default function RosterPage() {
                                         <FormControl>
                                             <Input
                                                 placeholder="1500 or UNR"
-                                                disabled={isUscfNew}
+                                                disabled={watchUscfId.toUpperCase() === 'NEW'}
                                                 {...field}
                                                 value={field.value ?? ''}
                                             />
@@ -781,14 +779,14 @@ export default function RosterPage() {
                                     <FormControl>
                                       <Input
                                         placeholder="MM/DD/YYYY"
-                                        disabled={isUscfNew}
+                                        disabled={watchUscfId.toUpperCase() === 'NEW'}
                                         value={field.value instanceof Date ? format(field.value, 'MM/dd/yyyy') : field.value || ''}
                                         onChange={(e) => field.onChange(e.target.value)}
                                       />
                                     </FormControl>
                                     <Popover>
                                       <PopoverTrigger asChild>
-                                        <Button variant={"outline"} size="icon" className="w-10 shrink-0" disabled={isUscfNew}>
+                                        <Button variant={"outline"} size="icon" className="w-10 shrink-0" disabled={watchUscfId.toUpperCase() === 'NEW'}>
                                           <CalendarIcon className="h-4 w-4" />
                                         </Button>
                                       </PopoverTrigger>
@@ -797,7 +795,7 @@ export default function RosterPage() {
                                           mode="single"
                                           selected={field.value instanceof Date ? field.value : undefined}
                                           onSelect={field.onChange}
-                                          disabled={isUscfNew}
+                                          disabled={watchUscfId.toUpperCase() === 'NEW'}
                                           captionLayout="dropdown-buttons"
                                           fromYear={new Date().getFullYear() - 2}
                                           toYear={new Date().getFullYear() + 10}
@@ -849,11 +847,11 @@ export default function RosterPage() {
                                       <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center gap-4 pt-2">
                                         <FormItem className="flex items-center space-x-2">
                                           <FormControl><RadioGroupItem value="gt" id={`gt-radio-${editingPlayer?.id || 'new'}`} /></FormControl>
-                                          <FormLabel htmlFor={`gt-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">GT Student</FormLabel>
+                                          <Label htmlFor={`gt-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">GT Student</Label>
                                         </FormItem>
                                         <FormItem className="flex items-center space-x-2">
                                           <FormControl><RadioGroupItem value="independent" id={`ind-radio-${editingPlayer?.id || 'new'}`} /></FormControl>
-                                          <FormLabel htmlFor={`ind-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">Independent</FormLabel>
+                                          <Label htmlFor={`ind-radio-${editingPlayer?.id || 'new'}`} className="font-normal cursor-pointer">Independent</Label>
                                         </FormItem>
                                       </RadioGroup>
                                     </FormControl>
@@ -890,4 +888,3 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
-
