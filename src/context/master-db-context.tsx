@@ -46,7 +46,7 @@ interface MasterDbContextType {
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
 const DB_NAME = 'ChessMatePlayerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 4;
 const STORE_NAME = 'players';
 
 async function getDb(): Promise<IDBPDatabase> {
