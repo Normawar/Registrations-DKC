@@ -1,6 +1,6 @@
 
 import Papa from 'papaparse';
-import type { MasterPlayer } from '@/context/master-db-context';
+import type { MasterPlayer } from '@/lib/data/master-player-data';
 
 // This tells TypeScript that `self` is a Worker global scope.
 declare const self: Worker;

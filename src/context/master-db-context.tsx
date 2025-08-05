@@ -30,7 +30,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Connect to AlaSQL IndexedDB database
-      // The version number (4) is critical. Increment it if schema changes.
+      // The version number (9) is critical. Increment it if schema changes.
       await alasql.promise(`
         CREATE INDEXEDDB DATABASE IF NOT EXISTS chessmate_db;
         ATTACH INDEXEDDB DATABASE chessmate_db;
@@ -38,7 +38,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         CREATE TABLE IF NOT EXISTS players (
           id STRING, uscfId STRING, firstName STRING, lastName STRING, middleName STRING, 
           state STRING, uscfExpiration STRING, regularRating INT, quickRating STRING, 
-          school STRING, district STRING, events INT, eventIds ARRAY,
+          school STRING, district STRING, events INT, eventIds JSON,
           grade STRING, section STRING, email STRING, phone STRING, dob STRING, zipCode STRING, studentType STRING
         );
       `);
