@@ -17,6 +17,8 @@ interface MasterDbContextType {
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
+const DB_NAME = 'ChessMatePlayerDB_v3';
+
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, setDatabaseState] = useState<MasterPlayer[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
@@ -30,9 +32,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Connect to AlaSQL IndexedDB database
       await alasql.promise(`
-        CREATE INDEXEDDB DATABASE IF NOT EXISTS chessmate_db;
-        ATTACH INDEXEDDB DATABASE chessmate_db;
-        USE chessmate_db;
+        CREATE INDEXEDDB DATABASE IF NOT EXISTS ${DB_NAME};
+        ATTACH INDEXEDDB DATABASE ${DB_NAME};
+        USE ${DB_NAME};
         CREATE TABLE IF NOT EXISTS players (
           id STRING, uscfId STRING, firstName STRING, lastName STRING, middleName STRING, 
           state STRING, uscfExpiration STRING, regularRating INT, quickRating STRING, 
