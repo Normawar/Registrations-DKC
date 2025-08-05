@@ -60,6 +60,26 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
           }
         }
         
+        let expirationDateISO: string | undefined = undefined;
+        if (expirationDateStr) {
+            const dateParts = expirationDateStr.split('/');
+            if (dateParts.length === 3) {
+                // Handle MM/DD/YY and MM/DD/YYYY
+                let year = parseInt(dateParts[2], 10);
+                if (!isNaN(year) && year < 100) {
+                    year += (year > 50 ? 1900 : 2000); // Simple heuristic for 2-digit years
+                }
+                const month = parseInt(dateParts[0], 10) - 1; // Month is 0-indexed
+                const day = parseInt(dateParts[1], 10);
+                if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+                    const parsedDate = new Date(Date.UTC(year, month, day));
+                    if (!isNaN(parsedDate.getTime())) {
+                        expirationDateISO = parsedDate.toISOString();
+                    }
+                }
+            }
+        }
+
         const player: MasterPlayer = {
           id: `p-${uscfId || index}`,
           uscfId: uscfId || '',
@@ -67,7 +87,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
           lastName: lastName,
           middleName: middleName,
           state: state || undefined,
-          uscfExpiration: expirationDateStr ? new Date(expirationDateStr).toISOString() : undefined,
+          uscfExpiration: expirationDateISO,
           regularRating: regularRatingString ? parseInt(regularRatingString, 10) : undefined,
           school: '', district: '', events: 0, eventIds: []
         };
@@ -157,3 +177,4 @@ export const useMasterDb = () => {
   }
   return context;
 };
+
