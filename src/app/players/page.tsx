@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -58,11 +58,6 @@ import {
   DialogClose
 } from '@/components/ui/dialog';
 import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-} from '@/components/ui/alert';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -95,7 +90,6 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -175,8 +169,7 @@ const playerFormSchema = z.object({
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state' | 'uscfExpiration' | 'events';
 
-
-export default function PlayersPage() {
+function PlayersPageContent() {
   const { toast } = useToast();
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
@@ -193,37 +186,7 @@ export default function PlayersPage() {
   const ROWS_PER_PAGE = 50;
 
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, setDatabase: setAllPlayers, isDbLoaded, dbPlayerCount } = useMasterDb();
-  
-  const dbStates = useMemo(() => {
-    if (isDbLoaded) {
-        const usStates = [
-            'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
-            'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-            'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-            'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-            'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
-        ];
-        const allUniqueStatesFromDb = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
-
-        const usStatesInDb = usStates.filter(s => allUniqueStatesFromDb.has(s));
-        const nonUsRegionsInDb = [...allUniqueStatesFromDb].filter(s => !usStates.includes(s));
-        
-        const sortedUsStates = usStatesInDb.filter(s => s !== 'TX').sort();
-        const sortedNonUsRegions = nonUsRegionsInDb.sort();
-        
-        const finalList = [
-            'ALL',
-            'TX',
-            'NO_STATE', 
-            ...sortedUsStates,
-            ...sortedNonUsRegions
-        ];
-        
-        return finalList;
-    }
-    return ['ALL', 'TX', 'NO_STATE'];
-  }, [isDbLoaded, allPlayers]);
+  const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, isDbLoaded, dbPlayerCount, dbStates, setDatabase } = useMasterDb();
   
   const formStates = useMemo(() => {
     if (isDbLoaded) {
@@ -234,101 +197,6 @@ export default function PlayersPage() {
   }, [isDbLoaded, allPlayers]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const workerRef = useRef<Worker>();
-  const [isImporting, setIsImporting] = useState(false);
-  const toastControlsRef = useRef<{ id: string; dismiss: () => void; update: (props: any) => void; } | null>(null);
-
-  const handleFileImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    setTimeout(() => {
-      toastControlsRef.current = toast({
-          title: 'Preparing Import...',
-          description: 'This may take a moment for large files.',
-          duration: Infinity,
-      });
-
-      workerRef.current?.postMessage({ file, existingPlayers: allPlayers });
-    }, 50);
-
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
-  }, [toast, allPlayers]);
-
-  useEffect(() => {
-    workerRef.current = new Worker(new URL('@/workers/importer-worker.ts', import.meta.url), {
-      type: 'module'
-    });
-
-    workerRef.current.onmessage = (event) => {
-        const { players, error, skipped, duplicates } = event.data;
-
-        if (error) {
-            setIsImporting(false);
-            if (toastControlsRef.current) toastControlsRef.current.dismiss();
-            toast({ variant: 'destructive', title: 'Import Error', description: `Failed to parse file: ${error}`, duration: 10000 });
-            return;
-        }
-
-        if (players) {
-            const totalToSave = players.length;
-            if (toastControlsRef.current) {
-                toastControlsRef.current.update({ id: toastControlsRef.current.id, title: 'Parsing Complete', description: `Found ${totalToSave.toLocaleString()} players. Now saving to database...` });
-            }
-            
-            (async () => {
-                try {
-                    await setAllPlayers(players, (saved, total) => {
-                        if (toastControlsRef.current) {
-                            const description = `Parsed: ${total.toLocaleString()} | Saved: ${saved.toLocaleString()} of ${total.toLocaleString()}`
-                            toastControlsRef.current.update({
-                                id: toastControlsRef.current.id,
-                                title: 'Saving to Database...',
-                                description,
-                            });
-                        }
-                    });
-                    let title = 'Import Complete!';
-                    let description = `The database now contains ${players.length.toLocaleString()} players.`;
-
-                    if (duplicates > 0) {
-                        description += ` Found and merged ${duplicates} duplicate records.`;
-                    }
-                    if (skipped > 0) {
-                      description += ` Skipped ${skipped} invalid records.`
-                    }
-
-                    if (toastControlsRef.current) {
-                      toastControlsRef.current.update({ id: toastControlsRef.current.id, title: title, description: description, duration: 10000 });
-                    }
-                } catch(err) {
-                    if (toastControlsRef.current) {
-                       toastControlsRef.current.update({ id: toastControlsRef.current.id, variant: 'destructive', title: 'Database Save Error', description: err instanceof Error ? err.message : 'An unknown error occurred.', duration: 10000 });
-                    }
-                } finally { 
-                  setIsImporting(false);
-                  toastControlsRef.current = null;
-                }
-            })();
-        }
-    };
-
-    workerRef.current.onerror = (e) => {
-        console.error("Worker error:", e);
-        if (toastControlsRef.current) {
-            toastControlsRef.current.update({ id: toastControlsRef.current.id, variant: 'destructive', title: 'Import Failed', description: 'A worker error occurred. Please check the console.', duration: 10000 });
-        }
-        setIsImporting(false);
-        toastControlsRef.current = null;
-    }
-
-    return () => { 
-        workerRef.current?.terminate();
-    };
-  }, [setAllPlayers, toast, allPlayers]);
   
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -406,9 +274,9 @@ export default function PlayersPage() {
         const stateMatch = searchState === 'ALL' 
             || (searchState === 'NO_STATE' && !player.state)
             || player.state === searchState;
-        const firstNameMatch = !lowerFirstName || player.firstName.toLowerCase().includes(lowerFirstName);
-        const lastNameMatch = !lowerLastName || player.lastName.toLowerCase().includes(lowerLastName);
-        const uscfIdMatch = !searchUscfId || player.uscfId.includes(searchUscfId);
+        const firstNameMatch = !lowerFirstName || player.firstName?.toLowerCase().includes(lowerFirstName);
+        const lastNameMatch = !lowerLastName || player.lastName?.toLowerCase().includes(lowerLastName);
+        const uscfIdMatch = !searchUscfId || player.uscfId?.includes(searchUscfId);
 
         return stateMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
     });
@@ -445,16 +313,16 @@ export default function PlayersPage() {
         }
 
         if (result === 0 && key === 'lastName') {
-            result = a.firstName.localeCompare(b.firstName);
+            result = (a.firstName || '').localeCompare(b.firstName || '');
         }
 
         return sortConfig.direction === 'ascending' ? result : -result;
       });
     } else {
         sortablePlayers.sort((a, b) => {
-            const lastNameComparison = a.lastName.localeCompare(b.lastName);
+            const lastNameComparison = (a.lastName || '').localeCompare(b.lastName || '');
             if (lastNameComparison !== 0) return lastNameComparison;
-            return a.firstName.localeCompare(b.firstName);
+            return (a.firstName || '').localeCompare(b.firstName || '');
         });
     }
     return sortablePlayers;
@@ -518,7 +386,7 @@ export default function PlayersPage() {
   function onSubmit(values: PlayerFormValues) {
     if (values.uscfId.toUpperCase() !== 'NEW') {
       const existingPlayerWithUscfId = allPlayers.find(p => 
-        p.uscfId.toLowerCase() === values.uscfId.toLowerCase() && p.id !== values.id
+        p.uscfId?.toLowerCase() === values.uscfId.toLowerCase() && p.id !== values.id
       );
 
       if (existingPlayerWithUscfId) {
@@ -554,204 +422,191 @@ export default function PlayersPage() {
   }
   
   const playerDistrict = form.watch('district');
-  const showStudentType = profile?.role === 'organizer' && playerDistrict === 'PHARR-SAN JUAN-ALAMO ISD';
+  const showStudentType = profile?.role === 'organizer' && playerDistrict === 'PSJA ISD';
 
 
   return (
-    <AppLayout>
-      <div className="space-y-8">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold font-headline">All Players</h1>
-            <p className="text-muted-foreground">
-              Manage the master database of all players in the system.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-             <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".txt,.tsv"
-              onChange={handleFileImport}
-            />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting}>
-                {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                Import Database (.txt)
-            </Button>
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold font-headline">All Players</h1>
+          <p className="text-muted-foreground">
+            Manage the master database of all players in the system.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
             <Button onClick={handleAddPlayer}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Player
             </Button>
-          </div>
         </div>
-        
-        <Card>
-            <CardHeader>
-                <CardTitle>Master Player Database</CardTitle>
-                <div className="text-sm text-muted-foreground">
-                    There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <div className="animate-pulse rounded-md bg-muted h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
-                </div>
-                <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="space-y-1">
-                        <Label htmlFor="search-state">State</Label>
-                        <Select value={searchState} onValueChange={setSearchState}>
-                            <SelectTrigger id="search-state">
-                                <SelectValue placeholder="All States" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {dbStates.map(s => (
-                                    <SelectItem key={s} value={s}>
-                                        {s === 'ALL' ? 'All States' : s === 'NO_STATE' ? 'No State' : s}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="search-first-name">First Name</Label>
-                        <Input
-                            id="search-first-name"
-                            placeholder="Filter by first name..."
-                            value={searchFirstName}
-                            onChange={e => setSearchFirstName(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="search-last-name">Last Name</Label>
-                        <Input
-                            id="search-last-name"
-                            placeholder="Filter by last name..."
-                            value={searchLastName}
-                            onChange={e => setSearchLastName(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="search-uscf-id">USCF ID</Label>
-                        <Input
-                            id="search-uscf-id"
-                            placeholder="Filter by USCF ID..."
-                            value={searchUscfId}
-                            onChange={e => setSearchUscfId(e.target.value)}
-                        />
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent>
-                <ScrollArea className="h-[60vh]">
-                    <Table>
-                        <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
-                                <TableHead className="p-0">
-                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('lastName')}>
-                                        Player {getSortIcon('lastName')}
-                                    </Button>
-                                </TableHead>
-                                <TableHead className="p-0">
-                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('school')}>
-                                        School / District {getSortIcon('school')}
-                                    </Button>
-                                </TableHead>
-                                <TableHead className="p-0">
-                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
-                                        USCF ID {getSortIcon('uscfId')}
-                                    </Button>
-                                </TableHead>
-                                <TableHead className="p-0">
-                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfExpiration')}>
-                                        Expiration {getSortIcon('uscfExpiration')}
-                                    </Button>
-                                </TableHead>
-                                <TableHead className="p-0">
-                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
-                                        Rating {getSortIcon('regularRating')}
-                                    </Button>
-                                </TableHead>
-                                 <TableHead className="p-0">
-                                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('events')}>
-                                        Events {getSortIcon('events')}
-                                    </Button>
-                                </TableHead>
-                                <TableHead>
-                                    <span className="sr-only">Actions</span>
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paginatedPlayers.map((player) => (
-                            <TableRow key={player.id}>
-                                <TableCell className="font-medium">
-                                <div className="flex items-center gap-3">
-                                    <Avatar className="h-9 w-9">
-                                    <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                                    <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                    {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
-                                    <div className="text-sm text-muted-foreground">{player.email}</div>
-                                    </div>
-                                </div>
-                                </TableCell>
-                                <TableCell>
-                                    <div>
-                                        <p className="font-medium">{player.school}</p>
-                                        <p className="text-sm text-muted-foreground">{player.district}</p>
-                                    </div>
-                                </TableCell>
-                                <TableCell>{player.uscfId}</TableCell>
-                                <TableCell>{player.uscfExpiration ? format(new Date(player.uscfExpiration), 'PPP') : 'N/A'}</TableCell>
-                                <TableCell>{player.regularRating === undefined ? 'UNR' : player.regularRating}</TableCell>
-                                <TableCell>{player.events}</TableCell>
-                                <TableCell className="text-right">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                        <span className="sr-only">Toggle menu</span>
-                                    </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={() => handleEditPlayer(player)}>Edit</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">
-                                        Delete
-                                    </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </ScrollArea>
-            </CardContent>
-            <CardFooter className="flex items-center justify-between pt-6">
-                <div className="text-sm text-muted-foreground">
-                    Showing <strong>{paginatedPlayers.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                    >
-                        Previous
-                    </Button>
-                    <span className="text-sm font-medium">
-                        Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
-                    </span>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
-                    >
-                        Next
-                    </Button>
-                </div>
-            </CardFooter>
-        </Card>
       </div>
+      
+      <Card>
+          <CardHeader>
+              <CardTitle>Master Player Database</CardTitle>
+              <div className="text-sm text-muted-foreground">
+                  There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <div className="animate-pulse rounded-md bg-muted h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
+              </div>
+              <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                      <Label htmlFor="search-state">State</Label>
+                      <Select value={searchState} onValueChange={setSearchState}>
+                          <SelectTrigger id="search-state">
+                              <SelectValue placeholder="All States" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              {dbStates.map(s => (
+                                  <SelectItem key={s} value={s}>
+                                      {s === 'ALL' ? 'All States' : s === 'NO_STATE' ? 'No State' : s}
+                                  </SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                  </div>
+                  <div className="space-y-1">
+                      <Label htmlFor="search-first-name">First Name</Label>
+                      <Input
+                          id="search-first-name"
+                          placeholder="Filter by first name..."
+                          value={searchFirstName}
+                          onChange={e => setSearchFirstName(e.target.value)}
+                      />
+                  </div>
+                  <div className="space-y-1">
+                      <Label htmlFor="search-last-name">Last Name</Label>
+                      <Input
+                          id="search-last-name"
+                          placeholder="Filter by last name..."
+                          value={searchLastName}
+                          onChange={e => setSearchLastName(e.target.value)}
+                      />
+                  </div>
+                  <div className="space-y-1">
+                      <Label htmlFor="search-uscf-id">USCF ID</Label>
+                      <Input
+                          id="search-uscf-id"
+                          placeholder="Filter by USCF ID..."
+                          value={searchUscfId}
+                          onChange={e => setSearchUscfId(e.target.value)}
+                      />
+                  </div>
+              </div>
+          </CardHeader>
+          <CardContent>
+              <ScrollArea className="h-[60vh]">
+                  <Table>
+                      <TableHeader className="sticky top-0 bg-background z-10">
+                          <TableRow>
+                              <TableHead className="p-0">
+                                  <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('lastName')}>
+                                      Player {getSortIcon('lastName')}
+                                  </Button>
+                              </TableHead>
+                              <TableHead className="p-0">
+                                  <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('school')}>
+                                      School / District {getSortIcon('school')}
+                                  </Button>
+                              </TableHead>
+                              <TableHead className="p-0">
+                                  <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfId')}>
+                                      USCF ID {getSortIcon('uscfId')}
+                                  </Button>
+                              </TableHead>
+                              <TableHead className="p-0">
+                                  <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('uscfExpiration')}>
+                                      Expiration {getSortIcon('uscfExpiration')}
+                                  </Button>
+                              </TableHead>
+                              <TableHead className="p-0">
+                                  <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularRating')}>
+                                      Rating {getSortIcon('regularRating')}
+                                  </Button>
+                              </TableHead>
+                               <TableHead className="p-0">
+                                  <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('events')}>
+                                      Events {getSortIcon('events')}
+                                  </Button>
+                              </TableHead>
+                              <TableHead>
+                                  <span className="sr-only">Actions</span>
+                              </TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {paginatedPlayers.map((player) => (
+                          <TableRow key={player.id}>
+                              <TableCell className="font-medium">
+                              <div className="flex items-center gap-3">
+                                  <Avatar className="h-9 w-9">
+                                  <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                  <AvatarFallback>{player.firstName?.charAt(0)}{player.lastName?.charAt(0)}</AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                  {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
+                                  <div className="text-sm text-muted-foreground">{player.email}</div>
+                                  </div>
+                              </div>
+                              </TableCell>
+                              <TableCell>
+                                  <div>
+                                      <p className="font-medium">{player.school}</p>
+                                      <p className="text-sm text-muted-foreground">{player.district}</p>
+                                  </div>
+                              </TableCell>
+                              <TableCell>{player.uscfId}</TableCell>
+                              <TableCell>{player.uscfExpiration ? format(new Date(player.uscfExpiration), 'PPP') : 'N/A'}</TableCell>
+                              <TableCell>{player.regularRating === undefined ? 'UNR' : player.regularRating}</TableCell>
+                              <TableCell>{player.events}</TableCell>
+                              <TableCell className="text-right">
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                  <Button aria-haspopup="true" size="icon" variant="ghost">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                      <span className="sr-only">Toggle menu</span>
+                                  </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => handleEditPlayer(player)}>Edit</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">
+                                      Delete
+                                  </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                              </DropdownMenu>
+                              </TableCell>
+                          </TableRow>
+                          ))}
+                      </TableBody>
+                  </Table>
+              </ScrollArea>
+          </CardContent>
+          <CardFooter className="flex items-center justify-between pt-6">
+              <div className="text-sm text-muted-foreground">
+                  Showing <strong>{paginatedPlayers.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players
+              </div>
+              <div className="flex items-center gap-2">
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                  >
+                      Previous
+                  </Button>
+                  <span className="text-sm font-medium">
+                      Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
+                  </span>
+                  <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                  >
+                      Next
+                  </Button>
+              </div>
+          </CardFooter>
+      </Card>
 
        <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
@@ -920,7 +775,6 @@ export default function PlayersPage() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -935,8 +789,17 @@ export default function PlayersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
 
-    </AppLayout>
-  );
+export default function PlayersPage() {
+    return (
+        <AppLayout>
+            <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+                <PlayersPageContent />
+            </Suspense>
+        </AppLayout>
+    );
 }
 

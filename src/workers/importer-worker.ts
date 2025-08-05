@@ -1,123 +1,107 @@
 
 import Papa from 'papaparse';
 import type { MasterPlayer } from '@/lib/data/master-player-data';
+import alasql from 'alasql';
 
 // This tells TypeScript that `self` is a Worker global scope.
 declare const self: Worker;
 
+const DB_NAME = 'ChessMatePlayerDB_v4'; // Must match context provider version
+
+async function processAndStoreData(players: MasterPlayer[]) {
+    if (players.length === 0) {
+        self.postMessage({ complete: true });
+        return;
+    }
+    try {
+        await alasql.promise(`ATTACH INDEXEDDB DATABASE ${DB_NAME}; USE ${DB_NAME};`);
+        
+        const chunkSize = 2000;
+        for (let i = 0; i < players.length; i += chunkSize) {
+            const chunk = players.slice(i, i + chunkSize);
+            await alasql.promise('INSERT INTO players FROM ?', [chunk]);
+            console.log(`Worker: Inserted chunk ${i / chunkSize + 1}`);
+        }
+        
+        self.postMessage({ complete: true });
+    } catch (e) {
+        console.error("Worker DB Error:", e);
+        self.postMessage({ error: (e as Error).message });
+    }
+}
+
+
 self.onmessage = (event) => {
-    const { file, existingPlayers } = event.data as { file: File, existingPlayers: MasterPlayer[] };
+    const { file } = event.data as { file: File, existingPlayers: MasterPlayer[] };
     if (!file) {
         self.postMessage({ error: 'No file received by worker.' });
         return;
     }
 
-    const dbMap = new Map<string, MasterPlayer>();
-    
-    // Pre-load existing players for efficient merging
-    if(existingPlayers && existingPlayers.length > 0) {
-        existingPlayers.forEach(p => dbMap.set(p.uscfId, p));
-    }
-
     let skippedCount = 0;
-    let duplicateIdCount = 0;
+    let finalPlayerList: MasterPlayer[] = [];
 
     Papa.parse(file, {
-        worker: false, // Run parsing in this worker thread, not another one.
+        worker: false, // Run parsing in this worker thread.
         delimiter: "\t",
         skipEmptyLines: true,
-        complete: (results) => {
+        chunk: (results) => {
             const rows = results.data as string[][];
-            
-            for (const row of rows) {
+             for (const row of rows) {
                 try {
                     const uscfId = row[1]?.trim();
-                    
-                    // A USCF ID is the only absolute requirement.
                     if (!uscfId) {
                         skippedCount++;
                         continue;
                     }
-
-                    if (dbMap.has(uscfId)) {
-                        duplicateIdCount++;
-                    }
-
-                    const namePart = row[0]?.trim();
+                    const namePart = row[0]?.trim() || `Player ${uscfId}`;
                     let lastName = '', firstName = '', middleName = '';
-                    
-                    // Use a placeholder if name is missing but ID is present.
-                    const cleanedName = (namePart || `Player ${uscfId}`).replace(/\s+/g, ' ').trim();
-                    
-                    if (cleanedName) {
-                        if (cleanedName.includes(',')) {
-                            // Handles "Last, First Middle" and "Last,"
-                            const namePieces = cleanedName.split(',').map(p => p.trim());
-                            lastName = namePieces[0] || '';
-                            if (namePieces.length > 1 && namePieces[1]) {
-                                const firstAndMiddle = namePieces[1].split(' ').filter(Boolean);
-                                firstName = firstAndMiddle.shift() || '';
-                                middleName = firstAndMiddle.join(' ');
-                            }
+                    if (namePart.includes(',')) {
+                        const namePieces = namePart.split(',').map(p => p.trim());
+                        lastName = namePieces[0] || '';
+                        if (namePieces.length > 1 && namePieces[1]) {
+                            const firstAndMiddle = namePieces[1].split(' ').filter(Boolean);
+                            firstName = firstAndMiddle.shift() || '.';
+                            middleName = firstAndMiddle.join(' ');
                         } else {
-                            // Handles "First Middle Last" and "First"
-                            const namePieces = cleanedName.split(' ').filter(Boolean);
-                            if (namePieces.length === 1) {
-                                // If only one word, treat it as the last name.
-                                lastName = namePieces[0];
-                            } else if (namePieces.length > 1) {
-                                lastName = namePieces.pop() || '';
-                                firstName = namePieces.shift() || '';
-                                middleName = namePieces.join(' ');
-                            }
+                           firstName = '.';
                         }
+                    } else {
+                        const namePieces = namePart.split(' ').filter(Boolean);
+                        lastName = namePieces.pop() || '.';
+                        firstName = namePieces.join(' ');
+                        if (!firstName) firstName = '.';
                     }
-
-                    // Fallback placeholders if parsing fails to populate names.
-                    if (cleanedName && !firstName && !lastName) {
-                        lastName = cleanedName;
-                    }
-                    if (cleanedName && !firstName) firstName = '.';
-                    if (cleanedName && !lastName) lastName = '.';
-
-                    // Date parsing
-                    const expirationDateStr = row[2] || '';
-                    let expirationDateISO: string | undefined = undefined;
-                    if (expirationDateStr) {
-                        const dateParts = expirationDateStr.split('/');
-                        if (dateParts.length === 3) {
-                            let year = parseInt(dateParts[2], 10);
-                            if (!isNaN(year) && year < 100) {
-                                year += (year > 50 ? 1900 : 2000);
-                            }
-                            const month = parseInt(dateParts[0], 10) - 1;
-                            const day = parseInt(dateParts[1], 10);
-                            if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-                                const parsedDate = new Date(Date.UTC(year, month, day));
-                                if (!isNaN(parsedDate.getTime())) {
-                                    expirationDateISO = parsedDate.toISOString();
-                                }
-                            }
-                        } else {
-                            const parsedDate = new Date(expirationDateStr);
-                             if (!isNaN(parsedDate.getTime())) {
-                                expirationDateISO = new Date(Date.UTC(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate())).toISOString();
-                            }
-                        }
-                    }
-                    
+                     const expirationDateStr = row[2] || '';
+                     let expirationDateISO: string | undefined = undefined;
+                     if (expirationDateStr) {
+                         const dateParts = expirationDateStr.split('/');
+                         if (dateParts.length === 3) {
+                             let year = parseInt(dateParts[2], 10);
+                             if (!isNaN(year) && year < 100) {
+                                 year += (year > 50 ? 1900 : 2000);
+                             }
+                             const month = parseInt(dateParts[0], 10) - 1;
+                             const day = parseInt(dateParts[1], 10);
+                             if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+                                 const parsedDate = new Date(Date.UTC(year, month, day));
+                                 if (!isNaN(parsedDate.getTime())) {
+                                     expirationDateISO = parsedDate.toISOString();
+                                 }
+                             }
+                         }
+                     }
                     const state = row[3]?.trim() || undefined;
                     const regularRatingString = row[4] || '';
                     const quickRatingString = row[5]?.trim() || undefined;
                     let regularRating: number | undefined = undefined;
-                    if (regularRatingString && regularRatingString.toLowerCase() !== 'unrated' && !isNaN(parseInt(regularRatingString, 10))) {
+                    if (regularRatingString && !isNaN(parseInt(regularRatingString, 10))) {
                         const ratingMatch = regularRatingString.match(/^(\d+)/);
                         if (ratingMatch && ratingMatch[1]) regularRating = parseInt(ratingMatch[1], 10);
                     }
                     
-                    const existingPlayer = dbMap.get(uscfId);
                     const playerRecord: MasterPlayer = {
-                        ...(existingPlayer || { id: `p-${uscfId}`, school: "Independent", district: "None", events: 0, eventIds: [] }),
+                        id: `p-${uscfId}`, 
                         uscfId: uscfId, 
                         firstName: firstName, 
                         lastName: lastName, 
@@ -126,22 +110,22 @@ self.onmessage = (event) => {
                         uscfExpiration: expirationDateISO, 
                         regularRating: regularRating,
                         quickRating: quickRatingString,
+                        school: "Independent", district: "None", events: 0, eventIds: []
                     };
-                    dbMap.set(uscfId, playerRecord);
+                    finalPlayerList.push(playerRecord);
                 } catch (e) { 
-                    console.error("Worker: Error parsing a player row:", row, e); 
                     skippedCount++;
                 }
             }
-            
-            const finalPlayerList = Array.from(dbMap.values());
-            self.postMessage({ players: finalPlayerList, skipped: skippedCount, duplicates: duplicateIdCount });
+        },
+        complete: () => {
+            console.log(`Worker: Parsing complete. Found ${finalPlayerList.length} players. Skipped ${skippedCount} rows. Now storing in DB...`);
+            processAndStoreData(finalPlayerList);
         },
         error: (error: any) => {
-            self.postMessage({ error: error.message, skipped: 0, duplicates: 0 });
+            self.postMessage({ error: error.message });
         }
     });
 };
 
-// This export is necessary to treat this file as a module.
 export {};
