@@ -29,7 +29,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Connect to AlaSQL IndexedDB database
-      // The version number (10) is critical. Increment it if schema changes.
       await alasql.promise(`
         CREATE INDEXEDDB DATABASE IF NOT EXISTS chessmate_db;
         ATTACH INDEXEDDB DATABASE chessmate_db;
@@ -47,7 +46,14 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       if (playerCount === 0) {
         // Use a worker to fetch and parse the large data file without blocking the UI
         if (workerRef.current) {
-            workerRef.current.postMessage({ command: 'loadInitialData' });
+            console.log('Fetching initial player data...');
+            const response = await fetch('/all-tx-players-with-id-and-school.txt');
+            if (!response.ok) {
+              throw new Error('Failed to fetch master player data file.');
+            }
+            const blob = await response.blob();
+            const file = new File([blob], 'all-tx-players-with-id-and-school.txt', { type: 'text/plain' });
+            workerRef.current.postMessage({ file, existingPlayers: [] });
         }
       } else {
         const storedPlayers = await alasql.promise('SELECT * FROM players');
@@ -56,7 +62,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error("Failed to initialize database:", error);
-      // Fallback or error handling
     }
   }, []);
   
@@ -70,7 +75,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const totalPlayers = players.length;
     for (let i = 0; i < totalPlayers; i += chunkSize) {
         const chunk = players.slice(i, i + chunkSize);
-        await alasql.promise('SELECT * INTO players FROM ?', [chunk]);
+        await alasql.promise('INSERT INTO players FROM ?', [chunk]);
         if (progressCallback) {
             progressCallback(Math.min(i + chunkSize, totalPlayers), totalPlayers);
         }

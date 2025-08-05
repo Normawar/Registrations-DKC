@@ -15,7 +15,9 @@ self.onmessage = (event) => {
     const dbMap = new Map<string, MasterPlayer>();
     
     // Pre-load existing players for efficient merging
-    existingPlayers.forEach(p => dbMap.set(p.uscfId, p));
+    if(existingPlayers && existingPlayers.length > 0) {
+        existingPlayers.forEach(p => dbMap.set(p.uscfId, p));
+    }
 
     let skippedCount = 0;
     let duplicateIdCount = 0;
