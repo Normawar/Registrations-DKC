@@ -1,8 +1,7 @@
 
-
 'use client';
 
-import { useState, useMemo, useRef, useCallback, Suspense } from 'react';
+import { useState, useMemo, useRef, useCallback, Suspense, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -186,18 +185,10 @@ function PlayersPageContent() {
   const ROWS_PER_PAGE = 50;
 
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, isDbLoaded, dbPlayerCount, dbStates, setDatabase } = useMasterDb();
+  const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, isDbLoaded, dbPlayerCount, dbStates } = useMasterDb();
   
-  const formStates = useMemo(() => {
-    if (isDbLoaded) {
-        const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
-        return Array.from(states).sort();
-    }
-    return [];
-  }, [isDbLoaded, allPlayers]);
+  const formStates = dbStates;
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
     defaultValues: {
@@ -269,7 +260,6 @@ function PlayersPageContent() {
         return allPlayers;
     }
 
-    // Debounced search can be implemented here if performance is an issue
     return allPlayers.filter(player => {
         const stateMatch = searchState === 'ALL' 
             || (searchState === 'NO_STATE' && !player.state)
