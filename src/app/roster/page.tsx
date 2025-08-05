@@ -201,18 +201,18 @@ export default function RosterPage() {
   const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
 
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, addPlayer, updatePlayer, isDbLoaded } = useMasterDb();
+  const { database, getPlayersByFilter, isDbLoaded } = useMasterDb();
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
   const rosterPlayers = useMemo(() => {
     if (!profile || !isDbLoaded || profile.role !== 'sponsor') return [];
-    return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
-  }, [allPlayers, profile, isDbLoaded]);
+    return database.filter(p => p.district === profile.district && p.school === profile.school);
+  }, [database, profile, isDbLoaded]);
 
   const dbStates = useMemo(() => {
     if (isDbLoaded) {
         const usStates = [ 'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY' ];
-        const allUniqueStatesFromDb = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
+        const allUniqueStatesFromDb = new Set(database.map(p => p.state).filter(Boolean) as string[]);
         const usStatesInDb = usStates.filter(s => allUniqueStatesFromDb.has(s));
         const nonUsRegionsInDb = [...allUniqueStatesFromDb].filter(s => !usStates.includes(s));
         const sortedUsStates = usStatesInDb.filter(s => s !== 'TX').sort();
@@ -220,15 +220,15 @@ export default function RosterPage() {
         return ['ALL', 'TX', 'NO_STATE', ...sortedUsStates, ...sortedNonUsRegions];
     }
     return ['ALL', 'TX', 'NO_STATE'];
-  }, [isDbLoaded, allPlayers]);
+  }, [isDbLoaded, database]);
   
   const formStates = useMemo(() => {
     if (isDbLoaded) {
-        const states = new Set(allPlayers.map(p => p.state).filter(Boolean) as string[]);
+        const states = new Set(database.map(p => p.state).filter(Boolean) as string[]);
         return Array.from(states).sort();
     }
     return [];
-  }, [isDbLoaded, allPlayers]);
+  }, [isDbLoaded, database]);
   
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -244,27 +244,31 @@ export default function RosterPage() {
 
   // Debounced search effect
   useEffect(() => {
-    if (!searchFirstName && !searchLastName && !searchUscfId && searchState === 'ALL') {
+    const hasSearchQuery = searchFirstName || searchLastName || searchUscfId;
+    if (!hasSearchQuery) {
         setSearchResults([]);
         return;
     }
+    
     setIsSearching(true);
-    const handler = setTimeout(() => {
-        const lowerFirstName = searchFirstName.toLowerCase();
-        const lowerLastName = searchLastName.toLowerCase();
-        const results = allPlayers.filter(p => {
-            const stateMatch = searchState === 'ALL' || (searchState === 'NO_STATE' && !p.state) || p.state === searchState;
-            const firstNameMatch = !lowerFirstName || p.firstName.toLowerCase().includes(lowerFirstName);
-            const lastNameMatch = !lowerLastName || p.lastName.toLowerCase().includes(lowerLastName);
-            const uscfIdMatch = !searchUscfId || p.uscfId.includes(searchUscfId);
-            return stateMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
-        }).slice(0, 50); // Limit results to avoid performance issues
-        setSearchResults(results);
+    const handler = setTimeout(async () => {
+        const rosterIds = new Set(rosterPlayers.map(p => p.id));
+        const results = await getPlayersByFilter({
+            firstName: searchFirstName,
+            lastName: searchLastName,
+            uscfId: searchUscfId,
+            state: searchState
+        });
+        
+        // Filter out players already on the roster
+        const nonRosterResults = results.filter(p => !rosterIds.has(p.id));
+
+        setSearchResults(nonRosterResults.slice(0, 50));
         setIsSearching(false);
     }, 300);
 
     return () => clearTimeout(handler);
-  }, [searchFirstName, searchLastName, searchUscfId, searchState, allPlayers]);
+  }, [searchFirstName, searchLastName, searchUscfId, searchState, getPlayersByFilter, rosterPlayers]);
 
 
   useEffect(() => {
@@ -392,7 +396,7 @@ export default function RosterPage() {
   const confirmDelete = () => {
     if (playerToDelete) {
       // Don't delete, just disassociate from the roster
-      updatePlayer({
+      getPlayersByFilter.updatePlayer({
           ...playerToDelete,
           school: "Independent",
           district: "None"
@@ -421,7 +425,7 @@ export default function RosterPage() {
     // Check for USCF ID uniqueness unless it's the same player being edited
     const idToUpdate = editingPlayer?.id;
     if (values.uscfId.toUpperCase() !== 'NEW') {
-        const existingPlayerInDb = allPlayers.find(p => p.uscfId.toLowerCase() === values.uscfId.toLowerCase());
+        const existingPlayerInDb = database.find(p => p.uscfId.toLowerCase() === values.uscfId.toLowerCase());
         if (existingPlayerInDb && existingPlayerInDb.id !== idToUpdate) {
             form.setError("uscfId", { type: "manual", message: `USCF ID already assigned to ${existingPlayerInDb.firstName} ${existingPlayerInDb.lastName}.` });
             return;
@@ -429,7 +433,7 @@ export default function RosterPage() {
     }
     
     const { uscfExpiration, dob, regularRating, ...formValues } = values;
-    const existingPlayerInDb = idToUpdate ? allPlayers.find(p => p.id === idToUpdate) : null;
+    const existingPlayerInDb = idToUpdate ? database.find(p => p.id === idToUpdate) : null;
     
     const baseRecord = existingPlayerInDb || {
         id: `p-${Date.now()}`,
@@ -455,11 +459,11 @@ export default function RosterPage() {
     };
     
     if (existingPlayerInDb) {
-      updatePlayer(playerRecord);
+      getPlayersByFilter.updatePlayer(playerRecord);
       const toastTitle = !rosterPlayers.some(p => p.id === playerRecord.id) ? "Player Added to Roster" : "Player Updated";
       toast({ title: toastTitle, description: `${values.firstName} ${values.lastName}'s information has been updated.`});
     } else {
-      addPlayer(playerRecord);
+      getPlayersByFilter.addPlayer(playerRecord);
       toast({ title: "Player Added", description: `${values.firstName} ${values.lastName} has been added to the roster.`});
     }
 
@@ -665,7 +669,7 @@ export default function RosterPage() {
                                     <Input id="dialog-search-uscf-id" placeholder="Filter by USCF ID..." value={searchUscfId} onChange={e => setSearchUscfId(e.target.value)} />
                                 </div>
                             </div>
-                            {(isSearching || searchResults.length > 0) && (
+                            {(isSearching || searchResults.length > 0 || (searchFirstName || searchLastName || searchUscfId)) && (
                                 <Card className="max-h-48 overflow-y-auto">
                                     <CardContent className="p-2">
                                         {isSearching ? (<div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>)
@@ -888,3 +892,4 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
+

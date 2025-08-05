@@ -1,157 +1,150 @@
 
+
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
-import { openDB, type IDBPDatabase } from 'idb';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useRef } from 'react';
+import type { MasterPlayer } from '@/lib/data/master-player-data';
 import { initialMasterPlayerData } from '@/lib/data/master-player-data';
-import { flushSync } from 'react-dom';
-
-// Define a consistent player type to be used everywhere
-export type MasterPlayer = {
-  id: string;
-  uscfId: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  state?: string;
-  // Dates should be stored as ISO strings for JSON compatibility
-  uscfExpiration?: string; 
-  regularRating?: number;
-  quickRating?: string;
-  school: string;
-  district: string;
-  events: number;
-  eventIds: string[];
-  // Roster-specific fields
-  grade?: string;
-  section?: string;
-  email?: string;
-  phone?: string;
-  dob?: string; // ISO String
-  zipCode?: string;
-  studentType?: 'gt' | 'independent';
-};
-
+import alasql from 'alasql';
 
 interface MasterDbContextType {
   database: MasterPlayer[];
-  setDatabase: (players: MasterPlayer[], onProgress?: (saved: number, total: number) => void) => Promise<void>;
+  getPlayersByFilter: (filters: { firstName?: string; lastName?: string; uscfId?: string, state?: string }) => Promise<MasterPlayer[]>;
   addPlayer: (player: MasterPlayer) => Promise<void>;
   updatePlayer: (player: MasterPlayer) => Promise<void>;
-  deletePlayer: (playerId: string) => Promise<void>;
   isDbLoaded: boolean;
   dbPlayerCount: number;
 }
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
-const DB_NAME = 'ChessMatePlayerDB';
-const DB_VERSION = 9;
-const STORE_NAME = 'players';
-
-async function getDb(): Promise<IDBPDatabase> {
-    return openDB(DB_NAME, DB_VERSION, {
-        upgrade(db) {
-            if (db.objectStoreNames.contains(STORE_NAME)) {
-                db.deleteObjectStore(STORE_NAME);
-            }
-            const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            store.createIndex('uscfId', 'uscfId', { unique: true });
-        },
-    });
-}
-
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, setDatabaseState] = useState<MasterPlayer[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
+  const dbInitialized = useRef(false);
 
-  // This effect runs once on mount to load data from IndexedDB
-  useEffect(() => {
-    async function loadDataFromDb() {
-      const db = await getDb();
-      let players = await db.getAll(STORE_NAME);
+  const initializeDatabase = useCallback(async () => {
+    if (dbInitialized.current) return;
+    dbInitialized.current = true;
 
-      if (players.length === 0) {
-        console.log("No players in DB, populating with initial data...");
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        try {
-            for (const player of initialMasterPlayerData) {
-                await tx.store.add(player);
-            }
-            await tx.done;
-            players = initialMasterPlayerData;
-        } catch (error) {
-            console.error("Error populating initial data", error);
-            if (!tx.aborted) {
-                tx.abort();
-            }
-        }
-      }
-      
-      setDatabaseState(players);
-      setIsDbLoaded(true);
-    }
-    loadDataFromDb();
-  }, []);
-
-  const setDatabase = useCallback(async (newPlayers: MasterPlayer[], onProgress?: (saved: number, total: number) => void) => {
-    const db = await getDb();
-    
-    const clearTx = db.transaction(STORE_NAME, 'readwrite');
-    await clearTx.store.clear();
-    await clearTx.done;
-    
-    const totalPlayers = newPlayers.length;
-    const CHUNK_SIZE = 5000;
-    let playersWritten = 0;
-
-    for (let i = 0; i < totalPlayers; i += CHUNK_SIZE) {
-        const chunk = newPlayers.slice(i, i + CHUNK_SIZE);
-        const tx = db.transaction(STORE_NAME, 'readwrite');
+    try {
+      const response = await fetch('/data/all-tx-players-2024-05-10-11_33_08.txt');
+      const textData = await response.text();
+      const players: MasterPlayer[] = textData.split('\n').map((line, index) => {
+        const parts = line.split('|');
+        const uscfId = parts[0]?.trim();
+        const namePart = parts[1]?.trim();
+        const expirationDateStr = parts[2]?.trim();
+        const state = parts[3]?.trim();
+        const regularRatingString = parts[4]?.trim();
         
-        try {
-            const addPromises = chunk.map(player => tx.store.add(player));
-            await Promise.all(addPromises);
-            await tx.done;
-            
-            playersWritten += chunk.length;
-            if (onProgress) {
-                onProgress(playersWritten, totalPlayers);
-            }
-        } catch(e) {
-            console.error("Failed to write chunk to IndexedDB", e);
-            if (!tx.aborted) tx.abort();
-            throw e; 
+        let lastName = '', firstName = '', middleName = '';
+        if (namePart) {
+          if (namePart.includes(',')) {
+              const namePieces = namePart.split(',').map(p => p.trim());
+              lastName = namePieces[0] || '';
+              if (namePieces.length > 1 && namePieces[1]) {
+                  const firstAndMiddle = namePieces[1].split(' ').filter(Boolean);
+                  firstName = firstAndMiddle.shift() || '';
+                  middleName = firstAndMiddle.join(' ');
+              }
+          } else {
+              const namePieces = namePart.split(' ').filter(Boolean);
+              if (namePieces.length === 1) {
+                  lastName = namePieces[0];
+              } else if (namePieces.length > 1) {
+                  lastName = namePieces.pop() || '';
+                  firstName = namePieces.shift() || '';
+                  middleName = namePieces.join(' ');
+              }
+          }
         }
-    }
-    flushSync(() => {
-      setDatabaseState(newPlayers);
+        
+        const player: MasterPlayer = {
+          id: `p-${uscfId || index}`,
+          uscfId: uscfId || '',
+          firstName: firstName,
+          lastName: lastName,
+          middleName: middleName,
+          state: state || undefined,
+          uscfExpiration: expirationDateStr ? new Date(expirationDateStr).toISOString() : undefined,
+          regularRating: regularRatingString ? parseInt(regularRatingString, 10) : undefined,
+          school: '', district: '', events: 0, eventIds: []
+        };
+        return player;
+      });
+      
+      alasql('CREATE TABLE players (id STRING, uscfId STRING, firstName STRING, lastName STRING, middleName STRING, state STRING, uscfExpiration STRING, regularRating INT, school STRING, district STRING, grade STRING, section STRING, email STRING, phone STRING, dob STRING, zipCode STRING, studentType STRING)');
+      alasql('SELECT * INTO players FROM ?', [players]);
+      setDatabaseState(players);
+    } catch (error) {
+      console.error("Failed to load and parse master player data:", error);
+      alasql('CREATE TABLE players (id STRING, uscfId STRING, firstName STRING, lastName STRING, middleName STRING, state STRING, uscfExpiration STRING, regularRating INT, school STRING, district STRING, grade STRING, section STRING, email STRING, phone STRING, dob STRING, zipCode STRING, studentType STRING)');
+      alasql('SELECT * INTO players FROM ?', [initialMasterPlayerData]);
+      setDatabaseState(initialMasterPlayerData);
+    } finally {
       setIsDbLoaded(true);
-    });
+    }
   }, []);
+
+  useEffect(() => {
+    initializeDatabase();
+  }, [initializeDatabase]);
+
+  const getPlayersByFilter = useCallback(async (filters: { firstName?: string; lastName?: string; uscfId?: string, state?:string }) => {
+    if (!isDbLoaded) return [];
+    
+    let query = 'SELECT * FROM players WHERE 1=1';
+    const params = [];
+    
+    if(filters.state && filters.state !== 'ALL') {
+      if(filters.state === 'NO_STATE') {
+        query += ' AND state IS NULL';
+      } else {
+        query += ' AND state = ?';
+        params.push(filters.state);
+      }
+    }
+
+    if (filters.firstName) {
+      query += ` AND LOWER(firstName) LIKE ?`;
+      params.push(`${filters.firstName.toLowerCase()}%`);
+    }
+    if (filters.lastName) {
+      query += ` AND LOWER(lastName) LIKE ?`;
+      params.push(`${filters.lastName.toLowerCase()}%`);
+    }
+    if (filters.uscfId) {
+      query += ` AND uscfId LIKE ?`;
+      params.push(`${filters.uscfId}%`);
+    }
+    
+    return alasql(query, params) as MasterPlayer[];
+  }, [isDbLoaded]);
 
   const addPlayer = useCallback(async (player: MasterPlayer) => {
-    const db = await getDb();
-    await db.add(STORE_NAME, player);
+    if (!isDbLoaded) return;
+    alasql('INSERT INTO players VALUES ?', [[player]]);
     setDatabaseState(prev => [...prev, player]);
-  }, []);
+  }, [isDbLoaded]);
 
   const updatePlayer = useCallback(async (player: MasterPlayer) => {
-    const db = await getDb();
-    await db.put(STORE_NAME, player);
+    if (!isDbLoaded) return;
+    alasql('UPDATE players SET ? WHERE id = ?', [player, player.id]);
     setDatabaseState(prev => prev.map(p => p.id === player.id ? player : p));
-  }, []);
+  }, [isDbLoaded]);
 
-  const deletePlayer = useCallback(async (playerId: string) => {
-    const db = await getDb();
-    await db.delete(STORE_NAME, playerId);
-    setDatabaseState(prev => prev.filter(p => p.id !== playerId));
-  }, []);
-
-  const dbPlayerCount = database.length;
+  const value = {
+    database,
+    getPlayersByFilter,
+    addPlayer,
+    updatePlayer,
+    isDbLoaded,
+    dbPlayerCount: database.length
+  };
 
   return (
-    <MasterDbContext.Provider value={{ database, setDatabase, addPlayer, updatePlayer, deletePlayer, isDbLoaded, dbPlayerCount }}>
+    <MasterDbContext.Provider value={value}>
       {children}
     </MasterDbContext.Provider>
   );
