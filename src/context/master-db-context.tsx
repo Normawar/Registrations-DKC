@@ -1,13 +1,13 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
-import initSqlJs, { type Database } from 'sql.js';
-import { MasterPlayer } from '@/lib/data/full-master-player-data';
+import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 
 interface MasterDbContextType {
-  database: Database | null;
-  query: (sql: string, params?: any[]) => any[];
+  database: MasterPlayer[];
+  addPlayer: (player: MasterPlayer) => void;
+  updatePlayer: (player: MasterPlayer) => void;
+  deletePlayer: (playerId: string) => void;
   isDbLoaded: boolean;
   dbPlayerCount: number;
   dbStates: string[];
@@ -16,80 +16,62 @@ interface MasterDbContextType {
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
-  const [db, setDb] = useState<Database | null>(null);
+  const [database, setDatabase] = useState<MasterPlayer[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
-  const [playerCount, setPlayerCount] = useState(0);
-  const [states, setStates] = useState<string[]>(['ALL', 'NO_STATE', 'TX']);
 
   useEffect(() => {
-    const initializeDatabase = async () => {
-      try {
-        const SQL = await initSqlJs({
-          locateFile: file => `/${file}`
-        });
-
-        const dbResponse = await fetch('/master_player_database.db');
-        if (!dbResponse.ok) {
-          throw new Error(`Failed to fetch database file: ${dbResponse.statusText}`);
-        }
-        const dbArrayBuffer = await dbResponse.arrayBuffer();
-        const database = new SQL.Database(new Uint8Array(dbArrayBuffer));
-        setDb(database);
-        
-        // Get total player count
-        const countResult = database.exec("SELECT COUNT(*) FROM players");
-        if (countResult.length > 0 && countResult[0].values.length > 0) {
-            setPlayerCount(countResult[0].values[0][0] as number);
-        }
-
-        // Get unique states
-        const statesResult = database.exec("SELECT DISTINCT state FROM players WHERE state IS NOT NULL AND state != '' ORDER BY state ASC");
-        if (statesResult.length > 0 && statesResult[0].values.length > 0) {
-            const dbStatesList = statesResult[0].values.map(row => row[0] as string);
-            const sortedUsStates = dbStatesList.filter(s => s !== 'TX').sort();
-            setStates(['ALL', 'NO_STATE', 'TX', ...sortedUsStates]);
-        }
-        
-        setIsDbLoaded(true);
-      } catch (error) {
-        console.error("Error initializing SQL.js database:", error);
-      }
-    };
-
-    initializeDatabase();
+    // Directly use the imported data. This avoids all file fetching and database initialization issues.
+    setDatabase(fullMasterPlayerData);
+    setIsDbLoaded(true);
   }, []);
-
-  const query = (sql: string, params?: any[]): any[] => {
-    if (!db) {
-        console.error("Database not loaded yet.");
-        return [];
-    }
-    try {
-        const stmt = db.prepare(sql);
-        stmt.bind(params);
-        const results = [];
-        while (stmt.step()) {
-            results.push(stmt.getAsObject());
-        }
-        stmt.free();
-        return results;
-    } catch (error) {
-        console.error(`Failed to execute query: ${sql}`, error);
-        return [];
-    }
+  
+  const addPlayer = (player: MasterPlayer) => {
+    // This is a mock implementation for the prototype.
+    // In a real app, this would send a request to a server.
+    const newPlayer = { ...player, id: player.id || `p-${Date.now()}` };
+    const newDb = [...database, newPlayer];
+    setDatabase(newDb);
+    // In a real app, you might save this back to localStorage or a server, but for now, it's in-memory.
   };
 
+  const updatePlayer = (updatedPlayer: MasterPlayer) => {
+    const newDb = database.map(p => p.id === updatedPlayer.id ? updatedPlayer : p);
+    setDatabase(newDb);
+  };
+  
+  const deletePlayer = (playerId: string) => {
+    const newDb = database.filter(p => p.id !== playerId);
+    setDatabase(newDb);
+  }
+
+  const dbStates = useMemo(() => {
+    if (!isDbLoaded) return ['ALL', 'NO_STATE', 'TX'];
+    const usStates = [
+        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
+        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+        'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+        'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+        'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+    ];
+    const allUniqueStatesFromDb = new Set(database.map(p => p.state).filter(Boolean) as string[]);
+    
+    const usStatesInDb = usStates.filter(s => allUniqueStatesFromDb.has(s));
+    const nonUsRegionsInDb = [...allUniqueStatesFromDb].filter(s => !usStates.includes(s)).sort();
+    
+    const sortedUsStates = usStatesInDb.filter(s => s !== 'TX').sort();
+
+    return ['ALL', 'NO_STATE', 'TX', ...sortedUsStates, ...nonUsRegionsInDb];
+  }, [database, isDbLoaded]);
 
   const value = {
-    database: db,
-    query,
+    database,
+    addPlayer,
+    updatePlayer,
+    deletePlayer,
     isDbLoaded,
-    dbPlayerCount: playerCount,
-    dbStates: states,
+    dbPlayerCount: database.length,
+    dbStates,
   };
-
-  // The functions addPlayer, updatePlayer, and deletePlayer are removed as direct DB manipulation
-  // in the browser is complex with sql.js file persistence. These would be server-side actions in a real app.
 
   return (
     <MasterDbContext.Provider value={value}>

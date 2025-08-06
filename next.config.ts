@@ -25,23 +25,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack: (config, { isServer }) => {
-    // This is to prevent `alasql` from trying to require modules that are not available in the web environment.
-    config.externals.push({
-      'react-native-fs': 'commonjs react-native-fs',
-      'react-native-fetch-blob': 'commonjs react-native-fetch-blob',
-    });
-
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        'sql.js': false,
-      };
-    }
-
-    return config;
-  },
 };
 
 export default nextConfig;
