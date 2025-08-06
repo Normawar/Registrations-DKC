@@ -1,0 +1,12 @@
+diff --git a/node_modules/alasql/dist/alasql.fs.js b/node_modules/alasql/dist/alasql.fs.js
+index 03d806a..69b76b2 100644
+--- a/node_modules/alasql/dist/alasql.fs.js
++++ b/node_modules/alasql/dist/alasql.fs.js
+@@ -3688,7 +3688,7 @@
+ 
+ // If ReactNative
+ //var RNFS = require('react-native-fs');
+-var RNFetchBlob = require('react-native-fetch-blob').default;
+ var dirs = RNFetchBlob.fs.dirs;
+ //should use readStream instead if the file is large
+ RNFetchBlob.fs.readStream(
