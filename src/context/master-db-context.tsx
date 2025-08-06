@@ -8,6 +8,7 @@ interface MasterDbContextType {
   addPlayer: (player: MasterPlayer) => void;
   updatePlayer: (player: MasterPlayer) => void;
   deletePlayer: (playerId: string) => void;
+  addBulkPlayers: (players: MasterPlayer[]) => void;
   isDbLoaded: boolean;
   dbPlayerCount: number;
   dbStates: string[];
@@ -33,6 +34,16 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     setDatabase(newDb);
     // In a real app, you might save this back to localStorage or a server, but for now, it's in-memory.
   };
+
+  const addBulkPlayers = (players: MasterPlayer[]) => {
+    // A simple way to merge is to create a map by a unique key (like USCF ID)
+    // and overwrite existing players with new data, then add completely new ones.
+    const playerMap = new Map(database.map(p => [p.uscfId, p]));
+    players.forEach(p => {
+        playerMap.set(p.uscfId, { ...playerMap.get(p.uscfId), ...p });
+    });
+    setDatabase(Array.from(playerMap.values()));
+  }
 
   const updatePlayer = (updatedPlayer: MasterPlayer) => {
     const newDb = database.map(p => p.id === updatedPlayer.id ? updatedPlayer : p);
@@ -68,6 +79,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     addPlayer,
     updatePlayer,
     deletePlayer,
+    addBulkPlayers,
     isDbLoaded,
     dbPlayerCount: database.length,
     dbStates,

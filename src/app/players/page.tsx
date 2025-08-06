@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useRef, useCallback, Suspense, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback, Suspense, useEffect, type ChangeEvent } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,7 +37,8 @@ import {
   Info,
   Download,
   Upload,
-  Trash2
+  Trash2,
+  ClipboardPaste
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -94,6 +95,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Papa from 'papaparse';
+import { Textarea } from '@/components/ui/textarea';
 
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
@@ -181,11 +184,15 @@ function PlayersPageContent() {
   const [searchUscfId, setSearchUscfId] = useState('');
   const [searchState, setSearchState] = useState('ALL');
 
+  const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
+  const [pasteData, setPasteData] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
 
   const { profile } = useSponsorProfile();
-  const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, isDbLoaded, dbPlayerCount, dbStates } = useMasterDb();
+  const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, isDbLoaded, dbPlayerCount, dbStates, addBulkPlayers } = useMasterDb();
   
   const formStates = dbStates;
 
@@ -414,6 +421,90 @@ function PlayersPageContent() {
   const playerDistrict = form.watch('district');
   const showStudentType = profile?.role === 'organizer' && playerDistrict === 'PSJA ISD';
 
+  const processImportData = (data: any[], hasHeaders: boolean) => {
+    const newPlayers: MasterPlayer[] = [];
+    let errors = 0;
+
+    const dataToProcess = hasHeaders ? data : data.map(arr => ({
+      // Map array indices to expected headers if no headers are present
+      'USCF ID': arr[0], 'Last Name': arr[1], 'First Name': arr[2], 'Middle Name': arr[3],
+      'State': arr[4], 'USCF Expiration': arr[5], 'Regular Rating': arr[6],
+      // Add other fields with default values if necessary
+    }));
+
+    dataToProcess.forEach((row: any) => {
+        try {
+            if (!row['USCF ID'] || !row['Last Name'] || !row['First Name']) {
+                errors++;
+                return;
+            }
+
+            const player: Partial<MasterPlayer> = {
+                id: row['USCF ID'], // Use USCF ID as initial ID
+                uscfId: row['USCF ID'],
+                lastName: row['Last Name'],
+                firstName: row['First Name'],
+                middleName: row['Middle Name'],
+                state: row['State'],
+                regularRating: row['Regular Rating'] ? parseInt(row['Regular Rating']) : undefined,
+                // Add more fields here as needed
+            };
+            
+            newPlayers.push(player as MasterPlayer);
+        } catch(e) {
+          errors++;
+          console.error("Error parsing player row:", row, e);
+        }
+    });
+
+    if (newPlayers.length === 0 && data.length > 0) {
+        toast({
+            variant: 'destructive',
+            title: 'Import Failed',
+            description: `Could not import any players. Please ensure your data is valid.`
+        });
+        return;
+    }
+
+    addBulkPlayers(newPlayers);
+    
+    toast({
+      title: "Import Complete",
+      description: `Successfully imported ${newPlayers.length} players. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
+    });
+  };
+
+  const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => processImportData(results.data, true),
+      error: (error) => toast({ variant: 'destructive', title: 'Import Failed', description: `An error occurred: ${error.message}` }),
+    });
+
+    if (e.target) e.target.value = '';
+  };
+
+  const handlePasteImport = () => {
+    if (!pasteData) {
+        toast({ variant: 'destructive', title: 'No data', description: 'Please paste data into the text area.' });
+        return;
+    }
+
+    Papa.parse(pasteData, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+            processImportData(results.data, true);
+            setIsPasteDialogOpen(false);
+            setPasteData('');
+        },
+        error: (error) => toast({ variant: 'destructive', title: 'Parse Failed', description: `An error occurred: ${error.message}` })
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -425,6 +516,19 @@ function PlayersPageContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              accept=".csv"
+              onChange={handleFileImport}
+            />
+             <Button variant="outline" onClick={() => setIsPasteDialogOpen(true)}>
+              <ClipboardPaste className="mr-2 h-4 w-4" /> Paste from Sheet
+            </Button>
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="mr-2 h-4 w-4" /> Import CSV
+            </Button>
             <Button onClick={handleAddPlayer}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add Player
             </Button>
@@ -779,6 +883,33 @@ function PlayersPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Paste from Spreadsheet</DialogTitle>
+            <DialogDescription>
+              Copy the data from your Google Sheet or Excel file (with or without a header row) and paste it into the text area below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              placeholder="Paste your tab-separated data here..."
+              className="h-64"
+              value={pasteData}
+              onChange={(e) => setPasteData(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+                <Button type="button" variant="ghost">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handlePasteImport}>
+              <ClipboardPaste className="mr-2 h-4 w-4" /> Import Data
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
