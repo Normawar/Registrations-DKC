@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef, useCallback, Suspense, useEffect, type ChangeEvent } from 'react';
@@ -189,6 +190,11 @@ function PlayersPageContent() {
 
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
+
+  const [clientReady, setClientReady] = useState(false);
+  useEffect(() => {
+    setClientReady(true);
+  }, []);
 
   const { profile } = useSponsorProfile();
   const { database: allPlayers, addPlayer, updatePlayer, deletePlayer, isDbLoaded, dbPlayerCount, dbStates, addBulkPlayers } = useMasterDb();
@@ -538,7 +544,7 @@ function PlayersPageContent() {
           <CardHeader>
               <CardTitle>Master Player Database</CardTitle>
               <div className="text-sm text-muted-foreground">
-                  There are currently {isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
+                  There are currently {clientReady && isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
               </div>
               <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-1">
