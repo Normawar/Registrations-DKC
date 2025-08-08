@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useRef, useCallback, Suspense, useEffect, type ChangeEvent } from 'react';
@@ -632,7 +633,7 @@ function PlayersPageContent() {
                           </TableRow>
                       </TableHeader>
                       <TableBody>
-                          {paginatedPlayers.map((player) => (
+                        {clientReady && paginatedPlayers.map((player) => (
                           <TableRow key={player.id}>
                               <TableCell className="font-medium">
                               <div className="flex items-center gap-3">
@@ -928,3 +929,4 @@ export default function PlayersPage() {
         </AppLayout>
     );
 }
+
