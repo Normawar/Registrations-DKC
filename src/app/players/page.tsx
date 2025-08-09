@@ -432,10 +432,8 @@ function PlayersPageContent() {
     let errors = 0;
 
     const dataToProcess = hasHeaders ? data : data.map(arr => ({
-      // Map array indices to expected headers if no headers are present
       'USCF ID': arr[0], 'Last Name': arr[1], 'First Name': arr[2], 'Middle Name': arr[3],
       'State': arr[4], 'USCF Expiration': arr[5], 'Regular Rating': arr[6],
-      // Add other fields with default values if necessary
     }));
 
     dataToProcess.forEach((row: any) => {
@@ -446,14 +444,13 @@ function PlayersPageContent() {
             }
 
             const player: Partial<MasterPlayer> = {
-                id: row['USCF ID'], // Use USCF ID as initial ID
+                id: row['USCF ID'], 
                 uscfId: row['USCF ID'],
                 lastName: row['Last Name'],
                 firstName: row['First Name'],
                 middleName: row['Middle Name'],
                 state: row['State'],
                 regularRating: row['Regular Rating'] ? parseInt(row['Regular Rating']) : undefined,
-                // Add more fields here as needed
             };
             
             newPlayers.push(player as MasterPlayer);
