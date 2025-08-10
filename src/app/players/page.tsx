@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, useCallback, Suspense } from 'react';
+import { useState, useMemo, useCallback, Suspense, useEffect } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -34,6 +34,16 @@ function PlayersPageContent() {
   
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
+
+  // State to hold the total player count, only set on the client
+  const [totalPlayers, setTotalPlayers] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (isDbLoaded) {
+      setTotalPlayers(database.length);
+    }
+  }, [isDbLoaded, database.length]);
+
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...database];
@@ -100,7 +110,7 @@ function PlayersPageContent() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Master Player Database</h1>
           <p className="text-muted-foreground">
-            Search, manage, and register every player in the system. Total Players: {isDbLoaded ? database.length.toLocaleString() : '...'}
+            Search, manage, and register every player in the system. Total Players: {totalPlayers !== null ? totalPlayers.toLocaleString() : '...'}
           </p>
         </div>
         <div className="flex items-center gap-2">
