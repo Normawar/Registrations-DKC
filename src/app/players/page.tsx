@@ -49,7 +49,25 @@ function PlayersPageContent() {
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...database];
-    // Sort logic here... (same as before)
+    if (sortConfig) {
+        sortablePlayers.sort((a, b) => {
+            let aValue: any = a[sortConfig.key as keyof MasterPlayer];
+            let bValue: any = b[sortConfig.key as keyof MasterPlayer];
+
+            if (sortConfig.key === 'uscfExpiration') {
+                aValue = a.uscfExpiration ? new Date(a.uscfExpiration).getTime() : 0;
+                bValue = b.uscfExpiration ? new Date(b.uscfExpiration).getTime() : 0;
+            } else if (typeof aValue === 'string' && typeof bValue === 'string') {
+                return sortConfig.direction === 'ascending' ? aValue.localeCompare(bValue) : bValue.localeCompare(aVal);
+            } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+                aValue = aValue ?? 0;
+                bValue = bValue ?? 0;
+            }
+
+            const result = aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+            return sortConfig.direction === 'ascending' ? result : -result;
+        });
+    }
     return sortablePlayers;
   }, [database, sortConfig]);
 
@@ -192,12 +210,18 @@ function PlayersPageContent() {
               </div>
           </CardContent>
           <CardFooter className="flex items-center justify-between pt-6">
-              <div className="text-sm text-muted-foreground">Showing <strong>{(currentPage - 1) * ROWS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players</div>
-              <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>Previous</Button>
-                  <span className="text-sm font-medium">Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}</span>
-                  <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
-              </div>
+            {isClient ? (
+                <>
+                    <div className="text-sm text-muted-foreground">Showing <strong>{(currentPage - 1) * ROWS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players</div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>Previous</Button>
+                        <span className="text-sm font-medium">Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}</span>
+                        <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
+                    </div>
+                </>
+            ) : (
+                <Skeleton className="h-8 w-full" />
+            )}
           </CardFooter>
       </Card>
       
