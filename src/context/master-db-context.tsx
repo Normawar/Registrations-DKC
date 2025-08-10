@@ -1,8 +1,10 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
+
+// --- Types ---
 
 interface MasterDbContextType {
   database: MasterPlayer[];
@@ -11,66 +13,170 @@ interface MasterDbContextType {
   deletePlayer: (playerId: string) => void;
   addBulkPlayers: (players: MasterPlayer[]) => void;
   isDbLoaded: boolean;
+  isDbError: boolean;
   dbPlayerCount: number;
   dbStates: string[];
+  dbSchools: string[];
+  dbDistricts: string[];
+  searchPlayers: (criteria: Partial<SearchCriteria>) => MasterPlayer[];
+  refreshDatabase: () => void;
 }
 
+export type SearchCriteria = {
+  firstName?: string;
+  lastName?: string;
+  uscfId?: string;
+  state?: string;
+  grade?: string;
+  section?: string;
+  school?: string;
+  district?: string;
+  minRating?: number;
+  maxRating?: number;
+  excludeIds?: string[];
+  maxResults?: number;
+}
+
+// --- Constants ---
+
+const DB_STORAGE_KEY = 'master_player_database';
+const TIMESTAMP_KEY = 'master_player_database_timestamp';
+const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
+
+// --- Context Definition ---
+
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
+
+// --- Provider Component ---
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, setDatabase] = useState<MasterPlayer[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
+  const [isDbError, setIsDbError] = useState(false);
+
+  const loadDatabase = useCallback(() => {
+    setIsDbLoaded(false);
+    setIsDbError(false);
+    try {
+      const storedDb = localStorage.getItem(DB_STORAGE_KEY);
+      const storedTimestamp = localStorage.getItem(TIMESTAMP_KEY);
+      const now = new Date().getTime();
+
+      if (storedDb && storedTimestamp && (now - parseInt(storedTimestamp, 10) < CACHE_DURATION)) {
+        setDatabase(JSON.parse(storedDb));
+      } else {
+        // Data is stale or doesn't exist, use initial data and set cache
+        setDatabase(fullMasterPlayerData);
+        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(fullMasterPlayerData));
+        localStorage.setItem(TIMESTAMP_KEY, now.toString());
+      }
+    } catch (error) {
+      console.error("Failed to load or parse master player database:", error);
+      setIsDbError(true);
+      // Fallback to initial data if localStorage fails
+      setDatabase(fullMasterPlayerData);
+    } finally {
+      setIsDbLoaded(true);
+    }
+  }, []);
 
   useEffect(() => {
-    // Directly use the imported data. This avoids all file fetching and database initialization issues.
-    setDatabase(fullMasterPlayerData);
-    setIsDbLoaded(true);
-  }, []);
+    loadDatabase();
+  }, [loadDatabase]);
+
+  const persistDatabase = (newDb: MasterPlayer[]) => {
+    try {
+      setDatabase(newDb);
+      localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(newDb));
+      localStorage.setItem(TIMESTAMP_KEY, new Date().getTime().toString());
+    } catch (error) {
+      console.error("Failed to persist database to localStorage:", error);
+      setIsDbError(true);
+    }
+  };
   
+  const refreshDatabase = () => {
+    localStorage.removeItem(DB_STORAGE_KEY);
+    localStorage.removeItem(TIMESTAMP_KEY);
+    loadDatabase();
+  };
+
   const addPlayer = (player: MasterPlayer) => {
     const newPlayer = { ...player, id: player.id || `p-${Date.now()}` };
     const newDb = [...database, newPlayer];
-    setDatabase(newDb);
+    persistDatabase(newDb);
   };
 
   const addBulkPlayers = (players: MasterPlayer[]) => {
     const playerMap = new Map(database.map(p => [p.uscfId, p]));
     players.forEach(p => {
-        // Ensure new players have a unique ID if not provided
         const id = p.id || p.uscfId || `p-${Date.now()}-${Math.random()}`;
         playerMap.set(p.uscfId, { ...playerMap.get(p.uscfId), ...p, id });
     });
-    setDatabase(Array.from(playerMap.values()));
-  }
+    persistDatabase(Array.from(playerMap.values()));
+  };
 
   const updatePlayer = (updatedPlayer: MasterPlayer) => {
     const newDb = database.map(p => p.id === updatedPlayer.id ? updatedPlayer : p);
-    setDatabase(newDb);
+    persistDatabase(newDb);
   };
-  
+
   const deletePlayer = (playerId: string) => {
     const newDb = database.filter(p => p.id !== playerId);
-    setDatabase(newDb);
-  }
+    persistDatabase(newDb);
+  };
+  
+  const searchPlayers = useCallback((criteria: Partial<SearchCriteria>): MasterPlayer[] => {
+    if (!isDbLoaded) return [];
 
-  const dbStates = useMemo(() => {
-    if (!isDbLoaded) return ['ALL', 'NO_STATE', 'TX'];
-    const usStates = [
-        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA',
-        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-        'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-        'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-        'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
-    ];
-    const allUniqueStatesFromDb = new Set(database.map(p => p.state).filter(Boolean) as string[]);
-    
-    const usStatesInDb = usStates.filter(s => allUniqueStatesFromDb.has(s));
-    const nonUsRegionsInDb = [...allUniqueStatesFromDb].filter(s => !usStates.includes(s)).sort();
-    
-    const sortedUsStates = usStatesInDb.filter(s => s !== 'TX').sort();
+    const {
+        firstName, lastName, uscfId, state, grade, section, school, district,
+        minRating, maxRating, excludeIds = [], maxResults = 100
+    } = criteria;
 
-    return ['ALL', 'NO_STATE', 'TX', ...sortedUsStates, ...nonUsRegionsInDb];
+    const lowerFirstName = firstName?.toLowerCase();
+    const lowerLastName = lastName?.toLowerCase();
+    const excludeSet = new Set(excludeIds);
+
+    const results = database.filter(p => {
+        if (excludeSet.has(p.id)) return false;
+
+        const stateMatch = !state || state === 'ALL' || p.state === state;
+        const gradeMatch = !grade || p.grade === grade;
+        const sectionMatch = !section || p.section === section;
+        const schoolMatch = !school || p.school?.toLowerCase().includes(school.toLowerCase());
+        const districtMatch = !district || p.district?.toLowerCase().includes(district.toLowerCase());
+
+        const rating = p.regularRating;
+        const ratingMatch = (!minRating || (rating && rating >= minRating)) && (!maxRating || (rating && rating <= maxRating));
+
+        const firstNameMatch = !lowerFirstName || p.firstName?.toLowerCase().includes(lowerFirstName);
+        const lastNameMatch = !lowerLastName || p.lastName?.toLowerCase().includes(lowerLastName);
+        const uscfIdMatch = !uscfId || p.uscfId?.includes(uscfId);
+
+        return stateMatch && gradeMatch && sectionMatch && schoolMatch && districtMatch && ratingMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
+    });
+
+    return results.slice(0, maxResults);
   }, [database, isDbLoaded]);
+
+  // Memoized derived data
+  const dbStates = useMemo(() => {
+    if (!isDbLoaded) return ['ALL', 'TX'];
+    const states = [...new Set(database.map(p => p.state).filter(Boolean))].sort();
+    return ['ALL', 'NO_STATE', ...states] as string[];
+  }, [database, isDbLoaded]);
+  
+  const dbSchools = useMemo(() => {
+    if (!isDbLoaded) return [];
+    return [...new Set(database.map(p => p.school).filter(Boolean))].sort() as string[];
+  }, [database, isDbLoaded]);
+
+  const dbDistricts = useMemo(() => {
+    if (!isDbLoaded) return [];
+    return [...new Set(database.map(p => p.district).filter(Boolean))].sort() as string[];
+  }, [database, isDbLoaded]);
+
 
   const value = {
     database,
@@ -79,8 +185,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     deletePlayer,
     addBulkPlayers,
     isDbLoaded,
+    isDbError,
     dbPlayerCount: database.length,
     dbStates,
+    dbSchools,
+    dbDistricts,
+    searchPlayers,
+    refreshDatabase
   };
 
   return (
