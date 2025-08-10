@@ -534,7 +534,7 @@ function PlayersPageContent() {
           <h1 className="text-3xl font-bold font-headline">All Players</h1>
           <p className="text-muted-foreground">
             Manage the master database of all players in the system. 
-            {clientReady && isDbLoaded && ` Total Players: ${dbPlayerCount.toLocaleString()}`}
+            {clientReady && isDbLoaded ? ` Total Players: ${dbPlayerCount.toLocaleString()}` : ''}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -561,7 +561,10 @@ function PlayersPageContent() {
           <CardHeader>
               <CardTitle>Master Player Database</CardTitle>
               <div className="text-sm text-muted-foreground">
-                  There are currently {clientReady && isDbLoaded ? dbPlayerCount.toLocaleString() : <Skeleton className="h-4 w-20 inline-block" />} players in the database. Use the fields below to filter the list.
+                {clientReady && isDbLoaded ? 
+                  `There are currently ${dbPlayerCount.toLocaleString()} players in the database. Use the fields below to filter the list.` : 
+                  <Skeleton className="h-4 w-full" />
+                }
               </div>
               <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-1">
@@ -649,7 +652,13 @@ function PlayersPageContent() {
                           </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {clientReady && paginatedPlayers.map((player) => (
+                        {!clientReady ? (
+                          Array.from({ length: 10 }).map((_, i) => (
+                            <TableRow key={i}>
+                              <TableCell colSpan={7}><Skeleton className="h-10 w-full" /></TableCell>
+                            </TableRow>
+                          ))
+                        ) : paginatedPlayers.map((player) => (
                           <TableRow key={player.id}>
                               <TableCell className="font-medium">
                               <div className="flex items-center gap-3">
@@ -698,7 +707,11 @@ function PlayersPageContent() {
           </CardContent>
           <CardFooter className="flex items-center justify-between pt-6">
               <div className="text-sm text-muted-foreground">
-                  Showing <strong>{paginatedPlayers.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players
+                  {clientReady ? (
+                    <>
+                      Showing <strong>{paginatedPlayers.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players
+                    </>
+                  ) : <Skeleton className="h-4 w-48" />}
               </div>
               <div className="flex items-center gap-2">
                   <Button
@@ -710,7 +723,7 @@ function PlayersPageContent() {
                       Previous
                   </Button>
                   <span className="text-sm font-medium">
-                      Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}
+                      Page {clientReady ? currentPage.toLocaleString() : '1'} of {clientReady ? totalPages.toLocaleString() : '1'}
                   </span>
                   <Button
                       variant="outline"
@@ -945,5 +958,6 @@ export default function PlayersPage() {
         </AppLayout>
     );
 }
+
 
 
