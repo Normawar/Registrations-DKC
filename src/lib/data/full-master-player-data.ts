@@ -39,7 +39,13 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2008-05-10T00:00:00.000Z",
     "zipCode": "78572",
     "events": 5,
-    "eventIds": ["1", "2", "3", "4", "5"]
+    "eventIds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5"
+    ]
   },
   {
     "id": "102",
@@ -57,7 +63,16 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2007-06-15T00:00:00.000Z",
     "zipCode": "78572",
     "events": 8,
-    "eventIds": ["1", "2", "3", "4", "5", "6", "7", "8"]
+    "eventIds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8"
+    ]
   },
   {
     "id": "103",
@@ -75,7 +90,11 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2009-09-01T00:00:00.000Z",
     "zipCode": "78501",
     "events": 3,
-    "eventIds": ["1", "3", "5"]
+    "eventIds": [
+      "1",
+      "3",
+      "5"
+    ]
   },
   {
     "id": "104",
@@ -93,7 +112,10 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2013-01-20T00:00:00.000Z",
     "zipCode": "78504",
     "events": 2,
-    "eventIds": ["2", "4"]
+    "eventIds": [
+      "2",
+      "4"
+    ]
   },
   {
     "id": "105",
@@ -111,7 +133,15 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2007-08-11T00:00:00.000Z",
     "zipCode": "78577",
     "events": 7,
-    "eventIds": ["1", "2", "3", "4", "6", "7", "8"]
+    "eventIds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "6",
+      "7",
+      "8"
+    ]
   },
   {
     "id": "106",
@@ -129,7 +159,12 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2009-03-22T00:00:00.000Z",
     "zipCode": "78577",
     "events": 4,
-    "eventIds": ["2", "4", "6", "8"]
+    "eventIds": [
+      "2",
+      "4",
+      "6",
+      "8"
+    ]
   },
   {
     "id": "107",
@@ -147,7 +182,17 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2006-11-30T00:00:00.000Z",
     "zipCode": "78539",
     "events": 9,
-    "eventIds": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]
+    "eventIds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9"
+    ]
   },
   {
     "id": "108",
@@ -165,7 +210,14 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2008-07-14T00:00:00.000Z",
     "zipCode": "90210",
     "events": 6,
-    "eventIds": ["1", "2", "4", "5", "7", "8"]
+    "eventIds": [
+      "1",
+      "2",
+      "4",
+      "5",
+      "7",
+      "8"
+    ]
   },
   {
     "id": "109",
@@ -183,7 +235,11 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2010-12-05T00:00:00.000Z",
     "zipCode": "33334",
     "events": 3,
-    "eventIds": ["3", "6", "9"]
+    "eventIds": [
+      "3",
+      "6",
+      "9"
+    ]
   },
   {
     "id": "110",
@@ -201,7 +257,16 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2007-02-18T00:00:00.000Z",
     "zipCode": "10282",
     "events": 8,
-    "eventIds": ["1", "2", "3", "4", "5", "6", "7", "9"]
+    "eventIds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "9"
+    ]
   },
   {
     "id": "111",
@@ -219,7 +284,12 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2011-10-25T00:00:00.000Z",
     "zipCode": "78501",
     "events": 4,
-    "eventIds": ["1", "4", "7", "9"]
+    "eventIds": [
+      "1",
+      "4",
+      "7",
+      "9"
+    ]
   },
   {
     "id": "112",
@@ -237,7 +307,10 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2014-04-03T00:00:00.000Z",
     "zipCode": "78504",
     "events": 2,
-    "eventIds": ["5", "8"]
+    "eventIds": [
+      "5",
+      "8"
+    ]
   },
   {
     "id": "113",
@@ -255,7 +328,18 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2006-09-12T00:00:00.000Z",
     "zipCode": "78539",
     "events": 10,
-    "eventIds": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"]
+    "eventIds": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "10"
+    ]
   },
   {
     "id": "114",
@@ -273,7 +357,13 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2010-07-07T00:00:00.000Z",
     "zipCode": "78539",
     "events": 5,
-    "eventIds": ["1", "3", "5", "7", "9"]
+    "eventIds": [
+      "1",
+      "3",
+      "5",
+      "7",
+      "9"
+    ]
   },
   {
     "id": "115",
@@ -291,7 +381,11 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2012-02-28T00:00:00.000Z",
     "zipCode": "78539",
     "events": 3,
-    "eventIds": ["2", "6", "10"]
+    "eventIds": [
+      "2",
+      "6",
+      "10"
+    ]
   },
   {
     "id": "116",
@@ -309,7 +403,9 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2015-05-19T00:00:00.000Z",
     "zipCode": "78577",
     "events": 1,
-    "eventIds": ["4"]
+    "eventIds": [
+      "4"
+    ]
   },
   {
     "id": "117",
@@ -327,7 +423,15 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2007-11-11T00:00:00.000Z",
     "zipCode": "90703",
     "events": 7,
-    "eventIds": ["1", "3", "4", "6", "7", "8", "10"]
+    "eventIds": [
+      "1",
+      "3",
+      "4",
+      "6",
+      "7",
+      "8",
+      "10"
+    ]
   },
   {
     "id": "118",
@@ -345,7 +449,13 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2009-06-24T00:00:00.000Z",
     "zipCode": "33324",
     "events": 5,
-    "eventIds": ["2", "4", "6", "8", "10"]
+    "eventIds": [
+      "2",
+      "4",
+      "6",
+      "8",
+      "10"
+    ]
   },
   {
     "id": "119",
@@ -363,7 +473,14 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2008-01-08T00:00:00.000Z",
     "zipCode": "10468",
     "events": 6,
-    "eventIds": ["1", "3", "5", "7", "9", "10"]
+    "eventIds": [
+      "1",
+      "3",
+      "5",
+      "7",
+      "9",
+      "10"
+    ]
   },
   {
     "id": "120",
@@ -381,7 +498,12 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2011-08-17T00:00:00.000Z",
     "zipCode": "78521",
     "events": 4,
-    "eventIds": ["2", "5", "8", "10"]
+    "eventIds": [
+      "2",
+      "5",
+      "8",
+      "10"
+    ]
   },
   {
     "id": "121",
@@ -399,7 +521,10 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2013-03-09T00:00:00.000Z",
     "zipCode": "78521",
     "events": 2,
-    "eventIds": ["1", "9"]
+    "eventIds": [
+      "1",
+      "9"
+    ]
   },
   {
     "id": "122",
@@ -417,7 +542,16 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2007-12-12T00:00:00.000Z",
     "zipCode": "78566",
     "events": 8,
-    "eventIds": ["1", "2", "3", "5", "6", "7", "8", "10"]
+    "eventIds": [
+      "1",
+      "2",
+      "3",
+      "5",
+      "6",
+      "7",
+      "8",
+      "10"
+    ]
   },
   {
     "id": "123",
@@ -435,7 +569,13 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "dob": "2009-07-30T00:00:00.000Z",
     "zipCode": "78550",
     "events": 5,
-    "eventIds": ["2", "4", "6", "8", "10"]
+    "eventIds": [
+      "2",
+      "4",
+      "6",
+      "8",
+      "10"
+    ]
   },
   {
     "id": "124",
@@ -653,4 +793,4 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     "events": 2,
     "eventIds": []
   }
-]
+];
