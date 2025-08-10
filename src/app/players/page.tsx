@@ -533,7 +533,8 @@ function PlayersPageContent() {
         <div>
           <h1 className="text-3xl font-bold font-headline">All Players</h1>
           <p className="text-muted-foreground">
-            Manage the master database of all players in the system.
+            Manage the master database of all players in the system. 
+            {clientReady && isDbLoaded && ` Total Players: ${dbPlayerCount.toLocaleString()}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -944,4 +945,5 @@ export default function PlayersPage() {
         </AppLayout>
     );
 }
+
 
