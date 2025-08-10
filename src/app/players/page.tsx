@@ -37,8 +37,10 @@ function PlayersPageContent() {
 
   // State to hold the total player count, only set on the client
   const [totalPlayers, setTotalPlayers] = useState<number | null>(null);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    setIsClient(true);
     if (isDbLoaded) {
       setTotalPlayers(database.length);
     }
@@ -153,7 +155,7 @@ function PlayersPageContent() {
                           </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {!isDbLoaded ? Array.from({ length: 10 }).map((_, i) => (
+                        {!isClient || !isDbLoaded ? Array.from({ length: 10 }).map((_, i) => (
                             <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
                         )) : paginatedPlayers.map((player) => (
                           <TableRow key={player.id}>
