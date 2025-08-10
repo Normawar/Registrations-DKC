@@ -427,30 +427,48 @@ function PlayersPageContent() {
   const playerDistrict = form.watch('district');
   const showStudentType = profile?.role === 'organizer' && playerDistrict === 'PSJA ISD';
 
-  const processImportData = (data: any[], hasHeaders: boolean) => {
+  const processImportData = (data: any[]) => {
+    const fieldMappings: { [key: string]: (keyof MasterPlayer)[] } = {
+      uscfId: ['USCF ID', 'id', 'uscfid'],
+      firstName: ['First Name', 'first_name', 'firstname'],
+      lastName: ['Last Name', 'last_name', 'lastname'],
+      middleName: ['Middle Name', 'middle_name', 'middlename'],
+      state: ['State', 'st'],
+      uscfExpiration: ['USCF Expiration', 'exp_date', 'expiration', 'uscf_exp'],
+      regularRating: ['Regular Rating', 'rating', 'regular_rating', 'reg_rtng'],
+    };
+
+    const findValue = (row: any, keys: string[]) => {
+      for (const key of keys) {
+        if (row[key] !== undefined) return row[key];
+      }
+      return undefined;
+    };
+    
     const newPlayers: MasterPlayer[] = [];
     let errors = 0;
-
-    const dataToProcess = hasHeaders ? data : data.map(arr => ({
-      'USCF ID': arr[0], 'Last Name': arr[1], 'First Name': arr[2], 'Middle Name': arr[3],
-      'State': arr[4], 'USCF Expiration': arr[5], 'Regular Rating': arr[6],
-    }));
-
-    dataToProcess.forEach((row: any) => {
+    
+    data.forEach((row: any) => {
         try {
-            if (!row['USCF ID'] || !row['Last Name'] || !row['First Name']) {
+            const uscfId = findValue(row, fieldMappings.uscfId);
+            const lastName = findValue(row, fieldMappings.lastName);
+            const firstName = findValue(row, fieldMappings.firstName);
+
+            if (!uscfId || !lastName || !firstName) {
                 errors++;
                 return;
             }
 
+            const rating = findValue(row, fieldMappings.regularRating);
+
             const player: Partial<MasterPlayer> = {
-                id: row['USCF ID'], 
-                uscfId: row['USCF ID'],
-                lastName: row['Last Name'],
-                firstName: row['First Name'],
-                middleName: row['Middle Name'],
-                state: row['State'],
-                regularRating: row['Regular Rating'] ? parseInt(row['Regular Rating']) : undefined,
+                id: String(uscfId), 
+                uscfId: String(uscfId),
+                lastName: String(lastName),
+                firstName: String(firstName),
+                middleName: findValue(row, fieldMappings.middleName) ? String(findValue(row, fieldMappings.middleName)) : undefined,
+                state: findValue(row, fieldMappings.state) ? String(findValue(row, fieldMappings.state)) : undefined,
+                regularRating: rating !== undefined && String(rating).toUpperCase() !== 'UNR' ? parseInt(String(rating)) : undefined,
             };
             
             newPlayers.push(player as MasterPlayer);
@@ -464,7 +482,7 @@ function PlayersPageContent() {
         toast({
             variant: 'destructive',
             title: 'Import Failed',
-            description: `Could not import any players. Please ensure your data is valid.`
+            description: `Could not import any players. Please ensure your data has columns for USCF ID, First Name, and Last Name.`
         });
         return;
     }
@@ -484,7 +502,7 @@ function PlayersPageContent() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => processImportData(results.data, true),
+      complete: (results) => processImportData(results.data),
       error: (error) => toast({ variant: 'destructive', title: 'Import Failed', description: `An error occurred: ${error.message}` }),
     });
 
@@ -501,7 +519,7 @@ function PlayersPageContent() {
         header: true,
         skipEmptyLines: true,
         complete: (results) => {
-            processImportData(results.data, true);
+            processImportData(results.data);
             setIsPasteDialogOpen(false);
             setPasteData('');
         },
