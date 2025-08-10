@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import { useMasterDb, type SearchCriteria } from '@/context/master-db-context';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useMasterDb, type SearchCriteria, type MasterPlayer } from '@/context/master-db-context';
 
 type UsePlayerSearchProps = {
   initialFilters?: Partial<SearchCriteria>;
@@ -18,6 +18,7 @@ export function usePlayerSearch({
   const { searchPlayers, isDbLoaded } = useMasterDb();
   const [filters, setFilters] = useState<Partial<SearchCriteria>>(initialFilters);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
 
   const updateFilter = useCallback((key: keyof SearchCriteria, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -27,29 +28,29 @@ export function usePlayerSearch({
     setFilters(initialFilters);
   }, [initialFilters]);
 
-  const searchResults = useMemo(() => {
-    setIsLoading(true);
-    if (!isDbLoaded) return [];
-    
-    // Ensure there's at least one text-based filter to avoid overly broad initial searches
-    const hasTextSearch = filters.firstName || filters.lastName || filters.uscfId;
-    if (!hasTextSearch && !filters.state && !filters.school && !filters.district) {
-        setIsLoading(false);
-        return [];
+  const hasActiveFilters = useMemo(() => {
+      return Object.values(filters).some(val => val && val !== 'ALL' && val !== '');
+  }, [filters]);
+  
+  useEffect(() => {
+    if (!isDbLoaded || !hasActiveFilters) {
+        setSearchResults([]);
+        return;
     }
 
+    setIsLoading(true);
     const results = searchPlayers({
       ...filters,
       excludeIds,
       maxResults,
     });
+    setSearchResults(results);
     setIsLoading(false);
-    return results;
-  }, [filters, searchPlayers, isDbLoaded, excludeIds, maxResults]);
+
+  }, [filters, searchPlayers, isDbLoaded, excludeIds, maxResults, hasActiveFilters]);
   
   const hasResults = searchResults.length > 0;
-  const hasActiveFilters = Object.values(filters).some(val => val && val !== 'ALL');
-
+  
   return {
     filters,
     updateFilter,
