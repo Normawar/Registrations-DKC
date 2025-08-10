@@ -560,12 +560,12 @@ function PlayersPageContent() {
       <Card>
           <CardHeader>
               <CardTitle>Master Player Database</CardTitle>
-              <div className="text-sm text-muted-foreground">
+              <CardDescription>
                 {clientReady && isDbLoaded ? 
                   `There are currently ${dbPlayerCount.toLocaleString()} players in the database. Use the fields below to filter the list.` : 
-                  <Skeleton className="h-4 w-full" />
+                  'Loading player database...'
                 }
-              </div>
+              </CardDescription>
               <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-1">
                       <Label htmlFor="search-state">State</Label>
@@ -958,6 +958,7 @@ export default function PlayersPage() {
         </AppLayout>
     );
 }
+
 
 
 
