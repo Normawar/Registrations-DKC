@@ -652,7 +652,7 @@ function PlayersPageContent() {
                           </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {!clientReady ? (
+                        {!clientReady || !isDbLoaded ? (
                           Array.from({ length: 10 }).map((_, i) => (
                             <TableRow key={i}>
                               <TableCell colSpan={7}><Skeleton className="h-10 w-full" /></TableCell>
@@ -707,7 +707,7 @@ function PlayersPageContent() {
           </CardContent>
           <CardFooter className="flex items-center justify-between pt-6">
               <div className="text-sm text-muted-foreground">
-                  {clientReady ? (
+                  {clientReady && isDbLoaded ? (
                     <>
                       Showing <strong>{paginatedPlayers.length > 0 ? (currentPage - 1) * ROWS_PER_PAGE + 1 : 0}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players
                     </>
@@ -723,7 +723,7 @@ function PlayersPageContent() {
                       Previous
                   </Button>
                   <span className="text-sm font-medium">
-                      Page {clientReady ? currentPage.toLocaleString() : '1'} of {clientReady ? totalPages.toLocaleString() : '1'}
+                      Page {clientReady && isDbLoaded ? currentPage.toLocaleString() : '1'} of {clientReady && isDbLoaded ? totalPages.toLocaleString() : '1'}
                   </span>
                   <Button
                       variant="outline"
@@ -958,6 +958,7 @@ export default function PlayersPage() {
         </AppLayout>
     );
 }
+
 
 
 

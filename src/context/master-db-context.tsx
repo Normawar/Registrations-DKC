@@ -28,20 +28,17 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, []);
   
   const addPlayer = (player: MasterPlayer) => {
-    // This is a mock implementation for the prototype.
-    // In a real app, this would send a request to a server.
     const newPlayer = { ...player, id: player.id || `p-${Date.now()}` };
     const newDb = [...database, newPlayer];
     setDatabase(newDb);
-    // In a real app, you might save this back to localStorage or a server, but for now, it's in-memory.
   };
 
   const addBulkPlayers = (players: MasterPlayer[]) => {
-    // A simple way to merge is to create a map by a unique key (like USCF ID)
-    // and overwrite existing players with new data, then add completely new ones.
     const playerMap = new Map(database.map(p => [p.uscfId, p]));
     players.forEach(p => {
-        playerMap.set(p.uscfId, { ...playerMap.get(p.uscfId), ...p });
+        // Ensure new players have a unique ID if not provided
+        const id = p.id || p.uscfId || `p-${Date.now()}-${Math.random()}`;
+        playerMap.set(p.uscfId, { ...playerMap.get(p.uscfId), ...p, id });
     });
     setDatabase(Array.from(playerMap.values()));
   }
