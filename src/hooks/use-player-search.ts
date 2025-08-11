@@ -47,7 +47,7 @@ export function usePlayerSearch({
     setSearchResults(results);
     setIsLoading(false);
 
-  }, [filters, searchPlayers, isDbLoaded, excludeIds, maxResults, hasActiveFilters]);
+  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters]);
   
   const hasResults = searchResults.length > 0;
   
