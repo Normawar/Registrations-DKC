@@ -16,7 +16,7 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { PlayerSearchDialog } from '@/components/PlayerSearchDialog'; // New search dialog
+import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
