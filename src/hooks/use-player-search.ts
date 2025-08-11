@@ -12,8 +12,8 @@ type UsePlayerSearchProps = {
 
 export function usePlayerSearch({
   initialFilters = {},
-  maxResults = 100,
-  excludeIds = [],
+  maxResults, // Removed default value
+  excludeIds,
 }: UsePlayerSearchProps) {
   const { searchPlayers, isDbLoaded } = useMasterDb();
   const [filters, setFilters] = useState<Partial<SearchCriteria>>(initialFilters);
@@ -29,8 +29,15 @@ export function usePlayerSearch({
   }, [initialFilters]);
 
   const hasActiveFilters = useMemo(() => {
-      return Object.values(filters).some(val => val && val !== 'ALL' && val !== '');
-  }, [filters]);
+      // An active filter is anything other than the default initial state.
+      // We check if any filter has a value that is not undefined, null, an empty string, or 'ALL'.
+      return Object.entries(filters).some(([key, value]) => {
+          if (initialFilters.hasOwnProperty(key) && initialFilters[key as keyof SearchCriteria] === value) {
+              return false;
+          }
+          return value !== undefined && value !== null && value !== '' && value !== 'ALL';
+      });
+  }, [filters, initialFilters]);
   
   useEffect(() => {
     if (!isDbLoaded || !hasActiveFilters) {
@@ -47,7 +54,7 @@ export function usePlayerSearch({
     setSearchResults(results);
     setIsLoading(false);
 
-  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters]);
+  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds]);
   
   const hasResults = searchResults.length > 0;
   
