@@ -142,7 +142,7 @@ export default function ManageEventsPage() {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
-  const [sortConfig, setSortConfig = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
   
   const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
   const [registrations, setRegistrations] = useState<RegistrationInfo[]>([]);
@@ -561,8 +561,11 @@ export default function ManageEventsPage() {
   const triggerPlayerImport = () => {
       const input = fileInputRef.current;
       if (input) {
-          input.onchange = (e) => handleFileImport(e as ChangeEvent<HTMLInputElement>, true);
-          input.click();
+          const currentInput = fileInputRef.current;
+          if (currentInput) {
+            currentInput.onchange = (e) => handleFileImport(e as ChangeEvent<HTMLInputElement>, true);
+            currentInput.click();
+          }
       }
   };
 
@@ -776,5 +779,3 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
-
-    
