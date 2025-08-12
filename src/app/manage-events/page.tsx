@@ -136,7 +136,7 @@ type StoredDownloads = {
 export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent } = useEvents();
-  const { database: allPlayers, isDbLoaded, addBulkPlayers: addBulkPlayersToDb, getDistricts, updateSchoolDistrict } = useMasterDb();
+  const { database: allPlayers, isDbLoaded, addBulkPlayers, updateSchoolDistrict } = useMasterDb();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -153,6 +153,10 @@ export default function ManageEventsPage() {
 
   const [selectedDistrictToEdit, setSelectedDistrictToEdit] = useState<string | null>(null);
   const [newDistrictName, setNewDistrictName] = useState('');
+  
+  const getDistricts = useCallback(() => {
+    return [...new Set(allPlayers.map(p => p.district).filter(Boolean))].sort() as string[];
+  }, [allPlayers]);
 
   const uniqueDistricts = useMemo(() => getDistricts(), [getDistricts]);
 
@@ -298,7 +302,7 @@ export default function ManageEventsPage() {
                 console.error("Error parsing player row:", row, e);
             }
         });
-        addBulkPlayersToDb(newPlayers);
+        addBulkPlayers(newPlayers);
         toast({
           title: "Player Database Updated",
           description: `Successfully imported ${newPlayers.length} players. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
@@ -550,23 +554,12 @@ export default function ManageEventsPage() {
     toast({ title: 'Status Cleared', description: 'All "new" indicators cleared.' });
   };
 
-  const triggerEventImport = () => {
-      const input = fileInputRef.current;
-      if (input) {
-          input.onchange = (e) => handleFileImport(e as ChangeEvent<HTMLInputElement>, false);
-          input.click();
-      }
-  };
-
-  const triggerPlayerImport = () => {
-      const input = fileInputRef.current;
-      if (input) {
-          const currentInput = fileInputRef.current;
-          if (currentInput) {
-            currentInput.onchange = (e) => handleFileImport(e as ChangeEvent<HTMLInputElement>, true);
-            currentInput.click();
-          }
-      }
+  const triggerImport = (isPlayerImport: boolean) => {
+    const input = fileInputRef.current;
+    if (input) {
+      input.onchange = (e) => handleFileImport(e as ChangeEvent<HTMLInputElement>, isPlayerImport);
+      input.click();
+    }
   };
 
   return (
@@ -582,11 +575,13 @@ export default function ManageEventsPage() {
           <div className="flex items-center gap-2">
             <input type="file" ref={fileInputRef} className="hidden" accept=".csv" />
             <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import</Button></DropdownMenuTrigger>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import</Button>
+              </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={triggerEventImport}>Import Events from CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={triggerPlayerImport}>Import Players from CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsPasteDialogOpen(true)}>Paste from Sheet</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => triggerImport(false)}>Import Events from CSV</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => triggerImport(true)}>Import Players from CSV</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsPasteDialogOpen(true)}>Paste from Sheet</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button onClick={handleAddEvent}>
