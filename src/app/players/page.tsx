@@ -35,8 +35,7 @@ function PlayersPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
 
-  // State to hold the total player count, only set on the client
-  const [totalPlayers, setTotalPlayers] = useState<number | null>(null);
+  const [totalPlayers, setTotalPlayers] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -58,7 +57,7 @@ function PlayersPageContent() {
                 aValue = a.uscfExpiration ? new Date(a.uscfExpiration).getTime() : 0;
                 bValue = b.uscfExpiration ? new Date(b.uscfExpiration).getTime() : 0;
             } else if (typeof aValue === 'string' && typeof bValue === 'string') {
-                return sortConfig.direction === 'ascending' ? aValue.localeCompare(bValue) : bValue.localeCompare(aVal);
+                return sortConfig.direction === 'ascending' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
             } else if (typeof aValue === 'number' && typeof bValue === 'number') {
                 aValue = aValue ?? 0;
                 bValue = bValue ?? 0;
@@ -92,7 +91,6 @@ function PlayersPageContent() {
       toast({ variant: 'destructive', title: 'No Event Selected', description: 'Please select an event from the dropdown to add this player.' });
       return;
     }
-    // In a real app, this would trigger a registration flow
     toast({ title: 'Player Added to Event', description: `${player.firstName} ${player.lastName} has been staged for registration in the selected event.` });
     console.log(`Staging player ${player.id} for event ${selectedEventId}`);
   };
@@ -112,6 +110,10 @@ function PlayersPageContent() {
   };
   
   const handleExport = () => {
+    if (database.length === 0) {
+      toast({ variant: 'destructive', title: 'No Data to Export', description: 'The player database is empty.' });
+      return;
+    }
     const csv = Papa.unparse(database);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -130,7 +132,7 @@ function PlayersPageContent() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Master Player Database</h1>
           <p className="text-muted-foreground">
-            Search, manage, and register every player in the system. Total Players: {totalPlayers !== null ? totalPlayers.toLocaleString() : '...'}
+            Search, manage, and register every player in the system. Total Players: {isClient ? totalPlayers.toLocaleString() : '...'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -210,7 +212,7 @@ function PlayersPageContent() {
               </div>
           </CardContent>
           <CardFooter className="flex items-center justify-between pt-6">
-            {isClient ? (
+            {isClient && totalPages > 0 && (
                 <>
                     <div className="text-sm text-muted-foreground">Showing <strong>{(currentPage - 1) * ROWS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players</div>
                     <div className="flex items-center gap-2">
@@ -219,9 +221,10 @@ function PlayersPageContent() {
                         <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
                     </div>
                 </>
-            ) : (
-                <Skeleton className="h-8 w-full" />
             )}
+             {isClient && totalPages === 0 && (
+                <div className="text-sm text-muted-foreground">Showing <strong>0</strong> to <strong>0</strong> of <strong>0</strong> players</div>
+             )}
           </CardFooter>
       </Card>
       

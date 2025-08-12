@@ -132,7 +132,7 @@ type StoredDownloads = {
 export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent } = useEvents();
-  const { database: allPlayers, isDbLoaded } = useMasterDb();
+  const { database: allPlayers, isDbLoaded, addBulkPlayers: addBulkPlayersToDb } = useMasterDb();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -258,160 +258,122 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
-  const processImportData = (data: any[], hasHeaders: boolean) => {
-      const newEvents: Event[] = [];
-      let errors = 0;
-
-      const dataToProcess = hasHeaders ? data : data.map(arr => ({
-          'Date': arr[0],
-          'Tournament': arr[1],
-          'Location': arr[2],
-          'Rounds': 5,
-          'Regular Fee': 25,
-          'Late Fee': 30,
-          'Very Late Fee': 35,
-          'Day of Fee': 40
-      }));
-
-      dataToProcess.forEach((row: any) => {
-        try {
-          let dateStr = row['date'] || row['Date'];
-          if (!dateStr) {
-              console.warn("Skipping row due to missing date:", row);
-              errors++;
-              return;
-          }
-
-          if (dateStr.includes('-')) {
-            dateStr = dateStr.split('-')[0].trim();
-          }
-
-          const date = new Date(dateStr);
-          if (!isValid(date)) throw new Error(`Invalid date format for value: "${dateStr}"`);
-          
-          const eventData = {
-            id: `evt-${Date.now()}-${Math.random()}`,
-            name: row['name'] || row['Name'] || row['Tournament'],
-            date: date.toISOString(),
-            location: row['location'] || row['Location'],
-            rounds: row['rounds'] || row['Rounds'],
-            regularFee: row['regularFee'] || row['Regular Fee'],
-            lateFee: row['lateFee'] || row['Late Fee'],
-            veryLateFee: row['veryLateFee'] || row['Very Late Fee'],
-            dayOfFee: row['dayOfFee'] || row['Day of Fee'],
-            imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
-            imageName: row['imageName'] || row['Image Name'] || undefined,
-            pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
-            pdfName: row['pdfName'] || row['PDF Name'] || undefined,
-          };
-
-          const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
-          for (const field of requiredFields) {
-            if (eventData[field] === undefined || eventData[field] === null || (typeof eventData[field] === 'number' && isNaN(eventData[field]))) {
-              throw new Error(`Missing or invalid required field: ${field}`);
+  const processImportData = (data: any[], hasHeaders: boolean, isPlayerImport: boolean) => {
+    if (isPlayerImport) {
+        const newPlayers: MasterPlayer[] = [];
+        let errors = 0;
+        data.forEach((row: any) => {
+            try {
+                if (!row.uscfId && !row.USCF_ID) {
+                  errors++; return;
+                }
+                const player: MasterPlayer = {
+                    id: row.id || row.ID || `p-${Date.now()}-${Math.random()}`,
+                    uscfId: row.uscfId || row.USCF_ID,
+                    firstName: row.firstName || row.First_Name,
+                    lastName: row.lastName || row.Last_Name,
+                    state: row.state || row.State,
+                    uscfExpiration: row.uscfExpiration || row.USCF_Expiration,
+                    regularRating: parseInt(row.regularRating || row.Regular_Rating, 10) || undefined,
+                    grade: row.grade || row.Grade,
+                    section: row.section || row.Section,
+                    email: row.email || row.Email,
+                    school: row.school || row.School,
+                    district: row.district || row.District,
+                    events: 0,
+                    eventIds: [],
+                };
+                newPlayers.push(player);
+            } catch(e) {
+                errors++;
+                console.error("Error parsing player row:", row, e);
             }
+        });
+        addBulkPlayersToDb(newPlayers);
+        toast({
+          title: "Player Database Updated",
+          description: `Successfully imported ${newPlayers.length} players. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
+        });
+    } else {
+        const newEvents: Event[] = [];
+        let errors = 0;
+
+        const dataToProcess = hasHeaders ? data : data.map(arr => ({
+            'Date': arr[0], 'Tournament': arr[1], 'Location': arr[2], 'Rounds': 5,
+            'Regular Fee': 25, 'Late Fee': 30, 'Very Late Fee': 35, 'Day of Fee': 40
+        }));
+
+        dataToProcess.forEach((row: any) => {
+          try {
+            let dateStr = row['date'] || row['Date'];
+            if (!dateStr) { errors++; return; }
+            if (dateStr.includes('-')) { dateStr = dateStr.split('-')[0].trim(); }
+            const date = new Date(dateStr);
+            if (!isValid(date)) throw new Error(`Invalid date format: "${dateStr}"`);
+            
+            const eventData = {
+              id: `evt-${Date.now()}-${Math.random()}`,
+              name: row['name'] || row['Name'] || row['Tournament'],
+              date: date.toISOString(),
+              location: row['location'] || row['Location'],
+              rounds: row['rounds'] || row['Rounds'],
+              regularFee: row['regularFee'] || row['Regular Fee'],
+              lateFee: row['lateFee'] || row['Late Fee'],
+              veryLateFee: row['veryLateFee'] || row['Very Late Fee'],
+              dayOfFee: row['dayOfFee'] || row['Day of Fee'],
+              imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
+              imageName: row['imageName'] || row['Image Name'] || undefined,
+              pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
+              pdfName: row['pdfName'] || row['PDF Name'] || undefined,
+            };
+
+            const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
+            for (const field of requiredFields) { if (eventData[field] === undefined || eventData[field] === null) { throw new Error(`Missing required field: ${field}`); } }
+            
+            newEvents.push(eventData as Event);
+          } catch(e) {
+            errors++;
+            console.error("Error parsing event row:", row, e);
           }
-          
-          const finalEvent: Event = {
-              id: eventData.id,
-              name: String(eventData.name),
-              date: eventData.date,
-              location: String(eventData.location),
-              rounds: parseInt(String(eventData.rounds), 10),
-              regularFee: parseFloat(String(eventData.regularFee)),
-              lateFee: parseFloat(String(eventData.lateFee)),
-              veryLateFee: parseFloat(String(eventData.veryLateFee)),
-              dayOfFee: parseFloat(String(eventData.dayOfFee)),
-              imageUrl: eventData.imageUrl ? String(eventData.imageUrl) : undefined,
-              imageName: eventData.imageName ? String(eventData.imageName) : undefined,
-              pdfUrl: eventData.pdfUrl ? String(eventData.pdfUrl) : undefined,
-              pdfName: eventData.pdfName ? String(eventData.pdfName) : undefined,
-          };
-          
-          newEvents.push(finalEvent);
-        } catch(e) {
-          errors++;
-          console.error("Error parsing event row:", row, e);
+        });
+        
+        if (newEvents.length === 0 && data.length > 0) {
+            toast({ variant: 'destructive', title: 'Import Failed', description: `Could not import any events.` });
+            return;
         }
-      });
-
-      if (newEvents.length === 0 && data.length > 0) {
-          toast({
-              variant: 'destructive',
-              title: 'Import Failed',
-              description: `Could not import any events. Please ensure your data has the required headers and valid data.`
-          });
-          return;
-      }
-
-      addBulkEvents(newEvents);
-      
-      toast({
-        title: "Import Complete",
-        description: `Successfully imported ${newEvents.length} events. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
-      });
+        addBulkEvents(newEvents);
+        toast({ title: "Import Complete", description: `Successfully imported ${newEvents.length} events. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}` });
+    }
   };
   
-  const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = (e: ChangeEvent<HTMLInputElement>, isPlayerImport: boolean) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => processImportData(results.data, true),
-      error: (error) => {
-        toast({
-          variant: 'destructive',
-          title: 'Import Failed',
-          description: `An error occurred while parsing the CSV file: ${error.message}`
-        });
-      },
+      complete: (results) => processImportData(results.data, true, isPlayerImport),
+      error: (error) => { toast({ variant: 'destructive', title: 'Import Failed', description: error.message }); },
     });
-
-    if (e.target) {
-        e.target.value = '';
-    }
+    if (e.target) e.target.value = '';
   };
 
-  const handlePasteImport = () => {
-    if (!pasteData) {
-        toast({ variant: 'destructive', title: 'No data', description: 'Please paste data into the text area.' });
-        return;
-    }
-
+  const handlePasteImport = (isPlayerImport: boolean) => {
+    if (!pasteData) { toast({ variant: 'destructive', title: 'No data', description: 'Please paste data.' }); return; }
     Papa.parse(pasteData, {
         header: true,
         skipEmptyLines: true,
         complete: (resultsWithHeader) => {
             if (resultsWithHeader.data.length > 0 && resultsWithHeader.meta.fields) {
-                const firstRowIsLikelyData = resultsWithHeader.meta.fields.some(field => field && (field.includes('/') || !isNaN(Date.parse(field))));
-                
-                if (firstRowIsLikelyData) {
-                    Papa.parse(pasteData, {
-                        header: false,
-                        skipEmptyLines: true,
-                        complete: (resultsWithoutHeader) => {
-                            processImportData(resultsWithoutHeader.data, false);
-                        }
-                    });
-                } else {
-                    processImportData(resultsWithHeader.data, true);
-                }
+                processImportData(resultsWithHeader.data, true, isPlayerImport);
             } else {
-                 toast({ variant: 'destructive', title: 'Import Failed', description: 'No data could be parsed from your input.' });
+                 toast({ variant: 'destructive', title: 'Import Failed', description: 'No data parsed.' });
             }
-
             setIsPasteDialogOpen(false);
             setPasteData('');
         },
-        error: (error) => {
-            toast({
-              variant: 'destructive',
-              title: 'Parse Failed',
-              description: `An error occurred while parsing the pasted data: ${error.message}`
-            });
-        }
+        error: (error) => { toast({ variant: 'destructive', title: 'Parse Failed', description: error.message }); }
     });
   };
 
@@ -496,14 +458,8 @@ export default function ManageEventsPage() {
     if (!selectedEventForReg) return [];
     const downloadedIds = new Set(downloadedPlayers[selectedEventForReg.id] || []);
     return registrations.filter(p => {
-        // Include if player is newly registered and not downloaded
-        if (!downloadedIds.has(p.player.id) && p.details.status !== 'withdrawn') {
-            return true;
-        }
-        // Include if player was withdrawn after they were already downloaded
-        if (downloadedIds.has(p.player.id) && p.details.status === 'withdrawn') {
-            return true;
-        }
+        if (!downloadedIds.has(p.player.id) && p.details.status !== 'withdrawn') return true;
+        if (downloadedIds.has(p.player.id) && p.details.status === 'withdrawn') return true;
         return false;
     });
   }, [registrations, downloadedPlayers, selectedEventForReg]);
@@ -513,19 +469,14 @@ export default function ManageEventsPage() {
     
     const playersToDownload = downloadAll ? registrations : playersForDownload;
     if (playersToDownload.length === 0) {
-      toast({ title: 'No Players to Download', description: downloadAll ? 'There are no registered players for this event.' : 'There are no new registrations or withdrawals to download.' });
+      toast({ title: 'No Players to Download', description: downloadAll ? 'There are no registered players.' : 'There are no new registrations or withdrawals.' });
       return;
     }
     
     const csvData = playersToDownload.map(p => ({
-        "USCF ID": p.player.uscfId,
-        "First Name": p.player.firstName,
-        "Last Name": p.player.lastName,
-        "Rating": p.player.regularRating || 'UNR',
-        "Grade": p.player.grade,
-        "Section": p.details.section,
-        "School": p.player.school,
-        "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : 'Registered'
+        "USCF ID": p.player.uscfId, "First Name": p.player.firstName, "Last Name": p.player.lastName,
+        "Rating": p.player.regularRating || 'UNR', "Grade": p.player.grade, "Section": p.details.section,
+        "School": p.player.school, "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : 'Registered'
     }));
 
     const csv = Papa.unparse(csvData);
@@ -533,7 +484,7 @@ export default function ManageEventsPage() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    const fileNameSuffix = downloadAll ? 'all_registrations' : 'registered_and_withdrawn';
+    const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_updates';
     link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, '_')}_${fileNameSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
@@ -548,8 +499,7 @@ export default function ManageEventsPage() {
       setDownloadedPlayers(updatedDownloads);
       localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
     }
-    
-    toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations have been downloaded.`});
+    toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations downloaded.`});
   };
   
   const handleMarkAllAsNew = () => {
@@ -558,19 +508,16 @@ export default function ManageEventsPage() {
     delete updatedDownloads[selectedEventForReg.id];
     setDownloadedPlayers(updatedDownloads);
     localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
-    toast({ title: 'Status Reset', description: 'All players for this event are marked as new.' });
+    toast({ title: 'Status Reset', description: 'All players marked as new for this event.' });
   };
 
   const handleClearAllNew = () => {
     if (!selectedEventForReg) return;
     const allPlayerIdsForEvent = registrations.map(p => p.player.id);
-    const updatedDownloads = {
-        ...downloadedPlayers,
-        [selectedEventForReg.id]: allPlayerIdsForEvent
-    };
+    const updatedDownloads = { ...downloadedPlayers, [selectedEventForReg.id]: allPlayerIdsForEvent };
     setDownloadedPlayers(updatedDownloads);
     localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
-    toast({ title: 'Status Cleared', description: 'All new registration indicators have been cleared.' });
+    toast({ title: 'Status Cleared', description: 'All "new" indicators cleared.' });
   };
 
   return (
@@ -584,19 +531,15 @@ export default function ManageEventsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".csv"
-              onChange={handleFileImport}
-            />
-             <Button variant="outline" onClick={() => setIsPasteDialogOpen(true)}>
-              <ClipboardPaste className="mr-2 h-4 w-4" /> Paste from Sheet
-            </Button>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" /> Import CSV
-            </Button>
+            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={(e) => handleFileImport(e, false)} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import</Button></DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>Import Events from CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {fileInputRef.current?.onchange = (e: any) => handleFileImport(e, true); fileInputRef.current?.click();}}>Import Players from CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsPasteDialogOpen(true)}>Paste from Sheet</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={handleAddEvent}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Event
             </Button>
@@ -608,34 +551,12 @@ export default function ManageEventsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>
-                        Event Name {getSortIcon('name')}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('date')}>
-                        Date {getSortIcon('date')}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('location')}>
-                        Location {getSortIcon('location')}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>
-                        Fees (Early, Reg., Late, Day of) {getSortIcon('regularFee')}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="p-0">
-                    <Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('status')}>
-                        Status {getSortIcon('status')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
+                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>Event Name {getSortIcon('name')}</Button></TableHead>
+                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('date')}>Date {getSortIcon('date')}</Button></TableHead>
+                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('location')}>Location {getSortIcon('location')}</Button></TableHead>
+                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>Fees {getSortIcon('regularFee')}</Button></TableHead>
+                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('status')}>Status {getSortIcon('status')}</Button></TableHead>
+                  <TableHead><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -645,35 +566,16 @@ export default function ManageEventsPage() {
                     <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                     <TableCell>{event.location}</TableCell>
                     <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
-                    <TableCell>
-                      <Badge variant={getEventStatus(event) === 'Open' ? 'default' : 'secondary'} className={cn(getEventStatus(event) === 'Open' ? 'bg-green-600 text-white' : '')}>
-                        {getEventStatus(event)}
-                      </Badge>
-                    </TableCell>
+                    <TableCell><Badge variant={getEventStatus(event) === 'Open' ? 'default' : 'secondary'} className={cn(getEventStatus(event) === 'Open' ? 'bg-green-600 text-white' : '')}>{getEventStatus(event)}</Badge></TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Toggle menu</span></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                           <DropdownMenuItem onClick={() => handleViewRegistrations(event)}>
-                            <Users className="mr-2 h-4 w-4" /> View Registrations
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditEvent(event)}>
-                            <FilePenLine className="mr-2 h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link href={`/organizer-registration?eventId=${event.id}`}>
-                              <PlusCircle className="mr-2 h-4 w-4" /> Register Players
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                          <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -689,229 +591,72 @@ export default function ManageEventsPage() {
         <DialogContent className="sm:max-w-3xl max-h-[90vh] p-0 flex flex-col">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
             <DialogTitle>{editingEvent ? 'Edit Event' : 'Add New Event'}</DialogTitle>
-            <DialogDescription>
-              {editingEvent ? 'Update the event details below.' : 'Fill in the form to create a new event.'}
-            </DialogDescription>
+            <DialogDescription>{editingEvent ? 'Update the event details below.' : 'Fill in the form to create a new event.'}</DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto p-6">
             <Form {...form}>
               <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="name" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Event Name</FormLabel>
-                      <FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="location" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  <FormField control={form.control} name="name" render={({ field }) => ( <FormItem><FormLabel>Event Name</FormLabel><FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField control={form.control} name="location" render={({ field }) => ( <FormItem><FormLabel>Location</FormLabel><FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="date"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Event Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
-                              captionLayout="dropdown-buttons"
-                              fromYear={new Date().getFullYear()}
-                              toYear={new Date().getFullYear() + 10}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField control={form.control} name="rounds" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Rounds</FormLabel>
-                      <FormControl><Input type="number" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Event Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10}/></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                  <FormField control={form.control} name="rounds" render={({ field }) => ( <FormItem><FormLabel>Rounds</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
                 </div>
-                
                 <div>
                   <Label>Registration Fees</Label>
-                  <Card className="p-4 mt-2 bg-muted/50">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <FormField control={form.control} name="regularFee" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Regular Fee ($)</FormLabel>
-                          <FormControl><Input type="number" placeholder="25" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name="lateFee" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Late Fee ($)</FormLabel>
-                          <FormControl><Input type="number" placeholder="30" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name="veryLateFee" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Very Late Fee ($)</FormLabel>
-                          <FormControl><Input type="number" placeholder="35" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                      <FormField control={form.control} name="dayOfFee" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Day of Fee ($)</FormLabel>
-                          <FormControl><Input type="number" placeholder="40" {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} />
-                    </div>
-                  </Card>
-                </div>
-
-                <div className="space-y-4">
-                  <FormField control={form.control} name="imageUrl" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Image URL (Optional)</FormLabel>
-                      <FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="imageName" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Image Name (Optional)</FormLabel>
-                      <FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl>
-                      <FormDescription>A descriptive name for the image attachment.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  <Card className="p-4 mt-2 bg-muted/50"><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <FormField control={form.control} name="regularFee" render={({ field }) => ( <FormItem><FormLabel>Regular Fee ($)</FormLabel><FormControl><Input type="number" placeholder="25" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="lateFee" render={({ field }) => ( <FormItem><FormLabel>Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="30" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="veryLateFee" render={({ field }) => ( <FormItem><FormLabel>Very Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="35" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="dayOfFee" render={({ field }) => ( <FormItem><FormLabel>Day of Fee ($)</FormLabel><FormControl><Input type="number" placeholder="40" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                  </div></Card>
                 </div>
                 <div className="space-y-4">
-                  <FormField control={form.control} name="pdfUrl" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>PDF Flyer URL (Optional)</FormLabel>
-                      <FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="pdfName" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>PDF Name (Optional)</FormLabel>
-                      <FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl>
-                      <FormDescription>A descriptive name for the PDF attachment.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  <FormField control={form.control} name="imageUrl" render={({ field }) => ( <FormItem><FormLabel>Image URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                  <FormField control={form.control} name="imageName" render={({ field }) => ( <FormItem><FormLabel>Image Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl><FormDescription>A descriptive name for the image attachment.</FormDescription><FormMessage /></FormItem> )}/>
+                </div>
+                <div className="space-y-4">
+                  <FormField control={form.control} name="pdfUrl" render={({ field }) => ( <FormItem><FormLabel>PDF Flyer URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                  <FormField control={form.control} name="pdfName" render={({ field }) => ( <FormItem><FormLabel>PDF Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl><FormDescription>A descriptive name for the PDF attachment.</FormDescription><FormMessage /></FormItem> )}/>
                 </div>
               </form>
             </Form>
           </div>
           <DialogFooter className="p-6 pt-4 border-t shrink-0">
-            <DialogClose asChild>
-              <Button type="button" variant="ghost">Cancel</Button>
-            </DialogClose>
-            <Button type="submit" form="event-form">
-              {editingEvent ? 'Save Changes' : 'Create Event'}
-            </Button>
+            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+            <Button type="submit" form="event-form">{editingEvent ? 'Save Changes' : 'Create Event'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the event
-              "{eventToDelete?.name}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-          </AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the event "{eventToDelete?.name}".</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={isRegistrationsOpen} onOpenChange={setIsRegistrationsOpen}>
         <DialogContent className="sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
-            <DialogDescription>
-              {registrations.length} player(s) registered for this event.
-            </DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle><DialogDescription>{registrations.length} player(s) registered for this event.</DialogDescription></DialogHeader>
           <div className='my-4 flex items-center justify-end gap-2'>
-              <Button onClick={() => handleDownload(false)} disabled={playersForDownload.length === 0} variant="outline" size="sm">
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Registered ({playersForDownload.length})
-              </Button>
-               <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">
-                  Download All ({registrations.length})
-              </Button>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span className="mx-1">|</span>
-                <button onClick={handleMarkAllAsNew} className="hover:underline">Mark all as new</button>
-                <span className="mx-1">|</span>
-                <button onClick={handleClearAllNew} className="hover:underline">Clear all new</button>
-              </div>
+              <Button onClick={() => handleDownload(false)} disabled={playersForDownload.length === 0} variant="outline" size="sm"><Download className="mr-2 h-4 w-4" />Download New ({playersForDownload.length})</Button>
+              <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">Download All ({registrations.length})</Button>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground"><span className="mx-1">|</span><button onClick={handleMarkAllAsNew} className="hover:underline">Mark all new</button><span className="mx-1">|</span><button onClick={handleClearAllNew} className="hover:underline">Clear all new</button></div>
           </div>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Player</TableHead>
-                  <TableHead>USCF ID</TableHead>
-                  <TableHead>School</TableHead>
-                  <TableHead>Section</TableHead>
-                  <TableHead>Invoice #</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
+              <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>USCF ID</TableHead><TableHead>School</TableHead><TableHead>Section</TableHead><TableHead>Invoice #</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
               <TableBody>
-                {registrations.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      No players registered yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
+                {registrations.length === 0 ? ( <TableRow><TableCell colSpan={6} className="h-24 text-center">No players registered yet.</TableCell></TableRow> ) : (
                   registrations.map(({ player, details, invoiceId, invoiceNumber }) => {
                     const isWithdrawn = details.status === 'withdrawn';
                     const isDownloaded = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
-                    let status: 'Withdrawn' | 'Active' | 'Registered' = 'Registered';
-                    if (isWithdrawn) {
-                        status = 'Withdrawn';
-                    } else if (isDownloaded) {
-                        status = 'Active';
-                    }
+                    let status: React.ReactNode = <Badge variant="secondary">Registered</Badge>;
+                    if(isWithdrawn) status = <Badge variant="destructive">Withdrawn</Badge>;
+                    else if(isDownloaded) status = <Badge variant="default" className="bg-green-600 text-white">Active</Badge>;
                     
                     return (
                         <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
@@ -919,19 +664,8 @@ export default function ManageEventsPage() {
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
-                            <TableCell>
-                                <Button variant="link" asChild className="p-0 h-auto font-mono">
-                                    <Link href={`/confirmations#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link>
-                                </Button>
-                            </TableCell>
-                            <TableCell>
-                                <Badge variant={
-                                    status === 'Withdrawn' ? 'destructive' :
-                                    status === 'Active' ? 'default' : 'secondary'
-                                } className={cn(status === 'Active' ? 'bg-green-600 text-white' : '')}>
-                                    {status}
-                                </Badge>
-                            </TableCell>
+                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/confirmations#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
+                            <TableCell>{status}</TableCell>
                         </TableRow>
                     )
                   })
@@ -944,31 +678,19 @@ export default function ManageEventsPage() {
       
       <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Paste from Spreadsheet</DialogTitle>
-            <DialogDescription>
-              Copy the data from your Google Sheet or Excel file (with or without a header row) and paste it into the text area below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Textarea
-              placeholder="Paste your tab-separated data here..."
-              className="h-64"
-              value={pasteData}
-              onChange={(e) => setPasteData(e.target.value)}
-            />
+          <DialogHeader><DialogTitle>Paste from Spreadsheet</DialogTitle><DialogDescription>Copy data from your spreadsheet and paste it into the text area below.</DialogDescription></DialogHeader>
+          <div className="py-4 space-y-4">
+            <Tabs defaultValue="events"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="events">Import Events</TabsTrigger><TabsTrigger value="players">Import Players</TabsTrigger></TabsList>
+              <TabsContent value="events"><Textarea placeholder="Paste event data here..." className="h-64" value={pasteData} onChange={(e) => setPasteData(e.target.value)} /></TabsContent>
+              <TabsContent value="players"><Textarea placeholder="Paste player data here..." className="h-64" value={pasteData} onChange={(e) => setPasteData(e.target.value)} /></TabsContent>
+            </Tabs>
           </div>
           <DialogFooter>
-            <DialogClose asChild>
-                <Button type="button" variant="ghost">Cancel</Button>
-            </DialogClose>
-            <Button onClick={handlePasteImport}>
-              <ClipboardPaste className="mr-2 h-4 w-4" /> Import Data
-            </Button>
+            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+            <Button onClick={() => handlePasteImport(document.querySelector('[data-state="active"]')?.getAttribute('data-value') === 'players')}><ClipboardPaste className="mr-2 h-4 w-4" />Import Data</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
     </AppLayout>
   );
 }
