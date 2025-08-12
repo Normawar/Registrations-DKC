@@ -12,13 +12,14 @@ type UsePlayerSearchProps = {
 
 export function usePlayerSearch({
   initialFilters = {},
-  maxResults, // Removed default value
+  maxResults: initialMaxResults,
   excludeIds,
 }: UsePlayerSearchProps) {
   const { searchPlayers, isDbLoaded } = useMasterDb();
   const [filters, setFilters] = useState<Partial<SearchCriteria>>(initialFilters);
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
+  const [maxResults, setMaxResults] = useState<number | undefined>(initialMaxResults);
 
   const updateFilter = useCallback((key: keyof SearchCriteria, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -29,8 +30,6 @@ export function usePlayerSearch({
   }, [initialFilters]);
 
   const hasActiveFilters = useMemo(() => {
-      // An active filter is anything other than the default initial state.
-      // We check if any filter has a value that is not undefined, null, an empty string, or 'ALL'.
       return Object.entries(filters).some(([key, value]) => {
           if (initialFilters.hasOwnProperty(key) && initialFilters[key as keyof SearchCriteria] === value) {
               return false;
@@ -54,7 +53,7 @@ export function usePlayerSearch({
     setSearchResults(results);
     setIsLoading(false);
 
-  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds]);
+  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters]);
   
   const hasResults = searchResults.length > 0;
   
@@ -66,5 +65,7 @@ export function usePlayerSearch({
     isLoading,
     hasResults,
     hasActiveFilters,
+    setMaxResults
   };
 }
+
