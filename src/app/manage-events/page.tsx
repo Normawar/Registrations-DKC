@@ -37,7 +37,8 @@ import {
     Upload,
     ClipboardPaste,
     Download,
-    Check
+    Check,
+    Edit
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -85,6 +86,9 @@ import Link from 'next/link';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import Papa from 'papaparse';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 const eventFormSchema = z.object({
   id: z.string().optional(),
@@ -132,13 +136,13 @@ type StoredDownloads = {
 export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent } = useEvents();
-  const { database: allPlayers, isDbLoaded, addBulkPlayers: addBulkPlayersToDb } = useMasterDb();
+  const { database: allPlayers, isDbLoaded, addBulkPlayers: addBulkPlayersToDb, getDistricts, updateSchoolDistrict } = useMasterDb();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
+  const [sortConfig, setSortConfig = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
   
   const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
   const [registrations, setRegistrations] = useState<RegistrationInfo[]>([]);
@@ -146,6 +150,11 @@ export default function ManageEventsPage() {
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pasteData, setPasteData] = useState('');
   const [downloadedPlayers, setDownloadedPlayers] = useState<StoredDownloads>({});
+
+  const [selectedDistrictToEdit, setSelectedDistrictToEdit] = useState<string | null>(null);
+  const [newDistrictName, setNewDistrictName] = useState('');
+
+  const uniqueDistricts = useMemo(() => getDistricts(), [getDistricts]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -501,6 +510,27 @@ export default function ManageEventsPage() {
     }
     toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations downloaded.`});
   };
+
+  const handleRenameDistrict = () => {
+    if (!selectedDistrictToEdit || !newDistrictName.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Input',
+        description: 'Please select a district and provide a new name.',
+      });
+      return;
+    }
+
+    updateSchoolDistrict(selectedDistrictToEdit, newDistrictName.trim());
+
+    toast({
+      title: 'District Renamed',
+      description: `All schools under "${selectedDistrictToEdit}" have been moved to "${newDistrictName.trim()}".`,
+    });
+    
+    setSelectedDistrictToEdit(null);
+    setNewDistrictName('');
+  };
   
   const handleMarkAllAsNew = () => {
     if (!selectedEventForReg) return;
@@ -520,6 +550,22 @@ export default function ManageEventsPage() {
     toast({ title: 'Status Cleared', description: 'All "new" indicators cleared.' });
   };
 
+  const triggerEventImport = () => {
+      const input = fileInputRef.current;
+      if (input) {
+          input.onchange = (e) => handleFileImport(e as ChangeEvent<HTMLInputElement>, false);
+          input.click();
+      }
+  };
+
+  const triggerPlayerImport = () => {
+      const input = fileInputRef.current;
+      if (input) {
+          input.onchange = (e) => handleFileImport(e as ChangeEvent<HTMLInputElement>, true);
+          input.click();
+      }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -531,12 +577,12 @@ export default function ManageEventsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={(e) => handleFileImport(e, false)} />
+            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import</Button></DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>Import Events from CSV</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {fileInputRef.current?.onchange = (e: any) => handleFileImport(e, true); fileInputRef.current?.click();}}>Import Players from CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={triggerEventImport}>Import Events from CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={triggerPlayerImport}>Import Players from CSV</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setIsPasteDialogOpen(true)}>Paste from Sheet</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -545,6 +591,42 @@ export default function ManageEventsPage() {
             </Button>
           </div>
         </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Edit District Name</CardTitle>
+            <CardDescription>
+              Select a district to rename. This will update all schools associated with it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row gap-4 items-end">
+            <div className="grid gap-1.5 flex-1">
+              <Label htmlFor="district-to-edit">District to Rename</Label>
+              <Select onValueChange={setSelectedDistrictToEdit} value={selectedDistrictToEdit || ''}>
+                <SelectTrigger id="district-to-edit">
+                  <SelectValue placeholder="Select a district..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5 flex-1">
+              <Label htmlFor="new-district-name">New District Name</Label>
+              <Input
+                id="new-district-name"
+                value={newDistrictName}
+                onChange={(e) => setNewDistrictName(e.target.value)}
+                disabled={!selectedDistrictToEdit}
+                placeholder='Enter new name...'
+              />
+            </div>
+            <Button onClick={handleRenameDistrict} disabled={!selectedDistrictToEdit || !newDistrictName.trim()}>
+              <Edit className="mr-2 h-4 w-4" />
+              Rename District
+            </Button>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardContent className="pt-6">
@@ -694,3 +776,5 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
+
+    
