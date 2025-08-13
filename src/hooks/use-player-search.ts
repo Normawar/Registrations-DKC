@@ -48,13 +48,23 @@ export function usePlayerSearch({
   }, [filters]);
 
   useEffect(() => {
-    if (!isDbLoaded) return;
+    console.log('🔍 useEffect triggered');
+    console.log('isDbLoaded:', isDbLoaded);
+    console.log('hasActiveFilters:', hasActiveFilters);
+    console.log('filters:', filters);
+    
+    if (!isDbLoaded) {
+        console.log('❌ Exiting: DB not loaded');
+        return;
+    }
     
     if (!hasActiveFilters) {
+        console.log('❌ Exiting: No active filters');
         setSearchResults([]);
         return;
     }
 
+    console.log('✅ About to run search');
     setIsLoading(true);
 
     const searchCriteria: SearchCriteria = {
