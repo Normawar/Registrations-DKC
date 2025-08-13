@@ -128,42 +128,49 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                 {hasActiveFilters && <Button variant="ghost" size="sm" onClick={clearFilters} className="text-destructive hover:text-destructive"><X className="mr-2 h-4 w-4" />Clear Filters</Button>}
             </div>
 
-            <div className="flex-1 overflow-hidden">
-            <ScrollArea className="h-full">
-                <div className="pr-4">
-                {isLoading && (
-                    <div className="flex items-center justify-center p-8 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin"/>Searching...</div>
-                )}
-                {!isLoading && !hasResults && hasActiveFilters && (
-                    <div className="text-center p-8 text-muted-foreground">No players found matching your criteria.</div>
-                )}
-                {!isLoading && !hasActiveFilters && (
-                    <div className="text-center p-8 text-muted-foreground">Enter search criteria above to find players.</div>
-                )}
-                {hasResults && (() => {
-                    // Add this right before the searchResults.map() in your dialog
-                    console.log('🎨 UI Debug - searchResults length:', searchResults?.length);
-                    console.log('🎨 UI Debug - hasResults:', hasResults);
-                    console.log('🎨 UI Debug - first 5 results:', searchResults?.slice(0, 5).map(p => `${p.firstName} ${p.lastName}`));
-                    return (
-                        <div className="space-y-2">
-                        {searchResults.map((player, index) => {
-                            console.log(`🎯 Rendering player ${index + 1}:`, player.firstName, player.lastName);
-                            return (
-                                <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
-                                    <div>
-                                        <p className="font-semibold">{player.firstName} {player.lastName}</p>
-                                        <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'UNR'} | School: {player.school || 'N/A'}</p>
-                                    </div>
-                                    <Button variant="secondary" size="sm" onClick={() => handleSelect(player)}>Select</Button>
-                                </div>
-                            );
-                        })}
-                        </div>
-                    )
-                })()}
-                </div>
-            </ScrollArea>
+            <div className="flex-1 min-h-0"> {/* Add min-h-0 for flex child */}
+                <ScrollArea className="h-[400px]"> {/* Fixed height instead of h-full */}
+                    <div className="pr-4 space-y-2">
+                        {isLoading && (
+                            <div className="flex items-center justify-center p-8 text-muted-foreground">
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin"/>Searching...
+                            </div>
+                        )}
+                        {!isLoading && !hasResults && hasActiveFilters && (
+                            <div className="text-center p-8 text-muted-foreground">
+                                No players found matching your criteria.
+                            </div>
+                        )}
+                        {!isLoading && !hasActiveFilters && (
+                            <div className="text-center p-8 text-muted-foreground">
+                                Enter search criteria above to find players.
+                            </div>
+                        )}
+                        {hasResults && (
+                            <div className="space-y-2">
+                                {console.log('🎨 UI Debug - searchResults length:', searchResults?.length)}
+                                {console.log('🎨 UI Debug - hasResults:', hasResults)}
+                                {console.log('🎨 UI Debug - first 5 results:', searchResults?.slice(0, 5).map(p => `${p.firstName} ${p.lastName}`))}
+                                {searchResults.map((player, index) => {
+                                    console.log(`🎯 Rendering player ${index + 1}:`, player.firstName, player.lastName);
+                                    return (
+                                        <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
+                                            <div>
+                                                <p className="font-semibold">{player.firstName} {player.lastName}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    ID: {player.uscfId} | Rating: {player.regularRating || 'UNR'} | School: {player.school || 'N/A'}
+                                                </p>
+                                            </div>
+                                            <Button variant="secondary" size="sm" onClick={() => handleSelect(player)}>
+                                                Select
+                                            </Button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </ScrollArea>
             </div>
             
             <DialogFooter>
