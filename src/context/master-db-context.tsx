@@ -104,8 +104,20 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addPlayer = (player: MasterPlayer) => {
-    const newPlayer = { ...player, id: player.id || `p-${Date.now()}` };
-    const newDb = [...database, newPlayer];
+    const newDb = [...database];
+    // Check if player already exists by USCF ID (and it's not a 'NEW' ID)
+    const existingPlayerIndex = newDb.findIndex(p => p.uscfId.toUpperCase() !== 'NEW' && p.uscfId === player.uscfId);
+    
+    if (existingPlayerIndex > -1) {
+        // Player exists, update it by merging new data into the existing record
+        // This preserves the original ID and any other local-specific data
+        const existingPlayer = newDb[existingPlayerIndex];
+        newDb[existingPlayerIndex] = { ...existingPlayer, ...player };
+    } else {
+        // Player is new, add them with a unique ID
+        const newPlayerWithId = { ...player, id: player.id || `p-${Date.now()}` };
+        newDb.push(newPlayerWithId);
+    }
     persistDatabase(newDb);
   };
 
@@ -113,16 +125,19 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const playerMap = new Map(database.map(p => [p.uscfId, p]));
 
     players.forEach(newPlayer => {
-      const playerWithId = {
-        ...newPlayer,
-        id: newPlayer.id || newPlayer.uscfId || `p-${Date.now()}-${Math.random()}`,
-      };
-      playerMap.set(playerWithId.uscfId, playerWithId);
+        const playerWithId = {
+            ...newPlayer,
+            id: newPlayer.id || newPlayer.uscfId || `p-${Date.now()}-${Math.random()}`,
+        };
+        // Update existing player or add new one
+        const existingPlayer = playerMap.get(playerWithId.uscfId);
+        playerMap.set(playerWithId.uscfId, { ...existingPlayer, ...playerWithId });
     });
     
     const updatedDb = Array.from(playerMap.values());
     persistDatabase(updatedDb);
-  };
+};
+
 
   const clearDatabase = () => {
     persistDatabase([]);
