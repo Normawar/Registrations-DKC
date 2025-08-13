@@ -17,7 +17,7 @@ export function usePlayerSearch({
   initialFilters = {},
   maxResults: initialMaxResults,
   excludeIds,
-  searchUnassigned: initialSearchUnassigned,
+  searchUnassigned,
   sponsorProfile,
 }: UsePlayerSearchProps) {
   const { searchPlayers, isDbLoaded } = useMasterDb();
@@ -36,8 +36,7 @@ export function usePlayerSearch({
 
   // Determine if there are any active, user-input filters, ignoring defaults.
   const hasActiveFilters = useMemo(() => {
-      const {state, district, school, ...restOfFilters} = filters;
-      return Object.values(restOfFilters).some(value => value !== undefined && value !== null && value !== '');
+    return Object.values(filters).some(value => value !== undefined && value !== null && value !== '' && value !== 'ALL');
   }, [filters]);
   
   useEffect(() => {
@@ -55,8 +54,7 @@ export function usePlayerSearch({
       ...filters,
       excludeIds,
       maxResults,
-      // Ensure the searchUnassigned flag is correctly set for sponsors
-      searchUnassigned: portalType === 'sponsor' ? true : initialSearchUnassigned, 
+      searchUnassigned,
       sponsorProfile,
     };
     
@@ -71,12 +69,9 @@ export function usePlayerSearch({
         clearTimeout(handler);
     };
 
-  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, initialSearchUnassigned, sponsorProfile]);
+  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, searchUnassigned, sponsorProfile]);
   
   const hasResults = searchResults.length > 0;
-  
-  // Expose portalType to be used in dependencies
-  const portalType = sponsorProfile ? 'sponsor' : 'organizer';
 
   return {
     filters,

@@ -41,15 +41,6 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
   const { profile } = useSponsorProfile();
   const { dbStates, dbSchools, dbDistricts } = useMasterDb();
 
-  const [initialSearchFilters, setInitialSearchFilters] = useState<Partial<MasterPlayer>>({ state: 'TX' });
-
-  useEffect(() => {
-    // Set initial district/school for sponsors, but let the hook handle the actual filtering logic
-    if (portalType === 'sponsor' && profile) {
-      setInitialSearchFilters({ state: 'TX', district: profile.district, school: profile.school });
-    }
-  }, [portalType, profile]);
-
   const {
     filters,
     updateFilter,
@@ -59,7 +50,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
     hasResults,
     hasActiveFilters,
   } = usePlayerSearch({
-    initialFilters: initialSearchFilters,
+    initialFilters: { state: 'TX' },
     excludeIds: excludeIds,
     searchUnassigned: portalType === 'sponsor',
     sponsorProfile: portalType === 'sponsor' ? profile : null,
