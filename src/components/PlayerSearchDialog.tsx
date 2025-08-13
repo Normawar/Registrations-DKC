@@ -129,7 +129,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
             </div>
 
             <div className="flex-1 min-h-0"> {/* Add min-h-0 for flex child */}
-                <ScrollArea className="h-[400px]"> {/* Fixed height instead of h-full */}
+                <ScrollArea className="h-[60vh]"> {/* Use viewport height instead */}
                     <div className="pr-4 space-y-2">
                         {isLoading && (
                             <div className="flex items-center justify-center p-8 text-muted-foreground">
