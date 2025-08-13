@@ -265,7 +265,7 @@ function PlayersPageContent() {
                           </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {!isDbLoaded ? Array.from({ length: 10 }).map((_, i) => (
+                        {!clientReady || !isDbLoaded ? Array.from({ length: 10 }).map((_, i) => (
                             <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
                         )) : paginatedPlayers.map((player) => (
                           <TableRow key={player.id}>
