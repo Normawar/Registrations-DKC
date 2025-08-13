@@ -38,15 +38,13 @@ export type SearchCriteria = {
   maxRating?: number;
   excludeIds?: string[];
   maxResults?: number;
-  searchUnassigned?: boolean; // For sponsor searches
+  searchUnassigned?: boolean;
   sponsorProfile?: SponsorProfile | null;
 }
 
 // --- Constants ---
 
 const DB_STORAGE_KEY = 'master_player_database';
-const TIMESTAMP_KEY = 'master_player_database_timestamp';
-const CACHE_DURATION = 1000 * 60 * 60; // 1 hour
 
 // --- Context Definition ---
 
@@ -63,46 +61,27 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     setIsDbLoaded(false);
     setIsDbError(false);
     try {
-      const storedDb = localStorage.getItem(DB_STORAGE_KEY);
-      const storedTimestamp = localStorage.getItem(TIMESTAMP_KEY);
-      const now = new Date().getTime();
-
-      if (storedDb && storedTimestamp && (now - parseInt(storedTimestamp, 10) < CACHE_DURATION)) {
-        setDatabase(JSON.parse(storedDb));
-      } else {
-        // Data is stale or doesn't exist, use initial data and set cache
-        setDatabase(fullMasterPlayerData);
-        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(fullMasterPlayerData));
-        localStorage.setItem(TIMESTAMP_KEY, now.toString());
-      }
-    } catch (error) {
-      console.error("Failed to load or parse master player database:", error);
-      setIsDbError(true);
-      // Fallback to initial data if localStorage fails
+      // Data is now loaded directly from the imported file
       setDatabase(fullMasterPlayerData);
+    } catch (error) {
+      console.error("Failed to load master player database:", error);
+      setIsDbError(true);
+      setDatabase([]);
     } finally {
       setIsDbLoaded(true);
     }
   }, []);
-
+  
   useEffect(() => {
     loadDatabase();
   }, [loadDatabase]);
 
   const persistDatabase = (newDb: MasterPlayer[]) => {
-    try {
-      setDatabase(newDb);
-      localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(newDb));
-      localStorage.setItem(TIMESTAMP_KEY, new Date().getTime().toString());
-    } catch (error) {
-      console.error("Failed to persist database to localStorage:", error);
-      setIsDbError(true);
-    }
+    // Overwrite the in-memory database. No-op for localStorage.
+    setDatabase(newDb);
   };
   
   const refreshDatabase = () => {
-    localStorage.removeItem(DB_STORAGE_KEY);
-    localStorage.removeItem(TIMESTAMP_KEY);
     loadDatabase();
   };
 
@@ -168,34 +147,63 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
     const {
         firstName, lastName, uscfId, state, grade, section, school, district,
-        minRating, maxRating, excludeIds = [], maxResults = 100,
+        minRating, maxRating, excludeIds = [], maxResults = 1000, // Increase default
         searchUnassigned, sponsorProfile
     } = criteria;
+
+    console.log('=== SEARCH DEBUG START ===');
+    console.log('Search criteria received:', criteria);
+    console.log('maxResults value:', maxResults);
+    console.log('Database size:', database.length);
+    console.log('searchUnassigned:', searchUnassigned);
+    console.log('sponsorProfile:', sponsorProfile);
+    console.log('lastName filter:', lastName);
 
     const lowerFirstName = firstName?.toLowerCase();
     const lowerLastName = lastName?.toLowerCase();
     const excludeSet = new Set(excludeIds);
 
-    const results = database.filter(p => {
-        if (excludeSet.has(p.id)) return false;
-        
-        // School/District filtering logic
+    // Let's see what happens step by step
+    let step1Results = database.filter(p => !excludeSet.has(p.id));
+    console.log('After excluding IDs:', step1Results.length);
+
+    let step2Results = step1Results.filter(p => {
         if (searchUnassigned && sponsorProfile) {
-            // For sponsors: find players in their school OR unassigned players.
             const isUnassigned = !p.school || p.school.trim() === '';
             const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
-            if (!isUnassigned && !belongsToSponsor) {
+            const shouldInclude = isUnassigned || belongsToSponsor;
+            if (!shouldInclude) {
                 return false;
             }
         } else {
-            // For organizers: standard filtering.
             const schoolMatch = !school || p.school?.toLowerCase().includes(school.toLowerCase());
             const districtMatch = !district || p.district?.toLowerCase().includes(district.toLowerCase());
             if (!schoolMatch || !districtMatch) return false;
         }
+        return true;
+    });
+    console.log('After school/district filtering:', step2Results.length);
 
-        // Other filters
+    let step3Results = step2Results.filter(p => {
         const stateMatch = !state || state === 'ALL' || p.state === state;
+        return stateMatch;
+    });
+    console.log('After state filtering:', step3Results.length);
+
+    let step4Results = step3Results.filter(p => {
+        const lastNameMatch = !lowerLastName || p.lastName?.toLowerCase().includes(lowerLastName);
+        return lastNameMatch;
+    });
+    console.log('After lastName filtering:', step4Results.length);
+    
+    // Show some examples of what was filtered out
+    if (lowerLastName && step4Results.length < step3Results.length) {
+        console.log('Sample names that were filtered out:');
+        const filtered = step3Results.filter(p => !p.lastName?.toLowerCase().includes(lowerLastName));
+        filtered.slice(0, 5).forEach(p => console.log(`- ${p.firstName} ${p.lastName}`));
+    }
+
+    const results = step4Results.filter(p => {
         const gradeMatch = !grade || p.grade === grade;
         const sectionMatch = !section || p.section === section;
         
@@ -203,14 +211,19 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         const ratingMatch = (!minRating || (rating && rating >= minRating)) && (!maxRating || (rating && rating <= maxRating));
 
         const firstNameMatch = !lowerFirstName || p.firstName?.toLowerCase().includes(lowerFirstName);
-        const lastNameMatch = !lowerLastName || p.lastName?.toLowerCase().includes(lowerLastName);
         const uscfIdMatch = !uscfId || p.uscfId?.includes(uscfId);
 
-        return stateMatch && gradeMatch && sectionMatch && ratingMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
+        return gradeMatch && sectionMatch && ratingMatch && firstNameMatch && uscfIdMatch;
     });
 
-    return results.slice(0, maxResults);
-  }, [database, isDbLoaded]);
+    console.log('Filtered results before slice:', results.length);
+    const finalResults = results.slice(0, maxResults);
+    console.log('Final results after slice:', finalResults.length);
+    console.log('Final results:', finalResults.map(p => `${p.firstName} ${p.lastName} (${p.school || 'No School'})`));
+    console.log('=== SEARCH DEBUG END ===');
+
+    return finalResults;
+}, [database, isDbLoaded]);
 
   // Memoized derived data
   const dbStates = useMemo(() => {
@@ -262,4 +275,3 @@ export const useMasterDb = () => {
   }
   return context;
 };
-
