@@ -35,8 +35,9 @@ export function usePlayerSearch({
   }, [initialFilters]);
 
   const hasActiveFilters = useMemo(() => {
+      const initialFilterKeys = Object.keys(initialFilters);
       return Object.entries(filters).some(([key, value]) => {
-          if (initialFilters.hasOwnProperty(key) && initialFilters[key as keyof SearchCriteria] === value) {
+          if (initialFilterKeys.includes(key) && initialFilters[key as keyof SearchCriteria] === value) {
               return false;
           }
           return value !== undefined && value !== null && value !== '' && value !== 'ALL';
@@ -46,20 +47,26 @@ export function usePlayerSearch({
   useEffect(() => {
     if (!isDbLoaded) return;
     
-    // De-activate search if no active filters are present.
     if (!hasActiveFilters) {
         setSearchResults([]);
         return;
     }
 
     setIsLoading(true);
-    const results = searchPlayers({
+    const searchCriteria: SearchCriteria = {
       ...filters,
       excludeIds,
       maxResults,
       searchUnassigned: searchUnassigned,
       sponsorProfile: sponsorProfile,
-    });
+    };
+    
+    // For sponsors, we modify the school filter behavior
+    if (searchUnassigned && sponsorProfile) {
+        delete searchCriteria.school; // The core search function will handle this logic
+    }
+
+    const results = searchPlayers(searchCriteria);
     setSearchResults(results);
     setIsLoading(false);
 
