@@ -149,14 +149,33 @@ function RosterPageContent() {
   };
 
   const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
+    // Open the edit dialog with the newly added player
     setEditingPlayer(player);
+    
+    // Properly populate ALL fields from the database
     playerForm.reset({
-        ...player,
+        id: player.id,
+        firstName: player.firstName || '',
+        middleName: player.middleName || '',
+        lastName: player.lastName || '',
+        uscfId: player.uscfId || '', // This should now populate
+        regularRating: player.regularRating, // Keep as number or undefined
+        grade: player.grade || '',
+        section: player.section || '',
+        email: player.email || '',
+        phone: player.phone || '',
+        zipCode: player.zipCode || '',
+        studentType: player.studentType || '',
+        state: player.state || '',
+        school: player.school || '',
+        district: player.district || '',
+        // Parse dates properly
         dob: player.dob ? new Date(player.dob) : undefined,
         uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
     });
+    
     setIsEditPlayerDialogOpen(true);
-  };
+};
   
   const handleRemoveFromRoster = (player: MasterPlayer) => {
     setPlayerToDelete(player);
