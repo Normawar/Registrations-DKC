@@ -71,37 +71,38 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
   
   return (
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
-            <DialogHeader>
-            <DialogTitle>Search Master Player Database</DialogTitle>
-            <DialogDescription>
-                Find existing players to add to your roster or event. For sponsors, players already on your roster are automatically excluded.
-            </DialogDescription>
+        <DialogContent className="sm:max-w-4xl h-[85vh] flex flex-col">
+            <DialogHeader className="shrink-0">
+                <DialogTitle>Search Master Player Database</DialogTitle>
+                <DialogDescription>
+                    Find existing players to add to your roster or event. For sponsors, players already on your roster are automatically excluded.
+                </DialogDescription>
             </DialogHeader>
 
-            <div className="border rounded-md p-4 space-y-4">
+            {/* Search Form - Fixed height */}
+            <div className="border rounded-md p-4 space-y-4 shrink-0">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                      <Label htmlFor="search-first-name">First Name</Label>
-                      <Input id="search-first-name" placeholder="John" value={filters.firstName || ''} onChange={(e) => updateFilter('firstName', e.target.value)} />
-                  </div>
-                  <div>
-                      <Label htmlFor="search-last-name">Last Name</Label>
-                      <Input id="search-last-name" placeholder="Doe" value={filters.lastName || ''} onChange={(e) => updateFilter('lastName', e.target.value)} />
-                  </div>
-                  <div>
-                      <Label htmlFor="search-uscf-id">USCF ID</Label>
-                      <Input id="search-uscf-id" placeholder="12345678" value={filters.uscfId || ''} onChange={(e) => updateFilter('uscfId', e.target.value)} />
-                  </div>
-                  <div>
-                      <Label htmlFor="search-state">State</Label>
-                      <Select value={filters.state || 'ALL'} onValueChange={(value) => updateFilter('state', value)} disabled={!isDbLoaded}>
-                        <SelectTrigger id="search-state">
-                            <SelectValue placeholder={isDbLoaded ? "All States" : "Loading..."} />
-                        </SelectTrigger>
-                        <SelectContent>{dbStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                  </div>
+                    <div>
+                        <Label htmlFor="search-first-name">First Name</Label>
+                        <Input id="search-first-name" placeholder="John" value={filters.firstName || ''} onChange={(e) => updateFilter('firstName', e.target.value)} />
+                    </div>
+                    <div>
+                        <Label htmlFor="search-last-name">Last Name</Label>
+                        <Input id="search-last-name" placeholder="Doe" value={filters.lastName || ''} onChange={(e) => updateFilter('lastName', e.target.value)} />
+                    </div>
+                    <div>
+                        <Label htmlFor="search-uscf-id">USCF ID</Label>
+                        <Input id="search-uscf-id" placeholder="12345678" value={filters.uscfId || ''} onChange={(e) => updateFilter('uscfId', e.target.value)} />
+                    </div>
+                    <div>
+                        <Label htmlFor="search-state">State</Label>
+                        <Select value={filters.state || 'ALL'} onValueChange={(value) => updateFilter('state', value)} disabled={!isDbLoaded}>
+                            <SelectTrigger id="search-state">
+                                <SelectValue placeholder={isDbLoaded ? "All States" : "Loading..."} />
+                            </SelectTrigger>
+                            <SelectContent>{dbStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
                 </div>
                 {portalType === 'organizer' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -116,7 +117,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                         </div>
                         <div>
                             <Label htmlFor="search-district">District</Label>
-                             <Select value={filters.district || ''} onValueChange={(value) => updateFilter('district', value)} disabled={!isDbLoaded}>
+                            <Select value={filters.district || ''} onValueChange={(value) => updateFilter('district', value)} disabled={!isDbLoaded}>
                                 <SelectTrigger id="search-district">
                                     <SelectValue placeholder={isDbLoaded ? "All Districts" : "Loading..."} />
                                 </SelectTrigger>
@@ -125,35 +126,44 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                         </div>
                     </div>
                 )}
-                {hasActiveFilters && <Button variant="ghost" size="sm" onClick={clearFilters} className="text-destructive hover:text-destructive"><X className="mr-2 h-4 w-4" />Clear Filters</Button>}
+                {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-destructive hover:text-destructive">
+                        <X className="mr-2 h-4 w-4" />Clear Filters
+                    </Button>
+                )}
             </div>
 
-            <div className="flex-1 min-h-0"> {/* Add min-h-0 for flex child */}
-                <ScrollArea className="h-[60vh]"> {/* Use viewport height instead */}
-                    <div className="pr-4 space-y-2">
-                        {isLoading && (
-                            <div className="flex items-center justify-center p-8 text-muted-foreground">
-                                <Loader2 className="mr-2 h-5 w-5 animate-spin"/>Searching...
-                            </div>
-                        )}
-                        {!isLoading && !hasResults && hasActiveFilters && (
-                            <div className="text-center p-8 text-muted-foreground">
-                                No players found matching your criteria.
-                            </div>
-                        )}
-                        {!isLoading && !hasActiveFilters && (
-                            <div className="text-center p-8 text-muted-foreground">
-                                Enter search criteria above to find players.
-                            </div>
-                        )}
-                        {hasResults && (
-                            <div className="space-y-2">
-                                {console.log('🎨 UI Debug - searchResults length:', searchResults?.length)}
-                                {console.log('🎨 UI Debug - hasResults:', hasResults)}
-                                {console.log('🎨 UI Debug - first 5 results:', searchResults?.slice(0, 5).map(p => `${p.firstName} ${p.lastName}`))}
-                                {searchResults.map((player, index) => {
-                                    console.log(`🎯 Rendering player ${index + 1}:`, player.firstName, player.lastName);
-                                    return (
+            {/* Results Section - Flex grow with proper overflow */}
+            <div className="flex flex-col flex-1 min-h-0">
+                {/* Results header */}
+                {hasResults && (
+                    <div className="py-2 text-sm text-muted-foreground shrink-0">
+                        Found {searchResults.length} player{searchResults.length !== 1 ? 's' : ''}
+                    </div>
+                )}
+                
+                {/* Scrollable results container */}
+                <div className="flex-1 overflow-hidden border rounded-md">
+                    <div className="h-full overflow-y-auto">
+                        <div className="p-4">
+                            {isLoading && (
+                                <div className="flex items-center justify-center p-8 text-muted-foreground">
+                                    <Loader2 className="mr-2 h-5 w-5 animate-spin"/>Searching...
+                                </div>
+                            )}
+                            {!isLoading && !hasResults && hasActiveFilters && (
+                                <div className="text-center p-8 text-muted-foreground">
+                                    No players found matching your criteria.
+                                </div>
+                            )}
+                            {!isLoading && !hasActiveFilters && (
+                                <div className="text-center p-8 text-muted-foreground">
+                                    Enter search criteria above to find players.
+                                </div>
+                            )}
+                            {hasResults && (
+                                <div className="space-y-2">
+                                    {searchResults.map(player => (
                                         <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
                                             <div>
                                                 <p className="font-semibold">{player.firstName} {player.lastName}</p>
@@ -165,21 +175,18 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                                                 Select
                                             </Button>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </ScrollArea>
-                {hasResults && searchResults.length > 5 && (
-                    <div className="text-center py-2 text-sm text-muted-foreground border-t">
-                        📜 Scroll to see all {searchResults.length} results
-                    </div>
-                )}
+                </div>
             </div>
             
-            <DialogFooter>
-                <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
+            <DialogFooter className="shrink-0">
+                <DialogClose asChild>
+                    <Button variant="outline">Close</Button>
+                </DialogClose>
             </DialogFooter>
         </DialogContent>
       </Dialog>
