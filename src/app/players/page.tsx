@@ -6,7 +6,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Download, Trash2, Edit, Upload, ClipboardPaste } from "lucide-react";
+import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Download, Trash2, Edit, Upload, ClipboardPaste, Delete } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -27,7 +27,7 @@ type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'g
 
 function PlayersPageContent() {
   const { toast } = useToast();
-  const { database, deletePlayer, isDbLoaded, addBulkPlayers, dbPlayerCount } = useMasterDb();
+  const { database, deletePlayer, isDbLoaded, addBulkPlayers, dbPlayerCount, clearDatabase } = useMasterDb();
   const { events } = useEvents();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -42,6 +42,8 @@ function PlayersPageContent() {
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pasteData, setPasteData] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
   
   const [clientReady, setClientReady] = useState(false);
   useEffect(() => {
@@ -143,7 +145,7 @@ function PlayersPageContent() {
                 errors++; return;
               }
               const player: MasterPlayer = {
-                  id: row.id || row.ID || `p-${Date.now()}-${Math.random()}`,
+                  id: row.id || row.ID || uscfId,
                   uscfId: uscfId,
                   firstName: row['First Name'] || row.firstName || row.First_Name,
                   lastName: row['Last Name'] || row.lastName || row.Last_Name,
@@ -167,7 +169,7 @@ function PlayersPageContent() {
       addBulkPlayers(newPlayers);
       toast({
         title: "Player Database Updated",
-        description: `Successfully imported ${newPlayers.length} players. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
+        description: `Successfully imported and merged ${newPlayers.length} players. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
       });
   };
 
@@ -201,6 +203,12 @@ function PlayersPageContent() {
         error: (error) => { toast({ variant: 'destructive', title: 'Parse Failed', description: error.message }); }
     });
   };
+  
+  const handleClearDatabase = () => {
+    clearDatabase();
+    toast({ title: 'Database Cleared', description: 'All players have been removed from the database.'});
+    setIsClearAlertOpen(false);
+  }
 
   return (
     <div className="space-y-8">
@@ -228,6 +236,7 @@ function PlayersPageContent() {
             </DropdownMenu>
             <Button variant="outline" onClick={() => setIsSearchOpen(true)}><Search className="mr-2 h-4 w-4" />Search Players</Button>
             <Button variant="secondary" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Export All</Button>
+            <Button variant="destructive" onClick={() => setIsClearAlertOpen(true)}><Delete className="mr-2 h-4 w-4" />Clear Database</Button>
         </div>
       </div>
       
@@ -290,7 +299,7 @@ function PlayersPageContent() {
                                   <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={() => alert('Edit page not implemented yet.')}><Edit className="mr-2 h-4 w-4"/>Edit Player</DropdownMenuItem>
+                                    <DropdownMenuItem disabled><Edit className="mr-2 h-4 w-4"/>Edit Player</DropdownMenuItem>
                                     <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Player</DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
@@ -302,7 +311,7 @@ function PlayersPageContent() {
               </div>
           </CardContent>
           <CardFooter className="flex items-center justify-between pt-6">
-            {clientReady ? (
+            {clientReady && isDbLoaded ? (
                 <>
                     <div className="text-sm text-muted-foreground">Showing <strong>{(currentPage - 1) * ROWS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players</div>
                     <div className="flex items-center gap-2">
@@ -333,6 +342,19 @@ function PlayersPageContent() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear Entire Player Database?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone. This will permanently remove all players from the database. Are you sure you want to continue?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearDatabase} className="bg-destructive hover:bg-destructive/90">Yes, Clear Database</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

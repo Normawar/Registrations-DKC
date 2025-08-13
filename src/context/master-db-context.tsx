@@ -12,6 +12,7 @@ interface MasterDbContextType {
   updatePlayer: (player: MasterPlayer) => void;
   deletePlayer: (playerId: string) => void;
   addBulkPlayers: (players: MasterPlayer[]) => void;
+  clearDatabase: () => void;
   updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
   isDbError: boolean;
@@ -109,12 +110,22 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addBulkPlayers = (players: MasterPlayer[]) => {
-    // This function now replaces the entire database with the new list.
-    const newDbWithIds = players.map(p => ({
-      ...p,
-      id: p.id || p.uscfId || `p-${Date.now()}-${Math.random()}`,
-    }));
-    persistDatabase(newDbWithIds);
+    const playerMap = new Map(database.map(p => [p.uscfId, p]));
+
+    players.forEach(newPlayer => {
+      const playerWithId = {
+        ...newPlayer,
+        id: newPlayer.id || newPlayer.uscfId || `p-${Date.now()}-${Math.random()}`,
+      };
+      playerMap.set(playerWithId.uscfId, playerWithId);
+    });
+    
+    const updatedDb = Array.from(playerMap.values());
+    persistDatabase(updatedDb);
+  };
+
+  const clearDatabase = () => {
+    persistDatabase([]);
   };
 
   const updatePlayer = (updatedPlayer: MasterPlayer) => {
@@ -195,6 +206,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     updatePlayer,
     deletePlayer,
     addBulkPlayers,
+    clearDatabase,
     updateSchoolDistrict,
     isDbLoaded,
     isDbError,
