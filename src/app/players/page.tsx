@@ -27,7 +27,7 @@ type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'g
 
 function PlayersPageContent() {
   const { toast } = useToast();
-  const { database, deletePlayer, isDbLoaded, addBulkPlayers } = useMasterDb();
+  const { database, deletePlayer, isDbLoaded, addBulkPlayers, dbPlayerCount } = useMasterDb();
   const { events } = useEvents();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -38,21 +38,10 @@ function PlayersPageContent() {
   
   const [currentPage, setCurrentPage] = useState(1);
   const ROWS_PER_PAGE = 50;
-
-  const [totalPlayers, setTotalPlayers] = useState<number>(0);
-  const [isClient, setIsClient] = useState(false);
   
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pasteData, setPasteData] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setIsClient(true);
-    if (isDbLoaded) {
-      setTotalPlayers(database.length);
-    }
-  }, [isDbLoaded, database.length]);
-
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...database];
@@ -80,6 +69,11 @@ function PlayersPageContent() {
 
   const totalPages = Math.ceil(sortedPlayers.length / ROWS_PER_PAGE);
   const paginatedPlayers = sortedPlayers.slice((currentPage - 1) * ROWS_PER_PAGE, currentPage * ROWS_PER_PAGE);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dbPlayerCount]);
+
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -209,7 +203,7 @@ function PlayersPageContent() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Master Player Database</h1>
           <p className="text-muted-foreground">
-            Search, manage, and register every player in the system. Total Players: {isClient ? totalPlayers.toLocaleString() : '...'}
+            Search, manage, and register every player in the system. Total Players: {isDbLoaded ? dbPlayerCount.toLocaleString() : '...'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -266,7 +260,7 @@ function PlayersPageContent() {
                           </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {!isClient || !isDbLoaded ? Array.from({ length: 10 }).map((_, i) => (
+                        {!isDbLoaded ? Array.from({ length: 10 }).map((_, i) => (
                             <TableRow key={i}><TableCell colSpan={7}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
                         )) : paginatedPlayers.map((player) => (
                           <TableRow key={player.id}>
@@ -303,7 +297,7 @@ function PlayersPageContent() {
               </div>
           </CardContent>
           <CardFooter className="flex items-center justify-between pt-6">
-            {isClient && totalPages > 0 ? (
+            {isDbLoaded && dbPlayerCount > 0 ? (
                 <>
                     <div className="text-sm text-muted-foreground">Showing <strong>{(currentPage - 1) * ROWS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players</div>
                     <div className="flex items-center gap-2">

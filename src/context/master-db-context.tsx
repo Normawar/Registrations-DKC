@@ -109,13 +109,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addBulkPlayers = (players: MasterPlayer[]) => {
-    const playerMap = new Map(database.map(p => [p.uscfId, p]));
-    players.forEach(p => {
-        const id = p.id || p.uscfId || `p-${Date.now()}-${Math.random()}`;
-        playerMap.set(p.uscfId, { ...playerMap.get(p.uscfId), ...p, id });
-    });
-    const newDb = Array.from(playerMap.values());
-    persistDatabase(newDb);
+    // This function now replaces the entire database with the new list.
+    const newDbWithIds = players.map(p => ({
+      ...p,
+      id: p.id || p.uscfId || `p-${Date.now()}-${Math.random()}`,
+    }));
+    persistDatabase(newDbWithIds);
   };
 
   const updatePlayer = (updatedPlayer: MasterPlayer) => {
