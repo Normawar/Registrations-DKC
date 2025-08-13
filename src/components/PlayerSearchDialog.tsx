@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,6 +41,14 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
   const { profile } = useSponsorProfile();
   const { dbStates, dbSchools, dbDistricts } = useMasterDb();
 
+  const [initialSearchFilters, setInitialSearchFilters] = useState<Partial<MasterPlayer>>({ state: 'TX' });
+
+  useEffect(() => {
+    if (portalType === 'sponsor' && profile) {
+      setInitialSearchFilters({ state: 'TX', school: profile.school });
+    }
+  }, [portalType, profile]);
+
   const {
     filters,
     updateFilter,
@@ -50,8 +58,10 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
     hasResults,
     hasActiveFilters,
   } = usePlayerSearch({
-    initialFilters: { state: 'TX' },
+    initialFilters: initialSearchFilters,
     excludeIds: excludeIds,
+    searchUnassigned: portalType === 'sponsor',
+    sponsorProfile: portalType === 'sponsor' ? profile : null,
   });
   
   const handleSelect = (player: MasterPlayer) => {

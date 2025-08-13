@@ -3,6 +3,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
+import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 // --- Types ---
 
@@ -37,6 +38,8 @@ export type SearchCriteria = {
   maxRating?: number;
   excludeIds?: string[];
   maxResults?: number;
+  searchUnassigned?: boolean; // For sponsor searches
+  sponsorProfile?: SponsorProfile | null;
 }
 
 // --- Constants ---
@@ -106,7 +109,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const addPlayer = (player: MasterPlayer) => {
     const newDb = [...database];
     // Check if player already exists by USCF ID (and it's not a 'NEW' ID)
-    const existingPlayerIndex = newDb.findIndex(p => p.uscfId.toUpperCase() !== 'NEW' && p.uscfId === player.uscfId);
+    const existingPlayerIndex = newDb.findIndex(p => p.uscfId && p.uscfId.toUpperCase() !== 'NEW' && p.uscfId === player.uscfId);
     
     if (existingPlayerIndex > -1) {
         // Player exists, update it by merging new data into the existing record
@@ -168,7 +171,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
     const {
         firstName, lastName, uscfId, state, grade, section, school, district,
-        minRating, maxRating, excludeIds = [], maxResults = 100
+        minRating, maxRating, excludeIds = [], maxResults = 100,
+        searchUnassigned, sponsorProfile
     } = criteria;
 
     const lowerFirstName = firstName?.toLowerCase();
@@ -177,13 +181,20 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
     const results = database.filter(p => {
         if (excludeSet.has(p.id)) return false;
+        
+        let sponsorMatch = true;
+        if (searchUnassigned && sponsorProfile) {
+            sponsorMatch = !p.school || p.school === sponsorProfile.school;
+        } else {
+            const schoolMatch = !school || p.school?.toLowerCase().includes(school.toLowerCase());
+            const districtMatch = !district || p.district?.toLowerCase().includes(district.toLowerCase());
+            sponsorMatch = schoolMatch && districtMatch;
+        }
 
         const stateMatch = !state || state === 'ALL' || p.state === state;
         const gradeMatch = !grade || p.grade === grade;
         const sectionMatch = !section || p.section === section;
-        const schoolMatch = !school || p.school?.toLowerCase().includes(school.toLowerCase());
-        const districtMatch = !district || p.district?.toLowerCase().includes(district.toLowerCase());
-
+        
         const rating = p.regularRating;
         const ratingMatch = (!minRating || (rating && rating >= minRating)) && (!maxRating || (rating && rating <= maxRating));
 
@@ -191,7 +202,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         const lastNameMatch = !lowerLastName || p.lastName?.toLowerCase().includes(lowerLastName);
         const uscfIdMatch = !uscfId || p.uscfId?.includes(uscfId);
 
-        return stateMatch && gradeMatch && sectionMatch && schoolMatch && districtMatch && ratingMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
+        return sponsorMatch && stateMatch && gradeMatch && sectionMatch && ratingMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
     });
 
     return results.slice(0, maxResults);

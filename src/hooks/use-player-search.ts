@@ -3,17 +3,22 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useMasterDb, type SearchCriteria, type MasterPlayer } from '@/context/master-db-context';
+import type { SponsorProfile } from './use-sponsor-profile';
 
 type UsePlayerSearchProps = {
   initialFilters?: Partial<SearchCriteria>;
   maxResults?: number;
   excludeIds?: string[];
+  searchUnassigned?: boolean; // New prop for sponsor search
+  sponsorProfile?: SponsorProfile | null;
 };
 
 export function usePlayerSearch({
   initialFilters = {},
   maxResults: initialMaxResults,
   excludeIds,
+  searchUnassigned = false,
+  sponsorProfile = null,
 }: UsePlayerSearchProps) {
   const { searchPlayers, isDbLoaded } = useMasterDb();
   const [filters, setFilters] = useState<Partial<SearchCriteria>>(initialFilters);
@@ -39,7 +44,10 @@ export function usePlayerSearch({
   }, [filters, initialFilters]);
   
   useEffect(() => {
-    if (!isDbLoaded || !hasActiveFilters) {
+    if (!isDbLoaded) return;
+    
+    // De-activate search if no active filters are present.
+    if (!hasActiveFilters) {
         setSearchResults([]);
         return;
     }
@@ -49,11 +57,13 @@ export function usePlayerSearch({
       ...filters,
       excludeIds,
       maxResults,
+      searchUnassigned: searchUnassigned,
+      sponsorProfile: sponsorProfile,
     });
     setSearchResults(results);
     setIsLoading(false);
 
-  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters]);
+  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, searchUnassigned, sponsorProfile]);
   
   const hasResults = searchResults.length > 0;
   
@@ -68,4 +78,3 @@ export function usePlayerSearch({
     setMaxResults
   };
 }
-
