@@ -9,18 +9,16 @@ type UsePlayerSearchProps = {
   initialFilters?: Partial<SearchCriteria>;
   maxResults?: number;
   excludeIds?: string[];
-  searchUnassigned?: boolean; 
-  sponsorProfile?: SponsorProfile | null;
+  portalType: 'sponsor' | 'organizer' | 'individual';
 };
 
 export function usePlayerSearch({
   initialFilters = {},
   maxResults: initialMaxResults,
   excludeIds,
-  searchUnassigned = false,
-  sponsorProfile = null,
+  portalType,
 }: UsePlayerSearchProps) {
-  const { searchPlayers, isDbLoaded } = useMasterDb();
+  const { searchPlayers, isDbLoaded, profile } = useMasterDb();
   const [filters, setFilters] = useState<Partial<SearchCriteria>>(initialFilters);
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
@@ -57,20 +55,15 @@ export function usePlayerSearch({
       ...filters,
       excludeIds,
       maxResults,
-      searchUnassigned: searchUnassigned,
-      sponsorProfile: sponsorProfile,
+      searchUnassigned: portalType === 'sponsor', // Explicitly set the flag for sponsor searches
+      sponsorProfile: portalType === 'sponsor' ? profile : null,
     };
     
-    // For sponsors, we modify the school filter behavior
-    if (searchUnassigned && sponsorProfile) {
-        delete searchCriteria.school; // The core search function will handle this logic
-    }
-
     const results = searchPlayers(searchCriteria);
     setSearchResults(results);
     setIsLoading(false);
 
-  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, searchUnassigned, sponsorProfile]);
+  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, portalType, profile]);
   
   const hasResults = searchResults.length > 0;
   
