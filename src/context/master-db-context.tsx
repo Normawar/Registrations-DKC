@@ -175,33 +175,14 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         minRating, maxRating, excludeIds = [], maxResults = 1000,
         searchUnassigned, sponsorProfile
     } = criteria;
-
-    console.log('=== DEBUGGING CASE SENSITIVITY ===');
-    console.log('Search lastName:', lastName);
-    console.log('Database size:', database.length);
-
+    
     const lowerFirstName = firstName?.toLowerCase();
     const lowerLastName = lastName?.toLowerCase();
-    console.log('lowerLastName:', lowerLastName);
-
-    // Let's see how many players have "GUERRA" in their last name
-    const guerraPlayers = database.filter(p => 
-        p.lastName && p.lastName.toUpperCase().includes('GUERRA')
-    );
-    console.log('Players with GUERRA in lastName (case-insensitive):', guerraPlayers.length);
-    console.log('Sample GUERRA players:', guerraPlayers.slice(0, 5).map(p => ({
-        name: `${p.firstName} ${p.lastName}`,
-        school: p.school,
-        district: p.district
-    })));
-
     const excludeSet = new Set(excludeIds);
 
-    // Step by step debugging
-    let step1 = database.filter(p => !excludeSet.has(p.id));
-    console.log('After exclude IDs:', step1.length);
+    const results = database.filter(p => {
+        if (excludeSet.has(p.id)) return false;
 
-    let step2 = step1.filter(p => {
         if (searchUnassigned && sponsorProfile) {
             const isUnassigned = !p.school || p.school.trim() === '';
             const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
@@ -210,36 +191,10 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             if (school && !p.school?.toLowerCase().includes(school.toLowerCase())) return false;
             if (district && !p.district?.toLowerCase().includes(district.toLowerCase())) return false;
         }
-        return true;
-    });
-    console.log('After school/district filter:', step2.length);
 
-    let step3 = step2.filter(p => {
         if (state && state !== 'ALL' && p.state !== state) return false;
-        return true;
-    });
-    console.log('After state filter:', step3.length);
-
-    let step4 = step3.filter(p => {
-        if (lowerLastName && !p.lastName?.toLowerCase().includes(lowerLastName)) {
-            // Debug why this player was filtered out
-            if (p.lastName?.toUpperCase().includes('GUERRA')) {
-                console.log('FILTERING OUT:', {
-                    name: `${p.firstName} ${p.lastName}`,
-                    lastName: p.lastName,
-                    lowerLastName: p.lastName?.toLowerCase(),
-                    searchTerm: lowerLastName,
-                    includes: p.lastName?.toLowerCase().includes(lowerLastName || '')
-                });
-            }
-            return false;
-        }
-        return true;
-    });
-    console.log('After lastName filter:', step4.length);
-
-    const results = step4.filter(p => {
         if (lowerFirstName && !p.firstName?.toLowerCase().includes(lowerFirstName)) return false;
+        if (lowerLastName && !p.lastName?.toLowerCase().includes(lowerLastName)) return false;
         if (uscfId && !p.uscfId?.includes(uscfId)) return false;
         if (grade && p.grade !== grade) return false;
         if (section && p.section !== section) return false;
@@ -251,12 +206,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         return true;
     });
 
-    console.log('Final results count:', results.length);
-    console.log('Final results:', results.map(p => `${p.firstName} ${p.lastName}`));
-    console.log('=== END DEBUG ===');
-
     return results.slice(0, maxResults);
-}, [database, isDbLoaded]);
+  }, [database, isDbLoaded]);
 
   // Memoized derived data
   const dbStates = useMemo(() => {

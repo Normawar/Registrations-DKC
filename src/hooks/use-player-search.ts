@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -14,7 +15,7 @@ type UsePlayerSearchProps = {
 
 export function usePlayerSearch({
   initialFilters: initialFiltersProp = {},
-  maxResults: initialMaxResults = 1000, // Set a higher default
+  maxResults: initialMaxResults = 1000,
   excludeIds,
   searchUnassigned,
   sponsorProfile,
@@ -24,7 +25,7 @@ export function usePlayerSearch({
   const [filters, setFilters] = useState<Partial<SearchCriteria>>(initialFiltersProp);
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
-  const [maxResults, setMaxResults] = useState<number>(initialMaxResults); // Remove undefined
+  const [maxResults, setMaxResults] = useState<number>(initialMaxResults);
 
   const updateFilter = useCallback((key: keyof SearchCriteria, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -34,14 +35,8 @@ export function usePlayerSearch({
     setFilters(initialFiltersProp);
   }, [initialFiltersProp]);
 
-  // Determine if there are any active, user-input filters.
-  // We ignore default state filter for this check.
   const hasActiveFilters = useMemo(() => {
-    const { state, ...restOfFilters } = filters;
-    if (Object.keys(restOfFilters).length > 0) {
-        return Object.values(restOfFilters).some(value => value !== undefined && value !== null && value !== '');
-    }
-    return false;
+    return Object.values(filters).some(value => value !== undefined && value !== null && value !== '' && value !== 'ALL');
   }, [filters]);
 
   useEffect(() => {
@@ -57,20 +52,16 @@ export function usePlayerSearch({
     const searchCriteria: SearchCriteria = {
       ...filters,
       excludeIds,
-      maxResults, // This will now have a proper default value
+      maxResults,
       searchUnassigned,
       sponsorProfile,
     };
     
-    console.log('Search criteria:', searchCriteria); // Add debugging
-    
-    // Using a timeout to debounce the search execution
     const handler = setTimeout(() => {
         const results = searchPlayers(searchCriteria);
-        console.log('Raw search results count:', results.length); // Add debugging
         setSearchResults(results);
         setIsLoading(false);
-    }, 300); // 300ms debounce delay
+    }, 300);
 
     return () => {
         clearTimeout(handler);
