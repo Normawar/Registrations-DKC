@@ -108,16 +108,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const addPlayer = (player: MasterPlayer) => {
     const newDb = [...database];
-    // Check if player already exists by USCF ID (and it's not a 'NEW' ID)
     const existingPlayerIndex = newDb.findIndex(p => p.uscfId && p.uscfId.toUpperCase() !== 'NEW' && p.uscfId === player.uscfId);
     
     if (existingPlayerIndex > -1) {
-        // Player exists, update it by merging new data into the existing record
-        // This preserves the original ID and any other local-specific data
         const existingPlayer = newDb[existingPlayerIndex];
         newDb[existingPlayerIndex] = { ...existingPlayer, ...player };
     } else {
-        // Player is new, add them with a unique ID
         const newPlayerWithId = { ...player, id: player.id || `p-${Date.now()}` };
         newDb.push(newPlayerWithId);
     }
@@ -132,7 +128,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             ...newPlayer,
             id: newPlayer.id || newPlayer.uscfId || `p-${Date.now()}-${Math.random()}`,
         };
-        // Update existing player or add new one
         const existingPlayer = playerMap.get(playerWithId.uscfId);
         playerMap.set(playerWithId.uscfId, { ...existingPlayer, ...playerWithId });
     });
@@ -182,13 +177,19 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const results = database.filter(p => {
         if (excludeSet.has(p.id)) return false;
         
-        let sponsorMatch = true;
+        // This is the key change. When searching for a sponsor, we want players
+        // from their school OR players with no school affiliation.
         if (searchUnassigned && sponsorProfile) {
-            sponsorMatch = !p.school || p.school === sponsorProfile.school;
+          const isUnassigned = !p.school || p.school.trim() === '';
+          const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
+          if (!isUnassigned && !belongsToSponsor) {
+            return false;
+          }
         } else {
+            // Original organizer logic
             const schoolMatch = !school || p.school?.toLowerCase().includes(school.toLowerCase());
             const districtMatch = !district || p.district?.toLowerCase().includes(district.toLowerCase());
-            sponsorMatch = schoolMatch && districtMatch;
+            if (!schoolMatch || !districtMatch) return false;
         }
 
         const stateMatch = !state || state === 'ALL' || p.state === state;
@@ -202,7 +203,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         const lastNameMatch = !lowerLastName || p.lastName?.toLowerCase().includes(lowerLastName);
         const uscfIdMatch = !uscfId || p.uscfId?.includes(uscfId);
 
-        return sponsorMatch && stateMatch && gradeMatch && sectionMatch && ratingMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
+        return stateMatch && gradeMatch && sectionMatch && ratingMatch && firstNameMatch && lastNameMatch && uscfIdMatch;
     });
 
     return results.slice(0, maxResults);
