@@ -75,8 +75,12 @@ export function usePlayerSearch({
       sponsorProfile,
     };
     
+    console.log('⏰ Setting up search timeout');
+
     const handler = setTimeout(() => {
+        console.log('🚀 Timeout executing, calling searchPlayers');
         const results = searchPlayers(searchCriteria);
+        console.log('Raw search results count:', results.length);
         setSearchResults(results);
         setIsLoading(false);
     }, 300);
