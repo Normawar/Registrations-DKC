@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useMasterDb, type SearchCriteria, type MasterPlayer } from '@/context/master-db-context';
-import type { SponsorProfile } from './use-sponsor-profile';
+import { useSponsorProfile, type SponsorProfile } from './use-sponsor-profile';
 
 type UsePlayerSearchProps = {
   initialFilters?: Partial<SearchCriteria>;
