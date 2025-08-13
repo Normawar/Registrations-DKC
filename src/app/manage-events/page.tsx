@@ -523,6 +523,13 @@ export default function ManageEventsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button onClick={() => {
+              localStorage.removeItem('master_player_database');
+              localStorage.removeItem('master_player_database_timestamp');
+              window.location.reload();
+            }} variant="destructive">
+              Clear DB Cache & Reload
+            </Button>
             <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
