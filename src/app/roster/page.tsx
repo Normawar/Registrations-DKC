@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo, Suspense, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -82,7 +82,7 @@ function RosterPageContent() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
 
   const { profile, isProfileLoaded } = useSponsorProfile();
-  const { database, addPlayer, updatePlayer, deletePlayer, isDbLoaded } = useMasterDb();
+  const { database, addPlayer, updatePlayer, isDbLoaded } = useMasterDb();
   
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
@@ -138,14 +138,14 @@ function RosterPageContent() {
     toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
   };
   
-  const handleDeletePlayer = (player: MasterPlayer) => {
+  const handleRemoveFromRoster = (player: MasterPlayer) => {
     setPlayerToDelete(player);
     setIsAlertOpen(true);
   };
   
-  const confirmDelete = () => {
+  const confirmRemoveFromRoster = () => {
     if (playerToDelete) {
-      deletePlayer(playerToDelete.id);
+      updatePlayer({ ...playerToDelete, school: '', district: '' });
       toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from your roster.` });
     }
     setIsAlertOpen(false);
@@ -254,7 +254,7 @@ function RosterPageContent() {
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
                               <DropdownMenuItem onClick={() => handleEditPlayer(player)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">Remove from Roster</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRemoveFromRoster(player)} className="text-destructive">Remove from Roster</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -278,11 +278,13 @@ function RosterPageContent() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Remove Player from Roster</AlertDialogTitle>
-              <AlertDialogDescription>Are you sure you want to remove {playerToDelete?.firstName} {playerToDelete?.lastName} from your roster?</AlertDialogDescription>
+              <AlertDialogDescription>
+                This will remove {playerToDelete?.firstName} {playerToDelete?.lastName} from your roster, but they will remain in the master database. Are you sure?
+              </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">Remove Player</AlertDialogAction>
+              <AlertDialogAction onClick={confirmRemoveFromRoster} className="bg-destructive text-destructive-foreground">Remove Player</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
