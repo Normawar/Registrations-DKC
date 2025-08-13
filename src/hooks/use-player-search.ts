@@ -17,7 +17,7 @@ export function usePlayerSearch({
   initialFilters: initialFiltersProp = {},
   maxResults: initialMaxResults,
   excludeIds,
-  searchUnassigned: initialSearchUnassigned,
+  searchUnassigned,
   sponsorProfile,
 }: UsePlayerSearchProps) {
   const { searchPlayers, isDbLoaded } = useMasterDb();
@@ -54,14 +54,12 @@ export function usePlayerSearch({
     }
 
     setIsLoading(true);
-    
-    const portalType = sponsorProfile ? 'sponsor' : 'organizer';
 
     const searchCriteria: SearchCriteria = {
       ...filters,
       excludeIds,
       maxResults,
-      searchUnassigned: portalType === 'sponsor' ? true : initialSearchUnassigned,
+      searchUnassigned,
       sponsorProfile,
     };
     
@@ -76,7 +74,7 @@ export function usePlayerSearch({
         clearTimeout(handler);
     };
 
-  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, initialSearchUnassigned, sponsorProfile]);
+  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, searchUnassigned, sponsorProfile]);
   
   const hasResults = searchResults.length > 0;
 
