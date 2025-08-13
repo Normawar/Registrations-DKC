@@ -171,6 +171,11 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                         )}
                     </div>
                 </ScrollArea>
+                {hasResults && searchResults.length > 5 && (
+                    <div className="text-center py-2 text-sm text-muted-foreground border-t bg-muted/30">
+                        Scroll to see all {searchResults.length} results
+                    </div>
+                )}
             </div>
             
             <DialogFooter>
