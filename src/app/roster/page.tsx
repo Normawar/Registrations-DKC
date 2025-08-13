@@ -148,7 +148,7 @@ function RosterPageContent() {
     toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
   };
 
-  const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
+const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
     // Open the edit dialog with the newly added player
     setEditingPlayer(player);
     
@@ -191,8 +191,35 @@ function RosterPageContent() {
     setPlayerToDelete(null);
   };
 
-  const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
+const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
     if (!editingPlayer) return;
+
+    // For sponsors, validate required fields before saving
+    const requiredFields = ['firstName', 'lastName', 'uscfId', 'email', 'grade', 'section', 'dob', 'zipCode'];
+    const missingFields = requiredFields.filter(field => {
+        const value = values[field as keyof PlayerFormValues];
+        return !value || (typeof value === 'string' && value.trim() === '');
+    });
+
+    if (missingFields.length > 0) {
+        const fieldLabels = {
+            firstName: 'First Name',
+            lastName: 'Last Name', 
+            uscfId: 'USCF ID',
+            email: 'Email',
+            grade: 'Grade',
+            section: 'Section',
+            dob: 'Date of Birth',
+            zipCode: 'Zip Code'
+        };
+        
+        toast({
+            variant: 'destructive',
+            title: 'Required Information Missing',
+            description: `Please complete these required fields: ${missingFields.map(f => fieldLabels[f as keyof typeof fieldLabels]).join(', ')}`
+        });
+        return; // Don't save until all required fields are filled
+    }
 
     const { uscfExpiration, dob, ...restOfValues } = values;
     
@@ -205,10 +232,14 @@ function RosterPageContent() {
     
     await updatePlayer(updatedPlayerRecord);
 
-    toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
+    toast({ 
+        title: "Player Updated", 
+        description: `${values.firstName} ${values.lastName} has been successfully added to your roster with complete information.`
+    });
+    
     setIsEditPlayerDialogOpen(false);
     setEditingPlayer(null);
-  };
+};
 
 
   if (!isProfileLoaded || !isDbLoaded) {
