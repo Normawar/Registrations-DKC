@@ -136,7 +136,7 @@ type StoredDownloads = {
 export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent } = useEvents();
-  const { database: allPlayers, isDbLoaded, addBulkPlayers, updateSchoolDistrict } = useMasterDb();
+  const { database: allPlayers, isDbLoaded, updateSchoolDistrict } = useMasterDb();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -271,53 +271,12 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
-  const processImportData = (data: any[], hasHeaders: boolean, isPlayerImport: boolean) => {
-    if (isPlayerImport) {
-        const newPlayers: MasterPlayer[] = [];
-        let errors = 0;
-        data.forEach((row: any) => {
-            try {
-                if (!row.uscfId && !row.USCF_ID) {
-                  errors++; return;
-                }
-                const player: MasterPlayer = {
-                    id: row.id || row.ID || `p-${Date.now()}-${Math.random()}`,
-                    uscfId: row.uscfId || row.USCF_ID,
-                    firstName: row.firstName || row.First_Name,
-                    lastName: row.lastName || row.Last_Name,
-                    state: row.state || row.State,
-                    uscfExpiration: row.uscfExpiration || row.USCF_Expiration,
-                    regularRating: parseInt(row.regularRating || row.Regular_Rating, 10) || undefined,
-                    grade: row.grade || row.Grade,
-                    section: row.section || row.Section,
-                    email: row.email || row.Email,
-                    school: row.school || row.School,
-                    district: row.district || row.District,
-                    events: 0,
-                    eventIds: [],
-                };
-                newPlayers.push(player);
-            } catch(e) {
-                errors++;
-                console.error("Error parsing player row:", row, e);
-            }
-        });
-        addBulkPlayers(newPlayers);
-        toast({
-          title: "Player Database Updated",
-          description: `Successfully imported ${newPlayers.length} players. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
-        });
-    } else {
-        const newEvents: Event[] = [];
-        let errors = 0;
+  const processEventImportData = (data: any[]) => {
+    const newEvents: Event[] = [];
+    let errors = 0;
 
-        const dataToProcess = hasHeaders ? data : data.map(arr => ({
-            'Date': arr[0], 'Tournament': arr[1], 'Location': arr[2], 'Rounds': 5,
-            'Regular Fee': 25, 'Late Fee': 30, 'Very Late Fee': 35, 'Day of Fee': 40
-        }));
-
-        dataToProcess.forEach((row: any) => {
-          try {
+    data.forEach((row: any) => {
+        try {
             let dateStr = row['date'] || row['Date'];
             if (!dateStr) { errors++; return; }
             if (dateStr.includes('-')) { dateStr = dateStr.split('-')[0].trim(); }
@@ -325,61 +284,60 @@ export default function ManageEventsPage() {
             if (!isValid(date)) throw new Error(`Invalid date format: "${dateStr}"`);
             
             const eventData = {
-              id: `evt-${Date.now()}-${Math.random()}`,
-              name: row['name'] || row['Name'] || row['Tournament'],
-              date: date.toISOString(),
-              location: row['location'] || row['Location'],
-              rounds: row['rounds'] || row['Rounds'],
-              regularFee: row['regularFee'] || row['Regular Fee'],
-              lateFee: row['lateFee'] || row['Late Fee'],
-              veryLateFee: row['veryLateFee'] || row['Very Late Fee'],
-              dayOfFee: row['dayOfFee'] || row['Day of Fee'],
-              imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
-              imageName: row['imageName'] || row['Image Name'] || undefined,
-              pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
-              pdfName: row['pdfName'] || row['PDF Name'] || undefined,
+                id: `evt-${Date.now()}-${Math.random()}`,
+                name: row['name'] || row['Name'] || row['Tournament'],
+                date: date.toISOString(),
+                location: row['location'] || row['Location'],
+                rounds: row['rounds'] || row['Rounds'] || 5,
+                regularFee: row['regularFee'] || row['Regular Fee'] || 25,
+                lateFee: row['lateFee'] || row['Late Fee'] || 30,
+                veryLateFee: row['veryLateFee'] || row['Very Late Fee'] || 35,
+                dayOfFee: row['dayOfFee'] || row['Day of Fee'] || 40,
+                imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
+                imageName: row['imageName'] || row['Image Name'] || undefined,
+                pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
+                pdfName: row['pdfName'] || row['PDF Name'] || undefined,
             };
 
             const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
             for (const field of requiredFields) { if (eventData[field] === undefined || eventData[field] === null) { throw new Error(`Missing required field: ${field}`); } }
             
             newEvents.push(eventData as Event);
-          } catch(e) {
+        } catch(e) {
             errors++;
             console.error("Error parsing event row:", row, e);
-          }
-        });
-        
-        if (newEvents.length === 0 && data.length > 0) {
-            toast({ variant: 'destructive', title: 'Import Failed', description: `Could not import any events.` });
-            return;
         }
-        addBulkEvents(newEvents);
-        toast({ title: "Import Complete", description: `Successfully imported ${newEvents.length} events. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}` });
+    });
+    
+    if (newEvents.length === 0 && data.length > 0) {
+        toast({ variant: 'destructive', title: 'Import Failed', description: `Could not import any events.` });
+        return;
     }
+    addBulkEvents(newEvents);
+    toast({ title: "Import Complete", description: `Successfully imported ${newEvents.length} events. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}` });
   };
-  
-  const handleFileImport = (e: ChangeEvent<HTMLInputElement>, isPlayerImport: boolean) => {
+
+  const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => processImportData(results.data, true, isPlayerImport),
+      complete: (results) => processEventImportData(results.data),
       error: (error) => { toast({ variant: 'destructive', title: 'Import Failed', description: error.message }); },
     });
     if (e.target) e.target.value = '';
   };
-
-  const handlePasteImport = (isPlayerImport: boolean) => {
+  
+  const handlePasteImport = () => {
     if (!pasteData) { toast({ variant: 'destructive', title: 'No data', description: 'Please paste data.' }); return; }
     Papa.parse(pasteData, {
         header: true,
         skipEmptyLines: true,
         complete: (resultsWithHeader) => {
             if (resultsWithHeader.data.length > 0 && resultsWithHeader.meta.fields) {
-                processImportData(resultsWithHeader.data, true, isPlayerImport);
+                processEventImportData(resultsWithHeader.data);
             } else {
                  toast({ variant: 'destructive', title: 'Import Failed', description: 'No data parsed.' });
             }
@@ -554,14 +512,6 @@ export default function ManageEventsPage() {
     toast({ title: 'Status Cleared', description: 'All "new" indicators cleared.' });
   };
 
-  const triggerImport = (isPlayerImport: boolean) => {
-    const input = fileInputRef.current;
-    if (input) {
-      input.onchange = (e) => handleFileImport(e as ChangeEvent<HTMLInputElement>, isPlayerImport);
-      input.click();
-    }
-  };
-
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -573,15 +523,18 @@ export default function ManageEventsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" />
+            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import</Button>
+                <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import Events</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => triggerImport(false)}>Import Events from CSV</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => triggerImport(true)}>Import Players from CSV</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setIsPasteDialogOpen(true)}>Paste from Sheet</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+                    Import Events from CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsPasteDialogOpen(true)}>
+                    Paste from Sheet
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button onClick={handleAddEvent}>
@@ -758,16 +711,15 @@ export default function ManageEventsPage() {
       
       <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
-          <DialogHeader><DialogTitle>Paste from Spreadsheet</DialogTitle><DialogDescription>Copy data from your spreadsheet and paste it into the text area below.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>Paste from Spreadsheet</DialogTitle><DialogDescription>Copy event data from your spreadsheet and paste it into the text area below.</DialogDescription></DialogHeader>
           <div className="py-4 space-y-4">
-            <Tabs defaultValue="events"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="events">Import Events</TabsTrigger><TabsTrigger value="players">Import Players</TabsTrigger></TabsList>
+            <Tabs defaultValue="events"><TabsList className="grid w-full grid-cols-1"><TabsTrigger value="events">Import Events</TabsTrigger></TabsList>
               <TabsContent value="events"><Textarea placeholder="Paste event data here..." className="h-64" value={pasteData} onChange={(e) => setPasteData(e.target.value)} /></TabsContent>
-              <TabsContent value="players"><Textarea placeholder="Paste player data here..." className="h-64" value={pasteData} onChange={(e) => setPasteData(e.target.value)} /></TabsContent>
             </Tabs>
           </div>
           <DialogFooter>
             <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-            <Button onClick={() => handlePasteImport(document.querySelector('[data-state="active"]')?.getAttribute('data-value') === 'players')}><ClipboardPaste className="mr-2 h-4 w-4" />Import Data</Button>
+            <Button onClick={handlePasteImport}><ClipboardPaste className="mr-2 h-4 w-4" />Import Data</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

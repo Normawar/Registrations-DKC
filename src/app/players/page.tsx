@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useState, useMemo, useCallback, Suspense, useEffect } from 'react';
+import { useState, useMemo, useCallback, Suspense, useEffect, useRef, type ChangeEvent } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Download, Trash2, Edit } from "lucide-react";
+import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Download, Trash2, Edit, Upload, ClipboardPaste } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -18,12 +18,16 @@ import { format } from 'date-fns';
 import Papa from 'papaparse';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+
 
 type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state' | 'uscfExpiration' | 'events';
 
 function PlayersPageContent() {
   const { toast } = useToast();
-  const { database, deletePlayer, isDbLoaded } = useMasterDb();
+  const { database, deletePlayer, isDbLoaded, addBulkPlayers } = useMasterDb();
   const { events } = useEvents();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -37,6 +41,10 @@ function PlayersPageContent() {
 
   const [totalPlayers, setTotalPlayers] = useState<number>(0);
   const [isClient, setIsClient] = useState(false);
+  
+  const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
+  const [pasteData, setPasteData] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -125,6 +133,74 @@ function PlayersPageContent() {
     document.body.removeChild(a);
     toast({ title: 'Export Complete', description: 'The master player database has been downloaded.' });
   };
+  
+  const processImportData = (data: any[]) => {
+      const newPlayers: MasterPlayer[] = [];
+      let errors = 0;
+      data.forEach((row: any) => {
+          try {
+              if (!row.uscfId && !row.USCF_ID) {
+                errors++; return;
+              }
+              const player: MasterPlayer = {
+                  id: row.id || row.ID || `p-${Date.now()}-${Math.random()}`,
+                  uscfId: row.uscfId || row.USCF_ID,
+                  firstName: row.firstName || row.First_Name,
+                  lastName: row.lastName || row.Last_Name,
+                  state: row.state || row.State,
+                  uscfExpiration: row.uscfExpiration || row.USCF_Expiration,
+                  regularRating: parseInt(row.regularRating || row.Regular_Rating, 10) || undefined,
+                  grade: row.grade || row.Grade,
+                  section: row.section || row.Section,
+                  email: row.email || row.Email,
+                  school: row.school || row.School,
+                  district: row.district || row.District,
+                  events: 0,
+                  eventIds: [],
+              };
+              newPlayers.push(player);
+          } catch(e) {
+              errors++;
+              console.error("Error parsing player row:", row, e);
+          }
+      });
+      addBulkPlayers(newPlayers);
+      toast({
+        title: "Player Database Updated",
+        description: `Successfully imported ${newPlayers.length} players. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
+      });
+  };
+
+  const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => processImportData(results.data),
+      error: (error) => { toast({ variant: 'destructive', title: 'Import Failed', description: error.message }); },
+    });
+    if (e.target) e.target.value = '';
+  };
+
+  const handlePasteImport = () => {
+    if (!pasteData) { toast({ variant: 'destructive', title: 'No data', description: 'Please paste data.' }); return; }
+    Papa.parse(pasteData, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (resultsWithHeader) => {
+            if (resultsWithHeader.data.length > 0 && resultsWithHeader.meta.fields) {
+                processImportData(resultsWithHeader.data);
+            } else {
+                 toast({ variant: 'destructive', title: 'Import Failed', description: 'No data parsed.' });
+            }
+            setIsPasteDialogOpen(false);
+            setPasteData('');
+        },
+        error: (error) => { toast({ variant: 'destructive', title: 'Parse Failed', description: error.message }); }
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -136,6 +212,20 @@ function PlayersPageContent() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import Players</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+                    Import Players from CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsPasteDialogOpen(true)}>
+                    Paste from Sheet
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" onClick={() => setIsSearchOpen(true)}><Search className="mr-2 h-4 w-4" />Search Players</Button>
             <Button variant="secondary" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Export All</Button>
         </div>
@@ -247,6 +337,19 @@ function PlayersPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader><DialogTitle>Paste from Spreadsheet</DialogTitle><DialogDescription>Copy player data from your spreadsheet and paste it into the text area below.</DialogDescription></DialogHeader>
+          <div className="py-4 space-y-4">
+              <Textarea placeholder="Paste player data here..." className="h-64" value={pasteData} onChange={(e) => setPasteData(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+            <Button onClick={handlePasteImport}><ClipboardPaste className="mr-2 h-4 w-4" />Import Data</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
