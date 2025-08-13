@@ -42,6 +42,11 @@ function PlayersPageContent() {
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pasteData, setPasteData] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [clientReady, setClientReady] = useState(false);
+  useEffect(() => {
+    setClientReady(true);
+  }, []);
 
   const sortedPlayers = useMemo(() => {
     const sortablePlayers = [...database];
@@ -133,23 +138,23 @@ function PlayersPageContent() {
       let errors = 0;
       data.forEach((row: any) => {
           try {
-              const uscfId = row.uscfId || row['USCF ID'] || row.USCF_ID;
+              const uscfId = row['USCF ID'] || row['uscfId'] || row.USCF_ID;
               if (!uscfId) {
                 errors++; return;
               }
               const player: MasterPlayer = {
                   id: row.id || row.ID || `p-${Date.now()}-${Math.random()}`,
                   uscfId: uscfId,
-                  firstName: row.firstName || row['First Name'] || row.First_Name,
-                  lastName: row.lastName || row['Last Name'] || row.Last_Name,
-                  state: row.state || row.State,
-                  uscfExpiration: row.uscfExpiration || row['USCF Expiration'] || row.USCF_Expiration,
-                  regularRating: parseInt(row.regularRating || row['Regular Rating'] || row.Regular_Rating, 10) || undefined,
-                  grade: row.grade || row.Grade,
-                  section: row.section || row.Section,
-                  email: row.email || row.Email,
-                  school: row.school || row.School,
-                  district: row.district || row.District,
+                  firstName: row['First Name'] || row.firstName || row.First_Name,
+                  lastName: row['Last Name'] || row.lastName || row.Last_Name,
+                  state: row.State || row.state,
+                  uscfExpiration: row['USCF Expiration'] || row.uscfExpiration || row.USCF_Expiration,
+                  regularRating: parseInt(row['Regular Rating'] || row.regularRating || row.Regular_Rating, 10) || undefined,
+                  grade: row.Grade || row.grade,
+                  section: row.Section || row.section,
+                  email: row.Email || row.email,
+                  school: row.School || row.school,
+                  district: row.District || row.district,
                   events: 0,
                   eventIds: [],
               };
@@ -203,7 +208,7 @@ function PlayersPageContent() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Master Player Database</h1>
           <p className="text-muted-foreground">
-            Search, manage, and register every player in the system. Total Players: {isDbLoaded ? dbPlayerCount.toLocaleString() : '...'}
+            Search, manage, and register every player in the system. Total Players: {clientReady ? dbPlayerCount.toLocaleString() : '...'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -297,7 +302,7 @@ function PlayersPageContent() {
               </div>
           </CardContent>
           <CardFooter className="flex items-center justify-between pt-6">
-            {isDbLoaded && dbPlayerCount > 0 ? (
+            {clientReady ? (
                 <>
                     <div className="text-sm text-muted-foreground">Showing <strong>{(currentPage - 1) * ROWS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players</div>
                     <div className="flex items-center gap-2">
@@ -307,7 +312,7 @@ function PlayersPageContent() {
                     </div>
                 </>
             ) : (
-                <div className="text-sm text-muted-foreground">Showing <strong>0</strong> to <strong>0</strong> of <strong>0</strong> players</div>
+                <div className="text-sm text-muted-foreground">Loading pagination...</div>
              )}
           </CardFooter>
       </Card>
