@@ -112,7 +112,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     if (existingPlayerIndex > -1) {
         const existingPlayer = newDb[existingPlayerIndex];
-        newDb[existingPlayerIndex] = { ...existingPlayer, ...player };
+        // Merge new player data into existing record, preserving the original ID
+        newDb[existingPlayerIndex] = { ...existingPlayer, ...player, id: existingPlayer.id };
     } else {
         const newPlayerWithId = { ...player, id: player.id || `p-${Date.now()}` };
         newDb.push(newPlayerWithId);
@@ -129,6 +130,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             id: newPlayer.id || newPlayer.uscfId || `p-${Date.now()}-${Math.random()}`,
         };
         const existingPlayer = playerMap.get(playerWithId.uscfId);
+        // Merge new data into existing record, keeping the original ID if it exists
         playerMap.set(playerWithId.uscfId, { ...existingPlayer, ...playerWithId });
     });
     
@@ -177,21 +179,22 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const results = database.filter(p => {
         if (excludeSet.has(p.id)) return false;
         
-        // This is the key change. When searching for a sponsor, we want players
-        // from their school OR players with no school affiliation.
+        // School/District filtering logic
         if (searchUnassigned && sponsorProfile) {
-          const isUnassigned = !p.school || p.school.trim() === '';
-          const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
-          if (!isUnassigned && !belongsToSponsor) {
-            return false;
-          }
+            // For sponsors: find players in their school OR unassigned players.
+            const isUnassigned = !p.school || p.school.trim() === '';
+            const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
+            if (!isUnassigned && !belongsToSponsor) {
+                return false;
+            }
         } else {
-            // Original organizer logic
+            // For organizers: standard filtering.
             const schoolMatch = !school || p.school?.toLowerCase().includes(school.toLowerCase());
             const districtMatch = !district || p.district?.toLowerCase().includes(district.toLowerCase());
             if (!schoolMatch || !districtMatch) return false;
         }
 
+        // Other filters
         const stateMatch = !state || state === 'ALL' || p.state === state;
         const gradeMatch = !grade || p.grade === grade;
         const sectionMatch = !section || p.section === section;
