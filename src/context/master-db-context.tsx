@@ -12,6 +12,7 @@ interface MasterDbContextType {
   updatePlayer: (player: MasterPlayer) => void;
   deletePlayer: (playerId: string) => void;
   addBulkPlayers: (players: MasterPlayer[]) => void;
+  updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
   isDbError: boolean;
   dbPlayerCount: number;
@@ -113,7 +114,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         const id = p.id || p.uscfId || `p-${Date.now()}-${Math.random()}`;
         playerMap.set(p.uscfId, { ...playerMap.get(p.uscfId), ...p, id });
     });
-    persistDatabase(Array.from(playerMap.values()));
+    const newDb = Array.from(playerMap.values());
+    persistDatabase(newDb);
   };
 
   const updatePlayer = (updatedPlayer: MasterPlayer) => {
@@ -123,6 +125,16 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const deletePlayer = (playerId: string) => {
     const newDb = database.filter(p => p.id !== playerId);
+    persistDatabase(newDb);
+  };
+
+  const updateSchoolDistrict = (oldDistrict: string, newDistrict: string) => {
+    const newDb = database.map(p => {
+      if (p.district === oldDistrict) {
+        return { ...p, district: newDistrict };
+      }
+      return p;
+    });
     persistDatabase(newDb);
   };
   
@@ -184,6 +196,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     updatePlayer,
     deletePlayer,
     addBulkPlayers,
+    updateSchoolDistrict,
     isDbLoaded,
     isDbError,
     dbPlayerCount: database.length,
