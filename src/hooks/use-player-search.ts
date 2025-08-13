@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -15,7 +14,7 @@ type UsePlayerSearchProps = {
 
 export function usePlayerSearch({
   initialFilters: initialFiltersProp = {},
-  maxResults: initialMaxResults,
+  maxResults: initialMaxResults = 1000, // Set a higher default
   excludeIds,
   searchUnassigned,
   sponsorProfile,
@@ -25,7 +24,7 @@ export function usePlayerSearch({
   const [filters, setFilters] = useState<Partial<SearchCriteria>>(initialFiltersProp);
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
-  const [maxResults, setMaxResults] = useState<number | undefined>(initialMaxResults);
+  const [maxResults, setMaxResults] = useState<number>(initialMaxResults); // Remove undefined
 
   const updateFilter = useCallback((key: keyof SearchCriteria, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -58,14 +57,17 @@ export function usePlayerSearch({
     const searchCriteria: SearchCriteria = {
       ...filters,
       excludeIds,
-      maxResults,
+      maxResults, // This will now have a proper default value
       searchUnassigned,
       sponsorProfile,
     };
     
+    console.log('Search criteria:', searchCriteria); // Add debugging
+    
     // Using a timeout to debounce the search execution
     const handler = setTimeout(() => {
         const results = searchPlayers(searchCriteria);
+        console.log('Raw search results count:', results.length); // Add debugging
         setSearchResults(results);
         setIsLoading(false);
     }, 300); // 300ms debounce delay
