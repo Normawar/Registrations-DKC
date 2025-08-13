@@ -140,19 +140,24 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                 {!isLoading && !hasActiveFilters && (
                     <div className="text-center p-8 text-muted-foreground">Enter search criteria above to find players.</div>
                 )}
-                {hasResults && (
-                    <div className="space-y-2">
-                    {searchResults.map(player => (
-                        <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
-                        <div>
-                            <p className="font-semibold">{player.firstName} {player.lastName}</p>
-                            <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'UNR'} | School: {player.school || 'N/A'}</p>
+                {hasResults && (() => {
+                    console.log('🎨 UI Debug - searchResults length:', searchResults?.length);
+                    console.log('🎨 UI Debug - hasResults:', hasResults);
+                    console.log('🎨 UI Debug - first 5 results:', searchResults?.slice(0, 5).map(p => `${p.firstName} ${p.lastName}`));
+                    return (
+                        <div className="space-y-2">
+                        {searchResults.map(player => (
+                            <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
+                            <div>
+                                <p className="font-semibold">{player.firstName} {player.lastName}</p>
+                                <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'UNR'} | School: {player.school || 'N/A'}</p>
+                            </div>
+                            <Button variant="secondary" size="sm" onClick={() => handleSelect(player)}>Select</Button>
+                            </div>
+                        ))}
                         </div>
-                        <Button variant="secondary" size="sm" onClick={() => handleSelect(player)}>Select</Button>
-                        </div>
-                    ))}
-                    </div>
-                )}
+                    )
+                })()}
                 </div>
             </ScrollArea>
             </div>
