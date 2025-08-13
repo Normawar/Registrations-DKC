@@ -22,7 +22,11 @@ export type MasterPlayer = {
   eventIds: string[];
 };
 
+// This is a placeholder for a much larger dataset.
+// In a real application, this would be fetched from a server.
 export const fullMasterPlayerData: MasterPlayer[] = [
+  // This array will be programmatically expanded to include 11,324 players.
+  // The following is just a small sample of the structure.
   {
     "id": "p1",
     "uscfId": "12345678",
