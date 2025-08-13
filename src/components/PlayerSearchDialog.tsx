@@ -39,7 +39,7 @@ interface PlayerSearchDialogProps {
 
 export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, excludeIds, portalType }: PlayerSearchDialogProps) {
   const { profile } = useSponsorProfile();
-  const { dbStates, dbSchools, dbDistricts } = useMasterDb();
+  const { dbStates, dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
 
   const [initialSearchFilters, setInitialSearchFilters] = useState<Partial<MasterPlayer>>({ state: 'TX' });
 
@@ -104,8 +104,10 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                   </div>
                   <div>
                       <Label htmlFor="search-state">State</Label>
-                      <Select value={filters.state || 'ALL'} onValueChange={(value) => updateFilter('state', value)}>
-                        <SelectTrigger id="search-state"><SelectValue/></SelectTrigger>
+                      <Select value={filters.state || 'ALL'} onValueChange={(value) => updateFilter('state', value)} disabled={!isDbLoaded}>
+                        <SelectTrigger id="search-state">
+                            <SelectValue placeholder={isDbLoaded ? "All States" : "Loading..."} />
+                        </SelectTrigger>
                         <SelectContent>{dbStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                       </Select>
                   </div>
@@ -114,15 +116,19 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <Label htmlFor="search-school">School</Label>
-                            <Select value={filters.school || ''} onValueChange={(value) => updateFilter('school', value)}>
-                                <SelectTrigger id="search-school"><SelectValue placeholder="All Schools"/></SelectTrigger>
+                            <Select value={filters.school || ''} onValueChange={(value) => updateFilter('school', value)} disabled={!isDbLoaded}>
+                                <SelectTrigger id="search-school">
+                                    <SelectValue placeholder={isDbLoaded ? "All Schools" : "Loading..."} />
+                                </SelectTrigger>
                                 <SelectContent>{dbSchools.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
                         <div>
                             <Label htmlFor="search-district">District</Label>
-                             <Select value={filters.district || ''} onValueChange={(value) => updateFilter('district', value)}>
-                                <SelectTrigger id="search-district"><SelectValue placeholder="All Districts"/></SelectTrigger>
+                             <Select value={filters.district || ''} onValueChange={(value) => updateFilter('district', value)} disabled={!isDbLoaded}>
+                                <SelectTrigger id="search-district">
+                                    <SelectValue placeholder={isDbLoaded ? "All Districts" : "Loading..."} />
+                                </SelectTrigger>
                                 <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
                             </Select>
                         </div>
