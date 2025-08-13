@@ -36,7 +36,15 @@ export function usePlayerSearch({
   }, [initialFiltersProp]);
 
   const hasActiveFilters = useMemo(() => {
-    return Object.values(filters).some(value => value !== undefined && value !== null && value !== '' && value !== 'ALL');
+    // Check if any filter has a meaningful value (not empty, undefined, null, or default 'ALL')
+    return Object.entries(filters).some(([key, value]) => {
+        if (key === 'state') {
+            // State is active if it's not empty, undefined, null, or 'ALL'
+            return value && value !== 'ALL' && value !== '';
+        }
+        // For other filters, they're active if they have any non-empty value
+        return value !== undefined && value !== null && value !== '';
+    });
   }, [filters]);
 
   useEffect(() => {
