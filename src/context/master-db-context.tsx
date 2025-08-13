@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
@@ -45,6 +45,8 @@ export type SearchCriteria = {
 // --- Constants ---
 
 const DB_STORAGE_KEY = 'master_player_database';
+const TIMESTAMP_KEY = 'master_player_database_timestamp';
+
 
 // --- Context Definition ---
 
@@ -61,12 +63,30 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     setIsDbLoaded(false);
     setIsDbError(false);
     try {
-      // Data is now loaded directly from the imported file
-      setDatabase(fullMasterPlayerData);
+      const storedDb = localStorage.getItem(DB_STORAGE_KEY);
+      
+      if (storedDb) {
+        // Always use stored data if it exists, regardless of timestamp
+        const parsedDb = JSON.parse(storedDb);
+        if (parsedDb.length > 0) {
+          setDatabase(parsedDb);
+        } else {
+          // Only fall back to sample data if stored data is empty
+          setDatabase(fullMasterPlayerData);
+          localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(fullMasterPlayerData));
+          localStorage.setItem(TIMESTAMP_KEY, new Date().getTime().toString());
+        }
+      } else {
+        // No stored data, use initial sample data
+        setDatabase(fullMasterPlayerData);
+        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(fullMasterPlayerData));
+        localStorage.setItem(TIMESTAMP_KEY, new Date().getTime().toString());
+      }
     } catch (error) {
-      console.error("Failed to load master player database:", error);
+      console.error("Failed to load or parse master player database:", error);
       setIsDbError(true);
-      setDatabase([]);
+      // Fallback to initial data if localStorage fails
+      setDatabase(fullMasterPlayerData);
     } finally {
       setIsDbLoaded(true);
     }
@@ -77,8 +97,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [loadDatabase]);
 
   const persistDatabase = (newDb: MasterPlayer[]) => {
-    // Overwrite the in-memory database. No-op for localStorage.
-    setDatabase(newDb);
+    try {
+      setDatabase(newDb);
+      localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(newDb));
+      localStorage.setItem(TIMESTAMP_KEY, new Date().getTime().toString());
+    } catch (error) {
+      console.error("Failed to persist database to localStorage:", error);
+    }
   };
   
   const refreshDatabase = () => {
