@@ -71,7 +71,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
   
   return (
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-4xl h-[95vh] flex flex-col">
             <DialogHeader className="shrink-0">
                 <DialogTitle>Search Master Player Database</DialogTitle>
                 <DialogDescription>
