@@ -9,7 +9,7 @@ type UsePlayerSearchProps = {
   initialFilters?: Partial<SearchCriteria>;
   maxResults?: number;
   excludeIds?: string[];
-  searchUnassigned?: boolean; // New prop for sponsor search
+  searchUnassigned?: boolean; 
   sponsorProfile?: SponsorProfile | null;
 };
 
