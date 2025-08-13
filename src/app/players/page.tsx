@@ -139,17 +139,18 @@ function PlayersPageContent() {
       let errors = 0;
       data.forEach((row: any) => {
           try {
-              if (!row.uscfId && !row.USCF_ID) {
+              const uscfId = row.uscfId || row['USCF ID'] || row.USCF_ID;
+              if (!uscfId) {
                 errors++; return;
               }
               const player: MasterPlayer = {
                   id: row.id || row.ID || `p-${Date.now()}-${Math.random()}`,
-                  uscfId: row.uscfId || row.USCF_ID,
-                  firstName: row.firstName || row.First_Name,
-                  lastName: row.lastName || row.Last_Name,
+                  uscfId: uscfId,
+                  firstName: row.firstName || row['First Name'] || row.First_Name,
+                  lastName: row.lastName || row['Last Name'] || row.Last_Name,
                   state: row.state || row.State,
-                  uscfExpiration: row.uscfExpiration || row.USCF_Expiration,
-                  regularRating: parseInt(row.regularRating || row.Regular_Rating, 10) || undefined,
+                  uscfExpiration: row.uscfExpiration || row['USCF Expiration'] || row.USCF_Expiration,
+                  regularRating: parseInt(row.regularRating || row['Regular Rating'] || row.Regular_Rating, 10) || undefined,
                   grade: row.grade || row.Grade,
                   section: row.section || row.Section,
                   email: row.email || row.Email,
@@ -302,7 +303,7 @@ function PlayersPageContent() {
               </div>
           </CardContent>
           <CardFooter className="flex items-center justify-between pt-6">
-            {isClient && totalPages > 0 && (
+            {isClient && totalPages > 0 ? (
                 <>
                     <div className="text-sm text-muted-foreground">Showing <strong>{(currentPage - 1) * ROWS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players</div>
                     <div className="flex items-center gap-2">
@@ -311,8 +312,7 @@ function PlayersPageContent() {
                         <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
                     </div>
                 </>
-            )}
-             {isClient && totalPages === 0 && (
+            ) : (
                 <div className="text-sm text-muted-foreground">Showing <strong>0</strong> to <strong>0</strong> of <strong>0</strong> players</div>
              )}
           </CardFooter>
