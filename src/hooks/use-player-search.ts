@@ -9,16 +9,18 @@ type UsePlayerSearchProps = {
   initialFilters?: Partial<SearchCriteria>;
   maxResults?: number;
   excludeIds?: string[];
-  portalType: 'sponsor' | 'organizer' | 'individual';
+  searchUnassigned?: boolean;
+  sponsorProfile?: SponsorProfile | null;
 };
 
 export function usePlayerSearch({
   initialFilters = {},
   maxResults: initialMaxResults,
   excludeIds,
-  portalType,
+  searchUnassigned,
+  sponsorProfile,
 }: UsePlayerSearchProps) {
-  const { searchPlayers, isDbLoaded, profile } = useMasterDb();
+  const { searchPlayers, isDbLoaded } = useMasterDb();
   const [filters, setFilters] = useState<Partial<SearchCriteria>>(initialFilters);
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
@@ -33,14 +35,8 @@ export function usePlayerSearch({
   }, [initialFilters]);
 
   const hasActiveFilters = useMemo(() => {
-      const initialFilterKeys = Object.keys(initialFilters);
-      return Object.entries(filters).some(([key, value]) => {
-          if (initialFilterKeys.includes(key) && initialFilters[key as keyof SearchCriteria] === value) {
-              return false;
-          }
-          return value !== undefined && value !== null && value !== '' && value !== 'ALL';
-      });
-  }, [filters, initialFilters]);
+      return Object.values(filters).some(value => value !== undefined && value !== null && value !== '' && value !== 'ALL');
+  }, [filters]);
   
   useEffect(() => {
     if (!isDbLoaded) return;
@@ -55,15 +51,15 @@ export function usePlayerSearch({
       ...filters,
       excludeIds,
       maxResults,
-      searchUnassigned: portalType === 'sponsor', // Explicitly set the flag for sponsor searches
-      sponsorProfile: portalType === 'sponsor' ? profile : null,
+      searchUnassigned,
+      sponsorProfile,
     };
     
     const results = searchPlayers(searchCriteria);
     setSearchResults(results);
     setIsLoading(false);
 
-  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, portalType, profile]);
+  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, searchUnassigned, sponsorProfile]);
   
   const hasResults = searchResults.length > 0;
   
