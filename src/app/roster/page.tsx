@@ -149,7 +149,13 @@ function RosterPageContent() {
   };
 
   const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
-    handleEditPlayer(player);
+    setEditingPlayer(player);
+    playerForm.reset({
+        ...player,
+        dob: player.dob ? new Date(player.dob) : undefined,
+        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+    });
+    setIsEditPlayerDialogOpen(true);
   };
   
   const handleRemoveFromRoster = (player: MasterPlayer) => {
