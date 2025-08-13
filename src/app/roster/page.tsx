@@ -2,11 +2,15 @@
 'use client';
 
 import { useState, useMemo, Suspense } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { format } from 'date-fns';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -17,12 +21,61 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { CalendarIcon } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
+const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
+const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
+const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3, '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7, '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11, '12th Grade': 12, };
+const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12 };
+
+const playerFormSchema = z.object({
+  id: z.string().optional(),
+  firstName: z.string().min(1, { message: "First Name is required." }),
+  middleName: z.string().optional(),
+  lastName: z.string().min(1, { message: "Last Name is required." }),
+  uscfId: z.string().min(1, { message: "USCF ID is required." }),
+  uscfExpiration: z.date().optional(),
+  regularRating: z.preprocess(
+    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
+    z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
+  ),
+  grade: z.string().optional(),
+  section: z.string().optional(),
+  email: z.string().email({ message: "Please enter a valid email." }).optional().or(z.literal('')),
+  phone: z.string().optional(),
+  dob: z.date().optional(),
+  zipCode: z.string().optional(),
+  studentType: z.string().optional(),
+  state: z.string().optional(),
+  school: z.string().min(1, { message: "School name is required."}),
+  district: z.string().min(1, { message: "District name is required."}),
+}).refine(data => {
+    if (data.uscfId.toUpperCase() !== 'NEW') { return data.uscfExpiration !== undefined; }
+    return true;
+}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] })
+.refine((data) => {
+    if (!data.grade || !data.section || data.section === 'Championship') return true;
+    const playerGradeLevel = gradeToNumber[data.grade];
+    const sectionMaxLevel = sectionMaxGrade[data.section];
+    if (playerGradeLevel === undefined || sectionMaxLevel === undefined) return true;
+    return playerGradeLevel <= sectionMaxLevel;
+  }, { message: "Player's grade is too high for this section.", path: ["section"] });
+
+type PlayerFormValues = z.infer<typeof playerFormSchema>;
+
 function RosterPageContent() {
   const { toast } = useToast();
-  const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
@@ -32,6 +85,10 @@ function RosterPageContent() {
   const { database, addPlayer, updatePlayer, deletePlayer, isDbLoaded } = useMasterDb();
   
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
+
+  const playerForm = useForm<PlayerFormValues>({
+    resolver: zodResolver(playerFormSchema),
+  });
 
   const rosterPlayers = useMemo(() => {
     if (!isProfileLoaded || !isDbLoaded || !profile) return [];
@@ -95,6 +152,36 @@ function RosterPageContent() {
     setPlayerToDelete(null);
   };
 
+  const handleEditPlayer = (player: MasterPlayer) => {
+    setEditingPlayer(player);
+    playerForm.reset({
+        ...player,
+        dob: player.dob ? new Date(player.dob) : undefined,
+        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+    });
+    setIsEditPlayerDialogOpen(true);
+  };
+
+  const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
+    if (!editingPlayer) return;
+
+    const { uscfExpiration, dob, ...restOfValues } = values;
+    
+    const updatedPlayerRecord: MasterPlayer = {
+        ...editingPlayer,
+        ...restOfValues,
+        dob: dob ? dob.toISOString() : undefined,
+        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+    };
+    
+    await updatePlayer(updatedPlayerRecord);
+
+    toast({ title: "Player Updated", description: `${values.firstName} ${values.lastName}'s information has been updated.`});
+    setIsEditPlayerDialogOpen(false);
+    setEditingPlayer(null);
+  };
+
+
   if (!isProfileLoaded || !isDbLoaded) {
     return <AppLayout><Skeleton className="h-[60vh] w-full" /></AppLayout>;
   }
@@ -109,7 +196,7 @@ function RosterPageContent() {
               Manage your team players and their information. ({rosterPlayers.length} players)
             </p>
           </div>
-          <Button onClick={() => setIsPlayerDialogOpen(true)} className="flex items-center gap-2">
+          <Button onClick={() => setIsSearchDialogOpen(true)} className="flex items-center gap-2">
             <Search className="h-4 w-4" />
             Add Player from Database
           </Button>
@@ -166,7 +253,7 @@ function RosterPageContent() {
                             <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuItem disabled>Edit</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditPlayer(player)}><Edit className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleDeletePlayer(player)} className="text-destructive">Remove from Roster</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -180,8 +267,8 @@ function RosterPageContent() {
         </Card>
 
         <PlayerSearchDialog 
-            isOpen={isPlayerDialogOpen}
-            onOpenChange={setIsPlayerDialogOpen}
+            isOpen={isSearchDialogOpen}
+            onOpenChange={setIsSearchDialogOpen}
             onSelectPlayer={handleSelectPlayer}
             excludeIds={rosterPlayerIds}
             portalType="sponsor"
@@ -199,6 +286,50 @@ function RosterPageContent() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
+            <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
+                <DialogHeader className="p-6 pb-4 border-b shrink-0">
+                    <DialogTitle>Edit Player Information</DialogTitle>
+                    <DialogDescription>Update the details for {editingPlayer?.firstName} {editingPlayer?.lastName}. This will update the master player record.</DialogDescription>
+                </DialogHeader>
+                <div className="flex-1 overflow-y-auto p-6">
+                    <Form {...playerForm}>
+                        <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Date of Birth</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()} initialFocus/></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>USCF Expiration</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 2} toYear={new Date().getFullYear() + 10} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                        </form>
+                    </Form>
+                </div>
+                <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                    <Button type="button" variant="ghost" onClick={() => setIsEditPlayerDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit" form="edit-player-form">Save Changes</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
