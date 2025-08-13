@@ -172,83 +172,42 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
     const {
         firstName, lastName, uscfId, state, grade, section, school, district,
-        minRating, maxRating, excludeIds = [], maxResults = 1000, // Increase default
+        minRating, maxRating, excludeIds = [], maxResults = 1000,
         searchUnassigned, sponsorProfile
     } = criteria;
-
-    console.log('=== SEARCH DEBUG START ===');
-    console.log('Search criteria received:', criteria);
-    console.log('maxResults value:', maxResults);
-    console.log('Database size:', database.length);
-    console.log('searchUnassigned:', searchUnassigned);
-    console.log('sponsorProfile:', sponsorProfile);
-    console.log('lastName filter:', lastName);
 
     const lowerFirstName = firstName?.toLowerCase();
     const lowerLastName = lastName?.toLowerCase();
     const excludeSet = new Set(excludeIds);
 
-    // Let's see what happens step by step
-    let step1Results = database.filter(p => !excludeSet.has(p.id));
-    console.log('After excluding IDs:', step1Results.length);
+    const results = database.filter(p => {
+        if (excludeSet.has(p.id)) return false;
 
-    let step2Results = step1Results.filter(p => {
         if (searchUnassigned && sponsorProfile) {
             const isUnassigned = !p.school || p.school.trim() === '';
             const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
-            const shouldInclude = isUnassigned || belongsToSponsor;
-            if (!shouldInclude) {
-                return false;
-            }
+            if (!isUnassigned && !belongsToSponsor) return false;
         } else {
-            const schoolMatch = !school || p.school?.toLowerCase().includes(school.toLowerCase());
-            const districtMatch = !district || p.district?.toLowerCase().includes(district.toLowerCase());
-            if (!schoolMatch || !districtMatch) return false;
+            if (school && !p.school?.toLowerCase().includes(school.toLowerCase())) return false;
+            if (district && !p.district?.toLowerCase().includes(district.toLowerCase())) return false;
         }
+
+        if (state && state !== 'ALL' && p.state !== state) return false;
+        if (lowerLastName && !p.lastName?.toLowerCase().includes(lowerLastName)) return false;
+        if (lowerFirstName && !p.firstName?.toLowerCase().includes(lowerFirstName)) return false;
+        if (uscfId && !p.uscfId?.includes(uscfId)) return false;
+        if (grade && p.grade !== grade) return false;
+        if (section && p.section !== section) return false;
+
+        const rating = p.regularRating;
+        if (minRating && (!rating || rating < minRating)) return false;
+        if (maxRating && (!rating || rating > maxRating)) return false;
+
         return true;
     });
-    console.log('After school/district filtering:', step2Results.length);
 
-    let step3Results = step2Results.filter(p => {
-        const stateMatch = !state || state === 'ALL' || p.state === state;
-        return stateMatch;
-    });
-    console.log('After state filtering:', step3Results.length);
-
-    let step4Results = step3Results.filter(p => {
-        const lastNameMatch = !lowerLastName || p.lastName?.toLowerCase().includes(lowerLastName);
-        return lastNameMatch;
-    });
-    console.log('After lastName filtering:', step4Results.length);
-    
-    // Show some examples of what was filtered out
-    if (lowerLastName && step4Results.length < step3Results.length) {
-        console.log('Sample names that were filtered out:');
-        const filtered = step3Results.filter(p => !p.lastName?.toLowerCase().includes(lowerLastName));
-        filtered.slice(0, 5).forEach(p => console.log(`- ${p.firstName} ${p.lastName}`));
-    }
-
-    const results = step4Results.filter(p => {
-        const gradeMatch = !grade || p.grade === grade;
-        const sectionMatch = !section || p.section === section;
-        
-        const rating = p.regularRating;
-        const ratingMatch = (!minRating || (rating && rating >= minRating)) && (!maxRating || (rating && rating <= maxRating));
-
-        const firstNameMatch = !lowerFirstName || p.firstName?.toLowerCase().includes(lowerFirstName);
-        const uscfIdMatch = !uscfId || p.uscfId?.includes(uscfId);
-
-        return gradeMatch && sectionMatch && ratingMatch && firstNameMatch && uscfIdMatch;
-    });
-
-    console.log('Filtered results before slice:', results.length);
-    const finalResults = results.slice(0, maxResults);
-    console.log('Final results after slice:', finalResults.length);
-    console.log('Final results:', finalResults.map(p => `${p.firstName} ${p.lastName} (${p.school || 'No School'})`));
-    console.log('=== SEARCH DEBUG END ===');
-
-    return finalResults;
-}, [database, isDbLoaded]);
+    return results.slice(0, maxResults);
+  }, [database, isDbLoaded]);
 
   // Memoized derived data
   const dbStates = useMemo(() => {
