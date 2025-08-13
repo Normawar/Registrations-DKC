@@ -33,11 +33,12 @@ interface PlayerSearchDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSelectPlayer: (player: MasterPlayer) => void;
+  onPlayerSelected?: (player: MasterPlayer) => void; // New prop
   excludeIds?: string[];
   portalType: 'sponsor' | 'organizer' | 'individual';
 }
 
-export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, excludeIds, portalType }: PlayerSearchDialogProps) {
+export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPlayerSelected, excludeIds, portalType }: PlayerSearchDialogProps) {
   const { profile } = useSponsorProfile();
   const { dbStates, dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
 
@@ -59,14 +60,23 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
   const handleSelect = (player: MasterPlayer) => {
     let playerWithSponsorInfo = { ...player };
     if (portalType === 'sponsor' && profile) {
-      playerWithSponsorInfo = {
-        ...player,
-        district: profile.district,
-        school: profile.school,
-      };
+        playerWithSponsorInfo = {
+            ...player,
+            district: profile.district,
+            school: profile.school,
+        };
     }
+    
+    // Add the player to the roster first
     onSelectPlayer(playerWithSponsorInfo);
+    
+    // Close the search dialog
     onOpenChange(false);
+    
+    // Trigger the edit dialog in the parent component
+    if (onPlayerSelected) {
+        onPlayerSelected(playerWithSponsorInfo);
+    }
   };
   
   return (
@@ -144,7 +154,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                 
                 {/* Scrollable results container */}
                 <div className="flex-1 overflow-hidden border rounded-md">
-                    <div className="h-full overflow-y-auto">
+                    <ScrollArea className="h-full">
                         <div className="p-4">
                             {isLoading && (
                                 <div className="flex items-center justify-center p-8 text-muted-foreground">
@@ -179,7 +189,12 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, exclu
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </ScrollArea>
+                    {hasResults && searchResults.length > 5 && (
+                        <div className="text-center py-2 text-sm text-muted-foreground border-t">
+                            📜 Scroll to see all {searchResults.length} results
+                        </div>
+                    )}
                 </div>
             </div>
             

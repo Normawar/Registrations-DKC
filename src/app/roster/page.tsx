@@ -132,10 +132,24 @@ function RosterPageContent() {
     return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
+  const handleEditPlayer = (player: MasterPlayer) => {
+    setEditingPlayer(player);
+    playerForm.reset({
+        ...player,
+        dob: player.dob ? new Date(player.dob) : undefined,
+        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+    });
+    setIsEditPlayerDialogOpen(true);
+  };
+  
   const handleSelectPlayer = (player: MasterPlayer) => {
     // Player is already assigned to the sponsor's school/district by the dialog
     addPlayer(player);
     toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
+  };
+
+  const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
+    handleEditPlayer(player);
   };
   
   const handleRemoveFromRoster = (player: MasterPlayer) => {
@@ -150,16 +164,6 @@ function RosterPageContent() {
     }
     setIsAlertOpen(false);
     setPlayerToDelete(null);
-  };
-
-  const handleEditPlayer = (player: MasterPlayer) => {
-    setEditingPlayer(player);
-    playerForm.reset({
-        ...player,
-        dob: player.dob ? new Date(player.dob) : undefined,
-        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
-    });
-    setIsEditPlayerDialogOpen(true);
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
@@ -270,6 +274,7 @@ function RosterPageContent() {
             isOpen={isSearchDialogOpen}
             onOpenChange={setIsSearchDialogOpen}
             onSelectPlayer={handleSelectPlayer}
+            onPlayerSelected={handlePlayerSelectedForEdit}
             excludeIds={rosterPlayerIds}
             portalType="sponsor"
         />
