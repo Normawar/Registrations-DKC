@@ -132,6 +132,10 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
       availableEventsCount
     };
   }, [userRegistrations, upcomingEventsWithStatus]);
+  
+  // Add this temporarily right after the profile check to see what's happening
+  console.log('Profile role:', profile?.role);
+  console.log('Parent students:', parentStudents);
 
   return (
     <div className="space-y-6">
@@ -345,7 +349,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
         </Card>
       </div>
 
-      {/* Student Management Section for Individual Users - Always show for individual users */}
+      {/* Student Management Section for Individual Users */}
       {profile.role === 'individual' && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -427,8 +431,8 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 <p className="text-sm text-orange-700 mt-1">
                   You need to add students to your profile before you can register for events.
                 </p>
-                <Button size="sm" asChild>
-                  <Link href="/profile">Add Students</Link>
+                <Button size="sm" onClick={() => setIsAddStudentDialogOpen(true)}>
+                  Add Students
                 </Button>
               </div>
             </div>
