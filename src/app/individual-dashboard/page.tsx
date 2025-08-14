@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEvents } from "@/hooks/use-events";
 import { useMemo, useState, useEffect } from "react";
 import { format } from "date-fns";
-import { FileText, ImageIcon, User, Users, Plus, X } from "lucide-react";
+import { FileText, ImageIcon, User, Users, Plus, X, CalendarIcon } from "lucide-react";
 import { ParentRegistrationComponent } from "@/components/parent-registration-component";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -40,17 +40,70 @@ import {
   DialogDescription, 
   DialogFooter 
 } from '@/components/ui/dialog';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { 
+  Form, 
+  FormControl, 
+  FormField, 
+  FormItem, 
+  FormLabel, 
+  FormMessage 
+} from "@/components/ui/form";
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+
+const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
+const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
+
+const playerFormSchema = z.object({
+  id: z.string().optional(),
+  firstName: z.string().min(1, { message: "First Name is required." }),
+  middleName: z.string().optional(),
+  lastName: z.string().min(1, { message: "Last Name is required." }),
+  uscfId: z.string().min(1, { message: "USCF ID is required." }),
+  uscfExpiration: z.date().optional(),
+  regularRating: z.preprocess(
+    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
+    z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
+  ),
+  grade: z.string().optional(),
+  section: z.string().optional(),
+  email: z.string().email({ message: "Please enter a valid email." }).optional().or(z.literal('')),
+  phone: z.string().optional(),
+  dob: z.date().optional(),
+  zipCode: z.string().optional(),
+  studentType: z.string().optional(),
+  state: z.string().optional(),
+  school: z.string().min(1, { message: "School name is required."}),
+  district: z.string().min(1, { message: "District name is required."}),
+});
+
+type PlayerFormValues = z.infer<typeof playerFormSchema>;
+
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
   const { profile, isProfileLoaded } = useSponsorProfile();
-  const { database } = useMasterDb();
+  const { database, updatePlayer } = useMasterDb();
   const { toast } = useToast();
   
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [pendingStudent, setPendingStudent] = useState<MasterPlayer | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+
+  const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
+  const [pendingStudentForEdit, setPendingStudentForEdit] = useState<MasterPlayer | null>(null);
+
+  const playerForm = useForm<PlayerFormValues>({
+    resolver: zodResolver(playerFormSchema),
+  });
 
   const upcomingEvents = useMemo(() => {
     return events
@@ -95,37 +148,110 @@ export default function IndividualDashboardPage() {
     if (!player.zipCode) missingFields.push('Zip Code');
     
     if (missingFields.length > 0) {
-      toast({
-        variant: 'destructive',
-        title: 'Incomplete Student Information',
-        description: `${player.firstName} ${player.lastName} is missing: ${missingFields.join(', ')}. Please contact support to complete their profile before adding as your student.`
-      });
+      // Instead of showing error, open edit dialog to complete info
+      setPendingStudentForEdit(player);
+      handleEditStudent(player);
       return;
     }
 
-    // If student has complete information, show confirmation dialog
-    setPendingStudent(player);
-    setIsConfirmDialogOpen(true);
+    // If student has complete information, add directly
+    handleConfirmAddStudent(player);
   };
 
-  const handleConfirmAddStudent = () => {
-    if (!pendingStudent || !profile?.email) return;
+  const handleEditStudent = (player: MasterPlayer) => {
+    setEditingPlayer(player);
+    playerForm.reset({
+      ...player,
+      dob: player.dob ? new Date(player.dob) : undefined,
+      uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+    });
+    setIsEditPlayerDialogOpen(true);
+  };
 
-    const updatedStudents = [...parentStudents, pendingStudent];
+  const handleConfirmAddStudent = (studentToAdd?: MasterPlayer) => {
+    const student = studentToAdd || pendingStudent;
+    if (!student || !profile?.email) return;
+
+    const updatedStudents = [...parentStudents, student];
     setParentStudents(updatedStudents);
     
-    // Save to localStorage
     const studentIds = updatedStudents.map(s => s.id);
     localStorage.setItem(`parent_students_${profile.email}`, JSON.stringify(studentIds));
     
     toast({
       title: "Student Added",
-      description: `${pendingStudent.firstName} ${pendingStudent.lastName} has been added to your students list.`
+      description: `${student.firstName} ${student.lastName} has been added to your students list.`
     });
 
     // Clean up
     setPendingStudent(null);
+    setPendingStudentForEdit(null);
     setIsConfirmDialogOpen(false);
+  };
+
+  const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
+    if (!editingPlayer) return;
+
+    // For parents, validate required fields before saving
+    const requiredFields = ['firstName', 'lastName', 'uscfId', 'email', 'grade', 'section', 'dob', 'zipCode'];
+    const missingFields = requiredFields.filter(field => {
+      const value = values[field as keyof PlayerFormValues];
+      return !value || (typeof value === 'string' && value.trim() === '');
+    });
+
+    if (missingFields.length > 0) {
+      const fieldLabels = {
+        firstName: 'First Name', lastName: 'Last Name', uscfId: 'USCF ID',
+        email: 'Email', grade: 'Grade', section: 'Section', 
+        dob: 'Date of Birth', zipCode: 'Zip Code'
+      };
+      
+      toast({
+        variant: 'destructive',
+        title: 'Required Information Missing',
+        description: `Please complete these required fields: ${missingFields.map(f => fieldLabels[f as keyof typeof fieldLabels]).join(', ')}`
+      });
+      return;
+    }
+
+    const { uscfExpiration, dob, ...restOfValues } = values;
+    
+    const updatedPlayerRecord: MasterPlayer = {
+      ...editingPlayer,
+      ...restOfValues,
+      dob: dob ? dob.toISOString() : undefined,
+      uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+    };
+    
+    // Update the player in the database
+    updatePlayer(updatedPlayerRecord);
+
+    // If this was a pending student, add them to the list
+    if (pendingStudentForEdit) {
+      handleConfirmAddStudent(updatedPlayerRecord);
+      toast({ 
+        title: "Student Added", 
+        description: `${values.firstName} ${values.lastName} has been completed and added to your students list.`
+      });
+    } else {
+      toast({ 
+        title: "Student Updated", 
+        description: `${values.firstName} ${values.lastName}'s information has been updated.`
+      });
+    }
+    
+    setIsEditPlayerDialogOpen(false);
+    setEditingPlayer(null);
+    setPendingStudentForEdit(null);
+  };
+
+  const handleCancelEdit = () => {
+    if (pendingStudentForEdit) {
+      // User was adding a new student but cancelled
+      setPendingStudentForEdit(null);
+    }
+    setIsEditPlayerDialogOpen(false);
+    setEditingPlayer(null);
   };
 
   const handleCancelAddStudent = () => {
@@ -202,7 +328,7 @@ export default function IndividualDashboardPage() {
                     <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-xl font-bold">{profile.firstName} ${profile.lastName}</div>
+                    <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
                     <div className="text-sm text-muted-foreground">{profile.email}</div>
                   </div>
                 </div>
@@ -366,8 +492,80 @@ export default function IndividualDashboardPage() {
               <Button variant="outline" onClick={handleCancelAddStudent}>
                 Cancel
               </Button>
-              <Button onClick={handleConfirmAddStudent}>
+              <Button onClick={() => handleConfirmAddStudent()}>
                 Add Student
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Student Dialog */}
+        <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-6 pb-4 border-b shrink-0">
+              <DialogTitle>
+                {pendingStudentForEdit ? 'Complete Student Information' : 'Edit Student Information'}
+              </DialogTitle>
+              <DialogDescription>
+                {pendingStudentForEdit 
+                  ? `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName} to add them as your student.`
+                  : `Update the details for ${editingPlayer?.firstName} ${editingPlayer?.lastName}.`
+                }
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto p-6">
+              <Form {...playerForm}>
+                <form id="edit-student-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <FormField control={playerForm.control} name="firstName" render={({ field }) => ( 
+                      <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                    )} />
+                    <FormField control={playerForm.control} name="lastName" render={({ field }) => ( 
+                      <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                    )} />
+                    <FormField control={playerForm.control} name="middleName" render={({ field }) => ( 
+                      <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( 
+                      <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                    )} />
+                    <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( 
+                      <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> 
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={playerForm.control} name="dob" render={({ field }) => ( 
+                      <FormItem className="flex flex-col"><FormLabel>Date of Birth *</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()} initialFocus/></PopoverContent></Popover><FormMessage /></FormItem> 
+                    )} />
+                    <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( 
+                      <FormItem className="flex flex-col"><FormLabel>USCF Expiration</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 2} toYear={new Date().getFullYear() + 10} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={playerForm.control} name="grade" render={({ field }) => ( 
+                      <FormItem><FormLabel>Grade *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> 
+                    )} />
+                    <FormField control={playerForm.control} name="section" render={({ field }) => ( 
+                      <FormItem><FormLabel>Section *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> 
+                    )} />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={playerForm.control} name="email" render={({ field }) => ( 
+                      <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> 
+                    )} />
+                    <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( 
+                      <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                    )} />
+                  </div>
+                </form>
+              </Form>
+            </div>
+            <DialogFooter className="p-6 pt-4 border-t shrink-0">
+              <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
+              <Button type="submit" form="edit-student-form">
+                {pendingStudentForEdit ? 'Complete & Add Student' : 'Save Changes'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -376,4 +574,3 @@ export default function IndividualDashboardPage() {
     </AppLayout>
   );
 }
-
