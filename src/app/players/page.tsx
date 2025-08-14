@@ -136,40 +136,79 @@ function PlayersPageContent() {
   };
   
   const processImportData = (data: any[]) => {
-      const newPlayers: MasterPlayer[] = [];
+      const newPlayers: any[] = [];
       let errors = 0;
+  
       data.forEach((row: any) => {
           try {
-              const uscfId = row['USCF ID'] || row['uscfId'] || row.USCF_ID;
-              if (!uscfId) {
-                errors++; return;
-              }
-              const player: MasterPlayer = {
-                  id: row.id || row.ID || uscfId,
-                  uscfId: uscfId,
-                  firstName: row['First Name'] || row.firstName || row.First_Name,
-                  lastName: row['Last Name'] || row.lastName || row.Last_Name,
-                  state: row.State || row.state,
-                  uscfExpiration: row['USCF Expiration'] || row.uscfExpiration || row.USCF_Expiration,
-                  regularRating: parseInt(row['Regular Rating'] || row.regularRating || row.Regular_Rating, 10) || undefined,
-                  grade: row.Grade || row.grade,
-                  section: row.Section || row.section,
-                  email: row.Email || row.email,
-                  school: row.School || row.school,
-                  district: row.District || row.district,
+              // Map your CSV columns to the correct field names
+              const playerData = {
+                  id: row['USCF ID'] || row['uscfId'] || `p-${Date.now()}-${Math.random()}`,
+                  uscfId: row['USCF ID'] || row['uscfId'] || '',
+                  firstName: (row['First Name'] || row['firstName'] || '').trim(),
+                  lastName: (row['Last Name'] || row['lastName'] || '').trim(),
+                  state: row['state'] || row['State'] || 'TX',
+                  
+                  // Map rating field correctly
+                  regularRating: (() => {
+                      const rating = row['rating'] || row['Rating'];
+                      if (!rating || rating === '0' || rating === 0) return undefined;
+                      const numRating = parseInt(rating);
+                      return isNaN(numRating) ? undefined : numRating;
+                  })(),
+                  
+                  // Map expiration date correctly
+                  uscfExpiration: (() => {
+                      const expires = row['expires'] || row['Expires'] || row['USCF Expiration'];
+                      if (!expires) return undefined;
+                      try {
+                          // Handle various date formats (MM/DD/YYYY, YYYY-MM-DD, etc.)
+                          const date = new Date(expires);
+                          return isNaN(date.getTime()) ? undefined : date.toISOString();
+                      } catch {
+                          return undefined;
+                      }
+                  })(),
+                  
+                  // Initialize other fields as empty (sponsors will complete these)
+                  middleName: '',
+                  grade: '',
+                  section: '',
+                  email: '',
+                  phone: '',
+                  dob: undefined,
+                  zipCode: '',
+                  studentType: '',
+                  school: '',
+                  district: '',
                   events: 0,
                   eventIds: [],
               };
-              newPlayers.push(player);
+  
+              // Basic validation
+              if (!playerData.firstName || !playerData.lastName || !playerData.uscfId) {
+                  throw new Error('Missing required name or USCF ID fields');
+              }
+              
+              newPlayers.push(playerData);
           } catch(e) {
               errors++;
               console.error("Error parsing player row:", row, e);
           }
       });
+      
+      if (newPlayers.length === 0 && data.length > 0) {
+          toast({ variant: 'destructive', title: 'Import Failed', description: 'Could not import any players.' });
+          return;
+      }
+  
+      // Clear existing database and add new players
+      clearDatabase();
       addBulkPlayers(newPlayers);
-      toast({
-        title: "Player Database Updated",
-        description: `Successfully imported and merged ${newPlayers.length} players. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
+      
+      toast({ 
+          title: "Player Import Complete", 
+          description: `Successfully imported ${newPlayers.length} players with ratings and expiration dates. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}` 
       });
   };
 
