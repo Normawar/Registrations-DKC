@@ -91,52 +91,140 @@ const playerFormSchema = z.object({
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
-const texasSchools = [
-  "SHARYLAND PIONEER H S",
-  "SHARYLAND H S", 
-  "MCALLEN H S",
-  "MCALLEN MEMORIAL H S",
-  "ROWE H S",
-  "NIKKI ROWE H S",
-  "LAMAR ACADEMY",
-  "IDEA MCALLEN",
-  "CATHEY MIDDLE",
-  "LINCOLN MIDDLE SCHOOL",
-  "TRAVIS MIDDLE SCHOOL",
-  "DE ZAVALA MIDDLE SCHOOL",
-  "MEMORIAL MIDDLE SCHOOL",
-  "BROWN MIDDLE SCHOOL",
-  "AUSTIN ELEMENTARY",
-  "BONHAM ELEMENTARY",
-  "CROCKETT ELEMENTARY",
-  "FRANKLIN ELEMENTARY",
-  "HOUSTON ELEMENTARY",
-  "JACKSON ELEMENTARY",
-  "KENNEDY ELEMENTARY",
-  "LAMAR ELEMENTARY",
-  "SEGUIN ELEMENTARY",
-  "TRAVIS ELEMENTARY",
-  "WILSON ELEMENTARY"
-].sort();
+const districtSchoolMapping = {
+  "SHARYLAND ISD": [
+    "SHARYLAND PIONEER H S",
+    "SHARYLAND H S",
+    "B L GRAY JUNIOR HIGH",
+    "SHARYLAND INTERMEDIATE",
+    "SHARYLAND NORTH JUNIOR HIGH",
+    "MISSION H S FRESHMAN",
+    "LAURA BIRD ELEMENTARY",
+    "LIBERTY ELEMENTARY",
+    "LOMA VISTA ELEMENTARY",
+    "NORMA ALVAREZ ELEMENTARY",
+    "SALINAS ELEMENTARY",
+    "SAUCEDA ELEMENTARY"
+  ],
+  "MCALLEN ISD": [
+    "MCALLEN H S",
+    "MCALLEN MEMORIAL H S",
+    "ROWE H S",
+    "NIKKI ROWE H S",
+    "LAMAR ACADEMY",
+    "CATHEY MIDDLE",
+    "LINCOLN MIDDLE SCHOOL",
+    "TRAVIS MIDDLE SCHOOL",
+    "DE ZAVALA MIDDLE SCHOOL",
+    "MEMORIAL MIDDLE SCHOOL",
+    "BROWN MIDDLE SCHOOL",
+    "AUSTIN ELEMENTARY",
+    "BONHAM ELEMENTARY",
+    "CROCKETT ELEMENTARY",
+    "FRANKLIN ELEMENTARY",
+    "HOUSTON ELEMENTARY",
+    "JACKSON ELEMENTARY",
+    "KENNEDY ELEMENTARY",
+    "LAMAR ELEMENTARY",
+    "SEGUIN ELEMENTARY",
+    "TRAVIS ELEMENTARY",
+    "WILSON ELEMENTARY"
+  ],
+  "EDINBURG CISD": [
+    "EDINBURG H S",
+    "EDINBURG NORTH H S",
+    "VELA H S",
+    "IDEA EDINBURG",
+    "ROBERT VELA H S",
+    "HENDERSON MIDDLE SCHOOL",
+    "KENNEDY MIDDLE SCHOOL",
+    "EISENHOWER MIDDLE SCHOOL",
+    "NASCIMENTO ELEMENTARY",
+    "PETERSON ELEMENTARY",
+    "RAMIREZ ELEMENTARY"
+  ],
+  "PHARR-SAN JUAN-ALAMO ISD": [
+    "PSJA H S",
+    "PSJA MEMORIAL H S",
+    "PSJA NORTH H S",
+    "PSJA SOUTHWEST H S",
+    "GERALDINE PALMER ELEMENTARY",
+    "LLOYD M BENTSEN ELEMENTARY",
+    "RAUL GARCIA ELEMENTARY",
+    "JOSE BORREGO MIDDLE SCHOOL"
+  ],
+  "LA JOYA ISD": [
+    "LA JOYA H S",
+    "PALMVIEW H S",
+    "JUAREZ-LINCOLN H S",
+    "LA JOYA COMMUNITY H S",
+    "MEMORIAL MIDDLE SCHOOL",
+    "DR AMERICO PAREDES MIDDLE SCHOOL",
+    "ABEL GARCIA ELEMENTARY",
+    "ALTON ELEMENTARY",
+    "INEZ ELEMENTARY"
+  ],
+  "MISSION CISD": [
+    "MISSION H S",
+    "MISSION VETERANS MEMORIAL H S",
+    "ALTON MEMORIAL JUNIOR HIGH",
+    "CANTU ELEMENTARY",
+    "ESCANDON ELEMENTARY",
+    "LEAL ELEMENTARY",
+    "MENDEZ ELEMENTARY"
+  ],
+  "HIDALGO ISD": [
+    "HIDALGO H S",
+    "HIDALGO EARLY COLLEGE H S",
+    "CARMEN ANAYA ELEMENTARY",
+    "SALINAS ELEMENTARY"
+  ],
+  "DONNA ISD": [
+    "DONNA H S",
+    "DONNA NORTH H S",
+    "S H LEADERSHIP ACADEMY",
+    "ADAME ELEMENTARY",
+    "ALBA A DUNLAP ELEMENTARY",
+    "DONNA ELEMENTARY"
+  ],
+  "MERCEDES ISD": [
+    "MERCEDES H S",
+    "MERCEDES JUNIOR HIGH",
+    "FERNANDEZ ELEMENTARY",
+    "MERCEDES ELEMENTARY",
+    "ROOSEVELT ELEMENTARY"
+  ],
+  "WESLACO ISD": [
+    "WESLACO H S",
+    "WESLACO EAST H S",
+    "JOHN F KENNEDY H S",
+    "WESLACO EAST H S",
+    "AIRPORT ELEMENTARY",
+    "BRIDGE ELEMENTARY",
+    "CENTRAL ELEMENTARY"
+  ],
+  "BROWNSVILLE ISD": [
+    "BROWNSVILLE H S",
+    "HANNA H S",
+    "LOPEZ H S",
+    "PACE H S",
+    "PORTER H S",
+    "VETERANS MEMORIAL H S",
+    "BREEDEN ELEMENTARY",
+    "CUMMINGS MIDDLE SCHOOL"
+  ],
+  "HARLINGEN CISD": [
+    "HARLINGEN H S",
+    "HARLINGEN SOUTH H S",
+    "HARLINGEN H S SOUTH CAMPUS",
+    "COAKLEY MIDDLE SCHOOL",
+    "GUTIERREZ MIDDLE SCHOOL",
+    "AUSTIN ELEMENTARY",
+    "BOWIE ELEMENTARY"
+  ]
+};
 
-const texasDistricts = [
-  "SHARYLAND ISD",
-  "MCALLEN ISD", 
-  "EDINBURG CISD",
-  "PHARR-SAN JUAN-ALAMO ISD",
-  "LA JOYA ISD",
-  "MISSION CISD",
-  "HIDALGO ISD",
-  "DONNA ISD",
-  "MERCEDES ISD",
-  "WESLACO ISD",
-  "BROWNSVILLE ISD",
-  "HARLINGEN CISD",
-  "LOS FRESNOS CISD",
-  "POINT ISABEL ISD",
-  "SAN BENITO CISD",
-  "SANTA MARIA ISD"
-].sort();
+const texasDistricts = Object.keys(districtSchoolMapping).sort();
 
 
 export default function IndividualDashboardPage() {
@@ -154,12 +242,23 @@ export default function IndividualDashboardPage() {
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [pendingStudentForEdit, setPendingStudentForEdit] = useState<MasterPlayer | null>(null);
   
+  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [availableSchools, setAvailableSchools] = useState<string[]>([]);
   const [showCustomSchool, setShowCustomSchool] = useState(false);
   const [showCustomDistrict, setShowCustomDistrict] = useState(false);
 
   const playerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
   });
+  
+  useEffect(() => {
+    if (selectedDistrict && selectedDistrict !== 'OTHER') {
+      const schools = districtSchoolMapping[selectedDistrict as keyof typeof districtSchoolMapping] || [];
+      setAvailableSchools(schools.sort());
+    } else {
+      setAvailableSchools([]);
+    }
+  }, [selectedDistrict]);
 
   const upcomingEvents = useMemo(() => {
     return events
@@ -213,6 +312,18 @@ export default function IndividualDashboardPage() {
   
   const handleEditStudent = (player: MasterPlayer) => {
       setEditingPlayer(player);
+      
+      setShowCustomSchool(false);
+      setShowCustomDistrict(false);
+      
+      const initialDistrict = player.district || '';
+      setSelectedDistrict(initialDistrict);
+      
+      console.log('🔍 Student school assignment status:', {
+        school: player.school,
+        district: player.district
+      });
+
       playerForm.reset({
         id: player.id || '',
         firstName: player.firstName || '',
@@ -258,26 +369,62 @@ export default function IndividualDashboardPage() {
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-      if (!editingPlayer) return;
-      const { uscfExpiration, dob, ...restOfValues } = values;
-      const updatedPlayerRecord: MasterPlayer = {
-        ...editingPlayer,
-        ...restOfValues,
-        dob: dob ? dob.toISOString() : undefined,
-        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-      };
-      updatePlayer(updatedPlayerRecord);
-      if (pendingStudentForEdit) {
-        handleConfirmAddStudent(updatedPlayerRecord);
-      } else {
-        toast({ 
-          title: "Student Updated", 
-          description: `${values.firstName} ${values.lastName}'s information has been updated.`
+      console.log('🔍 Form submit triggered with values:', values);
+      
+      if (!editingPlayer) {
+        console.log('❌ No editing player found');
+        return;
+      }
+    
+      try {
+        const { uscfExpiration, dob, ...restOfValues } = values;
+        
+        const updatedPlayerRecord: MasterPlayer = {
+          ...editingPlayer,
+          ...restOfValues,
+          school: values.school?.trim() || '',
+          district: values.district?.trim() || '',
+          dob: dob ? dob.toISOString() : undefined,
+          uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+        };
+        
+        console.log('🔍 About to update player:', updatedPlayerRecord);
+        
+        updatePlayer(updatedPlayerRecord);
+        console.log('✅ Player updated in database');
+    
+        if (pendingStudentForEdit) {
+          console.log('🔍 Adding student to parent list');
+          handleConfirmAddStudent(updatedPlayerRecord);
+          
+          const schoolInfo = values.school && values.district 
+            ? ` and assigned to ${values.school} - ${values.district}`
+            : '';
+          
+          toast({ 
+            title: "Student Added", 
+            description: `${values.firstName} ${values.lastName} has been completed${schoolInfo} and added to your students list.`
+          });
+        } else {
+          toast({ 
+            title: "Student Updated", 
+            description: `${values.firstName} ${values.lastName}'s information has been updated.`
+          });
+        }
+        
+        setIsEditPlayerDialogOpen(false);
+        setEditingPlayer(null);
+        setPendingStudentForEdit(null);
+        console.log('✅ Form submission completed successfully');
+        
+      } catch (error) {
+        console.error('❌ Error in form submission:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to save student information. Please try again.'
         });
       }
-      setIsEditPlayerDialogOpen(false);
-      setEditingPlayer(null);
-      setPendingStudentForEdit(null);
   };
 
   const handleCancelEdit = () => {
@@ -539,10 +686,19 @@ export default function IndividualDashboardPage() {
               {pendingStudentForEdit ? 'Complete Student Information' : 'Edit Student Information'}
             </DialogTitle>
             <DialogDescription>
-              {pendingStudentForEdit 
-                ? `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName} to add them as your student.`
-                : `Update the details for ${editingPlayer?.firstName} ${editingPlayer?.lastName}.`
-              }
+                {pendingStudentForEdit 
+                    ? (() => {
+                        const hasSchool = editingPlayer?.school && editingPlayer.school.trim() !== '';
+                        const hasDistrict = editingPlayer?.district && editingPlayer.district.trim() !== '';
+                        
+                        if (hasSchool && hasDistrict) {
+                          return `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName}. Student is currently assigned to ${editingPlayer?.school} - ${editingPlayer?.district}.`;
+                        } else {
+                          return `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName}. This student is not yet assigned to a school - you can assign them to your child's school.`;
+                        }
+                      })()
+                    : `Update the details for ${editingPlayer?.firstName} ${editingPlayer?.lastName}.`
+                  }
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto p-6">
@@ -559,111 +715,140 @@ export default function IndividualDashboardPage() {
                     <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
                   )} />
                 </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={playerForm.control} name="school" render={({ field }) => ( 
-                        <FormItem>
-                        <FormLabel>School *</FormLabel>
-                        {showCustomSchool ? (
-                            <div className="space-y-2">
-                            <FormControl>
-                                <Input 
-                                {...field} 
-                                placeholder="Enter custom school name"
-                                />
-                            </FormControl>
-                            <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => {
-                                setShowCustomSchool(false);
-                                field.onChange('');
-                                }}
-                            >
-                                ← Back to dropdown
-                            </Button>
-                            </div>
-                        ) : (
-                            <Select 
-                            onValueChange={(value) => {
-                                if (value === 'OTHER') {
-                                setShowCustomSchool(true);
-                                field.onChange('');
-                                } else {
-                                field.onChange(value);
-                                }
-                            }} 
-                            value={field.value && !showCustomSchool ? field.value : ''}
-                            >
-                            <FormControl>
-                                <SelectTrigger>
-                                <SelectValue placeholder="Select a school" />
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="max-h-[200px]">
-                                {texasSchools.map(school => (
-                                <SelectItem key={school} value={school}>{school}</SelectItem>
-                                ))}
-                                <SelectItem value="OTHER">Other (Enter Custom)</SelectItem>
-                            </SelectContent>
-                            </Select>
-                        )}
-                        <FormMessage />
-                        </FormItem> 
-                    )} />
-                    
-                    <FormField control={playerForm.control} name="district" render={({ field }) => ( 
-                        <FormItem>
-                        <FormLabel>District *</FormLabel>
-                        {showCustomDistrict ? (
-                            <div className="space-y-2">
-                            <FormControl>
-                                <Input 
-                                {...field} 
-                                placeholder="Enter custom district name"
-                                />
-                            </FormControl>
-                            <Button 
-                                type="button" 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => {
-                                setShowCustomDistrict(false);
-                                field.onChange('');
-                                }}
-                            >
-                                ← Back to dropdown
-                            </Button>
-                            </div>
-                        ) : (
-                            <Select 
-                            onValueChange={(value) => {
-                                if (value === 'OTHER') {
-                                setShowCustomDistrict(true);
-                                field.onChange('');
-                                } else {
-                                field.onChange(value);
-                                }
-                            }} 
-                            value={field.value && !showCustomDistrict ? field.value : ''}
-                            >
-                            <FormControl>
-                                <SelectTrigger>
-                                <SelectValue placeholder="Select a district" />
-                                </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="max-h-[200px]">
-                                {texasDistricts.map(district => (
-                                <SelectItem key={district} value={district}>{district}</SelectItem>
-                                ))}
-                                <SelectItem value="OTHER">Other (Enter Custom)</SelectItem>
-                            </SelectContent>
-                            </Select>
-                        )}
-                        <FormMessage />
-                        </FormItem> 
-                    )} />
+                  <FormField control={playerForm.control} name="district" render={({ field }) => ( 
+                    <FormItem>
+                      <FormLabel>District * (Select First)</FormLabel>
+                      {showCustomDistrict ? (
+                        <div className="space-y-2">
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="Enter custom district name"
+                              onChange={(e) => {
+                                field.onChange(e.target.value);
+                                setSelectedDistrict(e.target.value);
+                              }}
+                            />
+                          </FormControl>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setShowCustomDistrict(false);
+                              setSelectedDistrict('');
+                              field.onChange('');
+                              playerForm.setValue('school', '');
+                            }}
+                          >
+                            ← Back to dropdown
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select 
+                          onValueChange={(value) => {
+                            if (value === 'OTHER') {
+                              setShowCustomDistrict(true);
+                              setSelectedDistrict('OTHER');
+                              field.onChange('');
+                              playerForm.setValue('school', '');
+                            } else {
+                              field.onChange(value);
+                              setSelectedDistrict(value);
+                              playerForm.setValue('school', '');
+                              setShowCustomSchool(false);
+                            }
+                          }} 
+                          value={field.value && !showCustomDistrict ? field.value : ''}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a district first" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-[200px]">
+                            {texasDistricts.map(district => (
+                              <SelectItem key={district} value={district}>{district}</SelectItem>
+                            ))}
+                            <SelectItem value="OTHER">Other (Enter Custom)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <FormMessage />
+                    </FormItem> 
+                  )} />
+                  
+                  <FormField control={playerForm.control} name="school" render={({ field }) => ( 
+                    <FormItem>
+                      <FormLabel>School *</FormLabel>
+                      {showCustomSchool ? (
+                        <div className="space-y-2">
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="Enter custom school name"
+                            />
+                          </FormControl>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => {
+                              setShowCustomSchool(false);
+                              field.onChange('');
+                            }}
+                          >
+                            ← Back to dropdown
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select 
+                          onValueChange={(value) => {
+                            if (value === 'OTHER') {
+                              setShowCustomSchool(true);
+                              field.onChange('');
+                            } else {
+                              field.onChange(value);
+                            }
+                          }} 
+                          value={field.value && !showCustomSchool ? field.value : ''}
+                          disabled={!selectedDistrict || selectedDistrict === 'OTHER' || showCustomDistrict}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue 
+                                placeholder={
+                                  !selectedDistrict || selectedDistrict === 'OTHER' || showCustomDistrict
+                                    ? "Select district first" 
+                                    : availableSchools.length > 0
+                                    ? "Select a school"
+                                    : "No schools available"
+                                } 
+                              />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-[200px]">
+                            {availableSchools.map(school => (
+                              <SelectItem key={school} value={school}>{school}</SelectItem>
+                            ))}
+                            {availableSchools.length > 0 && (
+                              <SelectItem value="OTHER">Other (Enter Custom)</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      <FormMessage />
+                      {selectedDistrict && availableSchools.length > 0 && !showCustomSchool && (
+                        <p className="text-xs text-muted-foreground">
+                          {availableSchools.length} schools available in {selectedDistrict}
+                        </p>
+                      )}
+                    </FormItem> 
+                  )} />
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( 
                     <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
@@ -704,14 +889,20 @@ export default function IndividualDashboardPage() {
             <Button 
               type="button"
               onClick={async () => {
+                console.log('🔍 Button clicked - triggering form submission');
                 const validationResult = await playerForm.trigger();
+                console.log('🔍 Manual validation result:', validationResult);
+                const errorsAfterValidation = playerForm.formState.errors;
+                console.log('🔍 Errors after validation:', errorsAfterValidation);
                 if (validationResult) {
+                  console.log('✅ Validation passed, calling handleSubmit');
                   playerForm.handleSubmit(handlePlayerFormSubmit)();
                 } else {
+                  console.log('❌ Validation failed');
                   toast({
                     variant: 'destructive',
                     title: 'Validation Failed',
-                    description: 'Please fill in all required fields marked with * before saving.'
+                    description: 'Please fill in all required fields before saving.'
                   });
                 }
               }}
