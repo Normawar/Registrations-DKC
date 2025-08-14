@@ -98,13 +98,8 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
           const studentIds = JSON.parse(storedParentStudents);
           const students = database.filter(p => studentIds.includes(p.id));
           setParentStudents(students);
-        } else {
-          // Auto-suggest students with same last name
-          const suggestedStudents = database.filter(p => 
-            p.lastName.toLowerCase() === parentProfile.lastName.toLowerCase()
-          );
-          setParentStudents(suggestedStudents);
         }
+        // Removed the "else" block that auto-suggested students by last name.
       } catch (error) {
         console.error('Failed to load parent students:', error);
       }
@@ -113,7 +108,7 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
     if (database.length > 0) {
       loadParentStudents();
     }
-  }, [database, parentProfile.lastName, parentProfile.email]);
+  }, [database, parentProfile.email]);
 
   const handleAddStudent = (player: MasterPlayer) => {
     if (!parentStudents.find(s => s.id === player.id)) {
