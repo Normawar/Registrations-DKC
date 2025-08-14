@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -72,61 +71,77 @@ const playerFormSchema = z.object({
     (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
     z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
   ),
-  grade: z.preprocess(
-    (val) => (val === '' ? undefined : val),
-    z.string({ required_error: "Grade is required." }).min(1, { message: "Grade is required." })
-  ),
-  section: z.preprocess(
-    (val) => (val === '' ? undefined : val),
-    z.string({ required_error: "Section is required." }).min(1, { message: "Section is required." })
-  ),
-  email: z.preprocess(
-    (val) => (val === '' ? undefined : val),
-    z.string({ required_error: "Email is required." }).email({ message: "Please enter a valid email." })
-  ),
+  grade: z.string().min(1, { message: "Grade is required." }),
+  section: z.string().min(1, { message: "Section is required." }),
+  email: z.string().min(1, { message: "Email is required." }).email({ message: "Please enter a valid email." }),
   phone: z.string().optional(),
   dob: z.date({ required_error: "Date of Birth is required." }),
-  zipCode: z.preprocess(
-    (val) => (val === '' ? undefined : val),
-    z.string({ required_error: "Zip Code is required." }).min(1, { message: "Zip Code is required." })
-  ),
+  zipCode: z.string().min(1, { message: "Zip Code is required." }),
   studentType: z.string().optional(),
   state: z.string().optional(),
-  school: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : val),
-    z.string().optional()
-  ),
-  district: z.preprocess(
-    (val) => (val === '' || val === null || val === undefined ? undefined : val),
-    z.string().optional()
-  ),
+  school: z.string().min(1, { message: "School is required." }),
+  district: z.string().min(1, { message: "District is required." }),
 }).refine(data => {
     if (data.uscfId.toUpperCase() !== 'NEW') { 
         return data.uscfExpiration !== undefined; 
     }
     return true;
-}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] })
-.refine(data => {
-    const hasSchool = data.school && data.school.trim() !== '';
-    const hasDistrict = data.district && data.district.trim() !== '';
-    
-    if (hasSchool || hasDistrict) {
-        return hasSchool && hasDistrict;
-    }
-    
-    return true;
-}, { 
-    message: "Both school and district are required when assigning a student to a school.", 
-    path: ["school"] 
-});
+}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] });
 
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
+const texasSchools = [
+  "SHARYLAND PIONEER H S",
+  "SHARYLAND H S", 
+  "MCALLEN H S",
+  "MCALLEN MEMORIAL H S",
+  "ROWE H S",
+  "NIKKI ROWE H S",
+  "LAMAR ACADEMY",
+  "IDEA MCALLEN",
+  "CATHEY MIDDLE",
+  "LINCOLN MIDDLE SCHOOL",
+  "TRAVIS MIDDLE SCHOOL",
+  "DE ZAVALA MIDDLE SCHOOL",
+  "MEMORIAL MIDDLE SCHOOL",
+  "BROWN MIDDLE SCHOOL",
+  "AUSTIN ELEMENTARY",
+  "BONHAM ELEMENTARY",
+  "CROCKETT ELEMENTARY",
+  "FRANKLIN ELEMENTARY",
+  "HOUSTON ELEMENTARY",
+  "JACKSON ELEMENTARY",
+  "KENNEDY ELEMENTARY",
+  "LAMAR ELEMENTARY",
+  "SEGUIN ELEMENTARY",
+  "TRAVIS ELEMENTARY",
+  "WILSON ELEMENTARY"
+].sort();
+
+const texasDistricts = [
+  "SHARYLAND ISD",
+  "MCALLEN ISD", 
+  "EDINBURG CISD",
+  "PHARR-SAN JUAN-ALAMO ISD",
+  "LA JOYA ISD",
+  "MISSION CISD",
+  "HIDALGO ISD",
+  "DONNA ISD",
+  "MERCEDES ISD",
+  "WESLACO ISD",
+  "BROWNSVILLE ISD",
+  "HARLINGEN CISD",
+  "LOS FRESNOS CISD",
+  "POINT ISABEL ISD",
+  "SAN BENITO CISD",
+  "SANTA MARIA ISD"
+].sort();
+
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
-  const { profile, isProfileLoaded } = useSponsorProfile();
+  const { profile, isProfileLoaded, updateProfile: updateUserProfile } = useSponsorProfile();
   const { database, updatePlayer } = useMasterDb();
   const { toast } = useToast();
   
@@ -138,6 +153,9 @@ export default function IndividualDashboardPage() {
   const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [pendingStudentForEdit, setPendingStudentForEdit] = useState<MasterPlayer | null>(null);
+  
+  const [showCustomSchool, setShowCustomSchool] = useState(false);
+  const [showCustomDistrict, setShowCustomDistrict] = useState(false);
 
   const playerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -194,31 +212,27 @@ export default function IndividualDashboardPage() {
   };
   
   const handleEditStudent = (player: MasterPlayer) => {
-    setEditingPlayer(player);
-    
-    const hasExistingSchool = player.school && player.school.trim() !== '';
-    const hasExistingDistrict = player.district && player.district.trim() !== '';
-    
-    console.log('🔍 Student school assignment status:', {
-      hasExistingSchool,
-      hasExistingDistrict,
-      school: player.school,
-      district: player.district
-    });
-    
-    playerForm.reset({
-      ...player,
-      school: hasExistingSchool ? player.school : '',
-      district: hasExistingDistrict ? player.district : '',
-      grade: player.grade && player.grade.trim() !== '' ? player.grade : undefined,
-      section: player.section && player.section.trim() !== '' ? player.section : undefined,
-      email: player.email && player.email.trim() !== '' ? player.email : undefined,
-      zipCode: player.zipCode && player.zipCode.trim() !== '' ? player.zipCode : undefined,
-      dob: player.dob ? new Date(player.dob) : undefined,
-      uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
-    });
-    
-    setIsEditPlayerDialogOpen(true);
+      setEditingPlayer(player);
+      playerForm.reset({
+        id: player.id || '',
+        firstName: player.firstName || '',
+        middleName: player.middleName || '',
+        lastName: player.lastName || '',
+        uscfId: player.uscfId || '',
+        regularRating: player.regularRating,
+        grade: player.grade || '',
+        section: player.section || '',
+        email: player.email || '',
+        phone: player.phone || '',
+        zipCode: player.zipCode || '',
+        studentType: player.studentType || '',
+        state: player.state || 'TX',
+        school: player.school || '',
+        district: player.district || '',
+        dob: player.dob ? new Date(player.dob) : undefined,
+        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+      });
+      setIsEditPlayerDialogOpen(true);
   };
 
   const handleConfirmAddStudent = (studentToAdd?: MasterPlayer) => {
@@ -244,62 +258,26 @@ export default function IndividualDashboardPage() {
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-    console.log('🔍 Form submit triggered with values:', values);
-    
-    if (!editingPlayer) {
-      console.log('❌ No editing player found');
-      return;
-    }
-  
-    try {
+      if (!editingPlayer) return;
       const { uscfExpiration, dob, ...restOfValues } = values;
-      
       const updatedPlayerRecord: MasterPlayer = {
         ...editingPlayer,
         ...restOfValues,
-        school: values.school?.trim() || '',
-        district: values.district?.trim() || '',
         dob: dob ? dob.toISOString() : undefined,
         uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
       };
-      
-      console.log('🔍 About to update player:', updatedPlayerRecord);
-      
       updatePlayer(updatedPlayerRecord);
-      console.log('✅ Player updated in database');
-  
       if (pendingStudentForEdit) {
-        console.log('🔍 Adding student to parent list');
         handleConfirmAddStudent(updatedPlayerRecord);
-        
-        const schoolInfo = values.school && values.district 
-          ? ` and assigned to ${values.school} - ${values.district}`
-          : '';
-        
-        toast({ 
-          title: "Student Added", 
-          description: `${values.firstName} ${values.lastName} has been completed${schoolInfo} and added to your students list.`
-        });
       } else {
         toast({ 
           title: "Student Updated", 
           description: `${values.firstName} ${values.lastName}'s information has been updated.`
         });
       }
-      
       setIsEditPlayerDialogOpen(false);
       setEditingPlayer(null);
       setPendingStudentForEdit(null);
-      console.log('✅ Form submission completed successfully');
-      
-    } catch (error) {
-      console.error('❌ Error in form submission:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to save student information. Please try again.'
-      });
-    }
   };
 
   const handleCancelEdit = () => {
@@ -562,16 +540,7 @@ export default function IndividualDashboardPage() {
             </DialogTitle>
             <DialogDescription>
               {pendingStudentForEdit 
-                ? (() => {
-                    const hasSchool = editingPlayer?.school && editingPlayer.school.trim() !== '';
-                    const hasDistrict = editingPlayer?.district && editingPlayer.district.trim() !== '';
-                    
-                    if (hasSchool && hasDistrict) {
-                      return `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName}. Student is currently assigned to ${editingPlayer?.school} - ${editingPlayer?.district}.`;
-                    } else {
-                      return `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName}. This student is not yet assigned to a school - you can assign them to your child's school.`;
-                    }
-                  })()
+                ? `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName} to add them as your student.`
                 : `Update the details for ${editingPlayer?.firstName} ${editingPlayer?.lastName}.`
               }
             </DialogDescription>
@@ -591,38 +560,109 @@ export default function IndividualDashboardPage() {
                   )} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={playerForm.control} name="school" render={({ field }) => ( 
-                    <FormItem>
-                      <FormLabel>School</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder={
-                            editingPlayer?.school && editingPlayer.school.trim() !== '' 
-                              ? "Update school name" 
-                              : "Enter student's school name"
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem> 
-                  )} />
-                  <FormField control={playerForm.control} name="district" render={({ field }) => ( 
-                    <FormItem>
-                      <FormLabel>District</FormLabel>
-                      <FormControl>
-                        <Input 
-                          {...field} 
-                          placeholder={
-                            editingPlayer?.district && editingPlayer.district.trim() !== '' 
-                              ? "Update district name" 
-                              : "Enter school district name"
-                          }
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem> 
-                  )} />
+                    <FormField control={playerForm.control} name="school" render={({ field }) => ( 
+                        <FormItem>
+                        <FormLabel>School *</FormLabel>
+                        {showCustomSchool ? (
+                            <div className="space-y-2">
+                            <FormControl>
+                                <Input 
+                                {...field} 
+                                placeholder="Enter custom school name"
+                                />
+                            </FormControl>
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => {
+                                setShowCustomSchool(false);
+                                field.onChange('');
+                                }}
+                            >
+                                ← Back to dropdown
+                            </Button>
+                            </div>
+                        ) : (
+                            <Select 
+                            onValueChange={(value) => {
+                                if (value === 'OTHER') {
+                                setShowCustomSchool(true);
+                                field.onChange('');
+                                } else {
+                                field.onChange(value);
+                                }
+                            }} 
+                            value={field.value && !showCustomSchool ? field.value : ''}
+                            >
+                            <FormControl>
+                                <SelectTrigger>
+                                <SelectValue placeholder="Select a school" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="max-h-[200px]">
+                                {texasSchools.map(school => (
+                                <SelectItem key={school} value={school}>{school}</SelectItem>
+                                ))}
+                                <SelectItem value="OTHER">Other (Enter Custom)</SelectItem>
+                            </SelectContent>
+                            </Select>
+                        )}
+                        <FormMessage />
+                        </FormItem> 
+                    )} />
+                    
+                    <FormField control={playerForm.control} name="district" render={({ field }) => ( 
+                        <FormItem>
+                        <FormLabel>District *</FormLabel>
+                        {showCustomDistrict ? (
+                            <div className="space-y-2">
+                            <FormControl>
+                                <Input 
+                                {...field} 
+                                placeholder="Enter custom district name"
+                                />
+                            </FormControl>
+                            <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => {
+                                setShowCustomDistrict(false);
+                                field.onChange('');
+                                }}
+                            >
+                                ← Back to dropdown
+                            </Button>
+                            </div>
+                        ) : (
+                            <Select 
+                            onValueChange={(value) => {
+                                if (value === 'OTHER') {
+                                setShowCustomDistrict(true);
+                                field.onChange('');
+                                } else {
+                                field.onChange(value);
+                                }
+                            }} 
+                            value={field.value && !showCustomDistrict ? field.value : ''}
+                            >
+                            <FormControl>
+                                <SelectTrigger>
+                                <SelectValue placeholder="Select a district" />
+                                </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="max-h-[200px]">
+                                {texasDistricts.map(district => (
+                                <SelectItem key={district} value={district}>{district}</SelectItem>
+                                ))}
+                                <SelectItem value="OTHER">Other (Enter Custom)</SelectItem>
+                            </SelectContent>
+                            </Select>
+                        )}
+                        <FormMessage />
+                        </FormItem> 
+                    )} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( 
@@ -685,5 +725,3 @@ export default function IndividualDashboardPage() {
     </AppLayout>
   );
 }
-
-
