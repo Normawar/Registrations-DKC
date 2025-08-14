@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useEvents } from '@/hooks/use-events';
@@ -428,7 +428,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 <p className="text-sm text-orange-700 mt-1">
                   You need to add students to your profile before you can register for events.
                 </p>
-                <Button size="sm" className="mt-2" onClick={() => setIsAddStudentDialogOpen(true)}>
+                <Button size="sm" onClick={() => setIsAddStudentDialogOpen(true)}>
                   Add Students
                 </Button>
               </div>
