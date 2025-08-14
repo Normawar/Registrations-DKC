@@ -143,6 +143,7 @@ function PlayersPageContent() {
     const newPlayers: any[] = [];
     let errors = 0;
     let emptyRows = 0;
+    let skippedIncomplete = 0;
 
     data.forEach((row: any, index: number) => {
         try {
@@ -152,8 +153,6 @@ function PlayersPageContent() {
                 emptyRows++;
                 return;
             }
-
-            console.log(`🔍 Processing row ${index + 1}:`, row);
 
             // Try multiple possible column names for each field
             const getFieldValue = (possibleNames: string[]) => {
@@ -172,25 +171,33 @@ function PlayersPageContent() {
             const rating = getFieldValue(['rating', 'Rating', 'RATING']);
             const expires = getFieldValue(['expires', 'Expires', 'USCF Expiration', 'uscfExpiration', 'expiration']);
 
-            console.log(`🔍 Row ${index + 1} extracted values:`, {
-                uscfId, firstName, lastName, state, rating, expires
-            });
-
-            // Validate required fields
-            if (!uscfId || !firstName || !lastName) {
-                console.log(`❌ Row ${index + 1} missing required fields:`, {
+            // More lenient validation - only require USCF ID and at least last name
+            if (!uscfId || !lastName) {
+                console.log(`⚠️ Row ${index + 1} skipped - missing essential data:`, {
                     hasUscfId: !!uscfId,
-                    hasFirstName: !!firstName,
-                    hasLastName: !!lastName
+                    hasLastName: !!lastName,
+                    row: row
                 });
-                throw new Error(`Missing required fields - USCF ID: ${!!uscfId}, First Name: ${!!firstName}, Last Name: ${!!lastName}`);
+                skippedIncomplete++;
+                return; // Skip this row instead of throwing error
+            }
+
+            // Handle missing first name gracefully
+            const cleanFirstName = firstName || 'UNKNOWN';
+            const cleanLastName = lastName;
+
+            // If first name is missing, log it but continue
+            if (!firstName) {
+                console.log(`⚠️ Row ${index + 1} has missing first name, using 'UNKNOWN':`, {
+                    uscfId, lastName, fullRow: row
+                });
             }
 
             const playerData = {
                 id: uscfId,
                 uscfId: uscfId,
-                firstName: firstName,
-                lastName: lastName,
+                firstName: cleanFirstName,
+                lastName: cleanLastName,
                 state: state,
                 
                 // Parse rating
@@ -226,7 +233,6 @@ function PlayersPageContent() {
                 eventIds: [],
             };
 
-            console.log(`✅ Row ${index + 1} processed successfully:`, playerData);
             newPlayers.push(playerData);
             
         } catch(e) {
@@ -238,6 +244,7 @@ function PlayersPageContent() {
     console.log('🔍 Import Summary:', {
         totalRows: data.length,
         emptyRows,
+        skippedIncomplete,
         successfulImports: newPlayers.length,
         errors
     });
@@ -246,7 +253,7 @@ function PlayersPageContent() {
         toast({ 
             variant: 'destructive', 
             title: 'Import Failed', 
-            description: `No valid players found. Check console for details. Total rows: ${data.length}, Empty: ${emptyRows}, Errors: ${errors}` 
+            description: `No valid players found. Check console for details.` 
         });
         return;
     }
@@ -257,7 +264,7 @@ function PlayersPageContent() {
     
     toast({ 
         title: "Player Import Complete", 
-        description: `Successfully imported ${newPlayers.length} players. Skipped ${emptyRows} empty rows and ${errors} invalid rows.` 
+        description: `Successfully imported ${newPlayers.length} players. Skipped ${emptyRows} empty rows, ${skippedIncomplete} incomplete rows, and ${errors} invalid rows.` 
     });
 };
 
