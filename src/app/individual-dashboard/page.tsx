@@ -27,19 +27,13 @@ import { useMemo } from "react";
 import { format } from "date-fns";
 import { FileText, ImageIcon } from "lucide-react";
 import { ParentRegistrationComponent } from "@/components/parent-registration-component";
+import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
+import { Skeleton } from "@/components/ui/skeleton";
 
-
-const individualProfile = { 
-  id: "p2", 
-  firstName: "Olivia", 
-  lastName: "Smith", 
-  email: 'olivia@example.com', 
-  rating: 2100,
-  phone: '(555) 555-5555' 
-};
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
+  const { profile, isProfileLoaded } = useSponsorProfile();
 
   const upcomingEvents = useMemo(() => {
     return events
@@ -48,6 +42,39 @@ export default function IndividualDashboardPage() {
       // mock registration status
       .map((event, index) => ({...event, registered: [true, true, false, false, true][index % 5] || false })); 
   }, [events]);
+  
+  if (!isProfileLoaded || !profile) {
+    return (
+        <AppLayout>
+            <div className="space-y-8">
+                <div>
+                    <Skeleton className="h-9 w-1/2" />
+                    <Skeleton className="h-4 w-3/4 mt-2" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                             <Skeleton className="h-6 w-1/2" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center gap-4">
+                                <Skeleton className="h-16 w-16 rounded-full" />
+                                <div className="space-y-2">
+                                    <Skeleton className="h-6 w-32" />
+                                    <Skeleton className="h-4 w-48" />
+                                    <Skeleton className="h-4 w-24" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Skeleton className="h-48 w-full" />
+                </div>
+                <Skeleton className="h-64 w-full" />
+            </div>
+        </AppLayout>
+    );
+  }
+
 
   return (
     <AppLayout>
@@ -62,18 +89,17 @@ export default function IndividualDashboardPage() {
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>My Player Profile</CardTitle>
+              <CardTitle>Profile</CardTitle>
             </CardHeader>
             <CardContent>
                <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={`https://placehold.co/64x64.png`} alt={`${individualProfile.firstName} ${individualProfile.lastName}`} data-ai-hint="person face" />
-                    <AvatarFallback>{individualProfile.firstName.charAt(0)}{individualProfile.lastName.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={profile.avatarType === 'upload' ? profile.avatarValue : `https://placehold.co/64x64.png`} alt={`${profile.firstName} ${profile.lastName}`} data-ai-hint="person face" />
+                    <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-xl font-bold">{individualProfile.firstName} {individualProfile.lastName}</div>
-                    <div className="text-sm text-muted-foreground">{individualProfile.email}</div>
-                    <div className="text-sm font-semibold">Rating: {individualProfile.rating}</div>
+                    <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
+                    <div className="text-sm text-muted-foreground">{profile.email}</div>
                   </div>
                 </div>
             </CardContent>
@@ -130,7 +156,7 @@ export default function IndividualDashboardPage() {
           </Card>
         </div>
         
-        <ParentRegistrationComponent parentProfile={individualProfile} />
+        <ParentRegistrationComponent parentProfile={profile} />
 
         <div>
           <h2 className="text-2xl font-bold font-headline">Recent Activity</h2>
