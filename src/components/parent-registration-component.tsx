@@ -99,7 +99,6 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
           const students = database.filter(p => studentIds.includes(p.id));
           setParentStudents(students);
         }
-        // Removed the "else" block that auto-suggested students by last name.
       } catch (error) {
         console.error('Failed to load parent students:', error);
       }
@@ -214,29 +213,29 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Register Students for Events</h2>
-          <p className="text-muted-foreground">
-            Register your students for tournaments, even if they're already on a school roster.
-          </p>
-        </div>
-        <Button onClick={() => setIsSearchDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Student
-        </Button>
+      <div>
+        <h2 className="text-2xl font-bold">Register Students for Events</h2>
+        <p className="text-muted-foreground">
+          Register your students for tournaments, even if they're already on a school roster.
+        </p>
       </div>
 
       {/* Parent's Students */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Your Students ({parentStudents.length})
-          </CardTitle>
-          <CardDescription>
-            Students you can register for events
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Your Students ({parentStudents.length})
+              </CardTitle>
+              <CardDescription>
+                Students you can register for events
+              </CardDescription>
+            </div>
+            <Button onClick={() => setIsSearchDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Student
+            </Button>
         </CardHeader>
         <CardContent>
           {parentStudents.length === 0 ? (
