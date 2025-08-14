@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -71,12 +72,25 @@ const playerFormSchema = z.object({
     (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
     z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
   ),
-  grade: z.string().min(1, { message: "Grade is required." }),
-  section: z.string().min(1, { message: "Section is required." }),
-  email: z.string().min(1, { message: "Email is required." }).email({ message: "Please enter a valid email." }),
+  // Handle empty strings by transforming them to undefined, then requiring
+  grade: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string({ required_error: "Grade is required." }).min(1, { message: "Grade is required." })
+  ),
+  section: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string({ required_error: "Section is required." }).min(1, { message: "Section is required." })
+  ),
+  email: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string({ required_error: "Email is required." }).email({ message: "Please enter a valid email." })
+  ),
   phone: z.string().optional(),
   dob: z.date({ required_error: "Date of Birth is required." }),
-  zipCode: z.string().min(1, { message: "Zip Code is required." }),
+  zipCode: z.preprocess(
+    (val) => (val === '' ? undefined : val),
+    z.string({ required_error: "Zip Code is required." }).min(1, { message: "Zip Code is required." })
+  ),
   studentType: z.string().optional(),
   state: z.string().optional(),
   school: z.string().min(1, { message: "School name is required."}),
@@ -87,6 +101,7 @@ const playerFormSchema = z.object({
     }
     return true;
 }, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] });
+
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
@@ -225,10 +240,6 @@ export default function IndividualDashboardPage() {
     if (pendingStudentForEdit) {
       console.log('🔍 Adding student to parent list');
       handleConfirmAddStudent(updatedPlayerRecord);
-      toast({ 
-        title: "Student Added", 
-        description: `${values.firstName} ${values.lastName} has been completed and added to your students list.`
-      });
     } else {
       toast({ 
         title: "Student Updated", 
@@ -334,7 +345,7 @@ export default function IndividualDashboardPage() {
                     <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-xl font-bold">{profile.firstName} ${profile.lastName}</div>
+                    <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
                     <div className="text-sm text-muted-foreground">{profile.email}</div>
                   </div>
                 </div>
@@ -572,9 +583,40 @@ export default function IndividualDashboardPage() {
             <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
             <Button 
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 console.log('🔍 Button clicked - triggering form submission');
-                playerForm.handleSubmit(handlePlayerFormSubmit)();
+                
+                // Get current form values
+                const currentValues = playerForm.getValues();
+                console.log('🔍 Current form values:', currentValues);
+                
+                // Get form errors
+                const formErrors = playerForm.formState.errors;
+                console.log('🔍 Current form errors:', formErrors);
+                
+                // Check if form is valid
+                const isValid = playerForm.formState.isValid;
+                console.log('🔍 Form is valid:', isValid);
+                
+                // Trigger validation manually
+                const validationResult = await playerForm.trigger();
+                console.log('🔍 Manual validation result:', validationResult);
+                
+                // Get errors after manual validation
+                const errorsAfterValidation = playerForm.formState.errors;
+                console.log('🔍 Errors after validation:', errorsAfterValidation);
+                
+                if (validationResult) {
+                  console.log('✅ Validation passed, calling handleSubmit');
+                  playerForm.handleSubmit(handlePlayerFormSubmit)();
+                } else {
+                  console.log('❌ Validation failed');
+                  toast({
+                    variant: 'destructive',
+                    title: 'Validation Failed',
+                    description: 'Please fill in all required fields before saving.'
+                  });
+                }
               }}
             >
               {pendingStudentForEdit ? 'Complete & Add Student' : 'Save Changes'}
@@ -586,3 +628,4 @@ export default function IndividualDashboardPage() {
     </AppLayout>
   );
 }
+
