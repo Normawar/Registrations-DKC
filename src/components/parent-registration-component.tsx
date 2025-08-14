@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -50,10 +51,6 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
     };
 
     loadRegistrations();
-    window.addEventListener('storage', loadRegistrations);
-    return () => {
-      window.removeEventListener('storage', loadRegistrations);
-    };
   }, []);
 
   // Load parent's students
@@ -77,6 +74,14 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
   }, [database, parentProfile.email]);
 
   const getStudentRegistrationStatus = (student: MasterPlayer, event: any) => {
+    if (!event?.id) {
+      return {
+        isRegistered: false,
+        source: null,
+        message: 'Available for registration'
+      };
+    }
+    
     const existingReg = registrations.find(r => 
       r.eventId === event.id && 
       r.selections && 
@@ -118,7 +123,7 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold font-headline">Register Students for Events</h2>
+        <h2 className="text-2xl font-bold">Register Students for Events</h2>
         <p className="text-muted-foreground">
           Register your students for tournaments, even if they're already on a school roster.
         </p>
