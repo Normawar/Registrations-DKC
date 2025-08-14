@@ -4,13 +4,13 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
-import { School, User, DollarSign } from "lucide-react";
+import { School, User, DollarSign, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 
 interface IndividualRegistrationDialogProps {
@@ -37,6 +37,7 @@ export function IndividualRegistrationDialog({
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<Record<string, { section: string; uscfStatus: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registrations, setRegistrations] = useState<any[]>([]);
 
   // Load parent's students
   useEffect(() => {
@@ -53,33 +54,35 @@ export function IndividualRegistrationDialog({
       }
     }
   }, [parentProfile, database, isOpen]);
+  
+    useEffect(() => {
+        const loadRegistrations = () => {
+            const storedConfirmations = localStorage.getItem('confirmations');
+            if (storedConfirmations) {
+                setRegistrations(JSON.parse(storedConfirmations));
+            }
+        };
+        loadRegistrations();
+    }, [isOpen]);
 
   // Check which students are already registered
   const getStudentRegistrationStatus = (student: MasterPlayer) => {
-    try {
-      const storedConfirmations = localStorage.getItem('confirmations');
-      const allConfirmations = storedConfirmations ? JSON.parse(storedConfirmations) : [];
-      
-      const existingReg = allConfirmations.find((confirmation: any) => 
-        confirmation.eventId === event.id && 
-        confirmation.selections && 
-        confirmation.selections[student.id]
-      );
-      
-      if (existingReg) {
-        const isParentReg = existingReg.parentEmail === parentProfile.email;
-        return {
-          isRegistered: true,
-          source: isParentReg ? 'parent' : 'sponsor',
-          message: isParentReg ? 'Already registered by you' : 'Registered by school sponsor'
-        };
-      }
-      
-      return { isRegistered: false, source: null, message: 'Available for registration' };
-    } catch (error) {
-      console.error('Error checking registration status:', error);
-      return { isRegistered: false, source: null, message: 'Available for registration' };
+    const existingReg = registrations.find((confirmation: any) => 
+      confirmation.eventId === event.id && 
+      confirmation.selections && 
+      confirmation.selections[student.id]
+    );
+    
+    if (existingReg) {
+      const isParentReg = existingReg.parentEmail === parentProfile.email;
+      return {
+        isRegistered: true,
+        source: isParentReg ? 'parent' : 'sponsor',
+        message: isParentReg ? 'Already registered by you' : 'Registered by school sponsor'
+      };
     }
+    
+    return { isRegistered: false, source: null, message: 'Available for registration' };
   };
 
   const toggleStudentSelection = (student: MasterPlayer) => {
@@ -87,16 +90,16 @@ export function IndividualRegistrationDialog({
     if (status.isRegistered) return;
 
     setSelectedStudents(prev => {
-      const isSelected = prev[student.id];
+      const { [student.id]: isSelected, ...rest } = prev;
       if (isSelected) {
-        const { [student.id]: removed, ...rest } = prev;
         return rest;
       } else {
+        const isExpired = !student.uscfExpiration || new Date(student.uscfExpiration) < new Date(event.date);
         return {
           ...prev,
           [student.id]: {
             section: student.section || 'High School K-12',
-            uscfStatus: 'current'
+            uscfStatus: student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
           }
         };
       }
@@ -114,8 +117,14 @@ export function IndividualRegistrationDialog({
   };
 
   const calculateTotal = () => {
-    const selectedCount = Object.keys(selectedStudents).length;
-    return selectedCount * event.regularFee;
+    const uscfFee = 24;
+    return Object.entries(selectedStudents).reduce((total, [, details]) => {
+      let playerTotal = event.regularFee;
+      if (details.uscfStatus === 'new' || details.uscfStatus === 'renewing') {
+        playerTotal += uscfFee;
+      }
+      return total + playerTotal;
+    }, 0);
   };
 
   const handleSubmit = async () => {
@@ -194,15 +203,15 @@ export function IndividualRegistrationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+        <DialogHeader className="shrink-0">
           <DialogTitle>Register for {event?.name}</DialogTitle>
           <p className="text-sm text-muted-foreground">
             {event?.date && format(new Date(event.date), 'PPP')} • {event?.location}
           </p>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 flex-1 overflow-y-auto pr-6 -mr-6">
           {parentStudents.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -254,7 +263,10 @@ export function IndividualRegistrationDialog({
                               {status.message}
                             </Badge>
                           ) : isSelected ? (
-                            <Badge variant="default">Selected</Badge>
+                             <Badge variant="default" className="bg-green-600">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Selected
+                             </Badge>
                           ) : (
                             <Button variant="outline" size="sm">
                               Select
@@ -293,8 +305,8 @@ export function IndividualRegistrationDialog({
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="current">Current Member</SelectItem>
-                                <SelectItem value="new">New Member</SelectItem>
-                                <SelectItem value="renewing">Renewing Member</SelectItem>
+                                <SelectItem value="new">New Member (+$24)</SelectItem>
+                                <SelectItem value="renewing">Renewing Member (+$24)</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -309,7 +321,7 @@ export function IndividualRegistrationDialog({
         </div>
 
         {Object.keys(selectedStudents).length > 0 && (
-          <div className="border-t pt-4">
+          <div className="border-t pt-4 shrink-0">
             <div className="flex items-center justify-between text-lg font-semibold">
               <span>Total ({Object.keys(selectedStudents).length} students):</span>
               <span className="flex items-center gap-1">
@@ -320,7 +332,7 @@ export function IndividualRegistrationDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
@@ -331,3 +343,7 @@ export function IndividualRegistrationDialog({
             {isSubmitting ? 'Registering...' : `Register ${Object.keys(selectedStudents).length} Student(s)`}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
