@@ -26,9 +26,17 @@ import { useEvents } from "@/hooks/use-events";
 import { useMemo } from "react";
 import { format } from "date-fns";
 import { FileText, ImageIcon } from "lucide-react";
+import { ParentRegistrationComponent } from "@/components/parent-registration-component";
 
 
-const playerProfile = { id: "p2", firstName: "Olivia", lastName: "Smith", email: 'olivia@example.com', rating: 2100 };
+const individualProfile = { 
+  id: "p2", 
+  firstName: "Olivia", 
+  lastName: "Smith", 
+  email: 'olivia@example.com', 
+  rating: 2100,
+  phone: '(555) 555-5555' 
+};
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
@@ -59,13 +67,13 @@ export default function IndividualDashboardPage() {
             <CardContent>
                <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage src={`https://placehold.co/64x64.png`} alt={`${playerProfile.firstName} ${playerProfile.lastName}`} data-ai-hint="person face" />
-                    <AvatarFallback>{playerProfile.firstName.charAt(0)}{playerProfile.lastName.charAt(0)}</AvatarFallback>
+                    <AvatarImage src={`https://placehold.co/64x64.png`} alt={`${individualProfile.firstName} ${individualProfile.lastName}`} data-ai-hint="person face" />
+                    <AvatarFallback>{individualProfile.firstName.charAt(0)}{individualProfile.lastName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-xl font-bold">{playerProfile.firstName} {playerProfile.lastName}</div>
-                    <div className="text-sm text-muted-foreground">{playerProfile.email}</div>
-                    <div className="text-sm font-semibold">Rating: {playerProfile.rating}</div>
+                    <div className="text-xl font-bold">{individualProfile.firstName} {individualProfile.lastName}</div>
+                    <div className="text-sm text-muted-foreground">{individualProfile.email}</div>
+                    <div className="text-sm font-semibold">Rating: {individualProfile.rating}</div>
                   </div>
                 </div>
             </CardContent>
@@ -122,6 +130,8 @@ export default function IndividualDashboardPage() {
           </Card>
         </div>
         
+        <ParentRegistrationComponent parentProfile={individualProfile} />
+
         <div>
           <h2 className="text-2xl font-bold font-headline">Recent Activity</h2>
           <Card className="mt-4">
