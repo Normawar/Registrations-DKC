@@ -6,8 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useEvents } from '@/hooks/use-events';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { AddStudentDialog } from '@/components/add-student-dialog';
-import { EditStudentDialog } from '@/components/edit-student-dialog';
+import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 import { 
   Calendar, 
   Users, 
@@ -39,9 +38,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
   const { database } = useMasterDb();
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
-  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
-  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<MasterPlayer | null>(null);
+  const [isPlayerSearchOpen, setIsPlayerSearchOpen] = useState(false);
 
   // Load data
   useEffect(() => {
@@ -209,7 +206,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
             </div>
             <Button 
               size="sm" 
-              onClick={() => setIsAddStudentDialogOpen(true)}
+              onClick={() => setIsPlayerSearchOpen(true)}
             >
               <Users className="h-4 w-4 mr-2" />
               Add Student
@@ -223,7 +220,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 <p className="text-sm mb-4">
                   Add students to your profile to begin registering for tournaments.
                 </p>
-                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
+                <Button onClick={() => setIsPlayerSearchOpen(true)}>
                   <Users className="h-4 w-4 mr-2" />
                   Add Your First Student
                 </Button>
@@ -252,10 +249,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={() => {
-                          setSelectedStudent(student);
-                          setIsEditStudentDialogOpen(true);
-                        }}
+                        onClick={() => setIsPlayerSearchOpen(true)}
                       >
                         Edit
                       </Button>
@@ -408,7 +402,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
         </Card>
       </div>
 
-      {/* Important Notices */}
+      {/* Important Notices - Only show if no students and not showing the main section */}
       {profile.role === 'individual' && parentStudents.length === 0 && (
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="p-6">
@@ -419,7 +413,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 <p className="text-sm text-orange-700 mt-1">
                   You need to add students to your profile before you can register for events.
                 </p>
-                <Button size="sm" onClick={() => setIsAddStudentDialogOpen(true)}>
+                <Button size="sm" onClick={() => setIsPlayerSearchOpen(true)}>
                   Add Students
                 </Button>
               </div>
@@ -428,55 +422,31 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
         </Card>
       )}
       
-      {/* Student Management Dialogs */}
+      {/* Player Search Dialog for Individual Users */}
       {profile.role === 'individual' && (
-        <>
-          <AddStudentDialog
-            isOpen={isAddStudentDialogOpen}
-            onOpenChange={setIsAddStudentDialogOpen}
-            parentProfile={profile}
-            onStudentAdded={() => {
+        <PlayerSearchDialog
+          isOpen={isPlayerSearchOpen}
+          onOpenChange={setIsPlayerSearchOpen}
+          onSelectPlayer={() => {}} // Not used for individual portal
+          onPlayerSelected={(player) => {
+            // Add player to parent's student list
+            const parentStudentsKey = `parent_students_${profile.email}`;
+            const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
+            
+            if (!existingStudentIds.includes(player.id)) {
+              const updatedStudentIds = [...existingStudentIds, player.id];
+              localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
+              
               // Reload parent students
-              const loadParentStudents = () => {
-                try {
-                  const storedParentStudents = localStorage.getItem(`parent_students_${profile.email}`);
-                  if (storedParentStudents) {
-                    const studentIds = JSON.parse(storedParentStudents);
-                    const students = database.filter(p => studentIds.includes(p.id));
-                    setParentStudents(students);
-                  }
-                } catch (error) {
-                  console.error('Failed to reload parent students:', error);
-                }
-              };
-              loadParentStudents();
-            }}
-          />
-          
-          <EditStudentDialog
-            isOpen={isEditStudentDialogOpen}
-            onOpenChange={setIsEditStudentDialogOpen}
-            student={selectedStudent}
-            parentProfile={profile}
-            onStudentUpdated={() => {
-              // Reload parent students
-              const loadParentStudents = () => {
-                try {
-                  const storedParentStudents = localStorage.getItem(`parent_students_${profile.email}`);
-                  if (storedParentStudents) {
-                    const studentIds = JSON.parse(storedParentStudents);
-                    const students = database.filter(p => studentIds.includes(p.id));
-                    setParentStudents(students);
-                  }
-                } catch (error) {
-                  console.error('Failed to reload parent students:', error);
-                }
-              };
-              loadParentStudents();
-              setSelectedStudent(null);
-            }}
-          />
-        </>
+              const students = database.filter(p => updatedStudentIds.includes(p.id));
+              setParentStudents(students);
+              
+              console.log('Student added to parent profile');
+            }
+          }}
+          excludeIds={parentStudents.map(s => s.id)}
+          portalType="individual"
+        />
       )}
     </div>
   );
