@@ -143,12 +143,15 @@ function RosterPageContent() {
   };
   
   const handleSelectPlayer = (player: MasterPlayer) => {
+    console.log('🏠 Roster: handleSelectPlayer called with:', player.firstName, player.lastName);
     // Player is already assigned to the sponsor's school/district by the dialog
     addPlayer(player);
     toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
-  };
+    console.log('🏠 Roster: Player added to database');
+};
 
 const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
+    console.log('📝 Roster: handlePlayerSelectedForEdit called with:', player.firstName, player.lastName);
     console.log('🔍 Raw player data:', player);
     console.log('🔍 Player rating:', player.regularRating, typeof player.regularRating);
     console.log('🔍 Player uscfExpiration:', player.uscfExpiration, typeof player.uscfExpiration);
