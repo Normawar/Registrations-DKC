@@ -159,10 +159,10 @@ export default function IndividualDashboardPage() {
       return;
     }
 
-    // If student has complete information, add directly
+    // If student has complete information, show confirmation dialog
     handleConfirmAddStudent(player);
   };
-
+  
   const handleEditStudent = (player: MasterPlayer) => {
     setEditingPlayer(player);
     playerForm.reset({
@@ -195,37 +195,59 @@ export default function IndividualDashboardPage() {
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-    if (!editingPlayer) return;
-
-    const { uscfExpiration, dob, ...restOfValues } = values;
-    
-    const updatedPlayerRecord: MasterPlayer = {
-      ...editingPlayer,
-      ...restOfValues,
-      dob: dob ? dob.toISOString() : undefined,
-      uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-    };
-    
-    // Update the player in the database
-    updatePlayer(updatedPlayerRecord);
-
-    // If this was a pending student, add them to the list
-    if (pendingStudentForEdit) {
-      handleConfirmAddStudent(updatedPlayerRecord);
-      toast({ 
-        title: "Student Added", 
-        description: `${values.firstName} ${values.lastName} has been completed and added to your students list.`
-      });
-    } else {
-      toast({ 
-        title: "Student Updated", 
-        description: `${values.firstName} ${values.lastName}'s information has been updated.`
+    console.log('🔍 Form submit triggered with values:', values);
+    console.log('🔍 editingPlayer:', editingPlayer);
+    console.log('🔍 pendingStudentForEdit:', pendingStudentForEdit);
+  
+    if (!editingPlayer) {
+      console.log('❌ No editing player found');
+      return;
+    }
+  
+    try {
+      const { uscfExpiration, dob, ...restOfValues } = values;
+      
+      const updatedPlayerRecord: MasterPlayer = {
+        ...editingPlayer,
+        ...restOfValues,
+        dob: dob ? dob.toISOString() : undefined,
+        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+      };
+      
+      console.log('🔍 About to update player:', updatedPlayerRecord);
+      
+      // Update the player in the database
+      updatePlayer(updatedPlayerRecord);
+      console.log('✅ Player updated in database');
+  
+      // If this was a pending student, add them to the list
+      if (pendingStudentForEdit) {
+        console.log('🔍 Adding student to parent list');
+        handleConfirmAddStudent(updatedPlayerRecord);
+        toast({ 
+          title: "Student Added", 
+          description: `${values.firstName} ${values.lastName} has been completed and added to your students list.`
+        });
+      } else {
+        toast({ 
+          title: "Student Updated", 
+          description: `${values.firstName} ${values.lastName}'s information has been updated.`
+        });
+      }
+      
+      setIsEditPlayerDialogOpen(false);
+      setEditingPlayer(null);
+      setPendingStudentForEdit(null);
+      console.log('✅ Form submission completed successfully');
+      
+    } catch (error) {
+      console.error('❌ Error in form submission:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save student information. Please try again.'
       });
     }
-    
-    setIsEditPlayerDialogOpen(false);
-    setEditingPlayer(null);
-    setPendingStudentForEdit(null);
   };
 
   const handleCancelEdit = () => {
@@ -311,7 +333,7 @@ export default function IndividualDashboardPage() {
                     <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-xl font-bold">{profile.firstName} ${profile.lastName}</div>
+                    <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
                     <div className="text-sm text-muted-foreground">{profile.email}</div>
                   </div>
                 </div>
@@ -475,85 +497,93 @@ export default function IndividualDashboardPage() {
               <Button variant="outline" onClick={handleCancelAddStudent}>
                 Cancel
               </Button>
-              <Button onClick={handleConfirmAddStudent}>
+              <Button onClick={() => handleConfirmAddStudent()}>
                 Add Student
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Edit Student Dialog */}
-        <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="p-6 pb-4 border-b shrink-0">
-              <DialogTitle>
-                {pendingStudentForEdit ? 'Complete Student Information' : 'Edit Student Information'}
-              </DialogTitle>
-              <DialogDescription>
-                {pendingStudentForEdit 
-                  ? `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName} to add them as your student.`
-                  : `Update the details for ${editingPlayer?.firstName} ${editingPlayer?.lastName}.`
-                }
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto p-6">
-              <Form {...playerForm}>
-                <form id="edit-student-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <FormField control={playerForm.control} name="firstName" render={({ field }) => ( 
-                      <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                    )} />
-                    <FormField control={playerForm.control} name="lastName" render={({ field }) => ( 
-                      <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                    )} />
-                    <FormField control={playerForm.control} name="middleName" render={({ field }) => ( 
-                      <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                    )} />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( 
-                      <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                    )} />
-                    <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( 
-                      <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> 
-                    )} />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={playerForm.control} name="dob" render={({ field }) => ( 
-                      <FormItem className="flex flex-col"><FormLabel>Date of Birth *</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()} initialFocus/></PopoverContent></Popover><FormMessage /></FormItem> 
-                    )} />
-                    <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( 
-                      <FormItem className="flex flex-col"><FormLabel>USCF Expiration</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 2} toYear={new Date().getFullYear() + 10} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
-                    )} />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={playerForm.control} name="grade" render={({ field }) => ( 
-                      <FormItem><FormLabel>Grade *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> 
-                    )} />
-                    <FormField control={playerForm.control} name="section" render={({ field }) => ( 
-                      <FormItem><FormLabel>Section *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> 
-                    )} />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={playerForm.control} name="email" render={({ field }) => ( 
-                      <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> 
-                    )} />
-                    <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( 
-                      <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                    )} />
-                  </div>
-                </form>
-              </Form>
-            </div>
-            <DialogFooter className="p-6 pt-4 border-t shrink-0">
-              <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
-              <Button type="submit" form="edit-student-form">
-                {pendingStudentForEdit ? 'Complete & Add Student' : 'Save Changes'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
+
+      {/* Edit Student Dialog */}
+      <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="p-6 pb-4 border-b shrink-0">
+            <DialogTitle>
+              {pendingStudentForEdit ? 'Complete Student Information' : 'Edit Student Information'}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingStudentForEdit 
+                ? `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName} to add them as your student.`
+                : `Update the details for ${editingPlayer?.firstName} ${editingPlayer?.lastName}.`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-6">
+            <Form {...playerForm}>
+              <form id="edit-student-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <FormField control={playerForm.control} name="firstName" render={({ field }) => ( 
+                    <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                  )} />
+                  <FormField control={playerForm.control} name="lastName" render={({ field }) => ( 
+                    <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                  )} />
+                  <FormField control={playerForm.control} name="middleName" render={({ field }) => ( 
+                    <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                  )} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( 
+                    <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                  )} />
+                  <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( 
+                    <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> 
+                  )} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={playerForm.control} name="dob" render={({ field }) => ( 
+                    <FormItem className="flex flex-col"><FormLabel>Date of Birth *</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()} initialFocus/></PopoverContent></Popover><FormMessage /></FormItem> 
+                  )} />
+                  <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( 
+                    <FormItem className="flex flex-col"><FormLabel>USCF Expiration</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 2} toYear={new Date().getFullYear() + 10} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={playerForm.control} name="grade" render={({ field }) => ( 
+                    <FormItem><FormLabel>Grade *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> 
+                  )} />
+                  <FormField control={playerForm.control} name="section" render={({ field }) => ( 
+                    <FormItem><FormLabel>Section *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> 
+                  )} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={playerForm.control} name="email" render={({ field }) => ( 
+                    <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> 
+                  )} />
+                  <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( 
+                    <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                  )} />
+                </div>
+              </form>
+            </Form>
+          </div>
+          <DialogFooter className="p-6 pt-4 border-t shrink-0">
+            <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
+            <Button 
+              type="button"
+              onClick={() => {
+                console.log('🔍 Button clicked - triggering form submission');
+                playerForm.handleSubmit(handlePlayerFormSubmit)();
+              }}
+            >
+              {pendingStudentForEdit ? 'Complete & Add Student' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
+
+```
