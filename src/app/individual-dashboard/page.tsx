@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -32,7 +31,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 import { useToast } from "@/hooks/use-toast";
-
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
@@ -113,7 +111,6 @@ export default function IndividualDashboardPage() {
     );
   }
 
-
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -124,93 +121,46 @@ export default function IndividualDashboardPage() {
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-               <div className="flex items-center gap-4">
-                  <Avatar className="h-16 w-16">
-                    <AvatarImage src={profile.avatarType === 'upload' ? profile.avatarValue : `https://placehold.co/64x64.png`} alt={`${profile.firstName} ${profile.lastName}`} data-ai-hint="person face" />
-                    <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="text-xl font-bold">{profile.firstName} ${profile.lastName}</div>
-                    <div className="text-sm text-muted-foreground">{profile.email}</div>
-                  </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+             <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={profile.avatarType === 'upload' ? profile.avatarValue : `https://placehold.co/64x64.png`} alt={`${profile.firstName} ${profile.lastName}`} data-ai-hint="person face" />
+                  <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
+                  <div className="text-sm text-muted-foreground">{profile.email}</div>
                 </div>
-
-                <div className="space-y-2">
-                    <div className="flex justify-between items-center border-t pt-4">
-                        <h4 className="font-semibold flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /> Your Students ({parentStudents.length})</h4>
-                        <Button size="sm" onClick={() => setIsSearchDialogOpen(true)}>
-                            <Plus className="mr-2 h-4 w-4" /> Add Student
-                        </Button>
-                    </div>
-                    {parentStudents.length > 0 ? (
-                        <ul className="list-disc list-inside text-sm text-muted-foreground pl-2">
-                            {parentStudents.map(student => (
-                                <li key={student.id}>{student.firstName} {student.lastName}</li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">No students added yet. Use the Add Student button to search and add your students.</p>
-                    )}
-                </div>
-            </CardContent>
-            <CardFooter>
-               <Button asChild variant="outline">
-                  <Link href="/profile">View & Edit Profile</Link>
-                </Button>
-            </CardFooter>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming Events</CardTitle>
-               <CardDescription>Events you are registered for and upcoming tournaments.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {upcomingEvents.map((event) => (
-                  <div key={event.id} className="flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <div className="flex flex-col items-start gap-1">
-                            {event.imageUrl && (
-                                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
-                                  <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title={event.imageName}>
-                                    <ImageIcon className="mr-2 h-4 w-4" /> {event.imageName || 'Image'}
-                                  </a>
-                                </Button>
-                            )}
-                            {event.pdfUrl && event.pdfUrl !== '#' && (
-                                <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
-                                  <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title={event.pdfName}>
-                                    <FileText className="mr-2 h-4 w-4" /> {event.pdfName || 'PDF'}
-                                  </a>
-                                </Button>
-                            )}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{event.name}</p>
-                          <p className="text-xs text-muted-foreground">{format(new Date(event.date), 'PPP')}</p>
-                        </div>
-                    </div>
-                    {event.registered ? (
-                       <Badge variant="default" className="bg-green-600">Registered</Badge>
-                    ) : (
-                      <Button asChild variant="secondary" size="sm">
-                        <Link href="/events">
-                          Register Now
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
+
+              <div className="space-y-2">
+                  <div className="flex justify-between items-center border-t pt-4">
+                      <h4 className="font-semibold flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /> Your Students ({parentStudents.length})</h4>
+                      <Button size="sm" onClick={() => setIsSearchDialogOpen(true)}>
+                          <Plus className="mr-2 h-4 w-4" /> Add Student
+                      </Button>
+                  </div>
+                  {parentStudents.length > 0 ? (
+                      <ul className="list-disc list-inside text-sm text-muted-foreground pl-2">
+                          {parentStudents.map(student => (
+                              <li key={student.id}>{student.firstName} {student.lastName}</li>
+                          ))}
+                      </ul>
+                  ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">No students added yet. Use the Add Student button to search and add your students.</p>
+                  )}
+              </div>
+          </CardContent>
+          <CardFooter>
+             <Button asChild variant="outline">
+                <Link href="/profile">View & Edit Profile</Link>
+              </Button>
+          </CardFooter>
+        </Card>
         
         <ParentRegistrationComponent parentProfile={profile} />
 
