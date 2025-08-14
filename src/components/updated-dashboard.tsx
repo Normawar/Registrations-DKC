@@ -209,7 +209,12 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
             </div>
             <Button 
               size="sm" 
-              onClick={() => setIsAddStudentDialogOpen(true)}
+              onClick={() => {
+                console.log('Add Student button clicked!');
+                console.log('Dialog state before:', isAddStudentDialogOpen);
+                setIsAddStudentDialogOpen(true);
+                console.log('Dialog state should now be true');
+              }}
             >
               <Users className="h-4 w-4 mr-2" />
               Add Student
@@ -223,7 +228,12 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 <p className="text-sm mb-4">
                   Add students to your profile to begin registering for tournaments.
                 </p>
-                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
+                <Button onClick={() => {
+                  console.log('Add Your First Student button clicked!');
+                  console.log('Dialog state before:', isAddStudentDialogOpen);
+                  setIsAddStudentDialogOpen(true);
+                  console.log('Dialog state should now be true');
+                }}>
                   <Users className="h-4 w-4 mr-2" />
                   Add Your First Student
                 </Button>
@@ -431,11 +441,28 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
       {/* Student Management Dialogs */}
       {profile.role === 'individual' && (
         <>
+          {/* Temporary debug info */}
+          {isAddStudentDialogOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+              <div className="bg-white p-6 rounded-lg">
+                <h2 className="text-xl font-bold mb-4">Debug: Dialog State is Open</h2>
+                <p>This means the state is working. The issue is with the actual dialog component.</p>
+                <button 
+                  onClick={() => setIsAddStudentDialogOpen(false)}
+                  className="mt-4 px-4 py-2 bg-blue-500 text-white rounded"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+          
           <AddStudentDialog
             isOpen={isAddStudentDialogOpen}
             onOpenChange={setIsAddStudentDialogOpen}
             parentProfile={profile}
             onStudentAdded={() => {
+              console.log('Student added callback fired');
               // Reload parent students
               const loadParentStudents = () => {
                 try {
@@ -459,6 +486,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
             student={selectedStudent}
             parentProfile={profile}
             onStudentUpdated={() => {
+              console.log('Student updated callback fired');
               // Reload parent students
               const loadParentStudents = () => {
                 try {
