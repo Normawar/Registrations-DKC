@@ -136,81 +136,130 @@ function PlayersPageContent() {
   };
   
   const processImportData = (data: any[]) => {
-      const newPlayers: any[] = [];
-      let errors = 0;
-  
-      data.forEach((row: any) => {
-          try {
-              // Map your CSV columns to the correct field names
-              const playerData = {
-                  id: row['USCF ID'] || row['uscfId'] || `p-${Date.now()}-${Math.random()}`,
-                  uscfId: row['USCF ID'] || row['uscfId'] || '',
-                  firstName: (row['First Name'] || row['firstName'] || '').trim(),
-                  lastName: (row['Last Name'] || row['lastName'] || '').trim(),
-                  state: row['state'] || row['State'] || 'TX',
-                  
-                  // Map rating field correctly
-                  regularRating: (() => {
-                      const rating = row['rating'] || row['Rating'];
-                      if (!rating || rating === '0' || rating === 0) return undefined;
-                      const numRating = parseInt(rating);
-                      return isNaN(numRating) ? undefined : numRating;
-                  })(),
-                  
-                  // Map expiration date correctly
-                  uscfExpiration: (() => {
-                      const expires = row['expires'] || row['Expires'] || row['USCF Expiration'];
-                      if (!expires) return undefined;
-                      try {
-                          // Handle various date formats (MM/DD/YYYY, YYYY-MM-DD, etc.)
-                          const date = new Date(expires);
-                          return isNaN(date.getTime()) ? undefined : date.toISOString();
-                      } catch {
-                          return undefined;
-                      }
-                  })(),
-                  
-                  // Initialize other fields as empty (sponsors will complete these)
-                  middleName: '',
-                  grade: '',
-                  section: '',
-                  email: '',
-                  phone: '',
-                  dob: undefined,
-                  zipCode: '',
-                  studentType: '',
-                  school: '',
-                  district: '',
-                  events: 0,
-                  eventIds: [],
-              };
-  
-              // Basic validation
-              if (!playerData.firstName || !playerData.lastName || !playerData.uscfId) {
-                  throw new Error('Missing required name or USCF ID fields');
-              }
-              
-              newPlayers.push(playerData);
-          } catch(e) {
-              errors++;
-              console.error("Error parsing player row:", row, e);
-          }
-      });
-      
-      if (newPlayers.length === 0 && data.length > 0) {
-          toast({ variant: 'destructive', title: 'Import Failed', description: 'Could not import any players.' });
-          return;
-      }
-  
-      // Clear existing database and add new players
-      clearDatabase();
-      addBulkPlayers(newPlayers);
-      
-      toast({ 
-          title: "Player Import Complete", 
-          description: `Successfully imported ${newPlayers.length} players with ratings and expiration dates. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}` 
-      });
-  };
+    console.log('🔍 CSV Import Debug - Raw data length:', data.length);
+    console.log('🔍 CSV Import Debug - First 3 rows:', data.slice(0, 3));
+    console.log('🔍 CSV Import Debug - Sample row keys:', data[0] ? Object.keys(data[0]) : 'No data');
+
+    const newPlayers: any[] = [];
+    let errors = 0;
+    let emptyRows = 0;
+
+    data.forEach((row: any, index: number) => {
+        try {
+            // Skip completely empty rows
+            if (!row || Object.keys(row).length === 0 || 
+                Object.values(row).every(val => !val || String(val).trim() === '')) {
+                emptyRows++;
+                return;
+            }
+
+            console.log(`🔍 Processing row ${index + 1}:`, row);
+
+            // Try multiple possible column names for each field
+            const getFieldValue = (possibleNames: string[]) => {
+                for (const name of possibleNames) {
+                    if (row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') {
+                        return String(row[name]).trim();
+                    }
+                }
+                return '';
+            };
+
+            const uscfId = getFieldValue(['USCF ID', 'uscfId', 'ID', 'id']);
+            const firstName = getFieldValue(['First Name', 'firstName', 'FirstName', 'first_name']);
+            const lastName = getFieldValue(['Last Name', 'lastName', 'LastName', 'last_name']);
+            const state = getFieldValue(['state', 'State', 'ST']) || 'TX';
+            const rating = getFieldValue(['rating', 'Rating', 'RATING']);
+            const expires = getFieldValue(['expires', 'Expires', 'USCF Expiration', 'uscfExpiration', 'expiration']);
+
+            console.log(`🔍 Row ${index + 1} extracted values:`, {
+                uscfId, firstName, lastName, state, rating, expires
+            });
+
+            // Validate required fields
+            if (!uscfId || !firstName || !lastName) {
+                console.log(`❌ Row ${index + 1} missing required fields:`, {
+                    hasUscfId: !!uscfId,
+                    hasFirstName: !!firstName,
+                    hasLastName: !!lastName
+                });
+                throw new Error(`Missing required fields - USCF ID: ${!!uscfId}, First Name: ${!!firstName}, Last Name: ${!!lastName}`);
+            }
+
+            const playerData = {
+                id: uscfId,
+                uscfId: uscfId,
+                firstName: firstName,
+                lastName: lastName,
+                state: state,
+                
+                // Parse rating
+                regularRating: (() => {
+                    if (!rating || rating === '0') return undefined;
+                    const numRating = parseInt(rating);
+                    return isNaN(numRating) ? undefined : numRating;
+                })(),
+                
+                // Parse expiration date
+                uscfExpiration: (() => {
+                    if (!expires) return undefined;
+                    try {
+                        const date = new Date(expires);
+                        return isNaN(date.getTime()) ? undefined : date.toISOString();
+                    } catch {
+                        return undefined;
+                    }
+                })(),
+                
+                // Initialize other fields
+                middleName: '',
+                grade: '',
+                section: '',
+                email: '',
+                phone: '',
+                dob: undefined,
+                zipCode: '',
+                studentType: '',
+                school: '',
+                district: '',
+                events: 0,
+                eventIds: [],
+            };
+
+            console.log(`✅ Row ${index + 1} processed successfully:`, playerData);
+            newPlayers.push(playerData);
+            
+        } catch(e) {
+            errors++;
+            console.error(`❌ Error parsing row ${index + 1}:`, row, e);
+        }
+    });
+    
+    console.log('🔍 Import Summary:', {
+        totalRows: data.length,
+        emptyRows,
+        successfulImports: newPlayers.length,
+        errors
+    });
+
+    if (newPlayers.length === 0) {
+        toast({ 
+            variant: 'destructive', 
+            title: 'Import Failed', 
+            description: `No valid players found. Check console for details. Total rows: ${data.length}, Empty: ${emptyRows}, Errors: ${errors}` 
+        });
+        return;
+    }
+
+    // Clear existing database and add new players
+    clearDatabase();
+    addBulkPlayers(newPlayers);
+    
+    toast({ 
+        title: "Player Import Complete", 
+        description: `Successfully imported ${newPlayers.length} players. Skipped ${emptyRows} empty rows and ${errors} invalid rows.` 
+    });
+};
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
