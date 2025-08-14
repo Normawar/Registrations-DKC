@@ -72,7 +72,6 @@ const playerFormSchema = z.object({
     (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
     z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
   ),
-  // Handle empty strings by transforming them to undefined, then requiring
   grade: z.preprocess(
     (val) => (val === '' ? undefined : val),
     z.string({ required_error: "Grade is required." }).min(1, { message: "Grade is required." })
@@ -93,14 +92,33 @@ const playerFormSchema = z.object({
   ),
   studentType: z.string().optional(),
   state: z.string().optional(),
-  school: z.string().min(1, { message: "School name is required."}),
-  district: z.string().min(1, { message: "District name is required."}),
+  school: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : val),
+    z.string().optional()
+  ),
+  district: z.preprocess(
+    (val) => (val === '' || val === null || val === undefined ? undefined : val),
+    z.string().optional()
+  ),
 }).refine(data => {
     if (data.uscfId.toUpperCase() !== 'NEW') { 
         return data.uscfExpiration !== undefined; 
     }
     return true;
-}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] });
+}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] })
+.refine(data => {
+    const hasSchool = data.school && data.school.trim() !== '';
+    const hasDistrict = data.district && data.district.trim() !== '';
+    
+    if (hasSchool || hasDistrict) {
+        return hasSchool && hasDistrict;
+    }
+    
+    return true;
+}, { 
+    message: "Both school and district are required when assigning a student to a school.", 
+    path: ["school"] 
+});
 
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
@@ -108,7 +126,7 @@ type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
-  const { profile, isProfileLoaded, updateProfile: updateSponsorProfile } = useSponsorProfile();
+  const { profile, isProfileLoaded } = useSponsorProfile();
   const { database, updatePlayer } = useMasterDb();
   const { toast } = useToast();
   
@@ -149,7 +167,6 @@ export default function IndividualDashboardPage() {
   }, [profile, database]);
   
   const handleSelectStudent = (player: MasterPlayer) => {
-    // Check if student already added
     if (parentStudents.find(s => s.id === player.id)) {
       toast({
         variant: 'destructive',
@@ -159,7 +176,6 @@ export default function IndividualDashboardPage() {
       return;
     }
 
-    // Check if student has required information
     const missingFields = [];
     if (!player.dob) missingFields.push('Date of Birth');
     if (!player.grade) missingFields.push('Grade');
@@ -168,24 +184,40 @@ export default function IndividualDashboardPage() {
     if (!player.zipCode) missingFields.push('Zip Code');
     
     if (missingFields.length > 0) {
-      // Instead of showing error, open edit dialog to complete info
       setPendingStudentForEdit(player);
       handleEditStudent(player);
       return;
     }
 
-    // If student has complete information, show confirmation dialog
     setPendingStudent(player);
     setIsConfirmDialogOpen(true);
   };
   
   const handleEditStudent = (player: MasterPlayer) => {
     setEditingPlayer(player);
+    
+    const hasExistingSchool = player.school && player.school.trim() !== '';
+    const hasExistingDistrict = player.district && player.district.trim() !== '';
+    
+    console.log('🔍 Student school assignment status:', {
+      hasExistingSchool,
+      hasExistingDistrict,
+      school: player.school,
+      district: player.district
+    });
+    
     playerForm.reset({
       ...player,
+      school: hasExistingSchool ? player.school : '',
+      district: hasExistingDistrict ? player.district : '',
+      grade: player.grade && player.grade.trim() !== '' ? player.grade : undefined,
+      section: player.section && player.section.trim() !== '' ? player.section : undefined,
+      email: player.email && player.email.trim() !== '' ? player.email : undefined,
+      zipCode: player.zipCode && player.zipCode.trim() !== '' ? player.zipCode : undefined,
       dob: player.dob ? new Date(player.dob) : undefined,
       uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
     });
+    
     setIsEditPlayerDialogOpen(true);
   };
 
@@ -199,72 +231,79 @@ export default function IndividualDashboardPage() {
     const studentIds = updatedStudents.map(s => s.id);
     localStorage.setItem(`parent_students_${profile.email}`, JSON.stringify(studentIds));
     
-    toast({
-      title: "Student Added",
-      description: `${student.firstName} ${student.lastName} has been added to your students list.`
-    });
+    if(!studentToAdd) {
+        toast({
+          title: "Student Added",
+          description: `${student.firstName} ${student.lastName} has been added to your students list.`
+        });
+    }
 
-    // Clean up
     setPendingStudent(null);
     setPendingStudentForEdit(null);
     setIsConfirmDialogOpen(false);
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-  console.log('🔍 Form submit triggered with values:', values);
-  console.log('🔍 editingPlayer:', editingPlayer);
-  console.log('🔍 pendingStudentForEdit:', pendingStudentForEdit);
-
-  if (!editingPlayer) {
-    console.log('❌ No editing player found');
-    return;
-  }
-
-  try {
-    const { uscfExpiration, dob, ...restOfValues } = values;
+    console.log('🔍 Form submit triggered with values:', values);
     
-    const updatedPlayerRecord: MasterPlayer = {
-      ...editingPlayer,
-      ...restOfValues,
-      dob: dob ? dob.toISOString() : undefined,
-      uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-    };
-    
-    console.log('🔍 About to update player:', updatedPlayerRecord);
-    
-    // Update the player in the database
-    updatePlayer(updatedPlayerRecord);
-    console.log('✅ Player updated in database');
-
-    // If this was a pending student, add them to the list
-    if (pendingStudentForEdit) {
-      console.log('🔍 Adding student to parent list');
-      handleConfirmAddStudent(updatedPlayerRecord);
-    } else {
-      toast({ 
-        title: "Student Updated", 
-        description: `${values.firstName} ${values.lastName}'s information has been updated.`
+    if (!editingPlayer) {
+      console.log('❌ No editing player found');
+      return;
+    }
+  
+    try {
+      const { uscfExpiration, dob, ...restOfValues } = values;
+      
+      const updatedPlayerRecord: MasterPlayer = {
+        ...editingPlayer,
+        ...restOfValues,
+        school: values.school?.trim() || '',
+        district: values.district?.trim() || '',
+        dob: dob ? dob.toISOString() : undefined,
+        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+      };
+      
+      console.log('🔍 About to update player:', updatedPlayerRecord);
+      
+      updatePlayer(updatedPlayerRecord);
+      console.log('✅ Player updated in database');
+  
+      if (pendingStudentForEdit) {
+        console.log('🔍 Adding student to parent list');
+        handleConfirmAddStudent(updatedPlayerRecord);
+        
+        const schoolInfo = values.school && values.district 
+          ? ` and assigned to ${values.school} - ${values.district}`
+          : '';
+        
+        toast({ 
+          title: "Student Added", 
+          description: `${values.firstName} ${values.lastName} has been completed${schoolInfo} and added to your students list.`
+        });
+      } else {
+        toast({ 
+          title: "Student Updated", 
+          description: `${values.firstName} ${values.lastName}'s information has been updated.`
+        });
+      }
+      
+      setIsEditPlayerDialogOpen(false);
+      setEditingPlayer(null);
+      setPendingStudentForEdit(null);
+      console.log('✅ Form submission completed successfully');
+      
+    } catch (error) {
+      console.error('❌ Error in form submission:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to save student information. Please try again.'
       });
     }
-    
-    setIsEditPlayerDialogOpen(false);
-    setEditingPlayer(null);
-    setPendingStudentForEdit(null);
-    console.log('✅ Form submission completed successfully');
-    
-  } catch (error) {
-    console.error('❌ Error in form submission:', error);
-    toast({
-      variant: 'destructive',
-      title: 'Error',
-      description: 'Failed to save student information. Please try again.'
-    });
-  }
-};
+  };
 
   const handleCancelEdit = () => {
     if (pendingStudentForEdit) {
-      // User was adding a new student but cancelled
       setPendingStudentForEdit(null);
     }
     setIsEditPlayerDialogOpen(false);
@@ -484,7 +523,6 @@ export default function IndividualDashboardPage() {
             portalType="individual"
         />
 
-        {/* Confirmation Dialog */}
         <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -516,7 +554,6 @@ export default function IndividualDashboardPage() {
           </DialogContent>
         </Dialog>
         
-      {/* Edit Student Dialog */}
       <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
@@ -525,7 +562,16 @@ export default function IndividualDashboardPage() {
             </DialogTitle>
             <DialogDescription>
               {pendingStudentForEdit 
-                ? `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName} to add them as your student.`
+                ? (() => {
+                    const hasSchool = editingPlayer?.school && editingPlayer.school.trim() !== '';
+                    const hasDistrict = editingPlayer?.district && editingPlayer.district.trim() !== '';
+                    
+                    if (hasSchool && hasDistrict) {
+                      return `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName}. Student is currently assigned to ${editingPlayer?.school} - ${editingPlayer?.district}.`;
+                    } else {
+                      return `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName}. This student is not yet assigned to a school - you can assign them to your child's school.`;
+                    }
+                  })()
                 : `Update the details for ${editingPlayer?.firstName} ${editingPlayer?.lastName}.`
               }
             </DialogDescription>
@@ -542,6 +588,40 @@ export default function IndividualDashboardPage() {
                   )} />
                   <FormField control={playerForm.control} name="middleName" render={({ field }) => ( 
                     <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
+                  )} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField control={playerForm.control} name="school" render={({ field }) => ( 
+                    <FormItem>
+                      <FormLabel>School</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder={
+                            editingPlayer?.school && editingPlayer.school.trim() !== '' 
+                              ? "Update school name" 
+                              : "Enter student's school name"
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem> 
+                  )} />
+                  <FormField control={playerForm.control} name="district" render={({ field }) => ( 
+                    <FormItem>
+                      <FormLabel>District</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder={
+                            editingPlayer?.district && editingPlayer.district.trim() !== '' 
+                              ? "Update district name" 
+                              : "Enter school district name"
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem> 
                   )} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -584,37 +664,14 @@ export default function IndividualDashboardPage() {
             <Button 
               type="button"
               onClick={async () => {
-                console.log('🔍 Button clicked - triggering form submission');
-                
-                // Get current form values
-                const currentValues = playerForm.getValues();
-                console.log('🔍 Current form values:', currentValues);
-                
-                // Get form errors
-                const formErrors = playerForm.formState.errors;
-                console.log('🔍 Current form errors:', formErrors);
-                
-                // Check if form is valid
-                const isValid = playerForm.formState.isValid;
-                console.log('🔍 Form is valid:', isValid);
-                
-                // Trigger validation manually
                 const validationResult = await playerForm.trigger();
-                console.log('🔍 Manual validation result:', validationResult);
-                
-                // Get errors after manual validation
-                const errorsAfterValidation = playerForm.formState.errors;
-                console.log('🔍 Errors after validation:', errorsAfterValidation);
-                
                 if (validationResult) {
-                  console.log('✅ Validation passed, calling handleSubmit');
                   playerForm.handleSubmit(handlePlayerFormSubmit)();
                 } else {
-                  console.log('❌ Validation failed');
                   toast({
                     variant: 'destructive',
                     title: 'Validation Failed',
-                    description: 'Please fill in all required fields before saving.'
+                    description: 'Please fill in all required fields marked with * before saving.'
                   });
                 }
               }}
@@ -628,4 +685,5 @@ export default function IndividualDashboardPage() {
     </AppLayout>
   );
 }
+
 
