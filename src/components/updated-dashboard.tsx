@@ -428,7 +428,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 <p className="text-sm text-orange-700 mt-1">
                   You need to add students to your profile before you can register for events.
                 </p>
-                <Button size="sm" onClick={() => setIsAddStudentDialogOpen(true)}>
+                <Button size="sm" className="mt-2" onClick={() => setIsAddStudentDialogOpen(true)}>
                   Add Students
                 </Button>
               </div>
@@ -489,37 +489,4 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
       )}
     </div>
   );
-}
-
-// Placeholder components - replace with your actual dialog components
-function AddStudentDialog({ 
-  isOpen, 
-  onOpenChange, 
-  parentProfile, 
-  onStudentAdded 
-}: {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  parentProfile: any;
-  onStudentAdded: () => void;
-}) {
-  // TODO: Replace with your actual AddStudentDialog component
-  return null;
-}
-
-function EditStudentDialog({
-  isOpen,
-  onOpenChange,
-  student,
-  parentProfile,
-  onStudentUpdated
-}: {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  student: MasterPlayer | null;
-  parentProfile: any;
-  onStudentUpdated: () => void;
-}) {
-  // TODO: Replace with your actual EditStudentDialog component
-  return null;
 }
