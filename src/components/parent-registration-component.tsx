@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -51,6 +50,10 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
     };
 
     loadRegistrations();
+    window.addEventListener('storage', loadRegistrations);
+    return () => {
+      window.removeEventListener('storage', loadRegistrations);
+    };
   }, []);
 
   // Load parent's students
@@ -97,28 +100,9 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
   };
 
   const handleRegisterForEvent = (event: any) => {
-    const incompleteStudents = parentStudents.filter(student => {
-        const missingFields = [];
-        if (!student.dob) missingFields.push('Date of Birth');
-        if (!student.grade) missingFields.push('Grade');
-        if (!student.section) missingFields.push('Section');
-        if (!student.email) missingFields.push('Email');
-        if (!student.zipCode) missingFields.push('Zip Code');
-        return missingFields.length > 0;
-    });
-
-    if (incompleteStudents.length > 0) {
-        toast({
-            variant: 'destructive',
-            title: 'Incomplete Student Profiles',
-            description: `Some students have incomplete profiles and cannot be registered. Please go to the Profile page to add the missing information.`
-        });
-    }
-
     setSelectedEvent(event);
     setIsRegistrationDialogOpen(true);
   };
-
 
   const getEventRegistrationSummary = (event: any) => {
     const studentStatuses = parentStudents.map(student => 
@@ -150,9 +134,9 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
         <CardContent>
           {parentStudents.length === 0 ? (
             <div className="text-center p-6 text-muted-foreground">
-                <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-lg font-medium">No Students Found</p>
-                <p>Add students to your profile to begin registering for events.</p>
+              <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium">No Students Found</p>
+              <p>Add students to your profile to begin registering for events.</p>
             </div>
           ) : upcomingEvents.length === 0 ? (
             <div className="text-center p-6 text-muted-foreground">
