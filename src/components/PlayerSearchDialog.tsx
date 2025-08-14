@@ -25,7 +25,7 @@ import { Label } from '@/components/ui/label';
 import { usePlayerSearch } from '@/hooks/use-player-search';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { Loader2, Search, X } from 'lucide-react';
+import { Loader2, Search, X, School } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 
@@ -64,14 +64,6 @@ const handleSelect = (player: MasterPlayer) => {
     
     // For individual portal, the logic from onPlayerSelected is now used directly
     if (portalType === 'individual' && onPlayerSelected) {
-      if (parentStudents.find(s => s.id === player.id)) {
-        toast({
-          variant: 'destructive',
-          title: "Student Already Added",
-          description: `${player.firstName} ${player.lastName} is already in your students list.`
-        });
-        return;
-      }
       onOpenChange(false);
       onPlayerSelected(player);
     } else {
@@ -241,3 +233,4 @@ const handleSelect = (player: MasterPlayer) => {
       </Dialog>
   );
 }
+

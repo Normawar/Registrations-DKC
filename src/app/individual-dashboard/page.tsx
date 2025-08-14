@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEvents } from "@/hooks/use-events";
 import { useMemo, useState, useEffect } from "react";
 import { format } from "date-fns";
-import { FileText, ImageIcon, User, Users, Plus, X, CalendarIcon } from "lucide-react";
+import { FileText, ImageIcon, User, Users, Plus, X, School, CalendarIcon } from "lucide-react";
 import { ParentRegistrationComponent } from "@/components/parent-registration-component";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -229,7 +229,7 @@ const texasDistricts = Object.keys(districtSchoolMapping).sort();
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
-  const { profile, isProfileLoaded, updateProfile: updateUserProfile } = useSponsorProfile();
+  const { profile, isProfileLoaded } = useSponsorProfile();
   const { database, updatePlayer, addPlayer } = useMasterDb();
   const { toast } = useToast();
   
@@ -527,15 +527,40 @@ export default function IndividualDashboardPage() {
                     {parentStudents.length > 0 ? (
                         <div className="space-y-2">
                             {parentStudents.map(student => (
-                                <div key={student.id} className="flex items-center justify-between text-sm p-2 border rounded">
-                                    <span>{student.firstName} {student.lastName}</span>
+                                <div key={student.id} className="flex items-center justify-between text-sm p-3 border rounded hover:bg-muted/50 transition-colors">
+                                    <div className="flex-1">
+                                        <button
+                                            onClick={() => handleEditStudent(student)}
+                                            className="text-left hover:text-primary transition-colors font-medium underline-offset-4 hover:underline cursor-pointer"
+                                        >
+                                            {student.firstName} {student.lastName}
+                                        </button>
+                                        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                            <div>USCF ID: {student.uscfId} | Rating: {student.regularRating || 'UNR'}</div>
+                                            {student.school && student.district && (
+                                                <div className="flex items-center gap-1">
+                                                    <School className="h-3 w-3" />
+                                                    {student.school} - {student.district}
+                                                </div>
+                                            )}
+                                            {student.grade && (
+                                                <div>Grade: {student.grade} | Section: {student.section || 'Not set'}</div>
+                                            )}
+                                            {(!student.email || !student.grade || !student.section) && (
+                                                <div className="text-orange-600 text-xs">
+                                                    ⚠️ Profile incomplete - click name to complete
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                     <Button 
                                         size="sm" 
                                         variant="ghost" 
                                         onClick={() => handleRemoveStudent(student)}
-                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive ml-2 shrink-0"
+                                        title="Remove student"
                                     >
-                                        <X className="h-3 w-3" />
+                                        <X className="h-4 w-4" />
                                     </Button>
                                 </div>
                             ))}
@@ -916,3 +941,4 @@ export default function IndividualDashboardPage() {
     </AppLayout>
   );
 }
+
