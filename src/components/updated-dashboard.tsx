@@ -1,11 +1,14 @@
+
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useEvents } from '@/hooks/use-events';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import { AddStudentDialog } from '@/components/add-student-dialog';
+import { EditStudentDialog } from '@/components/edit-student-dialog';
 import { 
   Calendar, 
   Users, 
@@ -37,6 +40,9 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
   const { database } = useMasterDb();
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
+  const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
+  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<MasterPlayer | null>(null);
 
   // Load data
   useEffect(() => {
@@ -340,6 +346,77 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
         </Card>
       </div>
 
+      {/* Student Management Section for Individual Users */}
+      {profile.role === 'individual' && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>My Students</CardTitle>
+              <CardDescription>
+                Manage the students you can register for events
+              </CardDescription>
+            </div>
+            <Button 
+              size="sm" 
+              onClick={() => setIsAddStudentDialogOpen(true)}
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Add Student
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {parentStudents.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="font-medium text-foreground mb-2">No Students Added Yet</h3>
+                <p className="text-sm mb-4">
+                  Add students to your profile to begin registering for tournaments.
+                </p>
+                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
+                  <Users className="h-4 w-4 mr-2" />
+                  Add Your First Student
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {parentStudents.map(student => (
+                  <div key={student.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium">
+                        {student.firstName} {student.lastName}
+                      </h4>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>USCF ID: {student.uscfId}</span>
+                        <span>Rating: {student.regularRating || 'UNR'}</span>
+                        <span>Section: {student.section || 'Not set'}</span>
+                        {student.school && (
+                          <span>{student.school} - {student.district}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={student.uscfId?.toUpperCase() === 'NEW' ? 'secondary' : 'default'}>
+                        {student.uscfId?.toUpperCase() === 'NEW' ? 'New Member' : 'USCF Member'}
+                      </Badge>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedStudent(student);
+                          setIsEditStudentDialogOpen(true);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Important Notices */}
       {profile.role === 'individual' && parentStudents.length === 0 && (
         <Card className="border-orange-200 bg-orange-50">
@@ -351,14 +428,98 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 <p className="text-sm text-orange-700 mt-1">
                   You need to add students to your profile before you can register for events.
                 </p>
-                <Button size="sm" className="mt-2" asChild>
-                  <Link href="/profile">Add Students</Link>
+                <Button size="sm" onClick={() => setIsAddStudentDialogOpen(true)}>
+                  Add Students
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       )}
+      
+      {/* Student Management Dialogs */}
+      {profile.role === 'individual' && (
+        <>
+          <AddStudentDialog
+            isOpen={isAddStudentDialogOpen}
+            onOpenChange={setIsAddStudentDialogOpen}
+            parentProfile={profile}
+            onStudentAdded={() => {
+              // Reload parent students
+              const loadParentStudents = () => {
+                try {
+                  const storedParentStudents = localStorage.getItem(`parent_students_${profile.email}`);
+                  if (storedParentStudents) {
+                    const studentIds = JSON.parse(storedParentStudents);
+                    const students = database.filter(p => studentIds.includes(p.id));
+                    setParentStudents(students);
+                  }
+                } catch (error) {
+                  console.error('Failed to reload parent students:', error);
+                }
+              };
+              loadParentStudents();
+            }}
+          />
+          
+          <EditStudentDialog
+            isOpen={isEditStudentDialogOpen}
+            onOpenChange={setIsEditStudentDialogOpen}
+            student={selectedStudent}
+            parentProfile={profile}
+            onStudentUpdated={() => {
+              // Reload parent students
+              const loadParentStudents = () => {
+                try {
+                  const storedParentStudents = localStorage.getItem(`parent_students_${profile.email}`);
+                  if (storedParentStudents) {
+                    const studentIds = JSON.parse(storedParentStudents);
+                    const students = database.filter(p => studentIds.includes(p.id));
+                    setParentStudents(students);
+                  }
+                } catch (error) {
+                  console.error('Failed to reload parent students:', error);
+                }
+              };
+              loadParentStudents();
+              setSelectedStudent(null);
+            }}
+          />
+        </>
+      )}
     </div>
   );
+}
+
+// Placeholder components - replace with your actual dialog components
+function AddStudentDialog({ 
+  isOpen, 
+  onOpenChange, 
+  parentProfile, 
+  onStudentAdded 
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  parentProfile: any;
+  onStudentAdded: () => void;
+}) {
+  // TODO: Replace with your actual AddStudentDialog component
+  return null;
+}
+
+function EditStudentDialog({
+  isOpen,
+  onOpenChange,
+  student,
+  parentProfile,
+  onStudentUpdated
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  student: MasterPlayer | null;
+  parentProfile: any;
+  onStudentUpdated: () => void;
+}) {
+  // TODO: Replace with your actual EditStudentDialog component
+  return null;
 }
