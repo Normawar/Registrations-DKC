@@ -132,10 +132,6 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
       availableEventsCount
     };
   }, [userRegistrations, upcomingEventsWithStatus]);
-  
-  // Add this temporarily right after the profile check to see what's happening
-  console.log('Profile role:', profile?.role);
-  console.log('Parent students:', parentStudents);
 
   return (
     <div className="space-y-6">
@@ -201,6 +197,77 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
         </Card>
       </div>
 
+      {/* Student Management Section for Individual Users - Always show for individual users */}
+      {profile.role === 'individual' && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>My Students</CardTitle>
+              <CardDescription>
+                Manage the students you can register for events
+              </CardDescription>
+            </div>
+            <Button 
+              size="sm" 
+              onClick={() => setIsAddStudentDialogOpen(true)}
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Add Student
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {parentStudents.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <h3 className="font-medium text-foreground mb-2">No Students Added Yet</h3>
+                <p className="text-sm mb-4">
+                  Add students to your profile to begin registering for tournaments.
+                </p>
+                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
+                  <Users className="h-4 w-4 mr-2" />
+                  Add Your First Student
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {parentStudents.map(student => (
+                  <div key={student.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex-1">
+                      <h4 className="font-medium">
+                        {student.firstName} {student.lastName}
+                      </h4>
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>USCF ID: {student.uscfId}</span>
+                        <span>Rating: {student.regularRating || 'UNR'}</span>
+                        <span>Section: {student.section || 'Not set'}</span>
+                        {student.school && (
+                          <span>{student.school} - {student.district}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={student.uscfId?.toUpperCase() === 'NEW' ? 'secondary' : 'default'}>
+                        {student.uscfId?.toUpperCase() === 'NEW' ? 'New Member' : 'USCF Member'}
+                      </Badge>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedStudent(student);
+                          setIsEditStudentDialogOpen(true);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick Actions */}
       <Card>
         <CardHeader>
@@ -229,14 +296,6 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 View Invoices
               </Link>
             </Button>
-            {profile.role === 'individual' && (
-              <Button variant="outline" asChild>
-                <Link href="/profile">
-                  <Users className="h-4 w-4 mr-2" />
-                  Manage Students
-                </Link>
-              </Button>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -348,77 +407,6 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
           </CardContent>
         </Card>
       </div>
-
-      {/* Student Management Section for Individual Users */}
-      {profile.role === 'individual' && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>My Students</CardTitle>
-              <CardDescription>
-                Manage the students you can register for events
-              </CardDescription>
-            </div>
-            <Button 
-              size="sm" 
-              onClick={() => setIsAddStudentDialogOpen(true)}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Add Student
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {parentStudents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <h3 className="font-medium text-foreground mb-2">No Students Added Yet</h3>
-                <p className="text-sm mb-4">
-                  Add students to your profile to begin registering for tournaments.
-                </p>
-                <Button onClick={() => setIsAddStudentDialogOpen(true)}>
-                  <Users className="h-4 w-4 mr-2" />
-                  Add Your First Student
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {parentStudents.map(student => (
-                  <div key={student.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <h4 className="font-medium">
-                        {student.firstName} {student.lastName}
-                      </h4>
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>USCF ID: {student.uscfId}</span>
-                        <span>Rating: {student.regularRating || 'UNR'}</span>
-                        <span>Section: {student.section || 'Not set'}</span>
-                        {student.school && (
-                          <span>{student.school} - {student.district}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={student.uscfId?.toUpperCase() === 'NEW' ? 'secondary' : 'default'}>
-                        {student.uscfId?.toUpperCase() === 'NEW' ? 'New Member' : 'USCF Member'}
-                      </Badge>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedStudent(student);
-                          setIsEditStudentDialogOpen(true);
-                        }}
-                      >
-                        Edit
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {/* Important Notices */}
       {profile.role === 'individual' && parentStudents.length === 0 && (
