@@ -71,17 +71,22 @@ const playerFormSchema = z.object({
     (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
     z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
   ),
-  grade: z.string().optional(),
-  section: z.string().optional(),
-  email: z.string().email({ message: "Please enter a valid email." }).optional().or(z.literal('')),
+  grade: z.string().min(1, { message: "Grade is required." }),
+  section: z.string().min(1, { message: "Section is required." }),
+  email: z.string().min(1, { message: "Email is required." }).email({ message: "Please enter a valid email." }),
   phone: z.string().optional(),
-  dob: z.date().optional(),
-  zipCode: z.string().optional(),
+  dob: z.date({ required_error: "Date of Birth is required." }),
+  zipCode: z.string().min(1, { message: "Zip Code is required." }),
   studentType: z.string().optional(),
   state: z.string().optional(),
   school: z.string().min(1, { message: "School name is required."}),
   district: z.string().min(1, { message: "District name is required."}),
-});
+}).refine(data => {
+    if (data.uscfId.toUpperCase() !== 'NEW') { 
+        return data.uscfExpiration !== undefined; 
+    }
+    return true;
+}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
@@ -191,28 +196,6 @@ export default function IndividualDashboardPage() {
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
     if (!editingPlayer) return;
-
-    // For parents, validate required fields before saving
-    const requiredFields = ['firstName', 'lastName', 'uscfId', 'email', 'grade', 'section', 'dob', 'zipCode'];
-    const missingFields = requiredFields.filter(field => {
-      const value = values[field as keyof PlayerFormValues];
-      return !value || (typeof value === 'string' && value.trim() === '');
-    });
-
-    if (missingFields.length > 0) {
-      const fieldLabels = {
-        firstName: 'First Name', lastName: 'Last Name', uscfId: 'USCF ID',
-        email: 'Email', grade: 'Grade', section: 'Section', 
-        dob: 'Date of Birth', zipCode: 'Zip Code'
-      };
-      
-      toast({
-        variant: 'destructive',
-        title: 'Required Information Missing',
-        description: `Please complete these required fields: ${missingFields.map(f => fieldLabels[f as keyof typeof fieldLabels]).join(', ')}`
-      });
-      return;
-    }
 
     const { uscfExpiration, dob, ...restOfValues } = values;
     
@@ -328,7 +311,7 @@ export default function IndividualDashboardPage() {
                     <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
+                    <div className="text-xl font-bold">{profile.firstName} ${profile.lastName}</div>
                     <div className="text-sm text-muted-foreground">{profile.email}</div>
                   </div>
                 </div>
@@ -492,7 +475,7 @@ export default function IndividualDashboardPage() {
               <Button variant="outline" onClick={handleCancelAddStudent}>
                 Cancel
               </Button>
-              <Button onClick={() => handleConfirmAddStudent()}>
+              <Button onClick={handleConfirmAddStudent}>
                 Add Student
               </Button>
             </DialogFooter>
