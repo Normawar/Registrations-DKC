@@ -149,17 +149,73 @@ function RosterPageContent() {
   };
 
 const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
+    console.log('🔍 Raw player data:', player);
+    console.log('🔍 Player rating:', player.regularRating, typeof player.regularRating);
+    console.log('🔍 Player uscfExpiration:', player.uscfExpiration, typeof player.uscfExpiration);
+    
     // Open the edit dialog with the newly added player
     setEditingPlayer(player);
     
+    // Parse rating - handle both string and number formats
+    let ratingValue;
+    if (player.regularRating !== undefined && player.regularRating !== null) {
+        if (typeof player.regularRating === 'string') {
+            const numRating = parseInt(player.regularRating);
+            ratingValue = isNaN(numRating) ? undefined : numRating;
+        } else {
+            ratingValue = player.regularRating;
+        }
+    }
+    
+    // Parse USCF expiration date - handle multiple date formats
+    let uscfExpirationDate;
+    if (player.uscfExpiration) {
+        try {
+            // Try parsing as ISO string first
+            uscfExpirationDate = new Date(player.uscfExpiration);
+            // Check if the date is valid
+            if (isNaN(uscfExpirationDate.getTime())) {
+                console.log('❌ Invalid uscfExpiration date:', player.uscfExpiration);
+                uscfExpirationDate = undefined;
+            } else {
+                console.log('✅ Parsed uscfExpiration:', uscfExpirationDate);
+            }
+        } catch (error) {
+            console.log('❌ Error parsing uscfExpiration:', error);
+            uscfExpirationDate = undefined;
+        }
+    }
+    
+    // Parse DOB
+    let dobDate;
+    if (player.dob) {
+        try {
+            dobDate = new Date(player.dob);
+            if (isNaN(dobDate.getTime())) {
+                console.log('❌ Invalid dob date:', player.dob);
+                dobDate = undefined;
+            } else {
+                console.log('✅ Parsed dob:', dobDate);
+            }
+        } catch (error) {
+            console.log('❌ Error parsing dob:', error);
+            dobDate = undefined;
+        }
+    }
+    
+    console.log('🔍 Final values for form:');
+    console.log('- Rating:', ratingValue);
+    console.log('- USCF Expiration:', uscfExpirationDate);
+    console.log('- DOB:', dobDate);
+    
     // Properly populate ALL fields from the database
-    playerForm.reset({
+    const formData = {
         id: player.id,
         firstName: player.firstName || '',
         middleName: player.middleName || '',
         lastName: player.lastName || '',
-        uscfId: player.uscfId || '', // This should now populate
-        regularRating: player.regularRating, // Keep as number or undefined
+        uscfId: player.uscfId || '',
+        regularRating: ratingValue, // Use the parsed rating
         grade: player.grade || '',
         section: player.section || '',
         email: player.email || '',
@@ -169,11 +225,13 @@ const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
         state: player.state || '',
         school: player.school || '',
         district: player.district || '',
-        // Parse dates properly
-        dob: player.dob ? new Date(player.dob) : undefined,
-        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
-    });
+        dob: dobDate,
+        uscfExpiration: uscfExpirationDate,
+    };
     
+    console.log('🔍 Form data being set:', formData);
+    
+    playerForm.reset(formData);
     setIsEditPlayerDialogOpen(true);
 };
   
@@ -405,3 +463,5 @@ export default function RosterPage() {
     </Suspense>
   );
 }
+
+    
