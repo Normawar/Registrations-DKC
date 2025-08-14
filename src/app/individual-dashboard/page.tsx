@@ -93,7 +93,7 @@ type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
-  const { profile, isProfileLoaded } = useSponsorProfile();
+  const { profile, isProfileLoaded, updateProfile: updateSponsorProfile } = useSponsorProfile();
   const { database, updatePlayer } = useMasterDb();
   const { toast } = useToast();
   
@@ -160,7 +160,8 @@ export default function IndividualDashboardPage() {
     }
 
     // If student has complete information, show confirmation dialog
-    handleConfirmAddStudent(player);
+    setPendingStudent(player);
+    setIsConfirmDialogOpen(true);
   };
   
   const handleEditStudent = (player: MasterPlayer) => {
@@ -195,60 +196,60 @@ export default function IndividualDashboardPage() {
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-    console.log('🔍 Form submit triggered with values:', values);
-    console.log('🔍 editingPlayer:', editingPlayer);
-    console.log('🔍 pendingStudentForEdit:', pendingStudentForEdit);
-  
-    if (!editingPlayer) {
-      console.log('❌ No editing player found');
-      return;
-    }
-  
-    try {
-      const { uscfExpiration, dob, ...restOfValues } = values;
-      
-      const updatedPlayerRecord: MasterPlayer = {
-        ...editingPlayer,
-        ...restOfValues,
-        dob: dob ? dob.toISOString() : undefined,
-        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-      };
-      
-      console.log('🔍 About to update player:', updatedPlayerRecord);
-      
-      // Update the player in the database
-      updatePlayer(updatedPlayerRecord);
-      console.log('✅ Player updated in database');
-  
-      // If this was a pending student, add them to the list
-      if (pendingStudentForEdit) {
-        console.log('🔍 Adding student to parent list');
-        handleConfirmAddStudent(updatedPlayerRecord);
-        toast({ 
-          title: "Student Added", 
-          description: `${values.firstName} ${values.lastName} has been completed and added to your students list.`
-        });
-      } else {
-        toast({ 
-          title: "Student Updated", 
-          description: `${values.firstName} ${values.lastName}'s information has been updated.`
-        });
-      }
-      
-      setIsEditPlayerDialogOpen(false);
-      setEditingPlayer(null);
-      setPendingStudentForEdit(null);
-      console.log('✅ Form submission completed successfully');
-      
-    } catch (error) {
-      console.error('❌ Error in form submission:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to save student information. Please try again.'
+  console.log('🔍 Form submit triggered with values:', values);
+  console.log('🔍 editingPlayer:', editingPlayer);
+  console.log('🔍 pendingStudentForEdit:', pendingStudentForEdit);
+
+  if (!editingPlayer) {
+    console.log('❌ No editing player found');
+    return;
+  }
+
+  try {
+    const { uscfExpiration, dob, ...restOfValues } = values;
+    
+    const updatedPlayerRecord: MasterPlayer = {
+      ...editingPlayer,
+      ...restOfValues,
+      dob: dob ? dob.toISOString() : undefined,
+      uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+    };
+    
+    console.log('🔍 About to update player:', updatedPlayerRecord);
+    
+    // Update the player in the database
+    updatePlayer(updatedPlayerRecord);
+    console.log('✅ Player updated in database');
+
+    // If this was a pending student, add them to the list
+    if (pendingStudentForEdit) {
+      console.log('🔍 Adding student to parent list');
+      handleConfirmAddStudent(updatedPlayerRecord);
+      toast({ 
+        title: "Student Added", 
+        description: `${values.firstName} ${values.lastName} has been completed and added to your students list.`
+      });
+    } else {
+      toast({ 
+        title: "Student Updated", 
+        description: `${values.firstName} ${values.lastName}'s information has been updated.`
       });
     }
-  };
+    
+    setIsEditPlayerDialogOpen(false);
+    setEditingPlayer(null);
+    setPendingStudentForEdit(null);
+    console.log('✅ Form submission completed successfully');
+    
+  } catch (error) {
+    console.error('❌ Error in form submission:', error);
+    toast({
+      variant: 'destructive',
+      title: 'Error',
+      description: 'Failed to save student information. Please try again.'
+    });
+  }
+};
 
   const handleCancelEdit = () => {
     if (pendingStudentForEdit) {
@@ -333,7 +334,7 @@ export default function IndividualDashboardPage() {
                     <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
+                    <div className="text-xl font-bold">{profile.firstName} ${profile.lastName}</div>
                     <div className="text-sm text-muted-foreground">{profile.email}</div>
                   </div>
                 </div>
@@ -503,8 +504,7 @@ export default function IndividualDashboardPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-
+        
       {/* Edit Student Dialog */}
       <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
@@ -582,8 +582,7 @@ export default function IndividualDashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </AppLayout>
   );
 }
-
-```

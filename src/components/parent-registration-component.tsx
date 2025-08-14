@@ -1,15 +1,14 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 import { useEvents } from '@/hooks/use-events';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Plus, AlertTriangle, CheckCircle, School, User } from 'lucide-react';
+import { CheckCircle, School } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ParentRegistrationProps {
@@ -35,8 +34,6 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
   const { events } = useEvents();
   const { database } = useMasterDb();
   
-  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [registrations, setRegistrations] = useState<StudentRegistration[]>([]);
 
@@ -108,22 +105,6 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
       loadParentStudents();
     }
   }, [database, parentProfile.email]);
-
-  const handleAddStudent = (player: MasterPlayer) => {
-    if (!parentStudents.find(s => s.id === player.id)) {
-      const updatedStudents = [...parentStudents, player];
-      setParentStudents(updatedStudents);
-      
-      // Save to localStorage
-      const studentIds = updatedStudents.map(s => s.id);
-      localStorage.setItem(`parent_students_${parentProfile.email}`, JSON.stringify(studentIds));
-      
-      toast({
-        title: "Student Added",
-        description: `${player.firstName} ${player.lastName} has been added to your students list.`
-      });
-    }
-  };
 
   const getStudentRegistrationStatus = (student: MasterPlayer, event: any) => {
     const existingReg = registrations.find(r => 
@@ -214,7 +195,7 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Register Students for Events</h2>
+        <h2 className="text-2xl font-bold font-headline">Register Students for Events</h2>
         <p className="text-muted-foreground">
           Register your students for tournaments, even if they're already on a school roster.
         </p>
