@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -26,14 +25,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEvents } from "@/hooks/use-events";
 import { useMemo, useState, useEffect } from "react";
 import { format } from "date-fns";
-import { FileText, ImageIcon, User, Users, Plus } from "lucide-react";
+import { FileText, ImageIcon, User, Users, Plus, X } from "lucide-react";
 import { ParentRegistrationComponent } from "@/components/parent-registration-component";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 import { useToast } from "@/hooks/use-toast";
-
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogFooter 
+} from '@/components/ui/dialog';
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
@@ -43,6 +49,8 @@ export default function IndividualDashboardPage() {
   
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [pendingStudent, setPendingStudent] = useState<MasterPlayer | null>(null);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 
   const upcomingEvents = useMemo(() => {
     return events
@@ -67,19 +75,77 @@ export default function IndividualDashboardPage() {
     }
   }, [profile, database]);
   
-  const handleAddStudent = (player: MasterPlayer) => {
-    if (!parentStudents.find(s => s.id === player.id)) {
-      const updatedStudents = [...parentStudents, player];
-      setParentStudents(updatedStudents);
-      
-      const studentIds = updatedStudents.map(s => s.id);
-      localStorage.setItem(`parent_students_${parentProfile.email}`, JSON.stringify(studentIds));
-      
+  const handleSelectStudent = (player: MasterPlayer) => {
+    // Check if student already added
+    if (parentStudents.find(s => s.id === player.id)) {
       toast({
-        title: "Student Added",
-        description: `${player.firstName} ${player.lastName} has been added to your students list.`
+        variant: 'destructive',
+        title: "Student Already Added",
+        description: `${player.firstName} ${player.lastName} is already in your students list.`
       });
+      return;
     }
+
+    // Check if student has required information
+    const missingFields = [];
+    if (!player.dob) missingFields.push('Date of Birth');
+    if (!player.grade) missingFields.push('Grade');
+    if (!player.section) missingFields.push('Section');
+    if (!player.email) missingFields.push('Email');
+    if (!player.zipCode) missingFields.push('Zip Code');
+    
+    if (missingFields.length > 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Incomplete Student Information',
+        description: `${player.firstName} ${player.lastName} is missing: ${missingFields.join(', ')}. Please contact support to complete their profile before adding as your student.`
+      });
+      return;
+    }
+
+    // If student has complete information, show confirmation dialog
+    setPendingStudent(player);
+    setIsConfirmDialogOpen(true);
+  };
+
+  const handleConfirmAddStudent = () => {
+    if (!pendingStudent || !profile?.email) return;
+
+    const updatedStudents = [...parentStudents, pendingStudent];
+    setParentStudents(updatedStudents);
+    
+    // Save to localStorage
+    const studentIds = updatedStudents.map(s => s.id);
+    localStorage.setItem(`parent_students_${profile.email}`, JSON.stringify(studentIds));
+    
+    toast({
+      title: "Student Added",
+      description: `${pendingStudent.firstName} ${pendingStudent.lastName} has been added to your students list.`
+    });
+
+    // Clean up
+    setPendingStudent(null);
+    setIsConfirmDialogOpen(false);
+  };
+
+  const handleCancelAddStudent = () => {
+    setPendingStudent(null);
+    setIsConfirmDialogOpen(false);
+  };
+
+  const handleRemoveStudent = (student: MasterPlayer) => {
+    const updatedStudents = parentStudents.filter(s => s.id !== student.id);
+    setParentStudents(updatedStudents);
+    
+    if (profile?.email) {
+      const studentIds = updatedStudents.map(s => s.id);
+      localStorage.setItem(`parent_students_${profile.email}`, JSON.stringify(studentIds));
+    }
+    
+    toast({
+      title: "Student Removed",
+      description: `${student.firstName} ${student.lastName} has been removed from your students list.`
+    });
   };
 
   if (!isProfileLoaded || !profile) {
@@ -114,7 +180,6 @@ export default function IndividualDashboardPage() {
     );
   }
 
-
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -137,26 +202,41 @@ export default function IndividualDashboardPage() {
                     <AvatarFallback>{profile.firstName.charAt(0)}{profile.lastName.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
+                    <div className="text-xl font-bold">{profile.firstName} ${profile.lastName}</div>
                     <div className="text-sm text-muted-foreground">{profile.email}</div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                     <div className="flex justify-between items-center border-t pt-4">
-                        <h4 className="font-semibold flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /> Your Students ({parentStudents.length})</h4>
+                        <h4 className="font-semibold flex items-center gap-2 text-sm">
+                          <Users className="h-4 w-4 text-muted-foreground" /> 
+                          Your Students ({parentStudents.length})
+                        </h4>
                         <Button size="sm" onClick={() => setIsSearchDialogOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Student
                         </Button>
                     </div>
                     {parentStudents.length > 0 ? (
-                        <ul className="list-disc list-inside text-sm text-muted-foreground pl-2">
+                        <div className="space-y-2">
                             {parentStudents.map(student => (
-                                <li key={student.id}>{student.firstName} {student.lastName}</li>
+                                <div key={student.id} className="flex items-center justify-between text-sm p-2 border rounded">
+                                    <span>{student.firstName} {student.lastName}</span>
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={() => handleRemoveStudent(student)}
+                                        className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </Button>
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">No students added yet. Use the Add Student button to search and add your students.</p>
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No students added yet. Use the Add Student button to search and add your students.
+                        </p>
                     )}
                 </div>
             </CardContent>
@@ -253,14 +333,47 @@ export default function IndividualDashboardPage() {
           </Card>
         </div>
         
-         <PlayerSearchDialog
+        <PlayerSearchDialog
             isOpen={isSearchDialogOpen}
             onOpenChange={setIsSearchDialogOpen}
-            onSelectPlayer={handleAddStudent}
+            onSelectPlayer={handleSelectStudent}
             excludeIds={parentStudents.map(s => s.id)}
             portalType="individual"
         />
+
+        {/* Confirmation Dialog */}
+        <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Student</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to add {pendingStudent?.firstName} {pendingStudent?.lastName} to your students list?
+              </DialogDescription>
+            </DialogHeader>
+            {pendingStudent && (
+              <div className="py-4">
+                <div className="space-y-2">
+                  <p><strong>Name:</strong> {pendingStudent.firstName} {pendingStudent.lastName}</p>
+                  <p><strong>USCF ID:</strong> {pendingStudent.uscfId}</p>
+                  <p><strong>Rating:</strong> {pendingStudent.regularRating || 'UNR'}</p>
+                  <p><strong>School:</strong> {pendingStudent.school || 'N/A'}</p>
+                  <p><strong>Grade:</strong> {pendingStudent.grade || 'N/A'}</p>
+                  <p><strong>Section:</strong> {pendingStudent.section || 'N/A'}</p>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancelAddStudent}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmAddStudent}>
+                Add Student
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
 }
+
