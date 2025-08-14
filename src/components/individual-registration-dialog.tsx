@@ -41,7 +41,7 @@ export function IndividualRegistrationDialog({
 
   // Load parent's students
   useEffect(() => {
-    if (parentProfile?.email && database.length > 0) {
+    if (parentProfile?.email && database.length > 0 && isOpen) {
       try {
         const storedParentStudents = localStorage.getItem(`parent_students_${parentProfile.email}`);
         if (storedParentStudents) {
