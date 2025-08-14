@@ -80,6 +80,7 @@ function RosterPageContent() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
+  const [pendingPlayer, setPendingPlayer] = useState<MasterPlayer | null>(null);
 
   const { profile, isProfileLoaded } = useSponsorProfile();
   const { database, addPlayer, updatePlayer, isDbLoaded } = useMasterDb();
@@ -142,7 +143,7 @@ function RosterPageContent() {
     setIsEditPlayerDialogOpen(true);
   };
   
-  const handleSelectPlayer = (player: MasterPlayer) => {
+const handleSelectPlayer = (player: MasterPlayer) => {
     console.log('🏠 Roster: handleSelectPlayer called with:', player.firstName, player.lastName);
     // Player is already assigned to the sponsor's school/district by the dialog
     addPlayer(player);
@@ -163,7 +164,10 @@ const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
     console.log('🔍 Player rating:', player.regularRating, typeof player.regularRating);
     console.log('🔍 Player uscfExpiration:', player.uscfExpiration, typeof player.uscfExpiration);
     
-    // Open the edit dialog with the newly added player
+    // Store the pending player (not added to roster yet)
+    setPendingPlayer(player);
+    
+    // Open edit dialog with player data
     setEditingPlayer(player);
     
     // Parse rating - handle both string and number formats
@@ -298,13 +302,33 @@ const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
         uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
     };
     
-    await updatePlayer(updatedPlayerRecord);
-
-    toast({ 
-        title: "Player Updated", 
-        description: `${values.firstName} ${values.lastName} has been successfully added to your roster with complete information.`
-    });
+    // NOW add the player to the roster (only after successful validation)
+    if (pendingPlayer) {
+        addPlayer(updatedPlayerRecord);
+        toast({ 
+            title: "Player Added to Roster", 
+            description: `${values.firstName} ${values.lastName} has been successfully added to your roster with complete information.`
+        });
+        setPendingPlayer(null);
+    } else {
+        // This was an edit of existing roster player
+        await updatePlayer(updatedPlayerRecord);
+        toast({ 
+            title: "Player Updated", 
+            description: `${values.firstName} ${values.lastName}'s information has been updated.`
+        });
+    }
     
+    setIsEditPlayerDialogOpen(false);
+    setEditingPlayer(null);
+};
+
+const handleCancelEdit = () => {
+    if (pendingPlayer) {
+        // User was adding a new player but cancelled - don't add to roster
+        console.log('🚫 User cancelled adding new player - not adding to roster');
+        setPendingPlayer(null);
+    }
     setIsEditPlayerDialogOpen(false);
     setEditingPlayer(null);
 };
@@ -456,7 +480,7 @@ const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
                     </Form>
                 </div>
                 <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                    <Button type="button" variant="ghost" onClick={() => setIsEditPlayerDialogOpen(false)}>Cancel</Button>
+                    <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
                     <Button type="submit" form="edit-player-form">Save Changes</Button>
                 </DialogFooter>
             </DialogContent>
@@ -473,5 +497,3 @@ export default function RosterPage() {
     </Suspense>
   );
 }
-
-    

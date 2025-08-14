@@ -74,20 +74,18 @@ const handleSelect = (player: MasterPlayer) => {
         console.log('🎯 PlayerSearchDialog: Updated player with sponsor info:', playerWithSponsorInfo);
     }
     
-    // Add the player to the roster (always allow this)
-    console.log('🎯 PlayerSearchDialog: Calling onSelectPlayer');
-    onSelectPlayer(playerWithSponsorInfo);
-    
     // Close the search dialog
     console.log('🎯 PlayerSearchDialog: Closing dialog');
     onOpenChange(false);
     
     // For sponsors, always open edit dialog to complete/verify information
     if (portalType === 'sponsor' && onPlayerSelected) {
-        console.log('🎯 PlayerSearchDialog: Calling onPlayerSelected for sponsor');
+        console.log('🎯 PlayerSearchDialog: Opening edit dialog for sponsor');
         onPlayerSelected(playerWithSponsorInfo);
     } else {
-        console.log('🎯 PlayerSearchDialog: NOT calling onPlayerSelected. portalType:', portalType, 'onPlayerSelected exists:', !!onPlayerSelected);
+        // For non-sponsors, add immediately as before
+        console.log('🎯 PlayerSearchDialog: Adding player directly (non-sponsor)');
+        onSelectPlayer(playerWithSponsorInfo);
     }
 };
   
