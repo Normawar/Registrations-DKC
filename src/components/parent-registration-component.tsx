@@ -51,6 +51,10 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
     };
 
     loadRegistrations();
+    window.addEventListener('storage', loadRegistrations);
+    return () => {
+      window.removeEventListener('storage', loadRegistrations);
+    }
   }, []);
 
   // Load parent's students
@@ -154,7 +158,7 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
                 
                 return (
                   <div key={event.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center justify-between">
                       <div>
                         <h3 className="font-semibold text-lg">{event.name}</h3>
                         <p className="text-sm text-muted-foreground">
@@ -163,14 +167,14 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
                         <p className="text-sm text-muted-foreground">
                           Registration Fee: ${event.regularFee}
                         </p>
-                      </div>
-                      <div className="text-right">
                         {summary.registeredCount > 0 && (
-                          <div className="flex items-center gap-1 text-sm text-green-600 mb-2">
+                          <div className="flex items-center gap-1 text-sm text-green-600 mt-1">
                             <CheckCircle className="h-4 w-4" />
-                            {summary.registeredCount} registered
+                            {summary.registeredCount} student{summary.registeredCount > 1 ? 's' : ''} already registered
                           </div>
                         )}
+                      </div>
+                      <div className="text-right">
                         <Button 
                           onClick={() => handleRegisterForEvent(event)}
                           disabled={summary.availableCount === 0}
@@ -182,46 +186,6 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
                           }
                         </Button>
                       </div>
-                    </div>
-                    
-                    {/* Show student status summary */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                      {parentStudents.map(student => {
-                        const status = getStudentRegistrationStatus(student, event);
-                        return (
-                          <div key={student.id} className="flex items-center justify-between text-sm border rounded p-2">
-                            <span className="font-medium">
-                              {student.firstName} {student.lastName}
-                            </span>
-                            <Badge 
-                              variant={
-                                status.isRegistered 
-                                  ? status.source === 'sponsor' 
-                                    ? 'default' 
-                                    : 'secondary'
-                                  : 'outline'
-                              }
-                              className="text-xs"
-                            >
-                              {status.isRegistered ? (
-                                status.source === 'sponsor' ? (
-                                  <>
-                                    <School className="h-3 w-3 mr-1" />
-                                    School
-                                  </>
-                                ) : (
-                                  <>
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    Registered
-                                  </>
-                                )
-                              ) : (
-                                'Available'
-                              )}
-                            </Badge>
-                          </div>
-                        );
-                      })}
                     </div>
                   </div>
                 );
