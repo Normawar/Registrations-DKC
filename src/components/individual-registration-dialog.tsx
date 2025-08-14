@@ -1,0 +1,333 @@
+
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
+import { School, User, DollarSign } from "lucide-react";
+import { format } from "date-fns";
+
+interface IndividualRegistrationDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  event: any;
+  parentProfile: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+  };
+}
+
+export function IndividualRegistrationDialog({ 
+  isOpen, 
+  onOpenChange, 
+  event, 
+  parentProfile 
+}: IndividualRegistrationDialogProps) {
+  const { toast } = useToast();
+  const { database } = useMasterDb();
+  
+  const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
+  const [selectedStudents, setSelectedStudents] = useState<Record<string, { section: string; uscfStatus: string }>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Load parent's students
+  useEffect(() => {
+    if (parentProfile?.email && database.length > 0) {
+      try {
+        const storedParentStudents = localStorage.getItem(`parent_students_${parentProfile.email}`);
+        if (storedParentStudents) {
+          const studentIds = JSON.parse(storedParentStudents);
+          const students = database.filter(p => studentIds.includes(p.id));
+          setParentStudents(students);
+        }
+      } catch (error) {
+        console.error('Failed to load parent students:', error);
+      }
+    }
+  }, [parentProfile, database, isOpen]);
+
+  // Check which students are already registered
+  const getStudentRegistrationStatus = (student: MasterPlayer) => {
+    try {
+      const storedConfirmations = localStorage.getItem('confirmations');
+      const allConfirmations = storedConfirmations ? JSON.parse(storedConfirmations) : [];
+      
+      const existingReg = allConfirmations.find((confirmation: any) => 
+        confirmation.eventId === event.id && 
+        confirmation.selections && 
+        confirmation.selections[student.id]
+      );
+      
+      if (existingReg) {
+        const isParentReg = existingReg.parentEmail === parentProfile.email;
+        return {
+          isRegistered: true,
+          source: isParentReg ? 'parent' : 'sponsor',
+          message: isParentReg ? 'Already registered by you' : 'Registered by school sponsor'
+        };
+      }
+      
+      return { isRegistered: false, source: null, message: 'Available for registration' };
+    } catch (error) {
+      console.error('Error checking registration status:', error);
+      return { isRegistered: false, source: null, message: 'Available for registration' };
+    }
+  };
+
+  const toggleStudentSelection = (student: MasterPlayer) => {
+    const status = getStudentRegistrationStatus(student);
+    if (status.isRegistered) return;
+
+    setSelectedStudents(prev => {
+      const isSelected = prev[student.id];
+      if (isSelected) {
+        const { [student.id]: removed, ...rest } = prev;
+        return rest;
+      } else {
+        return {
+          ...prev,
+          [student.id]: {
+            section: student.section || 'High School K-12',
+            uscfStatus: 'current'
+          }
+        };
+      }
+    });
+  };
+
+  const updateStudentSelection = (studentId: string, field: 'section' | 'uscfStatus', value: string) => {
+    setSelectedStudents(prev => ({
+      ...prev,
+      [studentId]: {
+        ...prev[studentId],
+        [field]: value
+      }
+    }));
+  };
+
+  const calculateTotal = () => {
+    const selectedCount = Object.keys(selectedStudents).length;
+    return selectedCount * event.regularFee;
+  };
+
+  const handleSubmit = async () => {
+    if (Object.keys(selectedStudents).length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'No Students Selected',
+        description: 'Please select at least one student to register.'
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Create registration confirmation
+      const confirmationId = `parent-${Date.now()}-${Math.random()}`;
+      const confirmation = {
+        id: confirmationId,
+        invoiceId: confirmationId,
+        invoiceNumber: `INV-${confirmationId.slice(-8)}`,
+        submissionTimestamp: new Date().toISOString(),
+        eventId: event.id,
+        eventName: event.name,
+        eventDate: event.date,
+        parentEmail: parentProfile.email,
+        parentName: `${parentProfile.firstName} ${parentProfile.lastName}`,
+        schoolName: 'Individual Registration',
+        district: 'Individual',
+        selections: Object.fromEntries(
+          Object.entries(selectedStudents).map(([playerId, details]) => [
+            playerId,
+            {
+              ...details,
+              status: 'active'
+            }
+          ])
+        ),
+        totalInvoiced: calculateTotal(),
+        invoiceStatus: 'PAID' // Assuming direct payment or comped for now
+      };
+
+      // Save to localStorage
+      const existingConfirmations = localStorage.getItem('confirmations');
+      const allConfirmations = existingConfirmations ? JSON.parse(existingConfirmations) : [];
+      allConfirmations.push(confirmation);
+      localStorage.setItem('confirmations', JSON.stringify(allConfirmations));
+      
+      const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, confirmation]));
+      
+      toast({
+        title: "Registration Successful",
+        description: `${Object.keys(selectedStudents).length} student(s) registered for ${event.name}.`
+      });
+      
+      // Reset and close
+      setSelectedStudents({});
+      onOpenChange(false);
+      
+      // Reload page to refresh data
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('all_invoices_updated'));
+      
+    } catch (error) {
+      console.error('Registration failed:', error);
+      toast({
+        variant: 'destructive',
+        title: "Registration Failed",
+        description: "Failed to save registration. Please try again."
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Register for {event?.name}</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {event?.date && format(new Date(event.date), 'PPP')} • {event?.location}
+          </p>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {parentStudents.length === 0 ? (
+            <div className="text-center p-8 text-muted-foreground">
+              <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium">No Students Found</p>
+              <p>Add students to your profile first before registering for events.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              <h3 className="text-lg font-semibold">Select Students to Register</h3>
+              
+              {parentStudents.map(student => {
+                const status = getStudentRegistrationStatus(student);
+                const isSelected = !!selectedStudents[student.id];
+                
+                return (
+                  <Card 
+                    key={student.id} 
+                    className={`cursor-pointer transition-colors ${
+                      status.isRegistered 
+                        ? 'opacity-50 cursor-not-allowed' 
+                        : isSelected 
+                          ? 'ring-2 ring-primary bg-primary/5' 
+                          : 'hover:bg-muted/50'
+                    }`}
+                    onClick={() => !status.isRegistered && toggleStudentSelection(student)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="flex-1">
+                            <h4 className="font-semibold">
+                              {student.firstName} {student.lastName}
+                            </h4>
+                            <div className="text-sm text-muted-foreground space-y-1">
+                              <p>USCF ID: {student.uscfId} | Rating: {student.regularRating || 'UNR'}</p>
+                              {student.school && (
+                                <div className="flex items-center gap-1">
+                                  <School className="h-3 w-3" />
+                                  {student.school} - {student.district}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          {status.isRegistered ? (
+                            <Badge variant={status.source === 'sponsor' ? 'default' : 'secondary'}>
+                              {status.message}
+                            </Badge>
+                          ) : isSelected ? (
+                            <Badge variant="default">Selected</Badge>
+                          ) : (
+                            <Button variant="outline" size="sm">
+                              Select
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {isSelected && (
+                        <div className="mt-4 pt-4 border-t grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor={`section-${student.id}`}>Section</Label>
+                            <Select
+                              value={selectedStudents[student.id]?.section || ''}
+                              onValueChange={(value) => updateStudentSelection(student.id, 'section', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select section" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Elementary K-5">Elementary K-5</SelectItem>
+                                <SelectItem value="Middle School K-8">Middle School K-8</SelectItem>
+                                <SelectItem value="High School K-12">High School K-12</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor={`uscf-${student.id}`}>USCF Status</Label>
+                            <Select
+                              value={selectedStudents[student.id]?.uscfStatus || ''}
+                              onValueChange={(value) => updateStudentSelection(student.id, 'uscfStatus', value)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select USCF status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="current">Current Member</SelectItem>
+                                <SelectItem value="new">New Member</SelectItem>
+                                <SelectItem value="renewing">Renewing Member</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {Object.keys(selectedStudents).length > 0 && (
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between text-lg font-semibold">
+              <span>Total ({Object.keys(selectedStudents).length} students):</span>
+              <span className="flex items-center gap-1">
+                <DollarSign className="h-5 w-5" />
+                {calculateTotal().toFixed(2)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={Object.keys(selectedStudents).length === 0 || isSubmitting}
+          >
+            {isSubmitting ? 'Registering...' : `Register ${Object.keys(selectedStudents).length} Student(s)`}
+          </Button>
+        </DialogFooter>
