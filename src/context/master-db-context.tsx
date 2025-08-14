@@ -170,6 +170,23 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const searchPlayers = useCallback((criteria: Partial<SearchCriteria>): MasterPlayer[] => {
     if (!isDbLoaded) return [];
 
+    // DEBUG: Check what's actually in the database
+    if (database.length > 0) {
+        const firstPlayer = database[0];
+        console.log('🗃️ Database sample - First player (full object):', firstPlayer);
+        console.log('🗃️ First player properties:');
+        Object.keys(firstPlayer).forEach(key => {
+            console.log(`  ${key}:`, firstPlayer[key as keyof MasterPlayer], typeof firstPlayer[key as keyof MasterPlayer]);
+        });
+        
+        // Look for players with ratings
+        const playersWithRatings = database.filter(p => p.regularRating && p.regularRating !== 'UNR').slice(0, 3);
+        console.log('🗃️ Players with ratings:', playersWithRatings.length);
+        if (playersWithRatings.length > 0) {
+            console.log('🗃️ Sample rated player:', playersWithRatings[0]);
+        }
+    }
+
     const {
         firstName, lastName, uscfId, state, grade, section, school, district,
         minRating, maxRating, excludeIds = [], maxResults = 1000,
