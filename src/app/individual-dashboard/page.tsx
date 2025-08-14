@@ -23,17 +23,20 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEvents } from "@/hooks/use-events";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { format } from "date-fns";
-import { FileText, ImageIcon } from "lucide-react";
+import { FileText, ImageIcon, User, Users } from "lucide-react";
 import { ParentRegistrationComponent } from "@/components/parent-registration-component";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
   const { profile, isProfileLoaded } = useSponsorProfile();
+  const { database } = useMasterDb();
+  const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
 
   const upcomingEvents = useMemo(() => {
     return events
@@ -42,6 +45,21 @@ export default function IndividualDashboardPage() {
       // mock registration status
       .map((event, index) => ({...event, registered: [true, true, false, false, true][index % 5] || false })); 
   }, [events]);
+
+  useEffect(() => {
+    if (profile?.email && database.length > 0) {
+      try {
+        const storedParentStudents = localStorage.getItem(`parent_students_${profile.email}`);
+        if (storedParentStudents) {
+          const studentIds = JSON.parse(storedParentStudents);
+          const students = database.filter(p => studentIds.includes(p.id));
+          setParentStudents(students);
+        }
+      } catch (error) {
+        console.error('Failed to load parent students:', error);
+      }
+    }
+  }, [profile, database]);
   
   if (!isProfileLoaded || !profile) {
     return (
@@ -91,7 +109,7 @@ export default function IndividualDashboardPage() {
             <CardHeader>
               <CardTitle>Profile</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
                <div className="flex items-center gap-4">
                   <Avatar className="h-16 w-16">
                     <AvatarImage src={profile.avatarType === 'upload' ? profile.avatarValue : `https://placehold.co/64x64.png`} alt={`${profile.firstName} ${profile.lastName}`} data-ai-hint="person face" />
@@ -101,6 +119,19 @@ export default function IndividualDashboardPage() {
                     <div className="text-xl font-bold">{profile.firstName} {profile.lastName}</div>
                     <div className="text-sm text-muted-foreground">{profile.email}</div>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                    <h4 className="font-semibold flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /> Your Students</h4>
+                    {parentStudents.length > 0 ? (
+                        <ul className="list-disc list-inside text-sm text-muted-foreground">
+                            {parentStudents.map(student => (
+                                <li key={student.id}>{student.firstName} {student.lastName}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">No students added yet.</p>
+                    )}
                 </div>
             </CardContent>
             <CardFooter>
@@ -199,3 +230,4 @@ export default function IndividualDashboardPage() {
     </AppLayout>
   );
 }
+
