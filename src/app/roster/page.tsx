@@ -153,6 +153,13 @@ function RosterPageContent() {
 const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
     console.log('📝 Roster: handlePlayerSelectedForEdit called with:', player.firstName, player.lastName);
     console.log('🔍 Raw player data:', player);
+    
+    // NEW: Log all the player properties to see what's available
+    console.log('🔍 All player properties:');
+    Object.keys(player).forEach(key => {
+        console.log(`  ${key}:`, player[key as keyof MasterPlayer], typeof player[key as keyof MasterPlayer]);
+    });
+    
     console.log('🔍 Player rating:', player.regularRating, typeof player.regularRating);
     console.log('🔍 Player uscfExpiration:', player.uscfExpiration, typeof player.uscfExpiration);
     
