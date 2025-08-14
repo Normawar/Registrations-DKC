@@ -34,7 +34,7 @@ interface PlayerSearchDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSelectPlayer: (player: MasterPlayer) => void;
-  onPlayerSelected?: (player: MasterPlayer) => void; // Add this new prop
+  onPlayerSelected?: (player: MasterPlayer) => void; 
   excludeIds?: string[];
   portalType: 'sponsor' | 'organizer' | 'individual';
 }
@@ -60,31 +60,31 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPla
   });
   
 const handleSelect = (player: MasterPlayer) => {
-    console.log('🎯 PlayerSearchDialog: Player selected:', player.firstName, player.lastName);
-    console.log('🎯 PlayerSearchDialog: portalType:', portalType);
-    console.log('🎯 PlayerSearchDialog: profile:', profile);
-    
     let playerWithSponsorInfo = { ...player };
-    if (portalType === 'sponsor' && profile) {
-        playerWithSponsorInfo = {
-            ...player,
-            district: profile.district,
-            school: profile.school,
-        };
-        console.log('🎯 PlayerSearchDialog: Updated player with sponsor info:', playerWithSponsorInfo);
-    }
     
-    // Close the search dialog
-    console.log('🎯 PlayerSearchDialog: Closing dialog');
-    onOpenChange(false);
-    
-    // For sponsors, always open edit dialog to complete/verify information
-    if (portalType === 'sponsor' && onPlayerSelected) {
-        console.log('🎯 PlayerSearchDialog: Opening edit dialog for sponsor');
-        onPlayerSelected(playerWithSponsorInfo);
+    // For individual portal, the logic from onPlayerSelected is now used directly
+    if (portalType === 'individual' && onPlayerSelected) {
+      if (parentStudents.find(s => s.id === player.id)) {
+        toast({
+          variant: 'destructive',
+          title: "Student Already Added",
+          description: `${player.firstName} ${player.lastName} is already in your students list.`
+        });
+        return;
+      }
+      onOpenChange(false);
+      onPlayerSelected(player);
     } else {
-        // For non-sponsors, add immediately as before
-        console.log('🎯 PlayerSearchDialog: Adding player directly (non-sponsor)');
+        // Existing logic for sponsor/organizer
+        if (portalType === 'sponsor' && profile) {
+            playerWithSponsorInfo = {
+                ...player,
+                district: profile.district,
+                school: profile.school,
+            };
+        }
+        
+        onOpenChange(false);
         onSelectPlayer(playerWithSponsorInfo);
     }
 };
@@ -99,7 +99,6 @@ const handleSelect = (player: MasterPlayer) => {
                 </DialogDescription>
             </DialogHeader>
 
-            {/* Search Form - Fixed height */}
             <div className="border rounded-md p-4 space-y-4 shrink-0">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
@@ -153,16 +152,13 @@ const handleSelect = (player: MasterPlayer) => {
                 )}
             </div>
 
-            {/* Results Section - Flex grow with proper overflow */}
     <div className="flex flex-col flex-1 min-h-0">
-        {/* Results header */}
         {hasResults && (
             <div className="py-2 text-sm text-muted-foreground shrink-0">
                 Found {searchResults.length} player{searchResults.length !== 1 ? 's' : ''}
             </div>
         )}
         
-        {/* Scrollable results container */}
         <div className="flex-1 overflow-hidden border rounded-md">
             <div className="h-full overflow-y-auto">
                 <div className="p-4">
@@ -184,7 +180,7 @@ const handleSelect = (player: MasterPlayer) => {
                     {hasResults && (
                         <div className="space-y-2">
                             {searchResults.map((player, index) => {
-                                const missingFields = portalType === 'sponsor' ? [
+                                const missingFields = (portalType === 'sponsor' || portalType === 'individual') ? [
                                     !player.dob && 'DOB',
                                     !player.grade && 'Grade', 
                                     !player.section && 'Section',
@@ -201,12 +197,12 @@ const handleSelect = (player: MasterPlayer) => {
                                             <p className="text-sm text-muted-foreground">
                                                 ID: {player.uscfId} | Rating: {player.regularRating || 'UNR'} | School: {player.school || 'N/A'}
                                             </p>
-                                            {isIncomplete && portalType === 'sponsor' && (
+                                            {isIncomplete && (portalType === 'sponsor' || portalType === 'individual') && (
                                                 <p className="text-xs text-blue-600 mt-1">
                                                     📝 Needs completion: {missingFields.join(', ')}
                                                 </p>
                                             )}
-                                            {!isIncomplete && portalType === 'sponsor' && (
+                                            {!isIncomplete && (portalType === 'sponsor' || portalType === 'individual') && (
                                                 <p className="text-xs text-green-600 mt-1">
                                                     ✅ Complete profile
                                                 </p>
@@ -215,9 +211,16 @@ const handleSelect = (player: MasterPlayer) => {
                                         <Button 
                                             variant="secondary"
                                             size="sm" 
-                                            onClick={() => handleSelect(player)}
+                                            onClick={() => {
+                                                if (onPlayerSelected) {
+                                                    onPlayerSelected(player);
+                                                } else {
+                                                    onSelectPlayer(player);
+                                                }
+                                                onOpenChange(false);
+                                            }}
                                         >
-                                            {isIncomplete && portalType === 'sponsor' ? 'Add & Complete' : 'Select'}
+                                            {(isIncomplete && (portalType === 'sponsor' || portalType === 'individual')) ? 'Add & Complete' : 'Select'}
                                         </Button>
                                     </div>
                                 );

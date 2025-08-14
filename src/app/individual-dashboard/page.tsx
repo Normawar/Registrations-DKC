@@ -230,7 +230,7 @@ const texasDistricts = Object.keys(districtSchoolMapping).sort();
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
   const { profile, isProfileLoaded, updateProfile: updateUserProfile } = useSponsorProfile();
-  const { database, updatePlayer } = useMasterDb();
+  const { database, updatePlayer, addPlayer } = useMasterDb();
   const { toast } = useToast();
   
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);

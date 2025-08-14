@@ -143,111 +143,21 @@ function RosterPageContent() {
     setIsEditPlayerDialogOpen(true);
   };
   
-const handleSelectPlayer = (player: MasterPlayer) => {
-    console.log('🏠 Roster: handleSelectPlayer called with:', player.firstName, player.lastName);
-    // Player is already assigned to the sponsor's school/district by the dialog
+  const handleSelectPlayer = (player: MasterPlayer) => {
     addPlayer(player);
     toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
-    console.log('🏠 Roster: Player added to database');
-};
+  };
 
-const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
-    console.log('📝 Roster: handlePlayerSelectedForEdit called with:', player.firstName, player.lastName);
-    console.log('🔍 Raw player data:', player);
-    
-    // NEW: Log all the player properties to see what's available
-    console.log('🔍 All player properties:');
-    Object.keys(player).forEach(key => {
-        console.log(`  ${key}:`, player[key as keyof MasterPlayer], typeof player[key as keyof MasterPlayer]);
-    });
-    
-    console.log('🔍 Player rating:', player.regularRating, typeof player.regularRating);
-    console.log('🔍 Player uscfExpiration:', player.uscfExpiration, typeof player.uscfExpiration);
-    
-    // Store the pending player (not added to roster yet)
+  const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
     setPendingPlayer(player);
-    
-    // Open edit dialog with player data
     setEditingPlayer(player);
-    
-    // Parse rating - handle both string and number formats
-    let ratingValue;
-    if (player.regularRating !== undefined && player.regularRating !== null) {
-        if (typeof player.regularRating === 'string') {
-            const numRating = parseInt(player.regularRating);
-            ratingValue = isNaN(numRating) ? undefined : numRating;
-        } else {
-            ratingValue = player.regularRating;
-        }
-    }
-    
-    // Parse USCF expiration date - handle multiple date formats
-    let uscfExpirationDate;
-    if (player.uscfExpiration) {
-        try {
-            // Try parsing as ISO string first
-            uscfExpirationDate = new Date(player.uscfExpiration);
-            // Check if the date is valid
-            if (isNaN(uscfExpirationDate.getTime())) {
-                console.log('❌ Invalid uscfExpiration date:', player.uscfExpiration);
-                uscfExpirationDate = undefined;
-            } else {
-                console.log('✅ Parsed uscfExpiration:', uscfExpirationDate);
-            }
-        } catch (error) {
-            console.log('❌ Error parsing uscfExpiration:', error);
-            uscfExpirationDate = undefined;
-        }
-    }
-    
-    // Parse DOB
-    let dobDate;
-    if (player.dob) {
-        try {
-            dobDate = new Date(player.dob);
-            if (isNaN(dobDate.getTime())) {
-                console.log('❌ Invalid dob date:', player.dob);
-                dobDate = undefined;
-            } else {
-                console.log('✅ Parsed dob:', dobDate);
-            }
-        } catch (error) {
-            console.log('❌ Error parsing dob:', error);
-            dobDate = undefined;
-        }
-    }
-    
-    console.log('🔍 Final values for form:');
-    console.log('- Rating:', ratingValue);
-    console.log('- USCF Expiration:', uscfExpirationDate);
-    console.log('- DOB:', dobDate);
-    
-    // Properly populate ALL fields from the database
-    const formData = {
-        id: player.id,
-        firstName: player.firstName || '',
-        middleName: player.middleName || '',
-        lastName: player.lastName || '',
-        uscfId: player.uscfId || '',
-        regularRating: ratingValue, // Use the parsed rating
-        grade: player.grade || '',
-        section: player.section || '',
-        email: player.email || '',
-        phone: player.phone || '',
-        zipCode: player.zipCode || '',
-        studentType: player.studentType || '',
-        state: player.state || '',
-        school: player.school || '',
-        district: player.district || '',
-        dob: dobDate,
-        uscfExpiration: uscfExpirationDate,
-    };
-    
-    console.log('🔍 Form data being set:', formData);
-    
-    playerForm.reset(formData);
+    playerForm.reset({
+        ...player,
+        dob: player.dob ? new Date(player.dob) : undefined,
+        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+    });
     setIsEditPlayerDialogOpen(true);
-};
+  };
   
   const handleRemoveFromRoster = (player: MasterPlayer) => {
     setPlayerToDelete(player);
@@ -263,75 +173,44 @@ const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
     setPlayerToDelete(null);
   };
 
-const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-    if (!editingPlayer) return;
+  const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
+      if (!editingPlayer) return;
 
-    // For sponsors, validate required fields before saving
-    const requiredFields = ['firstName', 'lastName', 'uscfId', 'email', 'grade', 'section', 'dob', 'zipCode'];
-    const missingFields = requiredFields.filter(field => {
-        const value = values[field as keyof PlayerFormValues];
-        return !value || (typeof value === 'string' && value.trim() === '');
-    });
+      const { uscfExpiration, dob, ...restOfValues } = values;
+      
+      const updatedPlayerRecord: MasterPlayer = {
+          ...editingPlayer,
+          ...restOfValues,
+          dob: dob ? dob.toISOString() : undefined,
+          uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+      };
+      
+      if (pendingPlayer) {
+          addPlayer(updatedPlayerRecord);
+          toast({ 
+              title: "Player Added to Roster", 
+              description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
+          });
+          setPendingPlayer(null);
+      } else {
+          await updatePlayer(updatedPlayerRecord);
+          toast({ 
+              title: "Player Updated", 
+              description: `${values.firstName} ${values.lastName}'s information has been updated.`
+          });
+      }
+      
+      setIsEditPlayerDialogOpen(false);
+      setEditingPlayer(null);
+  };
 
-    if (missingFields.length > 0) {
-        const fieldLabels = {
-            firstName: 'First Name',
-            lastName: 'Last Name', 
-            uscfId: 'USCF ID',
-            email: 'Email',
-            grade: 'Grade',
-            section: 'Section',
-            dob: 'Date of Birth',
-            zipCode: 'Zip Code'
-        };
-        
-        toast({
-            variant: 'destructive',
-            title: 'Required Information Missing',
-            description: `Please complete these required fields: ${missingFields.map(f => fieldLabels[f as keyof typeof fieldLabels]).join(', ')}`
-        });
-        return; // Don't save until all required fields are filled
-    }
-
-    const { uscfExpiration, dob, ...restOfValues } = values;
-    
-    const updatedPlayerRecord: MasterPlayer = {
-        ...editingPlayer,
-        ...restOfValues,
-        dob: dob ? dob.toISOString() : undefined,
-        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-    };
-    
-    // NOW add the player to the roster (only after successful validation)
-    if (pendingPlayer) {
-        addPlayer(updatedPlayerRecord);
-        toast({ 
-            title: "Player Added to Roster", 
-            description: `${values.firstName} ${values.lastName} has been successfully added to your roster with complete information.`
-        });
-        setPendingPlayer(null);
-    } else {
-        // This was an edit of existing roster player
-        await updatePlayer(updatedPlayerRecord);
-        toast({ 
-            title: "Player Updated", 
-            description: `${values.firstName} ${values.lastName}'s information has been updated.`
-        });
-    }
-    
-    setIsEditPlayerDialogOpen(false);
-    setEditingPlayer(null);
-};
-
-const handleCancelEdit = () => {
-    if (pendingPlayer) {
-        // User was adding a new player but cancelled - don't add to roster
-        console.log('🚫 User cancelled adding new player - not adding to roster');
-        setPendingPlayer(null);
-    }
-    setIsEditPlayerDialogOpen(false);
-    setEditingPlayer(null);
-};
+  const handleCancelEdit = () => {
+      if (pendingPlayer) {
+          setPendingPlayer(null);
+      }
+      setIsEditPlayerDialogOpen(false);
+      setEditingPlayer(null);
+  };
 
 
   if (!isProfileLoaded || !isDbLoaded) {
