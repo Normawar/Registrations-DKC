@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -25,18 +26,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEvents } from "@/hooks/use-events";
 import { useMemo, useState, useEffect } from "react";
 import { format } from "date-fns";
-import { FileText, ImageIcon, User, Users } from "lucide-react";
+import { FileText, ImageIcon, User, Users, Plus } from "lucide-react";
 import { ParentRegistrationComponent } from "@/components/parent-registration-component";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
+import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
+import { useToast } from "@/hooks/use-toast";
 
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
   const { profile, isProfileLoaded } = useSponsorProfile();
   const { database } = useMasterDb();
+  const { toast } = useToast();
+  
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
 
   const upcomingEvents = useMemo(() => {
     return events
@@ -61,6 +67,21 @@ export default function IndividualDashboardPage() {
     }
   }, [profile, database]);
   
+  const handleAddStudent = (player: MasterPlayer) => {
+    if (!parentStudents.find(s => s.id === player.id)) {
+      const updatedStudents = [...parentStudents, player];
+      setParentStudents(updatedStudents);
+      
+      const studentIds = updatedStudents.map(s => s.id);
+      localStorage.setItem(`parent_students_${parentProfile.email}`, JSON.stringify(studentIds));
+      
+      toast({
+        title: "Student Added",
+        description: `${player.firstName} ${player.lastName} has been added to your students list.`
+      });
+    }
+  };
+
   if (!isProfileLoaded || !profile) {
     return (
         <AppLayout>
@@ -122,15 +143,20 @@ export default function IndividualDashboardPage() {
                 </div>
 
                 <div className="space-y-2">
-                    <h4 className="font-semibold flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /> Your Students</h4>
+                    <div className="flex justify-between items-center border-t pt-4">
+                        <h4 className="font-semibold flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /> Your Students ({parentStudents.length})</h4>
+                        <Button size="sm" onClick={() => setIsSearchDialogOpen(true)}>
+                            <Plus className="mr-2 h-4 w-4" /> Add Student
+                        </Button>
+                    </div>
                     {parentStudents.length > 0 ? (
-                        <ul className="list-disc list-inside text-sm text-muted-foreground">
+                        <ul className="list-disc list-inside text-sm text-muted-foreground pl-2">
                             {parentStudents.map(student => (
                                 <li key={student.id}>{student.firstName} {student.lastName}</li>
                             ))}
                         </ul>
                     ) : (
-                        <p className="text-sm text-muted-foreground">No students added yet.</p>
+                        <p className="text-sm text-muted-foreground text-center py-4">No students added yet. Use the Add Student button to search and add your students.</p>
                     )}
                 </div>
             </CardContent>
@@ -226,8 +252,15 @@ export default function IndividualDashboardPage() {
             </Table>
           </Card>
         </div>
+        
+         <PlayerSearchDialog
+            isOpen={isSearchDialogOpen}
+            onOpenChange={setIsSearchDialogOpen}
+            onSelectPlayer={handleAddStudent}
+            excludeIds={parentStudents.map(s => s.id)}
+            portalType="individual"
+        />
       </div>
     </AppLayout>
   );
 }
-

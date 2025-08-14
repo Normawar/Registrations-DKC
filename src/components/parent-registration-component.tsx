@@ -89,7 +89,7 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
     }
   }, [database, events, parentProfile.email]);
 
-  // Load parent's students (players with same last name or manually added)
+  // Load parent's students
   useEffect(() => {
     const loadParentStudents = () => {
       try {
@@ -220,29 +220,17 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
         </p>
       </div>
 
-      {/* Parent's Students */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Your Students ({parentStudents.length})
-              </CardTitle>
-              <CardDescription>
-                Students you can register for events
-              </CardDescription>
-            </div>
-            <Button onClick={() => setIsSearchDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Student
-            </Button>
+        <CardHeader>
+          <CardTitle>Event Registrations</CardTitle>
+          <CardDescription>
+            Register your students for upcoming tournaments.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {parentStudents.length === 0 ? (
             <div className="text-center p-6 text-muted-foreground">
-              <User className="mx-auto h-12 w-12 mb-4 opacity-50" />
-              <p>No students added yet.</p>
-              <p className="text-sm">Use the "Add Student" button to search and add your students.</p>
+                <p>No students found. Add a student to your profile to begin registering for events.</p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
@@ -310,14 +298,6 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
           )}
         </CardContent>
       </Card>
-
-      <PlayerSearchDialog
-        isOpen={isSearchDialogOpen}
-        onOpenChange={setIsSearchDialogOpen}
-        onSelectPlayer={handleAddStudent}
-        excludeIds={parentStudents.map(s => s.id)}
-        portalType="individual"
-      />
     </div>
   );
 }
