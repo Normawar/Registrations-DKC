@@ -25,240 +25,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEvents } from "@/hooks/use-events";
 import { useMemo, useState, useEffect } from "react";
 import { format } from "date-fns";
-import { FileText, ImageIcon, User, Users, Plus, X, School, CalendarIcon } from "lucide-react";
+import { FileText, ImageIcon, User, Users, Plus } from "lucide-react";
 import { ParentRegistrationComponent } from "@/components/parent-registration-component";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogFooter 
-} from '@/components/ui/dialog';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from "@/components/ui/form";
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
-
-const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
-const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
-
-const playerFormSchema = z.object({
-  id: z.string().optional(),
-  firstName: z.string().min(1, { message: "First Name is required." }),
-  middleName: z.string().optional(),
-  lastName: z.string().min(1, { message: "Last Name is required." }),
-  uscfId: z.string().min(1, { message: "USCF ID is required." }),
-  uscfExpiration: z.date().optional(),
-  regularRating: z.preprocess(
-    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
-    z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
-  ),
-  grade: z.string().min(1, { message: "Grade is required." }),
-  section: z.string().min(1, { message: "Section is required." }),
-  email: z.string().min(1, { message: "Email is required." }).email({ message: "Please enter a valid email." }),
-  phone: z.string().optional(),
-  dob: z.date({ required_error: "Date of Birth is required." }),
-  zipCode: z.string().min(1, { message: "Zip Code is required." }),
-  studentType: z.string().optional(),
-  state: z.string().optional(),
-  school: z.string().min(1, { message: "School is required." }),
-  district: z.string().min(1, { message: "District is required." }),
-}).refine(data => {
-    if (data.uscfId.toUpperCase() !== 'NEW') { 
-        return data.uscfExpiration !== undefined; 
-    }
-    return true;
-}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] });
-
-
-type PlayerFormValues = z.infer<typeof playerFormSchema>;
-
-const districtSchoolMapping = {
-  "SHARYLAND ISD": [
-    "SHARYLAND PIONEER H S",
-    "SHARYLAND H S",
-    "B L GRAY JUNIOR HIGH",
-    "SHARYLAND INTERMEDIATE",
-    "SHARYLAND NORTH JUNIOR HIGH",
-    "MISSION H S FRESHMAN",
-    "LAURA BIRD ELEMENTARY",
-    "LIBERTY ELEMENTARY",
-    "LOMA VISTA ELEMENTARY",
-    "NORMA ALVAREZ ELEMENTARY",
-    "SALINAS ELEMENTARY",
-    "SAUCEDA ELEMENTARY"
-  ],
-  "MCALLEN ISD": [
-    "MCALLEN H S",
-    "MCALLEN MEMORIAL H S",
-    "ROWE H S",
-    "NIKKI ROWE H S",
-    "LAMAR ACADEMY",
-    "CATHEY MIDDLE",
-    "LINCOLN MIDDLE SCHOOL",
-    "TRAVIS MIDDLE SCHOOL",
-    "DE ZAVALA MIDDLE SCHOOL",
-    "MEMORIAL MIDDLE SCHOOL",
-    "BROWN MIDDLE SCHOOL",
-    "AUSTIN ELEMENTARY",
-    "BONHAM ELEMENTARY",
-    "CROCKETT ELEMENTARY",
-    "FRANKLIN ELEMENTARY",
-    "HOUSTON ELEMENTARY",
-    "JACKSON ELEMENTARY",
-    "KENNEDY ELEMENTARY",
-    "LAMAR ELEMENTARY",
-    "SEGUIN ELEMENTARY",
-    "TRAVIS ELEMENTARY",
-    "WILSON ELEMENTARY"
-  ],
-  "EDINBURG CISD": [
-    "EDINBURG H S",
-    "EDINBURG NORTH H S",
-    "VELA H S",
-    "IDEA EDINBURG",
-    "ROBERT VELA H S",
-    "HENDERSON MIDDLE SCHOOL",
-    "KENNEDY MIDDLE SCHOOL",
-    "EISENHOWER MIDDLE SCHOOL",
-    "NASCIMENTO ELEMENTARY",
-    "PETERSON ELEMENTARY",
-    "RAMIREZ ELEMENTARY"
-  ],
-  "PHARR-SAN JUAN-ALAMO ISD": [
-    "PSJA H S",
-    "PSJA MEMORIAL H S",
-    "PSJA NORTH H S",
-    "PSJA SOUTHWEST H S",
-    "GERALDINE PALMER ELEMENTARY",
-    "LLOYD M BENTSEN ELEMENTARY",
-    "RAUL GARCIA ELEMENTARY",
-    "JOSE BORREGO MIDDLE SCHOOL"
-  ],
-  "LA JOYA ISD": [
-    "LA JOYA H S",
-    "PALMVIEW H S",
-    "JUAREZ-LINCOLN H S",
-    "LA JOYA COMMUNITY H S",
-    "MEMORIAL MIDDLE SCHOOL",
-    "DR AMERICO PAREDES MIDDLE SCHOOL",
-    "ABEL GARCIA ELEMENTARY",
-    "ALTON ELEMENTARY",
-    "INEZ ELEMENTARY"
-  ],
-  "MISSION CISD": [
-    "MISSION H S",
-    "MISSION VETERANS MEMORIAL H S",
-    "ALTON MEMORIAL JUNIOR HIGH",
-    "CANTU ELEMENTARY",
-    "ESCANDON ELEMENTARY",
-    "LEAL ELEMENTARY",
-    "MENDEZ ELEMENTARY"
-  ],
-  "HIDALGO ISD": [
-    "HIDALGO H S",
-    "HIDALGO EARLY COLLEGE H S",
-    "CARMEN ANAYA ELEMENTARY",
-    "SALINAS ELEMENTARY"
-  ],
-  "DONNA ISD": [
-    "DONNA H S",
-    "DONNA NORTH H S",
-    "S H LEADERSHIP ACADEMY",
-    "ADAME ELEMENTARY",
-    "ALBA A DUNLAP ELEMENTARY",
-    "DONNA ELEMENTARY"
-  ],
-  "MERCEDES ISD": [
-    "MERCEDES H S",
-    "MERCEDES JUNIOR HIGH",
-    "FERNANDEZ ELEMENTARY",
-    "MERCEDES ELEMENTARY",
-    "ROOSEVELT ELEMENTARY"
-  ],
-  "WESLACO ISD": [
-    "WESLACO H S",
-    "WESLACO EAST H S",
-    "JOHN F KENNEDY H S",
-    "WESLACO EAST H S",
-    "AIRPORT ELEMENTARY",
-    "BRIDGE ELEMENTARY",
-    "CENTRAL ELEMENTARY"
-  ],
-  "BROWNSVILLE ISD": [
-    "BROWNSVILLE H S",
-    "HANNA H S",
-    "LOPEZ H S",
-    "PACE H S",
-    "PORTER H S",
-    "VETERANS MEMORIAL H S",
-    "BREEDEN ELEMENTARY",
-    "CUMMINGS MIDDLE SCHOOL"
-  ],
-  "HARLINGEN CISD": [
-    "HARLINGEN H S",
-    "HARLINGEN SOUTH H S",
-    "HARLINGEN H S SOUTH CAMPUS",
-    "COAKLEY MIDDLE SCHOOL",
-    "GUTIERREZ MIDDLE SCHOOL",
-    "AUSTIN ELEMENTARY",
-    "BOWIE ELEMENTARY"
-  ]
-};
-
-const texasDistricts = Object.keys(districtSchoolMapping).sort();
 
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
   const { profile, isProfileLoaded } = useSponsorProfile();
-  const { database, updatePlayer, addPlayer } = useMasterDb();
+  const { database } = useMasterDb();
   const { toast } = useToast();
   
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
-  const [pendingStudent, setPendingStudent] = useState<MasterPlayer | null>(null);
-  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-
-  const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
-  const [pendingStudentForEdit, setPendingStudentForEdit] = useState<MasterPlayer | null>(null);
-  
-  const [selectedDistrict, setSelectedDistrict] = useState('');
-  const [availableSchools, setAvailableSchools] = useState<string[]>([]);
-  const [showCustomSchool, setShowCustomSchool] = useState(false);
-  const [showCustomDistrict, setShowCustomDistrict] = useState(false);
-
-  const playerForm = useForm<PlayerFormValues>({
-    resolver: zodResolver(playerFormSchema),
-  });
-  
-  useEffect(() => {
-    if (selectedDistrict && selectedDistrict !== 'OTHER') {
-      const schools = districtSchoolMapping[selectedDistrict as keyof typeof districtSchoolMapping] || [];
-      setAvailableSchools(schools.sort());
-    } else {
-      setAvailableSchools([]);
-    }
-  }, [selectedDistrict]);
 
   const upcomingEvents = useMemo(() => {
     return events
@@ -283,176 +66,20 @@ export default function IndividualDashboardPage() {
     }
   }, [profile, database]);
   
-  const handleSelectStudent = (player: MasterPlayer) => {
-    if (parentStudents.find(s => s.id === player.id)) {
-      toast({
-        variant: 'destructive',
-        title: "Student Already Added",
-        description: `${player.firstName} ${player.lastName} is already in your students list.`
-      });
-      return;
-    }
-
-    const missingFields = [];
-    if (!player.dob) missingFields.push('Date of Birth');
-    if (!player.grade) missingFields.push('Grade');
-    if (!player.section) missingFields.push('Section');
-    if (!player.email) missingFields.push('Email');
-    if (!player.zipCode) missingFields.push('Zip Code');
-    
-    if (missingFields.length > 0) {
-      setPendingStudentForEdit(player);
-      handleEditStudent(player);
-      return;
-    }
-
-    setPendingStudent(player);
-    setIsConfirmDialogOpen(true);
-  };
-  
-  const handleEditStudent = (player: MasterPlayer) => {
-      setEditingPlayer(player);
+  const handleAddStudent = (player: MasterPlayer) => {
+    if (!profile?.email) return;
+    if (!parentStudents.find(s => s.id === player.id)) {
+      const updatedStudents = [...parentStudents, player];
+      setParentStudents(updatedStudents);
       
-      setShowCustomSchool(false);
-      setShowCustomDistrict(false);
-      
-      const initialDistrict = player.district || '';
-      setSelectedDistrict(initialDistrict);
-      
-      console.log('🔍 Student school assignment status:', {
-        school: player.school,
-        district: player.district
-      });
-
-      playerForm.reset({
-        id: player.id || '',
-        firstName: player.firstName || '',
-        middleName: player.middleName || '',
-        lastName: player.lastName || '',
-        uscfId: player.uscfId || '',
-        regularRating: player.regularRating,
-        grade: player.grade || '',
-        section: player.section || '',
-        email: player.email || '',
-        phone: player.phone || '',
-        zipCode: player.zipCode || '',
-        studentType: player.studentType || '',
-        state: player.state || 'TX',
-        school: player.school || '',
-        district: player.district || '',
-        dob: player.dob ? new Date(player.dob) : undefined,
-        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
-      });
-      setIsEditPlayerDialogOpen(true);
-  };
-
-  const handleConfirmAddStudent = (studentToAdd?: MasterPlayer) => {
-    const student = studentToAdd || pendingStudent;
-    if (!student || !profile?.email) return;
-
-    const updatedStudents = [...parentStudents, student];
-    setParentStudents(updatedStudents);
-    
-    const studentIds = updatedStudents.map(s => s.id);
-    localStorage.setItem(`parent_students_${profile.email}`, JSON.stringify(studentIds));
-    
-    if(!studentToAdd) {
-        toast({
-          title: "Student Added",
-          description: `${student.firstName} ${student.lastName} has been added to your students list.`
-        });
-    }
-
-    setPendingStudent(null);
-    setPendingStudentForEdit(null);
-    setIsConfirmDialogOpen(false);
-  };
-
-  const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-      console.log('🔍 Form submit triggered with values:', values);
-      
-      if (!editingPlayer) {
-        console.log('❌ No editing player found');
-        return;
-      }
-    
-      try {
-        const { uscfExpiration, dob, ...restOfValues } = values;
-        
-        const updatedPlayerRecord: MasterPlayer = {
-          ...editingPlayer,
-          ...restOfValues,
-          school: values.school?.trim() || '',
-          district: values.district?.trim() || '',
-          dob: dob ? dob.toISOString() : undefined,
-          uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-        };
-        
-        console.log('🔍 About to update player:', updatedPlayerRecord);
-        
-        updatePlayer(updatedPlayerRecord);
-        console.log('✅ Player updated in database');
-    
-        if (pendingStudentForEdit) {
-          console.log('🔍 Adding student to parent list');
-          handleConfirmAddStudent(updatedPlayerRecord);
-          
-          const schoolInfo = values.school && values.district 
-            ? ` and assigned to ${values.school} - ${values.district}`
-            : '';
-          
-          toast({ 
-            title: "Student Added", 
-            description: `${values.firstName} ${values.lastName} has been completed${schoolInfo} and added to your students list.`
-          });
-        } else {
-          toast({ 
-            title: "Student Updated", 
-            description: `${values.firstName} ${values.lastName}'s information has been updated.`
-          });
-        }
-        
-        setIsEditPlayerDialogOpen(false);
-        setEditingPlayer(null);
-        setPendingStudentForEdit(null);
-        console.log('✅ Form submission completed successfully');
-        
-      } catch (error) {
-        console.error('❌ Error in form submission:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to save student information. Please try again.'
-        });
-      }
-  };
-
-  const handleCancelEdit = () => {
-    if (pendingStudentForEdit) {
-      setPendingStudentForEdit(null);
-    }
-    setIsEditPlayerDialogOpen(false);
-    setEditingPlayer(null);
-  };
-
-  const handleCancelAddStudent = () => {
-    setPendingStudent(null);
-    setIsConfirmDialogOpen(false);
-  };
-
-  const handleRemoveStudent = (student: MasterPlayer) => {
-    const updatedStudents = parentStudents.filter(s => s.id !== student.id);
-    setParentStudents(updatedStudents);
-    
-    if (profile?.email) {
       const studentIds = updatedStudents.map(s => s.id);
       localStorage.setItem(`parent_students_${profile.email}`, JSON.stringify(studentIds));
+      
+      toast({
+        title: "Student Added",
+        description: `${player.firstName} ${player.lastName} has been added to your students list.`
+      });
     }
-    
-    toast({
-      title: "Student Removed",
-      description: `${student.firstName} ${student.lastName} has been removed from your students list.`
-    });
   };
 
   if (!isProfileLoaded || !profile) {
@@ -487,6 +114,7 @@ export default function IndividualDashboardPage() {
     );
   }
 
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -516,59 +144,19 @@ export default function IndividualDashboardPage() {
 
                 <div className="space-y-2">
                     <div className="flex justify-between items-center border-t pt-4">
-                        <h4 className="font-semibold flex items-center gap-2 text-sm">
-                          <Users className="h-4 w-4 text-muted-foreground" /> 
-                          Your Students ({parentStudents.length})
-                        </h4>
+                        <h4 className="font-semibold flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /> Your Students ({parentStudents.length})</h4>
                         <Button size="sm" onClick={() => setIsSearchDialogOpen(true)}>
                             <Plus className="mr-2 h-4 w-4" /> Add Student
                         </Button>
                     </div>
                     {parentStudents.length > 0 ? (
-                        <div className="space-y-2">
+                        <ul className="list-disc list-inside text-sm text-muted-foreground pl-2">
                             {parentStudents.map(student => (
-                                <div key={student.id} className="flex items-center justify-between text-sm p-3 border rounded hover:bg-muted/50 transition-colors">
-                                    <div className="flex-1">
-                                        <button
-                                            onClick={() => handleEditStudent(student)}
-                                            className="text-left hover:text-primary transition-colors font-medium underline-offset-4 hover:underline cursor-pointer"
-                                        >
-                                            {student.firstName} {student.lastName}
-                                        </button>
-                                        <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                                            <div>USCF ID: {student.uscfId} | Rating: {student.regularRating || 'UNR'}</div>
-                                            {student.school && student.district && (
-                                                <div className="flex items-center gap-1">
-                                                    <School className="h-3 w-3" />
-                                                    {student.school} - {student.district}
-                                                </div>
-                                            )}
-                                            {student.grade && (
-                                                <div>Grade: {student.grade} | Section: {student.section || 'Not set'}</div>
-                                            )}
-                                            {(!student.email || !student.grade || !student.section) && (
-                                                <div className="text-orange-600 text-xs">
-                                                    ⚠️ Profile incomplete - click name to complete
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <Button 
-                                        size="sm" 
-                                        variant="ghost" 
-                                        onClick={() => handleRemoveStudent(student)}
-                                        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive ml-2 shrink-0"
-                                        title="Remove student"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                                <li key={student.id}>{student.firstName} {student.lastName}</li>
                             ))}
-                        </div>
+                        </ul>
                     ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          No students added yet. Use the Add Student button to search and add your students.
-                        </p>
+                        <p className="text-sm text-muted-foreground text-center py-4">No students added yet. Use the Add Student button to search and add your students.</p>
                     )}
                 </div>
             </CardContent>
@@ -665,280 +253,14 @@ export default function IndividualDashboardPage() {
           </Card>
         </div>
         
-        <PlayerSearchDialog
+         <PlayerSearchDialog
             isOpen={isSearchDialogOpen}
             onOpenChange={setIsSearchDialogOpen}
-            onSelectPlayer={handleSelectStudent}
+            onSelectPlayer={handleAddStudent}
             excludeIds={parentStudents.map(s => s.id)}
             portalType="individual"
         />
-
-        <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Student</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to add {pendingStudent?.firstName} {pendingStudent?.lastName} to your students list?
-              </DialogDescription>
-            </DialogHeader>
-            {pendingStudent && (
-              <div className="py-4">
-                <div className="space-y-2">
-                  <p><strong>Name:</strong> {pendingStudent.firstName} {pendingStudent.lastName}</p>
-                  <p><strong>USCF ID:</strong> {pendingStudent.uscfId}</p>
-                  <p><strong>Rating:</strong> {pendingStudent.regularRating || 'UNR'}</p>
-                  <p><strong>School:</strong> {pendingStudent.school || 'N/A'}</p>
-                  <p><strong>Grade:</strong> {pendingStudent.grade || 'N/A'}</p>
-                  <p><strong>Section:</strong> {pendingStudent.section || 'N/A'}</p>
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button variant="outline" onClick={handleCancelAddStudent}>
-                Cancel
-              </Button>
-              <Button onClick={() => handleConfirmAddStudent()}>
-                Add Student
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        
-      <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
-          <DialogHeader className="p-6 pb-4 border-b shrink-0">
-            <DialogTitle>
-              {pendingStudentForEdit ? 'Complete Student Information' : 'Edit Student Information'}
-            </DialogTitle>
-            <DialogDescription>
-                {pendingStudentForEdit 
-                    ? (() => {
-                        const hasSchool = editingPlayer?.school && editingPlayer.school.trim() !== '';
-                        const hasDistrict = editingPlayer?.district && editingPlayer.district.trim() !== '';
-                        
-                        if (hasSchool && hasDistrict) {
-                          return `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName}. Student is currently assigned to ${editingPlayer?.school} - ${editingPlayer?.district}.`;
-                        } else {
-                          return `Complete the required information for ${editingPlayer?.firstName} ${editingPlayer?.lastName}. This student is not yet assigned to a school - you can assign them to your child's school.`;
-                        }
-                      })()
-                    : `Update the details for ${editingPlayer?.firstName} ${editingPlayer?.lastName}.`
-                  }
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto p-6">
-            <Form {...playerForm}>
-              <form id="edit-student-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <FormField control={playerForm.control} name="firstName" render={({ field }) => ( 
-                    <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                  )} />
-                  <FormField control={playerForm.control} name="lastName" render={({ field }) => ( 
-                    <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                  )} />
-                  <FormField control={playerForm.control} name="middleName" render={({ field }) => ( 
-                    <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                  )} />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={playerForm.control} name="district" render={({ field }) => ( 
-                    <FormItem>
-                      <FormLabel>District * (Select First)</FormLabel>
-                      {showCustomDistrict ? (
-                        <div className="space-y-2">
-                          <FormControl>
-                            <Input 
-                              {...field} 
-                              placeholder="Enter custom district name"
-                              onChange={(e) => {
-                                field.onChange(e.target.value);
-                                setSelectedDistrict(e.target.value);
-                              }}
-                            />
-                          </FormControl>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => {
-                              setShowCustomDistrict(false);
-                              setSelectedDistrict('');
-                              field.onChange('');
-                              playerForm.setValue('school', '');
-                            }}
-                          >
-                            ← Back to dropdown
-                          </Button>
-                        </div>
-                      ) : (
-                        <Select 
-                          onValueChange={(value) => {
-                            if (value === 'OTHER') {
-                              setShowCustomDistrict(true);
-                              setSelectedDistrict('OTHER');
-                              field.onChange('');
-                              playerForm.setValue('school', '');
-                            } else {
-                              field.onChange(value);
-                              setSelectedDistrict(value);
-                              playerForm.setValue('school', '');
-                              setShowCustomSchool(false);
-                            }
-                          }} 
-                          value={field.value && !showCustomDistrict ? field.value : ''}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a district first" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-[200px]">
-                            {texasDistricts.map(district => (
-                              <SelectItem key={district} value={district}>{district}</SelectItem>
-                            ))}
-                            <SelectItem value="OTHER">Other (Enter Custom)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <FormMessage />
-                    </FormItem> 
-                  )} />
-                  
-                  <FormField control={playerForm.control} name="school" render={({ field }) => ( 
-                    <FormItem>
-                      <FormLabel>School *</FormLabel>
-                      {showCustomSchool ? (
-                        <div className="space-y-2">
-                          <FormControl>
-                            <Input 
-                              {...field} 
-                              placeholder="Enter custom school name"
-                            />
-                          </FormControl>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => {
-                              setShowCustomSchool(false);
-                              field.onChange('');
-                            }}
-                          >
-                            ← Back to dropdown
-                          </Button>
-                        </div>
-                      ) : (
-                        <Select 
-                          onValueChange={(value) => {
-                            if (value === 'OTHER') {
-                              setShowCustomSchool(true);
-                              field.onChange('');
-                            } else {
-                              field.onChange(value);
-                            }
-                          }} 
-                          value={field.value && !showCustomSchool ? field.value : ''}
-                          disabled={!selectedDistrict || selectedDistrict === 'OTHER' || showCustomDistrict}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue 
-                                placeholder={
-                                  !selectedDistrict || selectedDistrict === 'OTHER' || showCustomDistrict
-                                    ? "Select district first" 
-                                    : availableSchools.length > 0
-                                    ? "Select a school"
-                                    : "No schools available"
-                                } 
-                              />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-[200px]">
-                            {availableSchools.map(school => (
-                              <SelectItem key={school} value={school}>{school}</SelectItem>
-                            ))}
-                            {availableSchools.length > 0 && (
-                              <SelectItem value="OTHER">Other (Enter Custom)</SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      )}
-                      <FormMessage />
-                      {selectedDistrict && availableSchools.length > 0 && !showCustomSchool && (
-                        <p className="text-xs text-muted-foreground">
-                          {availableSchools.length} schools available in {selectedDistrict}
-                        </p>
-                      )}
-                    </FormItem> 
-                  )} />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( 
-                    <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                  )} />
-                  <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( 
-                    <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> 
-                  )} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={playerForm.control} name="dob" render={({ field }) => ( 
-                    <FormItem className="flex flex-col"><FormLabel>Date of Birth *</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()} initialFocus/></PopoverContent></Popover><FormMessage /></FormItem> 
-                  )} />
-                  <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( 
-                    <FormItem className="flex flex-col"><FormLabel>USCF Expiration</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 2} toYear={new Date().getFullYear() + 10} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
-                  )} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={playerForm.control} name="grade" render={({ field }) => ( 
-                    <FormItem><FormLabel>Grade *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> 
-                  )} />
-                  <FormField control={playerForm.control} name="section" render={({ field }) => ( 
-                    <FormItem><FormLabel>Section *</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> 
-                  )} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField control={playerForm.control} name="email" render={({ field }) => ( 
-                    <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> 
-                  )} />
-                  <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( 
-                    <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> 
-                  )} />
-                </div>
-              </form>
-            </Form>
-          </div>
-          <DialogFooter className="p-6 pt-4 border-t shrink-0">
-            <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
-            <Button 
-              type="button"
-              onClick={async () => {
-                console.log('🔍 Button clicked - triggering form submission');
-                const validationResult = await playerForm.trigger();
-                console.log('🔍 Manual validation result:', validationResult);
-                const errorsAfterValidation = playerForm.formState.errors;
-                console.log('🔍 Errors after validation:', errorsAfterValidation);
-                if (validationResult) {
-                  console.log('✅ Validation passed, calling handleSubmit');
-                  playerForm.handleSubmit(handlePlayerFormSubmit)();
-                } else {
-                  console.log('❌ Validation failed');
-                  toast({
-                    variant: 'destructive',
-                    title: 'Validation Failed',
-                    description: 'Please fill in all required fields before saving.'
-                  });
-                }
-              }}
-            >
-              {pendingStudentForEdit ? 'Complete & Add Student' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       </div>
     </AppLayout>
   );
 }
-
