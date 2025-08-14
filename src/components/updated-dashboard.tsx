@@ -345,7 +345,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
         </Card>
       </div>
 
-      {/* Student Management Section for Individual Users */}
+      {/* Student Management Section for Individual Users - Always show for individual users */}
       {profile.role === 'individual' && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -427,8 +427,8 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                 <p className="text-sm text-orange-700 mt-1">
                   You need to add students to your profile before you can register for events.
                 </p>
-                <Button size="sm" onClick={() => setIsAddStudentDialogOpen(true)}>
-                  Add Students
+                <Button size="sm" asChild>
+                  <Link href="/profile">Add Students</Link>
                 </Button>
               </div>
             </div>
