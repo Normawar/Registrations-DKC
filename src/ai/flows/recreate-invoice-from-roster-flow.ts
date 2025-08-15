@@ -128,7 +128,7 @@ const recreateInvoiceFlow = ai.defineFlow(
         const errorResult = error.result || {};
         const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
         console.error('Square API Error in recreateInvoiceFlow:', JSON.stringify(errorResult, null, 2));
-        const errorMessage = errors[0]?.detail || JSON.stringify(errorResult);
+        const errorMessage = errors.map((e: any) => `[${e.category}/${e.code}]: ${e.detail}`).join(', ');
         throw new Error(`Square Error: ${errorMessage}`);
       } else {
         console.error('An unexpected error occurred during invoice recreation:', error);

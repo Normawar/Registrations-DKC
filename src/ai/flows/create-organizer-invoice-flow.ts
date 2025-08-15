@@ -220,8 +220,7 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
         console.error('Square API Error in createOrganizerInvoiceFlow:', JSON.stringify(errorResult, null, 2));
         let errorMessage: string;
         if (errors.length > 0) {
-            const firstError = errors[0];
-            errorMessage = firstError.detail || `Category: ${firstError.category}, Code: ${firstError.code}`;
+            errorMessage = errors.map((e: any) => `[${e.category}/${e.code}]: ${e.detail}`).join(', ');
         } else {
             errorMessage = JSON.stringify(errorResult);
         }

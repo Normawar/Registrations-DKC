@@ -84,6 +84,7 @@ const cancelInvoiceFlow = ai.defineFlow(
       if (error instanceof ApiError) {
         const errorResult = error.result || {};
         const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
+        
         // Check for specific error where invoice cannot be canceled because of its state
         const isNotCancelable = errors.some(e => 
             e.code === 'BAD_REQUEST' && e.detail?.toLowerCase().includes('cannot be canceled')
@@ -98,8 +99,7 @@ const cancelInvoiceFlow = ai.defineFlow(
         console.error('Square API Error in cancelInvoiceFlow:', JSON.stringify(error.result, null, 2));
         let errorMessage: string;
         if (errors.length > 0) {
-            const firstError = errors[0];
-            errorMessage = firstError.detail || `Category: ${firstError.category}, Code: ${firstError.code}`;
+            errorMessage = errors.map((e: any) => `[${e.category}/${e.code}]: ${e.detail}`).join(', ');
         } else {
             errorMessage = JSON.stringify(error.result);
         }
