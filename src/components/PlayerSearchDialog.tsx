@@ -183,7 +183,7 @@ const handleSelect = (player: MasterPlayer) => {
                                 const isIncomplete = missingFields.length > 0;
                                 
                                 return (
-                                    <div key={player.id} className={`flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 ${isIncomplete ? 'border-blue-200 bg-blue-50' : 'border-green-200 bg-green-50'}`}>
+                                    <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 bg-green-50 border-green-200">
                                         <div className="flex-1">
                                             <p className="font-semibold">{player.firstName} {player.lastName}</p>
                                             <p className="text-sm text-muted-foreground">
@@ -233,4 +233,3 @@ const handleSelect = (player: MasterPlayer) => {
       </Dialog>
   );
 }
-
