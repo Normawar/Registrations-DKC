@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { ParentRegistrationComponent } from '@/components/parent-registration-component';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEvents } from '@/hooks/use-events';
@@ -74,7 +73,7 @@ export default function EventsPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <h2 className="text-xl font-semibold mb-2">Loading...</h2>
-          <p className="text-muted-foreground">Please wait while we load your profile.</p>
+          <div className="text-muted-foreground">Please wait while we load your profile.</div>
         </div>
       </div>
     );
@@ -101,9 +100,9 @@ export default function EventsPage() {
     <div className="space-y-6">
       <div className="border-b pb-6">
         <h1 className="text-3xl font-bold">Register for Events</h1>
-        <p className="text-muted-foreground mt-2">
+        <div className="text-muted-foreground mt-2">
           Register students from {profile.school} for upcoming tournaments.
-        </p>
+        </div>
       </div>
 
       {upcomingEvents.length === 0 ? (
@@ -128,22 +127,22 @@ export default function EventsPage() {
                   <div className="flex items-start justify-between">
                     <div className="space-y-2">
                       <CardTitle className="text-xl">{event.name}</CardTitle>
-                      <CardDescription className="text-base">
+                      <div className="text-muted-foreground text-base">
                         <div className="flex items-center gap-4 text-sm">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            {format(new Date(event.date), 'PPP')}
+                            <span>{format(new Date(event.date), 'PPP')}</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <MapPin className="h-4 w-4" />
-                            {event.location}
+                            <span>{event.location}</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-4 w-4" />
-                            ${event.regularFee}
+                            <span>${event.regularFee}</span>
                           </div>
                         </div>
-                      </CardDescription>
+                      </div>
                     </div>
                     
                     <div className="flex items-center gap-3">
@@ -164,7 +163,7 @@ export default function EventsPage() {
                 <CardContent className="pt-0">
                   <div className="space-y-3">
                     {event.description && (
-                      <p className="text-sm text-muted-foreground">{event.description}</p>
+                      <div className="text-sm text-muted-foreground">{event.description}</div>
                     )}
                     
                     <div className="flex items-center justify-between text-sm">
@@ -185,9 +184,9 @@ export default function EventsPage() {
                     {status.isRegistered && (
                       <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <h4 className="font-medium text-green-800 mb-1">Registration Status</h4>
-                        <p className="text-sm text-green-700">
+                        <div className="text-sm text-green-700">
                           You have {status.studentCount} student{status.studentCount !== 1 ? 's' : ''} registered for this event.
-                        </p>
+                        </div>
                       </div>
                     )}
                   </div>
