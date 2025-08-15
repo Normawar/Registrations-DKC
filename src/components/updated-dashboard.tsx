@@ -279,7 +279,7 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
         </Card>
       </div>
 
-      {/* Student Management Section for Individual Users - Always show for individual users */}
+      {/* Student Management Section for Individual Users */}
       {profile.role === 'individual' && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -616,22 +616,22 @@ function StudentEditDialog({
   const schoolsForSelectedDistrict = useMemo(() => {
     if (!formData.district) return [];
     
-    // Handle special districts
     if (formData.district === 'Independent') {
-      return ['Independent', 'Homeschool', 'Private School', 'Charter School'];
+        const allSchoolsFromSchoolsData = schoolsData.map(school => school.schoolName).filter(Boolean);
+        const allSchoolsFromPlayerData = [...new Set(database.map(player => player.school).filter(Boolean))];
+        const allAvailableSchools = [...new Set(['Independent', 'Homeschool', 'Private School', 'Charter School', ...allSchoolsFromSchoolsData, ...allSchoolsFromPlayerData])].sort();
+        return allAvailableSchools;
     }
     
     if (formData.district === 'Homeschool') {
       return ['Homeschool', 'Co-op', 'Online School'];
     }
     
-    // Get schools from schools data (primary source)
     const schoolsFromSchoolsData = schoolsData
       .filter(school => school.district === formData.district)
       .map(school => school.schoolName)
       .filter(Boolean);
 
-    // Get schools from player database (backup source)
     const schoolsFromPlayerData = [...new Set(
       database
         .filter(player => player.district === formData.district)
@@ -639,7 +639,6 @@ function StudentEditDialog({
         .filter(Boolean)
     )];
 
-    // Combine both sources and remove duplicates
     const allSchools = [...new Set([...schoolsFromSchoolsData, ...schoolsFromPlayerData])].sort();
     
     return allSchools;
@@ -763,6 +762,12 @@ function StudentEditDialog({
                     <option value="Homeschool">Homeschool</option>
                     <option value="Private School">Private School</option>
                     <option value="Charter School">Charter School</option>
+                    <option disabled>─── Or Select School ───</option>
+                    {schoolsForSelectedDistrict
+                      .filter(school => !['Independent', 'Homeschool', 'Private School', 'Charter School'].includes(school))
+                      .map(school => (
+                        <option key={school} value={school}>{school}</option>
+                      ))}
                   </>
                 )}
                 {formData.district === 'Homeschool' && (
