@@ -38,7 +38,7 @@ interface DashboardProps {
 
 export function UpdatedDashboard({ profile }: DashboardProps) {
   const { events } = useEvents();
-  const { database, updatePlayer } = useMasterDb();
+  const { database } = useMasterDb();
   const { toast } = useToast();
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
@@ -573,15 +573,41 @@ function StudentEditDialog({
   student: MasterPlayer | null;
   onStudentUpdated: (student: MasterPlayer) => void;
 }) {
-  const { updatePlayer } = useMasterDb();
+  const { updatePlayer, database, dbDistricts } = useMasterDb();
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     email: '',
     grade: '',
     section: 'High School K-12',
     zipCode: '',
-    dob: ''
+    dob: '',
+    district: '',
+    school: ''
   });
+
+  // Get schools for selected district
+  const schoolsForSelectedDistrict = useMemo(() => {
+    if (!formData.district) return [];
+    
+    // Handle special districts
+    if (formData.district === 'Independent') {
+      return ['Independent', 'Homeschool', 'Private School', 'Charter School'];
+    }
+    
+    if (formData.district === 'Homeschool') {
+      return ['Homeschool', 'Co-op', 'Online School'];
+    }
+    
+    // Regular district - get schools from database
+    const schoolsInDistrict = [...new Set(
+      database
+        .filter(player => player.district === formData.district)
+        .map(player => player.school)
+        .filter(Boolean)
+    )].sort();
+    
+    return schoolsInDistrict;
+  }, [formData.district, database]);
 
   useEffect(() => {
     if (student && isOpen) {
@@ -590,10 +616,21 @@ function StudentEditDialog({
         grade: student.grade || '',
         section: student.section || 'High School K-12',
         zipCode: student.zipCode || '',
-        dob: student.dob ? student.dob.split('T')[0] : ''
+        dob: student.dob ? student.dob.split('T')[0] : '',
+        district: student.district || '',
+        school: student.school || ''
       });
     }
   }, [student, isOpen]);
+
+  // Handle district change - clear school when district changes
+  const handleDistrictChange = (district: string) => {
+    setFormData(prev => ({
+      ...prev,
+      district,
+      school: '' // Clear school when district changes
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -605,7 +642,9 @@ function StudentEditDialog({
       grade: formData.grade,
       section: formData.section,
       zipCode: formData.zipCode.trim(),
-      dob: formData.dob ? new Date(formData.dob).toISOString() : undefined
+      dob: formData.dob ? new Date(formData.dob).toISOString() : undefined,
+      district: formData.district.trim(),
+      school: formData.school.trim()
     };
 
     try {
@@ -631,12 +670,14 @@ function StudentEditDialog({
     !student.grade && !formData.grade && 'Grade', 
     !student.section && !formData.section && 'Section',
     !student.email && !formData.email && 'Email',
-    !student.zipCode && !formData.zipCode && 'Zip Code'
+    !student.zipCode && !formData.zipCode && 'Zip Code',
+    !student.district && !formData.district && 'District',
+    !student.school && !formData.school && 'School'
   ].filter(Boolean);
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>Complete Student Information</AlertDialogTitle>
           <AlertDialogDescription>
@@ -650,6 +691,68 @@ function StudentEditDialog({
         </AlertDialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* District and School */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">District</label>
+              <select
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.district}
+                onChange={(e) => handleDistrictChange(e.target.value)}
+              >
+                <option value="">Select District</option>
+                <option value="Independent">Independent</option>
+                <option value="Homeschool">Homeschool</option>
+                <option disabled>─────────────────</option>
+                {dbDistricts.filter(d => d !== 'Independent' && d !== 'Homeschool').map(district => (
+                  <option key={district} value={district}>{district}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium">School</label>
+              <select
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.school}
+                onChange={(e) => setFormData(prev => ({ ...prev, school: e.target.value }))}
+                disabled={!formData.district}
+              >
+                <option value="">
+                  {formData.district ? `Select School in ${formData.district}` : "Select District First"}
+                </option>
+                {formData.district === 'Independent' && (
+                  <>
+                    <option value="Independent">Independent</option>
+                    <option value="Homeschool">Homeschool</option>
+                    <option value="Private School">Private School</option>
+                    <option value="Charter School">Charter School</option>
+                  </>
+                )}
+                {formData.district === 'Homeschool' && (
+                  <>
+                    <option value="Homeschool">Homeschool</option>
+                    <option value="Co-op">Co-op</option>
+                    <option value="Online School">Online School</option>
+                  </>
+                )}
+                {formData.district && !['Independent', 'Homeschool'].includes(formData.district) && (
+                  <>
+                    {schoolsForSelectedDistrict.length > 0 && schoolsForSelectedDistrict.map(school => (
+                      <option key={school} value={school}>{school}</option>
+                    ))}
+                  </>
+                )}
+              </select>
+              {formData.district && schoolsForSelectedDistrict.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {schoolsForSelectedDistrict.length} {formData.district === 'Independent' || formData.district === 'Homeschool' ? 'options' : 'schools'} available
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Email */}
           <div>
             <label className="text-sm font-medium">Email</label>
             <input
@@ -661,62 +764,68 @@ function StudentEditDialog({
             />
           </div>
 
-          <div>
-            <label className="text-sm font-medium">Grade</label>
-            <select
-              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
-              value={formData.grade}
-              onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
-            >
-              <option value="">Select Grade</option>
-              <option value="Kindergarten">Kindergarten</option>
-              <option value="1st Grade">1st Grade</option>
-              <option value="2nd Grade">2nd Grade</option>
-              <option value="3rd Grade">3rd Grade</option>
-              <option value="4th Grade">4th Grade</option>
-              <option value="5th Grade">5th Grade</option>
-              <option value="6th Grade">6th Grade</option>
-              <option value="7th Grade">7th Grade</option>
-              <option value="8th Grade">8th Grade</option>
-              <option value="9th Grade">9th Grade</option>
-              <option value="10th Grade">10th Grade</option>
-              <option value="11th Grade">11th Grade</option>
-              <option value="12th Grade">12th Grade</option>
-            </select>
+          {/* Grade and Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Grade</label>
+              <select
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.grade}
+                onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
+              >
+                <option value="">Select Grade</option>
+                <option value="Kindergarten">Kindergarten</option>
+                <option value="1st Grade">1st Grade</option>
+                <option value="2nd Grade">2nd Grade</option>
+                <option value="3rd Grade">3rd Grade</option>
+                <option value="4th Grade">4th Grade</option>
+                <option value="5th Grade">5th Grade</option>
+                <option value="6th Grade">6th Grade</option>
+                <option value="7th Grade">7th Grade</option>
+                <option value="8th Grade">8th Grade</option>
+                <option value="9th Grade">9th Grade</option>
+                <option value="10th Grade">10th Grade</option>
+                <option value="11th Grade">11th Grade</option>
+                <option value="12th Grade">12th Grade</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Section</label>
+              <select
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.section}
+                onChange={(e) => setFormData(prev => ({ ...prev, section: e.target.value }))}
+              >
+                <option value="Elementary K-5">Elementary K-5</option>
+                <option value="Middle School K-8">Middle School K-8</option>
+                <option value="High School K-12">High School K-12</option>
+              </select>
+            </div>
           </div>
 
-          <div>
-            <label className="text-sm font-medium">Section</label>
-            <select
-              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
-              value={formData.section}
-              onChange={(e) => setFormData(prev => ({ ...prev, section: e.target.value }))}
-            >
-              <option value="Elementary K-5">Elementary K-5</option>
-              <option value="Middle School K-8">Middle School K-8</option>
-              <option value="High School K-12">High School K-12</option>
-            </select>
-          </div>
+          {/* Date of Birth and Zip Code */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium">Date of Birth</label>
+              <input
+                type="date"
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.dob}
+                onChange={(e) => setFormData(prev => ({ ...prev, dob: e.target.value }))}
+              />
+            </div>
 
-          <div>
-            <label className="text-sm font-medium">Date of Birth</label>
-            <input
-              type="date"
-              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
-              value={formData.dob}
-              onChange={(e) => setFormData(prev => ({ ...prev, dob: e.target.value }))}
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Zip Code</label>
-            <input
-              type="text"
-              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
-              value={formData.zipCode}
-              onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
-              placeholder="12345"
-            />
+            <div>
+              <label className="text-sm font-medium">Zip Code</label>
+              <input
+                type="text"
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+                value={formData.zipCode}
+                onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                placeholder="12345"
+              />
+            </div>
           </div>
 
           <AlertDialogFooter className="mt-6">
