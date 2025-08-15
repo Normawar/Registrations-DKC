@@ -297,6 +297,16 @@ export function SponsorRegistrationDialog({
             document.body.removeChild(link);
             console.log('Invoice opened using temporary link method');
             opened = true;
+            
+            // Show success message for temporary link method
+            setTimeout(() => {
+              toast({
+                title: "Invoice Opened Successfully!",
+                description: `Check your browser tabs - the invoice payment page should be open. If you don't see a new tab, the URL has been copied to your clipboard.`,
+                duration: 5000,
+              });
+            }, 1000);
+            
           } catch (error) {
             console.error('Temporary link method failed:', error);
           }
