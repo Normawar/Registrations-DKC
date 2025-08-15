@@ -210,6 +210,8 @@ export function SponsorRegistrationDialog({
         players: playersToInvoice
       });
 
+      console.log('Full invoice creation result:', JSON.stringify(result, null, 2));
+
       // Create confirmation record
       const newConfirmation = {
         id: result.invoiceId,
@@ -246,14 +248,18 @@ export function SponsorRegistrationDialog({
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
       
+      const invoiceUrl = result.invoiceUrl;
+      
       toast({
         title: "Invoice Generated Successfully!",
-        description: `Invoice ${result.invoiceNumber} for ${Object.keys(selectedStudents).length} students has been created.`
+        description: `Invoice ${result.invoiceNumber} for ${Object.keys(selectedStudents).length} students has been created. ${invoiceUrl ? 'Opening invoice...' : 'Check your email for payment instructions.'}`
       });
       
       // Open the invoice in a new tab
-      if (result.invoiceUrl) {
-        window.open(result.invoiceUrl, '_blank');
+      if (invoiceUrl) {
+        setTimeout(() => {
+          window.open(invoiceUrl, '_blank', 'noopener,noreferrer');
+        }, 500);
       }
       
       // Reset and close
