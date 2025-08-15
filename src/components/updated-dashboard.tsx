@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -39,13 +38,15 @@ interface DashboardProps {
 
 export function UpdatedDashboard({ profile }: DashboardProps) {
   const { events } = useEvents();
-  const { database } = useMasterDb();
+  const { database, updatePlayer } = useMasterDb();
   const { toast } = useToast();
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [isPlayerSearchOpen, setIsPlayerSearchOpen] = useState(false);
   const [isRemoveStudentDialogOpen, setIsRemoveStudentDialogOpen] = useState(false);
   const [studentToRemove, setStudentToRemove] = useState<MasterPlayer | null>(null);
+  const [isEditStudentDialogOpen, setIsEditStudentDialogOpen] = useState(false);
+  const [studentToEdit, setStudentToEdit] = useState<MasterPlayer | null>(null);
 
   // Load data
   useEffect(() => {
@@ -161,6 +162,57 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
     }
     setIsRemoveStudentDialogOpen(false);
     setStudentToRemove(null);
+  };
+
+  // Handle player selection from search dialog
+  const handlePlayerSelected = (player: MasterPlayer) => {
+    // Check if player needs completion
+    const missingFields = [
+      !player.dob && 'DOB',
+      !player.grade && 'Grade', 
+      !player.section && 'Section',
+      !player.email && 'Email',
+      !player.zipCode && 'Zip'
+    ].filter(Boolean);
+    
+    const needsCompletion = missingFields.length > 0;
+    
+    if (needsCompletion) {
+      // Open edit dialog for completion
+      setStudentToEdit(player);
+      setIsEditStudentDialogOpen(true);
+    } else {
+      // Add directly to parent's student list
+      addStudentToParentList(player);
+    }
+  };
+
+  // Add student to parent's list (used after completion or for complete students)
+  const addStudentToParentList = (player: MasterPlayer) => {
+    const parentStudentsKey = `parent_students_${profile.email}`;
+    const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
+    
+    if (!existingStudentIds.includes(player.id)) {
+      const updatedStudentIds = [...existingStudentIds, player.id];
+      localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
+      
+      // Reload parent students
+      const students = database.filter(p => updatedStudentIds.includes(p.id));
+      setParentStudents(students);
+      
+      toast({
+        title: "Student Added",
+        description: `${player.firstName} ${player.lastName} has been added to your student list.`
+      });
+    }
+  };
+
+  // Handle student completion from edit dialog
+  const handleStudentCompleted = (updatedStudent: MasterPlayer) => {
+    // Add the completed student to parent's list
+    addStudentToParentList(updatedStudent);
+    setIsEditStudentDialogOpen(false);
+    setStudentToEdit(null);
   };
 
   return (
@@ -470,27 +522,17 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
             isOpen={isPlayerSearchOpen}
             onOpenChange={setIsPlayerSearchOpen}
             onSelectPlayer={() => {}} // Not used for individual portal
-            onPlayerSelected={(player) => {
-              // Add player to parent's student list
-              const parentStudentsKey = `parent_students_${profile.email}`;
-              const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
-              
-              if (!existingStudentIds.includes(player.id)) {
-                const updatedStudentIds = [...existingStudentIds, player.id];
-                localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
-                
-                // Reload parent students
-                const students = database.filter(p => updatedStudentIds.includes(p.id));
-                setParentStudents(students);
-                
-                toast({
-                  title: "Student Added",
-                  description: `${player.firstName} ${player.lastName} has been added to your student list.`
-                });
-              }
-            }}
+            onPlayerSelected={handlePlayerSelected}
             excludeIds={parentStudents.map(s => s.id)}
             portalType="individual"
+          />
+
+          {/* Student Edit/Completion Dialog */}
+          <StudentEditDialog
+            isOpen={isEditStudentDialogOpen}
+            onOpenChange={setIsEditStudentDialogOpen}
+            student={studentToEdit}
+            onStudentUpdated={handleStudentCompleted}
           />
 
           <AlertDialog open={isRemoveStudentDialogOpen} onOpenChange={setIsRemoveStudentDialogOpen}>
@@ -519,35 +561,170 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
   );
 }
 
-// Placeholder components - replace with your actual dialog components
-function AddStudentDialog({ 
-  isOpen, 
-  onOpenChange, 
-  parentProfile, 
-  onStudentAdded 
-}: {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  parentProfile: any;
-  onStudentAdded: () => void;
-}) {
-  // TODO: Replace with your actual AddStudentDialog component
-  return null;
-}
-
-function EditStudentDialog({
+// Simple Student Edit Dialog Component
+function StudentEditDialog({
   isOpen,
   onOpenChange,
   student,
-  parentProfile,
   onStudentUpdated
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   student: MasterPlayer | null;
-  parentProfile: any;
-  onStudentUpdated: () => void;
+  onStudentUpdated: (student: MasterPlayer) => void;
 }) {
-  // TODO: Replace with your actual EditStudentDialog component
-  return null;
+  const { updatePlayer } = useMasterDb();
+  const { toast } = useToast();
+  const [formData, setFormData] = useState({
+    email: '',
+    grade: '',
+    section: 'High School K-12',
+    zipCode: '',
+    dob: ''
+  });
+
+  useEffect(() => {
+    if (student && isOpen) {
+      setFormData({
+        email: student.email || '',
+        grade: student.grade || '',
+        section: student.section || 'High School K-12',
+        zipCode: student.zipCode || '',
+        dob: student.dob ? student.dob.split('T')[0] : ''
+      });
+    }
+  }, [student, isOpen]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!student) return;
+
+    const updatedStudent: MasterPlayer = {
+      ...student,
+      email: formData.email.trim(),
+      grade: formData.grade,
+      section: formData.section,
+      zipCode: formData.zipCode.trim(),
+      dob: formData.dob ? new Date(formData.dob).toISOString() : undefined
+    };
+
+    try {
+      await updatePlayer(updatedStudent);
+      toast({
+        title: "Student Updated",
+        description: `${student.firstName} ${student.lastName}'s information has been completed.`
+      });
+      onStudentUpdated(updatedStudent);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: "Update Failed",
+        description: "Failed to update student information."
+      });
+    }
+  };
+
+  if (!student) return null;
+
+  const missingFields = [
+    !student.dob && !formData.dob && 'Date of Birth',
+    !student.grade && !formData.grade && 'Grade', 
+    !student.section && !formData.section && 'Section',
+    !student.email && !formData.email && 'Email',
+    !student.zipCode && !formData.zipCode && 'Zip Code'
+  ].filter(Boolean);
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Complete Student Information</AlertDialogTitle>
+          <AlertDialogDescription>
+            Please complete the missing information for {student.firstName} {student.lastName}.
+            {missingFields.length > 0 && (
+              <span className="block mt-2 text-blue-600">
+                Missing: {missingFields.join(', ')}
+              </span>
+            )}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Email</label>
+            <input
+              type="email"
+              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+              value={formData.email}
+              onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="student@email.com"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Grade</label>
+            <select
+              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+              value={formData.grade}
+              onChange={(e) => setFormData(prev => ({ ...prev, grade: e.target.value }))}
+            >
+              <option value="">Select Grade</option>
+              <option value="Kindergarten">Kindergarten</option>
+              <option value="1st Grade">1st Grade</option>
+              <option value="2nd Grade">2nd Grade</option>
+              <option value="3rd Grade">3rd Grade</option>
+              <option value="4th Grade">4th Grade</option>
+              <option value="5th Grade">5th Grade</option>
+              <option value="6th Grade">6th Grade</option>
+              <option value="7th Grade">7th Grade</option>
+              <option value="8th Grade">8th Grade</option>
+              <option value="9th Grade">9th Grade</option>
+              <option value="10th Grade">10th Grade</option>
+              <option value="11th Grade">11th Grade</option>
+              <option value="12th Grade">12th Grade</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Section</label>
+            <select
+              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+              value={formData.section}
+              onChange={(e) => setFormData(prev => ({ ...prev, section: e.target.value }))}
+            >
+              <option value="Elementary K-5">Elementary K-5</option>
+              <option value="Middle School K-8">Middle School K-8</option>
+              <option value="High School K-12">High School K-12</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Date of Birth</label>
+            <input
+              type="date"
+              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+              value={formData.dob}
+              onChange={(e) => setFormData(prev => ({ ...prev, dob: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">Zip Code</label>
+            <input
+              type="text"
+              className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md"
+              value={formData.zipCode}
+              onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+              placeholder="12345"
+            />
+          </div>
+
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction type="submit">Complete & Add Student</AlertDialogAction>
+          </AlertDialogFooter>
+        </form>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }
