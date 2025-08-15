@@ -106,7 +106,7 @@ export function SponsorRegistrationDialog({
 
   // Calculate fees with breakdown
   const calculateFeeBreakdown = () => {
-    if (!event) return { registrationFees: 0, lateFees: 0, uscfFees: 0, total: 0, feeType: 'Regular Registration' };
+    if (!event) return { registrationFees: 0, lateFees: 0, uscfFees: 0, total: 0 };
     
     // Calculate current registration fee based on timing
     let registrationFeePerPlayer = event.regularFee;
@@ -257,9 +257,14 @@ export function SponsorRegistrationDialog({
       
       // Open the invoice in a new tab
       if (invoiceUrl) {
+        console.log('Opening invoice URL:', invoiceUrl);
+        
+        // Small delay to ensure the toast appears first
         setTimeout(() => {
           window.open(invoiceUrl, '_blank', 'noopener,noreferrer');
         }, 500);
+      } else {
+        console.warn('No invoice URL available in result:', result);
       }
       
       // Reset and close
