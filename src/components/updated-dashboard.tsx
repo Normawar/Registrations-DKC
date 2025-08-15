@@ -584,6 +584,33 @@ function StudentEditDialog({
     district: '',
     school: ''
   });
+  const [schoolsData, setSchoolsData] = useState<any[]>([]);
+
+  // Load schools data from localStorage
+  useEffect(() => {
+    try {
+      const storedSchools = localStorage.getItem('school_data');
+      if (storedSchools) {
+        setSchoolsData(JSON.parse(storedSchools));
+      }
+    } catch (error) {
+      console.error('Failed to load schools data:', error);
+    }
+  }, []);
+
+  // Get all unique districts from both sources
+  const allDistricts = useMemo(() => {
+    const schoolDistricts = schoolsData.map(school => school.district);
+    const playerDistricts = dbDistricts.filter(d => d !== 'ALL' && d !== 'NO_STATE');
+    const combined = [...new Set([
+      'Independent',
+      'Homeschool',
+      ...schoolDistricts,
+      ...playerDistricts
+    ])].filter(Boolean).sort();
+    
+    return combined;
+  }, [schoolsData, dbDistricts]);
 
   // Get schools for selected district
   const schoolsForSelectedDistrict = useMemo(() => {
@@ -598,16 +625,25 @@ function StudentEditDialog({
       return ['Homeschool', 'Co-op', 'Online School'];
     }
     
-    // Regular district - get schools from database
-    const schoolsInDistrict = [...new Set(
+    // Get schools from schools data (primary source)
+    const schoolsFromSchoolsData = schoolsData
+      .filter(school => school.district === formData.district)
+      .map(school => school.schoolName)
+      .filter(Boolean);
+
+    // Get schools from player database (backup source)
+    const schoolsFromPlayerData = [...new Set(
       database
         .filter(player => player.district === formData.district)
         .map(player => player.school)
         .filter(Boolean)
-    )].sort();
+    )];
+
+    // Combine both sources and remove duplicates
+    const allSchools = [...new Set([...schoolsFromSchoolsData, ...schoolsFromPlayerData])].sort();
     
-    return schoolsInDistrict;
-  }, [formData.district, database]);
+    return allSchools;
+  }, [formData.district, schoolsData, database]);
 
   useEffect(() => {
     if (student && isOpen) {
@@ -704,7 +740,7 @@ function StudentEditDialog({
                 <option value="Independent">Independent</option>
                 <option value="Homeschool">Homeschool</option>
                 <option disabled>─────────────────</option>
-                {dbDistricts.filter(d => d !== 'Independent' && d !== 'Homeschool').map(district => (
+                {allDistricts.filter(d => d !== 'Independent' && d !== 'Homeschool').map(district => (
                   <option key={district} value={district}>{district}</option>
                 ))}
               </select>
