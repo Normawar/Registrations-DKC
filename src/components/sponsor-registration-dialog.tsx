@@ -210,7 +210,7 @@ export function SponsorRegistrationDialog({
         players: playersToInvoice
       });
 
-      console.log('Invoice creation result:', result);
+      console.log('Full invoice creation result:', JSON.stringify(result, null, 2));
 
       // Create confirmation record
       const newConfirmation = {
