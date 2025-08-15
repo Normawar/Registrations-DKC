@@ -10,10 +10,12 @@ import { useEvents } from '@/hooks/use-events';
 import { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, MapPin, DollarSign, Users, CheckCircle, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function EventsPage() {
   const { profile } = useSponsorProfile();
   const { events } = useEvents();
+  const router = useRouter();
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
@@ -135,22 +137,20 @@ export default function EventsPage() {
                   <div className="flex items-start justify-between">
                     <div className="space-y-2">
                       <CardTitle className="text-xl">{event.name}</CardTitle>
-                      <CardDescription className="text-base">
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            {format(new Date(event.date), 'PPP')}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {event.location}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-4 w-4" />
-                            ${event.regularFee}
-                          </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          {format(new Date(event.date), 'PPP')}
                         </div>
-                      </CardDescription>
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          {event.location}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4" />
+                          ${event.regularFee}
+                        </div>
+                      </div>
                     </div>
                     
                     <div className="flex items-center gap-3">
