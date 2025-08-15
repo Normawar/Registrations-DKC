@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { School, User, DollarSign, CheckCircle } from "lucide-react";
-import { format } from "date-fns";
+import { format, differenceInHours, isSameDay } from "date-fns";
 
 interface SponsorRegistrationDialogProps {
   isOpen: boolean;
@@ -130,18 +130,68 @@ export function SponsorRegistrationDialog({
     setIsSubmitting(true);
 
     try {
-      // Create registration confirmation
-      const confirmationId = `sponsor-${Date.now()}-${Math.random()}`;
-      const confirmation = {
-        id: confirmationId,
-        invoiceId: confirmationId,
-        invoiceNumber: `INV-${confirmationId.slice(-8)}`,
+      // Import the createInvoice function
+      const { createInvoice } = await import('@/ai/flows/create-invoice-flow');
+      
+      // Calculate current registration fee based on timing
+      let registrationFeePerPlayer = event.regularFee;
+      const eventDate = new Date(event.date);
+      const now = new Date();
+      
+      if (isSameDay(eventDate, now)) {
+        registrationFeePerPlayer = event.dayOfFee || event.regularFee;
+      } else {
+        const hoursUntilEvent = differenceInHours(eventDate, now);
+        if (hoursUntilEvent <= 24) {
+          registrationFeePerPlayer = event.veryLateFee || event.regularFee;
+        } else if (hoursUntilEvent <= 48) {
+          registrationFeePerPlayer = event.lateFee || event.regularFee;
+        }
+      }
+
+      // Prepare players for invoice
+      const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
+        const student = rosterPlayers.find(p => p.id === playerId);
+        const lateFeeAmount = registrationFeePerPlayer - event.regularFee;
+        
+        return {
+          playerName: `${student?.firstName} ${student?.lastName}`,
+          uscfId: student?.uscfId || '',
+          baseRegistrationFee: event.regularFee,
+          lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+          uscfAction: details.uscfStatus !== 'current',
+        };
+      });
+
+      const uscfFee = 24;
+      
+      // Generate team code from profile
+      const teamCode = `${profile.school.split(' ').map(word => word.charAt(0)).join('').toUpperCase()}${profile.district.split(' ').map(word => word.charAt(0)).join('').toUpperCase()}`.substring(0, 6);
+
+      // Create the Square invoice
+      const result = await createInvoice({
+        sponsorName: `${profile.firstName} ${profile.lastName}`,
+        sponsorEmail: profile.email || '',
+        schoolName: profile.school,
+        teamCode: teamCode,
+        eventName: event.name,
+        eventDate: event.date,
+        uscfFee,
+        players: playersToInvoice
+      });
+
+      // Create confirmation record
+      const newConfirmation = {
+        id: result.invoiceId,
+        invoiceId: result.invoiceId,
+        invoiceNumber: result.invoiceNumber,
         submissionTimestamp: new Date().toISOString(),
         eventId: event.id,
         eventName: event.name,
         eventDate: event.date,
         schoolName: profile.school,
         district: profile.district,
+        teamCode: teamCode,
         selections: Object.fromEntries(
           Object.entries(selectedStudents).map(([playerId, details]) => [
             playerId,
@@ -152,21 +202,23 @@ export function SponsorRegistrationDialog({
           ])
         ),
         totalInvoiced: calculateTotal(),
-        invoiceStatus: 'PENDING' // Will need to be paid
+        invoiceStatus: result.status,
+        invoiceUrl: result.invoiceUrl,
+        purchaserName: `${profile.firstName} ${profile.lastName}`
       };
 
       // Save to localStorage
       const existingConfirmations = localStorage.getItem('confirmations');
       const allConfirmations = existingConfirmations ? JSON.parse(existingConfirmations) : [];
-      allConfirmations.push(confirmation);
+      allConfirmations.push(newConfirmation);
       localStorage.setItem('confirmations', JSON.stringify(allConfirmations));
       
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, confirmation]));
+      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
       
       toast({
-        title: "Registration Successful",
-        description: `${Object.keys(selectedStudents).length} student(s) registered for ${event.name}.`
+        title: "Invoice Generated Successfully!",
+        description: `Invoice ${result.invoiceNumber} for ${Object.keys(selectedStudents).length} students has been created. Check your email for payment instructions.`
       });
       
       // Reset and close
@@ -178,10 +230,11 @@ export function SponsorRegistrationDialog({
       
     } catch (error) {
       console.error('Registration failed:', error);
+      const description = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({
         variant: 'destructive',
-        title: "Registration Failed",
-        description: "Failed to save registration. Please try again."
+        title: "Invoice Creation Failed",
+        description: description
       });
     } finally {
       setIsSubmitting(false);
@@ -325,7 +378,7 @@ export function SponsorRegistrationDialog({
             onClick={handleSubmit} 
             disabled={Object.keys(selectedStudents).length === 0 || isSubmitting}
           >
-            {isSubmitting ? 'Registering...' : `Register ${Object.keys(selectedStudents).length} Student(s)`}
+            {isSubmitting ? 'Creating Invoice...' : `Create Invoice for ${Object.keys(selectedStudents).length} Student(s)`}
           </Button>
         </DialogFooter>
       </DialogContent>
