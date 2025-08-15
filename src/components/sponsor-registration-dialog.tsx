@@ -210,7 +210,7 @@ export function SponsorRegistrationDialog({
         players: playersToInvoice
       });
 
-      console.log('Full invoice creation result:', JSON.stringify(result, null, 2));
+      console.log('Invoice creation result:', result);
 
       // Create confirmation record
       const newConfirmation = {
@@ -235,7 +235,7 @@ export function SponsorRegistrationDialog({
         ),
         totalInvoiced: feeBreakdown.total,
         invoiceStatus: result.status,
-        invoiceUrl: result.invoiceUrl,
+        invoiceUrl: result.invoiceUrl || result.publicUrl,
         purchaserName: `${profile.firstName} ${profile.lastName}`
       };
 
@@ -248,23 +248,109 @@ export function SponsorRegistrationDialog({
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
       
-      const invoiceUrl = result.invoiceUrl;
+      // Determine which URL to use for opening the invoice
+      const invoiceUrl = result.invoiceUrl || result.publicUrl || result.public_url;
       
-      toast({
-        title: "Invoice Generated Successfully!",
-        description: `Invoice ${result.invoiceNumber} for ${Object.keys(selectedStudents).length} students has been created. ${invoiceUrl ? 'Opening invoice...' : 'Check your email for payment instructions.'}`
+      console.log('Invoice creation result details:', {
+        invoiceId: result.invoiceId,
+        invoiceNumber: result.invoiceNumber,
+        status: result.status,
+        invoiceUrl: invoiceUrl,
+        allFields: Object.keys(result)
       });
       
-      // Open the invoice in a new tab
       if (invoiceUrl) {
-        console.log('Opening invoice URL:', invoiceUrl);
+        toast({
+          title: "Invoice Generated Successfully!",
+          description: `Invoice ${result.invoiceNumber} for ${Object.keys(selectedStudents).length} students has been created. Opening invoice...`
+        });
         
-        // Small delay to ensure the toast appears first
-        setTimeout(() => {
-          window.open(invoiceUrl, '_blank', 'noopener,noreferrer');
-        }, 500);
+        console.log('Attempting to open invoice URL:', invoiceUrl);
+        
+        // Try multiple approaches to open the invoice
+        let opened = false;
+        
+        try {
+          // Method 1: Direct window.open (works best if called immediately after user action)
+          const newWindow = window.open(invoiceUrl, '_blank', 'noopener,noreferrer');
+          
+          if (newWindow && !newWindow.closed) {
+            console.log('Invoice opened successfully with window.open');
+            opened = true;
+          } else {
+            console.warn('window.open was blocked or failed');
+          }
+        } catch (error) {
+          console.error('window.open failed:', error);
+        }
+        
+        if (!opened) {
+          // Method 2: Create a temporary link and click it programmatically
+          try {
+            const link = document.createElement('a');
+            link.href = invoiceUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            console.log('Invoice opened using temporary link method');
+            opened = true;
+          } catch (error) {
+            console.error('Temporary link method failed:', error);
+          }
+        }
+        
+        if (!opened) {
+          // Method 3: Show a manual link if both automated methods fail
+          console.warn('All automated methods failed, showing manual link');
+          
+          // Update the toast to show a clickable link
+          setTimeout(() => {
+            toast({
+              title: "Invoice Ready - Click to Open",
+              description: (
+                <div className="space-y-3">
+                  <p className="text-sm">Invoice {result.invoiceNumber} is ready for payment.</p>
+                  <a 
+                    href={invoiceUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-block bg-primary text-primary-foreground px-4 py-2 rounded text-sm hover:bg-primary/90 transition-colors"
+                    onClick={(e) => {
+                      console.log('Manual link clicked:', invoiceUrl);
+                      // Let the default behavior handle the link
+                    }}
+                  >
+                    Open Invoice to Pay →
+                  </a>
+                  <div className="text-xs text-muted-foreground">
+                    <p>If the link doesn't work, copy this URL:</p>
+                    <code className="bg-muted px-1 rounded text-xs break-all">{invoiceUrl}</code>
+                  </div>
+                </div>
+              ),
+              duration: 15000, // Show for 15 seconds
+            });
+          }, 1000);
+        }
+        
+        // Also try to copy URL to clipboard as backup
+        try {
+          await navigator.clipboard.writeText(invoiceUrl);
+          console.log('Invoice URL copied to clipboard:', invoiceUrl);
+        } catch (clipboardError) {
+          console.warn('Could not copy to clipboard:', clipboardError);
+        }
+        
       } else {
         console.warn('No invoice URL available in result:', result);
+        
+        toast({
+          title: "Invoice Created Successfully!",
+          description: `Invoice ${result.invoiceNumber} has been created. Please check your email for the payment link or contact support with invoice number ${result.invoiceNumber}.`
+        });
       }
       
       // Reset and close
