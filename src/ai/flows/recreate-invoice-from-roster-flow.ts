@@ -110,7 +110,8 @@ const recreateInvoiceFlow = ai.defineFlow(
       let newTotal = 0;
       if (newInvoiceResult.invoiceId) {
           const { result: { invoice } } = await squareClient.invoicesApi.getInvoice(newInvoiceResult.invoiceId);
-          newTotal = Number(invoice?.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
+          const computedAmount = invoice?.paymentRequests?.[0]?.computedAmountMoney?.amount;
+          newTotal = computedAmount ? Number(computedAmount) / 100 : 0;
       }
       
       return {
@@ -124,8 +125,10 @@ const recreateInvoiceFlow = ai.defineFlow(
 
     } catch (error) {
       if (error instanceof ApiError) {
-        console.error('Square API Error in recreateInvoiceFlow:', JSON.stringify(error.result, null, 2));
-        const errorMessage = error.result.errors?.[0]?.detail || JSON.stringify(error.result);
+        const errorResult = error.result || {};
+        const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
+        console.error('Square API Error in recreateInvoiceFlow:', JSON.stringify(errorResult, null, 2));
+        const errorMessage = errors[0]?.detail || JSON.stringify(errorResult);
         throw new Error(`Square Error: ${errorMessage}`);
       } else {
         console.error('An unexpected error occurred during invoice recreation:', error);

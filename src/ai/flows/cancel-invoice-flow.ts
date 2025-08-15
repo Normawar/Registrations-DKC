@@ -60,11 +60,11 @@ const cancelInvoiceFlow = ai.defineFlow(
       // If already paid or otherwise non-cancelable, we can just return the current status.
       // The UI will handle this by simply marking it as comped locally.
       const cancelableStatuses = ['DRAFT', 'PUBLISHED', 'UNPAID', 'PARTIALLY_PAID'];
-      if (!cancelableStatuses.includes(invoice.status!)) {
+      if (!invoice.status || !cancelableStatuses.includes(invoice.status)) {
         console.log(`Invoice ${input.invoiceId} is in status ${invoice.status} and cannot be canceled via API. It will be marked as comped locally.`);
         return {
           invoiceId: invoice.id!,
-          status: invoice.status!,
+          status: invoice.status || 'UNKNOWN',
         };
       }
       
@@ -82,9 +82,11 @@ const cancelInvoiceFlow = ai.defineFlow(
       };
     } catch (error) {
       if (error instanceof ApiError) {
+        const errorResult = error.result || {};
+        const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
         // Check for specific error where invoice cannot be canceled because of its state
-        const isNotCancelable = error.result.errors?.some(e => 
-            e.code === 'BAD_REQUEST' && e.detail.toLowerCase().includes('cannot be canceled')
+        const isNotCancelable = errors.some(e => 
+            e.code === 'BAD_REQUEST' && e.detail?.toLowerCase().includes('cannot be canceled')
         );
 
         if (isNotCancelable) {
@@ -95,8 +97,8 @@ const cancelInvoiceFlow = ai.defineFlow(
 
         console.error('Square API Error in cancelInvoiceFlow:', JSON.stringify(error.result, null, 2));
         let errorMessage: string;
-        if (error.result.errors && error.result.errors.length > 0) {
-            const firstError = error.result.errors[0];
+        if (errors.length > 0) {
+            const firstError = errors[0];
             errorMessage = firstError.detail || `Category: ${firstError.category}, Code: ${firstError.code}`;
         } else {
             errorMessage = JSON.stringify(error.result);

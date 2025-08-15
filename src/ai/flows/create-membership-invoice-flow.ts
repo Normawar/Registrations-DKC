@@ -243,13 +243,15 @@ const createMembershipInvoiceFlow = ai.defineFlow(
 
     } catch (error) {
       if (error instanceof ApiError) {
-        console.error('Square API Error in createMembershipInvoiceFlow:', JSON.stringify(error.result, null, 2));
+        const errorResult = error.result || {};
+        const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
+        console.error('Square API Error in createMembershipInvoiceFlow:', JSON.stringify(errorResult, null, 2));
         let errorMessage: string;
-        if (error.result.errors && error.result.errors.length > 0) {
-            const firstError = error.result.errors[0];
+        if (errors.length > 0) {
+            const firstError = errors[0];
             errorMessage = firstError.detail || `Category: ${firstError.category}, Code: ${firstError.code}`;
         } else {
-            errorMessage = JSON.stringify(error.result);
+            errorMessage = JSON.stringify(errorResult);
         }
         throw new Error(`Square Error: ${errorMessage}`);
       } else {

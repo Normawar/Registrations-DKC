@@ -82,8 +82,10 @@ const recreateOrganizerInvoiceFlow = ai.defineFlow(
 
     } catch (error) {
       if (error instanceof ApiError) {
-        console.error('Square API Error in recreateOrganizerInvoiceFlow:', JSON.stringify(error.result, null, 2));
-        const errorMessage = error.result.errors?.[0]?.detail || JSON.stringify(error.result);
+        const errorResult = error.result || {};
+        const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
+        console.error('Square API Error in recreateOrganizerInvoiceFlow:', JSON.stringify(errorResult, null, 2));
+        const errorMessage = errors[0]?.detail || JSON.stringify(errorResult);
         throw new Error(`Square Error: ${errorMessage}`);
       } else {
         console.error('An unexpected error occurred during organizer invoice recreation:', error);
