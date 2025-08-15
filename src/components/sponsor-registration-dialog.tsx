@@ -211,7 +211,6 @@ export function SponsorRegistrationDialog({
       });
 
       console.log('Invoice creation result:', result);
-      console.log('Full invoice creation result:', JSON.stringify(result, null, 2));
 
       // Create confirmation record
       const newConfirmation = {
@@ -268,135 +267,54 @@ export function SponsorRegistrationDialog({
         
         console.log('Attempting to open invoice URL:', invoiceUrl);
         
-        // Try multiple approaches to open the invoice aggressively
-        let opened = false;
+        // Show immediate feedback
+        toast({
+          title: "Invoice Created Successfully!",
+          description: `Redirecting to payment page in 3 seconds...`,
+          duration: 3000,
+        });
         
+        // Method 1: Direct redirect (most reliable)
+        setTimeout(() => {
+          console.log('Redirecting to invoice URL:', invoiceUrl);
+          window.location.href = invoiceUrl;
+        }, 3000);
+        
+        // Also copy to clipboard as backup
         try {
-          // Method 1: Direct window.open with focus (most likely to work immediately after user click)
-          const newWindow = window.open('', '_blank', 'noopener,noreferrer,width=1200,height=800');
-          
-          if (newWindow && !newWindow.closed) {
-            // If we got a window, navigate it to the invoice URL
-            newWindow.location.href = invoiceUrl;
-            newWindow.focus(); // Try to bring it to front
-            console.log('Invoice opened successfully with window.open and navigation');
-            opened = true;
-          } else {
-            console.warn('window.open was blocked or failed');
-          }
-        } catch (error) {
-          console.error('window.open failed:', error);
+          await navigator.clipboard.writeText(invoiceUrl);
+          console.log('Invoice URL copied to clipboard as backup:', invoiceUrl);
+        } catch (clipboardError) {
+          console.warn('Could not copy to clipboard:', clipboardError);
         }
         
-        if (!opened) {
-          // Method 2: Try direct assignment to window.open
-          try {
-            const popup = window.open(invoiceUrl, '_blank', 'noopener,noreferrer,width=1200,height=800,scrollbars=yes,resizable=yes');
-            if (popup && !popup.closed) {
-              popup.focus();
-              console.log('Invoice opened with direct URL window.open');
-              opened = true;
-            }
-          } catch (error) {
-            console.error('Direct URL window.open failed:', error);
-          }
-        }
-
-        if (!opened) {
-          // Method 3: Create a temporary link and trigger click event
-          try {
-            const link = document.createElement('a');
-            link.href = invoiceUrl;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
-            
-            // Make the link visible briefly to avoid popup blocking
-            link.style.position = 'fixed';
-            link.style.top = '-1000px';
-            link.style.left = '-1000px';
-            link.style.width = '1px';
-            link.style.height = '1px';
-            
-            document.body.appendChild(link);
-            
-            // Create and dispatch a mouse click event
-            const clickEvent = new MouseEvent('click', {
-              view: window,
-              bubbles: true,
-              cancelable: true,
-              buttons: 1
-            });
-            
-            link.dispatchEvent(clickEvent);
-            
-            // Clean up after a short delay
-            setTimeout(() => {
-              document.body.removeChild(link);
-            }, 100);
-            
-            console.log('Invoice opened using enhanced temporary link method');
-            opened = true;
-            
-          } catch (error) {
-            console.error('Enhanced temporary link method failed:', error);
-          }
-        }
-
-        if (!opened) {
-          // Method 4: Use location.assign in a new window context
-          try {
-            const script = `
-              window.open('${'${invoiceUrl}'}', '_blank', 'noopener,noreferrer,width=1200,height=800');
-            `;
-            
-            // Create a temporary script element to execute the window.open
-            const scriptElement = document.createElement('script');
-            scriptElement.textContent = script;
-            document.head.appendChild(scriptElement);
-            document.head.removeChild(scriptElement);
-            
-            console.log('Invoice opened using script injection method');
-            opened = true;
-          } catch (error) {
-            console.error('Script injection method failed:', error);
-          }
-        }
-
-        // Always show user feedback regardless of method
-        if (opened) {
-          setTimeout(() => {
+        // Show countdown with option to redirect immediately
+        let countdown = 3;
+        const countdownInterval = setInterval(() => {
+          countdown--;
+          if (countdown > 0) {
             toast({
-              title: "Invoice Opened Successfully!",
-              description: `The invoice payment page should be opening in a new tab. If you don't see it, the URL has been copied to your clipboard.`,
-              duration: 5000,
-            });
-          }, 500);
-        } else {
-          // Last resort: Force user interaction
-          setTimeout(() => {
-            toast({
-              title: "Click to Open Invoice",
+              title: "Redirecting to Invoice...",
               description: (
-                <div className="space-y-3">
-                  <p className="text-sm">Browser blocked automatic opening. Click the button below:</p>
+                <div className="space-y-2">
+                  <p>Redirecting in {countdown} seconds...</p>
                   <button 
                     onClick={() => {
-                      // This will work because it's a direct user interaction
-                      window.open(invoiceUrl, '_blank', 'noopener,noreferrer');
+                      clearInterval(countdownInterval);
+                      window.location.href = invoiceUrl;
                     }}
-                    className="w-full bg-primary text-primary-foreground px-4 py-3 rounded text-sm hover:bg-primary/90 transition-colors font-medium"
+                    className="w-full bg-primary text-primary-foreground px-3 py-2 rounded text-sm hover:bg-primary/90"
                   >
-                    🚀 Open Invoice Payment Page
+                    Go to Invoice Now →
                   </button>
-                  <div className="text-xs text-muted-foreground">
-                    <p>Or copy this link: <code className="bg-muted px-1 rounded text-xs break-all">{invoiceUrl}</code></p>
-                  </div>
                 </div>
               ),
-              duration: 20000, // Show for 20 seconds
+              duration: 1000,
             });
-          }, 1000);
-        }
+          } else {
+            clearInterval(countdownInterval);
+          }
+        }, 1000);
         
         // Also try to copy URL to clipboard as backup
         try {
