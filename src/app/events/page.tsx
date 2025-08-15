@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
@@ -85,9 +86,9 @@ export default function EventsPage() {
       <div className="space-y-6">
         <div className="border-b pb-6">
           <h1 className="text-3xl font-bold">Register for Events</h1>
-          <p className="text-muted-foreground mt-2">
+          <div className="text-muted-foreground mt-2">
             Register your students for upcoming chess tournaments.
-          </p>
+          </div>
         </div>
         
         <ParentRegistrationComponent parentProfile={profile} />
@@ -110,10 +111,10 @@ export default function EventsPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Upcoming Events</h3>
-            <p className="text-muted-foreground text-center">
+            <div className="text-muted-foreground text-center">
               There are currently no events available for registration.
               Check back later for new tournaments.
-            </p>
+            </div>
           </CardContent>
         </Card>
       ) : (
