@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -7,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { useEvents } from '@/hooks/use-events';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Calendar, 
   Users, 
@@ -16,7 +19,8 @@ import {
   Award,
   MapPin,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
 import Link from 'next/link';
@@ -36,9 +40,12 @@ interface DashboardProps {
 export function UpdatedDashboard({ profile }: DashboardProps) {
   const { events } = useEvents();
   const { database } = useMasterDb();
+  const { toast } = useToast();
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [isPlayerSearchOpen, setIsPlayerSearchOpen] = useState(false);
+  const [isRemoveStudentDialogOpen, setIsRemoveStudentDialogOpen] = useState(false);
+  const [studentToRemove, setStudentToRemove] = useState<MasterPlayer | null>(null);
 
   // Load data
   useEffect(() => {
@@ -129,6 +136,32 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
       availableEventsCount
     };
   }, [userRegistrations, upcomingEventsWithStatus]);
+
+  // Handle removing a student from parent's list
+  const handleRemoveStudent = (student: MasterPlayer) => {
+    setStudentToRemove(student);
+    setIsRemoveStudentDialogOpen(true);
+  };
+
+  const confirmRemoveStudent = () => {
+    if (studentToRemove && profile) {
+      const parentStudentsKey = `parent_students_${profile.email}`;
+      const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
+      const updatedStudentIds = existingStudentIds.filter((id: string) => id !== studentToRemove.id);
+      localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
+      
+      // Update local state
+      const updatedStudents = database.filter(p => updatedStudentIds.includes(p.id));
+      setParentStudents(updatedStudents);
+      
+      toast({
+        title: "Student Removed",
+        description: `${studentToRemove.firstName} ${studentToRemove.lastName} has been removed from your student list.`
+      });
+    }
+    setIsRemoveStudentDialogOpen(false);
+    setStudentToRemove(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -252,6 +285,14 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
                         onClick={() => setIsPlayerSearchOpen(true)}
                       >
                         Edit
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleRemoveStudent(student)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
@@ -424,30 +465,89 @@ export function UpdatedDashboard({ profile }: DashboardProps) {
       
       {/* Player Search Dialog for Individual Users */}
       {profile.role === 'individual' && (
-        <PlayerSearchDialog
-          isOpen={isPlayerSearchOpen}
-          onOpenChange={setIsPlayerSearchOpen}
-          onSelectPlayer={() => {}} // Not used for individual portal
-          onPlayerSelected={(player) => {
-            // Add player to parent's student list
-            const parentStudentsKey = `parent_students_${profile.email}`;
-            const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
-            
-            if (!existingStudentIds.includes(player.id)) {
-              const updatedStudentIds = [...existingStudentIds, player.id];
-              localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
+        <>
+          <PlayerSearchDialog
+            isOpen={isPlayerSearchOpen}
+            onOpenChange={setIsPlayerSearchOpen}
+            onSelectPlayer={() => {}} // Not used for individual portal
+            onPlayerSelected={(player) => {
+              // Add player to parent's student list
+              const parentStudentsKey = `parent_students_${profile.email}`;
+              const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
               
-              // Reload parent students
-              const students = database.filter(p => updatedStudentIds.includes(p.id));
-              setParentStudents(students);
-              
-              console.log('Student added to parent profile');
-            }
-          }}
-          excludeIds={parentStudents.map(s => s.id)}
-          portalType="individual"
-        />
+              if (!existingStudentIds.includes(player.id)) {
+                const updatedStudentIds = [...existingStudentIds, player.id];
+                localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
+                
+                // Reload parent students
+                const students = database.filter(p => updatedStudentIds.includes(p.id));
+                setParentStudents(students);
+                
+                toast({
+                  title: "Student Added",
+                  description: `${player.firstName} ${player.lastName} has been added to your student list.`
+                });
+              }
+            }}
+            excludeIds={parentStudents.map(s => s.id)}
+            portalType="individual"
+          />
+
+          <AlertDialog open={isRemoveStudentDialogOpen} onOpenChange={setIsRemoveStudentDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Remove Student</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to remove {studentToRemove?.firstName} {studentToRemove?.lastName} from your student list? 
+                  This will not delete them from the master database, but you will need to add them again if you want to register them for events.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={confirmRemoveStudent}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Remove Student
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       )}
     </div>
   );
+}
+
+// Placeholder components - replace with your actual dialog components
+function AddStudentDialog({ 
+  isOpen, 
+  onOpenChange, 
+  parentProfile, 
+  onStudentAdded 
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  parentProfile: any;
+  onStudentAdded: () => void;
+}) {
+  // TODO: Replace with your actual AddStudentDialog component
+  return null;
+}
+
+function EditStudentDialog({
+  isOpen,
+  onOpenChange,
+  student,
+  parentProfile,
+  onStudentUpdated
+}: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  student: MasterPlayer | null;
+  parentProfile: any;
+  onStudentUpdated: () => void;
+}) {
+  // TODO: Replace with your actual EditStudentDialog component
+  return null;
 }
