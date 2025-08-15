@@ -9,10 +9,12 @@ import { useEvents } from '@/hooks/use-events';
 import { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { Calendar, MapPin, DollarSign, Users, CheckCircle, Clock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function EventsPage() {
   const { profile } = useSponsorProfile();
   const { events } = useEvents();
+  const router = useRouter();
   const [registrations, setRegistrations] = useState<any[]>([]);
 
   // Load registrations
@@ -68,6 +70,12 @@ export default function EventsPage() {
     };
   };
 
+  const handleEventRegistration = (eventId: string) => {
+    // For now, navigate to a registration page or show a placeholder
+    // You can replace this with your actual registration logic
+    router.push(`/organizer-registration?eventId=${eventId}`);
+  };
+
   if (!profile) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -100,9 +108,9 @@ export default function EventsPage() {
     <div className="space-y-6">
       <div className="border-b pb-6">
         <h1 className="text-3xl font-bold">Register for Events</h1>
-        <div className="text-muted-foreground mt-2">
+        <p className="text-muted-foreground mt-2">
           Register students from {profile.school} for upcoming tournaments.
-        </div>
+        </p>
       </div>
 
       {upcomingEvents.length === 0 ? (
@@ -153,7 +161,10 @@ export default function EventsPage() {
                         </Badge>
                       )}
                       
-                      <Button size="sm">
+                      <Button 
+                        size="sm"
+                        onClick={() => handleEventRegistration(event.id)}
+                      >
                         {status.isRegistered ? 'Manage Registration' : 'Register Students'}
                       </Button>
                     </div>
