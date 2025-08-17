@@ -90,7 +90,7 @@ export default function ConfirmedRegistrationsPage() {
       
       const statusResult = await getInvoiceStatus({ invoiceId: confirmation.invoiceId });
       
-      if (statusResult) {
+      if (statusResult.success && statusResult.status) {
         // Update the confirmation with new status
         const updatedConfirmations = confirmations.map(conf => 
           conf.id === confirmation.id 
@@ -117,7 +117,7 @@ export default function ConfirmedRegistrationsPage() {
           description: `Invoice status updated to: ${statusResult.status}`
         });
       } else {
-        throw new Error('Failed to get status');
+        throw new Error(statusResult.error || 'Failed to get status');
       }
     } catch (error) {
       console.error('Failed to refresh status:', error);
@@ -259,7 +259,10 @@ export default function ConfirmedRegistrationsPage() {
                     const playerCount = Object.keys(confirmation.selections || {}).length;
                     
                     return (
-                      <TableRow key={confirmation.id}>
+                      <TableRow 
+                        key={confirmation.id}
+                        className={selectedConfirmation?.id === confirmation.id ? 'bg-primary/5 border-primary' : ''}
+                      >
                         <TableCell className="font-medium">
                           {confirmation.eventName}
                         </TableCell>
@@ -285,7 +288,18 @@ export default function ConfirmedRegistrationsPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setSelectedConfirmation(confirmation)}
+                              onClick={() => {
+                                console.log('Managing confirmation:', confirmation);
+                                setSelectedConfirmation(confirmation);
+                                // Scroll to the payment section
+                                setTimeout(() => {
+                                  const paymentSection = document.querySelector('[data-payment-section]');
+                                  if (paymentSection) {
+                                    paymentSection.scrollIntoView({ behavior: 'smooth' });
+                                  }
+                                }, 100);
+                              }}
+                              className="hover:bg-primary hover:text-primary-foreground"
                             >
                               Manage
                             </Button>
@@ -296,6 +310,7 @@ export default function ConfirmedRegistrationsPage() {
                                   href={confirmation.invoiceUrl} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
+                                  title="View Invoice"
                                 >
                                   <ExternalLink className="h-4 w-4" />
                                 </a>
@@ -308,6 +323,7 @@ export default function ConfirmedRegistrationsPage() {
                                 size="sm"
                                 onClick={() => handleRefreshStatus(confirmation)}
                                 disabled={isRefreshing}
+                                title="Refresh Status"
                               >
                                 <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                               </Button>
@@ -392,10 +408,20 @@ export default function ConfirmedRegistrationsPage() {
 
         {/* Payment Information Section */}
         {selectedConfirmation && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Information</CardTitle>
-            </CardHeader>
+          <div data-payment-section>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  Payment Information
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setSelectedConfirmation(null)}
+                  >
+                    Close
+                  </Button>
+                </CardTitle>
+              </CardHeader>
             <CardContent className="space-y-6">
               {/* Payment Method Selection */}
               <div>
@@ -481,6 +507,7 @@ export default function ConfirmedRegistrationsPage() {
               </div>
             </CardContent>
           </Card>
+          </div>
         )}
       </div>
     </AppLayout>
