@@ -33,7 +33,7 @@ import {
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { cn } from '@/lib/utils';
-import { ExternalLink, RefreshCw, Receipt, MoreHorizontal, FilePenLine, Trash2 } from 'lucide-react';
+import { ExternalLink, RefreshCw, Receipt, MoreHorizontal, FilePenLine, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -105,6 +105,8 @@ export default function InvoicesPage() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [invoiceToCancel, setInvoiceToCancel] = useState<CombinedInvoice | null>(null);
 
+  const [sortField, setSortField] = useState<string>('submissionTimestamp');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const loadAndProcessInvoices = useCallback(() => {
     let storedData: any[] = [];
@@ -203,11 +205,28 @@ export default function InvoicesPage() {
     return ['ALL', ...Array.from(schools).sort()];
   }, [allInvoices]);
   
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: string) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4" />;
+    }
+    return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+  };
+
   const filteredInvoices = useMemo(() => {
     if (!profile) {
       return [];
     }
-    return allInvoices.filter(inv => {
+    
+    let invoicesToFilter = allInvoices.filter(inv => {
         if (profile.role === 'sponsor' && inv.schoolName && profile.school) {
             if (inv.schoolName.trim().toUpperCase() !== profile.school.trim().toUpperCase()) {
                 return false;
@@ -231,7 +250,27 @@ export default function InvoicesPage() {
         
         return true;
     });
-  }, [allInvoices, profile, schoolFilter, statusFilter, statuses]);
+
+    return invoicesToFilter.sort((a, b) => {
+      const aVal = a[sortField as keyof CombinedInvoice] || '';
+      const bVal = b[sortField as keyof CombinedInvoice] || '';
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      
+      if (sortField === 'submissionTimestamp') {
+        const aDate = new Date(aVal as string).getTime();
+        const bDate = new Date(bVal as string).getTime();
+        return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+      }
+      
+      return sortDirection === 'asc' 
+        ? String(aVal).localeCompare(String(bVal)) 
+        : String(bVal).localeCompare(String(aVal));
+    });
+
+  }, [allInvoices, profile, schoolFilter, statusFilter, statuses, sortField, sortDirection]);
   
   if (!profile) {
     return (
@@ -389,12 +428,12 @@ export default function InvoicesPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Invoice #</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>{profile.role === 'organizer' ? 'School' : 'Purchaser'}</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead><Button variant="ghost" className="pl-0" onClick={() => handleSort('invoiceNumber')}>Invoice # {getSortIcon('invoiceNumber')}</Button></TableHead>
+                            <TableHead><Button variant="ghost" className="pl-0" onClick={() => handleSort('description')}>Description {getSortIcon('description')}</Button></TableHead>
+                            <TableHead><Button variant="ghost" className="pl-0" onClick={() => handleSort(profile.role === 'organizer' ? 'schoolName' : 'purchaserName')}>{profile.role === 'organizer' ? 'School' : 'Purchaser'} {getSortIcon(profile.role === 'organizer' ? 'schoolName' : 'purchaserName')}</Button></TableHead>
+                            <TableHead><Button variant="ghost" className="pl-0" onClick={() => handleSort('submissionTimestamp')}>Date {getSortIcon('submissionTimestamp')}</Button></TableHead>
+                            <TableHead><Button variant="ghost" className="pl-0" onClick={() => handleSort('totalInvoiced')}>Amount {getSortIcon('totalInvoiced')}</Button></TableHead>
+                            <TableHead><Button variant="ghost" className="pl-0" onClick={() => handleSort('invoiceStatus')}>Status {getSortIcon('invoiceStatus')}</Button></TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -485,5 +524,3 @@ export default function InvoicesPage() {
     </AppLayout>
   );
 }
-
-
