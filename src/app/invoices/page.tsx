@@ -13,11 +13,11 @@ export default function UnifiedInvoiceRegistrations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortField, setSortField] = useState('submissionTimestamp');
-  const [sortDirection, setSortDirection] = useState('desc');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
-  // Load combined data from localStorage
+  // Replace the mock data loading in the unified component with this real data loading logic:
   const combinedData = useMemo(() => {
     if (typeof window === 'undefined') return [];
     
@@ -27,8 +27,14 @@ export default function UnifiedInvoiceRegistrations() {
       const allInvoices = localStorage.getItem('all_invoices');
       const confirmations = localStorage.getItem('confirmations');
       
+      console.log('Raw all_invoices from localStorage:', allInvoices);
+      console.log('Raw confirmations from localStorage:', confirmations);
+      
       const invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
       const confirmationsArray = confirmations ? JSON.parse(confirmations) : [];
+      
+      console.log('Parsed invoices array:', invoicesArray);
+      console.log('Parsed confirmations array:', confirmationsArray);
       
       // Combine invoice and confirmation data
       const mapped = invoicesArray.map((invoice) => {
@@ -69,26 +75,35 @@ export default function UnifiedInvoiceRegistrations() {
     }
   }, []);
 
-  // Set up localStorage monitoring
+  // Also add this debugging function to help track localStorage changes:
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
+    console.log('🔍 Unified page loading - setting up localStorage monitoring...');
+    
+    // Listen for storage events (when localStorage changes in other tabs)
     const handleStorageChange = (e) => {
       if (e.key === 'all_invoices' || e.key === 'confirmations') {
-        console.log('🔄 Storage event detected in unified page:', e.key);
-        window.location.reload();
-      }
-    };
-    
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('📖 Unified page became visible - checking localStorage...');
+        console.log('🔄 Storage event detected in unified page:', e.key, 'changed from', e.oldValue, 'to', e.newValue);
+        // You might want to trigger a re-render here
+        window.location.reload(); // Simple approach - reload the page when data changes
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
+    
+    // Listen for page visibility changes
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('📖 Unified page became visible - checking localStorage...');
+        console.log('all_invoices:', localStorage.getItem('all_invoices'));
+        console.log('confirmations:', localStorage.getItem('confirmations'));
+      }
+    };
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
+    // Cleanup
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
