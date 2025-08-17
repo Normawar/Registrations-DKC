@@ -12,6 +12,8 @@ import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { School, User, DollarSign, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { format, differenceInHours, isSameDay } from "date-fns";
+import { InvoiceDisplayModal } from '@/components/invoice-display-modal';
+
 
 interface SponsorRegistrationDialogProps {
   isOpen: boolean;
@@ -33,6 +35,15 @@ export function SponsorRegistrationDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
+
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [createdInvoice, setCreatedInvoice] = useState<{
+    invoiceId: string;
+    invoiceNumber: string;
+    invoiceUrl: string;
+    status: string;
+    totalAmount: number;
+  } | null>(null);
 
   // Load sponsor's roster players
   useEffect(() => {
@@ -106,7 +117,7 @@ export function SponsorRegistrationDialog({
 
   // Calculate fees with breakdown
   const calculateFeeBreakdown = () => {
-    if (!event) return { registrationFees: 0, lateFees: 0, uscfFees: 0, total: 0 };
+    if (!event) return { registrationFees: 0, lateFees: 0, uscfFees: 0, total: 0, feeType: 'Regular Registration' };
     
     // Calculate current registration fee based on timing
     let registrationFeePerPlayer = event.regularFee;
@@ -209,7 +220,7 @@ export function SponsorRegistrationDialog({
         uscfFee,
         players: playersToInvoice
       });
-
+      
       // Create confirmation record
       const newConfirmation = {
         id: result.invoiceId,
@@ -233,12 +244,10 @@ export function SponsorRegistrationDialog({
         ),
         totalInvoiced: feeBreakdown.total,
         invoiceStatus: result.status,
-        invoiceUrl: result.invoiceUrl || result.publicUrl,
+        invoiceUrl: result.invoiceUrl,
         purchaserName: `${profile.firstName} ${profile.lastName}`
       };
       
-      console.log('About to save confirmation:', newConfirmation);
-
       // Save to localStorage
       const existingConfirmations = localStorage.getItem('confirmations');
       const allConfirmations = existingConfirmations ? JSON.parse(existingConfirmations) : [];
@@ -248,96 +257,22 @@ export function SponsorRegistrationDialog({
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
 
-      console.log('Successfully saved to localStorage');
-      console.log('Confirmations in localStorage:', JSON.parse(localStorage.getItem('confirmations') || '[]'));
-      console.log('All invoices in localStorage:', JSON.parse(localStorage.getItem('all_invoices') || '[]'));
-      
-      // Determine which URL to use for opening the invoice
-      const invoiceUrl = result.invoiceUrl || result.publicUrl || result.public_url;
-      
-      console.log('Invoice creation result details:', {
+      console.log('Invoice creation result details:', result);
+
+      // Store the created invoice data
+      setCreatedInvoice({
         invoiceId: result.invoiceId,
-        invoiceNumber: result.invoiceNumber,
+        invoiceNumber: result.invoiceNumber || '',
+        invoiceUrl: result.invoiceUrl,
         status: result.status,
-        invoiceUrl: invoiceUrl,
-        allFields: Object.keys(result)
+        totalAmount: feeBreakdown.total * 100, // convert to cents for modal
       });
+
+      // Show the modal instead of navigating away
+      setShowInvoiceModal(true);
+      toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
       
-      if (invoiceUrl) {
-        toast({
-          title: "Invoice Generated Successfully!",
-          description: `Invoice ${result.invoiceNumber} for ${Object.keys(selectedStudents).length} students has been created. Opening invoice...`
-        });
-        
-        console.log('Attempting to open invoice URL:', invoiceUrl);
-        
-        // Show immediate feedback
-        toast({
-          title: "Invoice Created Successfully!",
-          description: `Redirecting to payment page in 3 seconds...`,
-          duration: 3000,
-        });
-        
-        // Method 1: Direct redirect (most reliable)
-        setTimeout(() => {
-          console.log('Redirecting to invoice URL:', invoiceUrl);
-          window.location.href = invoiceUrl;
-        }, 3000);
-        
-        // Also copy to clipboard as backup
-        try {
-          await navigator.clipboard.writeText(invoiceUrl);
-          console.log('Invoice URL copied to clipboard as backup:', invoiceUrl);
-        } catch (clipboardError) {
-          console.warn('Could not copy to clipboard:', clipboardError);
-        }
-        
-        // Show countdown with option to redirect immediately
-        let countdown = 3;
-        const countdownInterval = setInterval(() => {
-          countdown--;
-          if (countdown > 0) {
-            toast({
-              title: "Redirecting to Invoice...",
-              description: (
-                <div className="space-y-2">
-                  <p>Redirecting in {countdown} seconds...</p>
-                  <button 
-                    onClick={() => {
-                      clearInterval(countdownInterval);
-                      window.location.href = invoiceUrl;
-                    }}
-                    className="w-full bg-primary text-primary-foreground px-3 py-2 rounded text-sm hover:bg-primary/90"
-                  >
-                    Go to Invoice Now →
-                  </button>
-                </div>
-              ),
-              duration: 1000,
-            });
-          } else {
-            clearInterval(countdownInterval);
-          }
-        }, 1000);
-        
-        // Also try to copy URL to clipboard as backup
-        try {
-          await navigator.clipboard.writeText(invoiceUrl);
-          console.log('Invoice URL copied to clipboard:', invoiceUrl);
-        } catch (clipboardError) {
-          console.warn('Could not copy to clipboard:', clipboardError);
-        }
-        
-      } else {
-        console.warn('No invoice URL available in result:', result);
-        
-        toast({
-          title: "Invoice Created Successfully!",
-          description: `Invoice ${result.invoiceNumber} has been created. Please check your email for the payment link or contact support with invoice number ${result.invoiceNumber}.`
-        });
-      }
-      
-      // Reset and close
+      // Reset and close the registration dialog
       setSelectedStudents({});
       setShowConfirmation(false);
       onOpenChange(false);
@@ -606,6 +541,18 @@ export function SponsorRegistrationDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {showInvoiceModal && createdInvoice && (
+        <InvoiceDisplayModal
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false);
+            setCreatedInvoice(null);
+          }}
+          invoice={createdInvoice}
+          companyName={profile?.school || 'Your School'}
+          eventTitle={event?.name || 'Unknown Event'}
+        />
+      )}
     </>
   );
 }
