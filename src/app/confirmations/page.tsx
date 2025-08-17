@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -90,7 +91,7 @@ export default function ConfirmedRegistrationsPage() {
       
       const statusResult = await getInvoiceStatus({ invoiceId: confirmation.invoiceId });
       
-      if (statusResult.success && statusResult.status) {
+      if (statusResult?.status) {
         // Update the confirmation with new status
         const updatedConfirmations = confirmations.map(conf => 
           conf.id === confirmation.id 
@@ -117,7 +118,7 @@ export default function ConfirmedRegistrationsPage() {
           description: `Invoice status updated to: ${statusResult.status}`
         });
       } else {
-        throw new Error(statusResult.error || 'Failed to get status');
+        throw new Error('Failed to get status');
       }
     } catch (error) {
       console.error('Failed to refresh status:', error);
@@ -207,10 +208,48 @@ export default function ConfirmedRegistrationsPage() {
   };
 
   const getRegisteredPlayers = (confirmation: any) => {
-    if (!confirmation.selections || !masterDatabase.length) return [];
+    if (!confirmation.selections) return [];
+    
+    console.log('Getting players for confirmation:', confirmation.id);
+    console.log('Selections:', confirmation.selections);
+    console.log('Master database length:', masterDatabase.length);
     
     const playerIds = Object.keys(confirmation.selections);
-    return masterDatabase.filter(player => playerIds.includes(player.id));
+    console.log('Player IDs to find:', playerIds);
+    
+    // Try to find players in master database
+    let players = masterDatabase.filter(player => playerIds.includes(player.id));
+    console.log('Found players from master DB:', players);
+    
+    // If no players found in master database, try to get from localStorage
+    if (players.length === 0) {
+      try {
+        const storedMasterDb = localStorage.getItem('master_player_database');
+        if (storedMasterDb) {
+          const localPlayers = JSON.parse(storedMasterDb);
+          players = localPlayers.filter((player: any) => playerIds.includes(player.id));
+          console.log('Found players from localStorage:', players);
+        }
+      } catch (error) {
+        console.error('Error loading from localStorage:', error);
+      }
+    }
+    
+    // If still no players found, create placeholder entries with the IDs we have
+    if (players.length === 0 && playerIds.length > 0) {
+      console.log('No players found, creating placeholders');
+      players = playerIds.map(id => ({
+        id,
+        firstName: 'Player',
+        lastName: id.substring(0, 8), // Show part of the ID
+        ...(confirmation.playerNames && confirmation.playerNames[id] ? {
+          firstName: confirmation.playerNames[id].split(' ')[0] || 'Player',
+          lastName: confirmation.playerNames[id].split(' ').slice(1).join(' ') || id.substring(0, 8)
+        } : {})
+      }));
+    }
+    
+    return players;
   };
 
   return (
@@ -379,27 +418,74 @@ export default function ConfirmedRegistrationsPage() {
               <CardContent>
                 {(() => {
                   const players = getRegisteredPlayers(selectedConfirmation);
-                  return players.length > 0 ? (
-                    <div className="space-y-2">
-                      {players.map((player) => (
-                        <div key={player.id} className="flex justify-between items-center border-b pb-2">
-                          <div>
-                            <p className="font-medium">{player.firstName} {player.lastName}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {selectedConfirmation.selections[player.id]?.section || player.section}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm">
-                              USCF: {selectedConfirmation.selections[player.id]?.uscfStatus || 'Current'}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">No player details available</p>
-                  );
+                  const playerIds = Object.keys(selectedConfirmation.selections || {});
+                  
+                  console.log('Rendering players:', players);
+                  console.log('Player IDs:', playerIds);
+                  
+                  if (players.length > 0) {
+                    return (
+                      <div className="space-y-2">
+                        {players.map((player) => {
+                          const selectionInfo = selectedConfirmation.selections[player.id] || {};
+                          return (
+                            <div key={player.id} className="flex justify-between items-center border-b pb-2">
+                              <div>
+                                <p className="font-medium">{player.firstName} {player.lastName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Section: {selectionInfo.section || player.section || 'Not specified'}
+                                </p>
+                                {player.uscfId && (
+                                  <p className="text-xs text-muted-foreground">
+                                    USCF ID: {player.uscfId}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm">
+                                  USCF: {selectionInfo.uscfStatus || 'Current'}
+                                </p>
+                                {selectionInfo.byes && selectionInfo.byes !== 'none' && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Byes: {selectionInfo.byes}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  } else if (playerIds.length > 0) {
+                    // Show player IDs if we can't find the actual player data
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {playerIds.length} player(s) registered (player details not available):
+                        </p>
+                        {playerIds.map((playerId) => {
+                          const selectionInfo = selectedConfirmation.selections[playerId] || {};
+                          return (
+                            <div key={playerId} className="flex justify-between items-center border-b pb-2">
+                              <div>
+                                <p className="font-medium">Player ID: {playerId.substring(0, 12)}...</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Section: {selectionInfo.section || 'Not specified'}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm">
+                                  USCF: {selectionInfo.uscfStatus || 'Current'}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  } else {
+                    return <p className="text-muted-foreground">No player information available</p>;
+                  }
                 })()}
               </CardContent>
             </Card>
@@ -507,9 +593,8 @@ export default function ConfirmedRegistrationsPage() {
               </div>
             </CardContent>
           </Card>
-          </div>
-        )}
+        </div>
       </div>
     </AppLayout>
-  );
-}
+
+    
