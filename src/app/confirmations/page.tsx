@@ -14,7 +14,6 @@ import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
 import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Users, Calendar } from "lucide-react";
 import { format } from "date-fns";
-import Link from "next/link";
 
 export default function ConfirmedRegistrationsPage() {
   const { toast } = useToast();
@@ -75,18 +74,25 @@ export default function ConfirmedRegistrationsPage() {
   const getRegisteredPlayers = (confirmation: any) => {
     if (!confirmation.selections) return [];
     
+    console.log('Getting players for confirmation:', confirmation.id);
+    console.log('Selections:', confirmation.selections);
+    console.log('Master database length:', masterDatabase.length);
+    
     const playerIds = Object.keys(confirmation.selections);
+    console.log('Player IDs to find:', playerIds);
     
     // Try to find players in master database
     let players = masterDatabase.filter(player => playerIds.includes(player.id));
+    console.log('Found players from master DB:', players);
     
     // If no players found in master database, try to get from localStorage
     if (players.length === 0) {
       try {
-        const storedMasterDb = localStorage.getItem('master_player_database');
+        const storedMasterDb = localStorage.getItem('master_database');
         if (storedMasterDb) {
           const localPlayers = JSON.parse(storedMasterDb);
           players = localPlayers.filter((player: any) => playerIds.includes(player.id));
+          console.log('Found players from localStorage:', players);
         }
       } catch (error) {
         console.error('Error loading from localStorage:', error);
@@ -95,6 +101,7 @@ export default function ConfirmedRegistrationsPage() {
     
     // If still no players found, create placeholder entries with the IDs we have
     if (players.length === 0 && playerIds.length > 0) {
+      console.log('No players found, creating placeholders');
       players = playerIds.map(id => ({
         id,
         firstName: 'Player',
@@ -270,7 +277,7 @@ export default function ConfirmedRegistrationsPage() {
                 <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Registrations Found</h3>
                 <p className="text-muted-foreground">
-                  You haven&apos;t registered for any events yet.
+                  You haven't registered for any events yet.
                 </p>
               </div>
             ) : (
@@ -320,6 +327,7 @@ export default function ConfirmedRegistrationsPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => {
+                                console.log('Managing confirmation:', confirmation);
                                 setSelectedConfirmation(confirmation);
                                 // Scroll to the payment section
                                 setTimeout(() => {
@@ -411,6 +419,9 @@ export default function ConfirmedRegistrationsPage() {
                   const players = getRegisteredPlayers(selectedConfirmation);
                   const playerIds = Object.keys(selectedConfirmation.selections || {});
                   
+                  console.log('Rendering players:', players);
+                  console.log('Player IDs:', playerIds);
+                  
                   if (players.length > 0) {
                     return (
                       <div className="space-y-2">
@@ -433,7 +444,12 @@ export default function ConfirmedRegistrationsPage() {
                                 <p className="text-sm">
                                   USCF: {selectionInfo.uscfStatus || 'Current'}
                                 </p>
-                                {selectionInfo.byes && selectionInfo.byes !== 'none' && (
+                                {selectionInfo.byes && typeof selectionInfo.byes === 'object' && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Byes: R1-{selectionInfo.byes.round1 || 'None'}, R2-{selectionInfo.byes.round2 || 'None'}
+                                  </p>
+                                )}
+                                {selectionInfo.byes && typeof selectionInfo.byes === 'string' && selectionInfo.byes !== 'none' && (
                                   <p className="text-xs text-muted-foreground">
                                     Byes: {selectionInfo.byes}
                                   </p>
@@ -496,92 +512,92 @@ export default function ConfirmedRegistrationsPage() {
                   </Button>
                 </CardTitle>
               </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Payment Method Selection */}
-              <div>
-                <Label className="text-base font-medium mb-4 block">Payment Method</Label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <Button
-                    variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'}
-                    onClick={() => setSelectedPaymentMethod('purchase-order')}
-                    className="h-auto py-4 flex flex-col items-center gap-2"
-                  >
-                    <Upload className="h-5 w-5" />
-                    <span className="text-sm">Purchase Order</span>
-                  </Button>
-                  
-                  <Button
-                    variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'}
-                    onClick={() => setSelectedPaymentMethod('check')}
-                    className="h-auto py-4 flex flex-col items-center gap-2"
-                  >
-                    <Check className="h-5 w-5" />
-                    <span className="text-sm">Pay with Check</span>
-                  </Button>
-                  
-                  <Button
-                    variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'}
-                    onClick={() => setSelectedPaymentMethod('cash-app')}
-                    className="h-auto py-4 flex flex-col items-center gap-2"
-                  >
-                    <DollarSign className="h-5 w-5" />
-                    <span className="text-sm">Cash App</span>
-                  </Button>
-                  
-                  <Button
-                    variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'}
-                    onClick={() => setSelectedPaymentMethod('zelle')}
-                    className="h-auto py-4 flex flex-col items-center gap-2"
-                  >
-                    <CreditCard className="h-5 w-5" />
-                    <span className="text-sm">Zelle</span>
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Purchase Order Section */}
-              {selectedPaymentMethod === 'purchase-order' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <Label htmlFor="po-number">PO Number</Label>
-                    <Input
-                      id="po-number"
-                      placeholder="Enter PO Number"
-                      value={poNumber}
-                      onChange={(e) => setPONumber(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="po-document">Upload PO Document</Label>
-                    <Input
-                      id="po-document"
-                      type="file"
-                      accept=".pdf,.doc,.docx,.jpg,.png"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) setPODocument(file);
-                      }}
-                    />
+              <CardContent className="space-y-6">
+                {/* Payment Method Selection */}
+                <div>
+                  <Label className="text-base font-medium mb-4 block">Payment Method</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Button
+                      variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'}
+                      onClick={() => setSelectedPaymentMethod('purchase-order')}
+                      className="h-auto py-4 flex flex-col items-center gap-2"
+                    >
+                      <Upload className="h-5 w-5" />
+                      <span className="text-sm">Purchase Order</span>
+                    </Button>
+                    
+                    <Button
+                      variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'}
+                      onClick={() => setSelectedPaymentMethod('check')}
+                      className="h-auto py-4 flex flex-col items-center gap-2"
+                    >
+                      <Check className="h-5 w-5" />
+                      <span className="text-sm">Pay with Check</span>
+                    </Button>
+                    
+                    <Button
+                      variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'}
+                      onClick={() => setSelectedPaymentMethod('cash-app')}
+                      className="h-auto py-4 flex flex-col items-center gap-2"
+                    >
+                      <DollarSign className="h-5 w-5" />
+                      <span className="text-sm">Cash App</span>
+                    </Button>
+                    
+                    <Button
+                      variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'}
+                      onClick={() => setSelectedPaymentMethod('zelle')}
+                      className="h-auto py-4 flex flex-col items-center gap-2"
+                    >
+                      <CreditCard className="h-5 w-5" />
+                      <span className="text-sm">Zelle</span>
+                    </Button>
                   </div>
                 </div>
-              )}
 
-              {/* Action Button */}
-              <div className="flex justify-end">
-                <Button 
-                  onClick={handlePaymentUpdate}
-                  disabled={isUpdating}
-                  className="flex items-center gap-2"
-                >
-                  {isUpdating ? 'Updating...' : 'Save Payment & Update Invoice'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                <Separator />
+
+                {/* Purchase Order Section */}
+                {selectedPaymentMethod === 'purchase-order' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="po-number">PO Number</Label>
+                      <Input
+                        id="po-number"
+                        placeholder="Enter PO Number"
+                        value={poNumber}
+                        onChange={(e) => setPONumber(e.target.value)}
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="po-document">Upload PO Document</Label>
+                      <Input
+                        id="po-document"
+                        type="file"
+                        accept=".pdf,.doc,.docx,.jpg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) setPODocument(file);
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Button */}
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={handlePaymentUpdate}
+                    disabled={isUpdating}
+                    className="flex items-center gap-2"
+                  >
+                    {isUpdating ? 'Updating...' : 'Save Payment & Update Invoice'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </AppLayout>
