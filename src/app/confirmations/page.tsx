@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -73,6 +72,44 @@ export default function ConfirmedRegistrationsPage() {
     }
   };
 
+  const getRegisteredPlayers = (confirmation: any) => {
+    if (!confirmation.selections) return [];
+    
+    const playerIds = Object.keys(confirmation.selections);
+    
+    // Try to find players in master database
+    let players = masterDatabase.filter(player => playerIds.includes(player.id));
+    
+    // If no players found in master database, try to get from localStorage
+    if (players.length === 0) {
+      try {
+        const storedMasterDb = localStorage.getItem('master_player_database');
+        if (storedMasterDb) {
+          const localPlayers = JSON.parse(storedMasterDb);
+          players = localPlayers.filter((player: any) => playerIds.includes(player.id));
+        }
+      } catch (error) {
+        console.error('Error loading from localStorage:', error);
+      }
+    }
+    
+    // If still no players found, create placeholder entries with the IDs we have
+    if (players.length === 0 && playerIds.length > 0) {
+      players = playerIds.map(id => ({
+        id,
+        firstName: 'Player',
+        lastName: id.substring(0, 8), // Show part of the ID
+        // Try to get info from the confirmation if available
+        ...(confirmation.playerNames && confirmation.playerNames[id] ? {
+          firstName: confirmation.playerNames[id].split(' ')[0] || 'Player',
+          lastName: confirmation.playerNames[id].split(' ').slice(1).join(' ') || id.substring(0, 8)
+        } : {})
+      }));
+    }
+    
+    return players;
+  };
+
   // Safely refresh invoice status without crashing
   const handleRefreshStatus = async (confirmation: any) => {
     if (!confirmation.invoiceId) {
@@ -91,11 +128,12 @@ export default function ConfirmedRegistrationsPage() {
       
       const statusResult = await getInvoiceStatus({ invoiceId: confirmation.invoiceId });
       
-      if (statusResult?.status) {
+      const updatedStatus = statusResult.status;
+      if (updatedStatus) {
         // Update the confirmation with new status
         const updatedConfirmations = confirmations.map(conf => 
           conf.id === confirmation.id 
-            ? { ...conf, invoiceStatus: statusResult.status }
+            ? { ...conf, invoiceStatus: updatedStatus }
             : conf
         );
         
@@ -107,7 +145,7 @@ export default function ConfirmedRegistrationsPage() {
           const allConfirmations = JSON.parse(storedConfirmations);
           const updatedAllConfirmations = allConfirmations.map((conf: any) => 
             conf.id === confirmation.id 
-              ? { ...conf, invoiceStatus: statusResult.status }
+              ? { ...conf, invoiceStatus: updatedStatus }
               : conf
           );
           localStorage.setItem('confirmations', JSON.stringify(updatedAllConfirmations));
@@ -115,7 +153,7 @@ export default function ConfirmedRegistrationsPage() {
         
         toast({
           title: 'Status Updated',
-          description: `Invoice status updated to: ${statusResult.status}`
+          description: `Invoice status updated to: ${updatedStatus}`
         });
       } else {
         throw new Error('Failed to get status');
@@ -207,51 +245,6 @@ export default function ConfirmedRegistrationsPage() {
     }
   };
 
-  const getRegisteredPlayers = (confirmation: any) => {
-    if (!confirmation.selections) return [];
-    
-    console.log('Getting players for confirmation:', confirmation.id);
-    console.log('Selections:', confirmation.selections);
-    console.log('Master database length:', masterDatabase.length);
-    
-    const playerIds = Object.keys(confirmation.selections);
-    console.log('Player IDs to find:', playerIds);
-    
-    // Try to find players in master database
-    let players = masterDatabase.filter(player => playerIds.includes(player.id));
-    console.log('Found players from master DB:', players);
-    
-    // If no players found in master database, try to get from localStorage
-    if (players.length === 0) {
-      try {
-        const storedMasterDb = localStorage.getItem('master_player_database');
-        if (storedMasterDb) {
-          const localPlayers = JSON.parse(storedMasterDb);
-          players = localPlayers.filter((player: any) => playerIds.includes(player.id));
-          console.log('Found players from localStorage:', players);
-        }
-      } catch (error) {
-        console.error('Error loading from localStorage:', error);
-      }
-    }
-    
-    // If still no players found, create placeholder entries with the IDs we have
-    if (players.length === 0 && playerIds.length > 0) {
-      console.log('No players found, creating placeholders');
-      players = playerIds.map(id => ({
-        id,
-        firstName: 'Player',
-        lastName: id.substring(0, 8), // Show part of the ID
-        ...(confirmation.playerNames && confirmation.playerNames[id] ? {
-          firstName: confirmation.playerNames[id].split(' ')[0] || 'Player',
-          lastName: confirmation.playerNames[id].split(' ').slice(1).join(' ') || id.substring(0, 8)
-        } : {})
-      }));
-    }
-    
-    return players;
-  };
-
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -277,7 +270,7 @@ export default function ConfirmedRegistrationsPage() {
                 <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Registrations Found</h3>
                 <p className="text-muted-foreground">
-                  You haven't registered for any events yet.
+                  You haven&apos;t registered for any events yet.
                 </p>
               </div>
             ) : (
@@ -294,7 +287,6 @@ export default function ConfirmedRegistrationsPage() {
                 </TableHeader>
                 <TableBody>
                   {confirmations.map((confirmation) => {
-                    const players = getRegisteredPlayers(confirmation);
                     const playerCount = Object.keys(confirmation.selections || {}).length;
                     
                     return (
@@ -328,7 +320,6 @@ export default function ConfirmedRegistrationsPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                console.log('Managing confirmation:', confirmation);
                                 setSelectedConfirmation(confirmation);
                                 // Scroll to the payment section
                                 setTimeout(() => {
@@ -419,9 +410,6 @@ export default function ConfirmedRegistrationsPage() {
                 {(() => {
                   const players = getRegisteredPlayers(selectedConfirmation);
                   const playerIds = Object.keys(selectedConfirmation.selections || {});
-                  
-                  console.log('Rendering players:', players);
-                  console.log('Player IDs:', playerIds);
                   
                   if (players.length > 0) {
                     return (
@@ -594,7 +582,8 @@ export default function ConfirmedRegistrationsPage() {
             </CardContent>
           </Card>
         </div>
+        )}
       </div>
     </AppLayout>
-
-    
+  );
+}
