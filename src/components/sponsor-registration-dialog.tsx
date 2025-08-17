@@ -210,8 +210,6 @@ export function SponsorRegistrationDialog({
         players: playersToInvoice
       });
 
-      console.log('Full invoice creation result:', JSON.stringify(result, null, 2));
-
       // Create confirmation record
       const newConfirmation = {
         id: result.invoiceId,
@@ -251,6 +249,8 @@ export function SponsorRegistrationDialog({
       localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
 
       console.log('Successfully saved to localStorage');
+      console.log('Confirmations in localStorage:', JSON.parse(localStorage.getItem('confirmations') || '[]'));
+      console.log('All invoices in localStorage:', JSON.parse(localStorage.getItem('all_invoices') || '[]'));
       
       // Determine which URL to use for opening the invoice
       const invoiceUrl = result.invoiceUrl || result.publicUrl || result.public_url;
