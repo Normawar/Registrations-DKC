@@ -238,6 +238,8 @@ export function SponsorRegistrationDialog({
         invoiceUrl: result.invoiceUrl || result.publicUrl,
         purchaserName: `${profile.firstName} ${profile.lastName}`
       };
+      
+      console.log('About to save confirmation:', newConfirmation);
 
       // Save to localStorage
       const existingConfirmations = localStorage.getItem('confirmations');
@@ -247,6 +249,8 @@ export function SponsorRegistrationDialog({
       
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
+
+      console.log('Successfully saved to localStorage');
       
       // Determine which URL to use for opening the invoice
       const invoiceUrl = result.invoiceUrl || result.publicUrl || result.public_url;
@@ -342,7 +346,8 @@ export function SponsorRegistrationDialog({
       window.dispatchEvent(new Event('storage'));
       
     } catch (error) {
-      console.error('Registration failed:', error);
+      console.error('Registration failed with full error:', error);
+      console.error('Error stack:', (error as Error).stack);
       const description = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({
         variant: 'destructive',
