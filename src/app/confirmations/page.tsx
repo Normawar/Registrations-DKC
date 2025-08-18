@@ -201,7 +201,7 @@ export default function ConfirmedRegistrationsPage() {
             if (!storage) throw new Error("Firebase Storage is not configured.");
             
             const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
-            const recordId = invoiceId || id;
+            const recordId = selectedConfirmation.invoiceId || selectedConfirmation.id;
             const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
             const snapshot = await uploadBytes(storageRef, fileToUpload);
             const downloadUrl = await getDownloadURL(snapshot.ref);
@@ -229,7 +229,7 @@ export default function ConfirmedRegistrationsPage() {
             paymentMethod: selectedPaymentMethod,
             poNumber: finalPoNumber,
             invoiceTitle: newTitle,
-            paymentStatus: (selectedPaymentMethod === 'purchase-order' || selectedPaymentMethod === 'check' || selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle') ? 'pending-po' : selectedConfirmation.paymentStatus,
+            paymentStatus: 'pending-po', // Unify status for all manual payment methods
             lastUpdated: new Date().toISOString(),
         };
   
