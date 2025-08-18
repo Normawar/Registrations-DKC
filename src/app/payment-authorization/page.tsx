@@ -31,7 +31,7 @@ type Confirmation = {
   eventName: string;
   schoolName: string;
   totalInvoiced: number;
-  paymentMethod?: 'po' | 'check' | 'cashapp' | 'zelle';
+  paymentMethod?: 'po' | 'check' | 'cashapp' | 'zelle' | 'purchase-order';
   paymentStatus: 'pending-po' | 'paid' | 'unpaid';
   poNumber?: string;
   poFileUrl?: string;
@@ -115,9 +115,11 @@ export default function PaymentAuthorizationPage() {
   
   const getPaymentMethodLabel = (method: string | undefined) => {
     switch (method) {
-        case 'po': return 'Purchase Order';
+        case 'po':
+        case 'purchase-order':
+             return 'Purchase Order';
         case 'check': return 'Check';
-        case 'cashapp': return 'Cash App';
+        case 'cash-app': return 'Cash App';
         case 'zelle': return 'Zelle';
         default: return 'Unknown';
     }
@@ -174,24 +176,28 @@ export default function PaymentAuthorizationPage() {
                                     <Badge variant="secondary">{getPaymentMethodLabel(p.paymentMethod)}</Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {p.paymentMethod === 'po' && (
+                                    {(p.paymentMethod === 'po' || p.paymentMethod === 'purchase-order') && (
                                         <div className="flex items-center gap-2">
-                                            <span>PO #: {p.poNumber}</span>
+                                            <span>PO #: {p.poNumber || 'N/A'}</span>
                                             {p.poFileUrl && (
-                                                <a href={p.poFileUrl} target="_blank" rel="noopener noreferrer">
-                                                    <Download className="h-4 w-4" />
-                                                </a>
+                                                <Button asChild variant="link" size="sm" className="p-0 h-auto">
+                                                    <a href={p.poFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                                                        <Download className="h-4 w-4" /> View Document
+                                                    </a>
+                                                </Button>
                                             )}
                                         </div>
                                     )}
                                     {p.paymentMethod === 'check' && (
                                         <span>Check #: {p.checkNumber}, Dated: {p.checkDate ? format(new Date(p.checkDate), 'PPP') : 'N/A'}</span>
                                     )}
-                                    {(p.paymentMethod === 'cashapp' || p.paymentMethod === 'zelle') && (
+                                    {(p.paymentMethod === 'cash-app' || p.paymentMethod === 'zelle') && (
                                          p.paymentFileUrl && (
-                                            <a href={p.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 hover:underline">
-                                                <Download className="h-4 w-4" /> View Proof
-                                            </a>
+                                            <Button asChild variant="link" size="sm" className="p-0 h-auto">
+                                                <a href={p.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                                                    <Download className="h-4 w-4" /> View Proof
+                                                </a>
+                                            </Button>
                                         )
                                     )}
                                 </TableCell>
@@ -216,4 +222,3 @@ export default function PaymentAuthorizationPage() {
     </AppLayout>
   );
 }
-
