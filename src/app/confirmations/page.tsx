@@ -193,13 +193,15 @@ export default function ConfirmedRegistrationsPage() {
         const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
         let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
         
+        // Start with existing values
         let poFileUrl: string | undefined = selectedConfirmation.poFileUrl;
         let poFileName: string | undefined = selectedConfirmation.poFileName;
         let paymentFileUrl: string | undefined = selectedConfirmation.paymentFileUrl;
         let paymentFileName: string | undefined = selectedConfirmation.paymentFileName;
         
         const fileToUpload = selectedPaymentMethod === 'purchase-order' ? poDocument : paymentProof;
-        const uploadFolder = selectedPaymentMethod === 'purchase-order' ? 'purchase-orders' : 'payment-proofs';
+        const isPoUpload = selectedPaymentMethod === 'purchase-order';
+        const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
         
         if (fileToUpload) {
             if (!storage) throw new Error("Firebase Storage is not configured.");
@@ -208,7 +210,7 @@ export default function ConfirmedRegistrationsPage() {
             const snapshot = await uploadBytes(storageRef, fileToUpload);
             const downloadUrl = await getDownloadURL(snapshot.ref);
 
-            if (selectedPaymentMethod === 'purchase-order') {
+            if (isPoUpload) {
                 poFileUrl = downloadUrl;
                 poFileName = fileToUpload.name;
             } else {
@@ -217,8 +219,9 @@ export default function ConfirmedRegistrationsPage() {
             }
         }
         
-        if (selectedPaymentMethod === 'purchase-order' && poNumber) {
-            newTitle += ` PO: ${poNumber}`;
+        const finalPoNumber = selectedPaymentMethod === 'purchase-order' ? poNumber : selectedConfirmation.poNumber;
+        if (finalPoNumber) {
+            newTitle += ` PO: ${finalPoNumber}`;
         }
       
         if (selectedConfirmation.invoiceId) {
@@ -228,7 +231,7 @@ export default function ConfirmedRegistrationsPage() {
         const updatedConfirmation = {
             ...selectedConfirmation,
             paymentMethod: selectedPaymentMethod,
-            poNumber: poNumber,
+            poNumber: finalPoNumber,
             poFileUrl: poFileUrl,
             poFileName: poFileName,
             paymentFileUrl: paymentFileUrl,
@@ -463,7 +466,7 @@ export default function ConfirmedRegistrationsPage() {
                                 <p className="font-medium">{player.firstName} {player.lastName}</p>
                                 <p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p>
                               </div>
-                              <p>USCF: {selectionInfo.uscfStatus || 'Current'}</p>
+                              <p>USCF: {selectionInfo.uscfStatus || 'Current'</p>
                             </div>
                           );
                         })}
@@ -573,3 +576,5 @@ export default function ConfirmedRegistrationsPage() {
   );
 }
  
+
+    
