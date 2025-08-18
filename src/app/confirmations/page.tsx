@@ -19,7 +19,7 @@ import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, storage } from '@/lib/firebase';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 
@@ -37,26 +37,28 @@ export default function ConfirmedRegistrationsPage() {
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth || !storage) {
-        setIsAuthReady(false);
         setAuthError("Firebase is not configured, so file uploads are disabled.");
+        setIsAuthReady(true); // Set to true to allow UI to render correctly, but buttons will be disabled
         return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
         if (user) {
-            setIsAuthReady(true);
+            setCurrentUser(user);
             setAuthError(null);
         } else {
             signInAnonymously(auth).catch((error) => {
                 console.error("Anonymous sign-in failed:", error);
                 setAuthError("Authentication error. File uploads are disabled.");
-                setIsAuthReady(false);
+                setCurrentUser(null);
             });
         }
+        setIsAuthReady(true);
     });
     return () => unsubscribe();
   }, []);
@@ -182,14 +184,14 @@ export default function ConfirmedRegistrationsPage() {
 
   const handlePaymentUpdate = async () => {
     if (!selectedConfirmation) return;
-    if (!isAuthReady) {
-        toast({ variant: 'destructive', title: 'Authentication Not Ready', description: authError || "Cannot submit payment information at this time."});
+    if (!currentUser) {
+        toast({ variant: 'destructive', title: 'Authentication Not Ready', description: authError || "Cannot submit payment information at this time. Please refresh the page."});
         return;
     }
   
     setIsUpdating(true);
     try {
-        const { teamCode, eventDate, eventName, id } = selectedConfirmation;
+        const { teamCode, eventDate, eventName, id, invoiceId } = selectedConfirmation;
         const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
         let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
         
@@ -201,7 +203,7 @@ export default function ConfirmedRegistrationsPage() {
         
         if (fileToUpload) {
             if (!storage) throw new Error("Firebase Storage is not configured.");
-            const recordId = selectedConfirmation.invoiceId || id;
+            const recordId = invoiceId || id;
             const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
             const snapshot = await uploadBytes(storageRef, fileToUpload);
             const downloadUrl = await getDownloadURL(snapshot.ref);
@@ -230,7 +232,9 @@ export default function ConfirmedRegistrationsPage() {
             poNumber: finalPoNumber,
             invoiceTitle: newTitle,
             paymentStatus: (selectedPaymentMethod === 'purchase-order' || selectedPaymentMethod === 'check' || selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle') ? 'pending-po' : selectedConfirmation.paymentStatus,
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            poDocument: undefined, // Clear file object before saving
+            paymentProof: undefined // Clear file object before saving
         };
   
         const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -314,6 +318,13 @@ export default function ConfirmedRegistrationsPage() {
             Manage your event registrations and payment information
           </p>
         </div>
+
+        {authError && (
+          <Alert variant="destructive">
+            <AlertTitle>File Uploads Disabled</AlertTitle>
+            <AlertDescription>{authError}</AlertDescription>
+          </Alert>
+        )}
 
         <Card>
           <CardHeader>
@@ -554,7 +565,7 @@ export default function ConfirmedRegistrationsPage() {
 
 
                 <div className="flex justify-end">
-                  <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady} className="flex items-center gap-2">
+                  <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady || !!authError} className="flex items-center gap-2">
                     {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                     {isUpdating ? 'Submitting...' : 'Submit Information for Verification'}
                   </Button>
