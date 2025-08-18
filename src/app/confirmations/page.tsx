@@ -253,6 +253,7 @@ export default function ConfirmedRegistrationsPage() {
         });
   
         window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('all_invoices_updated'));
   
     } catch (error) {
         console.error('Failed to update payment:', error);
