@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Users, Calendar, Loader2, Download } from "lucide-react";
+import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Users, Calendar, Loader2, Download, File as FileIcon } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
@@ -33,6 +33,8 @@ export default function ConfirmedRegistrationsPage() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('purchase-order');
   const [poNumber, setPONumber] = useState('');
   const [poDocument, setPODocument] = useState<File | null>(null);
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -193,13 +195,25 @@ export default function ConfirmedRegistrationsPage() {
         
         let poFileUrl: string | undefined = selectedConfirmation.poFileUrl;
         let poFileName: string | undefined = selectedConfirmation.poFileName;
-
-        if (selectedPaymentMethod === 'purchase-order' && poDocument) {
+        let paymentFileUrl: string | undefined = selectedConfirmation.paymentFileUrl;
+        let paymentFileName: string | undefined = selectedConfirmation.paymentFileName;
+        
+        const fileToUpload = selectedPaymentMethod === 'purchase-order' ? poDocument : paymentProof;
+        const uploadFolder = selectedPaymentMethod === 'purchase-order' ? 'purchase-orders' : 'payment-proofs';
+        
+        if (fileToUpload) {
             if (!storage) throw new Error("Firebase Storage is not configured.");
-            const storageRef = ref(storage, `purchase-orders/${invoiceId}/${poDocument.name}`);
-            const snapshot = await uploadBytes(storageRef, poDocument);
-            poFileUrl = await getDownloadURL(snapshot.ref);
-            poFileName = poDocument.name;
+            const storageRef = ref(storage, `${uploadFolder}/${invoiceId}/${fileToUpload.name}`);
+            const snapshot = await uploadBytes(storageRef, fileToUpload);
+            const downloadUrl = await getDownloadURL(snapshot.ref);
+
+            if (selectedPaymentMethod === 'purchase-order') {
+                poFileUrl = downloadUrl;
+                poFileName = fileToUpload.name;
+            } else {
+                paymentFileUrl = downloadUrl;
+                paymentFileName = fileToUpload.name;
+            }
         }
         
         if (selectedPaymentMethod === 'purchase-order' && poNumber) {
@@ -216,6 +230,8 @@ export default function ConfirmedRegistrationsPage() {
             poNumber: poNumber,
             poFileUrl: poFileUrl,
             poFileName: poFileName,
+            paymentFileUrl: paymentFileUrl,
+            paymentFileName: paymentFileName,
             invoiceTitle: newTitle,
             paymentStatus: 'pending-po',
             lastUpdated: new Date().toISOString()
@@ -236,21 +252,28 @@ export default function ConfirmedRegistrationsPage() {
         setConfirmations(prev => prev.map(c => c.id === updatedConfirmation.id ? updatedConfirmation : c));
         setSelectedConfirmation(updatedConfirmation);
   
-        toast({
-            title: 'Payment Info Submitted - Authorization Pending',
-            duration: 10000,
-            description: (
-              <div className="flex flex-col gap-2 text-sm">
-                <p>For your payment to be fully authorized, please ensure the following steps are completed:</p>
-                <ol className="list-decimal list-inside space-y-1 pl-2 font-medium">
-                  <li>A copy of the PO document is uploaded.</li>
-                  <li>The PO is submitted for payment with your school's bookkeeper.</li>
-                  <li>The actual monetary payment has been sent and received.</li>
-                </ol>
-                <p className="mt-2 text-xs text-muted-foreground">An organizer will mark the invoice as "Paid" once funds are verified.</p>
-              </div>
-            ),
-        });
+        if (selectedPaymentMethod === 'purchase-order') {
+            toast({
+                title: 'Payment Info Submitted - Authorization Pending',
+                duration: 10000,
+                description: (
+                  <div className="flex flex-col gap-2 text-sm">
+                    <p>For your payment to be fully authorized, please ensure the following steps are completed:</p>
+                    <ol className="list-decimal list-inside space-y-1 pl-2 font-medium">
+                      <li>A copy of the PO document is uploaded.</li>
+                      <li>The PO is submitted for payment with your school's bookkeeper.</li>
+                      <li>The actual monetary payment has been sent and received.</li>
+                    </ol>
+                    <p className="mt-2 text-xs text-muted-foreground">An organizer will mark the invoice as "Paid" once funds are verified.</p>
+                  </div>
+                ),
+            });
+        } else {
+            toast({
+                title: 'Payment Info Submitted',
+                description: 'An organizer will verify receipt of funds to complete the process.'
+            });
+        }
   
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('all_invoices_updated'));
@@ -357,7 +380,8 @@ export default function ConfirmedRegistrationsPage() {
                               onClick={() => {
                                 setSelectedConfirmation(confirmation);
                                 setPONumber(confirmation.poNumber || '');
-                                setPODocument(null); // Reset file input
+                                setPODocument(null);
+                                setPaymentProof(null);
                                 setTimeout(() => {
                                   document.querySelector('[data-payment-section]')?.scrollIntoView({ behavior: 'smooth' });
                                 }, 100);
@@ -505,6 +529,27 @@ export default function ConfirmedRegistrationsPage() {
                       )}
                     </div>
                   </div>
+                )}
+                
+                {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle') && (
+                    <div>
+                      <Label htmlFor="payment-proof">Upload Payment Screenshot</Label>
+                      <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setPaymentProof(e.target.files?.[0] || null)} />
+                      {selectedConfirmation.paymentFileUrl && !paymentProof && (
+                        <div className="text-sm mt-2">
+                          <a href={selectedConfirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                            <Download className="h-4 w-4" />
+                            View uploaded proof: {selectedConfirmation.paymentFileName || 'View File'}
+                          </a>
+                        </div>
+                      )}
+                      {paymentProof && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <FileIcon className="h-4 w-4 inline-block mr-1" />
+                          New file selected: {paymentProof.name}
+                        </p>
+                      )}
+                    </div>
                 )}
 
 

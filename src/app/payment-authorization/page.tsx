@@ -31,7 +31,7 @@ type Confirmation = {
   eventName: string;
   schoolName: string;
   totalInvoiced: number;
-  paymentMethod?: 'po' | 'check' | 'cashapp' | 'zelle' | 'purchase-order';
+  paymentMethod?: 'po' | 'check' | 'cash-app' | 'zelle' | 'purchase-order';
   paymentStatus: 'pending-po' | 'paid' | 'unpaid';
   poNumber?: string;
   poFileUrl?: string;
