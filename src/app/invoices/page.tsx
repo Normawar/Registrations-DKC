@@ -164,6 +164,11 @@ export default function UnifiedInvoiceRegistrations() {
   const totalExpense = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + item.totalAmount, 0), [filteredAndSortedData]);
   const outstandingInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE').length, [filteredAndSortedData]);
   const paidInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status === 'PAID').length, [filteredAndSortedData]);
+  const outstandingAmount = useMemo(() => {
+    return filteredAndSortedData
+      .filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE')
+      .reduce((sum, item) => sum + item.totalAmount, 0);
+  }, [filteredAndSortedData]);
 
 
   return (
@@ -194,8 +199,8 @@ export default function UnifiedInvoiceRegistrations() {
               <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-               {clientReady ? (<div className="text-2xl font-bold">{outstandingInvoices}</div>) : (<Skeleton className="h-8 w-1/2" />)}
-              <p className="text-xs text-muted-foreground">Require payment</p>
+               {clientReady ? (<div className="text-2xl font-bold">${(outstandingAmount).toFixed(2)}</div>) : (<Skeleton className="h-8 w-3/4" />)}
+              <p className="text-xs text-muted-foreground">{outstandingInvoices} invoice(s) require payment</p>
             </CardContent>
           </Card>
 
