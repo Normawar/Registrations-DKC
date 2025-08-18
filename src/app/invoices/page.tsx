@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building } from 'lucide-react';
 import { InvoiceDisplayModal } from '@/components/invoice-display-modal';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 export default function UnifiedInvoiceRegistrations() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,101 +18,75 @@ export default function UnifiedInvoiceRegistrations() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [clientReady, setClientReady] = useState(false);
+  const [data, setData] = useState<any[]>([]);
 
-  // Replace the mock data loading in the unified component with this real data loading logic:
-  const combinedData = useMemo(() => {
-    if (typeof window === 'undefined') return [];
-    
-    console.log('🔄 Loading unified data from localStorage...');
-    
-    try {
-      const allInvoices = localStorage.getItem('all_invoices');
-      const confirmations = localStorage.getItem('confirmations');
-      
-      console.log('Raw all_invoices from localStorage:', allInvoices);
-      console.log('Raw confirmations from localStorage:', confirmations);
-      
-      const invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
-      const confirmationsArray = confirmations ? JSON.parse(confirmations) : [];
-      
-      console.log('Parsed invoices array:', invoicesArray);
-      console.log('Parsed confirmations array:', confirmationsArray);
-      
-      // Combine invoice and confirmation data
-      const mapped = invoicesArray.map((invoice) => {
-        const confirmation = confirmationsArray.find(c => c.invoiceId === invoice.invoiceId);
-        
-        // Get all registrations for this invoice
-        const registrations = confirmation?.registrations || [];
-        
-        return {
-          invoiceId: invoice.invoiceId,
-          invoiceNumber: invoice.invoiceNumber,
-          eventTitle: confirmation?.eventTitle || 'Unknown Event',
-          companyName: confirmation?.companyName || 'Unknown',
-          contactEmail: confirmation?.contactEmail || 'Unknown',
-          totalAmount: invoice.totalMoney?.amount ? 
-            parseFloat(invoice.totalMoney.amount) : 0,
-          status: invoice.status || 'UNKNOWN',
-          submissionTimestamp: confirmation?.submissionTimestamp || new Date().toISOString(),
-          invoiceUrl: invoice.publicUrl || '#',
-          registrations: registrations.map(reg => ({
-            id: reg.id || Math.random().toString(36).substr(2, 9),
-            studentName: reg.studentName || 'Unknown Student',
-            grade: reg.grade || 'Unknown',
-            school: reg.school || 'Unknown School',
-            email: reg.email || '',
-            parentName: reg.parentName || '',
-            parentEmail: reg.parentEmail || ''
-          }))
-        };
-      });
-      
-      console.log('Final mapped unified data:', mapped);
-      return mapped;
-      
-    } catch (error) {
-      console.error('❌ Error loading unified data from localStorage:', error);
-      return [];
-    }
-  }, []);
-
-  // Also add this debugging function to help track localStorage changes:
+  // Load combined data from localStorage, only runs on the client
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     
-    console.log('🔍 Unified page loading - setting up localStorage monitoring...');
+    const loadData = () => {
+      console.log('🔄 Loading unified data from localStorage...');
+      try {
+        const allInvoices = localStorage.getItem('all_invoices');
+        const confirmations = localStorage.getItem('confirmations');
+        
+        const invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
+        const confirmationsArray = confirmations ? JSON.parse(confirmations) : [];
+        
+        // Combine invoice and confirmation data
+        const mapped = invoicesArray.map((invoice: any) => {
+          const confirmation = confirmationsArray.find((c: any) => c.invoiceId === invoice.invoiceId);
+          
+          const registrations = confirmation?.registrations || [];
+          
+          return {
+            invoiceId: invoice.invoiceId,
+            invoiceNumber: invoice.invoiceNumber,
+            eventTitle: confirmation?.eventTitle || 'Unknown Event',
+            companyName: confirmation?.companyName || 'Unknown',
+            contactEmail: confirmation?.contactEmail || 'Unknown',
+            totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
+            status: invoice.invoiceStatus || invoice.status || 'UNKNOWN',
+            submissionTimestamp: confirmation?.submissionTimestamp || new Date().toISOString(),
+            invoiceUrl: invoice.publicUrl || invoice.invoiceUrl || '#',
+            registrations: Array.isArray(registrations) ? registrations.map((reg: any) => ({
+              id: reg.id || Math.random().toString(36).substr(2, 9),
+              studentName: reg.studentName || 'Unknown Student',
+              grade: reg.grade || 'Unknown',
+              school: reg.school || 'Unknown School',
+              email: reg.email || '',
+              parentName: reg.parentName || '',
+              parentEmail: reg.parentEmail || ''
+            })) : []
+          };
+        });
+        
+        console.log('Final mapped unified data:', mapped);
+        setData(mapped);
+      } catch (error) {
+        console.error('❌ Error loading unified data from localStorage:', error);
+        setData([]);
+      }
+    };
     
-    // Listen for storage events (when localStorage changes in other tabs)
-    const handleStorageChange = (e) => {
+    loadData();
+    setClientReady(true);
+    
+    const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'all_invoices' || e.key === 'confirmations') {
-        console.log('🔄 Storage event detected in unified page:', e.key, 'changed from', e.oldValue, 'to', e.newValue);
-        // You might want to trigger a re-render here
-        window.location.reload(); // Simple approach - reload the page when data changes
+        console.log('🔄 Storage event detected in unified page:', e.key);
+        loadData();
       }
     };
     
     window.addEventListener('storage', handleStorageChange);
     
-    // Listen for page visibility changes
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('📖 Unified page became visible - checking localStorage...');
-        console.log('all_invoices:', localStorage.getItem('all_invoices'));
-        console.log('confirmations:', localStorage.getItem('confirmations'));
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Cleanup
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -119,7 +95,7 @@ export default function UnifiedInvoiceRegistrations() {
     }
   };
 
-  const getSortIcon = (field) => {
+  const getSortIcon = (field: string) => {
     if (sortField !== field) {
       return <ArrowUpDown className="h-4 w-4" />;
     }
@@ -127,69 +103,42 @@ export default function UnifiedInvoiceRegistrations() {
   };
 
   const filteredAndSortedData = useMemo(() => {
-    const filtered = combinedData.filter(item => {
+    const filtered = data.filter((item: any) => {
+      const lowerSearchTerm = searchTerm.toLowerCase();
       const matchesSearch = 
-        item.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.eventTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.contactEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.registrations.some(reg => 
-          reg.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          reg.school.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        (item.invoiceNumber || '').toLowerCase().includes(lowerSearchTerm) ||
+        (item.eventTitle || '').toLowerCase().includes(lowerSearchTerm) ||
+        (item.companyName || '').toLowerCase().includes(lowerSearchTerm) ||
+        (item.contactEmail || '').toLowerCase().includes(lowerSearchTerm) ||
+        (Array.isArray(item.registrations) && item.registrations.some((reg: any) => 
+          (reg.studentName || '').toLowerCase().includes(lowerSearchTerm) ||
+          (reg.school || '').toLowerCase().includes(lowerSearchTerm)
+        ));
 
       const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
 
-    return filtered.sort((a, b) => {
+    return filtered.sort((a: any, b: any) => {
       let aValue, bValue;
 
       switch (sortField) {
-        case 'invoiceNumber':
-          aValue = a.invoiceNumber;
-          bValue = b.invoiceNumber;
-          break;
-        case 'companyName':
-          aValue = a.companyName;
-          bValue = b.companyName;
-          break;
-        case 'eventTitle':
-          aValue = a.eventTitle;
-          bValue = b.eventTitle;
-          break;
-        case 'amount':
-          aValue = a.totalAmount;
-          bValue = b.totalAmount;
-          break;
-        case 'status':
-          aValue = a.status;
-          bValue = b.status;
-          break;
-        case 'studentCount':
-          aValue = a.registrations.length;
-          bValue = b.registrations.length;
-          break;
-        case 'submissionTimestamp':
-        default:
-          aValue = new Date(a.submissionTimestamp);
-          bValue = new Date(b.submissionTimestamp);
-          break;
+        case 'invoiceNumber': aValue = a.invoiceNumber; bValue = b.invoiceNumber; break;
+        case 'companyName': aValue = a.companyName; bValue = b.companyName; break;
+        case 'eventTitle': aValue = a.eventTitle; bValue = b.eventTitle; break;
+        case 'amount': aValue = a.totalAmount; bValue = b.totalAmount; break;
+        case 'status': aValue = a.status; bValue = b.status; break;
+        case 'studentCount': aValue = a.registrations.length; bValue = b.registrations.length; break;
+        case 'submissionTimestamp': default: aValue = new Date(a.submissionTimestamp); bValue = new Date(b.submissionTimestamp); break;
       }
 
-      if (sortDirection === 'asc') {
-        if (aValue < bValue) return -1;
-        if (aValue > bValue) return 1;
-        return 0;
-      } else {
-        if (aValue > bValue) return -1;
-        if (aValue < bValue) return 1;
-        return 0;
-      }
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
     });
-  }, [combinedData, searchTerm, statusFilter, sortField, sortDirection]);
+  }, [data, searchTerm, statusFilter, sortField, sortDirection]);
 
-  const handleViewInvoice = (invoice) => {
+  const handleViewInvoice = (invoice: any) => {
     setSelectedInvoice({
       invoiceId: invoice.invoiceId,
       invoiceNumber: invoice.invoiceNumber,
@@ -200,27 +149,28 @@ export default function UnifiedInvoiceRegistrations() {
     setShowInvoiceModal(true);
   };
 
-  const handleOpenExternal = (invoiceUrl) => {
+  const handleOpenExternal = (invoiceUrl: string) => {
     window.open(invoiceUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const getStatusBadge = (status) => {
-    const variants = {
+  const getStatusBadge = (status: string) => {
+    const variants: {[key: string]: 'default' | 'destructive' | 'secondary'} = {
       'PAID': 'default',
       'UNPAID': 'destructive',
       'PENDING': 'secondary',
       'OVERDUE': 'destructive'
     };
-    return <Badge variant={variants[status] || 'secondary'}>{status}</Badge>;
+    return <Badge variant={variants[status] || 'secondary'} className={status === 'PAID' ? 'bg-green-600 text-white' : ''}>{status}</Badge>;
   };
 
-  const totalRevenue = filteredAndSortedData.reduce((sum, item) => sum + (item.status === 'PAID' ? item.totalAmount : 0), 0);
-  const totalStudents = filteredAndSortedData.reduce((sum, item) => sum + item.registrations.length, 0);
-  const paidInvoices = filteredAndSortedData.filter(item => item.status === 'PAID').length;
+  const totalRevenue = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + (item.status === 'PAID' ? item.totalAmount : 0), 0), [filteredAndSortedData]);
+  const totalStudents = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + item.registrations.length, 0), [filteredAndSortedData]);
+  const paidInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status === 'PAID').length, [filteredAndSortedData]);
+  const currentMonthInvoices = useMemo(() => filteredAndSortedData.filter(item => new Date(item.submissionTimestamp).getMonth() === new Date().getMonth()).length, [filteredAndSortedData]);
+
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Invoice & Registration Management</h1>
         <p className="text-muted-foreground">
@@ -228,7 +178,6 @@ export default function UnifiedInvoiceRegistrations() {
         </p>
       </div>
 
-      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -236,7 +185,7 @@ export default function UnifiedInvoiceRegistrations() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${(totalRevenue / 100).toFixed(2)}</div>
+            {clientReady ? (<div className="text-2xl font-bold">${(totalRevenue).toFixed(2)}</div>) : (<Skeleton className="h-8 w-3/4" />)}
             <p className="text-xs text-muted-foreground">From paid invoices</p>
           </CardContent>
         </Card>
@@ -247,7 +196,7 @@ export default function UnifiedInvoiceRegistrations() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalStudents}</div>
+            {clientReady ? (<div className="text-2xl font-bold">{totalStudents}</div>) : (<Skeleton className="h-8 w-1/2" />)}
             <p className="text-xs text-muted-foreground">Registered students</p>
           </CardContent>
         </Card>
@@ -258,8 +207,8 @@ export default function UnifiedInvoiceRegistrations() {
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{paidInvoices}</div>
-            <p className="text-xs text-muted-foreground">of {filteredAndSortedData.length} total</p>
+             {clientReady ? (<div className="text-2xl font-bold">{paidInvoices}</div>) : (<Skeleton className="h-8 w-1/2" />)}
+            <p className="text-xs text-muted-foreground">of {clientReady ? filteredAndSortedData.length : '...'} total</p>
           </CardContent>
         </Card>
 
@@ -269,13 +218,12 @@ export default function UnifiedInvoiceRegistrations() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{filteredAndSortedData.length}</div>
+            {clientReady ? (<div className="text-2xl font-bold">{currentMonthInvoices}</div>) : (<Skeleton className="h-8 w-1/2" />)}
             <p className="text-xs text-muted-foreground">New registrations</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardHeader>
           <CardTitle>Filters</CardTitle>
@@ -306,7 +254,6 @@ export default function UnifiedInvoiceRegistrations() {
         </CardContent>
       </Card>
 
-      {/* Main Table */}
       <Card>
         <CardHeader>
           <CardTitle>All Invoices & Registrations</CardTitle>
@@ -358,7 +305,11 @@ export default function UnifiedInvoiceRegistrations() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAndSortedData.map((invoice) => (
+                {!clientReady ? (
+                    Array.from({length: 5}).map((_, i) => (
+                        <tr key={i} className="border-b"><td colSpan={8} className="p-2"><Skeleton className="h-8 w-full"/></td></tr>
+                    ))
+                ) : filteredAndSortedData.map((invoice) => (
                   <tr key={invoice.invoiceId} className="border-b hover:bg-muted/50">
                     <td className="p-2 font-medium">#{invoice.invoiceNumber}</td>
                     <td className="p-2">
@@ -377,13 +328,13 @@ export default function UnifiedInvoiceRegistrations() {
                           {invoice.registrations.length}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {invoice.registrations.slice(0, 2).map(reg => reg.studentName).join(', ')}
+                          {invoice.registrations.slice(0, 2).map((reg: any) => reg.studentName).join(', ')}
                           {invoice.registrations.length > 2 && ` +${invoice.registrations.length - 2} more`}
                         </div>
                       </div>
                     </td>
                     <td className="p-2">
-                      <div className="font-medium">${(invoice.totalAmount / 100).toFixed(2)}</div>
+                      <div className="font-medium">${(invoice.totalAmount).toFixed(2)}</div>
                     </td>
                     <td className="p-2">{getStatusBadge(invoice.status)}</td>
                     <td className="p-2">{new Date(invoice.submissionTimestamp).toLocaleDateString()}</td>
@@ -404,7 +355,7 @@ export default function UnifiedInvoiceRegistrations() {
             </table>
           </div>
 
-          {filteredAndSortedData.length === 0 && (
+          {clientReady && filteredAndSortedData.length === 0 && (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No invoices found matching your criteria.</p>
             </div>
@@ -412,7 +363,6 @@ export default function UnifiedInvoiceRegistrations() {
         </CardContent>
       </Card>
 
-      {/* Invoice Display Modal */}
       {showInvoiceModal && selectedInvoice && (
         <InvoiceDisplayModal
           isOpen={showInvoiceModal}
