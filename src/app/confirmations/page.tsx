@@ -195,18 +195,16 @@ export default function ConfirmedRegistrationsPage() {
         
         let updatedConfirmationData: any = { ...selectedConfirmation };
         
-        const isPoUpload = selectedPaymentMethod === 'purchase-order';
-        
         if (fileToUpload) {
             if (!storage) throw new Error("Firebase Storage is not configured.");
             
-            const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
+            const uploadFolder = selectedPaymentMethod === 'purchase-order' ? 'purchase-orders' : 'payment-proofs';
             const recordId = selectedConfirmation.invoiceId || selectedConfirmation.id;
             const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
             const snapshot = await uploadBytes(storageRef, fileToUpload);
             const downloadUrl = await getDownloadURL(snapshot.ref);
 
-            if (isPoUpload) {
+            if (selectedPaymentMethod === 'purchase-order') {
                 updatedConfirmationData.poFileUrl = downloadUrl;
                 updatedConfirmationData.poFileName = fileToUpload.name;
             } else {
