@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -284,7 +284,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     </Card>
 
                     <Card>
-                        <CardHeader><CardTitle>Submit Payment Information</CardTitle></CardHeader>
+                         <CardHeader>
+                            <CardTitle>Submit Payment Information</CardTitle>
+                            <CardDescription>Select a payment method and provide the necessary details. An organizer will verify your payment.</CardDescription>
+                        </CardHeader>
                         <CardContent className="space-y-6">
                             <div>
                                 <Label className="text-base font-medium mb-4 block">Payment Method</Label>
