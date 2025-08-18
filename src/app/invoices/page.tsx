@@ -1,17 +1,31 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building, AlertCircle } from 'lucide-react';
-import { InvoiceDisplayModal } from '@/components/invoice-display-modal';
+import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building, AlertCircle, Edit, Trash2 } from 'lucide-react';
+import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
+import { useRouter } from 'next/navigation';
 
 
 export default function UnifiedInvoiceRegistrations() {
@@ -23,67 +37,74 @@ export default function UnifiedInvoiceRegistrations() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [clientReady, setClientReady] = useState(false);
   const [data, setData] = useState<any[]>([]);
+  const { profile } = useSponsorProfile();
+  const { toast } = useToast();
+  const router = useRouter();
 
-  // Load combined data from localStorage, only runs on the client
-  useEffect(() => {
-    
-    const loadData = () => {
-      try {
-        const allInvoices = localStorage.getItem('all_invoices');
-        const confirmations = localStorage.getItem('confirmations');
-        
-        const invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
-        const confirmationsArray = confirmations ? JSON.parse(confirmations) : [];
-        
-        // Combine invoice and confirmation data
-        const mapped = invoicesArray.map((invoice: any) => {
-          // Match by the primary ID, which should be the invoiceId
-          const confirmation = confirmationsArray.find((c: any) => c.id === invoice.id);
-          
-          const selections = confirmation?.selections || invoice.selections || {};
-          const registrations = Object.keys(selections).map(playerId => ({
-              id: playerId,
-              ...selections[playerId]
-          }));
-          
-          return {
-            id: invoice.id || invoice.invoiceId,
-            invoiceId: invoice.invoiceId,
-            invoiceNumber: invoice.invoiceNumber,
-            invoiceTitle: invoice.invoiceTitle || confirmation?.eventName || 'Unknown Event',
-            eventDate: confirmation?.eventDate || invoice.eventDate,
-            companyName: invoice.schoolName || confirmation?.schoolName || 'Unknown',
-            contactEmail: invoice.sponsorEmail || confirmation?.sponsorEmail || 'Unknown',
-            totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
-            status: invoice.invoiceStatus || invoice.status || 'UNKNOWN',
-            submissionTimestamp: confirmation?.submissionTimestamp || invoice.submissionTimestamp || new Date().toISOString(),
-            invoiceUrl: invoice.invoiceUrl || '#',
-            registrations: registrations,
-          };
-        });
-        
-        setData(mapped);
-      } catch (error) {
-        console.error('❌ Error loading unified data from localStorage:', error);
-        setData([]);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+
+  const loadData = useCallback(() => {
+    try {
+      const allInvoices = localStorage.getItem('all_invoices');
+      let invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
+
+      if (profile?.role === 'sponsor') {
+        invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
+      } else if (profile?.role === 'individual') {
+        invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
       }
-    };
-    
-    loadData();
+      
+      const mapped = invoicesArray.map((invoice: any) => {
+        let registrations: any[] = [];
+        if (invoice.selections) {
+          registrations = Object.keys(invoice.selections).map(playerId => ({
+            id: playerId,
+            ...invoice.selections[playerId]
+          }));
+        } else if (invoice.registrations) {
+          registrations = invoice.registrations;
+        }
+
+        return {
+          ...invoice, // Spread all properties
+          id: invoice.id || invoice.invoiceId,
+          invoiceTitle: invoice.invoiceTitle || invoice.eventName || 'Unknown Event',
+          companyName: invoice.schoolName || invoice.purchaserName || 'Unknown',
+          contactEmail: invoice.sponsorEmail || invoice.purchaserEmail || 'Unknown',
+          totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
+          status: invoice.invoiceStatus || invoice.status || 'UNKNOWN',
+          registrations: registrations,
+        };
+      });
+      
+      setData(mapped);
+    } catch (error) {
+      console.error('❌ Error loading unified data from localStorage:', error);
+      setData([]);
+    }
+  }, [profile]);
+  
+  useEffect(() => {
+    if (profile) {
+      loadData();
+    }
     setClientReady(true);
     
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'all_invoices' || e.key === 'confirmations') {
-        loadData();
-      }
+    const handleStorageChange = () => {
+      if (profile) loadData();
     };
     
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('all_invoices_updated', handleStorageChange);
     
     return () => {
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('all_invoices_updated', handleStorageChange);
     };
-  }, []);
+  }, [profile, loadData]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -127,9 +148,13 @@ export default function UnifiedInvoiceRegistrations() {
         case 'invoiceTitle': aValue = a.invoiceTitle || ''; bValue = b.invoiceTitle || ''; break;
         case 'amount': aValue = a.totalAmount || 0; bValue = b.totalAmount || 0; break;
         case 'status': aValue = a.status || ''; bValue = b.status || ''; break;
-        case 'studentCount': aValue = a.registrations.length || 0; bValue = b.registrations.length || 0; break;
-        case 'eventDate': aValue = new Date(a.eventDate); bValue = new Date(b.eventDate); break;
-        case 'submissionTimestamp': default: aValue = new Date(a.submissionTimestamp); bValue = new Date(b.submissionTimestamp); break;
+        case 'studentCount': aValue = a.registrations?.length || 0; bValue = b.registrations?.length || 0; break;
+        case 'eventDate': aValue = a.eventDate ? new Date(a.eventDate).getTime() : 0; bValue = b.eventDate ? new Date(b.eventDate).getTime() : 0; break;
+        case 'submissionTimestamp': default: aValue = a.submissionTimestamp ? new Date(a.submissionTimestamp).getTime() : 0; bValue = b.submissionTimestamp ? new Date(b.submissionTimestamp).getTime() : 0; break;
+      }
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue);
       }
 
       if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
@@ -139,36 +164,72 @@ export default function UnifiedInvoiceRegistrations() {
   }, [data, searchTerm, statusFilter, sortField, sortDirection]);
 
   const handleViewInvoice = (invoice: any) => {
-    setSelectedInvoice({
-      invoiceId: invoice.id,
-      invoiceNumber: invoice.invoiceNumber,
-      invoiceUrl: invoice.invoiceUrl,
-      status: invoice.status,
-      totalAmount: invoice.totalAmount,
-    });
+    setSelectedInvoice(invoice);
     setShowInvoiceModal(true);
   };
-
-  const handleOpenExternal = (invoiceUrl: string) => {
-    window.open(invoiceUrl, '_blank', 'noopener,noreferrer');
+  
+  const handleEditInvoice = (invoiceId: string) => {
+    router.push(`/organizer-invoice?edit=${invoiceId}`);
   };
+
+  const handleDeleteInvoice = (invoice: any) => {
+    setInvoiceToDelete(invoice);
+    setIsAlertOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!invoiceToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      if (invoiceToDelete.invoiceId && invoiceToDelete.invoiceId.startsWith('inv:')) {
+        await cancelInvoice({ invoiceId: invoiceToDelete.invoiceId });
+      }
+
+      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+      const updatedInvoices = allInvoices.filter((inv: any) => inv.id !== invoiceToDelete.id);
+      localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
+
+      const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+      const updatedConfirmations = confirmations.filter((conf: any) => conf.id !== invoiceToDelete.id);
+      localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+      
+      setData(updatedInvoices);
+      window.dispatchEvent(new Event('storage'));
+      
+      toast({ title: 'Invoice Deleted', description: `Invoice ${invoiceToDelete.invoiceNumber || invoiceToDelete.id} has been removed.` });
+    } catch (error) {
+        console.error("Failed to delete invoice:", error);
+        toast({ variant: 'destructive', title: 'Deletion Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
+    } finally {
+        setIsDeleting(false);
+        setIsAlertOpen(false);
+        setInvoiceToDelete(null);
+    }
+  };
+
 
   const getStatusBadge = (status: string) => {
     const s = (status || '').toUpperCase();
     const variants: {[key: string]: 'default' | 'destructive' | 'secondary'} = {
       'PAID': 'default', 'COMPED': 'default',
       'UNPAID': 'destructive', 'OVERDUE': 'destructive',
+      'CANCELED': 'destructive',
     };
-    return <Badge variant={variants[s] || 'secondary'} className={s === 'PAID' || s === 'COMPED' ? 'bg-green-600 text-white' : ''}>{s}</Badge>;
+    let className = '';
+    if (s === 'PAID' || s === 'COMPED') className = 'bg-green-600 text-white';
+    if (s === 'PENDING-PO') className = 'bg-yellow-500 text-black';
+
+    return <Badge variant={variants[s] || 'secondary'} className={className}>{s.replace(/_/g, ' ')}</Badge>;
   };
 
-  const totalExpense = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + item.totalAmount, 0), [filteredAndSortedData]);
+  const totalExpense = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + (item.totalAmount || 0), 0), [filteredAndSortedData]);
   const outstandingInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE').length, [filteredAndSortedData]);
   const paidInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status === 'PAID').length, [filteredAndSortedData]);
   const outstandingAmount = useMemo(() => {
     return filteredAndSortedData
       .filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE')
-      .reduce((sum, item) => sum + item.totalAmount, 0);
+      .reduce((sum, item) => sum + (item.totalAmount || 0), 0);
   }, [filteredAndSortedData]);
 
 
@@ -240,8 +301,9 @@ export default function UnifiedInvoiceRegistrations() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="PAID">Paid</SelectItem>
                   <SelectItem value="UNPAID">Unpaid</SelectItem>
-                  <SelectItem value="PENDING">Pending</SelectItem>
-                  <SelectItem value="OVERDUE">Overdue</SelectItem>
+                  <SelectItem value="PENDING-PO">Pending Verification</SelectItem>
+                  <SelectItem value="COMPED">Comped</SelectItem>
+                  <SelectItem value="CANCELED">Canceled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -319,16 +381,16 @@ export default function UnifiedInvoiceRegistrations() {
                         <div className="space-y-1">
                           <div className="font-medium flex items-center gap-1">
                             <Users className="h-4 w-4" />
-                            {invoice.registrations.length}
+                            {invoice.registrations?.length || 0}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {invoice.registrations.slice(0, 2).map((reg: any) => reg.studentName).join(', ')}
-                            {invoice.registrations.length > 2 && ` +${invoice.registrations.length - 2} more`}
+                            {invoice.registrations?.slice(0, 2).map((reg: any) => reg.studentName).join(', ')}
+                            {invoice.registrations?.length > 2 && ` +${invoice.registrations.length - 2} more`}
                           </div>
                         </div>
                       </td>
                       <td className="p-2">
-                        <div className="font-medium">${(invoice.totalAmount).toFixed(2)}</div>
+                        <div className="font-medium">${(invoice.totalAmount || 0).toFixed(2)}</div>
                       </td>
                       <td className="p-2">{getStatusBadge(invoice.status)}</td>
                       <td className="p-2">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'N/A'}</td>
@@ -336,11 +398,14 @@ export default function UnifiedInvoiceRegistrations() {
                         <div className="flex items-center gap-2">
                           <Button variant="outline" size="sm" onClick={() => handleViewInvoice(invoice)} className="gap-1">
                             <Eye className="h-4 w-4" />
-                            View
+                            Details
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleOpenExternal(invoice.invoiceUrl)} className="gap-1">
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
+                          {profile?.role === 'organizer' && (
+                            <>
+                              <Button variant="outline" size="icon" onClick={() => handleEditInvoice(invoice.id)}><Edit className="h-4 w-4" /></Button>
+                              <Button variant="destructive" size="icon" onClick={() => handleDeleteInvoice(invoice)}><Trash2 className="h-4 w-4" /></Button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -358,18 +423,33 @@ export default function UnifiedInvoiceRegistrations() {
         </Card>
 
         {showInvoiceModal && selectedInvoice && (
-          <InvoiceDisplayModal
+          <InvoiceDetailsDialog
             isOpen={showInvoiceModal}
             onClose={() => {
               setShowInvoiceModal(false);
               setSelectedInvoice(null);
             }}
-            invoice={selectedInvoice}
-            companyName={filteredAndSortedData.find(inv => inv.id === selectedInvoice.invoiceId)?.companyName || ''}
-            eventTitle={filteredAndSortedData.find(inv => inv.id === selectedInvoice.invoiceId)?.invoiceTitle || ''}
+            confirmationId={selectedInvoice.id}
           />
         )}
       </div>
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete invoice #{invoiceToDelete?.invoiceNumber}. If this is a Square invoice, it will also be canceled. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}>
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete Invoice
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
