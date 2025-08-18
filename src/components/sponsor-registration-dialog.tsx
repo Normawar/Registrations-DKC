@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -12,7 +13,7 @@ import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { School, User, DollarSign, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { format, differenceInHours, isSameDay } from "date-fns";
-import { InvoiceDisplayModal } from '@/components/invoice-display-modal';
+import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 
 
 interface SponsorRegistrationDialogProps {
@@ -37,13 +38,7 @@ export function SponsorRegistrationDialog({
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [createdInvoice, setCreatedInvoice] = useState<{
-    invoiceId: string;
-    invoiceNumber: string;
-    invoiceUrl: string;
-    status: string;
-    totalAmount: number;
-  } | null>(null);
+  const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
 
   // Load sponsor's roster players
   useEffect(() => {
@@ -213,6 +208,7 @@ export function SponsorRegistrationDialog({
       const result = await createInvoice({
         sponsorName: `${profile.firstName} ${profile.lastName}`,
         sponsorEmail: profile.email || '',
+        sponsorPhone: profile.phone || '',
         schoolName: profile.school,
         teamCode: teamCode,
         eventName: event.name,
@@ -245,7 +241,9 @@ export function SponsorRegistrationDialog({
         totalInvoiced: feeBreakdown.total,
         invoiceStatus: result.status,
         invoiceUrl: result.invoiceUrl,
-        purchaserName: `${profile.firstName} ${profile.lastName}`
+        purchaserName: `${profile.firstName} ${profile.lastName}`,
+        sponsorEmail: profile.email,
+        sponsorPhone: profile.phone,
       };
       
       // Save to localStorage
@@ -259,16 +257,8 @@ export function SponsorRegistrationDialog({
 
       console.log('Invoice creation result details:', result);
 
-      // Store the created invoice data
-      setCreatedInvoice({
-        invoiceId: result.invoiceId,
-        invoiceNumber: result.invoiceNumber || '',
-        invoiceUrl: result.invoiceUrl,
-        status: result.status,
-        totalAmount: feeBreakdown.total * 100, // convert to cents for modal
-      });
-
-      // Show the modal instead of navigating away
+      // Set state to show the invoice details modal
+      setCreatedInvoiceId(result.invoiceId);
       setShowInvoiceModal(true);
       toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
       
@@ -541,16 +531,14 @@ export function SponsorRegistrationDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {showInvoiceModal && createdInvoice && (
-        <InvoiceDisplayModal
+      {showInvoiceModal && createdInvoiceId && (
+        <InvoiceDetailsDialog
           isOpen={showInvoiceModal}
           onClose={() => {
             setShowInvoiceModal(false);
-            setCreatedInvoice(null);
+            setCreatedInvoiceId(null);
           }}
-          invoice={createdInvoice}
-          companyName={profile?.school || 'Your School'}
-          eventTitle={event?.name || 'Unknown Event'}
+          confirmationId={createdInvoiceId}
         />
       )}
     </>

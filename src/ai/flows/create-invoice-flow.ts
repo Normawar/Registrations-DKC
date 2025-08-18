@@ -27,6 +27,7 @@ const PlayerInvoiceInfoSchema = z.object({
 const CreateInvoiceInputSchema = z.object({
     sponsorName: z.string().describe('The name of the sponsor to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the sponsor.'),
+    sponsorPhone: z.string().optional().describe('The phone number of the sponsor.'),
     bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
     gtCoordinatorEmail: z.string().email().optional().describe('The email of the GT Coordinator to be CCed, if applicable.'),
     schoolName: z.string().describe('The name of the school associated with the sponsor.'),
