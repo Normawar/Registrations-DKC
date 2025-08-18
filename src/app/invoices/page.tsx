@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building, AlertCircle } from 'lucide-react';
 import { InvoiceDisplayModal } from '@/components/invoice-display-modal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -28,7 +28,6 @@ export default function UnifiedInvoiceRegistrations() {
   useEffect(() => {
     
     const loadData = () => {
-      console.log('🔄 Loading unified data from localStorage...');
       try {
         const allInvoices = localStorage.getItem('all_invoices');
         const confirmations = localStorage.getItem('confirmations');
@@ -62,7 +61,6 @@ export default function UnifiedInvoiceRegistrations() {
           };
         });
         
-        console.log('Final mapped unified data:', mapped);
         setData(mapped);
       } catch (error) {
         console.error('❌ Error loading unified data from localStorage:', error);
@@ -75,7 +73,6 @@ export default function UnifiedInvoiceRegistrations() {
     
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'all_invoices' || e.key === 'confirmations') {
-        console.log('🔄 Storage event detected in unified page:', e.key);
         loadData();
       }
     };
@@ -164,10 +161,9 @@ export default function UnifiedInvoiceRegistrations() {
     return <Badge variant={variants[s] || 'secondary'} className={s === 'PAID' || s === 'COMPED' ? 'bg-green-600 text-white' : ''}>{s}</Badge>;
   };
 
-  const totalRevenue = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + (item.status === 'PAID' ? item.totalAmount : 0), 0), [filteredAndSortedData]);
-  const totalStudents = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + item.registrations.length, 0), [filteredAndSortedData]);
+  const totalExpense = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + item.totalAmount, 0), [filteredAndSortedData]);
+  const outstandingInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE').length, [filteredAndSortedData]);
   const paidInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status === 'PAID').length, [filteredAndSortedData]);
-  const currentMonthInvoices = useMemo(() => filteredAndSortedData.filter(item => new Date(item.submissionTimestamp).getMonth() === new Date().getMonth()).length, [filteredAndSortedData]);
 
 
   return (
@@ -183,23 +179,23 @@ export default function UnifiedInvoiceRegistrations() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Expense</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {clientReady ? (<div className="text-2xl font-bold">${(totalRevenue).toFixed(2)}</div>) : (<Skeleton className="h-8 w-3/4" />)}
-              <p className="text-xs text-muted-foreground">From paid invoices</p>
+              {clientReady ? (<div className="text-2xl font-bold">${(totalExpense).toFixed(2)}</div>) : (<Skeleton className="h-8 w-3/4" />)}
+              <p className="text-xs text-muted-foreground">Across all invoices</p>
             </CardContent>
           </Card>
           
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Outstanding Invoices</CardTitle>
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {clientReady ? (<div className="text-2xl font-bold">{totalStudents}</div>) : (<Skeleton className="h-8 w-1/2" />)}
-              <p className="text-xs text-muted-foreground">Registered students</p>
+               {clientReady ? (<div className="text-2xl font-bold">{outstandingInvoices}</div>) : (<Skeleton className="h-8 w-1/2" />)}
+              <p className="text-xs text-muted-foreground">Require payment</p>
             </CardContent>
           </Card>
 
@@ -214,16 +210,6 @@ export default function UnifiedInvoiceRegistrations() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">This Month</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {clientReady ? (<div className="text-2xl font-bold">{currentMonthInvoices}</div>) : (<Skeleton className="h-8 w-1/2" />)}
-              <p className="text-xs text-muted-foreground">New registrations</p>
-            </CardContent>
-          </Card>
         </div>
 
         <Card>
