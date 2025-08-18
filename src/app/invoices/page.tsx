@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function UnifiedInvoiceRegistrations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [sortField, setSortField] = useState('submissionTimestamp');
+  const [sortField, setSortField] = useState<string>('submissionTimestamp');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -378,5 +378,4 @@ export default function UnifiedInvoiceRegistrations() {
       </div>
     </AppLayout>
   );
-
-    
+}
