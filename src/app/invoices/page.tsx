@@ -38,7 +38,7 @@ export default function UnifiedInvoiceRegistrations() {
         // Combine invoice and confirmation data
         const mapped = invoicesArray.map((invoice: any) => {
           // The key fix: Match invoice.id with confirmation.id or invoice.invoiceId with confirmation.invoiceId
-          const confirmation = confirmationsArray.find((c: any) => c.id === invoice.id || c.invoiceId === invoice.invoiceId);
+          const confirmation = confirmationsArray.find((c: any) => c.id === invoice.id || (invoice.invoiceId && c.invoiceId === invoice.invoiceId));
           
           const selections = confirmation?.selections || {};
           const registrations = Object.keys(selections).map(playerId => ({
