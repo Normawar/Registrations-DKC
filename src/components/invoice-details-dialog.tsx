@@ -178,7 +178,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
   
-        toast({ title: 'Payment Info Submitted', description: "An organizer will mark this payment as received once the monetary transfer has been verified." });
+        toast({ title: 'Payment Info Submitted', description: "An organizer will verify your payment once the monetary transfer has been verified." });
   
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('all_invoices_updated'));
@@ -216,13 +216,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <DialogHeader className="p-6 pb-4 border-b shrink-0">
                 <div className="flex justify-between items-start">
                     <div>
-                        <DialogTitle className="text-2xl">{confirmation.invoiceTitle}</DialogTitle>
-                        <DialogDescription className="flex items-center gap-2 mt-2">
+                        <DialogTitle className="text-2xl">{confirmation.invoiceTitle || confirmation.eventName}</DialogTitle>
+                         <div className="flex items-center gap-2 mt-2">
                             {getStatusBadge(confirmation.invoiceStatus || confirmation.status)}
                             <span className="text-sm text-muted-foreground">
                                 Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
                             </span>
-                        </DialogDescription>
+                        </div>
                     </div>
                      <DialogClose asChild>
                         <Button variant="ghost" size="icon"><X className="h-5 w-5" /></Button>
