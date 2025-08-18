@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -269,9 +269,9 @@ export default function ConfirmedRegistrationsPage() {
                 ),
             });
         } else {
-            toast({
+             toast({
                 title: 'Payment Info Submitted',
-                description: 'An organizer will verify receipt of funds to complete the process.'
+                description: "An organizer will mark this payment as received once the monetary transfer has been verified.",
             });
         }
   
@@ -280,10 +280,14 @@ export default function ConfirmedRegistrationsPage() {
   
     } catch (error) {
         console.error('Failed to update payment:', error);
+        let description = 'Failed to update payment information. Please check the console for details.';
+        if (error instanceof Error && (error as any).code === 'storage/unauthorized') {
+            description = "You do not have permission to upload this file. Please check your Firebase Storage security rules in the Firebase Console to allow writes.";
+        }
         toast({
             variant: 'destructive',
             title: 'Error',
-            description: 'Failed to update payment information. Please check the console for details.'
+            description: description
         });
     } finally {
         setIsUpdating(false);
@@ -520,7 +524,7 @@ export default function ConfirmedRegistrationsPage() {
                         <div className="text-sm mt-2">
                           <a href={selectedConfirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                             <Download className="h-4 w-4" />
-                            View uploaded document: {selectedConfirmation.poFileName || 'View File'}
+                            View previously uploaded document: {selectedConfirmation.poFileName || 'View File'}
                           </a>
                         </div>
                       )}
