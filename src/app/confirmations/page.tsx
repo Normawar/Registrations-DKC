@@ -32,8 +32,7 @@ export default function ConfirmedRegistrationsPage() {
   const [selectedConfirmation, setSelectedConfirmation] = useState<any>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('purchase-order');
   const [poNumber, setPONumber] = useState('');
-  const [poDocument, setPODocument] = useState<File | null>(null);
-  const [paymentProof, setPaymentProof] = useState<File | null>(null);
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -183,8 +182,7 @@ export default function ConfirmedRegistrationsPage() {
   };
 
   const handlePaymentUpdate = async () => {
-    if (!selectedConfirmation) return;
-    if (!currentUser) {
+    if (!selectedConfirmation || !currentUser) {
         toast({ variant: 'destructive', title: 'Authentication Not Ready', description: authError || "Cannot submit payment information at this time. Please refresh the page."});
         return;
     }
@@ -197,12 +195,12 @@ export default function ConfirmedRegistrationsPage() {
         
         let updatedConfirmationData: any = { ...selectedConfirmation };
         
-        const fileToUpload = selectedPaymentMethod === 'purchase-order' ? poDocument : paymentProof;
         const isPoUpload = selectedPaymentMethod === 'purchase-order';
-        const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
         
         if (fileToUpload) {
             if (!storage) throw new Error("Firebase Storage is not configured.");
+            
+            const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
             const recordId = invoiceId || id;
             const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
             const snapshot = await uploadBytes(storageRef, fileToUpload);
@@ -233,8 +231,6 @@ export default function ConfirmedRegistrationsPage() {
             invoiceTitle: newTitle,
             paymentStatus: (selectedPaymentMethod === 'purchase-order' || selectedPaymentMethod === 'check' || selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle') ? 'pending-po' : selectedConfirmation.paymentStatus,
             lastUpdated: new Date().toISOString(),
-            poDocument: undefined, // Clear file object before saving
-            paymentProof: undefined // Clear file object before saving
         };
   
         const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -251,6 +247,7 @@ export default function ConfirmedRegistrationsPage() {
 
         setConfirmations(prev => prev.map(c => c.id === updatedConfirmationData.id ? updatedConfirmationData : c));
         setSelectedConfirmation(updatedConfirmationData);
+        setFileToUpload(null);
   
         if (selectedPaymentMethod === 'purchase-order') {
             toast({
@@ -391,8 +388,7 @@ export default function ConfirmedRegistrationsPage() {
                               onClick={() => {
                                 setSelectedConfirmation(confirmation);
                                 setPONumber(confirmation.poNumber || '');
-                                setPODocument(null);
-                                setPaymentProof(null);
+                                setFileToUpload(null);
                                 setTimeout(() => {
                                   document.querySelector('[data-payment-section]')?.scrollIntoView({ behavior: 'smooth' });
                                 }, 100);
@@ -526,8 +522,8 @@ export default function ConfirmedRegistrationsPage() {
                     </div>
                     <div>
                       <Label htmlFor="po-document">Upload PO Document</Label>
-                      <Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setPODocument(e.target.files?.[0] || null)} />
-                      {selectedConfirmation.poFileUrl && !poDocument && (
+                      <Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} />
+                      {selectedConfirmation.poFileUrl && !fileToUpload && (
                         <div className="text-sm mt-2">
                           <a href={selectedConfirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                             <Download className="h-4 w-4" />
@@ -535,8 +531,8 @@ export default function ConfirmedRegistrationsPage() {
                           </a>
                         </div>
                       )}
-                      {poDocument && (
-                        <p className="text-sm text-muted-foreground mt-2">New file selected: {poDocument.name}</p>
+                      {fileToUpload && (
+                        <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
                       )}
                     </div>
                   </div>
@@ -545,8 +541,8 @@ export default function ConfirmedRegistrationsPage() {
                 {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle') && (
                     <div>
                       <Label htmlFor="payment-proof">Upload Payment Screenshot</Label>
-                      <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setPaymentProof(e.target.files?.[0] || null)} />
-                      {selectedConfirmation.paymentFileUrl && !paymentProof && (
+                      <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} />
+                      {selectedConfirmation.paymentFileUrl && !fileToUpload && (
                         <div className="text-sm mt-2">
                           <a href={selectedConfirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                             <Download className="h-4 w-4" />
@@ -554,10 +550,10 @@ export default function ConfirmedRegistrationsPage() {
                           </a>
                         </div>
                       )}
-                      {paymentProof && (
+                      {fileToUpload && (
                         <p className="text-sm text-muted-foreground mt-2">
                           <FileIcon className="h-4 w-4 inline-block mr-1" />
-                          New file selected: {paymentProof.name}
+                          New file selected: {fileToUpload.name}
                         </p>
                       )}
                     </div>
