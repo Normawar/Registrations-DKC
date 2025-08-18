@@ -14,6 +14,7 @@ import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { School, User, DollarSign, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { format, differenceInHours, isSameDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
+import { createInvoice } from '@/ai/flows/create-invoice-flow';
 
 
 interface SponsorRegistrationDialogProps {
@@ -168,8 +169,6 @@ export function SponsorRegistrationDialog({
     setIsSubmitting(true);
 
     try {
-      // Import the createInvoice function
-      const { createInvoice } = await import('@/ai/flows/create-invoice-flow');
       
       // Calculate current registration fee based on timing
       let registrationFeePerPlayer = event.regularFee;

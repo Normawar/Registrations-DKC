@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -284,95 +284,92 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     </Card>
 
                     <Card>
-                        <CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
-                        <CardContent>
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {players.map((player) => {
-                                    const selectionInfo = confirmation.selections[player.id] || {};
-                                    return (
-                                        <div key={player.id} className="flex justify-between items-center border-b pb-2 text-sm">
-                                            <div>
-                                                <p className="font-medium">{player.firstName} {player.lastName}</p>
-                                                <p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p>
-                                            </div>
-                                            <Badge variant="secondary">{selectionInfo.uscfStatus || 'Current'}</Badge>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-                
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Submit Payment Information</CardTitle>
-                        <CardDescription>Select a payment method and provide the necessary details. An organizer will verify your payment.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div>
-                            <Label className="text-base font-medium mb-4 block">Payment Method</Label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-4 flex flex-col items-center gap-2"><Upload className="h-5 w-5" /><span>Purchase Order</span></Button>
-                                <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-4 flex flex-col items-center gap-2"><Check className="h-5 w-5" /><span>Pay with Check</span></Button>
-                                <Button variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('cash-app')} className="h-auto py-4 flex flex-col items-center gap-2"><DollarSign className="h-5 w-5" /><span>Cash App</span></Button>
-                                <Button variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('zelle')} className="h-auto py-4 flex flex-col items-center gap-2"><CreditCard className="h-5 w-5" /><span>Zelle</span></Button>
-                            </div>
-                        </div>
-
-                        <Separator />
-
-                        {selectedPaymentMethod === 'purchase-order' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <Label htmlFor="po-number">PO Number</Label>
-                                    <Input id="po-number" placeholder="Enter PO Number" value={poNumber} onChange={(e) => setPONumber(e.target.value)} />
+                        <CardHeader><CardTitle>Submit Payment Information</CardTitle></CardHeader>
+                        <CardContent className="space-y-6">
+                            <div>
+                                <Label className="text-base font-medium mb-4 block">Payment Method</Label>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-4 flex flex-col items-center gap-2"><Upload className="h-5 w-5" /><span>Purchase Order</span></Button>
+                                    <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-4 flex flex-col items-center gap-2"><Check className="h-5 w-5" /><span>Pay with Check</span></Button>
+                                    <Button variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('cash-app')} className="h-auto py-4 flex flex-col items-center gap-2"><DollarSign className="h-5 w-5" /><span>Cash App</span></Button>
+                                    <Button variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('zelle')} className="h-auto py-4 flex flex-col items-center gap-2"><CreditCard className="h-5 w-5" /><span>Zelle</span></Button>
                                 </div>
+                            </div>
+    
+                            <Separator />
+    
+                            {selectedPaymentMethod === 'purchase-order' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <Label htmlFor="po-number">PO Number</Label>
+                                        <Input id="po-number" placeholder="Enter PO Number" value={poNumber} onChange={(e) => setPONumber(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="po-document">Upload PO Document</Label>
+                                        <Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} />
+                                        {confirmation.poFileUrl && !fileToUpload && (
+                                            <div className="text-sm mt-2">
+                                                <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                                                    <Download className="h-4 w-4" />
+                                                    View previously uploaded document: {confirmation.poFileName || 'View File'}
+                                                </a>
+                                            </div>
+                                        )}
+                                        {fileToUpload && (
+                                            <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (
                                 <div>
-                                    <Label htmlFor="po-document">Upload PO Document</Label>
-                                    <Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} />
-                                    {confirmation.poFileUrl && !fileToUpload && (
+                                    <Label htmlFor="payment-proof">Upload Payment Proof/Check Image</Label>
+                                    <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} />
+                                    {confirmation.paymentFileUrl && !fileToUpload && (
                                         <div className="text-sm mt-2">
-                                            <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                                            <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                                                 <Download className="h-4 w-4" />
-                                                View previously uploaded document: {confirmation.poFileName || 'View File'}
+                                                View uploaded proof: {confirmation.paymentFileName || 'View File'}
                                             </a>
                                         </div>
                                     )}
                                     {fileToUpload && (
-                                        <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
+                                        <p className="text-sm text-muted-foreground mt-2">
+                                            <FileIcon className="h-4 w-4 inline-block mr-1" />
+                                            New file selected: {fileToUpload.name}
+                                        </p>
                                     )}
                                 </div>
-                            </div>
-                        )}
-                        
-                        {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (
-                            <div>
-                                <Label htmlFor="payment-proof">Upload Payment Proof/Check Image</Label>
-                                <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} />
-                                {confirmation.paymentFileUrl && !fileToUpload && (
-                                    <div className="text-sm mt-2">
-                                        <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                                            <Download className="h-4 w-4" />
-                                            View uploaded proof: {confirmation.paymentFileName || 'View File'}
-                                        </a>
+                            )}
+                        </CardContent>
+                         <CardFooter>
+                            <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady || !!authError} className="flex items-center gap-2">
+                                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                {isUpdating ? 'Submitting...' : 'Submit Information for Verification'}
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </div>
+                
+                <Card>
+                    <CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
+                    <CardContent>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {players.map((player) => {
+                                const selectionInfo = confirmation.selections[player.id] || {};
+                                return (
+                                    <div key={player.id} className="flex justify-between items-center border-b pb-2 text-sm">
+                                        <div>
+                                            <p className="font-medium">{player.firstName} {player.lastName}</p>
+                                            <p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p>
+                                        </div>
+                                        <Badge variant="secondary">{selectionInfo.uscfStatus || 'Current'}</Badge>
                                     </div>
-                                )}
-                                {fileToUpload && (
-                                    <p className="text-sm text-muted-foreground mt-2">
-                                        <FileIcon className="h-4 w-4 inline-block mr-1" />
-                                        New file selected: {fileToUpload.name}
-                                    </p>
-                                )}
-                            </div>
-                        )}
+                                );
+                            })}
+                        </div>
                     </CardContent>
-                     <DialogFooter className="px-6">
-                        <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady || !!authError} className="flex items-center gap-2">
-                            {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                            {isUpdating ? 'Submitting...' : 'Submit Information for Verification'}
-                        </Button>
-                    </DialogFooter>
                 </Card>
             </div>
         </DialogContent>
