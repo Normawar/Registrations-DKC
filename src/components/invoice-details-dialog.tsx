@@ -4,12 +4,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
@@ -116,80 +116,83 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   const handlePaymentUpdate = async () => {
     if (!confirmation) {
-      return;
+        return;
     }
 
     setIsUpdating(true);
 
     try {
-      let updatedConfirmationData = { ...confirmation };
+        let updatedConfirmationData = { ...confirmation };
 
-      if (fileToUpload) {
-        if (!currentUser) {
-            toast({ variant: 'destructive', title: 'Authentication Not Ready', description: authError || "Cannot submit payment information at this time. Please refresh the page."});
-            setIsUpdating(false);
-            return;
+        if (fileToUpload) {
+            if (!currentUser) {
+                toast({ variant: 'destructive', title: 'Authentication Not Ready', description: authError || "Cannot submit payment information at this time. Please refresh the page."});
+                setIsUpdating(false);
+                return;
+            }
+
+            const isPoUpload = selectedPaymentMethod === 'purchase-order';
+            const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
+            const recordId = confirmation.id;
+            const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
+            
+            const snapshot = await uploadBytes(storageRef, fileToUpload);
+            const downloadUrl = await getDownloadURL(snapshot.ref);
+
+            if (isPoUpload) {
+                updatedConfirmationData.poFileUrl = downloadUrl;
+                updatedConfirmationData.poFileName = fileToUpload.name;
+            } else {
+                updatedConfirmationData.paymentFileUrl = downloadUrl;
+                updatedConfirmationData.paymentFileName = fileToUpload.name;
+            }
         }
 
-        const isPoUpload = selectedPaymentMethod === 'purchase-order';
-        const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
-        const recordId = confirmation.id;
-        const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
+        const formattedEventDate = format(new Date(updatedConfirmationData.eventDate), 'MM/dd/yyyy');
+        let newTitle = `${updatedConfirmationData.teamCode || updatedConfirmationData.schoolName} @ ${formattedEventDate} ${updatedConfirmationData.eventName}`;
         
-        const snapshot = await uploadBytes(storageRef, fileToUpload);
-        const downloadUrl = await getDownloadURL(snapshot.ref);
-
-        if (isPoUpload) {
-            updatedConfirmationData.poFileUrl = downloadUrl;
-            updatedConfirmationData.poFileName = fileToUpload.name;
-        } else {
-            updatedConfirmationData.paymentFileUrl = downloadUrl;
-            updatedConfirmationData.paymentFileName = fileToUpload.name;
+        const finalPoNumber = selectedPaymentMethod === 'purchase-order' ? poNumber : updatedConfirmationData.poNumber;
+        if (finalPoNumber) {
+            newTitle += ` PO: ${finalPoNumber}`;
         }
-      }
+      
+        if (updatedConfirmationData.invoiceId) {
+            await updateInvoiceTitle({ invoiceId: updatedConfirmationData.invoiceId, title: newTitle });
+        }
 
-      const formattedEventDate = format(new Date(confirmation.eventDate), 'MM/dd/yyyy');
-      let newTitle = `${confirmation.teamCode || confirmation.schoolName} @ ${formattedEventDate} ${confirmation.eventName}`;
-      const finalPoNumber = selectedPaymentMethod === 'purchase-order' ? poNumber : confirmation.poNumber;
-      if (finalPoNumber) {
-          newTitle += ` PO: ${finalPoNumber}`;
-      }
-    
-      if (confirmation.invoiceId) {
-          await updateInvoiceTitle({ invoiceId: confirmation.invoiceId, title: newTitle });
-      }
+        updatedConfirmationData = {
+            ...updatedConfirmationData,
+            paymentMethod: selectedPaymentMethod,
+            poNumber: finalPoNumber,
+            invoiceTitle: newTitle,
+            paymentStatus: 'pending-po',
+            status: 'PENDING-PO',
+            invoiceStatus: 'PENDING-PO',
+            lastUpdated: new Date().toISOString(),
+        };
 
-      updatedConfirmationData = {
-          ...updatedConfirmationData,
-          paymentMethod: selectedPaymentMethod,
-          poNumber: finalPoNumber,
-          invoiceTitle: newTitle,
-          paymentStatus: 'pending-po',
-          status: 'PENDING-PO',
-          lastUpdated: new Date().toISOString(),
-      };
+        const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+        const updatedAllInvoices = allInvoices.map((inv: any) =>
+            inv.id === confirmation.id ? updatedConfirmationData : inv
+        );
+        localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
 
-      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const updatedAllInvoices = allInvoices.map((inv: any) =>
-          inv.id === confirmation.id ? updatedConfirmationData : inv
-      );
-      localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+        setConfirmation(updatedConfirmationData);
+        setFileToUpload(null);
 
-      setConfirmation(updatedConfirmationData);
-      setFileToUpload(null);
+        toast({ title: 'Payment Info Submitted', description: "An organizer will verify your payment once the monetary transfer has been verified." });
 
-      toast({ title: 'Payment Info Submitted', description: "An organizer will verify your payment once the monetary transfer has been verified." });
-
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('all_invoices_updated'));
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('all_invoices_updated'));
 
     } catch (error) {
-      console.error('Failed to update payment:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update payment information.' });
+        console.error('Failed to update payment:', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to update payment information.' });
     } finally {
-      setIsUpdating(false);
+        setIsUpdating(false);
     }
   };
+
 
   const getStatusBadge = (status: string) => {
     const s = (status || '').toUpperCase();
