@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building } from 'lucide-react';
 import { InvoiceDisplayModal } from '@/components/invoice-display-modal';
 import { Skeleton } from '@/components/ui/skeleton';
+import { format } from 'date-fns';
 
 
 export default function UnifiedInvoiceRegistrations() {
@@ -37,7 +38,6 @@ export default function UnifiedInvoiceRegistrations() {
         
         // Combine invoice and confirmation data
         const mapped = invoicesArray.map((invoice: any) => {
-          // The key fix: Match invoice.id with confirmation.id or invoice.invoiceId with confirmation.invoiceId
           const confirmation = confirmationsArray.find((c: any) => c.id === invoice.id || (invoice.invoiceId && c.invoiceId === invoice.invoiceId));
           
           const selections = confirmation?.selections || {};
@@ -51,6 +51,7 @@ export default function UnifiedInvoiceRegistrations() {
             invoiceId: invoice.invoiceId,
             invoiceNumber: invoice.invoiceNumber,
             invoiceTitle: invoice.invoiceTitle || confirmation?.eventName || 'Unknown Event',
+            eventDate: confirmation?.eventDate,
             companyName: confirmation?.schoolName || invoice.schoolName || 'Unknown',
             contactEmail: confirmation?.sponsorEmail || invoice.sponsorEmail || 'Unknown',
             totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
@@ -129,6 +130,7 @@ export default function UnifiedInvoiceRegistrations() {
         case 'amount': aValue = a.totalAmount || 0; bValue = b.totalAmount || 0; break;
         case 'status': aValue = a.status || ''; bValue = b.status || ''; break;
         case 'studentCount': aValue = a.registrations.length || 0; bValue = b.registrations.length || 0; break;
+        case 'eventDate': aValue = new Date(a.eventDate); bValue = new Date(b.eventDate); break;
         case 'submissionTimestamp': default: aValue = new Date(a.submissionTimestamp); bValue = new Date(b.submissionTimestamp); break;
       }
 
@@ -297,8 +299,8 @@ export default function UnifiedInvoiceRegistrations() {
                       </Button>
                     </th>
                     <th className="text-left p-2">
-                      <Button variant="ghost" className="h-auto p-0 font-semibold" onClick={() => handleSort('submissionTimestamp')}>
-                        Date {getSortIcon('submissionTimestamp')}
+                      <Button variant="ghost" className="h-auto p-0 font-semibold" onClick={() => handleSort('eventDate')}>
+                        Event Date {getSortIcon('eventDate')}
                       </Button>
                     </th>
                     <th className="text-left p-2">Actions</th>
@@ -337,7 +339,7 @@ export default function UnifiedInvoiceRegistrations() {
                         <div className="font-medium">${(invoice.totalAmount).toFixed(2)}</div>
                       </td>
                       <td className="p-2">{getStatusBadge(invoice.status)}</td>
-                      <td className="p-2">{new Date(invoice.submissionTimestamp).toLocaleDateString()}</td>
+                      <td className="p-2">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'N/A'}</td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
                           <Button variant="outline" size="sm" onClick={() => handleViewInvoice(invoice)} className="gap-1">
