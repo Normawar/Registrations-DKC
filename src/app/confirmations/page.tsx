@@ -13,10 +13,13 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Users, Calendar } from "lucide-react";
+import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Users, Calendar, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, storage } from '@/lib/firebase';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
 export default function ConfirmedRegistrationsPage() {
   const { toast } = useToast();
@@ -30,6 +33,29 @@ export default function ConfirmedRegistrationsPage() {
   const [poDocument, setPODocument] = useState<File | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!auth || !storage) {
+        setIsAuthReady(false);
+        setAuthError("Firebase is not configured, so file uploads are disabled.");
+        return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+            setIsAuthReady(true);
+            setAuthError(null);
+        } else {
+            signInAnonymously(auth).catch((error) => {
+                console.error("Anonymous sign-in failed:", error);
+                setAuthError("Authentication error. File uploads are disabled.");
+                setIsAuthReady(false);
+            });
+        }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const loadConfirmations = useCallback(() => {
     try {
@@ -152,60 +178,78 @@ export default function ConfirmedRegistrationsPage() {
 
   const handlePaymentUpdate = async () => {
     if (!selectedConfirmation) return;
+    if (!isAuthReady) {
+        toast({ variant: 'destructive', title: 'Authentication Not Ready', description: authError || "Cannot submit payment information at this time."});
+        return;
+    }
   
     setIsUpdating(true);
     try {
-      const { teamCode, eventDate, eventName, invoiceId } = selectedConfirmation;
-      const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
-      let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
-      if (selectedPaymentMethod === 'purchase-order' && poNumber) {
-        newTitle += ` PO: ${poNumber}`;
-      }
-      
-      if (selectedConfirmation.invoiceId) {
-        await updateInvoiceTitle({ invoiceId, title: newTitle });
-      }
-  
-      const updatedConfirmation = {
-        ...selectedConfirmation,
-        paymentMethod: selectedPaymentMethod,
-        poNumber: poNumber,
-        invoiceTitle: newTitle,
-        paymentStatus: 'pending-po', // Set status to pending verification
-        lastUpdated: new Date().toISOString()
-      };
-  
-      const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      const updatedAllConfirmations = allConfirmations.map((conf: any) =>
-        conf.id === selectedConfirmation.id ? updatedConfirmation : conf
-      );
-      localStorage.setItem('confirmations', JSON.stringify(updatedAllConfirmations));
-      
-      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const updatedAllInvoices = allInvoices.map((inv: any) =>
-        inv.id === selectedConfirmation.id ? updatedConfirmation : inv
-      );
-      localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+        const { teamCode, eventDate, eventName, invoiceId } = selectedConfirmation;
+        const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
+        let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
+        
+        let poFileUrl: string | undefined = selectedConfirmation.poFileUrl;
+        let poFileName: string | undefined = selectedConfirmation.poFileName;
 
-      setConfirmations(prev => prev.map(c => c.id === updatedConfirmation.id ? updatedConfirmation : c));
-      setSelectedConfirmation(updatedConfirmation);
+        if (selectedPaymentMethod === 'purchase-order' && poDocument) {
+            if (!storage) throw new Error("Firebase Storage is not configured.");
+            const storageRef = ref(storage, `purchase-orders/${invoiceId}/${poDocument.name}`);
+            const snapshot = await uploadBytes(storageRef, poDocument);
+            poFileUrl = await getDownloadURL(snapshot.ref);
+            poFileName = poDocument.name;
+        }
+        
+        if (selectedPaymentMethod === 'purchase-order' && poNumber) {
+            newTitle += ` PO: ${poNumber}`;
+        }
+      
+        if (selectedConfirmation.invoiceId) {
+            await updateInvoiceTitle({ invoiceId, title: newTitle });
+        }
   
-      toast({
-        title: 'Payment Info Submitted',
-        description: 'Your payment information has been submitted for verification.'
-      });
+        const updatedConfirmation = {
+            ...selectedConfirmation,
+            paymentMethod: selectedPaymentMethod,
+            poNumber: poNumber,
+            poFileUrl: poFileUrl,
+            poFileName: poFileName,
+            invoiceTitle: newTitle,
+            paymentStatus: 'pending-po',
+            lastUpdated: new Date().toISOString()
+        };
   
-      window.dispatchEvent(new Event('storage'));
+        const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const updatedAllConfirmations = allConfirmations.map((conf: any) =>
+            conf.id === selectedConfirmation.id ? updatedConfirmation : conf
+        );
+        localStorage.setItem('confirmations', JSON.stringify(updatedAllConfirmations));
+      
+        const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+        const updatedAllInvoices = allInvoices.map((inv: any) =>
+            inv.id === selectedConfirmation.id ? { ...inv, ...updatedConfirmation } : inv
+        );
+        localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+
+        setConfirmations(prev => prev.map(c => c.id === updatedConfirmation.id ? updatedConfirmation : c));
+        setSelectedConfirmation(updatedConfirmation);
+  
+        toast({
+            title: 'Payment Info Submitted',
+            description: 'Your payment information has been submitted for verification.'
+        });
+  
+        window.dispatchEvent(new Event('storage'));
   
     } catch (error) {
-      console.error('Failed to update payment:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to update payment information. Please check the console for details.'
-      });
+        console.error('Failed to update payment:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Failed to update payment information. Please check the console for details.'
+        });
     } finally {
-      setIsUpdating(false);
+        setIsUpdating(false);
     }
   };
 
@@ -299,6 +343,7 @@ export default function ConfirmedRegistrationsPage() {
                               onClick={() => {
                                 setSelectedConfirmation(confirmation);
                                 setPONumber(confirmation.poNumber || '');
+                                setPODocument(null); // Reset file input
                                 setTimeout(() => {
                                   document.querySelector('[data-payment-section]')?.scrollIntoView({ behavior: 'smooth' });
                                 }, 100);
@@ -432,7 +477,8 @@ export default function ConfirmedRegistrationsPage() {
                 )}
 
                 <div className="flex justify-end">
-                  <Button onClick={handlePaymentUpdate} disabled={isUpdating} className="flex items-center gap-2">
+                  <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady} className="flex items-center gap-2">
+                    {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                     {isUpdating ? 'Submitting...' : 'Submit Information for Verification'}
                   </Button>
                 </div>
