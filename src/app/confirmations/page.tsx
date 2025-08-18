@@ -189,15 +189,11 @@ export default function ConfirmedRegistrationsPage() {
   
     setIsUpdating(true);
     try {
-        const { teamCode, eventDate, eventName, invoiceId, id } = selectedConfirmation;
+        const { teamCode, eventDate, eventName, id } = selectedConfirmation;
         const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
         let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
         
-        // Start with existing values
-        let poFileUrl: string | undefined = selectedConfirmation.poFileUrl;
-        let poFileName: string | undefined = selectedConfirmation.poFileName;
-        let paymentFileUrl: string | undefined = selectedConfirmation.paymentFileUrl;
-        let paymentFileName: string | undefined = selectedConfirmation.paymentFileName;
+        let updatedConfirmationData: any = { ...selectedConfirmation };
         
         const fileToUpload = selectedPaymentMethod === 'purchase-order' ? poDocument : paymentProof;
         const isPoUpload = selectedPaymentMethod === 'purchase-order';
@@ -205,17 +201,17 @@ export default function ConfirmedRegistrationsPage() {
         
         if (fileToUpload) {
             if (!storage) throw new Error("Firebase Storage is not configured.");
-            const recordId = selectedConfirmation.invoiceId || selectedConfirmation.id;
+            const recordId = selectedConfirmation.invoiceId || id;
             const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
             const snapshot = await uploadBytes(storageRef, fileToUpload);
             const downloadUrl = await getDownloadURL(snapshot.ref);
 
             if (isPoUpload) {
-                poFileUrl = downloadUrl;
-                poFileName = fileToUpload.name;
+                updatedConfirmationData.poFileUrl = downloadUrl;
+                updatedConfirmationData.poFileName = fileToUpload.name;
             } else {
-                paymentFileUrl = downloadUrl;
-                paymentFileName = fileToUpload.name;
+                updatedConfirmationData.paymentFileUrl = downloadUrl;
+                updatedConfirmationData.paymentFileName = fileToUpload.name;
             }
         }
         
@@ -228,33 +224,29 @@ export default function ConfirmedRegistrationsPage() {
             await updateInvoiceTitle({ invoiceId: selectedConfirmation.invoiceId, title: newTitle });
         }
   
-        const updatedConfirmation = {
-            ...selectedConfirmation,
+        updatedConfirmationData = {
+            ...updatedConfirmationData,
             paymentMethod: selectedPaymentMethod,
             poNumber: finalPoNumber,
-            poFileUrl: poFileUrl,
-            poFileName: poFileName,
-            paymentFileUrl: paymentFileUrl,
-            paymentFileName: paymentFileName,
             invoiceTitle: newTitle,
-            paymentStatus: selectedPaymentMethod === 'purchase-order' ? 'pending-po' : selectedConfirmation.paymentStatus,
+            paymentStatus: (selectedPaymentMethod === 'purchase-order' || selectedPaymentMethod === 'check' || selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle') ? 'pending-po' : selectedConfirmation.paymentStatus,
             lastUpdated: new Date().toISOString()
         };
   
         const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
         const updatedAllConfirmations = allConfirmations.map((conf: any) =>
-            conf.id === selectedConfirmation.id ? updatedConfirmation : conf
+            conf.id === selectedConfirmation.id ? updatedConfirmationData : conf
         );
         localStorage.setItem('confirmations', JSON.stringify(updatedAllConfirmations));
       
         const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
         const updatedAllInvoices = allInvoices.map((inv: any) =>
-            inv.id === selectedConfirmation.id ? { ...inv, ...updatedConfirmation, invoiceTitle: newTitle } : inv
+            inv.id === selectedConfirmation.id ? { ...inv, ...updatedConfirmationData, invoiceTitle: newTitle } : inv
         );
         localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
 
-        setConfirmations(prev => prev.map(c => c.id === updatedConfirmation.id ? updatedConfirmation : c));
-        setSelectedConfirmation(updatedConfirmation);
+        setConfirmations(prev => prev.map(c => c.id === updatedConfirmationData.id ? updatedConfirmationData : c));
+        setSelectedConfirmation(updatedConfirmationData);
   
         if (selectedPaymentMethod === 'purchase-order') {
             toast({
@@ -311,7 +303,7 @@ export default function ConfirmedRegistrationsPage() {
       default:
         return <Badge variant="outline">{status || 'Unknown'}</Badge>;
     }
-  };
+  }
 
   return (
     <AppLayout>
@@ -466,7 +458,7 @@ export default function ConfirmedRegistrationsPage() {
                                 <p className="font-medium">{player.firstName} {player.lastName}</p>
                                 <p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p>
                               </div>
-                              <p>USCF: {selectionInfo.uscfStatus || 'Current'</p>
+                              <p>USCF: {selectionInfo.uscfStatus || 'Current'}</p>
                             </div>
                           );
                         })}
