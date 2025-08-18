@@ -48,6 +48,16 @@ const updateInvoiceTitleFlow = ai.defineFlow(
       if (!invoice || !invoice.version) {
         throw new Error(`Could not find invoice or invoice version for ID: ${input.invoiceId}`);
       }
+
+      // Check if the invoice is in a state that allows updates.
+      if (invoice.status && invoice.status !== 'DRAFT' && invoice.status !== 'UNPAID' && invoice.status !== 'PARTIALLY_PAID') {
+        console.warn(`Invoice ${input.invoiceId} is in status ${invoice.status} and cannot be updated. Returning current state.`);
+        return {
+          invoiceId: invoice.id!,
+          title: invoice.title!,
+          status: invoice.status!,
+        };
+      }
       
       console.log(`Updating invoice ${input.invoiceId} with new title: "${input.title}"`);
       
@@ -70,6 +80,20 @@ const updateInvoiceTitleFlow = ai.defineFlow(
       if (error instanceof ApiError) {
         const errorResult = error.result || {};
         const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
+        
+        // Specifically check for the error indicating the invoice can't be updated due to its state.
+        const isNotUpdatable = errors.some(e => e.detail?.toLowerCase().includes('can only update an unpaid invoice'));
+
+        if (isNotUpdatable) {
+            console.warn(`Invoice ${input.invoiceId} cannot be updated via the API, likely because it's already paid or in a final state.`);
+            const { result: { invoice } } = await invoicesApi.getInvoice(input.invoiceId);
+            return {
+                invoiceId: invoice!.id!,
+                title: invoice!.title!,
+                status: invoice!.status!,
+            };
+        }
+        
         console.error('Square API Error in updateInvoiceTitleFlow:', JSON.stringify(errorResult, null, 2));
         let errorMessage: string;
         if (errors.length > 0) {
