@@ -130,6 +130,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return 0;
   }, [profile, changeRequests, confirmations]);
 
+  const pendingPaymentsCount = useMemo(() => {
+    if (profile?.role !== 'organizer') return 0;
+    return confirmations.filter(c => c.paymentStatus === 'pending-po').length;
+  }, [profile, confirmations]);
+
   const handleLogout = () => {
     localStorage.removeItem('current_user_profile');
     // We dispatch a storage event so all tabs know to log out.
@@ -194,25 +199,34 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarHeader>
           <SidebarContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={pathname.startsWith(item.href)}
-                    tooltip={{ children: item.label, side: "right" }}
-                  >
-                    <Link href={item.href}>
-                      <item.icon className="w-5 h-5" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                  {item.href === '/requests' && pendingRequestsCount > 0 && (
-                    <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
-                      {pendingRequestsCount}
-                    </SidebarMenuBadge>
-                  )}
-                </SidebarMenuItem>
-              ))}
+              {menuItems.map((item) => {
+                let badgeCount = 0;
+                if (item.href === '/requests') {
+                  badgeCount = pendingRequestsCount;
+                } else if (item.href === '/payment-authorization') {
+                  badgeCount = pendingPaymentsCount;
+                }
+
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname.startsWith(item.href)}
+                      tooltip={{ children: item.label, side: "right" }}
+                    >
+                      <Link href={item.href}>
+                        <item.icon className="w-5 h-5" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {badgeCount > 0 && (
+                      <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
+                        {badgeCount}
+                      </SidebarMenuBadge>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
