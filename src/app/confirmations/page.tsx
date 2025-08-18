@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Users, Calendar, Loader2 } from "lucide-react";
+import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Users, Calendar, Loader2, Download } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
@@ -485,10 +485,28 @@ export default function ConfirmedRegistrationsPage() {
 
                 {selectedPaymentMethod === 'purchase-order' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><Label htmlFor="po-number">PO Number</Label><Input id="po-number" placeholder="Enter PO Number" value={poNumber} onChange={(e) => setPONumber(e.target.value)} /></div>
-                    <div><Label htmlFor="po-document">Upload PO Document</Label><Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setPODocument(e.target.files?.[0] || null)} /></div>
+                    <div>
+                      <Label htmlFor="po-number">PO Number</Label>
+                      <Input id="po-number" placeholder="Enter PO Number" value={poNumber} onChange={(e) => setPONumber(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="po-document">Upload PO Document</Label>
+                      <Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setPODocument(e.target.files?.[0] || null)} />
+                      {selectedConfirmation.poFileUrl && !poDocument && (
+                        <div className="text-sm mt-2">
+                          <a href={selectedConfirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                            <Download className="h-4 w-4" />
+                            View uploaded document: {selectedConfirmation.poFileName || 'View File'}
+                          </a>
+                        </div>
+                      )}
+                      {poDocument && (
+                        <p className="text-sm text-muted-foreground mt-2">New file selected: {poDocument.name}</p>
+                      )}
+                    </div>
                   </div>
                 )}
+
 
                 <div className="flex justify-end">
                   <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady} className="flex items-center gap-2">
@@ -504,4 +522,3 @@ export default function ConfirmedRegistrationsPage() {
     </AppLayout>
   );
 }
-
