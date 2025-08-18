@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -47,7 +46,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     if (!isOpen) return;
 
     // Load specific confirmation details
-    const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+    const allConfirmations = JSON.parse(localStorage.getItem('all_invoices') || '[]');
     const currentConf = allConfirmations.find((c: any) => c.id === confirmationId);
     if (currentConf) {
       setConfirmation(currentConf);
@@ -93,18 +92,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     try {
       const { status, invoiceNumber } = await getInvoiceStatus({ invoiceId: confirmation.invoiceId });
       
-      const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      const updatedAllConfirmations = allConfirmations.map((conf: any) => 
-        conf.id === confirmation.id 
-          ? { ...conf, invoiceStatus: status, invoiceNumber: invoiceNumber }
-          : conf
+      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+      const updatedAllInvoices = allInvoices.map((inv: any) => 
+        inv.id === confirmation.id 
+          ? { ...inv, invoiceStatus: status, status: status, invoiceNumber: invoiceNumber }
+          : inv
       );
-      localStorage.setItem('confirmations', JSON.stringify(updatedAllConfirmations));
+      localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
       
-      setConfirmation((prev: any) => ({ ...prev, invoiceStatus: status, invoiceNumber }));
+      setConfirmation((prev: any) => ({ ...prev, invoiceStatus: status, status: status, invoiceNumber }));
 
       toast({ title: 'Status Updated', description: `Invoice status updated to: ${status}` });
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('all_invoices_updated'));
     } catch (error) {
       console.error('Failed to refresh status:', error);
       toast({ variant: 'destructive', title: 'Refresh Failed', description: 'Could not refresh invoice status.' });
@@ -114,9 +114,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const handlePaymentUpdate = async () => {
-    if (!confirmation) return;
-    
-    if (!currentUser) {
+    if (!confirmation || !currentUser) {
         toast({ variant: 'destructive', title: 'Authentication Not Ready', description: authError || "Cannot submit payment information at this time. Please refresh the page."});
         return;
     }
@@ -144,7 +142,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         }
         
         const formattedEventDate = format(new Date(confirmation.eventDate), 'MM/dd/yyyy');
-        let newTitle = `${confirmation.teamCode} @ ${formattedEventDate} ${confirmation.eventName}`;
+        let newTitle = `${confirmation.teamCode || confirmation.schoolName} @ ${formattedEventDate} ${confirmation.eventName}`;
         const finalPoNumber = selectedPaymentMethod === 'purchase-order' ? poNumber : confirmation.poNumber;
         if (finalPoNumber) {
             newTitle += ` PO: ${finalPoNumber}`;
@@ -160,18 +158,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             poNumber: finalPoNumber,
             invoiceTitle: newTitle,
             paymentStatus: 'pending-po',
+            status: 'PENDING-PO',
             lastUpdated: new Date().toISOString(),
         };
   
-        const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-        const updatedAllConfirmations = allConfirmations.map((conf: any) =>
-            conf.id === confirmation.id ? updatedConfirmationData : conf
-        );
-        localStorage.setItem('confirmations', JSON.stringify(updatedAllConfirmations));
-      
         const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
         const updatedAllInvoices = allInvoices.map((inv: any) =>
-            inv.id === confirmation.id ? { ...inv, ...updatedConfirmationData, invoiceTitle: newTitle } : inv
+            inv.id === confirmation.id ? updatedConfirmationData : inv
         );
         localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
 
@@ -218,10 +211,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     <div>
                         <DialogTitle className="text-2xl">{confirmation.invoiceTitle || confirmation.eventName}</DialogTitle>
                          <div className="flex items-center gap-2 mt-2">
+                           <div className="flex items-center gap-2">
                             {getStatusBadge(confirmation.invoiceStatus || confirmation.status)}
                             <span className="text-sm text-muted-foreground">
                                 Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
                             </span>
+                           </div>
                         </div>
                     </div>
                      <DialogClose asChild>
@@ -250,13 +245,21 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 <p className="font-medium text-muted-foreground">Date</p>
                                 <p>{format(new Date(confirmation.eventDate), 'PPP')}</p>
                             </div>
+                            <div className="flex justify-between">
+                                <p className="font-medium text-muted-foreground">Sponsor Name</p>
+                                <p>{confirmation.purchaserName || 'N/A'}</p>
+                            </div>
+                            <div className="flex justify-between">
+                                <p className="font-medium text-muted-foreground">Sponsor Email</p>
+                                <p>{confirmation.sponsorEmail || confirmation.purchaserEmail || 'N/A'}</p>
+                            </div>
                              <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Sponsor</p>
-                                <p>{confirmation.companyName}</p>
+                                <p className="font-medium text-muted-foreground">School</p>
+                                <p>{confirmation.schoolName || 'N/A'}</p>
                             </div>
                              <div className="flex justify-between items-center">
                                 <p className="font-medium text-muted-foreground">Total Amount</p>
-                                <p className="text-lg font-semibold">${(confirmation.totalAmount || 0).toFixed(2)}</p>
+                                <p className="text-lg font-semibold">${(confirmation.totalAmount || confirmation.totalInvoiced || 0).toFixed(2)}</p>
                             </div>
                             <div className="flex justify-between items-center">
                                 <p className="font-medium text-muted-foreground">Invoice Link</p>
