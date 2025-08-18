@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -47,8 +47,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     if (!isOpen) return;
 
     // Load specific confirmation details
-    const allConfirmations = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-    const currentConf = allConfirmations.find((c: any) => c.id === confirmationId);
+    const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+    const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
     if (currentConf) {
       setConfirmation(currentConf);
       setSelectedPaymentMethod(currentConf.paymentMethod || 'purchase-order');
@@ -217,11 +217,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 <div className="flex justify-between items-start">
                     <div>
                         <DialogTitle className="text-2xl">{confirmation.invoiceTitle || confirmation.eventName}</DialogTitle>
-                         <div className="text-sm text-muted-foreground flex items-center gap-2 mt-2">
-                            {getStatusBadge(confirmation.invoiceStatus || confirmation.status)}
-                            <span>
-                                Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
-                            </span>
+                         <div className="text-sm text-muted-foreground mt-2">
+                            <div className="flex items-center gap-2">
+                                {getStatusBadge(confirmation.invoiceStatus || confirmation.status)}
+                                <span>
+                                    Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
+                                </span>
+                            </div>
                          </div>
                     </div>
                      <DialogClose asChild>
