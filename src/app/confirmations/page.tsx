@@ -575,6 +575,3 @@ export default function ConfirmedRegistrationsPage() {
     </AppLayout>
   );
 }
- 
-
-    
