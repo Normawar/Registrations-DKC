@@ -37,9 +37,10 @@ export default function UnifiedInvoiceRegistrations() {
         
         // Combine invoice and confirmation data
         const mapped = invoicesArray.map((invoice: any) => {
-          const confirmation = confirmationsArray.find((c: any) => c.id === invoice.id || (invoice.invoiceId && c.invoiceId === invoice.invoiceId));
+          // Match by the primary ID, which should be the invoiceId
+          const confirmation = confirmationsArray.find((c: any) => c.id === invoice.id);
           
-          const selections = confirmation?.selections || {};
+          const selections = confirmation?.selections || invoice.selections || {};
           const registrations = Object.keys(selections).map(playerId => ({
               id: playerId,
               ...selections[playerId]
@@ -50,12 +51,12 @@ export default function UnifiedInvoiceRegistrations() {
             invoiceId: invoice.invoiceId,
             invoiceNumber: invoice.invoiceNumber,
             invoiceTitle: invoice.invoiceTitle || confirmation?.eventName || 'Unknown Event',
-            eventDate: confirmation?.eventDate,
-            companyName: confirmation?.schoolName || invoice.schoolName || 'Unknown',
-            contactEmail: confirmation?.sponsorEmail || invoice.sponsorEmail || 'Unknown',
+            eventDate: confirmation?.eventDate || invoice.eventDate,
+            companyName: invoice.schoolName || confirmation?.schoolName || 'Unknown',
+            contactEmail: invoice.sponsorEmail || confirmation?.sponsorEmail || 'Unknown',
             totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
             status: invoice.invoiceStatus || invoice.status || 'UNKNOWN',
-            submissionTimestamp: confirmation?.submissionTimestamp || new Date().toISOString(),
+            submissionTimestamp: confirmation?.submissionTimestamp || invoice.submissionTimestamp || new Date().toISOString(),
             invoiceUrl: invoice.invoiceUrl || '#',
             registrations: registrations,
           };

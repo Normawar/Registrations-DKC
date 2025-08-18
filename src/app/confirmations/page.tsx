@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -200,13 +201,13 @@ export default function ConfirmedRegistrationsPage() {
       };
   
       // Update confirmations in state
-      const updatedConfirmations = confirmations.map(conf => 
+      const updatedConfirmationsState = confirmations.map(conf => 
         conf.id === selectedConfirmation.id ? updatedConfirmation : conf
       );
-      setConfirmations(updatedConfirmations);
+      setConfirmations(updatedConfirmationsState);
       setSelectedConfirmation(updatedConfirmation);
   
-      // Update all_invoices in localStorage
+      // Update both all_invoices and confirmations in localStorage
       const storedInvoices = localStorage.getItem('all_invoices');
       if (storedInvoices) {
         const allInvoices = JSON.parse(storedInvoices);
@@ -216,7 +217,6 @@ export default function ConfirmedRegistrationsPage() {
         localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
       }
       
-      // Update confirmations in localStorage
        const storedConfirmations = localStorage.getItem('confirmations');
        if (storedConfirmations) {
          const allConfirmations = JSON.parse(storedConfirmations);
