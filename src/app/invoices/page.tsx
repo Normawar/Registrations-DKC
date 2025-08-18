@@ -50,7 +50,7 @@ export default function UnifiedInvoiceRegistrations() {
             id: invoice.id || invoice.invoiceId,
             invoiceId: invoice.invoiceId,
             invoiceNumber: invoice.invoiceNumber,
-            eventTitle: confirmation?.eventName || invoice.invoiceTitle || 'Unknown Event',
+            invoiceTitle: invoice.invoiceTitle || confirmation?.eventName || 'Unknown Event',
             companyName: confirmation?.schoolName || invoice.schoolName || 'Unknown',
             contactEmail: confirmation?.sponsorEmail || invoice.sponsorEmail || 'Unknown',
             totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
@@ -107,7 +107,7 @@ export default function UnifiedInvoiceRegistrations() {
       const lowerSearchTerm = searchTerm.toLowerCase();
       const matchesSearch = 
         (item.invoiceNumber || '').toLowerCase().includes(lowerSearchTerm) ||
-        (item.eventTitle || '').toLowerCase().includes(lowerSearchTerm) ||
+        (item.invoiceTitle || '').toLowerCase().includes(lowerSearchTerm) ||
         (item.companyName || '').toLowerCase().includes(lowerSearchTerm) ||
         (item.contactEmail || '').toLowerCase().includes(lowerSearchTerm) ||
         (Array.isArray(item.registrations) && item.registrations.some((reg: any) => 
@@ -125,7 +125,7 @@ export default function UnifiedInvoiceRegistrations() {
       switch (sortField) {
         case 'invoiceNumber': aValue = a.invoiceNumber || ''; bValue = b.invoiceNumber || ''; break;
         case 'companyName': aValue = a.companyName || ''; bValue = b.companyName || ''; break;
-        case 'eventTitle': aValue = a.eventTitle || ''; bValue = b.eventTitle || ''; break;
+        case 'invoiceTitle': aValue = a.invoiceTitle || ''; bValue = b.invoiceTitle || ''; break;
         case 'amount': aValue = a.totalAmount || 0; bValue = b.totalAmount || 0; break;
         case 'status': aValue = a.status || ''; bValue = b.status || ''; break;
         case 'studentCount': aValue = a.registrations.length || 0; bValue = b.registrations.length || 0; break;
@@ -272,8 +272,8 @@ export default function UnifiedInvoiceRegistrations() {
                       </Button>
                     </th>
                     <th className="text-left p-2">
-                      <Button variant="ghost" className="h-auto p-0 font-semibold" onClick={() => handleSort('eventTitle')}>
-                        Event {getSortIcon('eventTitle')}
+                      <Button variant="ghost" className="h-auto p-0 font-semibold" onClick={() => handleSort('invoiceTitle')}>
+                        Invoice Title {getSortIcon('invoiceTitle')}
                       </Button>
                     </th>
                     <th className="text-left p-2">
@@ -313,7 +313,7 @@ export default function UnifiedInvoiceRegistrations() {
                     <tr key={invoice.id} className="border-b hover:bg-muted/50">
                       <td className="p-2 font-medium">#{invoice.invoiceNumber}</td>
                       <td className="p-2">
-                        <div className="font-medium">{invoice.eventTitle}</div>
+                        <div className="font-medium">{invoice.invoiceTitle}</div>
                       </td>
                       <td className="p-2">
                         <div className="space-y-1">
@@ -372,10 +372,11 @@ export default function UnifiedInvoiceRegistrations() {
             }}
             invoice={selectedInvoice}
             companyName={filteredAndSortedData.find(inv => inv.id === selectedInvoice.invoiceId)?.companyName || ''}
-            eventTitle={filteredAndSortedData.find(inv => inv.id === selectedInvoice.invoiceId)?.eventTitle || ''}
+            eventTitle={filteredAndSortedData.find(inv => inv.id === selectedInvoice.invoiceId)?.invoiceTitle || ''}
           />
         )}
       </div>
     </AppLayout>
   );
-}
+
+    
