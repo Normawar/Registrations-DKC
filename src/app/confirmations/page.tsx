@@ -14,6 +14,7 @@ import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
 import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Users, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 
 export default function ConfirmedRegistrationsPage() {
   const { toast } = useToast();
@@ -179,58 +180,65 @@ export default function ConfirmedRegistrationsPage() {
 
   const handlePaymentUpdate = async () => {
     if (!selectedConfirmation) return;
-
+  
     setIsUpdating(true);
     try {
+      const { teamCode, eventDate, eventName, invoiceId } = selectedConfirmation;
+      const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
+      const newTitle = `${teamCode} @ ${formattedEventDate} ${eventName} PO: ${poNumber}`;
+      
+      // Update title in Square API
+      await updateInvoiceTitle({ invoiceId, title: newTitle });
+  
       const updatedConfirmation = {
         ...selectedConfirmation,
         paymentMethod: selectedPaymentMethod,
-        poNumber: selectedPaymentMethod === 'purchase-order' ? poNumber : undefined,
-        paymentStatus: selectedPaymentMethod === 'purchase-order' ? 'pending-po' : 'paid',
+        poNumber: poNumber,
+        invoiceTitle: newTitle, // Save the new title
+        paymentStatus: 'pending-po',
         lastUpdated: new Date().toISOString()
       };
-
-      // Update confirmations
+  
+      // Update confirmations in state
       const updatedConfirmations = confirmations.map(conf => 
         conf.id === selectedConfirmation.id ? updatedConfirmation : conf
       );
       setConfirmations(updatedConfirmations);
       setSelectedConfirmation(updatedConfirmation);
-
-      // Update localStorage
-      const storedConfirmations = localStorage.getItem('confirmations');
-      if (storedConfirmations) {
-        const allConfirmations = JSON.parse(storedConfirmations);
-        const updatedAllConfirmations = allConfirmations.map((conf: any) => 
-          conf.id === selectedConfirmation.id ? updatedConfirmation : conf
-        );
-        localStorage.setItem('confirmations', JSON.stringify(updatedAllConfirmations));
-      }
-
-      // Also update all_invoices if it exists
+  
+      // Update all_invoices in localStorage
       const storedInvoices = localStorage.getItem('all_invoices');
       if (storedInvoices) {
         const allInvoices = JSON.parse(storedInvoices);
         const updatedInvoices = allInvoices.map((inv: any) => 
-          inv.id === selectedConfirmation.id ? updatedConfirmation : inv
+          inv.id === selectedConfirmation.id ? { ...inv, invoiceTitle: newTitle, poNumber: poNumber } : inv
         );
         localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
       }
-
+      
+      // Update confirmations in localStorage
+       const storedConfirmations = localStorage.getItem('confirmations');
+       if (storedConfirmations) {
+         const allConfirmations = JSON.parse(storedConfirmations);
+         const updatedAllConfirmations = allConfirmations.map((conf: any) => 
+           conf.id === selectedConfirmation.id ? updatedConfirmation : conf
+         );
+         localStorage.setItem('confirmations', JSON.stringify(updatedAllConfirmations));
+       }
+  
       toast({
         title: 'Payment Updated',
-        description: 'Payment information has been saved successfully.'
+        description: 'Invoice has been updated with PO information.'
       });
-
-      // Trigger storage event
+  
       window.dispatchEvent(new Event('storage'));
-
+  
     } catch (error) {
       console.error('Failed to update payment:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to update payment information'
+        description: 'Failed to update payment information. Please check the console for details.'
       });
     } finally {
       setIsUpdating(false);
