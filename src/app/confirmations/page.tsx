@@ -43,7 +43,7 @@ export default function ConfirmedRegistrationsPage() {
   useEffect(() => {
     if (!auth || !storage) {
         setAuthError("Firebase is not configured, so file uploads are disabled.");
-        setIsAuthReady(true); // Set to true to allow UI to render correctly, but buttons will be disabled
+        setIsAuthReady(true);
         return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -191,16 +191,14 @@ export default function ConfirmedRegistrationsPage() {
   
     setIsUpdating(true);
     try {
-        const { teamCode, eventDate, eventName, id, invoiceId } = selectedConfirmation;
-        let updatedConfirmationData: any = { ...selectedConfirmation };
+        let updatedConfirmationData = { ...selectedConfirmation };
         
-        // --- Unified File Upload Logic ---
         if (fileToUpload) {
-             if (!storage) throw new Error("Firebase Storage is not configured.");
+            if (!storage) throw new Error("Firebase Storage is not configured.");
             
             const isPoUpload = selectedPaymentMethod === 'purchase-order';
             const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
-            const recordId = selectedConfirmation.invoiceId || selectedConfirmation.id;
+            const recordId = selectedConfirmation.id;
             const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
             
             const snapshot = await uploadBytes(storageRef, fileToUpload);
@@ -215,9 +213,8 @@ export default function ConfirmedRegistrationsPage() {
             }
         }
         
-        // --- Title and Data Update Logic ---
-        const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
-        let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
+        const formattedEventDate = format(new Date(selectedConfirmation.eventDate), 'MM/dd/yyyy');
+        let newTitle = `${selectedConfirmation.teamCode} @ ${formattedEventDate} ${selectedConfirmation.eventName}`;
         const finalPoNumber = selectedPaymentMethod === 'purchase-order' ? poNumber : selectedConfirmation.poNumber;
         if (finalPoNumber) {
             newTitle += ` PO: ${finalPoNumber}`;
@@ -232,7 +229,7 @@ export default function ConfirmedRegistrationsPage() {
             paymentMethod: selectedPaymentMethod,
             poNumber: finalPoNumber,
             invoiceTitle: newTitle,
-            paymentStatus: 'pending-po', // Unify status for all manual payment methods
+            paymentStatus: 'pending-po',
             lastUpdated: new Date().toISOString(),
         };
   
@@ -307,7 +304,7 @@ export default function ConfirmedRegistrationsPage() {
       default:
         return <Badge variant="outline">{status || 'Unknown'}</Badge>;
     }
-  }
+  };
 
   return (
     <AppLayout>
