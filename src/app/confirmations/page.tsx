@@ -189,7 +189,7 @@ export default function ConfirmedRegistrationsPage() {
   
     setIsUpdating(true);
     try {
-        const { teamCode, eventDate, eventName, invoiceId } = selectedConfirmation;
+        const { teamCode, eventDate, eventName, invoiceId, id } = selectedConfirmation;
         const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
         let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
         
@@ -203,7 +203,8 @@ export default function ConfirmedRegistrationsPage() {
         
         if (fileToUpload) {
             if (!storage) throw new Error("Firebase Storage is not configured.");
-            const storageRef = ref(storage, `${uploadFolder}/${invoiceId}/${fileToUpload.name}`);
+            const recordId = invoiceId || id;
+            const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
             const snapshot = await uploadBytes(storageRef, fileToUpload);
             const downloadUrl = await getDownloadURL(snapshot.ref);
 
@@ -221,7 +222,7 @@ export default function ConfirmedRegistrationsPage() {
         }
       
         if (selectedConfirmation.invoiceId) {
-            await updateInvoiceTitle({ invoiceId, title: newTitle });
+            await updateInvoiceTitle({ invoiceId: selectedConfirmation.invoiceId, title: newTitle });
         }
   
         const updatedConfirmation = {
