@@ -20,6 +20,8 @@ import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, storage } from '@/lib/firebase';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+
 
 export default function ConfirmedRegistrationsPage() {
   const { toast } = useToast();
@@ -227,7 +229,7 @@ export default function ConfirmedRegistrationsPage() {
       
         const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
         const updatedAllInvoices = allInvoices.map((inv: any) =>
-            inv.id === selectedConfirmation.id ? { ...inv, ...updatedConfirmation } : inv
+            inv.id === selectedConfirmation.id ? { ...inv, ...updatedConfirmation, invoiceTitle: newTitle } : inv
         );
         localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
 
@@ -235,8 +237,19 @@ export default function ConfirmedRegistrationsPage() {
         setSelectedConfirmation(updatedConfirmation);
   
         toast({
-            title: 'Payment Info Submitted',
-            description: 'Your payment information has been submitted for verification.'
+            title: 'Payment Info Submitted - Authorization Pending',
+            duration: 10000,
+            description: (
+              <div className="flex flex-col gap-2 text-sm">
+                <p>For your payment to be fully authorized, please ensure the following steps are completed:</p>
+                <ol className="list-decimal list-inside space-y-1 pl-2 font-medium">
+                  <li>A copy of the PO document is uploaded.</li>
+                  <li>The PO is submitted for payment with your school's bookkeeper.</li>
+                  <li>The actual monetary payment has been sent and received.</li>
+                </ol>
+                <p className="mt-2 text-xs text-muted-foreground">An organizer will mark the invoice as "Paid" once funds are verified.</p>
+              </div>
+            ),
         });
   
         window.dispatchEvent(new Event('storage'));
