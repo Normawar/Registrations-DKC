@@ -182,7 +182,9 @@ export default function ConfirmedRegistrationsPage() {
   };
 
   const handlePaymentUpdate = async () => {
-    if (!selectedConfirmation || !currentUser) {
+    if (!selectedConfirmation) return;
+    
+    if (!currentUser) {
         toast({ variant: 'destructive', title: 'Authentication Not Ready', description: authError || "Cannot submit payment information at this time. Please refresh the page."});
         return;
     }
@@ -190,21 +192,21 @@ export default function ConfirmedRegistrationsPage() {
     setIsUpdating(true);
     try {
         const { teamCode, eventDate, eventName, id, invoiceId } = selectedConfirmation;
-        const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
-        let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
-        
         let updatedConfirmationData: any = { ...selectedConfirmation };
         
+        // --- Unified File Upload Logic ---
         if (fileToUpload) {
-            if (!storage) throw new Error("Firebase Storage is not configured.");
+             if (!storage) throw new Error("Firebase Storage is not configured.");
             
-            const uploadFolder = selectedPaymentMethod === 'purchase-order' ? 'purchase-orders' : 'payment-proofs';
+            const isPoUpload = selectedPaymentMethod === 'purchase-order';
+            const uploadFolder = isPoUpload ? 'purchase-orders' : 'payment-proofs';
             const recordId = selectedConfirmation.invoiceId || selectedConfirmation.id;
             const storageRef = ref(storage, `${uploadFolder}/${recordId}/${fileToUpload.name}`);
+            
             const snapshot = await uploadBytes(storageRef, fileToUpload);
             const downloadUrl = await getDownloadURL(snapshot.ref);
 
-            if (selectedPaymentMethod === 'purchase-order') {
+            if (isPoUpload) {
                 updatedConfirmationData.poFileUrl = downloadUrl;
                 updatedConfirmationData.poFileName = fileToUpload.name;
             } else {
@@ -213,6 +215,9 @@ export default function ConfirmedRegistrationsPage() {
             }
         }
         
+        // --- Title and Data Update Logic ---
+        const formattedEventDate = format(new Date(eventDate), 'MM/dd/yyyy');
+        let newTitle = `${teamCode} @ ${formattedEventDate} ${eventName}`;
         const finalPoNumber = selectedPaymentMethod === 'purchase-order' ? poNumber : selectedConfirmation.poNumber;
         if (finalPoNumber) {
             newTitle += ` PO: ${finalPoNumber}`;
