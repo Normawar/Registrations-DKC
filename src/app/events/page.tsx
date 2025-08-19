@@ -1,5 +1,7 @@
+
 'use client';
 
+import { AppLayout } from '@/components/app-layout';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { ParentRegistrationComponent } from '@/components/parent-registration-component';
 import { SponsorRegistrationDialog } from '@/components/sponsor-registration-dialog';
@@ -80,136 +82,142 @@ export default function EventsPage() {
 
   if (!profile) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Loading...</h2>
-          <p className="text-muted-foreground">Please wait while we load your profile.</p>
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold mb-2">Loading...</h2>
+            <p className="text-muted-foreground">Please wait while we load your profile.</p>
+          </div>
         </div>
-      </div>
+      </AppLayout>
     );
   }
 
   // For individual users, show the parent registration component
   if (profile.role === 'individual') {
     return (
-      <div className="space-y-6">
-        <div className="border-b pb-6">
-          <h1 className="text-3xl font-bold">Register for Events</h1>
-          <p className="text-muted-foreground mt-2">
-            Register your students for upcoming chess tournaments.
-          </p>
+      <AppLayout>
+        <div className="space-y-6">
+          <div className="border-b pb-6">
+            <h1 className="text-3xl font-bold">Register for Events</h1>
+            <p className="text-muted-foreground mt-2">
+              Register your students for upcoming chess tournaments.
+            </p>
+          </div>
+          
+          <ParentRegistrationComponent parentProfile={profile} />
         </div>
-        
-        <ParentRegistrationComponent parentProfile={profile} />
-      </div>
+      </AppLayout>
     );
   }
 
   // For sponsors, show event list with registration capabilities
   return (
-    <div className="space-y-6">
-      <div className="border-b pb-6">
-        <h1 className="text-3xl font-bold">Register for Events</h1>
-        <p className="text-muted-foreground mt-2">
-          Register students from {profile.school} for upcoming tournaments.
-        </p>
-      </div>
+    <AppLayout>
+      <div className="space-y-6">
+        <div className="border-b pb-6">
+          <h1 className="text-3xl font-bold">Register for Events</h1>
+          <p className="text-muted-foreground mt-2">
+            Register students from {profile.school} for upcoming tournaments.
+          </p>
+        </div>
 
-      {upcomingEvents.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Upcoming Events</h3>
-            <p className="text-muted-foreground text-center">
-              There are currently no events available for registration.
-              Check back later for new tournaments.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6">
-          {upcomingEvents.map(event => {
-            const status = getEventRegistrationStatus(event);
-            
-            return (
-              <Card key={event.id} className="overflow-hidden">
-                <CardHeader className="pb-4">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-2">
-                      <CardTitle className="text-xl">{event.name}</CardTitle>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {format(new Date(event.date), 'PPP')}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {event.location}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <DollarSign className="h-4 w-4" />
-                          ${event.regularFee}
+        {upcomingEvents.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Calendar className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Upcoming Events</h3>
+              <p className="text-muted-foreground text-center">
+                There are currently no events available for registration.
+                Check back later for new tournaments.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6">
+            {upcomingEvents.map(event => {
+              const status = getEventRegistrationStatus(event);
+              
+              return (
+                <Card key={event.id} className="overflow-hidden">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2">
+                        <CardTitle className="text-xl">{event.name}</CardTitle>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            {format(new Date(event.date), 'PPP')}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            {event.location}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <DollarSign className="h-4 w-4" />
+                            ${event.regularFee}
+                          </div>
                         </div>
                       </div>
+                      
+                      <div className="flex items-center gap-3">
+                        {status.isRegistered && (
+                          <Badge variant="secondary" className="bg-green-100 text-green-800">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            {status.studentCount} student{status.studentCount !== 1 ? 's' : ''} registered
+                          </Badge>
+                        )}
+                        
+                        <Button size="sm" onClick={() => handleRegisterClick(event)}>
+                          {status.isRegistered ? 'Manage Registration' : 'Register Students'}
+                        </Button>
+                      </div>
                     </div>
-                    
-                    <div className="flex items-center gap-3">
-                      {status.isRegistered && (
-                        <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          {status.studentCount} student{status.studentCount !== 1 ? 's' : ''} registered
-                        </Badge>
+                  </CardHeader>
+                  
+                  <CardContent className="pt-0">
+                    <div className="space-y-3">
+                      {event.description && (
+                        <p className="text-sm text-muted-foreground">{event.description}</p>
                       )}
                       
-                      <Button size="sm" onClick={() => handleRegisterClick(event)}>
-                        {status.isRegistered ? 'Manage Registration' : 'Register Students'}
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    {event.description && (
-                      <p className="text-sm text-muted-foreground">{event.description}</p>
-                    )}
-                    
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <span>Registration Deadline: {format(new Date(event.registrationDeadline || event.date), 'PPP')}</span>
-                        </div>
-                        {event.maxParticipants && (
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-4">
                           <div className="flex items-center gap-1">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span>Max {event.maxParticipants} participants</span>
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <span>Registration Deadline: {format(new Date(event.registrationDeadline || event.date), 'PPP')}</span>
                           </div>
-                        )}
+                          {event.maxParticipants && (
+                            <div className="flex items-center gap-1">
+                              <Users className="h-4 w-4 text-muted-foreground" />
+                              <span>Max {event.maxParticipants} participants</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
+                      
+                      {status.isRegistered && (
+                        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <h4 className="font-medium text-green-800 mb-1">Registration Status</h4>
+                          <p className="text-sm text-green-700">
+                            You have {status.studentCount} student{status.studentCount !== 1 ? 's' : ''} registered for this event.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    
-                    {status.isRegistered && (
-                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                        <h4 className="font-medium text-green-800 mb-1">Registration Status</h4>
-                        <p className="text-sm text-green-700">
-                          You have {status.studentCount} student{status.studentCount !== 1 ? 's' : ''} registered for this event.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
 
-      <SponsorRegistrationDialog
-        isOpen={isRegistrationDialogOpen}
-        onOpenChange={setIsRegistrationDialogOpen}
-        event={selectedEvent}
-      />
-    </div>
+        <SponsorRegistrationDialog
+          isOpen={isRegistrationDialogOpen}
+          onOpenChange={setIsRegistrationDialogOpen}
+          event={selectedEvent}
+        />
+      </div>
+    </AppLayout>
   );
 }
