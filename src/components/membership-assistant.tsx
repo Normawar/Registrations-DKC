@@ -113,20 +113,21 @@ export function MembershipAssistant() {
                 control={form.control}
                 name="dob"
                 render={({ field }) => (
-                    <FormItem className="flex flex-col">
+                    <FormItem>
                       <FormLabel>Players Date of Birth</FormLabel>
+                      <div className="flex gap-2">
+                      <FormControl>
+                        <Input
+                            placeholder="MM/DD/YYYY"
+                            value={field.value ? format(field.value, 'MM/dd/yyyy') : ''}
+                            onChange={(e) => handleDateInputChange(e, field)}
+                        />
+                      </FormControl>
                       <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
-                            <FormControl>
-                                <div className="relative">
-                                <Input
-                                    placeholder="MM/DD/YYYY"
-                                    value={field.value ? format(field.value, 'MM/dd/yyyy') : ''}
-                                    onChange={(e) => handleDateInputChange(e, field)}
-                                />
-                                <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50" />
-                                </div>
-                            </FormControl>
+                            <Button variant="outline" size="icon">
+                                <CalendarIcon className="h-4 w-4" />
+                            </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
@@ -146,6 +147,7 @@ export function MembershipAssistant() {
                           />
                         </PopoverContent>
                       </Popover>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )
