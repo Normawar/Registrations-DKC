@@ -167,11 +167,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         if (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card') {
             
             let paymentAmount = 0;
-            if (selectedPaymentMethod === 'cash') paymentAmount = parseFloat(cashAmount);
-            else if (selectedPaymentMethod === 'check') paymentAmount = parseFloat(checkAmount);
-            else if (selectedPaymentMethod === 'cash-app') paymentAmount = parseFloat(cashAppAmount);
-            else if (selectedPaymentMethod === 'zelle') paymentAmount = parseFloat(zelleAmount);
-            else if (selectedPaymentMethod === 'purchase-order') paymentAmount = parseFloat(poAmount);
+            if (selectedPaymentMethod === 'cash') paymentAmount = parseFloat(cashAmount || '0');
+            else if (selectedPaymentMethod === 'check') paymentAmount = parseFloat(checkAmount || '0');
+            else if (selectedPaymentMethod === 'cash-app') paymentAmount = parseFloat(cashAppAmount || '0');
+            else if (selectedPaymentMethod === 'zelle') paymentAmount = parseFloat(zelleAmount || '0');
+            else if (selectedPaymentMethod === 'purchase-order') paymentAmount = parseFloat(poAmount || '0');
 
             if (!paymentAmount || paymentAmount <= 0) {
                 toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
@@ -549,7 +549,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <Input
                     id="sponsor-note"
                     placeholder="Enter note..."
-                    value={sponsorNote}
+                    value={sponsorNote || ''}
                     onChange={(e) => setSponsorNote(e.target.value || '')}
                     className="flex-1"
                   />
@@ -596,7 +596,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <Input
                     id="organizer-note"
                     placeholder="Enter note..."
-                    value={organizerNote}
+                    value={organizerNote || ''}
                     onChange={(e) => setOrganizerNote(e.target.value || '')}
                     className="flex-1"
                   />
