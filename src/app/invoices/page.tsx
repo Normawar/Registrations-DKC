@@ -68,17 +68,19 @@ export default function UnifiedInvoiceRegistrations() {
           registrations = invoice.registrations;
         }
 
-        // IMPROVED TITLE LOGIC - Priority: invoiceTitle > eventName > fallback
+        // FIXED TITLE LOGIC - Priority: invoiceTitle > eventName > fallback
         const getInvoiceTitle = () => {
-          // Check if invoiceTitle property exists and has a value
-          if (invoice.invoiceTitle && invoice.invoiceTitle.trim()) {
-            return invoice.invoiceTitle;
-          }
-          if (invoice.eventName && invoice.eventName.trim()) {
-            return invoice.eventName;
+          // MOST IMPORTANT: Always check invoiceTitle first and trust it if it exists
+          if (invoice.invoiceTitle && typeof invoice.invoiceTitle === 'string' && invoice.invoiceTitle.trim() !== '') {
+            return invoice.invoiceTitle.trim();
           }
           
-          // Fallback for different invoice types
+          // Second priority: eventName for event registrations
+          if (invoice.eventName && typeof invoice.eventName === 'string' && invoice.eventName.trim() !== '') {
+            return invoice.eventName.trim();
+          }
+          
+          // Last resort fallback for legacy data
           if (invoice.membershipType) {
             return `USCF ${invoice.membershipType}`;
           }
