@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const playerSchema = z.object({
     id: z.string().optional(),
@@ -63,6 +64,7 @@ const playerSchema = z.object({
     phone: z.string().min(1, { message: 'Phone number is required.' }),
     dob: z.date({ required_error: "Date of birth is required."}),
     zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
+    uscfStatus: z.enum(['new', 'renewing'], { required_error: "Please select New or Renewing."}),
 });
 
 const playerInfoSchema = z.object({
@@ -83,7 +85,7 @@ type PaymentInputs = {
 };
 
 type InvoiceState = CreateMembershipInvoiceOutput & { 
-    id: string; // Add id field
+    id: string;
     invoiceTitle: string;
     playerCount: number;
     membershipType: string;
@@ -93,9 +95,9 @@ type InvoiceState = CreateMembershipInvoiceOutput & {
     purchaserEmail: string;
     schoolName: string;
     district: string;
-    invoiceStatus: string; // Use invoiceStatus instead of status
-    status: string; // Add for consistency
-    totalAmount: number; // Add for consistency
+    invoiceStatus: string;
+    status: string;
+    totalAmount: number;
     sponsorEmail: string;
     sponsorPhone: string;
     contactEmail: string;
@@ -156,6 +158,7 @@ function UscfPurchaseComponent() {
                 phone: '',
                 dob: undefined,
                 zipCode: '',
+                uscfStatus: undefined,
             });
         }
     }, [isDbLoaded, fields.length, append]);
@@ -288,9 +291,9 @@ function UscfPurchaseComponent() {
             phone: player.phone || '',
             dob: player.dob ? new Date(player.dob) : undefined,
             zipCode: player.zipCode || '',
+            uscfStatus: 'renewing',
         };
 
-        // If the first player is empty, replace it. Otherwise, add a new one.
         if (fields.length === 1 && !fields[0].firstName && !fields[0].lastName) {
             replace([newPlayer]);
         } else {
@@ -554,12 +557,36 @@ function UscfPurchaseComponent() {
                                                 />
                                                 <FormField control={form.control} name={`players.${index}.zipCode`} render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                              </div>
+                                            <FormField control={form.control} name={`players.${index}.uscfStatus`} render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>USCF Status (New/Renewal)</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                        <FormControl>
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select status..." />
+                                                        </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="new">New Membership</SelectItem>
+                                                            <SelectItem value="renewing">Renewing Membership</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )} />
                                         </div>
                                     ))}
-                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: undefined, zipCode: '', uscfId: '', uscfExpiration: undefined })}>
-                                        <PlusCircle className="mr-2 h-4 w-4" />
-                                        Add Another Membership
-                                    </Button>
+                                    <div className="flex items-center gap-4">
+                                        <Button type="button" variant="outline" size="sm" onClick={() => append({ firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: undefined, zipCode: '', uscfId: '', uscfExpiration: undefined, uscfStatus: undefined })}>
+                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                            Add Another Membership Manually
+                                        </Button>
+                                        <span className="text-sm text-muted-foreground">or</span>
+                                        <Button type="button" variant="outline" size="sm" onClick={() => setIsSearchOpen(true)}>
+                                            <Search className="mr-2 h-4 w-4" />
+                                            Search Database to Add
+                                        </Button>
+                                    </div>
                                 </CardContent>
                                 <CardFooter>
                                     <Button type="submit" disabled={isCreatingInvoice}>
@@ -757,7 +784,7 @@ function UscfPurchaseComponent() {
                 isOpen={isSearchOpen}
                 onOpenChange={setIsSearchOpen}
                 onSelectPlayer={handlePlayerSelected}
-                portalType="organizer" // Or dynamically set based on user role
+                portalType="organizer"
             />
         </AppLayout>
     );
@@ -771,9 +798,3 @@ export default function UscfPurchasePage() {
         </Suspense>
     )
 }
-
-
-    
-
-    
-
