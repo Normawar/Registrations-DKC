@@ -458,7 +458,18 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
+  
+  if (!isOpen || !confirmation) return null;
 
+  const players = getRegisteredPlayers(confirmation);
+  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
+  const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
+  const totalPaid = confirmation.totalPaid || 0;
+  const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
+  const balanceDue = totalInvoiced - totalPaid;
+
+  const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
+  
   const NotesSection = () => {
     const notes = confirmation.notes || [];
     const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
@@ -562,7 +573,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       </div>
     );
   };
-
+  
+  const PaymentHistorySection = () => {
+    return (
+      <PaymentHistoryDisplay confirmation={confirmation} />
+    )
+  };
+  
   const renderPaymentMethodInputs = () => {
     const isOrganizer = profile?.role === 'organizer';
     
@@ -840,18 +857,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
     return null;
   };
-  
-  if (!isOpen || !confirmation) return null;
-
-  const players = getRegisteredPlayers(confirmation);
-  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
-  const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
-  const totalPaid = confirmation.totalPaid || 0;
-  const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
-  const balanceDue = totalInvoiced - totalPaid;
-
-  const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
-
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
