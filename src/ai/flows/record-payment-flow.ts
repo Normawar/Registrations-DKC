@@ -64,6 +64,10 @@ const recordPaymentFlow = ai.defineFlow(
         throw new Error(`Could not find invoice or version for invoice: ${input.invoiceId}`);
       }
 
+      if (!invoice.paymentRequests || invoice.paymentRequests.length === 0) {
+        throw new Error(`Invoice ${input.invoiceId} has no payment requests to apply payment to.`);
+      }
+
       console.log(`Recording external payment of $${input.amount} for invoice ID: ${input.invoiceId}`);
 
       const paymentAmount: Money = {
@@ -88,11 +92,17 @@ const recordPaymentFlow = ai.defineFlow(
       }
       
       console.log(`Successfully created payment ${payment.id}. Now adding to invoice...`);
+      
+      const existingPaymentRequest = invoice.paymentRequests[0];
 
       const { result: { invoice: finalInvoice } } = await invoicesApi.updateInvoice(input.invoiceId, {
         invoice: {
             paymentRequests: [{
-                paymentId: payment.id,
+                uid: existingPaymentRequest.uid,
+                requestType: existingPaymentRequest.requestType,
+                dueDate: existingPaymentRequest.dueDate,
+                reminders: existingPaymentRequest.reminders,
+                paymentId: payment.id, // This is how you link the created payment
             }],
             version: invoice.version,
         },
