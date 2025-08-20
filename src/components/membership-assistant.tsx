@@ -103,7 +103,7 @@ export function MembershipAssistant() {
                 name="dob"
                 render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Your Date of Birth</FormLabel>
+                      <FormLabel>Players Date of Birth</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -144,7 +144,7 @@ export function MembershipAssistant() {
                 name="hasPlayedBefore"
                 render={({ field }) => (
                   <FormItem className="space-y-3">
-                    <FormLabel>Have you played in a USCF-rated tournament before?</FormLabel>
+                    <FormLabel>Has this player participated in any USCF-rated tournaments before?</FormLabel>
                     <FormControl>
                       <RadioGroup
                         onValueChange={field.onChange}
