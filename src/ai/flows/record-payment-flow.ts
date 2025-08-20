@@ -71,8 +71,6 @@ const recordPaymentFlow = ai.defineFlow(
           currency: 'USD',
       };
       
-      // The correct flow for external payments is to create a payment and then
-      // link it to the invoice, rather than trying to create a payment on the order.
       const createPaymentResponse = await paymentsApi.createPayment({
           idempotencyKey: randomUUID(),
           sourceId: 'EXTERNAL', 
@@ -91,9 +89,13 @@ const recordPaymentFlow = ai.defineFlow(
       
       console.log(`Successfully created payment ${payment.id}. Now adding to invoice...`);
 
-      const { result: { invoice: finalInvoice } } = await invoicesApi.addPaymentToInvoice(input.invoiceId, {
-        paymentId: payment.id,
-        version: invoice.version,
+      const { result: { invoice: finalInvoice } } = await invoicesApi.updateInvoice(input.invoiceId, {
+        invoice: {
+            paymentRequests: [{
+                paymentId: payment.id,
+            }],
+            version: invoice.version,
+        },
         idempotencyKey: randomUUID(),
       });
 
