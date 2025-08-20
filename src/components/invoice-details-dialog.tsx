@@ -139,7 +139,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 });
             }
         }
-        unifiedPaymentHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date.getTime()));
+        unifiedPaymentHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
         const totalPaid = Math.max(result.totalPaid, unifiedPaymentHistory.reduce((sum, p) => sum + p.amount, 0));
         
@@ -390,7 +390,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(confirmations));
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
@@ -506,8 +506,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <Input
                     id="sponsor-note"
                     placeholder="Enter note..."
-                    value={sponsorNote || ''}
-                    onChange={(e) => setSponsorNote(e.target.value || '')}
+                    value={sponsorNote}
+                    onChange={(e) => setSponsorNote(e.target.value)}
                     className="flex-1"
                   />
                   <Button 
@@ -553,8 +553,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <Input
                     id="organizer-note"
                     placeholder="Enter note..."
-                    value={organizerNote || ''}
-                    onChange={(e) => setOrganizerNote(e.target.value || '')}
+                    value={organizerNote}
+                    onChange={(e) => setOrganizerNote(e.target.value)}
                     className="flex-1"
                   />
                   <Button 
@@ -581,280 +581,283 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   const renderPaymentMethodInputs = () => {
     const isOrganizer = profile?.role === 'organizer';
+    const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
+
+    const safeGetValue = (value: string | undefined | null): string => {
+        return value ?? '';
+    };
     
-    if (selectedPaymentMethod === 'credit-card') {
-        return (
-            <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 mb-3">
-                    Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
-                </p>
-                {invoiceUrl ? (
-                    <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                        <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
-                            Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
-                        </a>
-                    </Button>
-                ) : (
-                    <p className="text-sm text-red-600">Payment link not available</p>
-                )}
-            </div>
-        );
-    }
-
-    if (selectedPaymentMethod === 'cash') {
-        return (
-            <div>
-                <Label htmlFor="cash-amount">
-                    {isOrganizer ? 'Cash Amount Received' : 'Cash Amount Paid'}
-                </Label>
-                <Input 
-                    id="cash-amount" 
-                    type="number" 
-                    step="0.01" 
-                    placeholder="Enter amount" 
-                    value={cashAmount ?? ''} 
-                    onChange={(e) => setCashAmount(e.target.value ?? '')} 
-                    disabled={isPaymentApproved} 
-                />
-                {isOrganizer && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                        This will also open Square invoice for manual "Mark as paid" confirmation.
+    switch (selectedPaymentMethod) {
+        case 'credit-card':
+            return (
+                <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800 mb-3">
+                        Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
                     </p>
-                )}
-            </div>
-        );
-    }
-
-    if (selectedPaymentMethod === 'check') {
-        return (
-            <div className="space-y-4">
-                <div>
-                    <Label htmlFor="check-amount">
-                        {isOrganizer ? 'Check Amount Received' : 'Check Amount'}
-                    </Label>
-                    <Input 
-                        id="check-amount" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="Enter amount" 
-                        value={checkAmount ?? ''} 
-                        onChange={(e) => setCheckAmount(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="check-proof">Upload Check Image</Label>
-                    <Input 
-                        id="check-proof" 
-                        type="file" 
-                        accept="image/*,.pdf" 
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                        disabled={isPaymentApproved}
-                    />
-                     {confirmation.paymentFileUrl && !fileToUpload && (
-                        <div className="text-sm mt-2 flex items-center justify-between">
-                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                            <Download className="h-4 w-4" />
-                            View {confirmation.paymentFileName || 'File'}
-                          </a>
-                          {!isPaymentApproved && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      {fileToUpload && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          <FileIcon className="h-4 w-4 inline-block mr-1" />
-                          New file selected: {fileToUpload.name}
-                        </p>
-                      )}
-                </div>
-                {isOrganizer && (
-                    <p className="text-xs text-muted-foreground">
-                        This will also open Square invoice for manual "Mark as paid" confirmation.
-                    </p>
-                )}
-            </div>
-        );
-    }
-
-    if (selectedPaymentMethod === 'cash-app') {
-        return (
-            <div className="space-y-4">
-                <div>
-                    <Label htmlFor="cashapp-amount">
-                        {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
-                    </Label>
-                    <Input 
-                        id="cashapp-amount" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="Enter amount" 
-                        value={cashAppAmount ?? ''} 
-                        onChange={(e) => setCashAppAmount(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="cashapp-proof">Upload Cash App Screenshot</Label>
-                    <Input 
-                        id="cashapp-proof" 
-                        type="file" 
-                        accept="image/*,.pdf" 
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                        disabled={isPaymentApproved}
-                    />
-                     {confirmation.paymentFileUrl && !fileToUpload && (
-                        <div className="text-sm mt-2 flex items-center justify-between">
-                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                            <Download className="h-4 w-4" />
-                            View {confirmation.paymentFileName || 'File'}
-                          </a>
-                          {!isPaymentApproved && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      {fileToUpload && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          <FileIcon className="h-4 w-4 inline-block mr-1" />
-                          New file selected: {fileToUpload.name}
-                        </p>
-                      )}
-                </div>
-                {isOrganizer && (
-                    <p className="text-xs text-muted-foreground">
-                        This will also open Square invoice for manual "Mark as paid" confirmation.
-                    </p>
-                )}
-            </div>
-        );
-    }
-
-    if (selectedPaymentMethod === 'zelle') {
-        return (
-            <div className="space-y-4">
-                <div>
-                    <Label htmlFor="zelle-amount">
-                        {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
-                    </Label>
-                    <Input 
-                        id="zelle-amount" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="Enter amount" 
-                        value={zelleAmount ?? ''} 
-                        onChange={(e) => setZelleAmount(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="zelle-proof">Upload Zelle Confirmation</Label>
-                    <Input 
-                        id="zelle-proof" 
-                        type="file" 
-                        accept="image/*,.pdf" 
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                        disabled={isPaymentApproved}
-                    />
-                     {confirmation.paymentFileUrl && !fileToUpload && (
-                        <div className="text-sm mt-2 flex items-center justify-between">
-                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                            <Download className="h-4 w-4" />
-                            View {confirmation.paymentFileName || 'File'}
-                          </a>
-                          {!isPaymentApproved && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      {fileToUpload && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          <FileIcon className="h-4 w-4 inline-block mr-1" />
-                          New file selected: {fileToUpload.name}
-                        </p>
-                      )}
-                </div>
-                {isOrganizer && (
-                    <p className="text-xs text-muted-foreground">
-                        This will also open Square invoice for manual "Mark as paid" confirmation.
-                    </p>
-                )}
-            </div>
-        );
-    }
-
-    if (selectedPaymentMethod === 'purchase-order' && !isIndividualInvoice) {
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <Label htmlFor="po-amount">
-                        {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
-                    </Label>
-                    <Input 
-                        id="po-amount" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="Enter amount" 
-                        value={poAmount ?? ''} 
-                        onChange={(e) => setPoAmount(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="po-number">PO Number</Label>
-                    <Input 
-                        id="po-number" 
-                        placeholder="Enter PO Number" 
-                        value={poNumber ?? ''} 
-                        onChange={(e) => setPoNumber(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div className="md:col-span-2">
-                    <Label htmlFor="po-document">Upload PO Document</Label>
-                    <Input 
-                        id="po-document" 
-                        type="file" 
-                        accept=".pdf,.doc,.docx,.jpg,.png" 
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                        disabled={isPaymentApproved} 
-                    />
-                    {confirmation.poFileUrl && !fileToUpload && (
-                        <div className="text-sm mt-2 flex items-center justify-between">
-                            <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                                <Download className="h-4 w-4" />
-                                View {confirmation.poFileName || 'File'}
+                    {confirmation.invoiceUrl ? (
+                        <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                            <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                                Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
                             </a>
-                            {!isPaymentApproved && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            )}
-                        </div>
-                    )}
-                    {fileToUpload && (
-                        <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
+                        </Button>
+                    ) : (
+                        <p className="text-sm text-red-600">Payment link not available</p>
                     )}
                 </div>
-                {isOrganizer && (
-                    <div className="md:col-span-2">
+            );
+
+        case 'cash':
+            return (
+                <div>
+                    <Label htmlFor="cash-amount">
+                        {isOrganizer ? 'Cash Amount Received' : 'Cash Amount Paid'}
+                    </Label>
+                    <Input 
+                        id="cash-amount" 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="Enter amount" 
+                        value={safeGetValue(cashAmount)} 
+                        onChange={(e) => setCashAmount(e.target.value)} 
+                        disabled={isPaymentApproved} 
+                    />
+                    {isOrganizer && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                            This will also open Square invoice for manual "Mark as paid" confirmation.
+                        </p>
+                    )}
+                </div>
+            );
+
+        case 'check':
+            return (
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="check-amount">
+                            {isOrganizer ? 'Check Amount Received' : 'Check Amount'}
+                        </Label>
+                        <Input 
+                            id="check-amount" 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="Enter amount" 
+                            value={safeGetValue(checkAmount)} 
+                            onChange={(e) => setCheckAmount(e.target.value)} 
+                            disabled={isPaymentApproved} 
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="check-proof">Upload Check Image</Label>
+                        <Input 
+                            id="check-proof" 
+                            type="file" 
+                            accept="image/*,.pdf" 
+                            onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                            disabled={isPaymentApproved}
+                        />
+                         {confirmation.paymentFileUrl && !fileToUpload && (
+                            <div className="text-sm mt-2 flex items-center justify-between">
+                              <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                                <Download className="h-4 w-4" />
+                                View {confirmation.paymentFileName || 'File'}
+                              </a>
+                              {!isPaymentApproved && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                          {fileToUpload && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                              <FileIcon className="h-4 w-4 inline-block mr-1" />
+                              New file selected: {fileToUpload.name}
+                            </p>
+                          )}
+                    </div>
+                    {isOrganizer && (
                         <p className="text-xs text-muted-foreground">
                             This will also open Square invoice for manual "Mark as paid" confirmation.
                         </p>
-                    </div>
-                )}
-            </div>
-        );
-    }
+                    )}
+                </div>
+            );
 
-    return null;
+        case 'cash-app':
+            return (
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="cashapp-amount">
+                            {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
+                        </Label>
+                        <Input 
+                            id="cashapp-amount" 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="Enter amount" 
+                            value={safeGetValue(cashAppAmount)} 
+                            onChange={(e) => setCashAppAmount(e.target.value)} 
+                            disabled={isPaymentApproved} 
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="cashapp-proof">Upload Cash App Screenshot</Label>
+                        <Input 
+                            id="cashapp-proof" 
+                            type="file" 
+                            accept="image/*,.pdf" 
+                            onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                            disabled={isPaymentApproved}
+                        />
+                         {confirmation.paymentFileUrl && !fileToUpload && (
+                            <div className="text-sm mt-2 flex items-center justify-between">
+                              <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                                <Download className="h-4 w-4" />
+                                View {confirmation.paymentFileName || 'File'}
+                              </a>
+                              {!isPaymentApproved && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                          {fileToUpload && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                              <FileIcon className="h-4 w-4 inline-block mr-1" />
+                              New file selected: {fileToUpload.name}
+                            </p>
+                          )}
+                    </div>
+                    {isOrganizer && (
+                        <p className="text-xs text-muted-foreground">
+                            This will also open Square invoice for manual "Mark as paid" confirmation.
+                        </p>
+                    )}
+                </div>
+            );
+
+        case 'zelle':
+            return (
+                <div className="space-y-4">
+                    <div>
+                        <Label htmlFor="zelle-amount">
+                            {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
+                        </Label>
+                        <Input 
+                            id="zelle-amount" 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="Enter amount" 
+                            value={safeGetValue(zelleAmount)} 
+                            onChange={(e) => setZelleAmount(e.target.value)} 
+                            disabled={isPaymentApproved} 
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="zelle-proof">Upload Zelle Confirmation</Label>
+                        <Input 
+                            id="zelle-proof" 
+                            type="file" 
+                            accept="image/*,.pdf" 
+                            onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                            disabled={isPaymentApproved}
+                        />
+                         {confirmation.paymentFileUrl && !fileToUpload && (
+                            <div className="text-sm mt-2 flex items-center justify-between">
+                              <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                                <Download className="h-4 w-4" />
+                                View {confirmation.paymentFileName || 'File'}
+                              </a>
+                              {!isPaymentApproved && (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                          {fileToUpload && (
+                            <p className="text-sm text-muted-foreground mt-2">
+                              <FileIcon className="h-4 w-4 inline-block mr-1" />
+                              New file selected: {fileToUpload.name}
+                            </p>
+                          )}
+                    </div>
+                    {isOrganizer && (
+                        <p className="text-xs text-muted-foreground">
+                            This will also open Square invoice for manual "Mark as paid" confirmation.
+                        </p>
+                    )}
+                </div>
+            );
+
+        case 'purchase-order':
+            if (confirmation.schoolName === 'Individual Registration') return null;
+            return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <Label htmlFor="po-amount">
+                            {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
+                        </Label>
+                        <Input 
+                            id="po-amount" 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="Enter amount" 
+                            value={safeGetValue(poAmount)} 
+                            onChange={(e) => setPoAmount(e.target.value)} 
+                            disabled={isPaymentApproved} 
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="po-number">PO Number</Label>
+                        <Input 
+                            id="po-number" 
+                            placeholder="Enter PO Number" 
+                            value={safeGetValue(poNumber)} 
+                            onChange={(e) => setPoNumber(e.target.value)} 
+                            disabled={isPaymentApproved} 
+                        />
+                    </div>
+                    <div className="md:col-span-2">
+                        <Label htmlFor="po-document">Upload PO Document</Label>
+                        <Input 
+                            id="po-document" 
+                            type="file" 
+                            accept=".pdf,.doc,.docx,.jpg,.png" 
+                            onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                            disabled={isPaymentApproved} 
+                        />
+                        {confirmation.poFileUrl && !fileToUpload && (
+                            <div className="text-sm mt-2 flex items-center justify-between">
+                                <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                                    <Download className="h-4 w-4" />
+                                    View {confirmation.poFileName || 'File'}
+                                </a>
+                                {!isPaymentApproved && (
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                        {fileToUpload && (
+                            <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
+                        )}
+                    </div>
+                    {isOrganizer && (
+                        <div className="md:col-span-2">
+                            <p className="text-xs text-muted-foreground">
+                                This will also open Square invoice for manual "Mark as paid" confirmation.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            );
+
+        default:
+            return null;
+    }
   };
 
   if (!isOpen || !confirmation) return null;
