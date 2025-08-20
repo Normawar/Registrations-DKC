@@ -226,8 +226,8 @@ function UscfPurchaseComponent() {
             
             const firstPlayerName = `${values.players[0].firstName} ${values.players[0].middleName || ''} ${values.players[0].lastName}`.replace(/\s+/g, ' ').trim();
             const invoiceTitle = values.players.length > 1
-                ? `USCF Membership for ${values.players.length} players`
-                : `USCF Membership for ${firstPlayerName}`;
+                ? `USCF ${membershipType} for ${values.players.length} players`
+                : `USCF ${membershipType} for ${firstPlayerName}`;
 
             const result = await createMembershipInvoice({
                 purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
@@ -776,3 +776,4 @@ export default function UscfPurchasePage() {
     
 
     
+
