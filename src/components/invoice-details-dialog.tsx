@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -102,7 +101,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return masterDatabase.filter(player => playerIds.includes(player.id));
   };
   
-    const handleRefreshStatus = async () => {
+  const handleRefreshStatus = async () => {
     if (!confirmation?.invoiceId) {
         toast({ variant: 'destructive', title: 'Cannot Refresh', description: 'No invoice ID available for this confirmation' });
         return;
@@ -380,7 +379,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+        localStorage.setItem('confirmations', JSON.stringify(confirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
@@ -458,18 +457,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
-  
-  if (!isOpen || !confirmation) return null;
 
-  const players = getRegisteredPlayers(confirmation);
-  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
-  const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
-  const totalPaid = confirmation.totalPaid || 0;
-  const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
-  const balanceDue = totalInvoiced - totalPaid;
-
-  const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
-  
   const NotesSection = () => {
     const notes = confirmation.notes || [];
     const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
@@ -573,13 +561,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       </div>
     );
   };
-  
+
   const PaymentHistorySection = () => {
     return (
       <PaymentHistoryDisplay confirmation={confirmation} />
-    )
+    );
   };
-  
+
   const renderPaymentMethodInputs = () => {
     const isOrganizer = profile?.role === 'organizer';
     
@@ -857,6 +845,17 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
     return null;
   };
+
+  if (!isOpen || !confirmation) return null;
+
+  const players = getRegisteredPlayers(confirmation);
+  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
+  const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
+  const totalPaid = confirmation.totalPaid || 0;
+  const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
+  const balanceDue = totalInvoiced - totalPaid;
+
+  const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
