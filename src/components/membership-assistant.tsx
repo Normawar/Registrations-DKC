@@ -47,6 +47,7 @@ export function MembershipAssistant() {
   const [suggestion, setSuggestion] =
     useState<SuggestMembershipTypeOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -82,6 +83,16 @@ export function MembershipAssistant() {
       setIsLoading(false);
     }
   }
+  
+  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
+    const date = parse(e.target.value, "MM/dd/yyyy", new Date());
+    if (isValid(date)) {
+      field.onChange(date);
+    } else {
+      field.onChange(undefined);
+    }
+  };
+
 
   return (
     <div className="grid gap-8 md:grid-cols-2">
@@ -104,26 +115,27 @@ export function MembershipAssistant() {
                 render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Players Date of Birth</FormLabel>
-                      <Popover>
+                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                         <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
+                            <FormControl>
+                                <div className="relative">
+                                <Input
+                                    placeholder="MM/DD/YYYY"
+                                    value={field.value ? format(field.value, 'MM/dd/yyyy') : ''}
+                                    onChange={(e) => handleDateInputChange(e, field)}
+                                />
+                                <CalendarIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50" />
+                                </div>
+                            </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={field.onChange}
+                            onSelect={(date) => {
+                                field.onChange(date);
+                                setIsCalendarOpen(false);
+                            }}
                             disabled={(date) =>
                               date > new Date() || date < new Date("1900-01-01")
                             }
