@@ -305,7 +305,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(confirmations));
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
@@ -404,43 +404,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
 
-  const getSubmitButtonText = () => {
-    if (selectedPaymentMethod === 'credit-card') {
-        return isUpdating ? 'Submitting...' : 'Submit Information for Verification';
-    }
-    
-    if (profile?.role === 'organizer') {
-        return isUpdating ? 'Recording Payment...' : 'Record Payment & Open Square';
-    }
-    
-    return isUpdating ? 'Submitting...' : 'Submit Information for Verification';
-  };
-  
-  const getSubmitButtonDisabled = () => {
-    if (isUpdating || !isAuthReady || isPaymentApproved) return true;
-    
-    if (!!authError && selectedPaymentMethod !== 'cash') return true;
-    
-    if (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card') {
-        switch (selectedPaymentMethod) {
-            case 'cash':
-                return !cashAmount || parseFloat(cashAmount) <= 0;
-            case 'check':
-                return !checkAmount || parseFloat(checkAmount) <= 0;
-            case 'cash-app':
-                return !cashAppAmount || parseFloat(cashAppAmount) <= 0;
-            case 'zelle':
-                return !zelleAmount || parseFloat(zelleAmount) <= 0;
-            case 'purchase-order':
-                return !poAmount || parseFloat(poAmount) <= 0 || !poNumber;
-            default:
-                return false;
-        }
-    }
-    
-    return false;
-  };
-  
   const renderPaymentMethodInputs = () => {
     const isOrganizer = profile?.role === 'organizer';
     
@@ -513,6 +476,25 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                         disabled={isPaymentApproved}
                     />
+                     {confirmation.paymentFileUrl && !fileToUpload && (
+                        <div className="text-sm mt-2 flex items-center justify-between">
+                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                            <Download className="h-4 w-4" />
+                            View {confirmation.paymentFileName || 'File'}
+                          </a>
+                          {!isPaymentApproved && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      {fileToUpload && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <FileIcon className="h-4 w-4 inline-block mr-1" />
+                          New file selected: {fileToUpload.name}
+                        </p>
+                      )}
                 </div>
                 {isOrganizer && (
                     <p className="text-xs text-muted-foreground">
@@ -549,6 +531,25 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                         disabled={isPaymentApproved}
                     />
+                     {confirmation.paymentFileUrl && !fileToUpload && (
+                        <div className="text-sm mt-2 flex items-center justify-between">
+                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                            <Download className="h-4 w-4" />
+                            View {confirmation.paymentFileName || 'File'}
+                          </a>
+                          {!isPaymentApproved && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      {fileToUpload && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <FileIcon className="h-4 w-4 inline-block mr-1" />
+                          New file selected: {fileToUpload.name}
+                        </p>
+                      )}
                 </div>
                 {isOrganizer && (
                     <p className="text-xs text-muted-foreground">
@@ -585,6 +586,25 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                         disabled={isPaymentApproved}
                     />
+                     {confirmation.paymentFileUrl && !fileToUpload && (
+                        <div className="text-sm mt-2 flex items-center justify-between">
+                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                            <Download className="h-4 w-4" />
+                            View {confirmation.paymentFileName || 'File'}
+                          </a>
+                          {!isPaymentApproved && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                      {fileToUpload && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          <FileIcon className="h-4 w-4 inline-block mr-1" />
+                          New file selected: {fileToUpload.name}
+                        </p>
+                      )}
                 </div>
                 {isOrganizer && (
                     <p className="text-xs text-muted-foreground">
@@ -660,6 +680,113 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     }
 
     return null;
+  };
+
+  const PaymentHistorySection = () => {
+    const paymentHistory = confirmation.paymentHistory || [];
+    
+    const getPaymentMethodIcon = (method: string) => {
+      switch (method) {
+        case 'credit_card': return '💳';
+        case 'cash': return '💵';
+        case 'check': return '📝';
+        case 'cash_app': return '📱';
+        case 'zelle': return '🏦';
+        case 'external': return '🔗';
+        default: return '💰';
+      }
+    };
+    
+    const getPaymentMethodLabel = (payment: any) => {
+      if (payment.method === 'credit_card' && payment.cardBrand && payment.last4) {
+        return `${payment.cardBrand.toUpperCase()} ****${payment.last4}`;
+      }
+      
+      const methodLabels: Record<string, string> = {
+        credit_card: 'Credit Card',
+        cash: 'Cash Payment',
+        check: 'Check',
+        cash_app: 'Cash App',
+        zelle: 'Zelle',
+        external: 'External Payment',
+      };
+      
+      return methodLabels[payment.method] || 'Payment';
+    };
+    
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Payment History
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {paymentHistory.length > 0 ? (
+            <div className='space-y-3'>
+              {paymentHistory.map((payment: any, index: number) => (
+                <div key={payment.id || index} className="flex justify-between items-center border-b pb-3 last:border-b-0">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">{getPaymentMethodIcon(payment.method)}</span>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {getPaymentMethodLabel(payment)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {payment.date ? format(new Date(payment.date), 'MMM dd, yyyy \'at\' h:mm a') : 'Unknown date'}
+                      </p>
+                      {payment.note && (
+                        <p className="text-xs text-muted-foreground italic">
+                          {payment.note}
+                        </p>
+                      )}
+                      {payment.source === 'square' && (
+                        <Badge variant="outline" className="text-xs mt-1">
+                          Synced from Square
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className='font-semibold text-green-600'>
+                      ${payment.amount?.toFixed(2) || '0.00'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              
+              <Separator />
+              
+              {/* Payment Summary */}
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Total Paid</span>
+                  <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
+                </div>
+                
+                {balanceDue > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Balance Due</span>
+                    <span className="font-semibold text-destructive">${balanceDue.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-center text-sm text-muted-foreground">
+                  <span>Invoice Total</span>
+                  <span>${totalInvoiced.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className='text-sm text-muted-foreground text-center py-4'>
+              <History className="mx-auto h-6 w-6 mb-2" />
+              No payments have been recorded for this invoice yet.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
@@ -839,11 +966,16 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                          <CardFooter>
                             <Button 
                                 onClick={handlePaymentUpdate} 
-                                disabled={getSubmitButtonDisabled()} 
+                                disabled={isUpdating || !isAuthReady || (!!authError && selectedPaymentMethod !== 'cash') || isPaymentApproved || (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card' && ((selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) <= 0)) || (selectedPaymentMethod === 'check' && (!checkAmount || parseFloat(checkAmount) <= 0)) || (selectedPaymentMethod === 'cash-app' && (!cashAppAmount || parseFloat(cashAppAmount) <= 0)) || (selectedPaymentMethod === 'zelle' && (!zelleAmount || parseFloat(zelleAmount) <= 0)) || (selectedPaymentMethod === 'purchase-order' && (!poAmount || parseFloat(poAmount) <= 0 || !poNumber))))} 
                                 className="flex items-center gap-2"
                             >
                                 {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                                {getSubmitButtonText()}
+                                {selectedPaymentMethod === 'credit-card' 
+                                    ? (isUpdating ? 'Submitting...' : 'Submit Information for Verification')
+                                    : profile?.role === 'organizer' 
+                                    ? (isUpdating ? 'Recording Payment...' : 'Record Payment & Open Square')
+                                    : (isUpdating ? 'Submitting...' : 'Submit Information for Verification')
+                                }
                             </Button>
                         </CardFooter>
                     </Card>
