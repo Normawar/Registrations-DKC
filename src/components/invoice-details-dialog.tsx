@@ -379,7 +379,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+        localStorage.setItem('confirmations', JSON.stringify(confirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
@@ -472,8 +472,43 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               Sponsor Notes
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div>Notes count: {sponsorNotes.length}</div>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {sponsorNotes.length > 0 ? (
+                sponsorNotes.map((note: any) => (
+                  <div key={note.id} className="border-l-2 border-blue-200 pl-3 py-2">
+                    <p className="text-sm">{note.text}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\\'at\\\' h:mm a')}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">No sponsor notes yet.</p>
+              )}
+            </div>
+            
+            {(profile?.role === 'sponsor' || profile?.role === 'individual') && (
+              <div className="space-y-2">
+                <Label htmlFor="sponsor-note">Add Sponsor Note</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="sponsor-note"
+                    placeholder="Enter note..."
+                    value={sponsorNote || ''}
+                    onChange={(e) => setSponsorNote(e.target.value || '')}
+                    className="flex-1"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={() => addNote(sponsorNote, 'sponsor')}
+                    disabled={!sponsorNote.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
         
@@ -484,8 +519,43 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               Organizer Notes
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div>Notes count: {organizerNotes.length}</div>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {organizerNotes.length > 0 ? (
+                organizerNotes.map((note: any) => (
+                  <div key={note.id} className="border-l-2 border-green-200 pl-3 py-2">
+                    <p className="text-sm">{note.text}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\\'at\\\' h:mm a')}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">No organizer notes yet.</p>
+              )}
+            </div>
+            
+            {profile?.role === 'organizer' && (
+              <div className="space-y-2">
+                <Label htmlFor="organizer-note">Add Organizer Note</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="organizer-note"
+                    placeholder="Enter note..."
+                    value={organizerNote || ''}
+                    onChange={(e) => setOrganizerNote(e.target.value || '')}
+                    className="flex-1"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={() => addNote(organizerNote, 'organizer')}
+                    disabled={!organizerNote.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
