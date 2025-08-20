@@ -60,7 +60,7 @@ const playerSchema = z.object({
     uscfId: z.string().min(1, { message: 'USCF ID is required.' }),
     uscfExpiration: z.date().optional(),
     email: z.string().email({ message: 'A valid email is required.' }),
-    phone: z.string().optional(),
+    phone: z.string().min(1, { message: 'Phone number is required.' }),
     dob: z.date({ required_error: "Date of birth is required."}),
     zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
 });
@@ -751,5 +751,7 @@ export default function UscfPurchasePage() {
     )
 }
 
+
+    
 
     
