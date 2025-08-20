@@ -94,6 +94,12 @@ type InvoiceState = CreateMembershipInvoiceOutput & {
     schoolName: string;
     district: string;
     invoiceStatus: string; // Use invoiceStatus instead of status
+    status: string; // Add for consistency
+    totalAmount: number; // Add for consistency
+    sponsorEmail: string;
+    sponsorPhone: string;
+    contactEmail: string;
+    isUscfInvoice: boolean;
 };
 
 
@@ -237,14 +243,21 @@ function UscfPurchaseComponent() {
                 id: result.invoiceId,
                 invoiceTitle: invoiceTitle,
                 invoiceStatus: result.status,
+                status: result.status,
                 playerCount: values.players.length,
                 membershipType: membershipType,
                 submissionTimestamp: new Date().toISOString(),
                 totalInvoiced: price * values.players.length,
+                totalAmount: price * values.players.length,
                 purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 purchaserEmail: sponsorProfile.email,
                 schoolName: sponsorProfile.school,
                 district: sponsorProfile.district,
+                sponsorEmail: sponsorProfile.email,
+                sponsorPhone: sponsorProfile.phone || '',
+                contactEmail: sponsorProfile.email,
+                eventName: undefined,
+                isUscfInvoice: true,
             };
 
             setInvoice(newMembershipInvoice);

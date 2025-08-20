@@ -68,10 +68,23 @@ export default function UnifiedInvoiceRegistrations() {
           registrations = invoice.registrations;
         }
 
+        // IMPROVED TITLE LOGIC - Priority: invoiceTitle > eventName > fallback
+        const getInvoiceTitle = () => {
+          if (invoice.invoiceTitle) return invoice.invoiceTitle;
+          if (invoice.eventName) return invoice.eventName;
+          
+          // Fallback for different invoice types
+          if (invoice.membershipType) {
+            return `USCF ${invoice.membershipType}`;
+          }
+          
+          return 'Unknown Event';
+        };
+
         return {
           ...invoice, // Spread all properties
           id: invoice.id || invoice.invoiceId,
-          invoiceTitle: invoice.invoiceTitle || invoice.eventName || 'Unknown Event',
+          invoiceTitle: getInvoiceTitle(), // Use improved logic
           companyName: invoice.schoolName || invoice.purchaserName || 'Unknown',
           contactEmail: invoice.sponsorEmail || invoice.purchaserEmail || 'Unknown',
           totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
