@@ -253,7 +253,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
   const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
 
-  const invoiceUrl = confirmation.invoiceUrl || confirmation.publicUrl || confirmation.invoice_url;
+  const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -348,7 +348,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             <div>
                                 <Label className="text-base font-medium mb-4 block">Payment Method</Label>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                  {/* Purchase Order - Only for sponsors (not individuals) */}
                                   {!isIndividualInvoice && (
                                     <Button 
                                       variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} 
@@ -359,8 +358,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                       <span className="text-center">Purchase<br/>Order</span>
                                     </Button>
                                   )}
-                                  
-                                  {/* Credit Card - Links to Square invoice URL */}
                                   <Button 
                                     variant={selectedPaymentMethod === 'credit-card' ? 'default' : 'outline'} 
                                     onClick={() => setSelectedPaymentMethod('credit-card')} 
@@ -369,8 +366,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                     <CreditCard className="h-5 w-5" />
                                     <span className="text-center">Credit<br/>Card</span>
                                   </Button>
-                                  
-                                  {/* Check */}
                                   <Button 
                                     variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} 
                                     onClick={() => setSelectedPaymentMethod('check')} 
@@ -379,8 +374,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                     <Check className="h-5 w-5" />
                                     <span className="text-center">Pay with<br/>Check</span>
                                   </Button>
-                                  
-                                  {/* Cash App */}
                                   <Button 
                                     variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} 
                                     onClick={() => setSelectedPaymentMethod('cash-app')} 
@@ -389,8 +382,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                     <DollarSign className="h-5 w-5" />
                                     <span>Cash App</span>
                                   </Button>
-                                  
-                                  {/* Zelle */}
                                   <Button 
                                     variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} 
                                     onClick={() => setSelectedPaymentMethod('zelle')} 
@@ -407,7 +398,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             {selectedPaymentMethod === 'credit-card' && (
                               <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <p className="text-sm text-blue-800 mb-3">
-                                  Pay securely with your credit card through Square. After payment, use the 'Refresh Status' button below to update.
+                                  Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
                                 </p>
                                 {invoiceUrl ? (
                                   <Button asChild className="bg-blue-600 hover:bg-blue-700">
@@ -508,7 +499,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
                 <Button variant="outline" onClick={handleRefreshStatus} disabled={isRefreshing} className="mr-auto">
                     {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Refresh Status
+                    Refresh to see updated payment status
                 </Button>
                 <Button variant="ghost" onClick={onClose}>Close</Button>
             </DialogFooter>
