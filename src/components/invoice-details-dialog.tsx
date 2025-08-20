@@ -458,7 +458,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
-  
+
   const NotesSection = () => {
     const notes = confirmation.notes || [];
     const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
@@ -562,7 +562,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       </div>
     );
   };
-  
+
   const renderPaymentMethodInputs = () => {
     const isOrganizer = profile?.role === 'organizer';
     
@@ -873,7 +873,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         external: 'External Payment',
       };
       
-      return methodLabels[payment.method] || 'Payment';
+      return methodLabels[payment.method as keyof typeof methodLabels] || 'Payment';
     };
     
     return (
@@ -920,6 +920,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               
               <Separator />
               
+              {/* Payment Summary */}
               <div className="space-y-2 pt-2">
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Total Paid</span>
