@@ -316,7 +316,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+        localStorage.setItem('confirmations', JSON.stringify(confirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
