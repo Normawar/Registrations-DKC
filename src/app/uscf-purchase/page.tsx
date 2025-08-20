@@ -259,7 +259,6 @@ function UscfPurchaseComponent() {
                 sponsorEmail: sponsorProfile.email,
                 sponsorPhone: sponsorProfile.phone || '',
                 contactEmail: sponsorProfile.email,
-                eventName: undefined,
                 isUscfInvoice: true,
             };
 
@@ -499,7 +498,7 @@ function UscfPurchaseComponent() {
                                              </div>
                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField control={form.control} name={`players.${index}.email`} render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                                <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Player Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                              </div>
                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField 
