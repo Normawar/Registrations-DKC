@@ -49,12 +49,20 @@ export default function UnifiedInvoiceRegistrations() {
   const loadData = useCallback(() => {
     try {
       const allInvoices = localStorage.getItem('all_invoices');
+      console.log('🔍 loadData called - raw localStorage:', allInvoices);
+      
       let invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
+      console.log('🔍 Parsed invoices array length:', invoicesArray.length);
+      console.log('🔍 Full invoices array:', invoicesArray);
 
       if (profile?.role === 'sponsor') {
+        console.log('🔍 Filtering for sponsor:', profile.school, profile.district);
         invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
+        console.log('🔍 After sponsor filter:', invoicesArray.length);
       } else if (profile?.role === 'individual') {
+        console.log('🔍 Filtering for individual:', profile.email);
         invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
+        console.log('🔍 After individual filter:', invoicesArray.length);
       }
       
       const mapped = invoicesArray.map((invoice: any) => {
