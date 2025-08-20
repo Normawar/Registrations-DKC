@@ -512,14 +512,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <Input
                     id="sponsor-note"
                     placeholder="Enter note..."
-                    value={sponsorNote || ''}
-                    onChange={(e) => setSponsorNote(e.target.value || '')}
+                    value={sponsorNote ?? ''}
+                    onChange={(e) => setSponsorNote(e.target.value ?? '')}
                     className="flex-1"
                   />
                   <Button 
                     size="sm" 
                     onClick={() => addNote(sponsorNote, 'sponsor')}
-                    disabled={!sponsorNote.trim()}
+                    disabled={!sponsorNote?.trim()}
                   >
                     Add
                   </Button>
@@ -559,14 +559,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <Input
                     id="organizer-note"
                     placeholder="Enter note..."
-                    value={organizerNote || ''}
-                    onChange={(e) => setOrganizerNote(e.target.value || '')}
+                    value={organizerNote ?? ''}
+                    onChange={(e) => setOrganizerNote(e.target.value ?? '')}
                     className="flex-1"
                   />
                   <Button 
                     size="sm" 
                     onClick={() => addNote(organizerNote, 'organizer')}
-                    disabled={!organizerNote.trim()}
+                    disabled={!organizerNote?.trim()}
                   >
                     Add
                   </Button>
@@ -618,8 +618,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     type="number" 
                     step="0.01" 
                     placeholder="Enter amount" 
-                    value={cashAmount || ''} 
-                    onChange={(e) => setCashAmount(e.target.value || '')} 
+                    value={cashAmount ?? ''} 
+                    onChange={(e) => setCashAmount(e.target.value ?? '')} 
                     disabled={isPaymentApproved} 
                 />
                 {isOrganizer && (
@@ -643,8 +643,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         type="number" 
                         step="0.01" 
                         placeholder="Enter amount" 
-                        value={checkAmount || ''} 
-                        onChange={(e) => setCheckAmount(e.target.value || '')} 
+                        value={checkAmount ?? ''} 
+                        onChange={(e) => setCheckAmount(e.target.value ?? '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -698,8 +698,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         type="number" 
                         step="0.01" 
                         placeholder="Enter amount" 
-                        value={cashAppAmount || ''} 
-                        onChange={(e) => setCashAppAmount(e.target.value || '')} 
+                        value={cashAppAmount ?? ''} 
+                        onChange={(e) => setCashAppAmount(e.target.value ?? '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -753,8 +753,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         type="number" 
                         step="0.01" 
                         placeholder="Enter amount" 
-                        value={zelleAmount || ''} 
-                        onChange={(e) => setZelleAmount(e.target.value || '')} 
+                        value={zelleAmount ?? ''} 
+                        onChange={(e) => setZelleAmount(e.target.value ?? '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -808,8 +808,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         type="number" 
                         step="0.01" 
                         placeholder="Enter amount" 
-                        value={poAmount || ''} 
-                        onChange={(e) => setPoAmount(e.target.value || '')} 
+                        value={poAmount ?? ''} 
+                        onChange={(e) => setPoAmount(e.target.value ?? '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -818,8 +818,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     <Input 
                         id="po-number" 
                         placeholder="Enter PO Number" 
-                        value={poNumber || ''} 
-                        onChange={(e) => setPONumber(e.target.value || '')} 
+                        value={poNumber ?? ''} 
+                        onChange={(e) => setPONumber(e.target.value ?? '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
