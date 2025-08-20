@@ -25,7 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
 import { useState, useEffect, useMemo } from "react";
 import { format, isSameDay } from "date-fns";
-import { Info, FileText, ImageIcon, User, PlusCircle } from "lucide-react";
+import { Info, FileText, ImageIcon, User, PlusCircle, Search } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
@@ -33,13 +33,15 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { IndividualRegistrationDialog } from "@/components/individual-registration-dialog";
-import { AddStudentDialog } from "@/components/add-student-dialog";
+import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
+import { useToast } from "@/hooks/use-toast";
 
 
 export default function IndividualDashboardPage() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
   const { profile } = useSponsorProfile();
+  const { toast } = useToast();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [clientReady, setClientReady] = useState(false);
@@ -61,6 +63,8 @@ export default function IndividualDashboardPage() {
           const studentIds = JSON.parse(storedParentStudents);
           const students = allPlayers.filter(p => studentIds.includes(p.id));
           setParentStudents(students);
+        } else {
+          setParentStudents([]);
         }
       } catch (error) {
         console.error('Failed to load parent students:', error);
@@ -70,8 +74,10 @@ export default function IndividualDashboardPage() {
 
   useEffect(() => {
     loadParentStudents();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile, allPlayers]);
   
+  const parentStudentIds = useMemo(() => parentStudents.map(p => p.id), [parentStudents]);
 
   const playersWithMissingInfo = useMemo(() => {
     return parentStudents.filter(player => {
@@ -93,8 +99,26 @@ export default function IndividualDashboardPage() {
     setIsRegistrationDialogOpen(true);
   };
   
-  const handleStudentAdded = () => {
-    loadParentStudents();
+  const handleStudentAdded = (newStudent: MasterPlayer) => {
+    if (!profile) return;
+    
+    const parentStudentsKey = `parent_students_${profile.email}`;
+    const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
+    if (!existingStudentIds.includes(newStudent.id)) {
+        const updatedStudentIds = [...existingStudentIds, newStudent.id];
+        localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
+        loadParentStudents();
+        toast({
+            title: "Student Added",
+            description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
+        });
+    } else {
+        toast({
+            variant: 'destructive',
+            title: "Student Already Added",
+            description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
+        });
+    }
   };
 
   return (
@@ -235,7 +259,7 @@ export default function IndividualDashboardPage() {
                 </CardContent>
                 <CardFooter>
                   <Button onClick={() => setIsAddStudentDialogOpen(true)} variant="outline">
-                    <PlusCircle className="mr-2 h-4 w-4"/> Add Student
+                    <Search className="mr-2 h-4 w-4"/> Add Student from Database
                   </Button>
                 </CardFooter>
               </Card>
@@ -251,11 +275,12 @@ export default function IndividualDashboardPage() {
             event={selectedEvent}
             parentProfile={profile}
           />
-          <AddStudentDialog
+          <PlayerSearchDialog 
             isOpen={isAddStudentDialogOpen}
             onOpenChange={setIsAddStudentDialogOpen}
-            parentProfile={profile}
-            onStudentAdded={handleStudentAdded}
+            onSelectPlayer={handleStudentAdded}
+            excludeIds={parentStudentIds}
+            portalType="individual"
           />
         </>
       )}

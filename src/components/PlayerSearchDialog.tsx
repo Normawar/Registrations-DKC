@@ -54,7 +54,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPla
     hasActiveFilters,
   } = usePlayerSearch({
     initialFilters: { state: 'TX' },
-    excludeIds: excludeIds,
+    excludeIds: portalType === 'sponsor' ? excludeIds : [], // Only exclude for sponsors
     searchUnassigned: portalType === 'sponsor',
     sponsorProfile: portalType === 'sponsor' ? profile : null,
   });
@@ -66,19 +66,30 @@ const handleSelect = (player: MasterPlayer) => {
     if (portalType === 'individual' && onPlayerSelected) {
       onOpenChange(false);
       onPlayerSelected(player);
-    } else {
-        // Existing logic for sponsor/organizer
-        if (portalType === 'sponsor' && profile) {
-            playerWithSponsorInfo = {
-                ...player,
-                district: profile.district,
-                school: profile.school,
-            };
-        }
-        
+      return;
+    }
+    
+    if (portalType === 'individual') {
         onOpenChange(false);
+        onSelectPlayer(player);
+        return;
+    }
+
+    // Existing logic for sponsor/organizer
+    if (portalType === 'sponsor' && profile) {
+        playerWithSponsorInfo = {
+            ...player,
+            district: profile.district,
+            school: profile.school,
+        };
+    }
+    
+    if (onPlayerSelected) {
+        onPlayerSelected(playerWithSponsorInfo);
+    } else {
         onSelectPlayer(playerWithSponsorInfo);
     }
+    onOpenChange(false);
 };
   
   return (
@@ -87,7 +98,7 @@ const handleSelect = (player: MasterPlayer) => {
             <DialogHeader className="shrink-0">
                 <DialogTitle>Search Master Player Database</DialogTitle>
                 <DialogDescription>
-                    Find existing players to add to your roster or event. For sponsors, players already on your roster are automatically excluded.
+                    Find existing players to add. For sponsors, players already on your roster are automatically excluded.
                 </DialogDescription>
             </DialogHeader>
 
@@ -183,7 +194,7 @@ const handleSelect = (player: MasterPlayer) => {
                                 const isIncomplete = missingFields.length > 0;
                                 
                                 return (
-                                    <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 bg-green-50 border-green-200">
+                                    <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
                                         <div className="flex-1">
                                             <p className="font-semibold">{player.firstName} {player.lastName}</p>
                                             <p className="text-sm text-muted-foreground">
@@ -203,14 +214,7 @@ const handleSelect = (player: MasterPlayer) => {
                                         <Button 
                                             variant="secondary"
                                             size="sm" 
-                                            onClick={() => {
-                                                if (onPlayerSelected) {
-                                                    onPlayerSelected(player);
-                                                } else {
-                                                    onSelectPlayer(player);
-                                                }
-                                                onOpenChange(false);
-                                            }}
+                                            onClick={() => handleSelect(player)}
                                         >
                                             {(isIncomplete && (portalType === 'sponsor' || portalType === 'individual')) ? 'Add & Complete' : 'Select'}
                                         </Button>
