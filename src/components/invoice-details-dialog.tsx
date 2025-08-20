@@ -2,9 +2,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
@@ -13,11 +13,11 @@ import { Alert, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X } from "lucide-react";
+import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { auth, storage } from '@/lib/firebase';
 import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
 
@@ -192,6 +192,44 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         setIsUpdating(false);
     }
   };
+  
+  const handleDeleteFile = async () => {
+      if (!confirmation?.poFileUrl && !confirmation?.paymentFileUrl) return;
+
+      const isPoFile = selectedPaymentMethod === 'purchase-order';
+      const fileUrl = isPoFile ? confirmation.poFileUrl : confirmation.paymentFileUrl;
+      
+      if (!fileUrl) return;
+
+      setIsUpdating(true);
+      try {
+          const fileRef = ref(storage, fileUrl);
+          await deleteObject(fileRef);
+
+          const updatedConfirmationData = { ...confirmation };
+          if (isPoFile) {
+              delete updatedConfirmationData.poFileUrl;
+              delete updatedConfirmationData.poFileName;
+          } else {
+              delete updatedConfirmationData.paymentFileUrl;
+              delete updatedConfirmationData.paymentFileName;
+          }
+
+          const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+          const updatedAllInvoices = allInvoices.map((inv: any) =>
+              inv.id === confirmation.id ? updatedConfirmationData : inv
+          );
+          localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+          setConfirmation(updatedConfirmationData);
+          
+          toast({ title: 'File Deleted', description: 'The uploaded document has been removed.' });
+      } catch (error) {
+          console.error("Failed to delete file:", error);
+          toast({ variant: 'destructive', title: 'Deletion Failed', description: 'Could not delete the file.' });
+      } finally {
+          setIsUpdating(false);
+      }
+  };
 
 
   const getStatusBadge = (status: string) => {
@@ -212,6 +250,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   if (!isOpen || !confirmation) return null;
 
   const players = getRegisteredPlayers(confirmation);
+  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -220,13 +259,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 <div className="flex justify-between items-start">
                     <div>
                         <DialogTitle className="text-2xl">{confirmation.invoiceTitle || confirmation.eventName}</DialogTitle>
-                         <div className="text-sm text-muted-foreground mt-2">
-                            <div className="flex items-center gap-2">
-                                {getStatusBadge(confirmation.invoiceStatus || confirmation.status)}
-                                <span>
-                                    Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
-                                </span>
-                            </div>
+                         <div className="text-sm text-muted-foreground flex items-center gap-2 mt-2">
+                            {getStatusBadge(confirmation.invoiceStatus || confirmation.status)}
+                            <span>
+                                Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
+                            </span>
                          </div>
                     </div>
                      <DialogClose asChild>
@@ -279,9 +316,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                         </CardContent>
                     </Card>
-
+                    
                     <Card>
-                         <CardHeader>
+                        <CardHeader>
                             <CardTitle>Submit Payment Information</CardTitle>
                             <CardDescription>Select a payment method and provide the necessary details. An organizer will verify your payment.</CardDescription>
                         </CardHeader>
@@ -289,14 +326,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             {authError && (
                                 <Alert variant="destructive">
                                     <AlertTitle>File Uploads Disabled</AlertTitle>
-                                    <DialogDescription>{authError}</DialogDescription>
+                                    <CardDescription>{authError}</CardDescription>
                                 </Alert>
                             )}
                             <div>
                                 <Label className="text-base font-medium mb-4 block">Payment Method</Label>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-4 flex flex-col items-center gap-2"><Upload className="h-5 w-5" /><span>Purchase Order</span></Button>
-                                    <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-4 flex flex-col items-center gap-2"><Check className="h-5 w-5" /><span>Pay with Check</span></Button>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-2 flex-col items-center gap-1 leading-tight"><Upload className="h-5 w-5" /><span>Purchase<br/>Order</span></Button>
+                                    <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-2 flex-col items-center gap-1 leading-tight"><Check className="h-5 w-5" /><span>Pay with<br/>Check</span></Button>
                                     <Button variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('cash-app')} className="h-auto py-4 flex flex-col items-center gap-2"><DollarSign className="h-5 w-5" /><span>Cash App</span></Button>
                                     <Button variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('zelle')} className="h-auto py-4 flex flex-col items-center gap-2"><CreditCard className="h-5 w-5" /><span>Zelle</span></Button>
                                 </div>
@@ -308,17 +345,22 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <Label htmlFor="po-number">PO Number</Label>
-                                        <Input id="po-number" placeholder="Enter PO Number" value={poNumber} onChange={(e) => setPONumber(e.target.value)} />
+                                        <Input id="po-number" placeholder="Enter PO Number" value={poNumber} onChange={(e) => setPONumber(e.target.value)} disabled={isPaymentApproved} />
                                     </div>
                                     <div>
                                         <Label htmlFor="po-document">Upload PO Document</Label>
-                                        <Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} />
+                                        <Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} disabled={isPaymentApproved} />
                                         {confirmation.poFileUrl && !fileToUpload && (
-                                            <div className="text-sm mt-2">
+                                            <div className="text-sm mt-2 flex items-center justify-between">
                                                 <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                                                     <Download className="h-4 w-4" />
-                                                    View previously uploaded document: {confirmation.poFileName || 'View File'}
+                                                    View {confirmation.poFileName || 'File'}
                                                 </a>
+                                                 {!isPaymentApproved && (
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                 )}
                                             </div>
                                         )}
                                         {fileToUpload && (
@@ -331,13 +373,18 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (
                                 <div>
                                     <Label htmlFor="payment-proof">Upload Payment Proof/Check Image</Label>
-                                    <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} />
+                                    <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} disabled={isPaymentApproved}/>
                                     {confirmation.paymentFileUrl && !fileToUpload && (
-                                        <div className="text-sm mt-2">
+                                        <div className="text-sm mt-2 flex items-center justify-between">
                                             <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                                                 <Download className="h-4 w-4" />
-                                                View uploaded proof: {confirmation.paymentFileName || 'View File'}
+                                                View {confirmation.paymentFileName || 'File'}
                                             </a>
+                                            {!isPaymentApproved && (
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     )}
                                     {fileToUpload && (
@@ -350,14 +397,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             )}
                         </CardContent>
                          <CardFooter>
-                            <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady || !!authError} className="flex items-center gap-2">
+                            <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady || !!authError || isPaymentApproved} className="flex items-center gap-2">
                                 {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                 {isUpdating ? 'Submitting...' : 'Submit Information for Verification'}
                             </Button>
                         </CardFooter>
                     </Card>
                 </div>
-                
+
                 <Card>
                     <CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
                     <CardContent>
