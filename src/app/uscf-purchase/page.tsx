@@ -46,14 +46,19 @@ import {
     ExternalLink,
     RefreshCw,
     Trash2,
-    PlusCircle
+    PlusCircle,
+    Search
 } from 'lucide-react';
-import { useMasterDb } from '@/context/master-db-context';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 
 const playerSchema = z.object({
+    id: z.string().optional(),
     firstName: z.string().min(1, { message: 'First name is required.' }),
     middleName: z.string().optional(),
     lastName: z.string().min(1, { message: 'Last name is required.' }),
+    uscfId: z.string().min(1, { message: 'USCF ID is required.' }),
+    uscfExpiration: z.date().optional(),
     email: z.string().email({ message: 'A valid email is required.' }),
     phone: z.string().optional(),
     dob: z.date({ required_error: "Date of birth is required."}),
@@ -95,7 +100,7 @@ function UscfPurchaseComponent() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const { profile: sponsorProfile } = useSponsorProfile();
-    const { database: rosterPlayers } = useMasterDb();
+    const { database: rosterPlayers, isDbLoaded } = useMasterDb();
 
     const membershipType = searchParams.get('type') || 'Unknown Membership';
     const justification = searchParams.get('justification') || 'No justification provided.';
@@ -103,6 +108,7 @@ function UscfPurchaseComponent() {
     
     const [invoice, setInvoice] = useState<InvoiceState | null>(null);
     const [isCreatingInvoice, setIsCreatingInvoice] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
 
     const [paymentInputs, setPaymentInputs] = useState<Partial<PaymentInputs>>({
         paymentMethod: 'po',
@@ -121,22 +127,32 @@ function UscfPurchaseComponent() {
     const form = useForm<z.infer<typeof playerInfoSchema>>({
         resolver: zodResolver(playerInfoSchema),
         defaultValues: {
-            players: [{ 
+            players: [],
+        },
+    });
+
+    const { fields, append, remove, replace } = useFieldArray({
+        control: form.control,
+        name: "players"
+    });
+    
+    useEffect(() => {
+        if (!isDbLoaded) return;
+        if (fields.length === 0) {
+            append({ 
                 firstName: '',
                 middleName: '',
                 lastName: '',
+                uscfId: '',
+                uscfExpiration: undefined,
                 email: '',
                 phone: '',
                 dob: undefined,
                 zipCode: '',
-            }],
-        },
-    });
+            });
+        }
+    }, [isDbLoaded, fields.length, append]);
 
-    const { fields, append, remove } = useFieldArray({
-        control: form.control,
-        name: "players"
-    });
 
     useEffect(() => {
         if (!auth || !storage) {
@@ -183,7 +199,7 @@ function UscfPurchaseComponent() {
                 hasError = true;
             }
             const existingPlayer = rosterPlayers.find(rp => rp.email && rp.email.toLowerCase() === email);
-            if (existingPlayer) {
+            if (existingPlayer && existingPlayer.id !== player.id) {
                 form.setError(`players.${index}.email`, { type: 'manual', message: `Email is already assigned to ${existingPlayer.firstName} ${existingPlayer.lastName}.` });
                 hasError = true;
             }
@@ -237,6 +253,29 @@ function UscfPurchaseComponent() {
         } finally {
             setIsCreatingInvoice(false);
         }
+    };
+    
+    const handlePlayerSelected = (player: MasterPlayer) => {
+        const newPlayer = {
+            id: player.id,
+            firstName: player.firstName,
+            lastName: player.lastName,
+            middleName: player.middleName || '',
+            uscfId: player.uscfId || '',
+            uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+            email: player.email || '',
+            phone: player.phone || '',
+            dob: player.dob ? new Date(player.dob) : undefined,
+            zipCode: player.zipCode || '',
+        };
+
+        // If the first player is empty, replace it. Otherwise, add a new one.
+        if (fields.length === 1 && !fields[0].firstName && !fields[0].lastName) {
+            replace([newPlayer]);
+        } else {
+            append(newPlayer);
+        }
+        setIsSearchOpen(false);
     };
 
     const handleInputChange = (field: keyof PaymentInputs, value: any) => {
@@ -358,6 +397,19 @@ function UscfPurchaseComponent() {
                         Complete the form below to generate an invoice for a USCF membership.
                     </p>
                 </div>
+                
+                <Card>
+                    <CardHeader className='flex-row justify-between items-center'>
+                        <CardTitle>Search for Player</CardTitle>
+                        <Button variant="outline" onClick={() => setIsSearchOpen(true)}><Search className="mr-2 h-4 w-4"/>Search Database</Button>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                            Search the master database to pre-fill a player's information.
+                        </p>
+                    </CardContent>
+                </Card>
+
 
                 <Alert variant="destructive">
                     <Info className="h-4 w-4" />
@@ -417,6 +469,10 @@ function UscfPurchaseComponent() {
                                                 <FormField control={form.control} name={`players.${index}.middleName`} render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input placeholder="Michael" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                                 <FormField control={form.control} name={`players.${index}.lastName`} render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                             </div>
+                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <FormField control={form.control} name={`players.${index}.uscfId`} render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or NEW" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.uscfExpiration`} render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const date = e.target.valueAsDate; field.onChange(date ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : undefined); }} /></FormControl><FormMessage /></FormItem> )} />
+                                             </div>
                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField control={form.control} name={`players.${index}.email`} render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                                 <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
@@ -675,6 +731,13 @@ function UscfPurchaseComponent() {
                     </Card>
                 )}
             </div>
+            
+            <PlayerSearchDialog 
+                isOpen={isSearchOpen}
+                onOpenChange={setIsSearchOpen}
+                onSelectPlayer={handlePlayerSelected}
+                portalType="organizer" // Or dynamically set based on user role
+            />
         </AppLayout>
     );
 }
@@ -687,3 +750,6 @@ export default function UscfPurchasePage() {
         </Suspense>
     )
 }
+
+
+    
