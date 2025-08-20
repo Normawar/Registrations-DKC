@@ -1,3 +1,4 @@
+
 'use server';
 
 import {ai} from '@/ai/genkit';
@@ -141,4 +142,8 @@ export const getInvoiceStatusWithPayments = ai.defineFlow(
       if (error instanceof ApiError && error.statusCode === 404) {
          throw new Error(`Invoice ${input.invoiceId} not found in Square.`);
       }
-      console.error('Error getting invoice status with
+      console.error('Error getting invoice status with payments:', error);
+      throw error;
+    }
+  }
+);
