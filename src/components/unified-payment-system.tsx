@@ -1,4 +1,3 @@
-
 'use client';
 
 import { format } from "date-fns";
@@ -8,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { History } from "lucide-react";
 
-export const handleRefreshStatusWithPaymentSync = async (
+const handleRefreshStatusWithPaymentSync = async (
   confirmation: any,
   setConfirmation: Function,
   toast: Function,
@@ -99,7 +98,7 @@ export const handleRefreshStatusWithPaymentSync = async (
   }
 };
 
-export const PaymentHistoryDisplay = ({ confirmation }: { confirmation: any }) => {
+const PaymentHistoryDisplay = ({ confirmation }: { confirmation: any }) => {
   const totalPaid = confirmation.totalPaid || 0;
   const paymentHistory = confirmation.paymentHistory || [];
   const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
@@ -209,7 +208,7 @@ export const PaymentHistoryDisplay = ({ confirmation }: { confirmation: any }) =
   );
 };
 
-export const handleInvoiceWebhook = async (webhookData: any) => {
+const handleInvoiceWebhook = async (webhookData: any) => {
   if (webhookData.type === 'invoice.payment_updated' || webhookData.type === 'invoice.updated') {
     const invoiceId = webhookData.data?.object?.invoice?.id;
     
@@ -264,3 +263,5 @@ export const handleInvoiceWebhook = async (webhookData: any) => {
     }
   }
 };
+
+export { getInvoiceStatusWithPayments, handleRefreshStatusWithPaymentSync, PaymentHistoryDisplay, handleInvoiceWebhook };
