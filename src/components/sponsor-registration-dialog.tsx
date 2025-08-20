@@ -222,37 +222,44 @@ export function SponsorRegistrationDialog({
         district: profile.district,
       });
       
-      const newConfirmation = {
-        id: result.invoiceId,
-        invoiceId: result.invoiceId,
-        invoiceNumber: result.invoiceNumber,
-        submissionTimestamp: new Date().toISOString(),
-        eventId: event.id,
-        eventName: event.name,
-        eventDate: event.date,
-        schoolName: profile.school,
-        district: profile.district,
-        teamCode: teamCode,
-        selections: Object.fromEntries(
-          Object.entries(selectedStudents).map(([playerId, details]) => [
-            playerId,
-            {
-              ...details,
-              status: 'active'
-            }
-          ])
-        ),
-        totalInvoiced: feeBreakdown.total,
-        invoiceStatus: result.status,
-        invoiceUrl: result.invoiceUrl,
-        purchaserName: `${profile.firstName} ${profile.lastName}`,
-        sponsorEmail: profile.email,
-        sponsorPhone: profile.phone,
-        contactEmail: profile.email,
-        purchaserEmail: profile.email,
-        contactPhone: profile.phone,
-        purchaserPhone: profile.phone,
-      };
+const newConfirmation = {
+  id: result.invoiceId,
+  invoiceId: result.invoiceId,
+  invoiceNumber: result.invoiceNumber,
+  submissionTimestamp: new Date().toISOString(),
+  eventId: event.id,
+  eventName: event.name,
+  eventDate: event.date,
+  schoolName: profile.school,
+  district: profile.district,
+  teamCode: teamCode,
+  selections: Object.fromEntries(
+    Object.entries(selectedStudents).map(([playerId, details]) => [
+      playerId,
+      {
+        ...details,
+        status: 'active'
+      }
+    ])
+  ),
+  totalInvoiced: feeBreakdown.total,
+  totalAmount: feeBreakdown.total, // For consistency with invoices page
+  invoiceStatus: result.status,
+  status: result.status, // For consistency with status badges
+  invoiceUrl: result.invoiceUrl,
+  purchaserName: `${profile.firstName} ${profile.lastName}`,
+  
+  // Primary contact fields (standardized)
+  sponsorEmail: profile.email,
+  sponsorPhone: profile.phone,
+  
+  // Backward compatibility fields
+  contactEmail: profile.email,
+  contactPhone: profile.phone,
+  
+  // Invoice title for consistency
+  invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
+};
       
       // Save to localStorage
       const existingConfirmations = localStorage.getItem('confirmations');
