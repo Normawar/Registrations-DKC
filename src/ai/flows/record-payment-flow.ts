@@ -28,6 +28,8 @@ const RecordPaymentOutputSchema = z.object({
   paymentId: z.string(),
   status: z.string(),
   totalPaid: z.number(),
+  totalInvoiced: z.number(),
+  isPartialPayment: z.boolean(),
 });
 export type RecordPaymentOutput = z.infer<typeof RecordPaymentOutputSchema>;
 
@@ -45,11 +47,19 @@ const recordPaymentFlow = ai.defineFlow(
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       console.log(`Square not configured. Mock-recording payment for invoice ${input.invoiceId}.`);
+      
+      // For mock mode, assume a total invoice amount for demonstration
+      const mockTotalInvoiced = 100; // This would normally come from the invoice
+      const newTotal = input.amount;
+      const isPartial = newTotal < mockTotalInvoiced;
+      
       return {
         invoiceId: input.invoiceId,
         paymentId: `MOCK_PAY_${randomUUID()}`,
-        status: 'PAID',
-        totalPaid: input.amount,
+        status: isPartial ? 'PARTIALLY_PAID' : 'PAID',
+        totalPaid: newTotal,
+        totalInvoiced: mockTotalInvoiced,
+        isPartialPayment: isPartial,
       };
     }
 
@@ -67,6 +77,11 @@ const recordPaymentFlow = ai.defineFlow(
       if (!invoice.paymentRequests || invoice.paymentRequests.length === 0) {
         throw new Error(`Invoice ${input.invoiceId} has no payment requests to apply payment to.`);
       }
+
+      // Get the total invoice amount for comparison
+      const invoiceRequestedAmount = invoice.paymentRequests[0]?.requestedMoney?.amount 
+        ? Number(invoice.paymentRequests[0].requestedMoney.amount) / 100 
+        : 0;
 
       console.log(`Recording external payment of $${input.amount} for invoice ID: ${input.invoiceId}`);
 
@@ -109,15 +124,31 @@ const recordPaymentFlow = ai.defineFlow(
         idempotencyKey: randomUUID(),
       });
 
+      // Calculate total paid amount from all completed payment requests
       const totalPaidAmount = finalInvoice?.paymentRequests
         ?.flatMap(pr => pr.totalCompletedAmountMoney?.amount ? [pr.totalCompletedAmountMoney.amount] : [])
         .reduce((sum, current) => sum + current, BigInt(0)) || BigInt(0);
 
+      const totalPaidDollars = Number(totalPaidAmount) / 100;
+      const isPartialPayment = totalPaidDollars < invoiceRequestedAmount;
+
+      // Determine the correct status based on payment completion
+      let status = finalInvoice!.status!;
+      if (totalPaidDollars >= invoiceRequestedAmount) {
+        status = 'PAID';
+      } else if (totalPaidDollars > 0) {
+        status = 'PARTIALLY_PAID';
+      }
+
+      console.log(`Payment recorded. Status: ${status}, Total Paid: $${totalPaidDollars}, Invoice Total: $${invoiceRequestedAmount}`);
+
       return {
         invoiceId: finalInvoice!.id!,
         paymentId: payment.id,
-        status: finalInvoice!.status!,
-        totalPaid: Number(totalPaidAmount) / 100,
+        status: status,
+        totalPaid: totalPaidDollars,
+        totalInvoiced: invoiceRequestedAmount,
+        isPartialPayment: isPartialPayment,
       };
     } catch (error) {
       if (error instanceof ApiError) {
