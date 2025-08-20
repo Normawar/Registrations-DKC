@@ -426,7 +426,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         return `${payment.cardBrand.toUpperCase()} ****${payment.last4}`;
       }
       
-      const methodLabels = {
+      const methodLabels: Record<string, string> = {
         credit_card: 'Credit Card',
         cash: 'Cash Payment',
         check: 'Check',
@@ -458,7 +458,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         {getPaymentMethodLabel(payment)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {payment.date ? format(new Date(payment.date), 'MMM dd, yyyy \'at\' h:mm a') : 'Unknown date'}
+                        {payment.date ? format(new Date(payment.date), 'MMM dd, yyyy \\'at\\' h:mm a') : 'Unknown date'}
                       </p>
                       {payment.note && (
                         <p className="text-xs text-muted-foreground italic">
@@ -533,7 +533,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <div key={note.id} className="border-l-2 border-blue-200 pl-3 py-2">
                     <p className="text-sm">{note.text}</p>
                     <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \'at\' h:mm a')}
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
                     </p>
                   </div>
                 ))
@@ -580,7 +580,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <div key={note.id} className="border-l-2 border-green-200 pl-3 py-2">
                     <p className="text-sm">{note.text}</p>
                     <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \'at\' h:mm a')}
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
                     </p>
                   </div>
                 ))
