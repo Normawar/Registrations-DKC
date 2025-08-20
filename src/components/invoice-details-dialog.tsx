@@ -15,7 +15,7 @@ import { useMasterDb } from "@/context/master-db-context";
 import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
-import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
+import { getInvoiceStatusWithPayments } from '@/ai/flows/get-invoice-status-flow';
 import { recordPayment } from '@/ai/flows/record-payment-flow';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { auth, storage } from '@/lib/firebase';
@@ -26,6 +26,206 @@ interface InvoiceDetailsDialogProps {
   onClose: () => void;
   confirmationId: string;
 }
+
+const handleRefreshStatusWithPaymentSync = async (
+  confirmation: any,
+  setConfirmation: Function,
+  toast: Function,
+  setIsRefreshing: Function
+) => {
+  if (!confirmation?.invoiceId) {
+    toast({ variant: 'destructive', title: 'Cannot Refresh', description: 'No invoice ID available for this confirmation' });
+    return;
+  }
+
+  setIsRefreshing(true);
+  try {
+    // Get comprehensive invoice status including payment history
+    const result = await getInvoiceStatusWithPayments({ invoiceId: confirmation.invoiceId });
+    
+    // Merge Square payment history with local payment history
+    const localPayments = confirmation.paymentHistory || [];
+    const squarePayments = result.paymentHistory || [];
+    
+    // Create a unified payment history, prioritizing Square payments for credit cards
+    const unifiedPaymentHistory = [...localPayments];
+    
+    // Add Square payments that aren't already tracked locally
+    for (const squarePayment of squarePayments) {
+      const existsLocally = localPayments.some((local: any) => 
+        local.squarePaymentId === squarePayment.id || 
+        (local.method === 'credit_card' && Math.abs(local.amount - squarePayment.amount) < 0.01)
+      );
+      
+      if (!existsLocally) {
+        unifiedPaymentHistory.push({
+          ...squarePayment,
+          squarePaymentId: squarePayment.id,
+          source: 'square'
+        });
+      }
+    }
+    
+    // Sort by date
+    unifiedPaymentHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // Calculate totals
+    const totalPaidFromHistory = unifiedPaymentHistory.reduce((sum, payment) => sum + payment.amount, 0);
+    const totalPaid = Math.max(result.totalPaid, totalPaidFromHistory);
+    
+    // Update confirmation with synced data
+    const updatedConfirmation = {
+      ...confirmation,
+      invoiceStatus: result.status,
+      status: result.status,
+      invoiceNumber: result.invoiceNumber || confirmation.invoiceNumber,
+      totalPaid: totalPaid,
+      totalAmount: result.totalAmount || confirmation.totalAmount,
+      paymentHistory: unifiedPaymentHistory,
+      lastSquareSync: new Date().toISOString(),
+    };
+    
+    // Update localStorage
+    const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+    const updatedAllInvoices = allInvoices.map((inv: any) => 
+      inv.id === confirmation.id ? updatedConfirmation : inv
+    );
+    localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+    
+    const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+    const updatedConfirmations = confirmations.map((conf: any) =>
+      conf.id === confirmation.id ? updatedConfirmation : conf
+    );
+    localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+    
+    setConfirmation(updatedConfirmation);
+
+    const newPaymentCount = result.paymentHistory.length;
+    const message = newPaymentCount > 0 
+      ? `Status updated to: ${result.status}. Found ${newPaymentCount} payment(s) from Square.`
+      : `Status updated to: ${result.status}`;
+      
+    toast({ title: 'Status Updated', description: message });
+    
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('all_invoices_updated'));
+  } catch (error) {
+    console.error('Failed to refresh status:', error);
+    toast({ variant: 'destructive', title: 'Refresh Failed', description: 'Could not refresh invoice status.' });
+  } finally {
+    setIsRefreshing(false);
+  }
+};
+
+const PaymentHistoryDisplay = ({ confirmation }: { confirmation: any }) => {
+  const totalPaid = confirmation.totalPaid || 0;
+  const paymentHistory = confirmation.paymentHistory || [];
+  const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
+  const balanceDue = totalInvoiced - totalPaid;
+  
+  const getPaymentMethodIcon = (method: string) => {
+    switch (method) {
+      case 'credit_card': return '💳';
+      case 'cash': return '💵';
+      case 'check': return '📝';
+      case 'cash_app': return '📱';
+      case 'zelle': return '🏦';
+      case 'external': return '🔗';
+      default: return '💰';
+    }
+  };
+  
+  const getPaymentMethodLabel = (payment: any) => {
+    if (payment.method === 'credit_card' && payment.cardBrand && payment.last4) {
+      return `${payment.cardBrand.toUpperCase()} ****${payment.last4}`;
+    }
+    
+    const methodLabels: Record<string, string> = {
+      credit_card: 'Credit Card',
+      cash: 'Cash Payment',
+      check: 'Check',
+      cash_app: 'Cash App',
+      zelle: 'Zelle',
+      external: 'External Payment',
+    };
+    
+    return methodLabels[payment.method] || 'Payment';
+  };
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <History className="h-5 w-5" />
+          Payment History
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {paymentHistory.length > 0 ? (
+          <div className='space-y-3'>
+            {paymentHistory.map((payment: any, index: number) => (
+              <div key={payment.id || index} className="flex justify-between items-center border-b pb-3 last:border-b-0">
+                <div className="flex items-start gap-3">
+                  <span className="text-lg">{getPaymentMethodIcon(payment.method)}</span>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {getPaymentMethodLabel(payment)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {payment.date ? format(new Date(payment.date), 'MMM dd, yyyy \'at\' h:mm a') : 'Unknown date'}
+                    </p>
+                    {payment.note && (
+                      <p className="text-xs text-muted-foreground italic">
+                        {payment.note}
+                      </p>
+                    )}
+                    {payment.source === 'square' && (
+                      <Badge variant="outline" className="text-xs mt-1">
+                        Synced from Square
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className='font-semibold text-green-600'>
+                    ${payment.amount?.toFixed(2) || '0.00'}
+                  </span>
+                </div>
+              </div>
+            ))}
+            
+            <Separator />
+            
+            {/* Payment Summary */}
+            <div className="space-y-2 pt-2">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Total Paid</span>
+                <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
+              </div>
+              
+              {balanceDue > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="font-medium">Balance Due</span>
+                  <span className="font-semibold text-destructive">${balanceDue.toFixed(2)}</span>
+                </div>
+              )}
+              
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>Invoice Total</span>
+                <span>${totalInvoiced.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className='text-sm text-muted-foreground text-center py-4'>
+            <History className="mx-auto h-6 w-6 mb-2" />
+            No payments have been recorded for this invoice yet.
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: InvoiceDetailsDialogProps) {
   const { toast } = useToast();
@@ -84,37 +284,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     const playerIds = Object.keys(conf.selections);
     return masterDatabase.filter(player => playerIds.includes(player.id));
   };
-
-  const handleRefreshStatus = async () => {
-    if (!confirmation?.invoiceId) {
-      toast({ variant: 'destructive', title: 'Cannot Refresh', description: 'No invoice ID available for this confirmation' });
-      return;
-    }
-
-    setIsRefreshing(true);
-    try {
-      const { status, invoiceNumber } = await getInvoiceStatus({ invoiceId: confirmation.invoiceId });
-      
-      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const updatedAllInvoices = allInvoices.map((inv: any) => 
-        inv.id === confirmation.id 
-          ? { ...inv, invoiceStatus: status, status: status, invoiceNumber: invoiceNumber }
-          : inv
-      );
-      localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-      
-      setConfirmation((prev: any) => ({ ...prev, invoiceStatus: status, status: status, invoiceNumber }));
-
-      toast({ title: 'Status Updated', description: `Invoice status updated to: ${status}` });
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('all_invoices_updated'));
-    } catch (error) {
-      console.error('Failed to refresh status:', error);
-      toast({ variant: 'destructive', title: 'Refresh Failed', description: 'Could not refresh invoice status.' });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  
+  const handleRefresh = useCallback(() => {
+    handleRefreshStatusWithPaymentSync(confirmation, setConfirmation, toast, setIsRefreshing);
+  }, [confirmation, toast]);
 
   const handlePaymentUpdate = async () => {
     if (!confirmation) {
@@ -124,7 +297,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     setIsUpdating(true);
 
     try {
-        // For cash payments by organizers, record payment immediately
         if (selectedPaymentMethod === 'cash' && profile?.role === 'organizer') {
             if (!cashAmount || parseFloat(cashAmount) <= 0) {
                 toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid cash amount.' });
@@ -138,74 +310,22 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 return;
             }
 
-            // Record the cash payment directly
             const result = await recordPayment({
                 invoiceId: confirmation.invoiceId,
                 amount: parseFloat(cashAmount),
                 note: 'Cash payment recorded by organizer',
                 paymentDate: format(new Date(), 'yyyy-MM-dd'),
             });
-
-            console.log('Payment result:', result); // Debug log
-
-            // Calculate the cumulative totals properly
-            const previouslyPaid = confirmation.totalPaid || 0;
-            const newTotalPaid = result.totalPaid; // Use the total from Square
-            const totalInvoiced = result.totalInvoiced || confirmation.totalAmount || confirmation.totalInvoiced || 0;
-
-            // Update local records with proper payment data
-            const updatedConfirmationData = {
-                ...confirmation,
-                status: result.status,
-                invoiceStatus: result.status,
-                totalPaid: newTotalPaid,
-                totalAmount: totalInvoiced,
-                totalInvoiced: totalInvoiced,
-                paymentStatus: result.status === 'PAID' ? 'paid' : (newTotalPaid > 0 ? 'partially-paid' : 'unpaid'),
-                lastUpdated: new Date().toISOString(),
-                // Add payment history entry
-                paymentHistory: [
-                    ...(confirmation.paymentHistory || []),
-                    {
-                        id: result.paymentId,
-                        amount: parseFloat(cashAmount),
-                        date: new Date().toISOString(),
-                        method: 'cash',
-                        note: 'Cash payment recorded by organizer'
-                    }
-                ]
-            };
-
-            // Update both storage locations
-            const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-            const updatedAllInvoices = allInvoices.map((inv: any) =>
-                inv.id === confirmation.id ? updatedConfirmationData : inv
-            );
-            localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-
-            const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            const updatedConfirmations = confirmations.map((conf: any) =>
-                conf.id === confirmation.id ? updatedConfirmationData : conf
-            );
-            localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-
-            // Update local state
-            setConfirmation(updatedConfirmationData);
-            setCashAmount('');
-
+            
             toast({ 
                 title: 'Payment Recorded', 
-                description: `Cash payment of $${cashAmount} recorded. New total paid: $${newTotalPaid.toFixed(2)}. Status: ${result.status}` 
+                description: `Cash payment of $${cashAmount} recorded. Refreshing invoice...` 
             });
-
-            // Trigger storage events
-            window.dispatchEvent(new Event('storage'));
-            window.dispatchEvent(new Event('all_invoices_updated'));
-            setIsUpdating(false);
-            return;
+            handleRefresh(); // Refresh data from square after local change
+            setCashAmount('');
+            return; // Exit after handling cash payment
         }
 
-        // For non-cash payments, handle file uploads and submission for verification
         let updatedConfirmationData = { ...confirmation };
 
         if (fileToUpload) {
@@ -261,7 +381,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         );
         localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
 
-        // Also update confirmations store for payment authorization page
         const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
         const existingConfirmationIndex = confirmations.findIndex((conf: any) => conf.id === confirmation.id);
         if (existingConfirmationIndex >= 0) {
@@ -325,54 +444,39 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       }
   };
 
-const getStatusBadge = (status: string, totalPaid?: number, totalInvoiced?: number) => {
-    let displayStatus = (status || '').toUpperCase();
-    
-    // Override status based on payment amounts if available
-    if (totalPaid !== undefined && totalInvoiced !== undefined) {
-        if (totalPaid >= totalInvoiced && totalPaid > 0) {
-            displayStatus = 'PAID';
-        } else if (totalPaid > 0 && totalPaid < totalInvoiced) {
-            displayStatus = 'PARTIALLY_PAID';
-        } else if (totalPaid === 0) {
-            displayStatus = 'UNPAID';
-        }
-    }
-    
-    const variants: { [key: string]: 'default' | 'destructive' | 'secondary' } = {
-        'PAID': 'default',
-        'COMPED': 'default',
-        'UNPAID': 'destructive',
-        'OVERDUE': 'destructive',
-        'CANCELED': 'destructive',
-        'PARTIALLY_PAID': 'secondary',
-    };
-    
-    let className = '';
-    if (displayStatus === 'PAID' || displayStatus === 'COMPED') className = 'bg-green-600 text-white';
-    if (displayStatus === 'PARTIALLY_PAID') className = 'bg-blue-600 text-white';
-    if (displayStatus === 'PENDING-PO') className = 'bg-yellow-500 text-black';
-    
-    return (
-        <Badge variant={variants[displayStatus] || 'secondary'} className={className}>
-            {displayStatus.replace(/_/g, ' ')}
-        </Badge>
-    );
-};
-
+  const getStatusBadge = (status: string, totalPaid?: number, totalInvoiced?: number) => {
+      let displayStatus = (status || '').toUpperCase();
+      
+      if (totalPaid !== undefined && totalInvoiced !== undefined) {
+          if (totalPaid >= totalInvoiced && totalPaid > 0) {
+              displayStatus = 'PAID';
+          } else if (totalPaid > 0 && totalPaid < totalInvoiced) {
+              displayStatus = 'PARTIALLY_PAID';
+          }
+      }
+      
+      const variants: { [key: string]: 'default' | 'destructive' | 'secondary' } = {
+          'PAID': 'default', 'COMPED': 'default',
+          'UNPAID': 'destructive', 'OVERDUE': 'destructive', 'CANCELED': 'destructive',
+          'PARTIALLY_PAID': 'secondary',
+      };
+      
+      let className = '';
+      if (displayStatus === 'PAID' || displayStatus === 'COMPED') className = 'bg-green-600 text-white';
+      if (displayStatus === 'PARTIALLY_PAID') className = 'bg-blue-600 text-white';
+      if (displayStatus === 'PENDING-PO') className = 'bg-yellow-500 text-black';
+      
+      return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
+  };
 
   if (!isOpen || !confirmation) return null;
 
   const players = getRegisteredPlayers(confirmation);
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
   const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
-  const totalPaid = confirmation.totalPaid || 0;
-  const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
-  const balanceDue = totalInvoiced - totalPaid;
 
   const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
 
-  // Determine button text and functionality
   const getSubmitButtonText = () => {
     if (selectedPaymentMethod === 'cash' && profile?.role === 'organizer') {
       return isUpdating ? 'Recording Payment...' : 'Record Payment';
@@ -381,66 +485,6 @@ const getStatusBadge = (status: string, totalPaid?: number, totalInvoiced?: numb
   };
 
   const shouldShowCashAmount = selectedPaymentMethod === 'cash' && profile?.role === 'organizer';
-
-  const PaymentHistorySection = ({ confirmation }: { confirmation: any }) => {
-    const totalPaid = confirmation.totalPaid || 0;
-    const paymentHistory = confirmation.paymentHistory || [];
-    
-    return (
-        <Card>
-            <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
-            <CardContent>
-                {totalPaid > 0 || paymentHistory.length > 0 ? (
-                    <div className='space-y-3'>
-                        {/* Show payment history entries if available */}
-                        {paymentHistory.map((payment: any, index: number) => (
-                            <div key={payment.id || index} className="flex justify-between items-center border-b pb-2">
-                                <div>
-                                    <p className="text-sm font-medium">
-                                        {payment.method === 'cash' ? 'Cash Payment' : 'Payment'} 
-                                        {payment.note && ` - ${payment.note}`}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {payment.date ? format(new Date(payment.date), 'PPp') : 'Unknown date'}
-                                    </p>
-                                </div>
-                                <span className='font-medium text-green-600'>
-                                    ${payment.amount?.toFixed(2) || '0.00'}
-                                </span>
-                            </div>
-                        ))}
-                        
-                        {/* Fallback display if we have totalPaid but no detailed history */}
-                        {totalPaid > 0 && paymentHistory.length === 0 && (
-                            <div className="flex justify-between items-center border-b pb-2">
-                                <div>
-                                    <p className="text-sm font-medium">Payment Recorded</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {confirmation.lastUpdated ? format(new Date(confirmation.lastUpdated), 'PPp') : 'Recently'}
-                                    </p>
-                                </div>
-                                <span className='font-medium text-green-600'>
-                                    ${totalPaid.toFixed(2)}
-                                </span>
-                            </div>
-                        )}
-                        
-                        {/* Total summary */}
-                        <div className="flex justify-between items-center pt-2 border-t font-semibold">
-                            <span>Total Paid</span>
-                            <span className="text-green-600">${totalPaid.toFixed(2)}</span>
-                        </div>
-                    </div>
-                ) : (
-                    <div className='text-sm text-muted-foreground text-center py-4'>
-                        <History className="mx-auto h-6 w-6 mb-2" />
-                        No payments have been recorded for this invoice yet.
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    );
-};
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -451,302 +495,64 @@ const getStatusBadge = (status: string, totalPaid?: number, totalInvoiced?: numb
                         <DialogTitle className="text-2xl">{confirmation.invoiceTitle || confirmation.eventName}</DialogTitle>
                          <div className="text-sm text-muted-foreground flex items-center gap-2 mt-2">
                             {getStatusBadge(confirmation.invoiceStatus || confirmation.status, confirmation.totalPaid, confirmation.totalAmount || confirmation.totalInvoiced)}
-                            <span>
-                                Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
-                            </span>
+                            <span>Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}</span>
                          </div>
                     </div>
                 </div>
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                
                 <div className="grid gap-6 md:grid-cols-2">
                     <Card>
                         <CardHeader><CardTitle>Registration Details</CardTitle></CardHeader>
                         <CardContent className="space-y-4 text-sm">
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Event</p>
-                                <p>{confirmation.eventName}</p>
-                            </div>
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Date</p>
-                                <p>{confirmation.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</p>
-                            </div>
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Sponsor Name</p>
-                                <p>{confirmation.purchaserName || 'N/A'}</p>
-                            </div>
-                             <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Sponsor Email</p>
-                                <p>
-                                    {confirmation?.sponsorEmail || 
-                                     confirmation?.purchaserEmail || 
-                                     confirmation?.contactEmail || 
-                                     profile?.email || 
-                                     'N/A'}
-                                </p>
-                            </div>
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Sponsor Phone</p>
-                                <p>
-                                    {confirmation?.sponsorPhone || 
-                                     confirmation?.purchaserPhone || 
-                                     confirmation?.contactPhone || 
-                                     profile?.phone || 
-                                     'N/A'}
-                                </p>
-                            </div>
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">School</p>
-                                <p>{confirmation.schoolName || 'N/A'}</p>
-                            </div>
+                            <div className="flex justify-between"><p className="font-medium text-muted-foreground">Event</p><p>{confirmation.eventName}</p></div>
+                            <div className="flex justify-between"><p className="font-medium text-muted-foreground">Date</p><p>{confirmation.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</p></div>
+                            <div className="flex justify-between"><p className="font-medium text-muted-foreground">Sponsor Name</p><p>{confirmation.purchaserName || 'N/A'}</p></div>
+                            <div className="flex justify-between"><p className="font-medium text-muted-foreground">Sponsor Email</p><p>{confirmation?.sponsorEmail || confirmation?.purchaserEmail || confirmation?.contactEmail || profile?.email || 'N/A'}</p></div>
+                            <div className="flex justify-between"><p className="font-medium text-muted-foreground">Sponsor Phone</p><p>{confirmation?.sponsorPhone || confirmation?.purchaserPhone || confirmation?.contactPhone || profile?.phone || 'N/A'}</p></div>
+                            <div className="flex justify-between"><p className="font-medium text-muted-foreground">School</p><p>{confirmation.schoolName || 'N/A'}</p></div>
                             <Separator/>
-                             <div className="flex justify-between items-center text-base">
-                                <p className="font-medium">Total Amount</p>
-                                <p className="font-semibold">${(totalInvoiced).toFixed(2)}</p>
-                            </div>
-                            {totalPaid > 0 && (
-                                <>
-                                    <div className="flex justify-between items-center text-green-600">
-                                        <p className="font-medium">Amount Paid</p>
-                                        <p className="font-semibold">${(totalPaid).toFixed(2)}</p>
-                                    </div>
-                                    <div className="flex justify-between items-center text-destructive font-bold text-lg">
-                                        <p>Balance Due</p>
-                                        <p>${(balanceDue).toFixed(2)}</p>
-                                    </div>
-                                </>
-                            )}
-                            <div className="flex justify-between items-center">
-                                <p className="font-medium text-muted-foreground">Invoice Link</p>
+                            <div className="flex justify-between items-center"><p className="font-medium text-muted-foreground">Invoice Link</p>
                                 {invoiceUrl ? (
-                                    <Button asChild variant="outline" size="sm">
-                                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
-                                        View on Square <ExternalLink className="ml-2 h-4 w-4" />
-                                    </a>
-                                    </Button>
-                                ) : (
-                                    <span className="text-sm text-muted-foreground">No external link available</span>
-                                )}
+                                    <Button asChild variant="outline" size="sm"><a href={invoiceUrl} target="_blank" rel="noopener noreferrer">View on Square <ExternalLink className="ml-2 h-4 w-4" /></a></Button>
+                                ) : (<span className="text-sm text-muted-foreground">No external link available</span>)}
                             </div>
                         </CardContent>
                     </Card>
-                    
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Submit Payment Information</CardTitle>
-                            <CardDescription>
-                                {profile?.role === 'organizer' 
-                                    ? 'Record payments or submit payment information for verification.' 
-                                    : 'Select a payment method and provide the necessary details. An organizer will verify your payment.'
-                                }
-                            </CardDescription>
+                        <CardHeader><CardTitle>Submit Payment Information</CardTitle>
+                            <CardDescription>{profile?.role === 'organizer' ? 'Record payments or submit information for verification.' : 'Select a payment method and provide details. An organizer will verify your payment.'}</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            {authError && (
-                                <Alert variant="destructive">
-                                    <AlertTitle>File Uploads Disabled</AlertTitle>
-                                    <AlertDescription>{authError}</AlertDescription>
-                                </Alert>
-                            )}
-                            <div>
-                                <Label className="text-base font-medium mb-4 block">Payment Method</Label>
+                            {authError && (<Alert variant="destructive"><AlertTitle>File Uploads Disabled</AlertTitle><AlertDescription>{authError}</AlertDescription></Alert>)}
+                            <div><Label className="text-base font-medium mb-4 block">Payment Method</Label>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                  {!isIndividualInvoice && (
-                                    <Button 
-                                      variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} 
-                                      onClick={() => setSelectedPaymentMethod('purchase-order')} 
-                                      className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"
-                                      disabled={isPaymentApproved}
-                                    >
-                                      <Upload className="h-5 w-5" />
-                                      <span className="text-center">Purchase<br/>Order</span>
-                                    </Button>
-                                  )}
-                                  <Button 
-                                    variant={selectedPaymentMethod === 'credit-card' ? 'default' : 'outline'} 
-                                    onClick={() => setSelectedPaymentMethod('credit-card')} 
-                                    className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"
-                                  >
-                                    <CreditCard className="h-5 w-5" />
-                                    <span className="text-center">Credit<br/>Card</span>
-                                  </Button>
-                                  <Button 
-                                    variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} 
-                                    onClick={() => setSelectedPaymentMethod('check')} 
-                                    className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"
-                                    disabled={isPaymentApproved}
-                                  >
-                                    <Check className="h-5 w-5" />
-                                    <span className="text-center">Pay with<br/>Check</span>
-                                  </Button>
-                                  <Button 
-                                    variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} 
-                                    onClick={() => setSelectedPaymentMethod('cash-app')} 
-                                    className="h-auto py-4 flex flex-col items-center gap-2"
-                                    disabled={isPaymentApproved}
-                                  >
-                                    <DollarSign className="h-5 w-5" />
-                                    <span>Cash App</span>
-                                  </Button>
-                                  <Button 
-                                    variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} 
-                                    onClick={() => setSelectedPaymentMethod('zelle')} 
-                                    className="h-auto py-4 flex flex-col items-center gap-2"
-                                    disabled={isPaymentApproved}
-                                  >
-                                    <CreditCard className="h-5 w-5" />
-                                    <span>Zelle</span>
-                                  </Button>
-                                  <Button 
-                                    variant={selectedPaymentMethod === 'cash' ? 'default' : 'outline'} 
-                                    onClick={() => setSelectedPaymentMethod('cash')} 
-                                    className="h-auto py-4 flex flex-col items-center gap-2"
-                                    disabled={isPaymentApproved}
-                                  >
-                                    <DollarSign className="h-5 w-5" />
-                                    <span>Cash</span>
-                                  </Button>
+                                  {!isIndividualInvoice && (<Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight" disabled={isPaymentApproved}><Upload className="h-5 w-5" /><span className="text-center">Purchase<br/>Order</span></Button>)}
+                                  <Button variant={selectedPaymentMethod === 'credit-card' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('credit-card')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"><CreditCard className="h-5 w-5" /><span className="text-center">Credit<br/>Card</span></Button>
+                                  <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight" disabled={isPaymentApproved}><Check className="h-5 w-5" /><span className="text-center">Pay with<br/>Check</span></Button>
+                                  <Button variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('cash-app')} className="h-auto py-4 flex flex-col items-center gap-2" disabled={isPaymentApproved}><DollarSign className="h-5 w-5" /><span>Cash App</span></Button>
+                                  <Button variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('zelle')} className="h-auto py-4 flex flex-col items-center gap-2" disabled={isPaymentApproved}><CreditCard className="h-5 w-5" /><span>Zelle</span></Button>
+                                  <Button variant={selectedPaymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('cash')} className="h-auto py-4 flex flex-col items-center gap-2" disabled={isPaymentApproved}><DollarSign className="h-5 w-5" /><span>Cash</span></Button>
                                 </div>
-                            </div>
-    
-                            <Separator />
-
-                            {selectedPaymentMethod === 'credit-card' && (
-                              <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-sm text-blue-800 mb-3">
-                                  Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
-                                </p>
-                                {invoiceUrl ? (
-                                  <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
-                                      Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
-                                    </a>
-                                  </Button>
-                                ) : (
-                                  <p className="text-sm text-red-600">Payment link not available</p>
-                                )}
-                              </div>
-                            )}
-
-                            {shouldShowCashAmount && (
-                                <div>
-                                    <Label htmlFor="cash-amount">Cash Amount Received</Label>
-                                    <Input 
-                                        id="cash-amount" 
-                                        type="number" 
-                                        step="0.01" 
-                                        placeholder="Enter amount" 
-                                        value={cashAmount} 
-                                        onChange={(e) => setCashAmount(e.target.value)} 
-                                        disabled={isPaymentApproved} 
-                                    />
-                                </div>
-                            )}
-    
-                            {selectedPaymentMethod === 'purchase-order' && !isIndividualInvoice && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <Label htmlFor="po-number">PO Number</Label>
-                                        <Input id="po-number" placeholder="Enter PO Number" value={poNumber} onChange={(e) => setPONumber(e.target.value)} disabled={isPaymentApproved} />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="po-document">Upload PO Document</Label>
-                                        <Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} disabled={isPaymentApproved} />
-                                        {confirmation.poFileUrl && !fileToUpload && (
-                                            <div className="text-sm mt-2 flex items-center justify-between">
-                                                <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                                                    <Download className="h-4 w-4" />
-                                                    View {confirmation.poFileName || 'File'}
-                                                </a>
-                                                 {!isPaymentApproved && (
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                 )}
-                                            </div>
-                                        )}
-                                        {fileToUpload && (
-                                            <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            
-                            {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (
-                                <div>
-                                    <Label htmlFor="payment-proof">Upload Payment Proof/Check Image</Label>
-                                    <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} disabled={isPaymentApproved}/>
-                                    {confirmation.paymentFileUrl && !fileToUpload && (
-                                        <div className="text-sm mt-2 flex items-center justify-between">
-                                            <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                                                <Download className="h-4 w-4" />
-                                                View {confirmation.paymentFileName || 'File'}
-                                            </a>
-                                            {!isPaymentApproved && (
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    )}
-                                    {fileToUpload && (
-                                        <p className="text-sm text-muted-foreground mt-2">
-                                            <FileIcon className="h-4 w-4 inline-block mr-1" />
-                                            New file selected: {fileToUpload.name}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
+                            </div><Separator />
+                            {selectedPaymentMethod === 'credit-card' && (<div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg"><p className="text-sm text-blue-800 mb-3">Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.</p>{invoiceUrl ? (<Button asChild className="bg-blue-600 hover:bg-blue-700"><a href={invoiceUrl} target="_blank" rel="noopener noreferrer">Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" /></a></Button>) : (<p className="text-sm text-red-600">Payment link not available</p>)}</div>)}
+                            {shouldShowCashAmount && (<div><Label htmlFor="cash-amount">Cash Amount Received</Label><Input id="cash-amount" type="number" step="0.01" placeholder="Enter amount" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} disabled={isPaymentApproved} /></div>)}
+                            {selectedPaymentMethod === 'purchase-order' && !isIndividualInvoice && (<div className="grid grid-cols-1 md:grid-cols-2 gap-6"><div><Label htmlFor="po-number">PO Number</Label><Input id="po-number" placeholder="Enter PO Number" value={poNumber} onChange={(e) => setPONumber(e.target.value)} disabled={isPaymentApproved} /></div><div><Label htmlFor="po-document">Upload PO Document</Label><Input id="po-document" type="file" accept=".pdf,.doc,.docx,.jpg,.png" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} disabled={isPaymentApproved} />{confirmation.poFileUrl && !fileToUpload && (<div className="text-sm mt-2 flex items-center justify-between"><a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1"><Download className="h-4 w-4" />View {confirmation.poFileName || 'File'}</a>{!isPaymentApproved && (<Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}><Trash2 className="h-4 w-4" /></Button>)}</div>)}{fileToUpload && (<p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>)}</div></div>)}
+                            {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (<div><Label htmlFor="payment-proof">Upload Payment Proof/Check Image</Label><Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} disabled={isPaymentApproved}/>{confirmation.paymentFileUrl && !fileToUpload && (<div className="text-sm mt-2 flex items-center justify-between"><a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1"><Download className="h-4 w-4" />View {confirmation.paymentFileName || 'File'}</a>{!isPaymentApproved && (<Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}><Trash2 className="h-4 w-4" /></Button>)}</div>)}{fileToUpload && (<p className="text-sm text-muted-foreground mt-2"><FileIcon className="h-4 w-4 inline-block mr-1" />New file selected: {fileToUpload.name}</p>)}</div>)}
                         </CardContent>
-                         <CardFooter>
-                            <Button 
-                                onClick={handlePaymentUpdate} 
-                                disabled={
-                                    isUpdating || 
-                                    !isAuthReady || 
-                                    (!!authError && selectedPaymentMethod !== 'cash') || 
-                                    isPaymentApproved ||
-                                    (shouldShowCashAmount && (!cashAmount || parseFloat(cashAmount) <= 0))
-                                } 
-                                className="flex items-center gap-2"
-                            >
-                                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                                {getSubmitButtonText()}
-                            </Button>
-                        </CardFooter>
+                         <CardFooter><Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady || (!!authError && selectedPaymentMethod !== 'cash') || isPaymentApproved || (shouldShowCashAmount && (!cashAmount || parseFloat(cashAmount) <= 0))} className="flex items-center gap-2">{isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{getSubmitButtonText()}</Button></CardFooter>
                     </Card>
                 </div>
-                
                 <div className="grid gap-6 md:grid-cols-2">
-                    <Card>
-                        <CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
-                        <CardContent>
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {players.map((player) => {
-                                    const selectionInfo = confirmation.selections[player.id] || {};
-                                    return (
-                                        <div key={player.id} className="flex justify-between items-center border-b pb-2 text-sm">
-                                            <div>
-                                                <p className="font-medium">{player.firstName} {player.lastName}</p>
-                                                <p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p>
-                                            </div>
-                                            <Badge variant="secondary">{selectionInfo.uscfStatus || 'Current'}</Badge>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </CardContent>
+                    <Card><CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
+                        <CardContent><div className="space-y-2 max-h-48 overflow-y-auto">{players.map((player) => {const selectionInfo = confirmation.selections[player.id] || {};return (<div key={player.id} className="flex justify-between items-center border-b pb-2 text-sm"><div><p className="font-medium">{player.firstName} {player.lastName}</p><p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p></div><Badge variant="secondary">{selectionInfo.uscfStatus || 'Current'}</Badge></div>);})}</div></CardContent>
                     </Card>
-                    <PaymentHistorySection confirmation={confirmation} />
+                    <PaymentHistoryDisplay confirmation={confirmation} />
                 </div>
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                <Button variant="outline" onClick={handleRefreshStatus} disabled={isRefreshing} className="mr-auto">
-                    {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Refresh to see updated payment status
-                </Button>
+                <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing} className="mr-auto">{isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Refresh Status</Button>
                 <Button variant="ghost" onClick={onClose}>Close</Button>
             </DialogFooter>
         </DialogContent>
