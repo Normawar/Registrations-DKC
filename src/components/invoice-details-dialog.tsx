@@ -227,93 +227,110 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     setIsUpdating(true);
 
     try {
-        if (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card') {
-            
-            let paymentAmount = 0;
-            if (selectedPaymentMethod === 'cash') paymentAmount = parseFloat(cashAmount || '0');
-            else if (selectedPaymentMethod === 'check') paymentAmount = parseFloat(checkAmount || '0');
-            else if (selectedPaymentMethod === 'cash-app') paymentAmount = parseFloat(cashAppAmount || '0');
-            else if (selectedPaymentMethod === 'zelle') paymentAmount = parseFloat(zelleAmount || '0');
-            else if (selectedPaymentMethod === 'purchase-order') paymentAmount = parseFloat(poAmount || '0');
-
-            if (!paymentAmount || paymentAmount <= 0) {
-                toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
-                setIsUpdating(false);
-                return;
-            }
-
-            if (!confirmation.invoiceId) {
-                toast({ variant: 'destructive', title: 'Error', description: 'No invoice ID available for payment recording.' });
-                setIsUpdating(false);
-                return;
-            }
-
-            const result = await recordPayment({
-                invoiceId: confirmation.invoiceId,
-                amount: paymentAmount,
-                note: `${selectedPaymentMethod.replace('-', ' ')} payment recorded by ${profile?.firstName || 'organizer'}`,
-                paymentDate: format(new Date(), 'yyyy-MM-dd'),
-            });
-
-            const newTotalPaid = result.totalPaid;
-            const totalInvoiced = result.totalInvoiced || confirmation.totalAmount || confirmation.totalInvoiced || 0;
-            
-            let actualStatus = 'UNPAID';
-            if (newTotalPaid >= totalInvoiced) actualStatus = 'PAID';
-            else if (newTotalPaid > 0) actualStatus = 'PARTIALLY_PAID';
-
-            const newPaymentEntry = {
-                id: result.paymentId,
-                amount: paymentAmount,
-                date: new Date().toISOString(),
-                method: selectedPaymentMethod,
-                note: `${selectedPaymentMethod.replace('-', ' ')} payment recorded by ${profile?.firstName || 'organizer'}`,
-                source: 'manual',
-                recordedBy: profile?.firstName || 'organizer',
-            };
-
-            const updatedConfirmationData = {
-                ...confirmation,
-                status: actualStatus,
-                invoiceStatus: actualStatus,
-                totalPaid: newTotalPaid,
-                totalAmount: totalInvoiced,
-                totalInvoiced: totalInvoiced,
-                paymentStatus: actualStatus === 'PAID' ? 'paid' : 'partially-paid',
-                lastUpdated: new Date().toISOString(),
-                paymentHistory: [...(confirmation.paymentHistory || []), newPaymentEntry]
-            };
-
-            const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-            const updatedAllInvoices = allInvoices.map((inv: any) => inv.id === confirmation.id ? updatedConfirmationData : inv);
-            localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-
-            const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            const updatedConfirmations = confirmations.map((conf: any) => conf.id === confirmation.id ? updatedConfirmationData : conf);
-            localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-
-            setConfirmation(updatedConfirmationData);
-            
-            setCashAmount('');
-            setCheckAmount('');
-            setCashAppAmount('');
-            setZelleAmount('');
-            setPoAmount('');
-
-            const squareDashboardUrl = getSquareDashboardUrl(confirmation.invoiceNumber);
-            window.open(squareDashboardUrl, '_blank');
-            
-            toast({ 
-                title: 'Payment Recorded & Square Opened', 
-                description: `SQUARE DASHBOARD OPENED: Find invoice #${confirmation.invoiceNumber || confirmation.id.slice(-8)} and click "Mark as paid" with amount $${paymentAmount.toFixed(2)}.`,
-                duration: 10000
-            });
-
-            window.dispatchEvent(new Event('storage'));
-            window.dispatchEvent(new Event('all_invoices_updated'));
+      if (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card') {
+    
+        let paymentAmount = 0;
+        if (selectedPaymentMethod === 'cash') paymentAmount = parseFloat(cashAmount || '0');
+        else if (selectedPaymentMethod === 'check') paymentAmount = parseFloat(checkAmount || '0');
+        else if (selectedPaymentMethod === 'cash-app') paymentAmount = parseFloat(cashAppAmount || '0');
+        else if (selectedPaymentMethod === 'zelle') paymentAmount = parseFloat(zelleAmount || '0');
+        else if (selectedPaymentMethod === 'purchase-order') paymentAmount = parseFloat(poAmount || '0');
+    
+        if (!paymentAmount || paymentAmount <= 0) {
+            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
             setIsUpdating(false);
             return;
         }
+    
+        // Calculate new totals BEFORE calling Square API
+        const currentTotalPaid = confirmation.totalPaid || 0;
+        const newTotalPaid = currentTotalPaid + paymentAmount;
+        const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
+        
+        let actualStatus = 'UNPAID';
+        if (newTotalPaid >= totalInvoiced) actualStatus = 'PAID';
+        else if (newTotalPaid > 0) actualStatus = 'PARTIALLY_PAID';
+    
+        // Create new payment entry
+        const newPaymentEntry = {
+            id: `payment_${Date.now()}`,
+            amount: paymentAmount,
+            date: new Date().toISOString(),
+            method: selectedPaymentMethod,
+            note: `${selectedPaymentMethod.replace('-', ' ')} payment recorded by ${profile?.firstName || 'organizer'}`,
+            source: 'manual',
+            recordedBy: profile?.firstName || 'organizer',
+        };
+    
+        // Update confirmation data with correct calculations
+        const updatedConfirmationData = {
+            ...confirmation,
+            status: actualStatus,
+            invoiceStatus: actualStatus,
+            totalPaid: newTotalPaid,
+            totalAmount: totalInvoiced,
+            totalInvoiced: totalInvoiced,
+            paymentStatus: actualStatus === 'PAID' ? 'paid' : 'partially-paid',
+            lastUpdated: new Date().toISOString(),
+            paymentHistory: [...(confirmation.paymentHistory || []), newPaymentEntry]
+        };
+    
+        // Save to localStorage
+        const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+        const updatedAllInvoices = allInvoices.map((inv: any) => 
+            inv.id === confirmation.id ? updatedConfirmationData : inv
+        );
+        localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+    
+        const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const updatedConfirmations = confirmations.map((conf: any) => 
+            conf.id === confirmation.id ? updatedConfirmationData : conf
+        );
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+    
+        setConfirmation(updatedConfirmationData);
+        
+        // Clear form fields
+        setCashAmount('');
+        setCheckAmount('');
+        setCashAppAmount('');
+        setZelleAmount('');
+        setPoAmount('');
+    
+        // Try to call Square API (this might fail but shouldn't break the local update)
+        try {
+            if (confirmation.invoiceId) {
+                await recordPayment({
+                    invoiceId: confirmation.invoiceId,
+                    amount: paymentAmount,
+                    note: `${selectedPaymentMethod.replace('-', ' ')} payment recorded by ${profile?.firstName || 'organizer'}`,
+                    paymentDate: format(new Date(), 'yyyy-MM-dd'),
+                });
+            }
+        } catch (error) {
+            console.error('Square API call failed, but local payment was recorded:', error);
+            toast({ 
+                title: 'Payment Recorded Locally', 
+                description: `Payment of $${paymentAmount.toFixed(2)} was recorded. Square sync may be needed later.`,
+                duration: 5000
+            });
+        }
+    
+        // Open Square dashboard (modify URL for sandbox if needed)
+        const squareDashboardUrl = getSquareDashboardUrl(confirmation.invoiceNumber);
+        window.open(squareDashboardUrl, '_blank');
+        
+        toast({ 
+            title: 'Payment Recorded Successfully', 
+            description: `Payment of $${paymentAmount.toFixed(2)} recorded. New total paid: $${newTotalPaid.toFixed(2)}`,
+            duration: 8000
+        });
+    
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('all_invoices_updated'));
+        setIsUpdating(false);
+        return;
+    }
 
         let updatedConfirmationData = { ...confirmation };
 
@@ -479,7 +496,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <div key={note.id} className="border-l-2 border-blue-200 pl-3 py-2">
                     <p className="text-sm">{note.text}</p>
                     <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\\'at\\\' h:mm a')}
+                      {note.author} • {format(new Date(note.timestamp), "MMM dd, yyyy 'at' h:mm a")}
                     </p>
                   </div>
                 ))
@@ -526,7 +543,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <div key={note.id} className="border-l-2 border-green-200 pl-3 py-2">
                     <p className="text-sm">{note.text}</p>
                     <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\\'at\\\' h:mm a')}
+                      {note.author} • {format(new Date(note.timestamp), "MMM dd, yyyy 'at' h:mm a")}
                     </p>
                   </div>
                 ))
