@@ -375,20 +375,20 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     };
     
     const getPaymentMethodLabel = (payment: any) => {
-      if (payment.method === 'credit_card' && payment.cardBrand && payment.last4) {
-        return `${payment.cardBrand.toUpperCase()} ****${payment.last4}`;
-      }
-      
-      const methodLabels: Record<string, string> = {
-        credit_card: 'Credit Card',
-        cash: 'Cash Payment',
-        check: 'Check',
-        cash_app: 'Cash App',
-        zelle: 'Zelle',
-        external: 'External Payment',
-      };
-      
-      return methodLabels[payment.method as keyof typeof methodLabels] || 'Payment';
+        if (payment.method === 'credit_card' && payment.cardBrand && payment.last4) {
+            return `${payment.cardBrand.toUpperCase()} ****${payment.last4}`;
+        }
+        
+        const methodLabels = {
+            credit_card: 'Credit Card',
+            cash: 'Cash Payment',
+            check: 'Check',
+            cash_app: 'Cash App',
+            zelle: 'Zelle',
+            external: 'External Payment',
+        };
+        
+        return methodLabels[payment.method] || 'Payment';
     };
     
     return (
