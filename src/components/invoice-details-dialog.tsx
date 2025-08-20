@@ -459,10 +459,35 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const NotesSection = () => {
+    const notes = confirmation.notes || [];
+    const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
+    const organizerNotes = notes.filter((note: any) => note.type === 'organizer');
+    
     return (
       <div className="grid gap-6 md:grid-cols-2">
-        <div>Test 1</div>
-        <div>Test 2</div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Sponsor Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div>Notes count: {sponsorNotes.length}</div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Organizer Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div>Notes count: {organizerNotes.length}</div>
+          </CardContent>
+        </Card>
       </div>
     );
   };
