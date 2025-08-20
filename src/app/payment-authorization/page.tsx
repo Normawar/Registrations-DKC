@@ -55,6 +55,7 @@ type Confirmation = {
   checkNumber?: string;
   checkDate?: string;
   amountPaid?: string;
+  totalPaid?: number;
   paymentFileUrl?: string;
   paymentFileName?: string;
   invoiceUrl?: string;
@@ -119,7 +120,7 @@ export default function PaymentAuthorizationPage() {
     
     setIsApproving(true);
     try {
-      await recordPayment({
+      const result = await recordPayment({
         invoiceId: selectedConfirmation.invoiceId,
         amount: parseFloat(paymentAmount),
         note: paymentNote,
@@ -128,14 +129,14 @@ export default function PaymentAuthorizationPage() {
 
       const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       const updatedInvoices = allInvoices.map((inv: any) =>
-        inv.id === selectedConfirmation.id ? { ...inv, status: 'PAID', invoiceStatus: 'PAID', paymentStatus: 'paid' } : inv
+        inv.id === selectedConfirmation.id ? { ...inv, status: result.status, invoiceStatus: result.status, totalPaid: result.totalPaid, paymentStatus: result.status === 'PAID' ? 'paid' : 'unpaid' } : inv
       );
       localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
       
       const storedConfirmations = localStorage.getItem('confirmations') || '[]';
       const allConfirmations: Confirmation[] = JSON.parse(storedConfirmations);
       const updatedConfirmations = allConfirmations.map(c => 
-          c.id === selectedConfirmation.id ? { ...c, paymentStatus: 'paid', invoiceStatus: 'PAID' } : c
+          c.id === selectedConfirmation.id ? { ...c, paymentStatus: result.status === 'PAID' ? 'paid' : 'unpaid', invoiceStatus: result.status } : c
       );
       localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
       
@@ -144,7 +145,7 @@ export default function PaymentAuthorizationPage() {
       
       toast({
         title: 'Payment Recorded',
-        description: `Payment for invoice #${selectedConfirmation.invoiceNumber} has been successfully recorded in Square.`,
+        description: `Payment for invoice #${selectedConfirmation.invoiceNumber} has been successfully recorded in Square. Status: ${result.status}`,
       });
       setIsDialogOpen(false);
       setSelectedConfirmation(null);

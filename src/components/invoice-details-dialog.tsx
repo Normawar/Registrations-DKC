@@ -14,7 +14,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2 } from "lucide-react";
+import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
@@ -241,9 +241,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         'UNPAID': 'destructive',
         'OVERDUE': 'destructive',
         'CANCELED': 'destructive',
+        'PARTIALLY_PAID': 'secondary',
     };
     let className = '';
     if (s === 'PAID' || s === 'COMPED') className = 'bg-green-600 text-white';
+    if (s === 'PARTIALLY_PAID') className = 'bg-blue-600 text-white';
     if (s === 'PENDING-PO') className = 'bg-yellow-500 text-black';
     return <Badge variant={variants[s] || 'secondary'} className={className}>{s.replace(/_/g, ' ')}</Badge>;
   };
@@ -253,6 +255,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const players = getRegisteredPlayers(confirmation);
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
   const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
+  const totalPaid = confirmation.totalPaid || 0;
+  const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
+  const balanceDue = totalInvoiced - totalPaid;
 
   const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
 
@@ -315,10 +320,23 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 <p className="font-medium text-muted-foreground">School</p>
                                 <p>{confirmation.schoolName || 'N/A'}</p>
                             </div>
-                             <div className="flex justify-between items-center">
-                                <p className="font-medium text-muted-foreground">Total Amount</p>
-                                <p className="text-lg font-semibold">${(confirmation.totalAmount || confirmation.totalInvoiced || 0).toFixed(2)}</p>
+                            <Separator/>
+                             <div className="flex justify-between items-center text-base">
+                                <p className="font-medium">Total Amount</p>
+                                <p className="font-semibold">${(totalInvoiced).toFixed(2)}</p>
                             </div>
+                            {totalPaid > 0 && (
+                                <>
+                                    <div className="flex justify-between items-center text-green-600">
+                                        <p className="font-medium">Amount Paid</p>
+                                        <p className="font-semibold">${(totalPaid).toFixed(2)}</p>
+                                    </div>
+                                    <div className="flex justify-between items-center text-destructive font-bold text-lg">
+                                        <p>Balance Due</p>
+                                        <p>${(balanceDue).toFixed(2)}</p>
+                                    </div>
+                                </>
+                            )}
                             <div className="flex justify-between items-center">
                                 <p className="font-medium text-muted-foreground">Invoice Link</p>
                                 {invoiceUrl ? (
@@ -480,26 +498,47 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         </CardFooter>
                     </Card>
                 </div>
-
-                <Card>
-                    <CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
-                    <CardContent>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {players.map((player) => {
-                                const selectionInfo = confirmation.selections[player.id] || {};
-                                return (
-                                    <div key={player.id} className="flex justify-between items-center border-b pb-2 text-sm">
-                                        <div>
-                                            <p className="font-medium">{player.firstName} {player.lastName}</p>
-                                            <p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p>
+                
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Card>
+                        <CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
+                        <CardContent>
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {players.map((player) => {
+                                    const selectionInfo = confirmation.selections[player.id] || {};
+                                    return (
+                                        <div key={player.id} className="flex justify-between items-center border-b pb-2 text-sm">
+                                            <div>
+                                                <p className="font-medium">{player.firstName} {player.lastName}</p>
+                                                <p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p>
+                                            </div>
+                                            <Badge variant="secondary">{selectionInfo.uscfStatus || 'Current'}</Badge>
                                         </div>
-                                        <Badge variant="secondary">{selectionInfo.uscfStatus || 'Current'}</Badge>
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
+                         <CardContent>
+                            {totalPaid > 0 ? (
+                                <div className='space-y-2'>
+                                    {/* This is a placeholder; a real app would map over payment history records */}
+                                    <div className="flex justify-between text-sm">
+                                        <span>Manual Payment Recorded</span>
+                                        <span className='font-medium'>${totalPaid.toFixed(2)}</span>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
+                                </div>
+                            ) : (
+                                <div className='text-sm text-muted-foreground text-center py-4'>
+                                    <History className="mx-auto h-6 w-6 mb-2" />
+                                    No payments have been recorded for this invoice yet.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
                 <Button variant="outline" onClick={handleRefreshStatus} disabled={isRefreshing} className="mr-auto">

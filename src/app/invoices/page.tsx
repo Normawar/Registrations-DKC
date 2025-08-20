@@ -241,17 +241,18 @@ export default function UnifiedInvoiceRegistrations() {
     let className = '';
     if (s === 'PAID' || s === 'COMPED') className = 'bg-green-600 text-white';
     if (s === 'PENDING-PO') className = 'bg-yellow-500 text-black';
+    if (s === 'PARTIALLY_PAID') className = 'bg-blue-600 text-white';
 
     return <Badge variant={variants[s] || 'secondary'} className={className}>{s.replace(/_/g, ' ')}</Badge>;
   };
 
   const totalAmount = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + (item.totalAmount || 0), 0), [filteredAndSortedData]);
-  const outstandingInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE').length, [filteredAndSortedData]);
+  const outstandingInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE' || item.status?.toUpperCase() === 'PARTIALLY_PAID').length, [filteredAndSortedData]);
   const paidInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status === 'PAID').length, [filteredAndSortedData]);
   const outstandingAmount = useMemo(() => {
     return filteredAndSortedData
-      .filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE')
-      .reduce((sum, item) => sum + (item.totalAmount || 0), 0);
+      .filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE' || item.status?.toUpperCase() === 'PARTIALLY_PAID')
+      .reduce((sum, item) => sum + (item.totalAmount || 0) - (item.totalPaid || 0), 0);
   }, [filteredAndSortedData]);
 
 
@@ -324,6 +325,7 @@ export default function UnifiedInvoiceRegistrations() {
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="PAID">Paid</SelectItem>
+                  <SelectItem value="PARTIALLY_PAID">Partially Paid</SelectItem>
                   <SelectItem value="UNPAID">Unpaid</SelectItem>
                   <SelectItem value="PENDING-PO">Pending Verification</SelectItem>
                   <SelectItem value="COMPED">Comped</SelectItem>
