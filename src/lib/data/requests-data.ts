@@ -1,7 +1,7 @@
 
 
 export type ChangeRequest = {
-  id?: string; // Add optional ID for unique key
+  id: string;
   confirmationId: string;
   player: string;
   event: string;

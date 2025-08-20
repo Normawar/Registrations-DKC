@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -25,8 +24,9 @@ import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import Link from 'next/link';
-import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { ChangeRequestDialog } from '@/components/change-request-dialog';
 
 type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy' | 'eventDate' | 'action' | 'invoiceNumber';
 
@@ -35,6 +35,7 @@ export default function RequestsPage() {
   const { profile } = useSponsorProfile();
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'submitted', direction: 'descending' });
   const [confirmationsMap, setConfirmationsMap] = useState<Map<string, any>>(new Map());
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
 
 
   const loadData = useCallback(() => {
@@ -135,15 +136,26 @@ export default function RequestsPage() {
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
+  const handleRequestCreated = () => {
+    loadData(); // Refresh the list after a new request is made
+  };
+
 
   return (
     <AppLayout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold font-headline">Change Requests</h1>
-          <p className="text-muted-foreground">
-            View and manage player-submitted change requests.
-          </p>
+        <div className="flex items-center justify-between">
+            <div>
+                <h1 className="text-3xl font-bold font-headline">Change Requests</h1>
+                <p className="text-muted-foreground">
+                    View and manage player-submitted change requests.
+                </p>
+            </div>
+            {profile?.role === 'sponsor' && (
+                <Button onClick={() => setIsRequestDialogOpen(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Make A Change Request
+                </Button>
+            )}
         </div>
 
         <Card>
@@ -171,7 +183,7 @@ export default function RequestsPage() {
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('submittedBy')} className="w-full justify-start px-4">Submitted By {getSortIcon('submittedBy')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('submitted')} className="w-full justify-start px-4">Submitted Date {getSortIcon('submitted')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('status')} className="w-full justify-start px-4">Status {getSortIcon('status')}</Button></TableHead>
-                        {profile?.role === 'organizer' && <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('action')} className="w-full justify-start px-4">Action {getSortIcon('action')}</Button></TableHead>}
+                        <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('action')} className="w-full justify-start px-4">Action {getSortIcon('action')}</Button></TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -199,20 +211,18 @@ export default function RequestsPage() {
                                     {request.status}
                                 </Badge>
                                 </TableCell>
-                                {profile?.role === 'organizer' && (
-                                    <TableCell>
-                                        {request.status === 'Pending' ? (
-                                            <Button asChild variant="outline" size="sm">
-                                              <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
-                                            </Button>
-                                        ) : (
-                                            <div className="text-xs text-muted-foreground">
-                                                <p>By {request.approvedBy || 'N/A'}</p>
-                                                <p>{request.approvedAt ? format(new Date(request.approvedAt), 'MM/dd/yy, p') : ''}</p>
-                                            </div>
-                                        )}
-                                    </TableCell>
-                                )}
+                                <TableCell>
+                                    {request.status === 'Pending' && profile?.role === 'organizer' ? (
+                                        <Button asChild variant="outline" size="sm">
+                                          <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
+                                        </Button>
+                                    ) : (
+                                        <div className="text-xs text-muted-foreground">
+                                            <p>By {request.approvedBy || 'N/A'}</p>
+                                            <p>{request.approvedAt ? format(new Date(request.approvedAt), 'MM/dd/yy, p') : ''}</p>
+                                        </div>
+                                    )}
+                                </TableCell>
                             </TableRow>
                         );
                     })}
@@ -222,6 +232,15 @@ export default function RequestsPage() {
           </CardContent>
         </Card>
       </div>
+
+       {profile && (
+        <ChangeRequestDialog
+          isOpen={isRequestDialogOpen}
+          onOpenChange={setIsRequestDialogOpen}
+          profile={profile}
+          onRequestCreated={handleRequestCreated}
+        />
+      )}
     </AppLayout>
   );
 }
