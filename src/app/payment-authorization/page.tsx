@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -47,7 +48,7 @@ type Confirmation = {
   eventName: string;
   schoolName: string;
   totalInvoiced: number;
-  paymentMethod?: 'po' | 'check' | 'cash-app' | 'zelle' | 'purchase-order';
+  paymentMethod?: 'po' | 'check' | 'cash-app' | 'zelle' | 'purchase-order' | 'cash';
   paymentStatus: 'pending-po' | 'paid' | 'unpaid';
   poNumber?: string;
   poFileUrl?: string;
@@ -165,6 +166,7 @@ export default function PaymentAuthorizationPage() {
         case 'check': return 'Check';
         case 'cash-app': return 'Cash App';
         case 'zelle': return 'Zelle';
+        case 'cash': return 'Cash';
         default: return 'Unknown';
     }
   };

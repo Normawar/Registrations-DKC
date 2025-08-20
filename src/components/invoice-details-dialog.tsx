@@ -413,6 +413,15 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                     <CreditCard className="h-5 w-5" />
                                     <span>Zelle</span>
                                   </Button>
+                                  <Button 
+                                    variant={selectedPaymentMethod === 'cash' ? 'default' : 'outline'} 
+                                    onClick={() => setSelectedPaymentMethod('cash')} 
+                                    className="h-auto py-4 flex flex-col items-center gap-2"
+                                    disabled={isPaymentApproved}
+                                  >
+                                    <DollarSign className="h-5 w-5" />
+                                    <span>Cash</span>
+                                  </Button>
                                 </div>
                             </div>
     
@@ -464,7 +473,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 </div>
                             )}
                             
-                            {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (
+                            {(selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (
                                 <div>
                                     <Label htmlFor="payment-proof">Upload Payment Proof/Check Image</Label>
                                     <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} disabled={isPaymentApproved}/>
