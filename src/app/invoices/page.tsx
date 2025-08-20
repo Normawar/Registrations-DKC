@@ -231,28 +231,66 @@ export default function UnifiedInvoiceRegistrations() {
   };
 
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, totalPaid?: number, totalInvoiced?: number) => {
     const s = (status || '').toUpperCase();
+    
+    // Override status if we have payment data that indicates partial payment
+    let displayStatus = s;
+    if (totalPaid && totalInvoiced && totalPaid > 0 && totalPaid < totalInvoiced) {
+      displayStatus = 'PARTIALLY_PAID';
+    }
+    
     const variants: {[key: string]: 'default' | 'destructive' | 'secondary'} = {
-      'PAID': 'default', 'COMPED': 'default',
-      'UNPAID': 'destructive', 'OVERDUE': 'destructive',
+      'PAID': 'default', 
+      'COMPED': 'default',
+      'UNPAID': 'destructive', 
+      'OVERDUE': 'destructive',
       'CANCELED': 'destructive',
+      'PARTIALLY_PAID': 'secondary',
     };
+    
     let className = '';
-    if (s === 'PAID' || s === 'COMPED') className = 'bg-green-600 text-white';
-    if (s === 'PENDING-PO') className = 'bg-yellow-500 text-black';
-    if (s === 'PARTIALLY_PAID') className = 'bg-blue-600 text-white';
+    if (displayStatus === 'PAID' || displayStatus === 'COMPED') className = 'bg-green-600 text-white';
+    if (displayStatus === 'PENDING-PO') className = 'bg-yellow-500 text-black';
+    if (displayStatus === 'PARTIALLY_PAID') className = 'bg-blue-600 text-white';
 
-    return <Badge variant={variants[s] || 'secondary'} className={className}>{s.replace(/_/g, ' ')}</Badge>;
+    return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>
+      {displayStatus.replace(/_/g, ' ')}
+    </Badge>;
   };
 
   const totalAmount = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + (item.totalAmount || 0), 0), [filteredAndSortedData]);
-  const outstandingInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE' || item.status?.toUpperCase() === 'PARTIALLY_PAID').length, [filteredAndSortedData]);
+  const outstandingInvoices = useMemo(() => {
+    return filteredAndSortedData.filter(item => {
+      const status = item.status?.toUpperCase();
+      const totalPaid = item.totalPaid || 0;
+      const totalAmount = item.totalAmount || 0;
+      
+      return status === 'UNPAID' || 
+             status === 'OVERDUE' || 
+             status === 'PARTIALLY_PAID' ||
+             (totalPaid > 0 && totalPaid < totalAmount);
+    }).length;
+  }, [filteredAndSortedData]);
   const paidInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status === 'PAID').length, [filteredAndSortedData]);
   const outstandingAmount = useMemo(() => {
     return filteredAndSortedData
-      .filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE' || item.status?.toUpperCase() === 'PARTIALLY_PAID')
-      .reduce((sum, item) => sum + (item.totalAmount || 0) - (item.totalPaid || 0), 0);
+      .filter(item => {
+        const status = item.status?.toUpperCase();
+        const totalPaid = item.totalPaid || 0;
+        const totalAmount = item.totalAmount || 0;
+        
+        // Include if unpaid, overdue, or has a balance due
+        return status === 'UNPAID' || 
+               status === 'OVERDUE' || 
+               status === 'PARTIALLY_PAID' ||
+               (totalPaid > 0 && totalPaid < totalAmount);
+      })
+      .reduce((sum, item) => {
+        const totalAmount = item.totalAmount || 0;
+        const totalPaid = item.totalPaid || 0;
+        return sum + (totalAmount - totalPaid);
+      }, 0);
   }, [filteredAndSortedData]);
 
 
@@ -416,9 +454,18 @@ export default function UnifiedInvoiceRegistrations() {
                         </div>
                       </td>
                       <td className="p-2">
-                        <div className="font-medium">${(invoice.totalAmount || 0).toFixed(2)}</div>
+                        <div className="space-y-1">
+                          <div className="font-medium">${(invoice.totalAmount || 0).toFixed(2)}</div>
+                          {invoice.totalPaid > 0 && invoice.totalPaid < invoice.totalAmount && (
+                            <div className="text-xs text-green-600">
+                              Paid: ${invoice.totalPaid.toFixed(2)}
+                            </div>
+                          )}
+                        </div>
                       </td>
-                      <td className="p-2">{getStatusBadge(invoice.status)}</td>
+                      <td className="p-2">
+                        {getStatusBadge(invoice.status, invoice.totalPaid, invoice.totalAmount)}
+                      </td>
                       <td className="p-2">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'N/A'}</td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
@@ -479,3 +526,4 @@ export default function UnifiedInvoiceRegistrations() {
     </AppLayout>
   );
 }
+
