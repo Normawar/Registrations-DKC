@@ -318,11 +318,15 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                             <div className="flex justify-between items-center">
                                 <p className="font-medium text-muted-foreground">Invoice Link</p>
-                                <Button asChild variant="outline" size="sm">
+                                {confirmation.invoiceUrl ? (
+                                    <Button asChild variant="outline" size="sm">
                                     <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
                                         View on Square <ExternalLink className="ml-2 h-4 w-4" />
                                     </a>
-                                </Button>
+                                    </Button>
+                                ) : (
+                                    <span className="text-sm text-muted-foreground">No external link available</span>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -341,23 +345,79 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             )}
                             <div>
                                 <Label className="text-base font-medium mb-4 block">Payment Method</Label>
-                                <div className={`grid ${isIndividualInvoice ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
-                                    {!isIndividualInvoice && (
-                                        <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight">
-                                            <Upload className="h-5 w-5" />
-                                            <span className="text-center">Purchase<br/>Order</span>
-                                        </Button>
-                                    )}
-                                    <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight">
-                                        <Check className="h-5 w-5" />
-                                        <span className="text-center">Pay with<br/>Check</span>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                  {/* Purchase Order - Only for sponsors (not individuals) */}
+                                  {!isIndividualInvoice && (
+                                    <Button 
+                                      variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} 
+                                      onClick={() => setSelectedPaymentMethod('purchase-order')} 
+                                      className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"
+                                    >
+                                      <Upload className="h-5 w-5" />
+                                      <span className="text-center">Purchase<br/>Order</span>
                                     </Button>
-                                    <Button variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('cash-app')} className="h-auto py-4 flex flex-col items-center gap-2"><DollarSign className="h-5 w-5" /><span>Cash App</span></Button>
-                                    <Button variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('zelle')} className="h-auto py-4 flex flex-col items-center gap-2"><CreditCard className="h-5 w-5" /><span>Zelle</span></Button>
+                                  )}
+                                  
+                                  {/* Credit Card - Links to Square invoice URL */}
+                                  <Button 
+                                    variant={selectedPaymentMethod === 'credit-card' ? 'default' : 'outline'} 
+                                    onClick={() => setSelectedPaymentMethod('credit-card')} 
+                                    className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"
+                                  >
+                                    <CreditCard className="h-5 w-5" />
+                                    <span className="text-center">Credit<br/>Card</span>
+                                  </Button>
+                                  
+                                  {/* Check */}
+                                  <Button 
+                                    variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} 
+                                    onClick={() => setSelectedPaymentMethod('check')} 
+                                    className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"
+                                  >
+                                    <Check className="h-5 w-5" />
+                                    <span className="text-center">Pay with<br/>Check</span>
+                                  </Button>
+                                  
+                                  {/* Cash App */}
+                                  <Button 
+                                    variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} 
+                                    onClick={() => setSelectedPaymentMethod('cash-app')} 
+                                    className="h-auto py-4 flex flex-col items-center gap-2"
+                                  >
+                                    <DollarSign className="h-5 w-5" />
+                                    <span>Cash App</span>
+                                  </Button>
+                                  
+                                  {/* Zelle */}
+                                  <Button 
+                                    variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} 
+                                    onClick={() => setSelectedPaymentMethod('zelle')} 
+                                    className="h-auto py-4 flex flex-col items-center gap-2"
+                                  >
+                                    <CreditCard className="h-5 w-5" />
+                                    <span>Zelle</span>
+                                  </Button>
                                 </div>
                             </div>
     
                             <Separator />
+
+                            {selectedPaymentMethod === 'credit-card' && (
+                              <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-sm text-blue-800 mb-3">
+                                  Pay securely with your credit card through Square
+                                </p>
+                                {confirmation.invoiceUrl ? (
+                                  <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                                    <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                                      Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                ) : (
+                                  <p className="text-sm text-red-600">Payment link not available</p>
+                                )}
+                              </div>
+                            )}
     
                             {selectedPaymentMethod === 'purchase-order' && !isIndividualInvoice && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

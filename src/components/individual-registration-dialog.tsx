@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { School, User, DollarSign, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
+import { createInvoice } from '@/ai/flows/create-invoice-flow';
+import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 
 interface IndividualRegistrationDialogProps {
   isOpen: boolean;
@@ -38,6 +40,8 @@ export function IndividualRegistrationDialog({
   const [selectedStudents, setSelectedStudents] = useState<Record<string, { section: string; uscfStatus: string }>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrations, setRegistrations] = useState<any[]>([]);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
 
   // Load parent's students
   useEffect(() => {
@@ -128,80 +132,144 @@ export function IndividualRegistrationDialog({
   };
 
   const handleSubmit = async () => {
-    if (Object.keys(selectedStudents).length === 0) {
-      toast({
-        variant: 'destructive',
-        title: 'No Students Selected',
-        description: 'Please select at least one student to register.'
-      });
-      return;
-    }
+  if (Object.keys(selectedStudents).length === 0) {
+    toast({
+      variant: 'destructive',
+      title: 'No Students Selected',
+      description: 'Please select at least one student to register.'
+    });
+    return;
+  }
 
-    setIsSubmitting(true);
+  setIsSubmitting(true);
 
-    try {
-      // Create registration confirmation
-      const confirmationId = `parent-${Date.now()}-${Math.random()}`;
-      const confirmation = {
-        id: confirmationId,
-        invoiceId: confirmationId,
-        invoiceNumber: `INV-${confirmationId.slice(-8)}`,
-        submissionTimestamp: new Date().toISOString(),
-        eventId: event.id,
-        eventName: event.name,
-        eventDate: event.date,
-        parentEmail: parentProfile.email,
-        parentName: `${parentProfile.firstName} ${parentProfile.lastName}`,
-        schoolName: 'Individual Registration',
-        district: 'Individual',
-        selections: Object.fromEntries(
-          Object.entries(selectedStudents).map(([playerId, details]) => [
-            playerId,
-            {
-              ...details,
-              status: 'active'
-            }
-          ])
-        ),
-        totalInvoiced: calculateTotal(),
-        invoiceStatus: 'PAID' // Assuming direct payment or comped for now
+  try {
+    // Generate individual team code
+    const generateIndividualTeamCode = (lastName: string): string => {
+      const sanitized = lastName.replace(/[^A-Za-z]/g, '').toUpperCase();
+      const timestamp = Date.now().toString().slice(-4);
+      return `IND-${sanitized.slice(0, 4)}${timestamp}`;
+    };
+
+    const teamCode = generateIndividualTeamCode(parentProfile.lastName);
+
+    // Prepare players for Square invoice
+    const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
+      const student = parentStudents.find(p => p.id === playerId);
+      
+      return {
+        playerName: `${student?.firstName} ${student?.lastName}`,
+        uscfId: student?.uscfId || '',
+        baseRegistrationFee: event.regularFee,
+        lateFee: 0, // Individual registrations typically don't have late fees
+        uscfAction: details.uscfStatus !== 'current',
       };
+    });
 
-      // Save to localStorage
-      const existingConfirmations = localStorage.getItem('confirmations');
-      const allConfirmations = existingConfirmations ? JSON.parse(existingConfirmations) : [];
-      allConfirmations.push(confirmation);
-      localStorage.setItem('confirmations', JSON.stringify(allConfirmations));
+    // Create Square invoice using the same flow as sponsors
+    const result = await createInvoice({
+      sponsorName: `${parentProfile.firstName} ${parentProfile.lastName}`,
+      sponsorEmail: parentProfile.email,
+      sponsorPhone: parentProfile.phone || '',
+      schoolName: 'Individual Registration',
+      teamCode: teamCode,
+      eventName: event.name,
+      eventDate: event.date,
+      uscfFee: 24,
+      players: playersToInvoice,
+      // No bookkeeper or GT coordinator emails for individuals
+      bookkeeperEmail: undefined,
+      gtCoordinatorEmail: undefined,
+      schoolAddress: '',
+      schoolPhone: '',
+      district: 'Individual',
+    });
+
+    // Create confirmation record with proper Square invoice data
+    const newConfirmation = {
+      id: result.invoiceId,
+      invoiceId: result.invoiceId,
+      invoiceNumber: result.invoiceNumber,
+      submissionTimestamp: new Date().toISOString(),
+      eventId: event.id,
+      eventName: event.name,
+      eventDate: event.date,
       
-      const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, confirmation]));
+      // Individual-specific fields
+      parentEmail: parentProfile.email,
+      parentName: `${parentProfile.firstName} ${parentProfile.lastName}`,
+      schoolName: 'Individual Registration',
+      district: 'Individual',
+      teamCode: teamCode,
       
-      toast({
-        title: "Registration Successful",
-        description: `${Object.keys(selectedStudents).length} student(s) registered for ${event.name}.`
-      });
+      // Standardized contact fields (like sponsors)
+      sponsorEmail: parentProfile.email,
+      sponsorPhone: parentProfile.phone || '',
+      contactEmail: parentProfile.email,
+      purchaserEmail: parentProfile.email,
+      purchaserName: `${parentProfile.firstName} ${parentProfile.lastName}`,
       
-      // Reset and close
-      setSelectedStudents({});
-      onOpenChange(false);
+      selections: Object.fromEntries(
+        Object.entries(selectedStudents).map(([playerId, details]) => [
+          playerId,
+          {
+            ...details,
+            status: 'active'
+          }
+        ])
+      ),
+      totalInvoiced: calculateTotal(),
+      totalAmount: calculateTotal(), // For consistency
       
-      // Reload page to refresh data
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('all_invoices_updated'));
-      
-    } catch (error) {
-      console.error('Registration failed:', error);
-      toast({
-        variant: 'destructive',
-        title: "Registration Failed",
-        description: "Failed to save registration. Please try again."
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+      // Square invoice fields
+      invoiceStatus: result.status,
+      status: result.status,
+      invoiceUrl: result.invoiceUrl, // This is the key missing field!
+      invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
+    };
+
+    // Save to localStorage
+    const existingConfirmations = localStorage.getItem('confirmations');
+    const allConfirmations = existingConfirmations ? JSON.parse(existingConfirmations) : [];
+    allConfirmations.push(newConfirmation);
+    localStorage.setItem('confirmations', JSON.stringify(allConfirmations));
+    
+    const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+    localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
+
+    // Show the invoice details modal like sponsors do
+    setCreatedInvoiceId(result.invoiceId);
+    setShowInvoiceModal(true);
+    
+    toast({
+      title: "Registration Successful",
+      description: `Invoice #${result.invoiceNumber} created for ${Object.keys(selectedStudents).length} student(s).`
+    });
+    
+    // Reset and close
+    setSelectedStudents({});
+    onOpenChange(false);
+    
+    // Trigger storage event to update other components
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('all_invoices_updated'));
+    
+  } catch (error) {
+    console.error('Registration failed:', error);
+    const description = error instanceof Error ? error.message : "An unknown error occurred.";
+    toast({
+      variant: 'destructive',
+      title: "Registration Failed",
+      description: description
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
         <DialogHeader className="shrink-0">
@@ -345,5 +413,16 @@ export function IndividualRegistrationDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {showInvoiceModal && createdInvoiceId && (
+      <InvoiceDetailsDialog
+        isOpen={showInvoiceModal}
+        onClose={() => {
+          setShowInvoiceModal(false);
+          setCreatedInvoiceId(null);
+        }}
+        confirmationId={createdInvoiceId}
+      />
+    )}
+    </>
   );
 }
