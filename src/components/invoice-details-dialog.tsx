@@ -110,7 +110,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       return `${baseUrl}/${invoiceNumber}`;
     }
     return baseUrl;
-  };
+  }
 
   const addNote = async (noteText: string, noteType: 'sponsor' | 'organizer') => {
     if (!noteText.trim()) return;
@@ -316,7 +316,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(confirmations));
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
@@ -405,7 +405,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const balanceDue = totalInvoiced - totalPaid;
 
   const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
-
+  
   const PaymentHistorySection = () => {
     const paymentHistory = confirmation.paymentHistory || [];
     
@@ -1077,11 +1077,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                     (!!authError && selectedPaymentMethod !== 'cash') || 
                                     isPaymentApproved ||
                                     (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card' && (
-                                        (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount) <= 0)) ||
-                                        (selectedPaymentMethod === 'check' && (!checkAmount || parseFloat(checkAmount) <= 0)) ||
-                                        (selectedPaymentMethod === 'cash-app' && (!cashAppAmount || parseFloat(cashAppAmount) <= 0)) ||
-                                        (selectedPaymentMethod === 'zelle' && (!zelleAmount || parseFloat(zelleAmount) <= 0)) ||
-                                        (selectedPaymentMethod === 'purchase-order' && (!poAmount || parseFloat(poAmount) <= 0 || !poNumber))
+                                        (selectedPaymentMethod === 'cash' && (!cashAmount || parseFloat(cashAmount || '0') <= 0)) ||
+                                        (selectedPaymentMethod === 'check' && (!checkAmount || parseFloat(checkAmount || '0') <= 0)) ||
+                                        (selectedPaymentMethod === 'cash-app' && (!cashAppAmount || parseFloat(cashAppAmount || '0') <= 0)) ||
+                                        (selectedPaymentMethod === 'zelle' && (!zelleAmount || parseFloat(zelleAmount || '0') <= 0)) ||
+                                        (selectedPaymentMethod === 'purchase-order' && (!poAmount || parseFloat(poAmount || '0') <= 0 || !poNumber))
                                     ))
                                 } 
                                 className="flex items-center gap-2"
@@ -1133,3 +1133,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
+
+    
