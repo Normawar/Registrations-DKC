@@ -12,6 +12,7 @@ import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { type SponsorProfile } from "@/hooks/use-sponsor-profile";
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ChangeRequestDialogProps {
   isOpen: boolean;
@@ -26,9 +27,18 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
   
   const [confirmations, setConfirmations] = useState<any[]>([]);
   const [selectedConfirmationId, setSelectedConfirmationId] = useState<string>('');
-  const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
+  
+  // State for various request types
+  const [playerToRemove, setPlayerToRemove] = useState<string>('');
+  const [playerToAdd, setPlayerToAdd] = useState<string>('');
+  const [playerForSectionChange, setPlayerForSectionChange] = useState<string>('');
+  const [newSection, setNewSection] = useState<string>('');
+  const [playerForBye, setPlayerForBye] = useState<string>('');
+  const [byeRound, setByeRound] = useState<string>('');
+  const [playerToWithdraw, setPlayerToWithdraw] = useState<string>('');
+
   const [requestType, setRequestType] = useState<string>('');
-  const [details, setDetails] = useState('');
+  const [additionalNotes, setAdditionalNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -41,46 +51,98 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
     } else {
       // Reset form on close
       setSelectedConfirmationId('');
-      setSelectedPlayerId('');
       setRequestType('');
-      setDetails('');
+      setPlayerToRemove('');
+      setPlayerToAdd('');
+      setPlayerForSectionChange('');
+      setNewSection('');
+      setPlayerForBye('');
+      setByeRound('');
+      setPlayerToWithdraw('');
+      setAdditionalNotes('');
     }
   }, [isOpen, profile.school, profile.district]);
 
-  const availablePlayers = useMemo(() => {
-    if (!selectedConfirmationId) return [];
-    const conf = confirmations.find(c => c.id === selectedConfirmationId);
-    if (!conf || !conf.selections) return [];
+  const selectedConfirmation = useMemo(() => {
+    return confirmations.find(c => c.id === selectedConfirmationId);
+  }, [selectedConfirmationId, confirmations]);
+
+  const registeredPlayers = useMemo(() => {
+    if (!selectedConfirmation || !selectedConfirmation.selections) return [];
     
-    return Object.keys(conf.selections).map(playerId => {
+    return Object.keys(selectedConfirmation.selections).map(playerId => {
       const player = masterDb.find(p => p.id === playerId);
       return player || { id: playerId, firstName: 'Unknown', lastName: 'Player' };
-    }).filter(Boolean) as MasterPlayer[];
-  }, [selectedConfirmationId, confirmations, masterDb]);
+    }).filter(p => p && selectedConfirmation.selections[p.id]?.status !== 'withdrawn') as MasterPlayer[];
+  }, [selectedConfirmation, masterDb]);
+
+  const availableRosterPlayers = useMemo(() => {
+    if (!profile) return [];
+    const roster = masterDb.filter(p => p.school === profile.school && p.district === profile.district);
+    const registeredIds = new Set(registeredPlayers.map(p => p.id));
+    return roster.filter(p => !registeredIds.has(p.id));
+  }, [masterDb, profile, registeredPlayers]);
+  
+  const selectedPlayerToAddDetails = useMemo(() => {
+    if (!playerToAdd) return null;
+    return masterDb.find(p => p.id === playerToAdd);
+  }, [playerToAdd, masterDb]);
 
   const handleSubmit = () => {
-    if (!selectedConfirmationId || !selectedPlayerId || !requestType) {
-      toast({ variant: 'destructive', title: 'Missing Information', description: 'Please fill out all fields.' });
+    if (!selectedConfirmationId || !requestType) {
+      toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select an event and a request type.' });
       return;
     }
+    
     setIsSubmitting(true);
+    let details = additionalNotes;
+    let player = 'N/A';
 
-    const confirmation = confirmations.find(c => c.id === selectedConfirmationId);
-    const player = availablePlayers.find(p => p.id === selectedPlayerId);
-    if (!confirmation || !player) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not find selected registration or player.' });
-      setIsSubmitting(false);
-      return;
+    switch (requestType) {
+        case 'Substitution':
+            const removing = masterDb.find(p => p.id === playerToRemove);
+            const adding = masterDb.find(p => p.id === playerToAdd);
+            if (!removing || !adding) { toast({ variant: 'destructive', title: 'Error', description: 'Selected players for substitution not found.' }); setIsSubmitting(false); return; }
+            details = `Substitute ${removing.firstName} ${removing.lastName} with ${adding.firstName} ${adding.lastName}. ${additionalNotes}`;
+            player = `${removing.firstName} ${removing.lastName}`;
+            break;
+        case 'Section Change':
+            const playerToChange = masterDb.find(p => p.id === playerForSectionChange);
+            if (!playerToChange || !newSection) { toast({ variant: 'destructive', title: 'Error', description: 'Player or new section not selected.' }); setIsSubmitting(false); return; }
+            const currentSection = selectedConfirmation.selections[playerToChange.id]?.section || 'N/A';
+            details = `Change section from ${currentSection} to ${newSection}. ${additionalNotes}`;
+            player = `${playerToChange.firstName} ${playerToChange.lastName}`;
+            break;
+        case 'Bye Request':
+            const playerForByeDetails = masterDb.find(p => p.id === playerForBye);
+            if (!playerForByeDetails || !byeRound) { toast({ variant: 'destructive', title: 'Error', description: 'Player or bye round not selected.'}); setIsSubmitting(false); return; }
+            details = `Requesting a bye for Round ${byeRound}. ${additionalNotes}`;
+            player = `${playerForByeDetails.firstName} ${playerForByeDetails.lastName}`;
+            break;
+        case 'Withdrawal':
+            const playerToWithdrawDetails = masterDb.find(p => p.id === playerToWithdraw);
+            if (!playerToWithdrawDetails) { toast({ variant: 'destructive', title: 'Error', description: 'Player to withdraw not selected.' }); setIsSubmitting(false); return; }
+            details = `Requesting to withdraw player from event. ${additionalNotes}`;
+            player = `${playerToWithdrawDetails.firstName} ${playerToWithdrawDetails.lastName}`;
+            break;
+        case 'Other':
+            if (!additionalNotes) { toast({ variant: 'destructive', title: 'Error', description: 'Please provide details for your request.'}); setIsSubmitting(false); return; }
+            player = 'Multiple/N/A';
+            break;
+        default:
+            toast({ variant: 'destructive', title: 'Error', description: 'Invalid request type.'});
+            setIsSubmitting(false);
+            return;
     }
     
     const newRequest: ChangeRequest = {
         id: `req-${Date.now()}`,
-        confirmationId: confirmation.id,
-        player: `${player.firstName} ${player.lastName}`,
-        event: confirmation.eventName,
-        eventDate: confirmation.eventDate,
+        confirmationId: selectedConfirmation.id,
+        player,
+        event: selectedConfirmation.eventName,
+        eventDate: selectedConfirmation.eventDate,
         type: requestType,
-        details,
+        details: details,
         submitted: new Date().toISOString(),
         submittedBy: `${profile.firstName} ${profile.lastName}`,
         status: 'Pending',
@@ -100,16 +162,16 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Make a Change Request</DialogTitle>
           <DialogDescription>
-            Select a registration and describe the change you need.
+            Select a registration and describe the change you need. This will be sent to an organizer for approval.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="confirmation-select">Select Registration</Label>
+            <Label htmlFor="confirmation-select">Select Event Registration</Label>
             <Select value={selectedConfirmationId} onValueChange={setSelectedConfirmationId}>
               <SelectTrigger id="confirmation-select">
                 <SelectValue placeholder="Choose an event registration..." />
@@ -124,27 +186,9 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
             </Select>
           </div>
           
-          {availablePlayers.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="player-select">Select Player</Label>
-              <Select value={selectedPlayerId} onValueChange={setSelectedPlayerId}>
-                <SelectTrigger id="player-select">
-                  <SelectValue placeholder="Choose a player..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availablePlayers.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.firstName} {p.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           <div className="space-y-2">
             <Label htmlFor="request-type-select">Request Type</Label>
-            <Select value={requestType} onValueChange={setRequestType}>
+            <Select value={requestType} onValueChange={setRequestType} disabled={!selectedConfirmationId}>
               <SelectTrigger id="request-type-select">
                 <SelectValue placeholder="Choose request type..." />
               </SelectTrigger>
@@ -157,14 +201,106 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
               </SelectContent>
             </Select>
           </div>
+          
+          {/* Dynamic Fields */}
+          {requestType === 'Substitution' && (
+            <div className="space-y-4 p-4 border rounded-md bg-muted/50">
+              <h4 className="font-semibold text-sm">Substitution Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="player-remove-select">Player to Remove</Label>
+                    <Select value={playerToRemove} onValueChange={setPlayerToRemove}><SelectTrigger id="player-remove-select"><SelectValue placeholder="Select player..." /></SelectTrigger>
+                      <SelectContent>{registeredPlayers.map(p => (<SelectItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="player-add-select">Player to Add</Label>
+                    <Select value={playerToAdd} onValueChange={setPlayerToAdd}><SelectTrigger id="player-add-select"><SelectValue placeholder="Select player..." /></SelectTrigger>
+                      <SelectContent>{availableRosterPlayers.map(p => (<SelectItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</SelectItem>))}</SelectContent>
+                    </Select>
+                  </div>
+              </div>
+              {selectedPlayerToAddDetails && (
+                <div className="text-xs text-muted-foreground space-y-1">
+                    <p><strong>New Player Info:</strong></p>
+                    <p>USCF ID: {selectedPlayerToAddDetails.uscfId}</p>
+                    <p>Expiration: {selectedPlayerToAddDetails.uscfExpiration ? format(new Date(selectedPlayerToAddDetails.uscfExpiration), 'PPP') : 'N/A'}</p>
+                </div>
+              )}
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="details-textarea">Details</Label>
+          {requestType === 'Section Change' && (
+             <div className="space-y-4 p-4 border rounded-md bg-muted/50">
+                <h4 className="font-semibold text-sm">Section Change Details</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Player</Label>
+                        <Select value={playerForSectionChange} onValueChange={setPlayerForSectionChange}><SelectTrigger><SelectValue placeholder="Select player..." /></SelectTrigger>
+                          <SelectContent>{registeredPlayers.map(p => (<SelectItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</SelectItem>))}</SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>New Section</Label>
+                        <Select value={newSection} onValueChange={setNewSection}><SelectTrigger><SelectValue placeholder="Select new section..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Kinder-1st">Kinder-1st</SelectItem>
+                            <SelectItem value="Primary K-3">Primary K-3</SelectItem>
+                            <SelectItem value="Elementary K-5">Elementary K-5</SelectItem>
+                            <SelectItem value="Middle School K-8">Middle School K-8</SelectItem>
+                            <SelectItem value="High School K-12">High School K-12</SelectItem>
+                            <SelectItem value="Championship">Championship</SelectItem>
+                          </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                {playerForSectionChange && (<p className="text-xs text-muted-foreground">Current Section: {selectedConfirmation?.selections[playerForSectionChange]?.section || 'N/A'}</p>)}
+             </div>
+          )}
+
+          {requestType === 'Bye Request' && (
+            <div className="space-y-4 p-4 border rounded-md bg-muted/50">
+              <h4 className="font-semibold text-sm">Bye Request Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                      <Label>Player</Label>
+                      <Select value={playerForBye} onValueChange={setPlayerForBye}><SelectTrigger><SelectValue placeholder="Select player..." /></SelectTrigger>
+                        <SelectContent>{registeredPlayers.map(p => (<SelectItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</SelectItem>))}</SelectContent>
+                      </Select>
+                  </div>
+                   <div className="space-y-2">
+                      <Label>Bye for Round</Label>
+                      <Select value={byeRound} onValueChange={setByeRound}><SelectTrigger><SelectValue placeholder="Select round..." /></SelectTrigger>
+                        <SelectContent>
+                            {Array.from({ length: selectedConfirmation?.eventDetails?.rounds || 5 }, (_, i) => i + 1).map(r => (
+                                <SelectItem key={r} value={String(r)}>Round {r}</SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                  </div>
+              </div>
+            </div>
+          )}
+          
+          {requestType === 'Withdrawal' && (
+            <div className="space-y-4 p-4 border rounded-md bg-muted/50">
+              <h4 className="font-semibold text-sm">Withdrawal Details</h4>
+              <div className="space-y-2">
+                  <Label>Player to Withdraw</Label>
+                  <Select value={playerToWithdraw} onValueChange={setPlayerToWithdraw}><SelectTrigger><SelectValue placeholder="Select player..." /></SelectTrigger>
+                    <SelectContent>{registeredPlayers.map(p => (<SelectItem key={p.id} value={p.id}>{p.firstName} {p.lastName}</SelectItem>))}</SelectContent>
+                  </Select>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 pt-2">
+            <Label htmlFor="details-textarea">Additional Notes</Label>
             <Textarea
               id="details-textarea"
-              placeholder="Provide details for your request (e.g., 'Substitute with John Doe, USCF ID: 12345')."
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
+              placeholder="Provide any other relevant details for your request..."
+              value={additionalNotes}
+              onChange={(e) => setAdditionalNotes(e.target.value)}
             />
           </div>
         </div>
