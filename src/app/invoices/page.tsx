@@ -70,8 +70,13 @@ export default function UnifiedInvoiceRegistrations() {
 
         // IMPROVED TITLE LOGIC - Priority: invoiceTitle > eventName > fallback
         const getInvoiceTitle = () => {
-          if (invoice.invoiceTitle) return invoice.invoiceTitle;
-          if (invoice.eventName) return invoice.eventName;
+          // Check if invoiceTitle property exists and has a value
+          if (invoice.invoiceTitle && invoice.invoiceTitle.trim()) {
+            return invoice.invoiceTitle;
+          }
+          if (invoice.eventName && invoice.eventName.trim()) {
+            return invoice.eventName;
+          }
           
           // Fallback for different invoice types
           if (invoice.membershipType) {
