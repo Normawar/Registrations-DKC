@@ -25,7 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
 import { useState, useEffect, useMemo } from "react";
 import { format, isSameDay } from "date-fns";
-import { Info } from "lucide-react";
+import { Info, FileText, ImageIcon } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useMasterDb } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
@@ -124,15 +124,33 @@ export default function DashboardPage() {
                               <h4 className="font-semibold">Events on {selectedDate ? format(selectedDate, 'PPP') : 'selected date'}</h4>
                               {eventsForSelectedDate.length > 0 ? (
                                   eventsForSelectedDate.map(event => (
-                                      <div key={event.id} className="p-3 border rounded-md text-sm flex justify-between items-center">
-                                          <div>
-                                            <p className="font-medium">{event.name}</p>
-                                            <p className="text-muted-foreground">{event.location}</p>
-                                          </div>
-                                          <Button size="sm" onClick={() => handleRegisterClick(event)}>
-                                            Register Players
-                                          </Button>
-                                      </div>
+                                      <div key={event.id} className="p-3 border rounded-md text-sm">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <p className="font-medium">{event.name}</p>
+                                                <p className="text-muted-foreground">{event.location}</p>
+                                            </div>
+                                            <Button size="sm" onClick={() => handleRegisterClick(event)}>
+                                                Register Players
+                                            </Button>
+                                        </div>
+                                        <div className="mt-2 pt-2 border-t flex items-center gap-4">
+                                            {event.imageUrl && (
+                                                <Button asChild variant="link" size="sm" className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                                    <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title={event.imageName}>
+                                                        <ImageIcon className="mr-1.5 h-4 w-4" /> {event.imageName || 'Image'}
+                                                    </a>
+                                                </Button>
+                                            )}
+                                            {event.pdfUrl && event.pdfUrl !== '#' && (
+                                                <Button asChild variant="link" size="sm" className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                                    <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title={event.pdfName}>
+                                                        <FileText className="mr-1.5 h-4 w-4" /> {event.pdfName || 'PDF'}
+                                                    </a>
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
                                   ))
                               ) : (
                                   <p className="text-sm text-muted-foreground">No events scheduled for this day.</p>
