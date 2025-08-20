@@ -11,7 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type Money } from 'square';
+import { ApiError, type Money, type Payment } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 
@@ -57,40 +57,41 @@ const recordPaymentFlow = ai.defineFlow(
     const { invoicesApi, paymentsApi } = squareClient;
       
     try {
-      console.log(`Fetching invoice ${input.invoiceId} to get order ID...`);
+      console.log(`Fetching invoice ${input.invoiceId} to get current version and order ID...`);
       const { result: { invoice } } = await invoicesApi.getInvoice(input.invoiceId);
       
-      if (!invoice || !invoice.orderId) {
-        throw new Error(`Could not find invoice or order ID for invoice: ${input.invoiceId}`);
+      if (!invoice || !invoice.version) {
+        throw new Error(`Could not find invoice or version for invoice: ${input.invoiceId}`);
       }
 
-      console.log(`Recording payment for order ID: ${invoice.orderId}`);
+      console.log(`Recording external payment of $${input.amount} for invoice ID: ${input.invoiceId}`);
 
       const paymentAmount: Money = {
           amount: BigInt(Math.round(input.amount * 100)),
           currency: 'USD',
       };
-
-      const { result: { payment } } = await paymentsApi.createPayment({
-          idempotencyKey: randomUUID(),
-          sourceId: 'EXTERNAL',
-          amountMoney: paymentAmount,
-          orderId: invoice.orderId,
-          note: input.note,
-          externalDetails: {
-            type: 'OTHER',
-            source: 'Manual entry by organizer',
-            sourceFeeMoney: { amount: BigInt(0), currency: 'USD' }
-          }
-      });
       
+      // The correct flow for external payments is to create a payment and then
+      // link it to the invoice, rather than trying to create a payment on the order.
+      const createPaymentResponse = await paymentsApi.createPayment({
+          idempotencyKey: randomUUID(),
+          sourceId: 'EXTERNAL', 
+          amountMoney: paymentAmount,
+          note: input.note,
+      });
+
+      const payment = createPaymentResponse.result.payment as Payment;
       if (!payment || !payment.id) {
         throw new Error("Failed to create payment record in Square.");
       }
+      
+      console.log(`Successfully created payment ${payment.id}. Now adding to invoice...`);
 
-      // After payment, get the latest invoice status
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Wait for propagation
-      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(input.invoiceId);
+      const { result: { invoice: finalInvoice } } = await invoicesApi.addPaymentToInvoice(input.invoiceId, {
+        paymentId: payment.id,
+        version: invoice.version,
+        idempotencyKey: randomUUID(),
+      });
 
       const totalPaidAmount = finalInvoice?.paymentRequests
         ?.flatMap(pr => pr.totalCompletedAmountMoney?.amount ? [pr.totalCompletedAmountMoney.amount] : [])
