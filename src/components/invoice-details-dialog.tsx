@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -16,7 +15,7 @@ import { useMasterDb } from "@/context/master-db-context";
 import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, Sync } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
-import { getInvoiceStatusWithPayments, handleRefreshStatusWithPaymentSync, PaymentHistoryDisplay } from './unified-payment-system';
+// import { getInvoiceStatusWithPayments, handleRefreshStatusWithPaymentSync, PaymentHistoryDisplay } from './unified-payment-system';
 import { recordPayment } from '@/ai/flows/record-payment-flow';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { auth, storage } from '@/lib/firebase';
@@ -88,7 +87,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   // Enhanced refresh that syncs Square payments
   const handleRefreshStatus = async () => {
-    await handleRefreshStatusWithPaymentSync(confirmation, setConfirmation, toast, setIsRefreshing);
+    // await handleRefreshStatusWithPaymentSync(confirmation, setConfirmation, toast, setIsRefreshing);
   };
 
   const handlePaymentUpdate = async () => {
@@ -656,7 +655,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                         </CardContent>
                     </Card>
-                   <PaymentHistoryDisplay confirmation={confirmation} />
+                    <div>Payment History Placeholder</div>
                 </div>
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
@@ -670,6 +669,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
-
-    
