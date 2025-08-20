@@ -23,7 +23,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { format, isSameDay } from "date-fns";
 import { Info } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -31,6 +31,7 @@ import { useMasterDb } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export default function DashboardPage() {
@@ -39,8 +40,11 @@ export default function DashboardPage() {
   const { profile } = useSponsorProfile();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [clientReady, setClientReady] = useState(false);
 
   useEffect(() => {
+    // This ensures client-specific code runs only after mounting
+    setClientReady(true);
     setSelectedDate(new Date());
   }, []);
 
@@ -92,70 +96,88 @@ export default function DashboardPage() {
                     <CardDescription>Highlighted dates indicate a scheduled tournament.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center">
-                    <Calendar
-                        mode="single"
-                        selected={selectedDate}
-                        onSelect={setSelectedDate}
-                        className="rounded-md border"
-                        modifiers={{
-                            highlighted: eventDates,
-                        }}
-                        modifiersClassNames={{
-                            highlighted: 'bg-primary/20 text-primary-foreground rounded-full'
-                        }}
-                    />
-                    <div className="mt-4 w-full space-y-2">
-                        <h4 className="font-semibold">Events on {selectedDate ? format(selectedDate, 'PPP') : 'selected date'}</h4>
-                        {eventsForSelectedDate.length > 0 ? (
-                            eventsForSelectedDate.map(event => (
-                                <div key={event.id} className="p-3 border rounded-md text-sm">
-                                    <p className="font-medium">{event.name}</p>
-                                    <p className="text-muted-foreground">{event.location}</p>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-muted-foreground">No events scheduled for this day.</p>
-                        )}
-                    </div>
+                    {clientReady ? (
+                      <>
+                        <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={setSelectedDate}
+                            className="rounded-md border"
+                            modifiers={{
+                                highlighted: eventDates,
+                            }}
+                            modifiersClassNames={{
+                                highlighted: 'bg-primary/20 text-primary-foreground rounded-full'
+                            }}
+                        />
+                        <div className="mt-4 w-full space-y-2">
+                            <h4 className="font-semibold">Events on {selectedDate ? format(selectedDate, 'PPP') : 'selected date'}</h4>
+                            {eventsForSelectedDate.length > 0 ? (
+                                eventsForSelectedDate.map(event => (
+                                    <div key={event.id} className="p-3 border rounded-md text-sm">
+                                        <p className="font-medium">{event.name}</p>
+                                        <p className="text-muted-foreground">{event.location}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No events scheduled for this day.</p>
+                            )}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full flex flex-col items-center gap-4">
+                        <Skeleton className="h-[290px] w-[280px]" />
+                        <Skeleton className="h-20 w-full" />
+                      </div>
+                    )}
                 </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>My Roster ({rosterPlayers.length})</CardTitle>
+                <CardTitle>My Roster ({clientReady ? rosterPlayers.length : '...'})</CardTitle>
                 <CardDescription>A quick view of your sponsored players.</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="h-96">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Player</TableHead>
-                        <TableHead className="text-right">Rating</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rosterPlayers.map((player) => (
-                        <TableRow key={player.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-9 w-9">
-                                <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                                <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {player.email}
+                   {clientReady ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Player</TableHead>
+                          <TableHead className="text-right">Rating</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rosterPlayers.map((player) => (
+                          <TableRow key={player.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-9 w-9">
+                                  <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                  <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">{player.lastName}, {player.firstName}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {player.email}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                            </TableCell>
+                            <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                   ) : (
+                    <div className="space-y-4">
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
+                    </div>
+                   )}
                 </ScrollArea>
               </CardContent>
               <CardFooter>
