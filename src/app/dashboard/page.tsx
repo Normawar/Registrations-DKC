@@ -19,104 +19,46 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { format } from "date-fns";
-import { FileText, ImageIcon, Info, Bell } from "lucide-react";
+import { format, isSameDay } from "date-fns";
+import { Info } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useMasterDb } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
-import type { ChangeRequest } from '@/lib/data/requests-data';
-import { requestsData as initialRequestsData } from '@/lib/data/requests-data';
+import { Calendar } from "@/components/ui/calendar";
 
 
 export default function DashboardPage() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
   const { profile } = useSponsorProfile();
-  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
-  const [confirmations, setConfirmations] = useState<any[]>([]);
-
-  const loadData = useCallback(() => {
-    try {
-      const storedRequests = localStorage.getItem('change_requests');
-      setChangeRequests(storedRequests ? JSON.parse(storedRequests) : initialRequestsData);
-      
-      const storedConfirmations = localStorage.getItem('confirmations');
-      const allConfirmations = storedConfirmations ? JSON.parse(storedConfirmations) : [];
-
-      if (profile?.role === 'sponsor') {
-          const sponsorConfirmations = allConfirmations.filter((c: any) => 
-              c.schoolName === profile.school && c.district === profile.district
-          );
-          setConfirmations(sponsorConfirmations);
-      } else {
-          setConfirmations(allConfirmations);
-      }
-    } catch (error) {
-      console.error("Failed to load dashboard data:", error);
-      setChangeRequests(initialRequestsData);
-      setConfirmations([]);
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    if (profile) {
-        loadData();
-    }
-    const handleStorageChange = () => {
-        if (profile) loadData();
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [loadData, profile]);
+  
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
   const rosterPlayers = useMemo(() => {
     if (!profile || profile.role !== 'sponsor') return [];
     return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
   }, [allPlayers, profile]);
 
-  const upcomingEvents = useMemo(() => {
-    return events
-      .filter(event => new Date(event.date) >= new Date())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }, [events]);
-
   const playersWithMissingInfo = useMemo(() => {
     return rosterPlayers.filter(player => {
       return !player.uscfId || !player.grade || !player.section || !player.email || !player.dob || !player.zipCode;
     });
   }, [rosterPlayers]);
-  
-  const sponsorConfirmationIds = useMemo(() => {
-    if (!profile) return new Set();
-    const ids = confirmations.map(c => c.id);
-    return new Set(ids);
-  }, [confirmations, profile]);
 
-  const pendingRequests = useMemo(() => {
-    return changeRequests.filter(req => req.status === 'Pending' && sponsorConfirmationIds.has(req.confirmationId));
-  }, [changeRequests, sponsorConfirmationIds]);
+  const eventDates = useMemo(() => {
+    return events.map(event => new Date(event.date));
+  }, [events]);
 
-  const pendingRequestsByEvent = useMemo(() => {
-    const map = new Map<string, number>();
-    pendingRequests.forEach(req => {
-      const confirmation = confirmations.find(c => c.id === req.confirmationId);
-      if (confirmation) {
-          const eventId = confirmation.eventId;
-          map.set(eventId, (map.get(eventId) || 0) + 1);
-      }
-    });
-    return map;
-  }, [pendingRequests, confirmations]);
-
+  const eventsForSelectedDate = useMemo(() => {
+    if (!selectedDate) return [];
+    return events.filter(event => isSameDay(new Date(event.date), selectedDate));
+  }, [events, selectedDate]);
 
   return (
     <AppLayout>
@@ -127,16 +69,6 @@ export default function DashboardPage() {
             An overview of your sponsored activities.
           </p>
         </div>
-
-        {pendingRequests.length > 0 && (
-          <Alert>
-            <Bell className="h-4 w-4" />
-            <AlertTitle>You have {pendingRequests.length} pending request(s)!</AlertTitle>
-            <AlertDescription>
-              The tournament organizer is reviewing your request(s). Check the <Link href="/requests" className="font-bold underline">Change Requests</Link> page for status updates.
-            </AlertDescription>
-          </Alert>
-        )}
 
         {playersWithMissingInfo.length > 0 && (
           <Alert variant="destructive">
@@ -149,101 +81,87 @@ export default function DashboardPage() {
           </Alert>
         )}
 
-        <div className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming Events ({upcomingEvents.length})</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {upcomingEvents.map((event) => {
-                  const pendingCount = pendingRequestsByEvent.get(event.id) || 0;
-                  return (
-                    <div key={event.id} className="flex justify-between items-center">
-                       <div className="flex items-center gap-4">
-                          <div className="flex flex-col items-start gap-1">
-                              {event.imageUrl && (
-                                  <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
-                                    <a href={event.imageUrl} target="_blank" rel="noopener noreferrer" title={event.imageName}>
-                                      <ImageIcon className="mr-2 h-4 w-4" /> {event.imageName || 'Image'}
-                                    </a>
-                                  </Button>
-                              )}
-                              {event.pdfUrl && event.pdfUrl !== '#' && (
-                                  <Button asChild variant="link" className="p-0 h-auto text-muted-foreground hover:text-primary">
-                                    <a href={event.pdfUrl} target="_blank" rel="noopener noreferrer" title={event.pdfName}>
-                                      <FileText className="mr-2 h-4 w-4" /> {event.pdfName || 'PDF'}
-                                    </a>
-                                  </Button>
-                              )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm">{event.name}</p>
-                            <p className="text-xs text-muted-foreground">{format(new Date(event.date), 'PPP')}</p>
-                          </div>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {pendingCount > 0 ? (
-                          <Link href="/requests">
-                            <Badge variant="destructive">{pendingCount} pending request(s)</Badge>
-                          </Link>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+                <CardHeader>
+                    <CardTitle>Event Calendar</CardTitle>
+                    <CardDescription>Highlighted dates indicate a scheduled tournament.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center">
+                    <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        className="rounded-md border"
+                        modifiers={{
+                            highlighted: eventDates,
+                        }}
+                        modifiersClassNames={{
+                            highlighted: 'bg-primary/20 text-primary-foreground rounded-full'
+                        }}
+                    />
+                    <div className="mt-4 w-full space-y-2">
+                        <h4 className="font-semibold">Events on {selectedDate ? format(selectedDate, 'PPP') : 'selected date'}</h4>
+                        {eventsForSelectedDate.length > 0 ? (
+                            eventsForSelectedDate.map(event => (
+                                <div key={event.id} className="p-3 border rounded-md text-sm">
+                                    <p className="font-medium">{event.name}</p>
+                                    <p className="text-muted-foreground">{event.location}</p>
+                                </div>
+                            ))
                         ) : (
-                          <span>No pending requests</span>
+                            <p className="text-sm text-muted-foreground">No events scheduled for this day.</p>
                         )}
-                      </div>
                     </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>My Roster ({rosterPlayers.length})</CardTitle>
+                <CardDescription>A quick view of your sponsored players.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-96">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Player</TableHead>
+                        <TableHead className="text-right">Rating</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rosterPlayers.map((player) => (
+                        <TableRow key={player.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-9 w-9">
+                                <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">{player.lastName}, {player.firstName}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {player.email}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </CardContent>
+              <CardFooter>
+                <Button asChild variant="outline">
+                  <Link href="/roster">View & Manage Full Roster</Link>
+                </Button>
+              </CardFooter>
+            </Card>
         </div>
         
-        <Card>
-          <CardHeader>
-            <CardTitle>My Roster ({rosterPlayers.length})</CardTitle>
-            <CardDescription>A quick view of your sponsored players. Scroll to see more.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-72">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Player</TableHead>
-                    <TableHead className="text-right">Regular Rating</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rosterPlayers.map((player) => (
-                    <TableRow key={player.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-9 w-9">
-                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                            <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {player.email}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </CardContent>
-          <CardFooter>
-            <Button asChild variant="outline">
-              <Link href="/roster">View & Manage Full Roster</Link>
-            </Button>
-          </CardFooter>
-        </Card>
-
         <div>
           <h2 className="text-2xl font-bold font-headline">Recent Activity</h2>
           <Card className="mt-4">
