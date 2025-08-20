@@ -78,6 +78,10 @@ const recordPaymentFlow = ai.defineFlow(
           sourceId: 'EXTERNAL', 
           amountMoney: paymentAmount,
           note: input.note,
+          externalDetails: {
+            type: 'EXTERNAL',
+            source: input.note || 'Manual Payment',
+          }
       });
 
       const payment = createPaymentResponse.result.payment as Payment;
