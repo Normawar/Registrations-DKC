@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
@@ -253,6 +253,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
   const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
 
+  const invoiceUrl = confirmation.invoiceUrl || confirmation.publicUrl || confirmation.invoice_url;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
@@ -318,9 +320,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                             <div className="flex justify-between items-center">
                                 <p className="font-medium text-muted-foreground">Invoice Link</p>
-                                {confirmation.invoiceUrl ? (
+                                {invoiceUrl ? (
                                     <Button asChild variant="outline" size="sm">
-                                    <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
                                         View on Square <ExternalLink className="ml-2 h-4 w-4" />
                                     </a>
                                     </Button>
@@ -340,7 +342,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             {authError && (
                                 <Alert variant="destructive">
                                     <AlertTitle>File Uploads Disabled</AlertTitle>
-                                    <CardDescription>{authError}</CardDescription>
+                                    <AlertDescription>{authError}</AlertDescription>
                                 </Alert>
                             )}
                             <div>
@@ -405,11 +407,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             {selectedPaymentMethod === 'credit-card' && (
                               <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
                                 <p className="text-sm text-blue-800 mb-3">
-                                  Pay securely with your credit card through Square
+                                  Pay securely with your credit card through Square. After payment, use the 'Refresh Status' button below to update.
                                 </p>
-                                {confirmation.invoiceUrl ? (
+                                {invoiceUrl ? (
                                   <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                                    <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
                                       Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
                                     </a>
                                   </Button>
