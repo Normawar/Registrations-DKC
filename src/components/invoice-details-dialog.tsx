@@ -435,7 +435,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         external: 'External Payment',
       };
       
-      return methodLabels[payment.method] || 'Payment';
+      return methodLabels[payment.method as keyof typeof methodLabels] || 'Payment';
     };
     
     return (
@@ -550,7 +550,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     id="sponsor-note"
                     placeholder="Enter note..."
                     value={sponsorNote}
-                    onChange={(e) => setSponsorNote(e.target.value)}
+                    onChange={(e) => setSponsorNote(e.target.value || '')}
                     className="flex-1"
                   />
                   <Button 
@@ -597,7 +597,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     id="organizer-note"
                     placeholder="Enter note..."
                     value={organizerNote}
-                    onChange={(e) => setOrganizerNote(e.target.value)}
+                    onChange={(e) => setOrganizerNote(e.target.value || '')}
                     className="flex-1"
                   />
                   <Button 
@@ -650,7 +650,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     step="0.01" 
                     placeholder="Enter amount" 
                     value={cashAmount || ''} 
-                    onChange={(e) => setCashAmount(e.target.value)} 
+                    onChange={(e) => setCashAmount(e.target.value || '')} 
                     disabled={isPaymentApproved} 
                 />
                 {isOrganizer && (
@@ -675,7 +675,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         step="0.01" 
                         placeholder="Enter amount" 
                         value={checkAmount || ''} 
-                        onChange={(e) => setCheckAmount(e.target.value)} 
+                        onChange={(e) => setCheckAmount(e.target.value || '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -730,7 +730,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         step="0.01" 
                         placeholder="Enter amount" 
                         value={cashAppAmount || ''} 
-                        onChange={(e) => setCashAppAmount(e.target.value)} 
+                        onChange={(e) => setCashAppAmount(e.target.value || '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -785,7 +785,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         step="0.01" 
                         placeholder="Enter amount" 
                         value={zelleAmount || ''} 
-                        onChange={(e) => setZelleAmount(e.target.value)} 
+                        onChange={(e) => setZelleAmount(e.target.value || '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -840,7 +840,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         step="0.01" 
                         placeholder="Enter amount" 
                         value={poAmount || ''} 
-                        onChange={(e) => setPoAmount(e.target.value)} 
+                        onChange={(e) => setPoAmount(e.target.value || '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -850,7 +850,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         id="po-number" 
                         placeholder="Enter PO Number" 
                         value={poNumber || ''} 
-                        onChange={(e) => setPONumber(e.target.value)} 
+                        onChange={(e) => setPONumber(e.target.value || '')} 
                         disabled={isPaymentApproved} 
                     />
                 </div>
@@ -1103,7 +1103,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         <CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
                         <CardContent>
                             <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {players.map((player) => {
+                                {players.map((player: any) => {
                                     const selectionInfo = confirmation.selections[player.id] || {};
                                     return (
                                         <div key={player.id} className="flex justify-between items-center border-b pb-2 text-sm">
