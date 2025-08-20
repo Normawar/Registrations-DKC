@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -39,7 +38,11 @@ export default function DashboardPage() {
   const { database: allPlayers } = useMasterDb();
   const { profile } = useSponsorProfile();
   
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+
+  useEffect(() => {
+    setSelectedDate(new Date());
+  }, []);
 
   const rosterPlayers = useMemo(() => {
     if (!profile || profile.role !== 'sponsor') return [];
