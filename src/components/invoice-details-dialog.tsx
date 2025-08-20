@@ -39,7 +39,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [poNumber, setPONumber] = useState('');
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   
-  // State for all payment amounts
   const [cashAmount, setCashAmount] = useState('');
   const [checkAmount, setCheckAmount] = useState('');
   const [cashAppAmount, setCashAppAmount] = useState('');
@@ -102,7 +101,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   // Enhanced refresh that syncs Square payments
   const handleRefreshStatus = async () => {
-    await handleRefreshStatusWithPaymentSync(confirmation, setConfirmation, toast, setIsRefreshing);
+    // await handleRefreshStatusWithPaymentSync(confirmation, setConfirmation, toast, setIsRefreshing);
   };
   
   const getSquareDashboardUrl = (invoiceNumber: string) => {
@@ -1000,7 +999,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                         </CardContent>
                     </Card>
-                    <PaymentHistoryDisplay confirmation={confirmation} />
+                    <PaymentHistorySection />
                 </div>
                 <NotesSection />
             </div>
