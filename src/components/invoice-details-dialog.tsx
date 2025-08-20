@@ -458,6 +458,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
 
+  // Temporarily comment out NotesSection to find the real error
+  /*
   const NotesSection = () => {
     const notes = confirmation.notes || [];
     const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
@@ -561,6 +563,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       </div>
     );
   };
+  */
 
   const PaymentHistorySection = () => {
     return (
@@ -1083,7 +1086,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     </Card>
                     <PaymentHistorySection />
                 </div>
-                <NotesSection />
+                {/* <NotesSection /> */}
+                <div>Notes section temporarily disabled</div>
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
                 <Button variant="outline" onClick={handleRefreshStatus} disabled={isRefreshing} className="mr-auto">
