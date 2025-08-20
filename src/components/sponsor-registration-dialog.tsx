@@ -15,6 +15,7 @@ import { School, User, DollarSign, CheckCircle, Clock, AlertCircle } from "lucid
 import { format, differenceInHours, isSameDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
+import { generateTeamCode } from '@/lib/school-utils';
 
 
 interface SponsorRegistrationDialogProps {
@@ -201,7 +202,7 @@ export function SponsorRegistrationDialog({
       const uscfFee = 24;
       
       // Generate team code from profile
-      const teamCode = `${profile.school.split(' ').map(word => word.charAt(0)).join('').toUpperCase()}${profile.district.split(' ').map(word => word.charAt(0)).join('').toUpperCase()}`.substring(0, 6);
+      const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
 
       // Create the Square invoice
       const result = await createInvoice({

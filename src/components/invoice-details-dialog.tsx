@@ -266,9 +266,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </span>
                          </div>
                     </div>
-                     <DialogClose asChild>
-                        <Button variant="ghost" size="icon"><X className="h-5 w-5" /></Button>
-                    </DialogClose>
                 </div>
             </DialogHeader>
 
@@ -332,8 +329,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             <div>
                                 <Label className="text-base font-medium mb-4 block">Payment Method</Label>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-2 flex-col items-center gap-1 leading-tight"><Upload className="h-5 w-5" /><span>Purchase<br/>Order</span></Button>
-                                    <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-2 flex-col items-center gap-1 leading-tight"><Check className="h-5 w-5" /><span>Pay with<br/>Check</span></Button>
+                                    <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"><Upload className="h-5 w-5" /><span>Purchase<br/>Order</span></Button>
+                                    <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"><Check className="h-5 w-5" /><span>Pay with<br/>Check</span></Button>
                                     <Button variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('cash-app')} className="h-auto py-4 flex flex-col items-center gap-2"><DollarSign className="h-5 w-5" /><span>Cash App</span></Button>
                                     <Button variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('zelle')} className="h-auto py-4 flex flex-col items-center gap-2"><CreditCard className="h-5 w-5" /><span>Zelle</span></Button>
                                 </div>
@@ -425,6 +422,15 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     </CardContent>
                 </Card>
             </div>
+            <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                <Button variant="outline" onClick={handleRefreshStatus} disabled={isRefreshing} className="mr-auto">
+                    {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Refresh Status
+                </Button>
+                <DialogClose asChild>
+                    <Button variant="ghost">Close</Button>
+                </DialogClose>
+            </DialogFooter>
         </DialogContent>
     </Dialog>
   );
