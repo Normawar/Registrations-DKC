@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -49,20 +50,13 @@ export default function UnifiedInvoiceRegistrations() {
   const loadData = useCallback(() => {
     try {
       const allInvoices = localStorage.getItem('all_invoices');
-      console.log('🔍 loadData called - raw localStorage:', allInvoices);
       
       let invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
-      console.log('🔍 Parsed invoices array length:', invoicesArray.length);
-      console.log('🔍 Full invoices array:', invoicesArray);
 
       if (profile?.role === 'sponsor') {
-        console.log('🔍 Filtering for sponsor:', profile.school, profile.district);
         invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
-        console.log('🔍 After sponsor filter:', invoicesArray.length);
       } else if (profile?.role === 'individual') {
-        console.log('🔍 Filtering for individual:', profile.email);
         invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
-        console.log('🔍 After individual filter:', invoicesArray.length);
       }
       
       const mapped = invoicesArray.map((invoice: any) => {
@@ -251,7 +245,7 @@ export default function UnifiedInvoiceRegistrations() {
     return <Badge variant={variants[s] || 'secondary'} className={className}>{s.replace(/_/g, ' ')}</Badge>;
   };
 
-  const totalExpense = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + (item.totalAmount || 0), 0), [filteredAndSortedData]);
+  const totalAmount = useMemo(() => filteredAndSortedData.reduce((sum, item) => sum + (item.totalAmount || 0), 0), [filteredAndSortedData]);
   const outstandingInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status?.toUpperCase() === 'UNPAID' || item.status?.toUpperCase() === 'OVERDUE').length, [filteredAndSortedData]);
   const paidInvoices = useMemo(() => filteredAndSortedData.filter(item => item.status === 'PAID').length, [filteredAndSortedData]);
   const outstandingAmount = useMemo(() => {
@@ -274,11 +268,13 @@ export default function UnifiedInvoiceRegistrations() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expense</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {profile?.role === 'organizer' ? 'Total Revenue' : 'Total Expense'}
+              </CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {clientReady ? (<div className="text-2xl font-bold">${(totalExpense).toFixed(2)}</div>) : (<Skeleton className="h-8 w-3/4" />)}
+              {clientReady ? (<div className="text-2xl font-bold">${(totalAmount).toFixed(2)}</div>) : (<Skeleton className="h-8 w-3/4" />)}
               <p className="text-xs text-muted-foreground">Across all invoices</p>
             </CardContent>
           </Card>

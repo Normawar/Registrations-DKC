@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -353,6 +354,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                       variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} 
                                       onClick={() => setSelectedPaymentMethod('purchase-order')} 
                                       className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"
+                                      disabled={isPaymentApproved}
                                     >
                                       <Upload className="h-5 w-5" />
                                       <span className="text-center">Purchase<br/>Order</span>
@@ -370,6 +372,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                     variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} 
                                     onClick={() => setSelectedPaymentMethod('check')} 
                                     className="h-auto py-2 flex flex-col items-center gap-1 leading-tight"
+                                    disabled={isPaymentApproved}
                                   >
                                     <Check className="h-5 w-5" />
                                     <span className="text-center">Pay with<br/>Check</span>
@@ -378,6 +381,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                     variant={selectedPaymentMethod === 'cash-app' ? 'default' : 'outline'} 
                                     onClick={() => setSelectedPaymentMethod('cash-app')} 
                                     className="h-auto py-4 flex flex-col items-center gap-2"
+                                    disabled={isPaymentApproved}
                                   >
                                     <DollarSign className="h-5 w-5" />
                                     <span>Cash App</span>
@@ -386,6 +390,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                     variant={selectedPaymentMethod === 'zelle' ? 'default' : 'outline'} 
                                     onClick={() => setSelectedPaymentMethod('zelle')} 
                                     className="h-auto py-4 flex flex-col items-center gap-2"
+                                    disabled={isPaymentApproved}
                                   >
                                     <CreditCard className="h-5 w-5" />
                                     <span>Zelle</span>
