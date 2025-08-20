@@ -13,7 +13,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History } from "lucide-react";
+import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { recordPayment } from '@/ai/flows/record-payment-flow';
@@ -51,6 +51,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const [sponsorNote, setSponsorNote] = useState('');
+  const [organizerNote, setOrganizerNote] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -101,6 +104,60 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const handleRefreshStatus = async () => {
     await handleRefreshStatusWithPaymentSync(confirmation, setConfirmation, toast, setIsRefreshing);
   };
+  
+  const getSquareDashboardUrl = (invoiceNumber: string) => {
+    const baseUrl = 'https://squareup.com/dashboard/invoices';
+    if (invoiceNumber) {
+      return `${baseUrl}/${invoiceNumber}`;
+    }
+    return baseUrl;
+  };
+
+  const addNote = async (noteText: string, noteType: 'sponsor' | 'organizer') => {
+    if (!noteText.trim()) return;
+    
+    const newNote = {
+      id: `note_${Date.now()}`,
+      text: noteText.trim(),
+      type: noteType,
+      author: noteType === 'sponsor' ? (profile?.email || 'Sponsor') : (profile?.firstName || 'Organizer'),
+      timestamp: new Date().toISOString(),
+    };
+    
+    const updatedConfirmationData = {
+      ...confirmation,
+      notes: [...(confirmation.notes || []), newNote],
+      lastUpdated: new Date().toISOString(),
+    };
+    
+    const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+    const updatedAllInvoices = allInvoices.map((inv: any) =>
+      inv.id === confirmation.id ? updatedConfirmationData : inv
+    );
+    localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+    
+    const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+    const updatedConfirmations = confirmations.map((conf: any) =>
+      conf.id === confirmation.id ? updatedConfirmationData : conf
+    );
+    localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+    
+    setConfirmation(updatedConfirmationData);
+    
+    if (noteType === 'sponsor') {
+      setSponsorNote('');
+    } else {
+      setOrganizerNote('');
+    }
+    
+    toast({
+      title: 'Note Added',
+      description: `${noteType === 'sponsor' ? 'Sponsor' : 'Organizer'} note has been saved.`
+    });
+    
+    window.dispatchEvent(new Event('storage'));
+    window.dispatchEvent(new Event('all_invoices_updated'));
+  };
 
   const handlePaymentUpdate = async () => {
     if (!confirmation) return;
@@ -108,45 +165,27 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     setIsUpdating(true);
 
     try {
-        // For ANY payment method by organizers (except credit card), handle locally AND open Square
         if (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card') {
             
-            // Get the payment amount based on method
             let paymentAmount = 0;
-            if (selectedPaymentMethod === 'cash') {
-                paymentAmount = parseFloat(cashAmount);
-            } else if (selectedPaymentMethod === 'check') {
-                paymentAmount = parseFloat(checkAmount);
-            } else if (selectedPaymentMethod === 'cash-app') {
-                paymentAmount = parseFloat(cashAppAmount);
-            } else if (selectedPaymentMethod === 'zelle') {
-                paymentAmount = parseFloat(zelleAmount);
-            } else if (selectedPaymentMethod === 'purchase-order') {
-                paymentAmount = parseFloat(poAmount);
-            }
+            if (selectedPaymentMethod === 'cash') paymentAmount = parseFloat(cashAmount);
+            else if (selectedPaymentMethod === 'check') paymentAmount = parseFloat(checkAmount);
+            else if (selectedPaymentMethod === 'cash-app') paymentAmount = parseFloat(cashAppAmount);
+            else if (selectedPaymentMethod === 'zelle') paymentAmount = parseFloat(zelleAmount);
+            else if (selectedPaymentMethod === 'purchase-order') paymentAmount = parseFloat(poAmount);
 
-            // Validate amount
             if (!paymentAmount || paymentAmount <= 0) {
-                toast({ 
-                    variant: 'destructive', 
-                    title: 'Invalid Amount', 
-                    description: 'Please enter a valid payment amount.' 
-                });
+                toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
                 setIsUpdating(false);
                 return;
             }
 
             if (!confirmation.invoiceId) {
-                toast({ 
-                    variant: 'destructive', 
-                    title: 'Error', 
-                    description: 'No invoice ID available for payment recording.' 
-                });
+                toast({ variant: 'destructive', title: 'Error', description: 'No invoice ID available for payment recording.' });
                 setIsUpdating(false);
                 return;
             }
 
-            // Record the payment locally first
             const result = await recordPayment({
                 invoiceId: confirmation.invoiceId,
                 amount: paymentAmount,
@@ -154,19 +193,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 paymentDate: format(new Date(), 'yyyy-MM-dd'),
             });
 
-            // Calculate cumulative totals
             const newTotalPaid = result.totalPaid;
             const totalInvoiced = result.totalInvoiced || confirmation.totalAmount || confirmation.totalInvoiced || 0;
             
-            // Determine status
             let actualStatus = 'UNPAID';
-            if (newTotalPaid >= totalInvoiced) {
-                actualStatus = 'PAID';
-            } else if (newTotalPaid > 0) {
-                actualStatus = 'PARTIALLY_PAID';
-            }
+            if (newTotalPaid >= totalInvoiced) actualStatus = 'PAID';
+            else if (newTotalPaid > 0) actualStatus = 'PARTIALLY_PAID';
 
-            // Create payment history entry
             const newPaymentEntry = {
                 id: result.paymentId,
                 amount: paymentAmount,
@@ -177,7 +210,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 recordedBy: profile?.firstName || 'organizer',
             };
 
-            // Update local records
             const updatedConfirmationData = {
                 ...confirmation,
                 status: actualStatus,
@@ -190,53 +222,37 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 paymentHistory: [...(confirmation.paymentHistory || []), newPaymentEntry]
             };
 
-            // Update localStorage
             const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-            const updatedAllInvoices = allInvoices.map((inv: any) =>
-                inv.id === confirmation.id ? updatedConfirmationData : inv
-            );
+            const updatedAllInvoices = allInvoices.map((inv: any) => inv.id === confirmation.id ? updatedConfirmationData : inv);
             localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
 
             const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            const updatedConfirmations = confirmations.map((conf: any) =>
-                conf.id === confirmation.id ? updatedConfirmationData : conf
-            );
+            const updatedConfirmations = confirmations.map((conf: any) => conf.id === confirmation.id ? updatedConfirmationData : conf);
             localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
 
             setConfirmation(updatedConfirmationData);
             
-            // Clear the amount fields
             setCashAmount('');
             setCheckAmount('');
             setCashAppAmount('');
             setZelleAmount('');
             setPoAmount('');
 
-            // Open Square invoice for manual "Mark as paid" - this will pre-populate
-            const squareInvoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
-            if (squareInvoiceUrl) {
-                // Open Square invoice in new tab
-                window.open(squareInvoiceUrl, '_blank');
-                
-                toast({ 
-                    title: 'Payment Recorded Locally', 
-                    description: `${selectedPaymentMethod.replace('-', ' ')} payment of $${paymentAmount.toFixed(2)} recorded in your app. Square invoice opened - please also "Mark as paid" in Square to keep systems in sync.` 
-                });
-            } else {
-                toast({ 
-                    title: 'Payment Recorded', 
-                    description: `${selectedPaymentMethod.replace('-', ' ')} payment of $${paymentAmount.toFixed(2)} recorded locally. Status: ${actualStatus}. Square invoice link not available.` 
-                });
-            }
+            const squareDashboardUrl = getSquareDashboardUrl(confirmation.invoiceNumber);
+            window.open(squareDashboardUrl, '_blank');
+            
+            toast({ 
+                title: 'Payment Recorded & Square Opened', 
+                description: `${selectedPaymentMethod.replace('-', ' ')} payment of $${paymentAmount.toFixed(2)} recorded locally. Square Dashboard opened - find invoice #${confirmation.invoiceNumber || confirmation.id.slice(-8)} and click "Mark as paid" with amount $${paymentAmount.toFixed(2)}.`,
+                duration: 8000
+            });
 
-            // Trigger storage events
             window.dispatchEvent(new Event('storage'));
             window.dispatchEvent(new Event('all_invoices_updated'));
             setIsUpdating(false);
             return;
         }
 
-        // For non-organizer users or credit card, handle as before
         let updatedConfirmationData = { ...confirmation };
 
         if (fileToUpload) {
@@ -267,7 +283,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             }
         }
 
-        // Update invoice title with PO information
         const formattedEventDate = format(new Date(updatedConfirmationData.eventDate), 'MM/dd/yyyy');
         let newTitle = `${updatedConfirmationData.teamCode || updatedConfirmationData.schoolName} @ ${formattedEventDate} ${updatedConfirmationData.eventName}`;
         
@@ -291,11 +306,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             lastUpdated: new Date().toISOString(),
         };
 
-        // Update storage
         const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-        const updatedAllInvoices = allInvoices.map((inv: any) =>
-            inv.id === confirmation.id ? updatedConfirmationData : inv
-        );
+        const updatedAllInvoices = allInvoices.map((inv: any) => inv.id === confirmation.id ? updatedConfirmationData : inv);
         localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
 
         const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
@@ -305,26 +317,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+        localStorage.setItem('confirmations', JSON.stringify(confirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
 
-        toast({ 
-            title: 'Payment Info Submitted', 
-            description: "An organizer will verify your payment once the monetary transfer has been verified." 
-        });
+        toast({ title: 'Payment Info Submitted', description: "An organizer will verify your payment once the monetary transfer has been verified." });
 
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('all_invoices_updated'));
 
     } catch (error) {
         console.error('Failed to update payment:', error);
-        toast({ 
-            variant: 'destructive', 
-            title: 'Error', 
-            description: 'Failed to update payment information.' 
-        });
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to update payment information.' });
     } finally {
         setIsUpdating(false);
     }
@@ -353,9 +358,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           }
 
           const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-          const updatedAllInvoices = allInvoices.map((inv: any) =>
-              inv.id === confirmation.id ? updatedConfirmationData : inv
-          );
+          const updatedAllInvoices = allInvoices.map((inv: any) => inv.id === confirmation.id ? updatedConfirmationData : inv);
           localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
           setConfirmation(updatedConfirmationData);
           
@@ -405,8 +408,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
 
   const renderPaymentMethodInputs = () => {
-    const isOrganizer = profile?.role === 'organizer';
-    
     if (selectedPaymentMethod === 'credit-card') {
         return (
             <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -430,7 +431,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         return (
             <div>
                 <Label htmlFor="cash-amount">
-                    {isOrganizer ? 'Cash Amount Received' : 'Cash Amount Paid'}
+                    {profile?.role === 'organizer' ? 'Cash Amount Received' : 'Cash Amount Paid'}
                 </Label>
                 <Input 
                     id="cash-amount" 
@@ -441,7 +442,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     onChange={(e) => setCashAmount(e.target.value)} 
                     disabled={isPaymentApproved} 
                 />
-                {isOrganizer && (
+                {profile?.role === 'organizer' && (
                     <p className="text-xs text-muted-foreground mt-1">
                         This will also open Square invoice for manual "Mark as paid" confirmation.
                     </p>
@@ -455,7 +456,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <div className="space-y-4">
                 <div>
                     <Label htmlFor="check-amount">
-                        {isOrganizer ? 'Check Amount Received' : 'Check Amount'}
+                        {profile?.role === 'organizer' ? 'Check Amount Received' : 'Check Amount'}
                     </Label>
                     <Input 
                         id="check-amount" 
@@ -496,7 +497,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         </p>
                       )}
                 </div>
-                {isOrganizer && (
+                {profile?.role === 'organizer' && (
                     <p className="text-xs text-muted-foreground">
                         This will also open Square invoice for manual "Mark as paid" confirmation.
                     </p>
@@ -510,7 +511,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <div className="space-y-4">
                 <div>
                     <Label htmlFor="cashapp-amount">
-                        {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
+                        {profile?.role === 'organizer' ? 'Cash App Amount Received' : 'Cash App Amount'}
                     </Label>
                     <Input 
                         id="cashapp-amount" 
@@ -551,7 +552,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         </p>
                       )}
                 </div>
-                {isOrganizer && (
+                {profile?.role === 'organizer' && (
                     <p className="text-xs text-muted-foreground">
                         This will also open Square invoice for manual "Mark as paid" confirmation.
                     </p>
@@ -565,7 +566,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <div className="space-y-4">
                 <div>
                     <Label htmlFor="zelle-amount">
-                        {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
+                        {profile?.role === 'organizer' ? 'Zelle Amount Received' : 'Zelle Amount'}
                     </Label>
                     <Input 
                         id="zelle-amount" 
@@ -606,7 +607,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         </p>
                       )}
                 </div>
-                {isOrganizer && (
+                {profile?.role === 'organizer' && (
                     <p className="text-xs text-muted-foreground">
                         This will also open Square invoice for manual "Mark as paid" confirmation.
                     </p>
@@ -620,7 +621,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <Label htmlFor="po-amount">
-                        {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
+                        {profile?.role === 'organizer' ? 'PO Amount' : 'Purchase Order Amount'}
                     </Label>
                     <Input 
                         id="po-amount" 
@@ -668,7 +669,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
                     )}
                 </div>
-                {isOrganizer && (
+                {profile?.role === 'organizer' && (
                     <div className="md:col-span-2">
                         <p className="text-xs text-muted-foreground">
                             This will also open Square invoice for manual "Mark as paid" confirmation.
@@ -681,113 +682,111 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
     return null;
   };
-
-  const PaymentHistorySection = () => {
-    const paymentHistory = confirmation.paymentHistory || [];
-    
-    const getPaymentMethodIcon = (method: string) => {
-      switch (method) {
-        case 'credit_card': return '💳';
-        case 'cash': return '💵';
-        case 'check': return '📝';
-        case 'cash_app': return '📱';
-        case 'zelle': return '🏦';
-        case 'external': return '🔗';
-        default: return '💰';
-      }
-    };
-    
-    const getPaymentMethodLabel = (payment: any) => {
-      if (payment.method === 'credit_card' && payment.cardBrand && payment.last4) {
-        return `${payment.cardBrand.toUpperCase()} ****${payment.last4}`;
-      }
-      
-      const methodLabels: Record<string, string> = {
-        credit_card: 'Credit Card',
-        cash: 'Cash Payment',
-        check: 'Check',
-        cash_app: 'Cash App',
-        zelle: 'Zelle',
-        external: 'External Payment',
-      };
-      
-      return methodLabels[payment.method] || 'Payment';
-    };
+  
+  const NotesSection = () => {
+    const notes = confirmation.notes || [];
+    const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
+    const organizerNotes = notes.filter((note: any) => note.type === 'organizer');
     
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="h-5 w-5" />
-            Payment History
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {paymentHistory.length > 0 ? (
-            <div className='space-y-3'>
-              {paymentHistory.map((payment: any, index: number) => (
-                <div key={payment.id || index} className="flex justify-between items-center border-b pb-3 last:border-b-0">
-                  <div className="flex items-start gap-3">
-                    <span className="text-lg">{getPaymentMethodIcon(payment.method)}</span>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {getPaymentMethodLabel(payment)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {payment.date ? format(new Date(payment.date), 'MMM dd, yyyy \'at\' h:mm a') : 'Unknown date'}
-                      </p>
-                      {payment.note && (
-                        <p className="text-xs text-muted-foreground italic">
-                          {payment.note}
-                        </p>
-                      )}
-                      {payment.source === 'square' && (
-                        <Badge variant="outline" className="text-xs mt-1">
-                          Synced from Square
-                        </Badge>
-                      )}
-                    </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Sponsor Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {sponsorNotes.length > 0 ? (
+                sponsorNotes.map((note: any) => (
+                  <div key={note.id} className="border-l-2 border-blue-200 pl-3 py-2">
+                    <p className="text-sm">{note.text}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \'at\' h:mm a')}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <span className='font-semibold text-green-600'>
-                      ${payment.amount?.toFixed(2) || '0.00'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              
-              <Separator />
-              
-              {/* Payment Summary */}
-              <div className="space-y-2 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium">Total Paid</span>
-                  <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
-                </div>
-                
-                {balanceDue > 0 && (
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">Balance Due</span>
-                    <span className="font-semibold text-destructive">${balanceDue.toFixed(2)}</span>
-                  </div>
-                )}
-                
-                <div className="flex justify-between items-center text-sm text-muted-foreground">
-                  <span>Invoice Total</span>
-                  <span>${totalInvoiced.toFixed(2)}</span>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">No sponsor notes yet.</p>
+              )}
+            </div>
+            
+            {(profile?.role === 'sponsor' || profile?.role === 'individual') && (
+              <div className="space-y-2">
+                <Label htmlFor="sponsor-note">Add Sponsor Note</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="sponsor-note"
+                    placeholder="Enter note..."
+                    value={sponsorNote}
+                    onChange={(e) => setSponsorNote(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={() => addNote(sponsorNote, 'sponsor')}
+                    disabled={!sponsorNote.trim()}
+                  >
+                    Add
+                  </Button>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Organizer Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {organizerNotes.length > 0 ? (
+                organizerNotes.map((note: any) => (
+                  <div key={note.id} className="border-l-2 border-green-200 pl-3 py-2">
+                    <p className="text-sm">{note.text}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \'at\' h:mm a')}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">No organizer notes yet.</p>
+              )}
             </div>
-          ) : (
-            <div className='text-sm text-muted-foreground text-center py-4'>
-              <History className="mx-auto h-6 w-6 mb-2" />
-              No payments have been recorded for this invoice yet.
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            
+            {profile?.role === 'organizer' && (
+              <div className="space-y-2">
+                <Label htmlFor="organizer-note">Add Organizer Note</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="organizer-note"
+                    placeholder="Enter note..."
+                    value={organizerNote}
+                    onChange={(e) => setOrganizerNote(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={() => addNote(organizerNote, 'organizer')}
+                    disabled={!organizerNote.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     );
   };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1001,8 +1000,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                         </CardContent>
                     </Card>
-                    <PaymentHistorySection />
+                    <PaymentHistoryDisplay confirmation={confirmation} />
                 </div>
+                <NotesSection />
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
                 <Button variant="outline" onClick={handleRefreshStatus} disabled={isRefreshing} className="mr-auto">
