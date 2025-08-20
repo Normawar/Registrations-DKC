@@ -289,11 +289,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                             <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">Sponsor Email</p>
-                                <p>{confirmation.sponsorEmail || 'N/A'}</p>
+                                <p>{confirmation.sponsorEmail || confirmation.purchaserEmail || confirmation.contactEmail || 'N/A'}</p>
                             </div>
                             <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">Sponsor Phone</p>
-                                <p>{confirmation.sponsorPhone || 'N/A'}</p>
+                                <p>{confirmation.sponsorPhone || confirmation.purchaserPhone || confirmation.contactPhone || 'N/A'}</p>
                             </div>
                             <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">School</p>

@@ -222,7 +222,6 @@ export function SponsorRegistrationDialog({
         district: profile.district,
       });
       
-      // Create confirmation record
       const newConfirmation = {
         id: result.invoiceId,
         invoiceId: result.invoiceId,
@@ -249,6 +248,10 @@ export function SponsorRegistrationDialog({
         purchaserName: `${profile.firstName} ${profile.lastName}`,
         sponsorEmail: profile.email,
         sponsorPhone: profile.phone,
+        contactEmail: profile.email,
+        purchaserEmail: profile.email,
+        contactPhone: profile.phone,
+        purchaserPhone: profile.phone,
       };
       
       // Save to localStorage
