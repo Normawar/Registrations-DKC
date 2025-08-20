@@ -214,7 +214,12 @@ export function SponsorRegistrationDialog({
         eventName: event.name,
         eventDate: event.date,
         uscfFee,
-        players: playersToInvoice
+        players: playersToInvoice,
+        bookkeeperEmail: profile.bookkeeperEmail,
+        gtCoordinatorEmail: profile.gtCoordinatorEmail,
+        schoolAddress: profile.schoolAddress,
+        schoolPhone: profile.schoolPhone,
+        district: profile.district,
       });
       
       // Create confirmation record
