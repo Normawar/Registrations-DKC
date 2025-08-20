@@ -10,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
-import { School, User, DollarSign, CheckCircle } from "lucide-react";
+import { School, User, DollarSign, CheckCircle, Lock } from "lucide-react";
 import { format } from "date-fns";
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface IndividualRegistrationDialogProps {
   isOpen: boolean;
@@ -268,6 +269,30 @@ export function IndividualRegistrationDialog({
       setIsSubmitting(false);
     }
   };
+
+  if (!event) return null;
+
+  if (event.isClosed) {
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{event.name}</DialogTitle>
+                </DialogHeader>
+                <Alert variant="destructive">
+                    <Lock className="h-4 w-4" />
+                    <AlertTitle>Registration Closed</AlertTitle>
+                    <AlertDescription>
+                        We are no longer accepting registrations for this event.
+                    </AlertDescription>
+                </Alert>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+  }
 
 
   return (

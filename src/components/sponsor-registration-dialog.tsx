@@ -11,11 +11,12 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
-import { School, User, DollarSign, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { School, User, DollarSign, CheckCircle, Clock, AlertCircle, Lock } from "lucide-react";
 import { format, differenceInHours, isSameDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { generateTeamCode } from '@/lib/school-utils';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 
 interface SponsorRegistrationDialogProps {
@@ -303,6 +304,28 @@ export function SponsorRegistrationDialog({
   };
 
   if (!event) return null;
+
+  if (event.isClosed) {
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{event.name}</DialogTitle>
+                </DialogHeader>
+                <Alert variant="destructive">
+                    <Lock className="h-4 w-4" />
+                    <AlertTitle>Registration Closed</AlertTitle>
+                    <AlertDescription>
+                        We are no longer accepting registrations for this event.
+                    </AlertDescription>
+                </Alert>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+  }
 
   return (
     <>

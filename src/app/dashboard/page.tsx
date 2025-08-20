@@ -25,7 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
 import { useState, useEffect, useMemo } from "react";
 import { format, isSameDay } from "date-fns";
-import { Info, FileText, ImageIcon } from "lucide-react";
+import { Info, FileText, ImageIcon, Lock } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useMasterDb } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
@@ -129,8 +129,14 @@ export default function DashboardPage() {
                                             <div>
                                                 <p className="font-medium">{event.name}</p>
                                                 <p className="text-muted-foreground">{event.location}</p>
+                                                {event.isClosed && (
+                                                    <Badge variant="destructive" className="mt-1">
+                                                        <Lock className="h-3 w-3 mr-1" />
+                                                        Registration Closed
+                                                    </Badge>
+                                                )}
                                             </div>
-                                            <Button size="sm" onClick={() => handleRegisterClick(event)}>
+                                            <Button size="sm" onClick={() => handleRegisterClick(event)} disabled={event.isClosed}>
                                                 Register Players
                                             </Button>
                                         </div>

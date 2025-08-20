@@ -88,6 +88,7 @@ import Papa from 'papaparse';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const eventFormSchema = z.object({
@@ -104,6 +105,7 @@ const eventFormSchema = z.object({
   imageName: z.string().optional(),
   pdfUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   pdfName: z.string().optional(),
+  isClosed: z.boolean().optional(),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -177,10 +179,12 @@ export default function ManageEventsPage() {
       imageName: '',
       pdfUrl: '',
       pdfName: '',
+      isClosed: false,
     },
   });
 
-  const getEventStatus = (event: Event): "Open" | "Completed" => {
+  const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
+    if (event.isClosed) return "Closed";
     return new Date(event.date) < new Date() ? "Completed" : "Open";
   };
 
@@ -190,8 +194,10 @@ export default function ManageEventsPage() {
       sortableEvents.sort((a, b) => {
         const aStatus = getEventStatus(a);
         const bStatus = getEventStatus(b);
-        if (aStatus === 'Open' && bStatus === 'Completed') return -1;
-        if (aStatus === 'Completed' && bStatus === 'Open') return 1;
+        if (aStatus === 'Open' && bStatus !== 'Open') return -1;
+        if (aStatus !== 'Open' && bStatus === 'Open') return 1;
+        if (aStatus === 'Closed' && bStatus === 'Completed') return -1;
+        if (aStatus === 'Completed' && bStatus === 'Closed') return 1;
 
         let aValue: any = a[sortConfig.key as keyof Event];
         let bValue: any = b[sortConfig.key as keyof Event];
@@ -251,6 +257,7 @@ export default function ManageEventsPage() {
           imageName: editingEvent.imageName || '',
           pdfUrl: editingEvent.pdfUrl || '',
           pdfName: editingEvent.pdfName || '',
+          isClosed: !!editingEvent.isClosed,
         });
       } else {
         form.reset({
@@ -266,6 +273,7 @@ export default function ManageEventsPage() {
           imageName: '',
           pdfUrl: '',
           pdfName: '',
+          isClosed: false,
         });
       }
     }
@@ -297,6 +305,7 @@ export default function ManageEventsPage() {
                 imageName: row['imageName'] || row['Image Name'] || undefined,
                 pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
                 pdfName: row['pdfName'] || row['PDF Name'] || undefined,
+                isClosed: row['isClosed'] === 'true' || row['isClosed'] === true,
             };
 
             const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
@@ -600,27 +609,30 @@ export default function ManageEventsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedEvents.map((event) => (
-                  <TableRow key={event.id}>
-                    <TableCell className="font-medium">{event.name}</TableCell>
-                    <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
-                    <TableCell>{event.location}</TableCell>
-                    <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
-                    <TableCell><Badge variant={getEventStatus(event) === 'Open' ? 'default' : 'secondary'} className={cn(getEventStatus(event) === 'Open' ? 'bg-green-600 text-white' : '')}>{getEventStatus(event)}</Badge></TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Toggle menu</span></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                          <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {sortedEvents.map((event) => {
+                  const status = getEventStatus(event);
+                  return (
+                    <TableRow key={event.id}>
+                      <TableCell className="font-medium">{event.name}</TableCell>
+                      <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
+                      <TableCell>{event.location}</TableCell>
+                      <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
+                      <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Toggle menu</span></Button></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -661,6 +673,28 @@ export default function ManageEventsPage() {
                   <FormField control={form.control} name="pdfUrl" render={({ field }) => ( <FormItem><FormLabel>PDF Flyer URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl><FormMessage /></FormItem> )}/>
                   <FormField control={form.control} name="pdfName" render={({ field }) => ( <FormItem><FormLabel>PDF Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl><FormDescription>A descriptive name for the PDF attachment.</FormDescription><FormMessage /></FormItem> )}/>
                 </div>
+                <FormField
+                  control={form.control}
+                  name="isClosed"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          Close Registrations
+                        </FormLabel>
+                        <FormDescription>
+                          Check this box to prevent any new registrations for this event.
+                        </FormDescription>
+                      </div>
+                    </FormItem>
+                  )}
+                />
               </form>
             </Form>
           </div>

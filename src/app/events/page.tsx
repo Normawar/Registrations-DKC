@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { useEvents } from '@/hooks/use-events';
 import { useMemo, useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Calendar, MapPin, DollarSign, Users, CheckCircle, Clock } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, Users, CheckCircle, Clock, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function EventsPage() {
@@ -167,8 +167,14 @@ export default function EventsPage() {
                             {status.studentCount} student{status.studentCount !== 1 ? 's' : ''} registered
                           </Badge>
                         )}
+                        {event.isClosed && (
+                            <Badge variant="destructive">
+                                <Lock className="h-3 w-3 mr-1.5" />
+                                Registration Closed
+                            </Badge>
+                        )}
                         
-                        <Button size="sm" onClick={() => handleRegisterClick(event)}>
+                        <Button size="sm" onClick={() => handleRegisterClick(event)} disabled={event.isClosed}>
                           {status.isRegistered ? 'Manage Registration' : 'Register Students'}
                         </Button>
                       </div>
