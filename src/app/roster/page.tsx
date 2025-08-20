@@ -344,8 +344,49 @@ function RosterPageContent() {
                                 <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Date of Birth</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 100} toYear={new Date().getFullYear()} initialFocus/></PopoverContent></Popover><FormMessage /></FormItem> )} />
-                                <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>USCF Expiration</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} captionLayout="dropdown-buttons" fromYear={new Date().getFullYear() - 2} toYear={new Date().getFullYear() + 10} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                                <FormField control={playerForm.control} name="dob" render={({ field }) => ( 
+                                    <FormItem><FormLabel>Date of Birth</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="date"
+                                        value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                        onChange={(e) => {
+                                          const dateValue = e.target.value;
+                                          if (dateValue) {
+                                            const parsedDate = new Date(dateValue + 'T00:00:00');
+                                            if (!isNaN(parsedDate.getTime())) {
+                                              field.onChange(parsedDate);
+                                            }
+                                          } else {
+                                            field.onChange(undefined);
+                                          }
+                                        }}
+                                        placeholder="Select date of birth"
+                                        max={format(new Date(), 'yyyy-MM-dd')}
+                                        min="1900-01-01"
+                                      />
+                                    </FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( 
+                                    <FormItem><FormLabel>USCF Expiration</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="date"
+                                        value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                        onChange={(e) => {
+                                          const dateValue = e.target.value;
+                                          if (dateValue) {
+                                            const parsedDate = new Date(dateValue + 'T00:00:00');
+                                            if (!isNaN(parsedDate.getTime())) {
+                                              field.onChange(parsedDate);
+                                            }
+                                          } else {
+                                            field.onChange(undefined);
+                                          }
+                                        }}
+                                        placeholder="Select expiration date"
+                                        min={format(new Date(), 'yyyy-MM-dd')}
+                                      />
+                                    </FormControl><FormMessage /></FormItem>)} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />

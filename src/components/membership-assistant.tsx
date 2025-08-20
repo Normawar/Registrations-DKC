@@ -83,16 +83,6 @@ export function MembershipAssistant() {
       setIsLoading(false);
     }
   }
-  
-  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>, field: any) => {
-    const date = parse(e.target.value, "MM/dd/yyyy", new Date());
-    if (isValid(date)) {
-      field.onChange(date);
-    } else {
-      field.onChange(undefined);
-    }
-  };
-
 
   return (
     <div className="grid gap-8 md:grid-cols-2">
@@ -115,39 +105,26 @@ export function MembershipAssistant() {
                 render={({ field }) => (
                     <FormItem>
                       <FormLabel>Players Date of Birth</FormLabel>
-                      <div className="flex gap-2">
-                      <FormControl>
-                        <Input
-                            placeholder="MM/DD/YYYY"
-                            value={field.value ? format(field.value, 'MM/dd/yyyy') : ''}
-                            onChange={(e) => handleDateInputChange(e, field)}
-                        />
-                      </FormControl>
-                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="icon">
-                                <CalendarIcon className="h-4 w-4" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={(date) => {
-                                field.onChange(date);
-                                setIsCalendarOpen(false);
+                        <FormControl>
+                          <Input
+                            type="date"
+                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                            onChange={(e) => {
+                              const dateValue = e.target.value;
+                              if (dateValue) {
+                                const parsedDate = new Date(dateValue + 'T00:00:00');
+                                if (!isNaN(parsedDate.getTime())) {
+                                  field.onChange(parsedDate);
+                                }
+                              } else {
+                                field.onChange(undefined);
+                              }
                             }}
-                            disabled={(date) =>
-                              date > new Date() || date < new Date("1900-01-01")
-                            }
-                            initialFocus
-                            captionLayout="dropdown-buttons"
-                            fromYear={new Date().getFullYear() - 100}
-                            toYear={new Date().getFullYear()}
+                            placeholder="Select date of birth"
+                            max={format(new Date(), 'yyyy-MM-dd')}
+                            min="1900-01-01"
                           />
-                        </PopoverContent>
-                      </Popover>
-                      </div>
+                        </FormControl>
                       <FormMessage />
                     </FormItem>
                   )

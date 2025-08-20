@@ -422,31 +422,59 @@ function UscfPurchaseComponent() {
                                                 <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                              </div>
                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <FormField control={form.control} name={`players.${index}.dob`} render={({ field }) => ( 
-                                                    <FormItem className='flex flex-col'><FormLabel>Date of Birth</FormLabel>
-                                                        <Popover><PopoverTrigger asChild>
+                                                <FormField 
+                                                  control={form.control} 
+                                                  name={`players.${index}.dob`} 
+                                                  render={({ field }) => ( 
+                                                    <FormItem className='flex flex-col'>
+                                                      <FormLabel>Date of Birth</FormLabel>
+                                                      <div className="flex gap-2">
                                                         <FormControl>
-                                                            <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                            </Button>
+                                                          <Input
+                                                            type="date"
+                                                            value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                                            onChange={(e) => {
+                                                              const dateValue = e.target.value;
+                                                              if (dateValue) {
+                                                                const parsedDate = new Date(dateValue + 'T00:00:00');
+                                                                if (!isNaN(parsedDate.getTime())) {
+                                                                  field.onChange(parsedDate);
+                                                                }
+                                                              } else {
+                                                                field.onChange(undefined);
+                                                              }
+                                                            }}
+                                                            className="flex-1"
+                                                            placeholder="yyyy-mm-dd"
+                                                            max={format(new Date(), 'yyyy-MM-dd')}
+                                                            min="1900-01-01"
+                                                          />
                                                         </FormControl>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-auto p-0" align="start">
+                                                        
+                                                        <Popover>
+                                                          <PopoverTrigger asChild>
+                                                            <Button variant="outline" size="icon" type="button">
+                                                              <CalendarIcon className="h-4 w-4" />
+                                                            </Button>
+                                                          </PopoverTrigger>
+                                                          <PopoverContent className="w-auto p-0" align="start">
                                                             <Calendar
-                                                                mode="single"
-                                                                selected={field.value}
-                                                                onSelect={field.onChange}
-                                                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                                                initialFocus
-                                                                captionLayout="dropdown-buttons"
-                                                                fromYear={new Date().getFullYear() - 100}
-                                                                toYear={new Date().getFullYear()}
+                                                              mode="single"
+                                                              selected={field.value}
+                                                              onSelect={field.onChange}
+                                                              disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                                              initialFocus
+                                                              captionLayout="dropdown-buttons"
+                                                              fromYear={new Date().getFullYear() - 100}
+                                                              toYear={new Date().getFullYear()}
                                                             />
-                                                        </PopoverContent>
-                                                    </Popover><FormMessage />
+                                                          </PopoverContent>
+                                                        </Popover>
+                                                      </div>
+                                                      <FormMessage />
                                                     </FormItem>
-                                                )} />
+                                                  )} 
+                                                />
                                                 <FormField control={form.control} name={`players.${index}.zipCode`} render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input placeholder="78501" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                              </div>
                                         </div>
@@ -539,30 +567,45 @@ function UscfPurchaseComponent() {
                                         <Input id={`check-amount-${invoice.invoiceId}`} type="number" placeholder={(price * invoice.playerCount).toFixed(2)} value={paymentInputs.amountPaid || ''} onChange={(e) => handleInputChange('amountPaid', e.target.value)} disabled={isLoading} />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Check Date</Label>
+                                      <Label htmlFor={`check-date-${invoice.invoiceId}`}>Check Date</Label>
+                                      <div className="flex gap-2">
+                                        <Input
+                                          id={`check-date-${invoice.invoiceId}`}
+                                          type="date"
+                                          value={paymentInputs.checkDate ? format(paymentInputs.checkDate, 'yyyy-MM-dd') : ''}
+                                          onChange={(e) => {
+                                            const dateValue = e.target.value;
+                                            if (dateValue) {
+                                              const parsedDate = new Date(dateValue + 'T00:00:00');
+                                              if (!isNaN(parsedDate.getTime())) {
+                                                handleInputChange('checkDate', parsedDate);
+                                              }
+                                            } else {
+                                              handleInputChange('checkDate', undefined);
+                                            }
+                                          }}
+                                          disabled={isLoading}
+                                          className="flex-1"
+                                        />
                                         <Popover>
-                                            <PopoverTrigger asChild>
-                                            <Button
-                                                variant={"outline"}
-                                                className={cn("w-full justify-start text-left font-normal", !paymentInputs.checkDate && "text-muted-foreground")}
-                                                disabled={isLoading}
-                                            >
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {paymentInputs.checkDate ? format(paymentInputs.checkDate, "PPP") : <span>Pick a date</span>}
+                                          <PopoverTrigger asChild>
+                                            <Button variant="outline" size="icon" type="button" disabled={isLoading}>
+                                              <CalendarIcon className="h-4 w-4" />
                                             </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0">
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-0">
                                             <Calendar 
-                                                mode="single" 
-                                                selected={paymentInputs.checkDate} 
-                                                onSelect={(date) => handleInputChange('checkDate', date)} 
-                                                initialFocus 
-                                                captionLayout="dropdown-buttons"
-                                                fromYear={new Date().getFullYear() - 5}
-                                                toYear={new Date().getFullYear() + 5}
+                                              mode="single" 
+                                              selected={paymentInputs.checkDate} 
+                                              onSelect={(date) => handleInputChange('checkDate', date)} 
+                                              initialFocus 
+                                              captionLayout="dropdown-buttons"
+                                              fromYear={new Date().getFullYear() - 5}
+                                              toYear={new Date().getFullYear() + 5}
                                             />
-                                            </PopoverContent>
+                                          </PopoverContent>
                                         </Popover>
+                                      </div>
                                     </div>
                                 </div>
                             )}
