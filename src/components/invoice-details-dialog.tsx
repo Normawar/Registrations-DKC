@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -18,6 +16,7 @@ import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { getInvoiceStatus } from '@/ai/flows/get-invoice-status-flow';
+import { recordPayment } from '@/ai/flows/record-payment-flow';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { auth, storage } from '@/lib/firebase';
 import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
@@ -37,6 +36,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('purchase-order');
   const [poNumber, setPONumber] = useState('');
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [cashAmount, setCashAmount] = useState('');
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -54,6 +54,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       setConfirmation(currentConf);
       setSelectedPaymentMethod(currentConf.paymentMethod || 'purchase-order');
       setPONumber(currentConf.poNumber || '');
+      setCashAmount('');
     }
 
     // Firebase Auth
@@ -123,6 +124,66 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     setIsUpdating(true);
 
     try {
+        // For cash payments by organizers, record payment immediately
+        if (selectedPaymentMethod === 'cash' && profile?.role === 'organizer') {
+            if (!cashAmount || parseFloat(cashAmount) <= 0) {
+                toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid cash amount.' });
+                setIsUpdating(false);
+                return;
+            }
+
+            if (!confirmation.invoiceId) {
+                toast({ variant: 'destructive', title: 'Error', description: 'No invoice ID available for payment recording.' });
+                setIsUpdating(false);
+                return;
+            }
+
+            // Record the cash payment directly
+            const result = await recordPayment({
+                invoiceId: confirmation.invoiceId,
+                amount: parseFloat(cashAmount),
+                note: 'Cash payment recorded by organizer',
+                paymentDate: format(new Date(), 'yyyy-MM-dd'),
+            });
+
+            // Update local records with payment result
+            const updatedConfirmationData = {
+                ...confirmation,
+                status: result.status,
+                invoiceStatus: result.status,
+                totalPaid: result.totalPaid,
+                paymentStatus: result.status === 'PAID' ? 'paid' : 'partially-paid',
+                lastUpdated: new Date().toISOString(),
+            };
+
+            // Update both all_invoices and confirmations
+            const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+            const updatedAllInvoices = allInvoices.map((inv: any) =>
+                inv.id === confirmation.id ? updatedConfirmationData : inv
+            );
+            localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+
+            const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+            const updatedConfirmations = confirmations.map((conf: any) =>
+                conf.id === confirmation.id ? updatedConfirmationData : conf
+            );
+            localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+
+            setConfirmation(updatedConfirmationData);
+            setCashAmount('');
+
+            toast({ 
+                title: 'Payment Recorded', 
+                description: `Cash payment of $${cashAmount} has been recorded. Invoice status: ${result.status}` 
+            });
+
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new Event('all_invoices_updated'));
+            setIsUpdating(false);
+            return;
+        }
+
+        // For non-cash payments, handle file uploads and submission for verification
         let updatedConfirmationData = { ...confirmation };
 
         if (fileToUpload) {
@@ -178,6 +239,16 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         );
         localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
 
+        // Also update confirmations store for payment authorization page
+        const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const existingConfirmationIndex = confirmations.findIndex((conf: any) => conf.id === confirmation.id);
+        if (existingConfirmationIndex >= 0) {
+            confirmations[existingConfirmationIndex] = updatedConfirmationData;
+        } else {
+            confirmations.push(updatedConfirmationData);
+        }
+        localStorage.setItem('confirmations', JSON.stringify(confirmations));
+
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
 
@@ -232,7 +303,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       }
   };
 
-
   const getStatusBadge = (status: string) => {
     const s = (status || '').toUpperCase();
     const variants: { [key: string]: 'default' | 'destructive' | 'secondary' } = {
@@ -260,6 +330,16 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const balanceDue = totalInvoiced - totalPaid;
 
   const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
+
+  // Determine button text and functionality
+  const getSubmitButtonText = () => {
+    if (selectedPaymentMethod === 'cash' && profile?.role === 'organizer') {
+      return isUpdating ? 'Recording Payment...' : 'Record Payment';
+    }
+    return isUpdating ? 'Submitting...' : 'Submit Information for Verification';
+  };
+
+  const shouldShowCashAmount = selectedPaymentMethod === 'cash' && profile?.role === 'organizer';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -355,7 +435,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     <Card>
                         <CardHeader>
                             <CardTitle>Submit Payment Information</CardTitle>
-                            <CardDescription>Select a payment method and provide the necessary details. An organizer will verify your payment.</CardDescription>
+                            <CardDescription>
+                                {profile?.role === 'organizer' 
+                                    ? 'Record payments or submit payment information for verification.' 
+                                    : 'Select a payment method and provide the necessary details. An organizer will verify your payment.'
+                                }
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {authError && (
@@ -443,6 +528,21 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 )}
                               </div>
                             )}
+
+                            {shouldShowCashAmount && (
+                                <div>
+                                    <Label htmlFor="cash-amount">Cash Amount Received</Label>
+                                    <Input 
+                                        id="cash-amount" 
+                                        type="number" 
+                                        step="0.01" 
+                                        placeholder="Enter amount" 
+                                        value={cashAmount} 
+                                        onChange={(e) => setCashAmount(e.target.value)} 
+                                        disabled={isPaymentApproved} 
+                                    />
+                                </div>
+                            )}
     
                             {selectedPaymentMethod === 'purchase-order' && !isIndividualInvoice && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -473,7 +573,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 </div>
                             )}
                             
-                            {(selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (
+                            {(selectedPaymentMethod === 'cash-app' || selectedPaymentMethod === 'zelle' || selectedPaymentMethod === 'check') && (
                                 <div>
                                     <Label htmlFor="payment-proof">Upload Payment Proof/Check Image</Label>
                                     <Input id="payment-proof" type="file" accept="image/*,.pdf" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} disabled={isPaymentApproved}/>
@@ -500,9 +600,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             )}
                         </CardContent>
                          <CardFooter>
-                            <Button onClick={handlePaymentUpdate} disabled={isUpdating || !isAuthReady || !!authError || isPaymentApproved} className="flex items-center gap-2">
+                            <Button 
+                                onClick={handlePaymentUpdate} 
+                                disabled={
+                                    isUpdating || 
+                                    !isAuthReady || 
+                                    (!!authError && selectedPaymentMethod !== 'cash') || 
+                                    isPaymentApproved ||
+                                    (shouldShowCashAmount && (!cashAmount || parseFloat(cashAmount) <= 0))
+                                } 
+                                className="flex items-center gap-2"
+                            >
                                 {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                                {isUpdating ? 'Submitting...' : 'Submit Information for Verification'}
+                                {getSubmitButtonText()}
                             </Button>
                         </CardFooter>
                     </Card>
