@@ -84,6 +84,7 @@ type PaymentInputs = {
 
 type InvoiceState = CreateMembershipInvoiceOutput & { 
     id: string; // Add id field
+    invoiceTitle: string;
     playerCount: number;
     membershipType: string;
     submissionTimestamp: string;
@@ -216,6 +217,12 @@ function UscfPurchaseComponent() {
                 ...p,
                 dob: p.dob.toISOString(),
             }));
+            
+            const firstPlayerName = `${values.players[0].firstName} ${values.players[0].middleName || ''} ${values.players[0].lastName}`.replace(/\s+/g, ' ').trim();
+            const invoiceTitle = values.players.length > 1
+                ? `USCF Membership for ${values.players.length} players`
+                : `USCF Membership for ${firstPlayerName}`;
+
             const result = await createMembershipInvoice({
                 purchaserName: `${sponsorProfile.firstName} ${sponsorProfile.lastName}`,
                 purchaserEmail: sponsorProfile.email,
@@ -228,6 +235,7 @@ function UscfPurchaseComponent() {
             const newMembershipInvoice: InvoiceState = {
                 ...result,
                 id: result.invoiceId,
+                invoiceTitle: invoiceTitle,
                 invoiceStatus: result.status,
                 playerCount: values.players.length,
                 membershipType: membershipType,
@@ -329,7 +337,7 @@ function UscfPurchaseComponent() {
                 paymentFileName = file.name;
             }
             
-            let newTitle = invoice.playerCount > 1 ? `USCF Membership for ${invoice.playerCount} players` : `USCF Membership (${invoice.membershipType})`;
+            let newTitle = invoice.invoiceTitle;
             let toastMessage = "Payment information has been saved.";
 
             switch (paymentMethod) {
@@ -475,7 +483,7 @@ function UscfPurchaseComponent() {
                                              </div>
                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField control={form.control} name={`players.${index}.email`} render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="player@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                                <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Phone Number (Optional)</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                                <FormField control={form.control} name={`players.${index}.phone`} render={({ field }) => ( <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                              </div>
                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <FormField 
@@ -535,7 +543,7 @@ function UscfPurchaseComponent() {
                                              </div>
                                         </div>
                                     ))}
-                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: undefined, zipCode: '' })}>
+                                    <Button type="button" variant="outline" size="sm" onClick={() => append({ firstName: '', middleName: '', lastName: '', email: '', phone: '', dob: undefined, zipCode: '', uscfId: '', uscfExpiration: undefined })}>
                                         <PlusCircle className="mr-2 h-4 w-4" />
                                         Add Another Membership
                                     </Button>
