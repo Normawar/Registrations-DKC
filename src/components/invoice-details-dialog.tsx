@@ -284,7 +284,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                             <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">Date</p>
-                                <p>{format(new Date(confirmation.eventDate), 'PPP')}</p>
+                                <p>{confirmation.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</p>
                             </div>
                             <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">Sponsor Name</p>
