@@ -379,7 +379,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(confirmations));
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
@@ -458,112 +458,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
 
-  // Temporarily comment out NotesSection to find the real error
-  /*
   const NotesSection = () => {
-    const notes = confirmation.notes || [];
-    const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
-    const organizerNotes = notes.filter((note: any) => note.type === 'organizer');
-    
     return (
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              Sponsor Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2 max-h-32 overflow-y-auto">
-              {sponsorNotes.length > 0 ? (
-                sponsorNotes.map((note: any) => (
-                  <div key={note.id} className="border-l-2 border-blue-200 pl-3 py-2">
-                    <p className="text-sm">{note.text}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground">No sponsor notes yet.</p>
-              )}
-            </div>
-            
-            {(profile?.role === 'sponsor' || profile?.role === 'individual') && (
-              <div className="space-y-2">
-                <Label htmlFor="sponsor-note">Add Sponsor Note</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="sponsor-note"
-                    placeholder="Enter note..."
-                    value={sponsorNote || ''}
-                    onChange={(e) => setSponsorNote(e.target.value || '')}
-                    className="flex-1"
-                  />
-                  <Button 
-                    size="sm" 
-                    onClick={() => addNote(sponsorNote, 'sponsor')}
-                    disabled={!sponsorNote.trim()}
-                  >
-                    Add
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Organizer Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2 max-h-32 overflow-y-auto">
-              {organizerNotes.length > 0 ? (
-                organizerNotes.map((note: any) => (
-                  <div key={note.id} className="border-l-2 border-green-200 pl-3 py-2">
-                    <p className="text-sm">{note.text}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground">No organizer notes yet.</p>
-              )}
-            </div>
-            
-            {profile?.role === 'organizer' && (
-              <div className="space-y-2">
-                <Label htmlFor="organizer-note">Add Organizer Note</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="organizer-note"
-                    placeholder="Enter note..."
-                    value={organizerNote || ''}
-                    onChange={(e) => setOrganizerNote(e.target.value || '')}
-                    className="flex-1"
-                  />
-                  <Button 
-                    size="sm" 
-                    onClick={() => addNote(organizerNote, 'organizer')}
-                    disabled={!organizerNote.trim()}
-                  >
-                    Add
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <div>Test 1</div>
+        <div>Test 2</div>
       </div>
     );
   };
-  */
 
   const PaymentHistorySection = () => {
     return (
@@ -1086,8 +988,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     </Card>
                     <PaymentHistorySection />
                 </div>
-                {/* <NotesSection /> */}
-                <div>Notes section temporarily disabled</div>
+                <NotesSection />
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
                 <Button variant="outline" onClick={handleRefreshStatus} disabled={isRefreshing} className="mr-auto">
