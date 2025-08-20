@@ -36,14 +36,20 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   
   const [confirmation, setConfirmation] = useState<any>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('purchase-order');
-  const [poNumber, setPONumber] = useState('');
+  const [poNumber, setPoNumber] = useState<string>('');
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   
-  const [cashAmount, setCashAmount] = useState('');
-  const [checkAmount, setCheckAmount] = useState('');
-  const [cashAppAmount, setCashAppAmount] = useState('');
-  const [zelleAmount, setZelleAmount] = useState('');
-  const [poAmount, setPoAmount] = useState('');
+  // State for different payment methods
+  const [poAmount, setPoAmount] = useState<string>('');
+  const [checkAmount, setCheckAmount] = useState<string>('');
+  const [cashAmount, setCashAmount] = useState<string>('');
+  const [creditCardAmount, setCreditCardAmount] = useState<string>('');
+  const [creditCardLast4, setCreditCardLast4] = useState<string>('');
+  const [cashAppAmount, setCashAppAmount] = useState<string>('');
+  const [cashAppHandle, setCashAppHandle] = useState<string>('');
+  const [zelleAmount, setZelleAmount] = useState<string>('');
+  const [zelleEmail, setZelleEmail] = useState<string>('');
+
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -63,12 +69,17 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     if (currentConf) {
       setConfirmation(currentConf);
       setSelectedPaymentMethod(currentConf.paymentMethod || 'purchase-order');
-      setPONumber(currentConf.poNumber || '');
+      setPoNumber(currentConf.poNumber || '');
+      // Initialize all payment fields to empty strings
       setCashAmount('');
       setCheckAmount('');
       setCashAppAmount('');
       setZelleAmount('');
       setPoAmount('');
+      setCreditCardAmount('');
+      setCreditCardLast4('');
+      setCashAppHandle('');
+      setZelleEmail('');
       setSponsorNote('');
       setOrganizerNote('');
     }
@@ -227,110 +238,93 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     setIsUpdating(true);
 
     try {
-      if (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card') {
-    
-        let paymentAmount = 0;
-        if (selectedPaymentMethod === 'cash') paymentAmount = parseFloat(cashAmount || '0');
-        else if (selectedPaymentMethod === 'check') paymentAmount = parseFloat(checkAmount || '0');
-        else if (selectedPaymentMethod === 'cash-app') paymentAmount = parseFloat(cashAppAmount || '0');
-        else if (selectedPaymentMethod === 'zelle') paymentAmount = parseFloat(zelleAmount || '0');
-        else if (selectedPaymentMethod === 'purchase-order') paymentAmount = parseFloat(poAmount || '0');
-    
-        if (!paymentAmount || paymentAmount <= 0) {
-            toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
+        if (profile?.role === 'organizer' && selectedPaymentMethod !== 'credit-card') {
+            
+            let paymentAmount = 0;
+            if (selectedPaymentMethod === 'cash') paymentAmount = parseFloat(cashAmount || '0');
+            else if (selectedPaymentMethod === 'check') paymentAmount = parseFloat(checkAmount || '0');
+            else if (selectedPaymentMethod === 'cash-app') paymentAmount = parseFloat(cashAppAmount || '0');
+            else if (selectedPaymentMethod === 'zelle') paymentAmount = parseFloat(zelleAmount || '0');
+            else if (selectedPaymentMethod === 'purchase-order') paymentAmount = parseFloat(poAmount || '0');
+
+            if (!paymentAmount || paymentAmount <= 0) {
+                toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
+                setIsUpdating(false);
+                return;
+            }
+
+            if (!confirmation.invoiceId) {
+                toast({ variant: 'destructive', title: 'Error', description: 'No invoice ID available for payment recording.' });
+                setIsUpdating(false);
+                return;
+            }
+
+            const result = await recordPayment({
+                invoiceId: confirmation.invoiceId,
+                amount: paymentAmount,
+                note: `${selectedPaymentMethod.replace('-', ' ')} payment recorded by ${profile?.firstName || 'organizer'}`,
+                paymentDate: format(new Date(), 'yyyy-MM-dd'),
+            });
+
+            const newTotalPaid = result.totalPaid;
+            const totalInvoiced = result.totalInvoiced || confirmation.totalAmount || confirmation.totalInvoiced || 0;
+            
+            let actualStatus = 'UNPAID';
+            if (newTotalPaid >= totalInvoiced) actualStatus = 'PAID';
+            else if (newTotalPaid > 0) actualStatus = 'PARTIALLY_PAID';
+
+            const newPaymentEntry = {
+                id: result.paymentId,
+                amount: paymentAmount,
+                date: new Date().toISOString(),
+                method: selectedPaymentMethod,
+                note: `${selectedPaymentMethod.replace('-', ' ')} payment recorded by ${profile?.firstName || 'organizer'}`,
+                source: 'manual',
+                recordedBy: profile?.firstName || 'organizer',
+            };
+
+            const updatedConfirmationData = {
+                ...confirmation,
+                status: actualStatus,
+                invoiceStatus: actualStatus,
+                totalPaid: newTotalPaid,
+                totalAmount: totalInvoiced,
+                totalInvoiced: totalInvoiced,
+                paymentStatus: actualStatus === 'PAID' ? 'paid' : 'partially-paid',
+                lastUpdated: new Date().toISOString(),
+                paymentHistory: [...(confirmation.paymentHistory || []), newPaymentEntry]
+            };
+
+            const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+            const updatedAllInvoices = allInvoices.map((inv: any) => inv.id === confirmation.id ? updatedConfirmationData : inv);
+            localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+
+            const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+            const updatedConfirmations = confirmations.map((conf: any) => conf.id === confirmation.id ? updatedConfirmationData : conf);
+            localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+
+            setConfirmation(updatedConfirmationData);
+            
+            setCashAmount('');
+            setCheckAmount('');
+            setCashAppAmount('');
+            setZelleAmount('');
+            setPoAmount('');
+
+            const squareDashboardUrl = getSquareDashboardUrl(confirmation.invoiceNumber);
+            window.open(squareDashboardUrl, '_blank');
+            
+            toast({ 
+                title: 'Payment Recorded & Square Opened', 
+                description: `SQUARE DASHBOARD OPENED: Find invoice #${confirmation.invoiceNumber || confirmation.id.slice(-8)} and click "Mark as paid" with amount $${paymentAmount.toFixed(2)}.`,
+                duration: 10000
+            });
+
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new Event('all_invoices_updated'));
             setIsUpdating(false);
             return;
         }
-    
-        // Calculate new totals BEFORE calling Square API
-        const currentTotalPaid = confirmation.totalPaid || 0;
-        const newTotalPaid = currentTotalPaid + paymentAmount;
-        const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
-        
-        let actualStatus = 'UNPAID';
-        if (newTotalPaid >= totalInvoiced) actualStatus = 'PAID';
-        else if (newTotalPaid > 0) actualStatus = 'PARTIALLY_PAID';
-    
-        // Create new payment entry
-        const newPaymentEntry = {
-            id: `payment_${Date.now()}`,
-            amount: paymentAmount,
-            date: new Date().toISOString(),
-            method: selectedPaymentMethod,
-            note: `${selectedPaymentMethod.replace('-', ' ')} payment recorded by ${profile?.firstName || 'organizer'}`,
-            source: 'manual',
-            recordedBy: profile?.firstName || 'organizer',
-        };
-    
-        // Update confirmation data with correct calculations
-        const updatedConfirmationData = {
-            ...confirmation,
-            status: actualStatus,
-            invoiceStatus: actualStatus,
-            totalPaid: newTotalPaid,
-            totalAmount: totalInvoiced,
-            totalInvoiced: totalInvoiced,
-            paymentStatus: actualStatus === 'PAID' ? 'paid' : 'partially-paid',
-            lastUpdated: new Date().toISOString(),
-            paymentHistory: [...(confirmation.paymentHistory || []), newPaymentEntry]
-        };
-    
-        // Save to localStorage
-        const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-        const updatedAllInvoices = allInvoices.map((inv: any) => 
-            inv.id === confirmation.id ? updatedConfirmationData : inv
-        );
-        localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-    
-        const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-        const updatedConfirmations = confirmations.map((conf: any) => 
-            conf.id === confirmation.id ? updatedConfirmationData : conf
-        );
-        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-    
-        setConfirmation(updatedConfirmationData);
-        
-        // Clear form fields
-        setCashAmount('');
-        setCheckAmount('');
-        setCashAppAmount('');
-        setZelleAmount('');
-        setPoAmount('');
-    
-        // Try to call Square API (this might fail but shouldn't break the local update)
-        try {
-            if (confirmation.invoiceId) {
-                await recordPayment({
-                    invoiceId: confirmation.invoiceId,
-                    amount: paymentAmount,
-                    note: `${selectedPaymentMethod.replace('-', ' ')} payment recorded by ${profile?.firstName || 'organizer'}`,
-                    paymentDate: format(new Date(), 'yyyy-MM-dd'),
-                });
-            }
-        } catch (error) {
-            console.error('Square API call failed, but local payment was recorded:', error);
-            toast({ 
-                title: 'Payment Recorded Locally', 
-                description: `Payment of $${paymentAmount.toFixed(2)} was recorded. Square sync may be needed later.`,
-                duration: 5000
-            });
-        }
-    
-        // Open Square dashboard (modify URL for sandbox if needed)
-        const squareDashboardUrl = getSquareDashboardUrl(confirmation.invoiceNumber);
-        window.open(squareDashboardUrl, '_blank');
-        
-        toast({ 
-            title: 'Payment Recorded Successfully', 
-            description: `Payment of $${paymentAmount.toFixed(2)} recorded. New total paid: $${newTotalPaid.toFixed(2)}`,
-            duration: 8000
-        });
-    
-        window.dispatchEvent(new Event('storage'));
-        window.dispatchEvent(new Event('all_invoices_updated'));
-        setIsUpdating(false);
-        return;
-    }
 
         let updatedConfirmationData = { ...confirmation };
 
@@ -496,7 +490,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <div key={note.id} className="border-l-2 border-blue-200 pl-3 py-2">
                     <p className="text-sm">{note.text}</p>
                     <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), "MMM dd, yyyy 'at' h:mm a")}
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
                     </p>
                   </div>
                 ))
@@ -543,7 +537,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <div key={note.id} className="border-l-2 border-green-200 pl-3 py-2">
                     <p className="text-sm">{note.text}</p>
                     <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), "MMM dd, yyyy 'at' h:mm a")}
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
                     </p>
                   </div>
                 ))
@@ -587,279 +581,280 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   const renderPaymentMethodInputs = () => {
     const isOrganizer = profile?.role === 'organizer';
-    
+    const safeGetValue = (value: string | undefined | null): string => value ?? '';
+  
     if (selectedPaymentMethod === 'credit-card') {
-        return (
-            <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800 mb-3">
-                    Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
-                </p>
-                {invoiceUrl ? (
-                    <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                        <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
-                            Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
-                        </a>
-                    </Button>
-                ) : (
-                    <p className="text-sm text-red-600">Payment link not available</p>
-                )}
-            </div>
-        );
+      return (
+        <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800 mb-3">
+            Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
+          </p>
+          {invoiceUrl ? (
+            <Button asChild className="bg-blue-600 hover:bg-blue-700">
+              <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
+                Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
+          ) : (
+            <p className="text-sm text-red-600">Payment link not available</p>
+          )}
+        </div>
+      );
     }
-
+  
     if (selectedPaymentMethod === 'cash') {
-        return (
-            <div>
-                <Label htmlFor="cash-amount">
-                    {isOrganizer ? 'Cash Amount Received' : 'Cash Amount Paid'}
-                </Label>
-                <Input 
-                    id="cash-amount" 
-                    type="number" 
-                    step="0.01" 
-                    placeholder="Enter amount" 
-                    value={cashAmount ?? ''} 
-                    onChange={(e) => setCashAmount(e.target.value ?? '')} 
-                    disabled={isPaymentApproved} 
-                />
-                {isOrganizer && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                        This will also open Square invoice for manual "Mark as paid" confirmation.
-                    </p>
-                )}
-            </div>
-        );
+      return (
+        <div>
+          <Label htmlFor="cash-amount">
+            {isOrganizer ? 'Cash Amount Received' : 'Cash Amount Paid'}
+          </Label>
+          <Input
+            id="cash-amount"
+            type="number"
+            step="0.01"
+            placeholder="Enter amount"
+            value={safeGetValue(cashAmount)}
+            onChange={(e) => setCashAmount(e.target.value)}
+            disabled={isPaymentApproved}
+          />
+          {isOrganizer && (
+            <p className="text-xs text-muted-foreground mt-1">
+              This will also open Square invoice for manual "Mark as paid" confirmation.
+            </p>
+          )}
+        </div>
+      );
     }
-
+  
     if (selectedPaymentMethod === 'check') {
-        return (
-            <div className="space-y-4">
-                <div>
-                    <Label htmlFor="check-amount">
-                        {isOrganizer ? 'Check Amount Received' : 'Check Amount'}
-                    </Label>
-                    <Input 
-                        id="check-amount" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="Enter amount" 
-                        value={checkAmount ?? ''} 
-                        onChange={(e) => setCheckAmount(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="check-proof">Upload Check Image</Label>
-                    <Input 
-                        id="check-proof" 
-                        type="file" 
-                        accept="image/*,.pdf" 
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                        disabled={isPaymentApproved}
-                    />
-                     {confirmation.paymentFileUrl && !fileToUpload && (
-                        <div className="text-sm mt-2 flex items-center justify-between">
-                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                            <Download className="h-4 w-4" />
-                            View {confirmation.paymentFileName || 'File'}
-                          </a>
-                          {!isPaymentApproved && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      {fileToUpload && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          <FileIcon className="h-4 w-4 inline-block mr-1" />
-                          New file selected: {fileToUpload.name}
-                        </p>
-                      )}
-                </div>
-                {isOrganizer && (
-                    <p className="text-xs text-muted-foreground">
-                        This will also open Square invoice for manual "Mark as paid" confirmation.
-                    </p>
+      return (
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="check-amount">
+              {isOrganizer ? 'Check Amount Received' : 'Check Amount'}
+            </Label>
+            <Input
+              id="check-amount"
+              type="number"
+              step="0.01"
+              placeholder="Enter amount"
+              value={safeGetValue(checkAmount)}
+              onChange={(e) => setCheckAmount(e.target.value)}
+              disabled={isPaymentApproved}
+            />
+          </div>
+          <div>
+            <Label htmlFor="check-proof">Upload Check Image</Label>
+            <Input
+              id="check-proof"
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
+              disabled={isPaymentApproved}
+            />
+            {confirmation.paymentFileUrl && !fileToUpload && (
+              <div className="text-sm mt-2 flex items-center justify-between">
+                <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                  <Download className="h-4 w-4" />
+                  View {confirmation.paymentFileName || 'File'}
+                </a>
+                {!isPaymentApproved && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
-            </div>
-        );
+              </div>
+            )}
+            {fileToUpload && (
+              <p className="text-sm text-muted-foreground mt-2">
+                <FileIcon className="h-4 w-4 inline-block mr-1" />
+                New file selected: {fileToUpload.name}
+              </p>
+            )}
+          </div>
+          {isOrganizer && (
+            <p className="text-xs text-muted-foreground">
+              This will also open Square invoice for manual "Mark as paid" confirmation.
+            </p>
+          )}
+        </div>
+      );
     }
-
+  
     if (selectedPaymentMethod === 'cash-app') {
-        return (
-            <div className="space-y-4">
-                <div>
-                    <Label htmlFor="cashapp-amount">
-                        {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
-                    </Label>
-                    <Input 
-                        id="cashapp-amount" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="Enter amount" 
-                        value={cashAppAmount ?? ''} 
-                        onChange={(e) => setCashAppAmount(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="cashapp-proof">Upload Cash App Screenshot</Label>
-                    <Input 
-                        id="cashapp-proof" 
-                        type="file" 
-                        accept="image/*,.pdf" 
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                        disabled={isPaymentApproved}
-                    />
-                     {confirmation.paymentFileUrl && !fileToUpload && (
-                        <div className="text-sm mt-2 flex items-center justify-between">
-                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                            <Download className="h-4 w-4" />
-                            View {confirmation.paymentFileName || 'File'}
-                          </a>
-                          {!isPaymentApproved && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      {fileToUpload && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          <FileIcon className="h-4 w-4 inline-block mr-1" />
-                          New file selected: {fileToUpload.name}
-                        </p>
-                      )}
-                </div>
-                {isOrganizer && (
-                    <p className="text-xs text-muted-foreground">
-                        This will also open Square invoice for manual "Mark as paid" confirmation.
-                    </p>
+      return (
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="cashapp-amount">
+              {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
+            </Label>
+            <Input
+              id="cashapp-amount"
+              type="number"
+              step="0.01"
+              placeholder="Enter amount"
+              value={safeGetValue(cashAppAmount)}
+              onChange={(e) => setCashAppAmount(e.target.value)}
+              disabled={isPaymentApproved}
+            />
+          </div>
+          <div>
+            <Label htmlFor="cashapp-proof">Upload Cash App Screenshot</Label>
+            <Input
+              id="cashapp-proof"
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
+              disabled={isPaymentApproved}
+            />
+            {confirmation.paymentFileUrl && !fileToUpload && (
+              <div className="text-sm mt-2 flex items-center justify-between">
+                <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                  <Download className="h-4 w-4" />
+                  View {confirmation.paymentFileName || 'File'}
+                </a>
+                {!isPaymentApproved && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
-            </div>
-        );
+              </div>
+            )}
+            {fileToUpload && (
+              <p className="text-sm text-muted-foreground mt-2">
+                <FileIcon className="h-4 w-4 inline-block mr-1" />
+                New file selected: {fileToUpload.name}
+              </p>
+            )}
+          </div>
+          {isOrganizer && (
+            <p className="text-xs text-muted-foreground">
+              This will also open Square invoice for manual "Mark as paid" confirmation.
+            </p>
+          )}
+        </div>
+      );
     }
-
+  
     if (selectedPaymentMethod === 'zelle') {
-        return (
-            <div className="space-y-4">
-                <div>
-                    <Label htmlFor="zelle-amount">
-                        {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
-                    </Label>
-                    <Input 
-                        id="zelle-amount" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="Enter amount" 
-                        value={zelleAmount ?? ''} 
-                        onChange={(e) => setZelleAmount(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="zelle-proof">Upload Zelle Confirmation</Label>
-                    <Input 
-                        id="zelle-proof" 
-                        type="file" 
-                        accept="image/*,.pdf" 
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                        disabled={isPaymentApproved}
-                    />
-                     {confirmation.paymentFileUrl && !fileToUpload && (
-                        <div className="text-sm mt-2 flex items-center justify-between">
-                          <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                            <Download className="h-4 w-4" />
-                            View {confirmation.paymentFileName || 'File'}
-                          </a>
-                          {!isPaymentApproved && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                      {fileToUpload && (
-                        <p className="text-sm text-muted-foreground mt-2">
-                          <FileIcon className="h-4 w-4 inline-block mr-1" />
-                          New file selected: {fileToUpload.name}
-                        </p>
-                      )}
-                </div>
-                {isOrganizer && (
-                    <p className="text-xs text-muted-foreground">
-                        This will also open Square invoice for manual "Mark as paid" confirmation.
-                    </p>
+      return (
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="zelle-amount">
+              {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
+            </Label>
+            <Input
+              id="zelle-amount"
+              type="number"
+              step="0.01"
+              placeholder="Enter amount"
+              value={safeGetValue(zelleAmount)}
+              onChange={(e) => setZelleAmount(e.target.value)}
+              disabled={isPaymentApproved}
+            />
+          </div>
+          <div>
+            <Label htmlFor="zelle-proof">Upload Zelle Confirmation</Label>
+            <Input
+              id="zelle-proof"
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
+              disabled={isPaymentApproved}
+            />
+            {confirmation.paymentFileUrl && !fileToUpload && (
+              <div className="text-sm mt-2 flex items-center justify-between">
+                <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                  <Download className="h-4 w-4" />
+                  View {confirmation.paymentFileName || 'File'}
+                </a>
+                {!isPaymentApproved && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
-            </div>
-        );
+              </div>
+            )}
+            {fileToUpload && (
+              <p className="text-sm text-muted-foreground mt-2">
+                <FileIcon className="h-4 w-4 inline-block mr-1" />
+                New file selected: {fileToUpload.name}
+              </p>
+            )}
+          </div>
+          {isOrganizer && (
+            <p className="text-xs text-muted-foreground">
+              This will also open Square invoice for manual "Mark as paid" confirmation.
+            </p>
+          )}
+        </div>
+      );
     }
-
+  
     if (selectedPaymentMethod === 'purchase-order' && !isIndividualInvoice) {
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <Label htmlFor="po-amount">
-                        {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
-                    </Label>
-                    <Input 
-                        id="po-amount" 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="Enter amount" 
-                        value={poAmount ?? ''} 
-                        onChange={(e) => setPoAmount(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div>
-                    <Label htmlFor="po-number">PO Number</Label>
-                    <Input 
-                        id="po-number" 
-                        placeholder="Enter PO Number" 
-                        value={poNumber ?? ''} 
-                        onChange={(e) => setPONumber(e.target.value ?? '')} 
-                        disabled={isPaymentApproved} 
-                    />
-                </div>
-                <div className="md:col-span-2">
-                    <Label htmlFor="po-document">Upload PO Document</Label>
-                    <Input 
-                        id="po-document" 
-                        type="file" 
-                        accept=".pdf,.doc,.docx,.jpg,.png" 
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                        disabled={isPaymentApproved} 
-                    />
-                    {confirmation.poFileUrl && !fileToUpload && (
-                        <div className="text-sm mt-2 flex items-center justify-between">
-                            <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
-                                <Download className="h-4 w-4" />
-                                View {confirmation.poFileName || 'File'}
-                            </a>
-                            {!isPaymentApproved && (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            )}
-                        </div>
-                    )}
-                    {fileToUpload && (
-                        <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
-                    )}
-                </div>
-                {isOrganizer && (
-                    <div className="md:col-span-2">
-                        <p className="text-xs text-muted-foreground">
-                            This will also open Square invoice for manual "Mark as paid" confirmation.
-                        </p>
-                    </div>
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <Label htmlFor="po-amount">
+              {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
+            </Label>
+            <Input
+              id="po-amount"
+              type="number"
+              step="0.01"
+              placeholder="Enter amount"
+              value={safeGetValue(poAmount)}
+              onChange={(e) => setPoAmount(e.target.value)}
+              disabled={isPaymentApproved}
+            />
+          </div>
+          <div>
+            <Label htmlFor="po-number">PO Number</Label>
+            <Input
+              id="po-number"
+              placeholder="Enter PO Number"
+              value={safeGetValue(poNumber)}
+              onChange={(e) => setPoNumber(e.target.value)}
+              disabled={isPaymentApproved}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Label htmlFor="po-document">Upload PO Document</Label>
+            <Input
+              id="po-document"
+              type="file"
+              accept=".pdf,.doc,.docx,.jpg,.png"
+              onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
+              disabled={isPaymentApproved}
+            />
+            {confirmation.poFileUrl && !fileToUpload && (
+              <div className="text-sm mt-2 flex items-center justify-between">
+                <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                  <Download className="h-4 w-4" />
+                  View {confirmation.poFileName || 'File'}
+                </a>
+                {!isPaymentApproved && (
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={handleDeleteFile} disabled={isUpdating}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
+              </div>
+            )}
+            {fileToUpload && (
+              <p className="text-sm text-muted-foreground mt-2">New file selected: {fileToUpload.name}</p>
+            )}
+          </div>
+          {isOrganizer && (
+            <div className="md:col-span-2">
+              <p className="text-xs text-muted-foreground">
+                This will also open Square invoice for manual "Mark as paid" confirmation.
+              </p>
             </div>
-        );
+          )}
+        </div>
+      );
     }
-
+  
     return null;
   };
 
