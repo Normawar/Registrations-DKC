@@ -18,6 +18,7 @@ export type Event = {
   pdfUrl?: string;
   pdfName?: string;
   isClosed?: boolean;
+  isPsjaOnly?: boolean;
 };
 
 const initialEvents: Event[] = [
@@ -36,6 +37,7 @@ const initialEvents: Event[] = [
         pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
         pdfName: "Spring Flyer",
         isClosed: false,
+        isPsjaOnly: false,
     },
     {
         id: '2',
@@ -48,6 +50,7 @@ const initialEvents: Event[] = [
         veryLateFee: 35,
         dayOfFee: 40,
         isClosed: false,
+        isPsjaOnly: false,
     },
     {
         id: '3',
@@ -62,6 +65,7 @@ const initialEvents: Event[] = [
         pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
         pdfName: "Autumn Classic PDF",
         isClosed: true,
+        isPsjaOnly: false,
     },
     {
         id: '4',
@@ -74,6 +78,7 @@ const initialEvents: Event[] = [
         veryLateFee: 30,
         dayOfFee: 35,
         isClosed: false,
+        isPsjaOnly: false,
     },
     {
         id: '5',
@@ -88,6 +93,7 @@ const initialEvents: Event[] = [
         imageUrl: "https://placehold.co/100x100.png",
         imageName: "Blitz Image",
         isClosed: false,
+        isPsjaOnly: true,
     },
 ];
 

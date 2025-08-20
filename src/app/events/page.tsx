@@ -137,6 +137,7 @@ export default function EventsPage() {
           <div className="grid gap-6">
             {upcomingEvents.map(event => {
               const status = getEventRegistrationStatus(event);
+              const isPsjaRestricted = event.isPsjaOnly && profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD';
               
               return (
                 <Card key={event.id} className="overflow-hidden">
@@ -167,14 +168,14 @@ export default function EventsPage() {
                             {status.studentCount} student{status.studentCount !== 1 ? 's' : ''} registered
                           </Badge>
                         )}
-                        {event.isClosed && (
+                        {(event.isClosed || isPsjaRestricted) && (
                             <Badge variant="destructive">
                                 <Lock className="h-3 w-3 mr-1.5" />
-                                Registration Closed
+                                {isPsjaRestricted ? 'PSJA Only' : 'Registration Closed'}
                             </Badge>
                         )}
                         
-                        <Button size="sm" onClick={() => handleRegisterClick(event)} disabled={event.isClosed}>
+                        <Button size="sm" onClick={() => handleRegisterClick(event)} disabled={event.isClosed || isPsjaRestricted}>
                           {status.isRegistered ? 'Manage Registration' : 'Register Students'}
                         </Button>
                       </div>

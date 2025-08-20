@@ -305,7 +305,9 @@ export function SponsorRegistrationDialog({
 
   if (!event) return null;
 
-  if (event.isClosed) {
+  const isRestrictedEvent = event.isPsjaOnly && profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD';
+
+  if (event.isClosed || isRestrictedEvent) {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
@@ -314,9 +316,12 @@ export function SponsorRegistrationDialog({
                 </DialogHeader>
                 <Alert variant="destructive">
                     <Lock className="h-4 w-4" />
-                    <AlertTitle>Registration Closed</AlertTitle>
+                    <AlertTitle>{isRestrictedEvent ? 'Registration Restricted' : 'Registration Closed'}</AlertTitle>
                     <AlertDescription>
-                        We are no longer accepting registrations for this event.
+                        {isRestrictedEvent 
+                          ? 'This event is only open to students from the PHARR-SAN JUAN-ALAMO ISD.'
+                          : 'We are no longer accepting registrations for this event.'
+                        }
                     </AlertDescription>
                 </Alert>
                 <DialogFooter>

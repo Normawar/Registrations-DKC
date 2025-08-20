@@ -51,14 +51,17 @@ export function IndividualRegistrationDialog({
         const storedParentStudents = localStorage.getItem(`parent_students_${parentProfile.email}`);
         if (storedParentStudents) {
           const studentIds = JSON.parse(storedParentStudents);
-          const students = database.filter(p => studentIds.includes(p.id));
+          let students = database.filter(p => studentIds.includes(p.id));
+          if (event?.isPsjaOnly) {
+            students = students.filter(p => p.district === 'PHARR-SAN JUAN-ALAMO ISD');
+          }
           setParentStudents(students);
         }
       } catch (error) {
         console.error('Failed to load parent students:', error);
       }
     }
-  }, [parentProfile, database, isOpen]);
+  }, [parentProfile, database, isOpen, event]);
   
     useEffect(() => {
         const loadRegistrations = () => {
@@ -177,7 +180,6 @@ export function IndividualRegistrationDialog({
         eventName: event.name,
         eventDate: event.date,
         uscfFee: 24,
-        players: playersToInvoice,
         // No bookkeeper or GT coordinator emails for individuals
         bookkeeperEmail: undefined,
         gtCoordinatorEmail: undefined,
@@ -271,6 +273,8 @@ export function IndividualRegistrationDialog({
   };
 
   if (!event) return null;
+  
+  const isPsjaRestricted = event.isPsjaOnly;
 
   if (event.isClosed) {
     return (
@@ -307,11 +311,17 @@ export function IndividualRegistrationDialog({
         </DialogHeader>
 
         <div className="space-y-4 flex-1 overflow-y-auto pr-6 -mr-6">
+          {isPsjaRestricted && (
+            <Alert>
+              <AlertTitle>PSJA-Only Event</AlertTitle>
+              <AlertDescription>This event is restricted to students from the PHARR-SAN JUAN-ALAMO ISD. Only eligible students from your list are shown.</AlertDescription>
+            </Alert>
+          )}
           {parentStudents.length === 0 ? (
             <div className="text-center p-8 text-muted-foreground">
               <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No Students Found</p>
-              <p>Add students to your profile first before registering for events.</p>
+              <p className="text-lg font-medium">No Eligible Students Found</p>
+              <p>{isPsjaRestricted ? "You have no students from PHARR-SAN JUAN-ALAMO ISD on your list." : "Add students to your profile first before registering for events."}</p>
             </div>
           ) : (
             <div className="grid gap-4">

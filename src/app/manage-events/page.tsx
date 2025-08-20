@@ -106,6 +106,7 @@ const eventFormSchema = z.object({
   pdfUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
   pdfName: z.string().optional(),
   isClosed: z.boolean().optional(),
+  isPsjaOnly: z.boolean().optional(),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -180,6 +181,7 @@ export default function ManageEventsPage() {
       pdfUrl: '',
       pdfName: '',
       isClosed: false,
+      isPsjaOnly: false,
     },
   });
 
@@ -258,6 +260,7 @@ export default function ManageEventsPage() {
           pdfUrl: editingEvent.pdfUrl || '',
           pdfName: editingEvent.pdfName || '',
           isClosed: !!editingEvent.isClosed,
+          isPsjaOnly: !!editingEvent.isPsjaOnly,
         });
       } else {
         form.reset({
@@ -274,6 +277,7 @@ export default function ManageEventsPage() {
           pdfUrl: '',
           pdfName: '',
           isClosed: false,
+          isPsjaOnly: false,
         });
       }
     }
@@ -532,13 +536,6 @@ export default function ManageEventsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => {
-              localStorage.removeItem('master_player_database');
-              localStorage.removeItem('master_player_database_timestamp');
-              window.location.reload();
-            }} variant="destructive">
-              Clear DB Cache & Reload
-            </Button>
             <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -673,28 +670,52 @@ export default function ManageEventsPage() {
                   <FormField control={form.control} name="pdfUrl" render={({ field }) => ( <FormItem><FormLabel>PDF Flyer URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl><FormMessage /></FormItem> )}/>
                   <FormField control={form.control} name="pdfName" render={({ field }) => ( <FormItem><FormLabel>PDF Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl><FormDescription>A descriptive name for the PDF attachment.</FormDescription><FormMessage /></FormItem> )}/>
                 </div>
-                <FormField
-                  control={form.control}
-                  name="isClosed"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>
-                          Close Registrations
-                        </FormLabel>
-                        <FormDescription>
-                          Check this box to prevent any new registrations for this event.
-                        </FormDescription>
-                      </div>
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="isClosed"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Close Registrations
+                            </FormLabel>
+                            <FormDescription>
+                              Check this box to prevent any new registrations for this event.
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="isPsjaOnly"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Restrict to PSJA Students
+                            </FormLabel>
+                            <FormDescription>
+                              Only allow sponsors and parents of students in PHARR-SAN JUAN-ALAMO ISD to register.
+                            </FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                </div>
               </form>
             </Form>
           </div>
