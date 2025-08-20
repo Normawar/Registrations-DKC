@@ -146,17 +146,37 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 paymentDate: format(new Date(), 'yyyy-MM-dd'),
             });
 
-            // Update local records with payment result
+            console.log('Payment result:', result); // Debug log
+
+            // Calculate the cumulative totals properly
+            const previouslyPaid = confirmation.totalPaid || 0;
+            const newTotalPaid = result.totalPaid; // Use the total from Square
+            const totalInvoiced = result.totalInvoiced || confirmation.totalAmount || confirmation.totalInvoiced || 0;
+
+            // Update local records with proper payment data
             const updatedConfirmationData = {
                 ...confirmation,
                 status: result.status,
                 invoiceStatus: result.status,
-                totalPaid: result.totalPaid,
-                paymentStatus: result.status === 'PAID' ? 'paid' : 'partially-paid',
+                totalPaid: newTotalPaid,
+                totalAmount: totalInvoiced,
+                totalInvoiced: totalInvoiced,
+                paymentStatus: result.status === 'PAID' ? 'paid' : (newTotalPaid > 0 ? 'partially-paid' : 'unpaid'),
                 lastUpdated: new Date().toISOString(),
+                // Add payment history entry
+                paymentHistory: [
+                    ...(confirmation.paymentHistory || []),
+                    {
+                        id: result.paymentId,
+                        amount: parseFloat(cashAmount),
+                        date: new Date().toISOString(),
+                        method: 'cash',
+                        note: 'Cash payment recorded by organizer'
+                    }
+                ]
             };
 
-            // Update both all_invoices and confirmations
+            // Update both storage locations
             const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
             const updatedAllInvoices = allInvoices.map((inv: any) =>
                 inv.id === confirmation.id ? updatedConfirmationData : inv
@@ -169,14 +189,16 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             );
             localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
 
+            // Update local state
             setConfirmation(updatedConfirmationData);
             setCashAmount('');
 
             toast({ 
                 title: 'Payment Recorded', 
-                description: `Cash payment of $${cashAmount} has been recorded. Invoice status: ${result.status}` 
+                description: `Cash payment of $${cashAmount} recorded. New total paid: $${newTotalPaid.toFixed(2)}. Status: ${result.status}` 
             });
 
+            // Trigger storage events
             window.dispatchEvent(new Event('storage'));
             window.dispatchEvent(new Event('all_invoices_updated'));
             setIsUpdating(false);
@@ -303,8 +325,20 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       }
   };
 
-  const getStatusBadge = (status: string) => {
-    const s = (status || '').toUpperCase();
+const getStatusBadge = (status: string, totalPaid?: number, totalInvoiced?: number) => {
+    let displayStatus = (status || '').toUpperCase();
+    
+    // Override status based on payment amounts if available
+    if (totalPaid !== undefined && totalInvoiced !== undefined) {
+        if (totalPaid >= totalInvoiced && totalPaid > 0) {
+            displayStatus = 'PAID';
+        } else if (totalPaid > 0 && totalPaid < totalInvoiced) {
+            displayStatus = 'PARTIALLY_PAID';
+        } else if (totalPaid === 0) {
+            displayStatus = 'UNPAID';
+        }
+    }
+    
     const variants: { [key: string]: 'default' | 'destructive' | 'secondary' } = {
         'PAID': 'default',
         'COMPED': 'default',
@@ -313,12 +347,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         'CANCELED': 'destructive',
         'PARTIALLY_PAID': 'secondary',
     };
+    
     let className = '';
-    if (s === 'PAID' || s === 'COMPED') className = 'bg-green-600 text-white';
-    if (s === 'PARTIALLY_PAID') className = 'bg-blue-600 text-white';
-    if (s === 'PENDING-PO') className = 'bg-yellow-500 text-black';
-    return <Badge variant={variants[s] || 'secondary'} className={className}>{s.replace(/_/g, ' ')}</Badge>;
-  };
+    if (displayStatus === 'PAID' || displayStatus === 'COMPED') className = 'bg-green-600 text-white';
+    if (displayStatus === 'PARTIALLY_PAID') className = 'bg-blue-600 text-white';
+    if (displayStatus === 'PENDING-PO') className = 'bg-yellow-500 text-black';
+    
+    return (
+        <Badge variant={variants[displayStatus] || 'secondary'} className={className}>
+            {displayStatus.replace(/_/g, ' ')}
+        </Badge>
+    );
+};
+
 
   if (!isOpen || !confirmation) return null;
 
@@ -341,6 +382,66 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   const shouldShowCashAmount = selectedPaymentMethod === 'cash' && profile?.role === 'organizer';
 
+  const PaymentHistorySection = ({ confirmation }: { confirmation: any }) => {
+    const totalPaid = confirmation.totalPaid || 0;
+    const paymentHistory = confirmation.paymentHistory || [];
+    
+    return (
+        <Card>
+            <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
+            <CardContent>
+                {totalPaid > 0 || paymentHistory.length > 0 ? (
+                    <div className='space-y-3'>
+                        {/* Show payment history entries if available */}
+                        {paymentHistory.map((payment: any, index: number) => (
+                            <div key={payment.id || index} className="flex justify-between items-center border-b pb-2">
+                                <div>
+                                    <p className="text-sm font-medium">
+                                        {payment.method === 'cash' ? 'Cash Payment' : 'Payment'} 
+                                        {payment.note && ` - ${payment.note}`}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {payment.date ? format(new Date(payment.date), 'PPp') : 'Unknown date'}
+                                    </p>
+                                </div>
+                                <span className='font-medium text-green-600'>
+                                    ${payment.amount?.toFixed(2) || '0.00'}
+                                </span>
+                            </div>
+                        ))}
+                        
+                        {/* Fallback display if we have totalPaid but no detailed history */}
+                        {totalPaid > 0 && paymentHistory.length === 0 && (
+                            <div className="flex justify-between items-center border-b pb-2">
+                                <div>
+                                    <p className="text-sm font-medium">Payment Recorded</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {confirmation.lastUpdated ? format(new Date(confirmation.lastUpdated), 'PPp') : 'Recently'}
+                                    </p>
+                                </div>
+                                <span className='font-medium text-green-600'>
+                                    ${totalPaid.toFixed(2)}
+                                </span>
+                            </div>
+                        )}
+                        
+                        {/* Total summary */}
+                        <div className="flex justify-between items-center pt-2 border-t font-semibold">
+                            <span>Total Paid</span>
+                            <span className="text-green-600">${totalPaid.toFixed(2)}</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className='text-sm text-muted-foreground text-center py-4'>
+                        <History className="mx-auto h-6 w-6 mb-2" />
+                        No payments have been recorded for this invoice yet.
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
@@ -349,7 +450,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     <div>
                         <DialogTitle className="text-2xl">{confirmation.invoiceTitle || confirmation.eventName}</DialogTitle>
                          <div className="text-sm text-muted-foreground flex items-center gap-2 mt-2">
-                            {getStatusBadge(confirmation.invoiceStatus || confirmation.status)}
+                            {getStatusBadge(confirmation.invoiceStatus || confirmation.status, confirmation.totalPaid, confirmation.totalAmount || confirmation.totalInvoiced)}
                             <span>
                                 Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
                             </span>
@@ -638,25 +739,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader><CardTitle>Payment History</CardTitle></CardHeader>
-                         <CardContent>
-                            {totalPaid > 0 ? (
-                                <div className='space-y-2'>
-                                    {/* This is a placeholder; a real app would map over payment history records */}
-                                    <div className="flex justify-between text-sm">
-                                        <span>Manual Payment Recorded</span>
-                                        <span className='font-medium'>${totalPaid.toFixed(2)}</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className='text-sm text-muted-foreground text-center py-4'>
-                                    <History className="mx-auto h-6 w-6 mb-2" />
-                                    No payments have been recorded for this invoice yet.
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                    <PaymentHistorySection confirmation={confirmation} />
                 </div>
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
