@@ -360,34 +360,34 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const shouldShowCashAmount = selectedPaymentMethod === 'cash' && profile?.role === 'organizer';
   
   const PaymentHistorySection = () => {
-  const paymentHistory = confirmation.paymentHistory || [];
-  
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Payment History</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {paymentHistory.length > 0 ? (
-          <div className="space-y-2">
-            {paymentHistory.map((payment: any, index: number) => (
-              <div key={index} className="flex justify-between border-b pb-2">
-                <span className="text-sm">{payment.method || 'Payment'}</span>
-                <span className="font-semibold">${payment.amount?.toFixed(2) || '0.00'}</span>
+    const paymentHistory = confirmation.paymentHistory || [];
+    
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {paymentHistory.length > 0 ? (
+            <div className="space-y-2">
+              {paymentHistory.map((payment, index) => (
+                <div key={index} className="flex justify-between border-b pb-2">
+                  <span className="text-sm">{payment.method || 'Payment'}</span>
+                  <span className="font-semibold">${payment.amount?.toFixed(2) || '0.00'}</span>
+                </div>
+              ))}
+              <div className="flex justify-between pt-2 border-t font-semibold">
+                <span>Total Paid</span>
+                <span>${totalPaid.toFixed(2)}</span>
               </div>
-            ))}
-            <div className="flex justify-between pt-2 border-t font-semibold">
-              <span>Total Paid</span>
-              <span>${totalPaid.toFixed(2)}</span>
             </div>
-          </div>
-        ) : (
-          <p className="text-gray-500 text-center py-4">No payments recorded yet.</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
+          ) : (
+            <p className="text-gray-500 text-center py-4">No payments recorded yet.</p>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
 
   return (
@@ -687,7 +687,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                         </CardContent>
                     </Card>
-                    <PaymentHistorySection />
+                    <div>Simple Payment History Test</div>
                 </div>
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
@@ -701,3 +701,4 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
+
