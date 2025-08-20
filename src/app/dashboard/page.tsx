@@ -31,6 +31,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useMasterDb } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
 
 
 export default function DashboardPage() {
