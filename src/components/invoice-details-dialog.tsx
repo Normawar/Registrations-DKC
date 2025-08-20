@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -29,6 +28,31 @@ interface InvoiceDetailsDialogProps {
 }
 
 export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: InvoiceDetailsDialogProps) {
+  // Add these debug lines RIGHT HERE
+  console.log('=== COMPONENT DEBUG ===');
+  console.log('Dialog:', Dialog);
+  console.log('DialogContent:', DialogContent);
+  console.log('DialogHeader:', DialogHeader);
+  console.log('DialogTitle:', DialogTitle);
+  console.log('DialogFooter:', DialogFooter);
+  console.log('Card:', Card);
+  console.log('CardHeader:', CardHeader);
+  console.log('CardTitle:', CardTitle);
+  console.log('CardContent:', CardContent);
+  console.log('CardDescription:', CardDescription);
+  console.log('CardFooter:', CardFooter);
+  console.log('Button:', Button);
+  console.log('Badge:', Badge);
+  console.log('Input:', Input);
+  console.log('Label:', Label);
+  console.log('Separator:', Separator);
+  console.log('Alert:', Alert);
+  console.log('AlertTitle:', AlertTitle);
+  console.log('AlertDescription:', AlertDescription);
+  console.log('History:', History);
+  console.log('Sync:', Sync);
+  console.log('=== END DEBUG ===');
+  
   const { toast } = useToast();
   const { profile } = useSponsorProfile();
   const { database: masterDatabase } = useMasterDb();
@@ -701,4 +725,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
