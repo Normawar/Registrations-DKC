@@ -26,7 +26,7 @@ interface SponsorRegistrationDialogProps {
 export function SponsorRegistrationDialog({ 
   isOpen, 
   onOpenChange, 
-  event
+  event 
 }: SponsorRegistrationDialogProps) {
   const { toast } = useToast();
   const { database } = useMasterDb();

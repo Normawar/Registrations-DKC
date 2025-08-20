@@ -236,12 +236,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             </DialogHeader>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {authError && (
-                    <Alert variant="destructive">
-                        <AlertTitle>File Uploads Disabled</AlertTitle>
-                        <AlertDescription>{authError}</AlertDescription>
-                    </Alert>
-                )}
                 
                 <div className="grid gap-6 md:grid-cols-2">
                     <Card>
@@ -261,13 +255,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             </div>
                             <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">Sponsor Email</p>
-                                <p>{confirmation.sponsorEmail || confirmation.purchaserEmail || 'N/A'}</p>
+                                <p>{confirmation.sponsorEmail || 'N/A'}</p>
                             </div>
-                             <div className="flex justify-between">
+                            <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">Sponsor Phone</p>
                                 <p>{confirmation.sponsorPhone || 'N/A'}</p>
                             </div>
-                             <div className="flex justify-between">
+                            <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">School</p>
                                 <p>{confirmation.schoolName || 'N/A'}</p>
                             </div>
@@ -292,6 +286,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             <CardDescription>Select a payment method and provide the necessary details. An organizer will verify your payment.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
+                            {authError && (
+                                <Alert variant="destructive">
+                                    <AlertTitle>File Uploads Disabled</AlertTitle>
+                                    <DialogDescription>{authError}</DialogDescription>
+                                </Alert>
+                            )}
                             <div>
                                 <Label className="text-base font-medium mb-4 block">Payment Method</Label>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
