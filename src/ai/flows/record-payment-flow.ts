@@ -1,11 +1,6 @@
-
 'use server';
 /**
- * @fileOverview Records a payment against a Square invoice.
- *
- * - recordPayment - A function that handles adding a payment to an invoice.
- * - RecordPaymentInput - The input type for the recordPayment function.
- * - RecordPaymentOutput - The return type for the recordPayment function.
+ * @fileOverview Records a payment against a Square invoice using proper Square API methods.
  */
 
 import {ai} from '@/ai/genkit';
@@ -48,16 +43,15 @@ const recordPaymentFlow = ai.defineFlow(
     if (!isConfigured) {
       console.log(`Square not configured. Mock-recording payment for invoice ${input.invoiceId}.`);
       
-      // For mock mode, assume a total invoice amount for demonstration
-      const mockTotalInvoiced = 100; // This would normally come from the invoice
-      const newTotal = input.amount;
-      const isPartial = newTotal < mockTotalInvoiced;
+      // For mock mode, simulate realistic behavior
+      const mockTotalInvoiced = 40; // Use a realistic amount
+      const isPartial = input.amount < mockTotalInvoiced;
       
       return {
         invoiceId: input.invoiceId,
         paymentId: `MOCK_PAY_${randomUUID()}`,
         status: isPartial ? 'PARTIALLY_PAID' : 'PAID',
-        totalPaid: newTotal,
+        totalPaid: input.amount,
         totalInvoiced: mockTotalInvoiced,
         isPartialPayment: isPartial,
       };
@@ -67,7 +61,7 @@ const recordPaymentFlow = ai.defineFlow(
     const { invoicesApi, paymentsApi } = squareClient;
       
     try {
-      console.log(`Fetching invoice ${input.invoiceId} to get current version and order ID...`);
+      console.log(`Fetching invoice ${input.invoiceId} to get current details...`);
       const { result: { invoice } } = await invoicesApi.getInvoice(input.invoiceId);
       
       if (!invoice || !invoice.version) {
@@ -78,13 +72,18 @@ const recordPaymentFlow = ai.defineFlow(
         throw new Error(`Invoice ${input.invoiceId} has no payment requests to apply payment to.`);
       }
 
-      // Get the total invoice amount for comparison
-      const invoiceRequestedAmount = invoice.paymentRequests[0]?.requestedMoney?.amount 
-        ? Number(invoice.paymentRequests[0].requestedMoney.amount) / 100 
-        : 0;
+      // Get the total invoice amount
+      const paymentRequest = invoice.paymentRequests[0];
+      const totalInvoicedCents = paymentRequest.requestedMoney?.amount ? Number(paymentRequest.requestedMoney.amount) : 0;
+      const totalInvoicedDollars = totalInvoicedCents / 100;
 
-      console.log(`Recording external payment of $${input.amount} for invoice ID: ${input.invoiceId}`);
+      // Get current paid amount
+      const currentPaidCents = paymentRequest.totalCompletedAmountMoney?.amount ? Number(paymentRequest.totalCompletedAmountMoney.amount) : 0;
+      const currentPaidDollars = currentPaidCents / 100;
 
+      console.log(`Invoice details - Total: $${totalInvoicedDollars}, Currently Paid: $${currentPaidDollars}, New Payment: $${input.amount}`);
+
+      // Create the external payment record
       const paymentAmount: Money = {
           amount: BigInt(Math.round(input.amount * 100)),
           currency: 'USD',
@@ -94,10 +93,14 @@ const recordPaymentFlow = ai.defineFlow(
           idempotencyKey: randomUUID(),
           sourceId: 'EXTERNAL', 
           amountMoney: paymentAmount,
-          note: input.note,
+          note: input.note || 'Manual payment entry',
           externalDetails: {
             type: 'EXTERNAL',
             source: input.note || 'Manual Payment',
+            sourceFeeMoney: {
+              amount: BigInt(0),
+              currency: 'USD'
+            }
           }
       });
 
@@ -106,50 +109,71 @@ const recordPaymentFlow = ai.defineFlow(
         throw new Error("Failed to create payment record in Square.");
       }
       
-      console.log(`Successfully created payment ${payment.id}. Now adding to invoice...`);
+      console.log(`Successfully created payment ${payment.id}. Now linking to invoice...`);
       
-      const existingPaymentRequest = invoice.paymentRequests[0];
+      // Use the Square Invoices API to record the payment properly
+      // This should use the recordPayment endpoint as per Square documentation
+      try {
+        const recordResponse = await invoicesApi.recordPayment(input.invoiceId, {
+          paymentId: payment.id,
+          requestMethod: 'EXTERNAL'
+        });
+        
+        console.log('Payment recorded via recordPayment API:', recordResponse.result);
+      } catch (recordError) {
+        console.log('recordPayment API failed, falling back to updateInvoice method:', recordError);
+        
+        // Fallback to updating the invoice manually
+        await invoicesApi.updateInvoice(input.invoiceId, {
+          invoice: {
+              paymentRequests: [{
+                  uid: paymentRequest.uid,
+                  requestType: paymentRequest.requestType,
+                  dueDate: paymentRequest.dueDate,
+                  reminders: paymentRequest.reminders,
+                  paymentId: payment.id,
+              }],
+              version: invoice.version,
+          },
+          idempotencyKey: randomUUID(),
+        });
+      }
 
-      const { result: { invoice: finalInvoice } } = await invoicesApi.updateInvoice(input.invoiceId, {
-        invoice: {
-            paymentRequests: [{
-                uid: existingPaymentRequest.uid,
-                requestType: existingPaymentRequest.requestType,
-                dueDate: existingPaymentRequest.dueDate,
-                reminders: existingPaymentRequest.reminders,
-                paymentId: payment.id, // This is how you link the created payment
-            }],
-            version: invoice.version,
-        },
-        idempotencyKey: randomUUID(),
-      });
+      // Fetch the updated invoice to get the final status
+      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(input.invoiceId);
+      
+      if (!finalInvoice) {
+        throw new Error("Failed to fetch updated invoice after payment recording.");
+      }
 
-      // Calculate total paid amount from all completed payment requests
-      const totalPaidAmount = finalInvoice?.paymentRequests
-        ?.flatMap(pr => pr.totalCompletedAmountMoney?.amount ? [pr.totalCompletedAmountMoney.amount] : [])
-        .reduce((sum, current) => sum + current, BigInt(0)) || BigInt(0);
+      // Calculate the new total paid amount
+      const newTotalPaidDollars = currentPaidDollars + input.amount;
+      const isPartialPayment = newTotalPaidDollars < totalInvoicedDollars;
 
-      const totalPaidDollars = Number(totalPaidAmount) / 100;
-      const isPartialPayment = totalPaidDollars < invoiceRequestedAmount;
-
-      // Determine the correct status based on payment completion
-      let status = finalInvoice!.status!;
-      if (totalPaidDollars >= invoiceRequestedAmount) {
+      // Determine the correct status
+      let status = finalInvoice.status || 'UNPAID';
+      if (newTotalPaidDollars >= totalInvoicedDollars) {
         status = 'PAID';
-      } else if (totalPaidDollars > 0) {
+      } else if (newTotalPaidDollars > 0) {
         status = 'PARTIALLY_PAID';
       }
 
-      console.log(`Payment recorded. Status: ${status}, Total Paid: $${totalPaidDollars}, Invoice Total: $${invoiceRequestedAmount}`);
+      console.log(`Payment processing complete:
+        - Payment ID: ${payment.id}
+        - Status: ${status}
+        - Total Paid: $${newTotalPaidDollars}
+        - Invoice Total: $${totalInvoicedDollars}
+        - Is Partial: ${isPartialPayment}`);
 
       return {
-        invoiceId: finalInvoice!.id!,
+        invoiceId: finalInvoice.id!,
         paymentId: payment.id,
         status: status,
-        totalPaid: totalPaidDollars,
-        totalInvoiced: invoiceRequestedAmount,
+        totalPaid: newTotalPaidDollars,
+        totalInvoiced: totalInvoicedDollars,
         isPartialPayment: isPartialPayment,
       };
+      
     } catch (error) {
       if (error instanceof ApiError) {
         console.error('Square API Error in recordPaymentFlow:', JSON.stringify(error.result, null, 2));
