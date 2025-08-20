@@ -251,6 +251,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   const players = getRegisteredPlayers(confirmation);
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
+  const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -291,20 +292,20 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 <p className="font-medium text-muted-foreground">Sponsor Email</p>
                                 <p>
                                     {confirmation?.sponsorEmail || 
-                                    confirmation?.purchaserEmail || 
-                                    confirmation?.contactEmail || 
-                                    profile?.email || 
-                                    'N/A'}
+                                     confirmation?.purchaserEmail || 
+                                     confirmation?.contactEmail || 
+                                     profile?.email || 
+                                     'N/A'}
                                 </p>
                             </div>
                             <div className="flex justify-between">
                                 <p className="font-medium text-muted-foreground">Sponsor Phone</p>
                                 <p>
                                     {confirmation?.sponsorPhone || 
-                                    confirmation?.purchaserPhone || 
-                                    confirmation?.contactPhone || 
-                                    profile?.phone || 
-                                    'N/A'}
+                                     confirmation?.purchaserPhone || 
+                                     confirmation?.contactPhone || 
+                                     profile?.phone || 
+                                     'N/A'}
                                 </p>
                             </div>
                             <div className="flex justify-between">
@@ -340,11 +341,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             )}
                             <div>
                                 <Label className="text-base font-medium mb-4 block">Payment Method</Label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight">
-                                        <Upload className="h-5 w-5" />
-                                        <span className="text-center">Purchase<br/>Order</span>
-                                    </Button>
+                                <div className={`grid ${isIndividualInvoice ? 'grid-cols-3' : 'grid-cols-2'} gap-3`}>
+                                    {!isIndividualInvoice && (
+                                        <Button variant={selectedPaymentMethod === 'purchase-order' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('purchase-order')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight">
+                                            <Upload className="h-5 w-5" />
+                                            <span className="text-center">Purchase<br/>Order</span>
+                                        </Button>
+                                    )}
                                     <Button variant={selectedPaymentMethod === 'check' ? 'default' : 'outline'} onClick={() => setSelectedPaymentMethod('check')} className="h-auto py-2 flex flex-col items-center gap-1 leading-tight">
                                         <Check className="h-5 w-5" />
                                         <span className="text-center">Pay with<br/>Check</span>
@@ -356,7 +359,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     
                             <Separator />
     
-                            {selectedPaymentMethod === 'purchase-order' && (
+                            {selectedPaymentMethod === 'purchase-order' && !isIndividualInvoice && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <Label htmlFor="po-number">PO Number</Label>
