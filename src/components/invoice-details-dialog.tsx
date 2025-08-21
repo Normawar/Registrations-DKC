@@ -119,20 +119,21 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
 
   useEffect(() => {
-    if (!isOpen) return;
-  
-    const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-    const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
-    if (currentConf) {
+  if (!isOpen) return;
+
+  const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+  const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
+  if (currentConf) {
       console.log('📋 Loading confirmation:', currentConf);
       console.log('📋 ALL CONFIRMATION KEYS:', Object.keys(currentConf).sort());
       console.log('📋 FULL CONFIRMATION OBJECT:', JSON.stringify(currentConf, null, 2));
       setConfirmation(currentConf);
       
+      // Load selected payment methods
       const savedMethods = currentConf.selectedPaymentMethods || [];
       console.log('📋 Loading saved payment methods:', savedMethods);
       setSelectedPaymentMethods(savedMethods);
-    }
+  }
   
     if (!auth || !storage) {
         setAuthError("Firebase is not configured, so file uploads are disabled.");
@@ -519,38 +520,50 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
 const RegistrationDetailsSection = () => {
-  // First, let's see what's actually in the profile object
-  console.log('👤 FULL PROFILE OBJECT:', profile);
-  console.log('👤 PROFILE KEYS:', Object.keys(profile || {}));
+  console.log('🔍 FULL CONFIRMATION OBJECT:', confirmation);
+  console.log('🔍 Available fields:', Object.keys(confirmation || {}));
   
-  // Try many different possible phone field names
-  const phoneNumber = confirmation?.phone || 
-                     confirmation?.sponsorPhone || 
-                     confirmation?.purchaserPhone ||
-                     profile?.phone ||
-                     profile?.cellPhone ||
-                     profile?.phoneNumber ||
-                     profile?.cellPhoneNumber ||
-                     profile?.mobile ||
-                     profile?.contactPhone ||
-                     profile?.primaryPhone;
-
-  // Debug all possible phone fields in profile
-  const profilePhoneFields = {
-    phone: profile?.phone,
-    cellPhone: profile?.cellPhone,
-    phoneNumber: profile?.phoneNumber,
-    cellPhoneNumber: profile?.cellPhoneNumber,
-    mobile: profile?.mobile,
-    contactPhone: profile?.contactPhone,
-    primaryPhone: profile?.primaryPhone,
-    tel: profile?.tel,
-    telephone: profile?.telephone
-  };
-
-  console.log('📞 Profile phone fields check:', profilePhoneFields);
-  console.log('📞 Final phone number:', phoneNumber);
-
+  // Let's check all possible field names
+  const possibleEventNames = [
+    confirmation?.invoiceTitle,
+    confirmation?.eventName, 
+    confirmation?.eventTitle,
+    confirmation?.title,
+    confirmation?.event,
+    confirmation?.description
+  ].filter(Boolean);
+  
+  const possibleSponsorNames = [
+    confirmation?.purchaserName,
+    confirmation?.sponsorName,
+    confirmation?.customerName,
+    confirmation?.firstName,
+    confirmation?.lastName,
+    confirmation?.name,
+    confirmation?.primaryContact?.name
+  ].filter(Boolean);
+  
+  const possibleEmails = [
+    confirmation?.sponsorEmail,
+    confirmation?.email,
+    confirmation?.purchaserEmail,
+    confirmation?.customerEmail,
+    confirmation?.primaryContact?.email
+  ].filter(Boolean);
+  
+  const possiblePhones = [
+    confirmation?.sponsorPhone,
+    confirmation?.phone,
+    confirmation?.purchaserPhone,
+    confirmation?.customerPhone,
+    confirmation?.primaryContact?.phone
+  ].filter(Boolean);
+  
+  console.log('🔍 Event names found:', possibleEventNames);
+  console.log('🔍 Sponsor names found:', possibleSponsorNames);
+  console.log('🔍 Emails found:', possibleEmails);
+  console.log('🔍 Phones found:', possiblePhones);
+  
   return (
     <div className="bg-white rounded-lg border p-4">
       <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
@@ -558,64 +571,46 @@ const RegistrationDetailsSection = () => {
       <div className="space-y-3">
         <div className="flex justify-between">
           <span className="text-gray-600">Event</span>
-          <span>Chess Tournament</span>
+          <span>{possibleEventNames[0] || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Date</span>
-          <span>TBD</span>
+          <span>{confirmation?.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Name</span>
-          <span>
-            {confirmation?.purchaserName || 
-             (profile?.firstName && profile?.lastName ? 
-               `${profile.firstName} ${profile.lastName}` : 
-               'FirstName LName')}
-          </span>
+          <span>{possibleSponsorNames[0] || `${confirmation?.firstName || ''} ${confirmation?.lastName || ''}`.trim() || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Email</span>
-          <span>
-            {confirmation?.purchaserEmail || 
-             profile?.email || 
-             'normaguerra@yahoo.com'}
-          </span>
+          <span>{possibleEmails[0] || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Phone</span>
-          <span>
-            {phoneNumber ? formatPhoneNumber(phoneNumber) : 'Phone not provided'}
-          </span>
+          <span>{formatPhoneNumber(possiblePhones[0] || '')}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">School</span>
-          <span>
-            {confirmation?.schoolName || 
-             profile?.school || 
-             'SHARYLAND PIONEER H S'}
-          </span>
+          <span>{confirmation?.schoolName || confirmation?.school || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between font-semibold text-lg border-t pt-3">
           <span>Total Amount</span>
-          <span className="text-blue-600">${(confirmation?.totalAmount || 48).toFixed(2)}</span>
+          <span className="text-blue-600">${totalInvoiced.toFixed(2)}</span>
         </div>
       </div>
-
-      {/* Enhanced debug info */}
-      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-        <div><strong>Phone Source Debug:</strong></div>
-        <div>Profile keys: {Object.keys(profile || {}).join(', ')}</div>
-        <div>Profile phone: {profile?.phone || 'none'}</div>
-        <div>Profile cellPhone: {profile?.cellPhone || 'none'}</div>
-        <div>Profile phoneNumber: {profile?.phoneNumber || 'none'}</div>
-        <div>Profile cellPhoneNumber: {profile?.cellPhoneNumber || 'none'}</div>
-        <div>Used: {phoneNumber || 'none found'}</div>
+      
+      {/* Debug section - you can remove this later */}
+      <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+        <div><strong>Debug - Available fields:</strong></div>
+        <div className="max-h-20 overflow-y-auto">
+          {Object.keys(confirmation || {}).join(', ')}
+        </div>
       </div>
     </div>
   );
@@ -1085,7 +1080,7 @@ const PaymentSummarySection = () => (
 
   const QuickTestSection = () => (
     <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
-      <h4 className="font-medium text-green-800 mb-2">🧪 Quick Test Section</h4>
+      <h4 className="font-medium text-green-800 mb-2">🧪 Quick Test (Remove after testing):</h4>
       <div className="space-y-2">
         <Button
           size="sm"
@@ -1096,9 +1091,8 @@ const PaymentSummarySection = () => (
             setCashAppAmount('28');
             setCashAppHandle('@test');
           }}
-          className="w-full text-xs"
         >
-          🚀 Quick Test: Select Cash App + $28
+          Select Cash App $28
         </Button>
         
         <Button
@@ -1125,17 +1119,15 @@ const PaymentSummarySection = () => (
             setCheckAmount('');
             setCheckNumber('');
           }}
-          className="w-full text-xs"
         >
-          🔄 Reset Form
+          Clear All
         </Button>
-        
-        <div className="mt-2 text-xs text-green-700">
-          <div>Selected: {JSON.stringify(selectedPaymentMethods)}</div>
-          <div>Cash App Amount: "{cashAppAmount}"</div>
-          <div>Check Amount: "{checkAmount}"</div>
-          <div>Should Enable Button: {selectedPaymentMethods.includes('cashapp') && parseFloat(cashAppAmount || '0') > 0 ? '✅' : '❌'}</div>
-        </div>
+      </div>
+      
+      <div className="mt-2 text-xs text-green-700">
+        <div>Selected Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
+        <div>Cash App: ${cashAppAmount || '0'} | Check: ${checkAmount || '0'}</div>
+        <div>Button Should Be: {canRecordPayment ? '✅ ACTIVE' : '❌ DISABLED'}</div>
       </div>
     </div>
   );
@@ -1357,3 +1349,5 @@ const PaymentSummarySection = () => (
     </Dialog>
   );
 }
+
+    
