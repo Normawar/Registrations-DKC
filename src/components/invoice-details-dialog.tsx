@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -124,6 +125,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
     if (currentConf) {
       console.log('📋 Loading confirmation:', currentConf);
+      console.log('📋 ALL CONFIRMATION KEYS:', Object.keys(currentConf).sort());
+      console.log('📋 FULL CONFIRMATION OBJECT:', JSON.stringify(currentConf, null, 2));
       setConfirmation(currentConf);
       
       const savedMethods = currentConf.selectedPaymentMethods || [];
@@ -394,35 +397,92 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
   
-const canRecordPayment = useMemo(() => {
-  if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
-    return false;
-  }
-
-  // Direct check without complex logic
-  const amounts = {
-    check: checkAmount,
-    zelle: zelleAmount, 
-    cashapp: cashAppAmount,
-    venmo: venmoAmount,
-    cash: cashAmount,
-    other: otherAmount
-  };
-
-  return selectedPaymentMethods.some(method => {
-    const amount = amounts[method as keyof typeof amounts];
-    const numericAmount = parseFloat(String(amount || '0'));
-    return !isNaN(numericAmount) && numericAmount > 0;
-  });
-}, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
+  const canRecordPayment = useMemo(() => {
+    console.log('=== ENHANCED VALIDATION DEBUG ===');
+    console.log('selectedPaymentMethods:', selectedPaymentMethods);
+    console.log('selectedPaymentMethods.length:', selectedPaymentMethods.length);
+    console.log('selectedPaymentMethods type:', typeof selectedPaymentMethods);
+    console.log('selectedPaymentMethods.includes("cashapp"):', selectedPaymentMethods.includes('cashapp'));
+    
+    // Check all amounts
+    const amounts = {
+      checkAmount: checkAmount,
+      zelleAmount: zelleAmount,
+      cashAppAmount: cashAppAmount,
+      venmoAmount: venmoAmount,
+      cashAmount: cashAmount,
+      otherAmount: otherAmount
+    };
+    
+    console.log('All amounts:', amounts);
+    
+    if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
+      console.log('❌ No payment methods selected');
+      return false;
+    }
+  
+    // Check each selected method for valid amount
+    const result = selectedPaymentMethods.some(method => {
+      let amount = 0;
+      
+      switch (method) {
+        case 'check':
+          amount = parseFloat(checkAmount || '0');
+          console.log(`✅ Check: "${checkAmount}" -> ${amount}, valid: ${amount > 0}`);
+          break;
+        case 'zelle':
+          amount = parseFloat(zelleAmount || '0');
+          console.log(`✅ Zelle: "${zelleAmount}" -> ${amount}, valid: ${amount > 0}`);
+          break;
+        case 'cashapp':
+          amount = parseFloat(cashAppAmount || '0');
+          console.log(`✅ Cash App: "${cashAppAmount}" -> ${amount}, valid: ${amount > 0}`);
+          break;
+        case 'venmo':
+          amount = parseFloat(venmoAmount || '0');
+          console.log(`✅ Venmo: "${venmoAmount}" -> ${amount}, valid: ${amount > 0}`);
+          break;
+        case 'cash':
+          amount = parseFloat(cashAmount || '0');
+          console.log(`✅ Cash: "${cashAmount}" -> ${amount}, valid: ${amount > 0}`);
+          break;
+        case 'other':
+          amount = parseFloat(otherAmount || '0');
+          console.log(`✅ Other: "${otherAmount}" -> ${amount}, valid: ${amount > 0}`);
+          break;
+        default:
+          console.log(`❌ Unknown method: ${method}`);
+          return false;
+      }
+      
+      const isValid = !isNaN(amount) && amount > 0;
+      console.log(`Method ${method}: amount=${amount}, valid=${isValid}`);
+      return isValid;
+    });
+    
+    console.log('Final validation result:', result);
+    console.log('=== END ENHANCED DEBUG ===');
+    return result;
+  }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
   const formatPhoneNumber = (phone: string) => {
-    if (!phone) return 'N/A';
+    if (!phone || phone.trim() === '') return 'Not provided';
+    
+    // Remove any non-digit characters
     const cleaned = phone.replace(/\D/g, '');
+    
+    console.log('📞 Formatting phone:', phone, '-> cleaned:', cleaned, '-> length:', cleaned.length);
+    
+    // Format based on length
     if (cleaned.length === 10) {
       return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+    } else if (cleaned.length > 0) {
+      return `${cleaned} (${cleaned.length} digits)`;
     }
-    return phone;
+    
+    return phone; // Return original if no digits found
   };
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -459,6 +519,62 @@ const canRecordPayment = useMemo(() => {
   };
 
 const RegistrationDetailsSection = () => {
+  console.log('🔍 FULL CONFIRMATION OBJECT:', confirmation);
+  console.log('🔍 Available fields:', Object.keys(confirmation || {}));
+  
+  // Let's check all possible field names
+  const possibleEventNames = [
+    confirmation?.invoiceTitle,
+    confirmation?.eventName, 
+    confirmation?.eventTitle,
+    confirmation?.title,
+    confirmation?.event,
+    confirmation?.description
+  ].filter(Boolean);
+  
+  const possibleSponsorNames = [
+    confirmation?.purchaserName,
+    confirmation?.sponsorName,
+    confirmation?.customerName,
+    confirmation?.firstName,
+    confirmation?.lastName,
+    confirmation?.name,
+    confirmation?.primaryContact?.name
+  ].filter(Boolean);
+  
+  const possibleEmails = [
+    confirmation?.sponsorEmail,
+    confirmation?.email,
+    confirmation?.purchaserEmail,
+    confirmation?.customerEmail,
+    confirmation?.primaryContact?.email
+  ].filter(Boolean);
+  
+  const phoneFields = [
+    confirmation?.phone,
+    confirmation?.sponsorPhone, 
+    confirmation?.purchaserPhone,
+    confirmation?.customerPhone,
+    confirmation?.phoneNumber,
+    confirmation?.primaryContact?.phone,
+    confirmation?.contact?.phone,
+    confirmation?.billing?.phone,
+    confirmation?.shipping?.phone
+  ];
+  
+  console.log('🔍 PHONE DEBUG - All possible phone fields:', phoneFields);
+  console.log('🔍 PHONE DEBUG - All confirmation keys:', Object.keys(confirmation || {}));
+  console.log('🔍 PHONE DEBUG - Phone-related keys:', 
+    Object.keys(confirmation || {}).filter(key => 
+      key.toLowerCase().includes('phone') || 
+      key.toLowerCase().includes('contact') ||
+      key.toLowerCase().includes('tel')
+    )
+  );
+
+  const foundPhone = phoneFields.find(phone => phone && phone.trim() !== '');
+  console.log('🔍 PHONE DEBUG - Found phone:', foundPhone);
+  
   return (
     <div className="bg-white rounded-lg border p-4">
       <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
@@ -466,78 +582,46 @@ const RegistrationDetailsSection = () => {
       <div className="space-y-3">
         <div className="flex justify-between">
           <span className="text-gray-600">Event</span>
-          <span>
-            {confirmation?.invoiceTitle ||
-             confirmation?.eventName || 
-             confirmation?.eventTitle ||
-             confirmation?.title ||
-             confirmation?.description ||
-             'Chess Tournament'}
-          </span>
+          <span>{possibleEventNames[0] || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Date</span>
-          <span>
-            {confirmation?.eventDate ? 
-              format(new Date(confirmation.eventDate), 'PPP') : 
-              'TBD'}
-          </span>
+          <span>{confirmation?.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Name</span>
-          <span>
-            {confirmation?.purchaserName ||
-             confirmation?.sponsorName ||
-             (confirmation?.firstName && confirmation?.lastName ? 
-               `${confirmation.firstName} ${confirmation.lastName}` :
-               confirmation?.firstName || confirmation?.lastName) ||
-             confirmation?.customerName ||
-             'FirstName LName'}
-          </span>
+          <span>{possibleSponsorNames[0] || `${confirmation?.firstName || ''} ${confirmation?.lastName || ''}`.trim() || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Email</span>
-          <span>
-            {confirmation?.email ||
-             confirmation?.sponsorEmail ||
-             confirmation?.purchaserEmail ||
-             confirmation?.customerEmail ||
-             'normaguerra@yahoo.com'}
-          </span>
+          <span>{possibleEmails[0] || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Phone</span>
-          <span>
-            {formatPhoneNumber(
-              confirmation?.phone ||
-              confirmation?.sponsorPhone ||
-              confirmation?.purchaserPhone ||
-              confirmation?.customerPhone || 
-              ''
-            )}
-          </span>
+          <span>{foundPhone ? formatPhoneNumber(foundPhone) : 'Not provided'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">School</span>
-          <span>
-            {confirmation?.schoolName ||
-             confirmation?.school ||
-             confirmation?.schoolDistrict ||
-             'SHARYLAND PIONEER H S'}
-          </span>
+          <span>{confirmation?.schoolName || confirmation?.school || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between font-semibold text-lg border-t pt-3">
           <span>Total Amount</span>
-          <span className="text-blue-600">
-            ${(confirmation?.totalAmount || confirmation?.totalInvoiced || 48).toFixed(2)}
-          </span>
+          <span className="text-blue-600">${totalInvoiced.toFixed(2)}</span>
         </div>
+      </div>
+      
+      {/* Debug section - you can remove this later */}
+      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+        <div><strong>Phone Debug:</strong></div>
+        <div>Found: {foundPhone || 'NONE FOUND'}</div>
+        <div>Checked fields: phone, sponsorPhone, purchaserPhone, customerPhone, phoneNumber</div>
+        <div>Available keys: {Object.keys(confirmation || {}).slice(0, 10).join(', ')}...</div>
       </div>
     </div>
   );
@@ -598,7 +682,7 @@ const RecordPaymentButton = () => {
 
   return (
     <div className="space-y-2">
-      {/* Keep basic status for now, remove later */}
+      {/* Debug info - you can remove this later */}
       <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
         <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
         <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
@@ -873,6 +957,63 @@ const PaymentSummarySection = () => (
 
   if (!isOpen || !confirmation) return null;
   
+  const QuickTestSection = () => (
+    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+      <h4 className="font-medium text-green-800 mb-2">🧪 Quick Test Section</h4>
+      <div className="space-y-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            console.log('🧪 Quick test: Selecting Cash App with $28');
+            setSelectedPaymentMethods(['cashapp']);
+            setCashAppAmount('28');
+            setCashAppHandle('@test');
+          }}
+          className="w-full text-xs"
+        >
+          🚀 Quick Test: Select Cash App + $28
+        </Button>
+        
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            console.log('🧪 Quick test: Selecting Check with $28');
+            setSelectedPaymentMethods(['check']);
+            setCheckAmount('28');
+            setCheckNumber('1234');
+          }}
+          className="w-full text-xs"
+        >
+          Select Check $28
+        </Button>
+        
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            console.log('🧪 Reset test');
+            setSelectedPaymentMethods([]);
+            setCashAppAmount('');
+            setCashAppHandle('');
+            setCheckAmount('');
+            setCheckNumber('');
+          }}
+          className="w-full text-xs"
+        >
+          🔄 Reset Form
+        </Button>
+        
+        <div className="mt-2 text-xs text-green-700">
+          <div>Selected Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
+          <div>Cash App: ${cashAppAmount || '0'} | Check: ${checkAmount || '0'}</div>
+          <div>Button Should Be: {canRecordPayment ? '✅ ACTIVE' : '❌ DISABLED'}</div>
+        </div>
+      </div>
+    </div>
+  );
+  
   const SquareDeveloperConsoleButton = () => {
     if (profile?.role !== 'organizer') return null;
 
@@ -1054,7 +1195,7 @@ const PaymentSummarySection = () => (
             <p className="text-sm text-gray-600 mb-4">
               Record payments or submit payment information for verification.
             </p>
-
+            <QuickTestSection />
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Payment Method</label>
@@ -1063,7 +1204,6 @@ const PaymentSummarySection = () => (
                 </div>
               </div>
               {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
-
               <RecordPaymentButton />
             </div>
           </div>
@@ -1089,4 +1229,4 @@ const PaymentSummarySection = () => (
     </Dialog>
   );
 }
-    
+
