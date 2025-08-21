@@ -59,33 +59,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [sponsorNote, setSponsorNote] = useState<string>('');
   const [organizerNote, setOrganizerNote] = useState<string>('');
 
-  const setSafeCheckAmount = (value: string | undefined | null) => {
-    setCheckAmount(value ?? '');
-  };
-
-  const setSafeCashAmount = (value: string | undefined | null) => {
-    setCashAmount(value ?? '');
-  };
-
-  const setSafeCashAppAmount = (value: string | undefined | null) => {
-    setCashAppAmount(value ?? '');
-  };
-
-  const setSafeZelleAmount = (value: string | undefined | null) => {
-    setZelleAmount(value ?? '');
-  };
-
-  const setSafePoAmount = (value: string | undefined | null) => {
-    setPoAmount(value ?? '');
-  };
-
-  const setSafePoNumber = (value: string | undefined | null) => {
-    setPoNumber(value ?? '');
-  };
-
   useEffect(() => {
     if (!isOpen) return;
-
+  
     // Load specific confirmation details
     const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
     const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
@@ -107,7 +83,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       setSponsorNote('');
       setOrganizerNote('');
     }
-
+  
     // Firebase Auth setup
     if (!auth || !storage) {
         setAuthError("Firebase is not configured, so file uploads are disabled.");
@@ -494,9 +470,107 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const NotesSection = () => {
+    if (!confirmation) return null;
+    
+    const notes = confirmation.notes || [];
+    const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
+    const organizerNotes = notes.filter((note: any) => note.type === 'organizer');
+    
     return (
-      <div>
-        <p>Test Notes Section</p>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Sponsor Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {sponsorNotes.length > 0 ? (
+                sponsorNotes.map((note: any) => (
+                  <div key={note.id} className="border-l-2 border-blue-200 pl-3 py-2">
+                    <p className="text-sm">{note.text}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">No sponsor notes yet.</p>
+              )}
+            </div>
+            
+            {(profile?.role === 'sponsor' || profile?.role === 'individual') && (
+              <div className="space-y-2">
+                <Label htmlFor="sponsor-note">Add Sponsor Note</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="sponsor-note"
+                    placeholder="Enter note..."
+                    value={sponsorNote ?? ''}
+                    onChange={(e) => setSponsorNote(e.target.value ?? '')}
+                    className="flex-1"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={() => addNote(sponsorNote, 'sponsor')}
+                    disabled={!sponsorNote?.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Organizer Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {organizerNotes.length > 0 ? (
+                organizerNotes.map((note: any) => (
+                  <div key={note.id} className="border-l-2 border-green-200 pl-3 py-2">
+                    <p className="text-sm">{note.text}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">No organizer notes yet.</p>
+              )}
+            </div>
+            
+            {profile?.role === 'organizer' && (
+              <div className="space-y-2">
+                <Label htmlFor="organizer-note">Add Organizer Note</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="organizer-note"
+                    placeholder="Enter note..."
+                    value={organizerNote ?? ''}
+                    onChange={(e) => setOrganizerNote(e.target.value ?? '')}
+                    className="flex-1"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={() => addNote(organizerNote, 'organizer')}
+                    disabled={!organizerNote?.trim()}
+                  >
+                    Add
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   };
@@ -511,9 +585,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     const isOrganizer = profile?.role === 'organizer';
     const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
   
-    // ✅ FIXED: Always return string, never undefined
-    const safeGetValue = (value: string | undefined | null): string => {
-      return value ?? '';
+    // Simple helper to ensure string values
+    const ensureString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      return String(val);
     };
   
     switch (selectedPaymentMethod) {
@@ -541,14 +616,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <Label htmlFor="cash-amount">
               {isOrganizer ? 'Cash Amount Received' : 'Cash Amount Paid'}
             </Label>
-            <Input
-              id="cash-amount"
-              type="number"
-              step="0.01"
-              placeholder="Enter amount"
-              value={safeGetValue(cashAmount)}
-              onChange={(e) => setSafeCashAmount(e.target.value)}
-              disabled={isPaymentApproved}
+            <Input 
+              id="cash-amount" 
+              type="number" 
+              step="0.01" 
+              placeholder="Enter amount" 
+              value={ensureString(cashAmount)}
+              onChange={(e) => setCashAmount(ensureString(e.target.value))}
+              disabled={isPaymentApproved} 
             />
             {isOrganizer && (
               <p className="text-xs text-muted-foreground mt-1">
@@ -565,23 +640,23 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               <Label htmlFor="check-amount">
                 {isOrganizer ? 'Check Amount Received' : 'Check Amount'}
               </Label>
-              <Input
-                id="check-amount"
-                type="number"
-                step="0.01"
-                placeholder="Enter amount"
-                value={safeGetValue(checkAmount)}
-                onChange={(e) => setSafeCheckAmount(e.target.value)}
-                disabled={isPaymentApproved}
+              <Input 
+                id="check-amount" 
+                type="number" 
+                step="0.01" 
+                placeholder="Enter amount" 
+                value={ensureString(checkAmount)}
+                onChange={(e) => setCheckAmount(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
               />
             </div>
             <div>
               <Label htmlFor="check-proof">Upload Check Image</Label>
-              <Input
-                id="check-proof"
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
+              <Input 
+                id="check-proof" 
+                type="file" 
+                accept="image/*,.pdf" 
+                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                 disabled={isPaymentApproved}
               />
               {confirmation?.paymentFileUrl && !fileToUpload && (
@@ -619,23 +694,23 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               <Label htmlFor="cashapp-amount">
                 {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
               </Label>
-              <Input
-                id="cashapp-amount"
-                type="number"
-                step="0.01"
-                placeholder="Enter amount"
-                value={safeGetValue(cashAppAmount)}
-                onChange={(e) => setSafeCashAppAmount(e.target.value)}
-                disabled={isPaymentApproved}
+              <Input 
+                id="cashapp-amount" 
+                type="number" 
+                step="0.01" 
+                placeholder="Enter amount" 
+                value={ensureString(cashAppAmount)}
+                onChange={(e) => setCashAppAmount(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
               />
             </div>
             <div>
               <Label htmlFor="cashapp-proof">Upload Cash App Screenshot</Label>
-              <Input
-                id="cashapp-proof"
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
+              <Input 
+                id="cashapp-proof" 
+                type="file" 
+                accept="image/*,.pdf" 
+                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                 disabled={isPaymentApproved}
               />
               {confirmation?.paymentFileUrl && !fileToUpload && (
@@ -673,23 +748,23 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               <Label htmlFor="zelle-amount">
                 {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
               </Label>
-              <Input
-                id="zelle-amount"
-                type="number"
-                step="0.01"
-                placeholder="Enter amount"
-                value={safeGetValue(zelleAmount)}
-                onChange={(e) => setSafeZelleAmount(e.target.value)}
-                disabled={isPaymentApproved}
+              <Input 
+                id="zelle-amount" 
+                type="number" 
+                step="0.01" 
+                placeholder="Enter amount" 
+                value={ensureString(zelleAmount)}
+                onChange={(e) => setZelleAmount(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
               />
             </div>
             <div>
               <Label htmlFor="zelle-proof">Upload Zelle Confirmation</Label>
-              <Input
-                id="zelle-proof"
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
+              <Input 
+                id="zelle-proof" 
+                type="file" 
+                accept="image/*,.pdf" 
+                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                 disabled={isPaymentApproved}
               />
               {confirmation?.paymentFileUrl && !fileToUpload && (
@@ -728,34 +803,34 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               <Label htmlFor="po-amount">
                 {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
               </Label>
-              <Input
-                id="po-amount"
-                type="number"
-                step="0.01"
-                placeholder="Enter amount"
-                value={safeGetValue(poAmount)}
-                onChange={(e) => setSafePoAmount(e.target.value)}
-                disabled={isPaymentApproved}
+              <Input 
+                id="po-amount" 
+                type="number" 
+                step="0.01" 
+                placeholder="Enter amount" 
+                value={ensureString(poAmount)}
+                onChange={(e) => setPoAmount(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
               />
             </div>
             <div>
               <Label htmlFor="po-number">PO Number</Label>
-              <Input
-                id="po-number"
-                placeholder="Enter PO Number"
-                value={safeGetValue(poNumber)}
-                onChange={(e) => setSafePoNumber(e.target.value)}
-                disabled={isPaymentApproved}
+              <Input 
+                id="po-number" 
+                placeholder="Enter PO Number" 
+                value={ensureString(poNumber)}
+                onChange={(e) => setPoNumber(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
               />
             </div>
             <div className="md:col-span-2">
               <Label htmlFor="po-document">Upload PO Document</Label>
-              <Input
-                id="po-document"
-                type="file"
-                accept=".pdf,.doc,.docx,.jpg,.png"
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
-                disabled={isPaymentApproved}
+              <Input 
+                id="po-document" 
+                type="file" 
+                accept=".pdf,.doc,.docx,.jpg,.png" 
+                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                disabled={isPaymentApproved} 
               />
               {confirmation?.poFileUrl && !fileToUpload && (
                 <div className="text-sm mt-2 flex items-center justify-between">
@@ -1039,4 +1114,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
