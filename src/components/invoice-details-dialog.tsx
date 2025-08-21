@@ -59,6 +59,30 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [sponsorNote, setSponsorNote] = useState<string>('');
   const [organizerNote, setOrganizerNote] = useState<string>('');
 
+  const setSafeCheckAmount = (value: string | undefined | null) => {
+    setCheckAmount(value ?? '');
+  };
+
+  const setSafeCashAmount = (value: string | undefined | null) => {
+    setCashAmount(value ?? '');
+  };
+
+  const setSafeCashAppAmount = (value: string | undefined | null) => {
+    setCashAppAmount(value ?? '');
+  };
+
+  const setSafeZelleAmount = (value: string | undefined | null) => {
+    setZelleAmount(value ?? '');
+  };
+
+  const setSafePoAmount = (value: string | undefined | null) => {
+    setPoAmount(value ?? '');
+  };
+
+  const setSafePoNumber = (value: string | undefined | null) => {
+    setPoNumber(value ?? '');
+  };
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -467,7 +491,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     if (displayStatus === 'PENDING-PO') className = 'bg-yellow-500 text-black';
     
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
-  };
+  }
 
   const NotesSection = () => {
     if (!confirmation) return null;
@@ -492,7 +516,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <div key={note.id} className="border-l-2 border-blue-200 pl-3 py-2">
                     <p className="text-sm">{note.text}</p>
                     <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \'at\' h:mm a')}
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
                     </p>
                   </div>
                 ))
@@ -539,7 +563,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <div key={note.id} className="border-l-2 border-green-200 pl-3 py-2">
                     <p className="text-sm">{note.text}</p>
                     <p className="text-xs text-muted-foreground">
-                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \'at\' h:mm a')}
+                      {note.author} • {format(new Date(note.timestamp), 'MMM dd, yyyy \\'at\\' h:mm a')}
                     </p>
                   </div>
                 ))
@@ -584,7 +608,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const renderPaymentMethodInputs = () => {
     const isOrganizer = profile?.role === 'organizer';
     const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
-    const invoiceUrl = confirmation?.publicUrl || confirmation?.invoiceUrl;
   
     // ✅ FIXED: Always return string, never undefined
     const safeGetValue = (value: string | undefined | null): string => {
@@ -598,9 +621,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <p className="text-sm text-blue-800 mb-3">
               Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
             </p>
-            {invoiceUrl ? (
+            {confirmation?.invoiceUrl ? (
               <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
+                <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
                   Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
                 </a>
               </Button>
@@ -622,7 +645,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               step="0.01"
               placeholder="Enter amount"
               value={safeGetValue(cashAmount)}
-              onChange={(e) => setCashAmount(e.target.value ?? '')}
+              onChange={(e) => setSafeCashAmount(e.target.value)}
               disabled={isPaymentApproved}
             />
             {isOrganizer && (
@@ -646,7 +669,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 step="0.01"
                 placeholder="Enter amount"
                 value={safeGetValue(checkAmount)}
-                onChange={(e) => setCheckAmount(e.target.value ?? '')}
+                onChange={(e) => setSafeCheckAmount(e.target.value)}
                 disabled={isPaymentApproved}
               />
             </div>
@@ -700,7 +723,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 step="0.01"
                 placeholder="Enter amount"
                 value={safeGetValue(cashAppAmount)}
-                onChange={(e) => setCashAppAmount(e.target.value ?? '')}
+                onChange={(e) => setSafeCashAppAmount(e.target.value)}
                 disabled={isPaymentApproved}
               />
             </div>
@@ -754,7 +777,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 step="0.01"
                 placeholder="Enter amount"
                 value={safeGetValue(zelleAmount)}
-                onChange={(e) => setZelleAmount(e.target.value ?? '')}
+                onChange={(e) => setSafeZelleAmount(e.target.value)}
                 disabled={isPaymentApproved}
               />
             </div>
@@ -809,7 +832,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 step="0.01"
                 placeholder="Enter amount"
                 value={safeGetValue(poAmount)}
-                onChange={(e) => setPoAmount(e.target.value ?? '')}
+                onChange={(e) => setSafePoAmount(e.target.value)}
                 disabled={isPaymentApproved}
               />
             </div>
@@ -819,7 +842,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 id="po-number"
                 placeholder="Enter PO Number"
                 value={safeGetValue(poNumber)}
-                onChange={(e) => setPoNumber(e.target.value ?? '')}
+                onChange={(e) => setSafePoNumber(e.target.value)}
                 disabled={isPaymentApproved}
               />
             </div>
@@ -1114,4 +1137,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
