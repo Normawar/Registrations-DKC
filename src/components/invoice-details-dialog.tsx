@@ -484,34 +484,52 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const renderPaymentMethodInputs = () => {
-  const isOrganizer = profile?.role === 'organizer';
-  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
-
-  const ensureString = (val: any): string => {
-    if (val === null || val === undefined) return '';
-    return String(val);
-  };
-
-  switch (selectedPaymentMethod) {
-    case 'check':
-      return (
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="check-amount">Check Amount</Label>
-            <Input 
-              id="check-amount" 
-              type="number" 
-              value={ensureString(checkAmount)}
-              onChange={(e) => setCheckAmount(ensureString(e.target.value))}
-            />
+    const isOrganizer = profile?.role === 'organizer';
+    const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
+  
+    const ensureString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      return String(val);
+    };
+  
+    switch (selectedPaymentMethod) {
+      case 'credit-card':
+        return (
+          <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800 mb-3">
+              Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
+            </p>
+            {confirmation?.invoiceUrl ? (
+              <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                  Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+            ) : (
+              <p className="text-sm text-red-600">Payment link not available</p>
+            )}
           </div>
-        </div>
-      );
-    
-    default:
-      return <div>Other payment methods coming soon</div>;
-  }
-};
+        );
+  
+      case 'check':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="check-amount">Check Amount</Label>
+              <Input 
+                id="check-amount" 
+                type="number" 
+                value={ensureString(checkAmount)}
+                onChange={(e) => setCheckAmount(ensureString(e.target.value))}
+              />
+            </div>
+          </div>
+        );
+      
+      default:
+        return <div>Other payment methods coming soon</div>;
+    }
+  };
 
   if (!isOpen || !confirmation) return null;
 
@@ -763,4 +781,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
