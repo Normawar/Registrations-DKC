@@ -322,7 +322,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         // ✅ UPDATED: Don't redirect, just show success message
         toast({ 
           title: 'Payment Recorded Successfully', 
-          description: `Payment of $${paymentAmount.toFixed(2)} recorded in your system. Use the Square management tools below to sync with Square Sandbox.`,
+          description: `$${paymentAmount.toFixed(2)} recorded locally. Use the Square management tools below to sync with Square Sandbox.`,
           duration: 8000
         });
   
@@ -441,16 +441,26 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       
       return (
         <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
-          <p className="text-sm text-blue-800 font-medium mb-1">
-            📋 Organizer Instructions:
+          <p className="text-sm text-blue-800 font-medium mb-2">
+            📋 Organizer Workflow for {method.charAt(0).toUpperCase() + method.slice(1)} Payment:
           </p>
           <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
-            <li>Enter the {method} amount received above</li>
-            <li>Click "Record Payment & Open Square"</li>
-            <li>In Square Sandbox, find invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
-            <li>Click "Mark as paid" or "Add payment" in Square</li>
-            <li>Return here and click "Sync with Square" to update status</li>
+            <li><strong>Record locally:</strong> Enter ${actualBalanceDue.toFixed(2)} {method} amount above</li>
+            <li><strong>Submit:</strong> Click "Record Payment" button</li>
+            <li><strong>Update Square:</strong> Use "Invoices API" button below</li>
+            <li><strong>Find invoice:</strong> Search for #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
+            <li><strong>Mark paid:</strong> Update invoice status to "PAID" in Square</li>
+            <li><strong>Sync:</strong> Return here and click "Sync with Square"</li>
           </ol>
+          
+          <div className="mt-2 p-2 bg-blue-100 rounded">
+            <p className="text-xs text-blue-800 font-medium">
+              Square API Steps:
+            </p>
+            <p className="text-xs text-blue-700">
+              Invoices API → Search Invoices → invoice_number: "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}" → Update Invoice → status: "PAID"
+            </p>
+          </div>
         </div>
       );
     };
@@ -556,6 +566,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           </div>
         );
   
+      // ... Add similar updates for other payment methods (cash-app, zelle, etc.)
+      
       default:
         return null;
     }
@@ -564,22 +576,35 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const SquareDashboardButton = () => {
     if (profile?.role !== 'organizer') return null;
   
-    const openSquareDeveloperConsole = () => {
-      window.open('https://developer.squareup.com/apps', '_blank');
+    const openInvoicesAPI = () => {
+      // Direct link to Invoices API in the explorer
+      window.open('https://developer.squareup.com/explorer/square/invoices-api', '_blank');
       
       toast({
-        title: 'Square Developer Console Opened',
-        description: `Sign in to view your sandbox application. Navigate to your app → Webhooks/API to manage sandbox data. Invoice: #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}`,
+        title: 'Square Invoices API Opened',
+        description: `Use "Search Invoices" or "Get Invoice" to find invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}, then use "Update Invoice" to mark as paid.`,
+        duration: 15000
+      });
+    };
+  
+    const openPaymentsAPI = () => {
+      // Direct link to Payments API in the explorer
+      window.open('https://developer.squareup.com/explorer/square/payments-api', '_blank');
+      
+      toast({
+        title: 'Square Payments API Opened',
+        description: 'Use "List Payments" to view existing payments or "Create Payment" to record new payments.',
         duration: 12000
       });
     };
   
-    const openSquareAPIExplorer = () => {
-      window.open('https://developer.squareup.com/explorer/square/invoices-api', '_blank');
+    const openSandboxGuide = () => {
+      // Link to the sandbox payments documentation you provided
+      window.open('https://developer.squareup.com/docs/devtools/sandbox/payments', '_blank');
       
       toast({
-        title: 'Square API Explorer Opened',
-        description: 'Use the API Explorer to view, update, or mark invoices as paid in sandbox environment.',
+        title: 'Square Sandbox Guide Opened',
+        description: 'Complete guide for testing payments in Square Sandbox environment.',
         duration: 10000
       });
     };
@@ -589,31 +614,62 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         <div className="space-y-3">
           <div>
             <h4 className="font-medium text-sm">Square Sandbox Management</h4>
-            <p className="text-xs text-muted-foreground">Access sandbox tools for invoice management</p>
+            <p className="text-xs text-muted-foreground">Use Square API Explorer to manage sandbox invoices and payments</p>
           </div>
           
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={openSquareDeveloperConsole} size="sm">
+            <Button variant="outline" onClick={openInvoicesAPI} size="sm">
               <ExternalLink className="mr-2 h-4 w-4" />
-              Developer Console
+              Invoices API
             </Button>
             
-            <Button variant="outline" onClick={openSquareAPIExplorer} size="sm">
+            <Button variant="outline" onClick={openPaymentsAPI} size="sm">
               <ExternalLink className="mr-2 h-4 w-4" />
-              API Explorer
+              Payments API
+            </Button>
+  
+            <Button variant="outline" onClick={openSandboxGuide} size="sm">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Sandbox Guide
             </Button>
           </div>
           
           <div className="bg-blue-50 border border-blue-200 rounded p-3">
             <p className="text-xs text-blue-800 font-medium mb-2">
-              📋 Square Sandbox Instructions:
+              🔧 Square API Explorer Instructions:
             </p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
-              <li><strong>Developer Console:</strong> Sign in → Select your app → View webhook logs/data</li>
-              <li><strong>API Explorer:</strong> Use "List Invoices" to find invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
-              <li><strong>Update Payment:</strong> Use "Update Invoice" or payment endpoints</li>
-              <li><strong>Return here:</strong> Click "Sync with Square" to refresh status</li>
-            </ol>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs text-blue-700 font-medium">To find your invoice:</p>
+                <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
+                  <li>Select "Invoices API" → "Search Invoices"</li>
+                  <li>Use filter: invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</li>
+                  <li>Click "Run request" to find your invoice</li>
+                </ol>
+              </div>
+              
+              <div>
+                <p className="text-xs text-blue-700 font-medium">To mark as paid:</p>
+                <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
+                  <li>Copy the invoice ID from search results</li>
+                  <li>Select "Update Invoice" endpoint</li>
+                  <li>Set status to "PAID" or add payment information</li>
+                  <li>Run request to update the invoice</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+  
+          <div className="bg-green-50 border border-green-200 rounded p-3">
+            <p className="text-xs text-green-800 font-medium mb-1">
+              💡 Quick Reference - Invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}:
+            </p>
+            <div className="text-xs text-green-700 space-y-1">
+              <p><strong>Invoice ID:</strong> {confirmation?.invoiceId || 'Check search results'}</p>
+              <p><strong>Total Amount:</strong> ${(confirmation?.totalAmount || 0).toFixed(2)}</p>
+              <p><strong>Amount Paid:</strong> ${(confirmation?.totalPaid || 0).toFixed(2)}</p>
+              <p><strong>Balance Due:</strong> ${Math.max(0, (confirmation?.totalAmount || 0) - (confirmation?.totalPaid || 0)).toFixed(2)}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -842,7 +898,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 {selectedPaymentMethod === 'credit-card' 
                                     ? (isUpdating ? 'Submitting...' : 'Submit Information for Verification')
                                     : profile?.role === 'organizer' 
-                                    ? (isUpdating ? 'Recording Payment...' : 'Record Payment & Open Square')
+                                    ? (isUpdating ? 'Recording Payment...' : 'Record Payment')
                                     : (isUpdating ? 'Submitting...' : 'Submit Information for Verification')
                                 }
                             </Button>
