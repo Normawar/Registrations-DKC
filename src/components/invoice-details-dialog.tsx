@@ -613,54 +613,38 @@ const RegistrationDetailsSection = () => {
   );
 
 const RecordPaymentButton = () => {
-  console.log('RecordPaymentButton render:', {
-    canRecordPayment,
-    isUpdating,
-    disabled: !canRecordPayment || isUpdating
-  });
-
-  const handleRecordClick = () => {
-    console.log('Record Payment button clicked!');
-    console.log('Current state:', {
-      canRecordPayment,
-      isUpdating,
-      selectedPaymentMethods,
-      cashAppAmount
+  const handleDebug = () => {
+    console.log('=== FULL DEBUG ===');
+    console.log('selectedPaymentMethods:', selectedPaymentMethods);
+    console.log('All amounts:', {
+      checkAmount,
+      zelleAmount, 
+      cashAppAmount,
+      venmoAmount,
+      cashAmount,
+      otherAmount
     });
-    
-    if (!canRecordPayment) {
-      console.log('❌ Cannot record payment - validation failed');
-      return;
-    }
-    
-    if (isUpdating) {
-      console.log('❌ Cannot record payment - already updating');
-      return;
-    }
-    
-    console.log('✅ Proceeding with payment update...');
-    handlePaymentUpdate();
+    console.log('canRecordPayment:', canRecordPayment);
+    console.log('isUpdating:', isUpdating);
+    console.log('Button disabled?', !canRecordPayment || isUpdating);
   };
 
   return (
     <div className="space-y-2">
-      {/* Debug info */}
-      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
-        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
-        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
-        <div>Is Updating: {isUpdating ? '⏳ Yes' : '✅ No'}</div>
-        <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
-      </div>
-      
-      {/* Enhanced Record Payment Button with explicit styling */}
+      {/* Temporary debug button */}
       <Button
-        onClick={handleRecordClick}
+        type="button"
+        variant="outline"
+        onClick={handleDebug}
+        className="w-full text-xs"
+      >
+        🐛 Debug (Check Console)
+      </Button>
+      
+      <Button
+        onClick={handlePaymentUpdate}
         disabled={!canRecordPayment || isUpdating}
-        className={`w-full transition-all duration-200 ${
-          canRecordPayment && !isUpdating 
-            ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer' 
-            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-        }`}
+        className="w-full"
       >
         {isUpdating ? (
           <>
@@ -672,18 +656,12 @@ const RecordPaymentButton = () => {
         )}
       </Button>
       
-      {/* Test button to verify click handlers work */}
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => {
-          console.log('Test button clicked - handlers are working!');
-          alert('Click handlers are working! If Record Payment button still inactive, it\'s a CSS issue.');
-        }}
-        className="w-full text-xs"
-      >
-        🧪 Test Click (Should Work)
-      </Button>
+      {/* Debug info */}
+      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
+        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
+        <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
+      </div>
     </div>
   );
 };
@@ -1044,78 +1022,78 @@ const PaymentSummarySection = () => (
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>
-          <div className="flex items-center gap-2">
-            {getStatusBadge(confirmation?.invoiceStatus || confirmation?.status || 'UNPAID', totalPaid, totalInvoiced)}
-            Invoice #{confirmation?.invoiceNumber || 'Unknown'}
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            <div className="flex items-center gap-2">
+              {getStatusBadge(confirmation?.invoiceStatus || confirmation?.status || 'UNPAID', totalPaid, totalInvoiced)}
+              Invoice #{confirmation?.invoiceNumber || 'Unknown'}
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left Column - Registration Details */}
+          <div>
+            <RegistrationDetailsSection />
+            
+            <PaymentSummarySection />
+
+            {/* Square Invoice Link */}
+            <div className="mt-4">
+              <label className="text-sm text-gray-600">Invoice Link</label>
+              <Button
+                variant="outline"
+                className="w-full mt-1"
+                onClick={() => window.open(invoiceUrl, '_blank')}
+              >
+                View on Square
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
           </div>
-        </DialogTitle>
-      </DialogHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Left Column - Registration Details */}
-        <div>
-          <RegistrationDetailsSection />
-          
-          <PaymentSummarySection />
+          {/* Right Column - Payment Methods */}
+          <div>
+            <div className="bg-white rounded-lg border p-4">
+              <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Record payments or submit payment information for verification.
+              </p>
 
-          {/* Square Invoice Link */}
-          <div className="mt-4">
-            <label className="text-sm text-gray-600">Invoice Link</label>
-            <Button
-              variant="outline"
-              className="w-full mt-1"
-              onClick={() => window.open(invoiceUrl, '_blank')}
-            >
-              View on Square
-              <ExternalLink className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Right Column - Payment Methods */}
-        <div>
-          <div className="bg-white rounded-lg border p-4">
-            <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Record payments or submit payment information for verification.
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Payment Method</label>
-                <div className="mt-2">
-                  {renderPaymentMethodInputs()}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Payment Method</label>
+                  <div className="mt-2">
+                    {renderPaymentMethodInputs()}
+                  </div>
                 </div>
+
+                {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
+
+                <RecordPaymentButton />
               </div>
-
-              {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
-
-              <RecordPaymentButton />
             </div>
           </div>
         </div>
-      </div>
 
-      {profile?.role === 'organizer' && (
-          <SquareDeveloperConsoleButton />
-      )}
+        {profile?.role === 'organizer' && (
+            <SquareDeveloperConsoleButton />
+        )}
 
-      {/* Sync Button */}
-      <div className="mt-6 pt-4 border-t">
-        <Button
-          variant="outline"
-          onClick={handleRefreshStatus}
-          disabled={isRefreshing}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Sync with Square
-        </Button>
-      </div>
-    </DialogContent>
-  </Dialog>
+        {/* Sync Button */}
+        <div className="mt-6 pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={handleRefreshStatus}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Sync with Square
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
