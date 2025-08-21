@@ -24,12 +24,7 @@ import { getInvoiceStatusWithPayments } from '@/ai/flows/get-invoice-status-flow
 import { PaymentHistoryDisplay } from '@/components/unified-payment-system';
 import { Checkbox } from './ui/checkbox';
 
-
-interface InvoiceDetailsDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  confirmationId: string;
-}
+// 1. ADD THESE HELPER FUNCTIONS AT THE TOP OF YOUR COMPONENT (before the main component function)
 
 const safeString = (value: any): string => {
   if (value === null || value === undefined || value === false || Number.isNaN(value)) {
@@ -45,6 +40,12 @@ const createSafeOnChange = (setter: (value: string) => void) => {
     setter(safeString(value));
   };
 };
+
+interface InvoiceDetailsDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  confirmationId: string;
+}
 
 export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: InvoiceDetailsDialogProps) {
   const { toast } = useToast();
@@ -88,18 +89,21 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return masterDatabase.filter(player => playerIds.includes(player.id));
   };
   
+    // ✅ FIXED: Define balance calculation variables in main component scope
   const players = getRegisteredPlayers(confirmation);
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
   const isIndividualInvoice = confirmation?.schoolName === 'Individual Registration';
 
+  // Calculate totals properly
   const paymentHistory = confirmation?.paymentHistory || [];
   const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => {
     return sum + (payment.amount || 0);
   }, 0);
-  
   const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
   const totalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
   const balanceDue = Math.max(0, totalInvoiced - totalPaid);
+
+  // Invoice URL
   const invoiceUrl = confirmation?.publicUrl || confirmation?.invoiceUrl;
 
 
@@ -345,41 +349,57 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
   
-  const canRecordPayment = useMemo(() => {
-    if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
-      return false;
-    }
+const canRecordPayment = useMemo(() => {
+  console.log('=== VALIDATION DEBUG ===');
+  console.log('selectedPaymentMethods:', selectedPaymentMethods);
+  console.log('checkAmount:', checkAmount, typeof checkAmount);
+  console.log('zelleAmount:', zelleAmount, typeof zelleAmount);
+  console.log('cashAppAmount:', cashAppAmount, typeof cashAppAmount);
+  
+  if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
+    console.log('❌ No payment methods selected');
+    return false;
+  }
 
-    // Check each selected method for valid amount
-    return selectedPaymentMethods.some(method => {
-      let amount = 0;
-      
-      switch (method) {
-        case 'check':
-          amount = parseFloat(checkAmount || '0');
-          break;
-        case 'zelle':
-          amount = parseFloat(zelleAmount || '0');
-          break;
-        case 'cashapp':
-          amount = parseFloat(cashAppAmount || '0');
-          break;
-        case 'venmo':
-          amount = parseFloat(venmoAmount || '0');
-          break;
-        case 'cash':
-          amount = parseFloat(cashAmount || '0');
-          break;
-        case 'other':
-          amount = parseFloat(otherAmount || '0');
-          break;
-        default:
-          return false;
-      }
-      
-      return !isNaN(amount) && amount > 0;
-    });
-  }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
+  // Check each selected method for valid amount
+  const result = selectedPaymentMethods.some(method => {
+    let amount = 0;
+    
+    switch (method) {
+      case 'check':
+        amount = parseFloat(checkAmount || '0');
+        console.log(`Check: "${checkAmount}" -> ${amount}`);
+        break;
+      case 'zelle':
+        amount = parseFloat(zelleAmount || '0');
+        console.log(`Zelle: "${zelleAmount}" -> ${amount}`);
+        break;
+      case 'cashapp':
+        amount = parseFloat(cashAppAmount || '0');
+        console.log(`Cash App: "${cashAppAmount}" -> ${amount}`);
+        break;
+      case 'venmo':
+        amount = parseFloat(venmoAmount || '0');
+        break;
+      case 'cash':
+        amount = parseFloat(cashAmount || '0');
+        break;
+      case 'other':
+        amount = parseFloat(otherAmount || '0');
+        break;
+      default:
+        return false;
+    }
+    
+    const isValid = !isNaN(amount) && amount > 0;
+    console.log(`Method ${method}: amount=${amount}, valid=${isValid}`);
+    return isValid;
+  });
+  
+  console.log('Final validation result:', result);
+  console.log('=== END DEBUG ===');
+  return result;
+}, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
   const formatPhoneNumber = (phone: string) => {
     if (!phone) return 'N/A';
@@ -429,14 +449,17 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     });
   };
 
-  const RegistrationDetailsSection = () => (
+const RegistrationDetailsSection = () => {
+  console.log('Confirmation data:', confirmation);
+  
+  return (
     <div className="bg-white rounded-lg border p-4">
       <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
       
       <div className="space-y-3">
         <div className="flex justify-between">
           <span className="text-gray-600">Event</span>
-          <span>{confirmation?.invoiceTitle || confirmation?.eventName || 'N/A'}</span>
+          <span>{confirmation?.invoiceTitle || confirmation?.eventName || confirmation?.eventTitle || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
@@ -446,22 +469,28 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Name</span>
-          <span>{confirmation?.purchaserName || (confirmation?.firstName + ' ' + confirmation?.lastName) || 'N/A'}</span>
+          <span>
+            {confirmation?.purchaserName || 
+             confirmation?.sponsorName ||
+             (confirmation?.firstName && confirmation?.lastName ? 
+               `${confirmation.firstName} ${confirmation.lastName}` : 
+               confirmation?.firstName || confirmation?.lastName || 'N/A')}
+          </span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Email</span>
-          <span>{confirmation?.sponsorEmail || confirmation?.email || 'N/A'}</span>
+          <span>{confirmation?.sponsorEmail || confirmation?.email || confirmation?.purchaserEmail || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Phone</span>
-          <span>{formatPhoneNumber(confirmation?.sponsorPhone || confirmation?.phone || '')}</span>
+          <span>{formatPhoneNumber(confirmation?.sponsorPhone || confirmation?.phone || confirmation?.purchaserPhone || '')}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">School</span>
-          <span>{confirmation?.schoolName || 'N/A'}</span>
+          <span>{confirmation?.schoolName || confirmation?.school || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between font-semibold text-lg border-t pt-3">
@@ -471,6 +500,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       </div>
     </div>
   );
+};
+
 
   const ProofOfPaymentSection = () => (
     <div className="mt-4">
@@ -523,22 +554,60 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </div>
   );
 
-  const RecordPaymentButton = () => (
-    <Button
-      onClick={handlePaymentUpdate}
-      disabled={!canRecordPayment || isUpdating}
-      className="w-full"
-    >
-      {isUpdating ? (
-        <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          Recording Payment...
-        </>
-      ) : (
-        'Record Payment'
-      )}
-    </Button>
+const RecordPaymentButton = () => {
+  const handleDebug = () => {
+    console.log('=== FULL DEBUG ===');
+    console.log('selectedPaymentMethods:', selectedPaymentMethods);
+    console.log('All amounts:', {
+      checkAmount,
+      zelleAmount, 
+      cashAppAmount,
+      venmoAmount,
+      cashAmount,
+      otherAmount
+    });
+    console.log('canRecordPayment:', canRecordPayment);
+    console.log('isUpdating:', isUpdating);
+    console.log('Button disabled?', !canRecordPayment || isUpdating);
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Temporary debug button */}
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleDebug}
+        className="w-full text-xs"
+      >
+        🐛 Debug (Check Console)
+      </Button>
+      
+      <Button
+        onClick={handlePaymentUpdate}
+        disabled={!canRecordPayment || isUpdating}
+        className="w-full"
+      >
+        {isUpdating ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Recording Payment...
+          </>
+        ) : (
+          'Record Payment'
+        )}
+      </Button>
+      
+      {/* Debug info */}
+      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
+        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
+        <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
+      </div>
+    </div>
   );
+};
+
 
   const renderPaymentMethodInputs = () => {
     return (
@@ -731,101 +800,96 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       </div>
     );
   };
-
-  const handleSync = () => {
-    // Placeholder for sync logic
-    console.log("Syncing with Square...");
-  };
-
   const isSyncing = isRefreshing;
 
+const PaymentSummarySection = () => (
+  <div className="mt-4 bg-gray-50 rounded-lg p-4">
+    <div className="flex justify-between items-center mb-2">
+      <span className="text-green-600 font-medium">Amount Paid</span>
+      <span className="text-green-600 font-bold">${totalPaid.toFixed(2)}</span>
+    </div>
+    <div className="flex justify-between items-center">
+      <span className="text-red-600 font-medium">Balance Due</span>
+      <span className="text-red-600 font-bold">${balanceDue.toFixed(2)}</span>
+    </div>
+  </div>
+);
 
   if (!isOpen || !confirmation) return null;
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                PARTIALLY PAID
-              </Badge>
-              Invoice #{confirmation?.invoiceNumber || 'Unknown'}
-            </div>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left Column - Registration Details */}
-          <div>
-            <RegistrationDetailsSection />
-            
-            {/* Payment Summary */}
-            <div className="mt-4 bg-gray-50 rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-green-600 font-medium">Amount Paid</span>
-                <span className="text-green-600 font-bold">${totalPaid.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-red-600 font-medium">Balance Due</span>
-                <span className="text-red-600 font-bold">${balanceDue.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {/* Square Invoice Link */}
-            <div className="mt-4">
-              <label className="text-sm text-gray-600">Invoice Link</label>
-              <Button
-                variant="outline"
-                className="w-full mt-1"
-                onClick={() => window.open(confirmation?.invoiceUrl, '_blank')}
-              >
-                View on Square
-                <ExternalLink className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
+    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>
+          <div className="flex items-center gap-2">
+            {getStatusBadge(confirmation?.invoiceStatus || confirmation?.status || 'UNPAID', totalPaid, totalInvoiced)}
+            Invoice #{confirmation?.invoiceNumber || 'Unknown'}
           </div>
+        </DialogTitle>
+      </DialogHeader>
 
-          {/* Right Column - Payment Methods */}
-          <div>
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Record payments or submit payment information for verification.
-              </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Left Column - Registration Details */}
+        <div>
+          <RegistrationDetailsSection />
+          
+          {/* Payment Summary - ADD THIS BACK */}
+          <PaymentSummarySection />
 
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Payment Method</label>
-                  <div className="mt-2">
-                    {renderPaymentMethodInputs()}
-                  </div>
+          {/* Square Invoice Link */}
+          <div className="mt-4">
+            <label className="text-sm text-gray-600">Invoice Link</label>
+            <Button
+              variant="outline"
+              className="w-full mt-1"
+              onClick={() => window.open(confirmation?.invoiceUrl || confirmation?.publicUrl, '_blank')}
+            >
+              View on Square
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Right Column - Payment Methods */}
+        <div>
+          <div className="bg-white rounded-lg border p-4">
+            <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Record payments or submit payment information for verification.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Payment Method</label>
+                <div className="mt-2">
+                  {renderPaymentMethodInputs()}
                 </div>
-
-                {/* Add Proof of Payment Section */}
-                {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
-
-                {/* Record Payment Button */}
-                <RecordPaymentButton />
               </div>
+
+              {/* Add Proof of Payment Section */}
+              {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
+
+              {/* Record Payment Button */}
+              <RecordPaymentButton />
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Sync Button */}
-        <div className="mt-6 pt-4 border-t">
-          <Button
-            variant="outline"
-            onClick={handleSync}
-            disabled={isSyncing}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            Sync with Square
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Sync Button */}
+      <div className="mt-6 pt-4 border-t">
+        <Button
+          variant="outline"
+          onClick={handleRefreshStatus}
+          disabled={isRefreshing}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Sync with Square
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
   );
 }
