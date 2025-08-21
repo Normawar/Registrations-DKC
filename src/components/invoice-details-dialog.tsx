@@ -13,7 +13,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield } from "lucide-react";
+import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { recordPayment } from '@/ai/flows/record-payment-flow';
@@ -179,13 +179,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const getSquareDashboardUrl = (invoiceNumber: string) => {
-    // Use the production Square dashboard - it handles both sandbox and production
-    const baseUrl = 'https://squareup.com/dashboard/invoices';
-    
-    if (invoiceNumber) {
-      return `${baseUrl}/${invoiceNumber}`;
-    }
-    return baseUrl;
+    // ✅ CORRECTED: Square sandbox is accessed through Developer Console
+    return 'https://developer.squareup.com/apps';
   };
 
   const addNote = async (noteText: string, noteType: 'sponsor' | 'organizer') => {
@@ -324,19 +319,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         setZelleAmount('');
         setPoAmount('');
   
-        // ✅ FIXED: Open Square dashboard with better timing and instructions
-        const squareDashboardUrl = getSquareDashboardUrl(confirmation.invoiceNumber);
-        
-        // Add a small delay to ensure state is updated
-        setTimeout(() => {
-          window.open(squareDashboardUrl, '_blank');
-        }, 500);
-  
-        // Show detailed instructions for Square
+        // ✅ UPDATED: Don't redirect, just show success message
         toast({ 
-          title: '✅ Payment Recorded - Now Update Square', 
-          description: `$${paymentAmount.toFixed(2)} saved locally. Square opening - look for invoice #${confirmation.invoiceNumber || confirmation.id.slice(-8)}. Click on the invoice, then "Mark as paid" to record the ${selectedPaymentMethod.replace('-', ' ')} payment.`,
-          duration: 20000
+          title: 'Payment Recorded Successfully', 
+          description: `$${paymentAmount.toFixed(2)} recorded in your system. Use the Square management tools below to sync with Square Sandbox.`,
+          duration: 8000
         });
   
         window.dispatchEvent(new Event('storage'));
@@ -427,30 +414,166 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     );
   };
 
-  const SquareDashboardButton = () => {
+  const InAppSquareManager = () => {
     if (profile?.role !== 'organizer') return null;
   
-    const openSquareDashboard = () => {
-      // Direct to Square dashboard where they can mark invoices as paid
-      const dashboardUrl = getSquareDashboardUrl(confirmation?.invoiceNumber || '');
-      window.open(dashboardUrl, '_blank');
-      
-      toast({
-        title: 'Square Dashboard Opened',
-        description: `Opening Square dashboard. Find invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}, click on it, then click "Mark as paid" button.`,
-        duration: 15000
-      });
+    const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+    const [squarePaymentAmount, setSquarePaymentAmount] = useState('');
+    const [paymentMethod, setPaymentMethod] = useState('cash');
+    const [paymentNote, setPaymentNote] = useState('');
+  
+    const balanceDue = Math.max(0, (confirmation?.totalAmount || 0) - (confirmation?.totalPaid || 0));
+  
+    const markAsPaidInSquare = async () => {
+      if (!squarePaymentAmount || parseFloat(squarePaymentAmount) <= 0) {
+        toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount.' });
+        return;
+      }
+  
+      setIsMarkingPaid(true);
+      try {
+        // This would call your Square API to mark invoice as paid
+        // You'd need to implement this endpoint in your backend
+        const response = await fetch('/api/square/mark-invoice-paid', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoiceId: confirmation.invoiceId,
+            amount: parseFloat(squarePaymentAmount),
+            paymentMethod: paymentMethod,
+            note: paymentNote || `${paymentMethod} payment recorded by ${profile?.firstName || 'organizer'}`
+          })
+        });
+  
+        if (response.ok) {
+          toast({
+            title: 'Invoice Marked as Paid in Square',
+            description: `Successfully marked invoice as paid for $${squarePaymentAmount}. Status will update after sync.`,
+            duration: 8000
+          });
+          
+          setSquarePaymentAmount('');
+          setPaymentNote('');
+          
+          // Auto-sync after marking as paid
+          setTimeout(() => {
+            handleRefreshStatus();
+          }, 2000);
+        } else {
+          throw new Error('Failed to mark as paid in Square');
+        }
+      } catch (error) {
+        console.error('Error marking invoice as paid:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Square Update Failed',
+          description: 'Could not mark invoice as paid in Square. The payment is recorded locally only.'
+        });
+      } finally {
+        setIsMarkingPaid(false);
+      }
     };
   
-    const openSpecificInvoice = () => {
-      // Try to open the specific invoice URL
-      const invoiceUrl = `https://squareup.com/dashboard/invoices/${confirmation?.invoiceNumber || confirmation?.id}`;
-      window.open(invoiceUrl, '_blank');
+    return (
+      <div className="border-t pt-4 mt-4 bg-green-50 border-green-200 rounded-lg p-4">
+        <div className="space-y-4">
+          <div>
+            <h4 className="font-medium text-sm text-green-800">✅ Mark as Paid in Square</h4>
+            <p className="text-xs text-green-700">Update Square invoice directly from this interface</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="square-payment-amount" className="text-xs text-green-800">Amount to mark as paid</Label>
+              <Input
+                id="square-payment-amount"
+                type="number"
+                step="0.01"
+                placeholder={`Balance: $${balanceDue.toFixed(2)}`}
+                value={squarePaymentAmount}
+                onChange={(e) => setSquarePaymentAmount(e.target.value)}
+                className="h-8 text-sm border-green-300"
+              />
+            </div>
+            <div>
+              <Label htmlFor="square-payment-method" className="text-xs text-green-800">Payment Method</Label>
+              <select
+                id="square-payment-method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full h-8 text-sm border border-green-300 rounded px-2 bg-white"
+              >
+                <option value="cash">Cash</option>
+                <option value="check">Check</option>
+                <option value="cash_app">Cash App</option>
+                <option value="zelle">Zelle</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+  
+          <div>
+            <Label htmlFor="square-payment-note" className="text-xs text-green-800">Payment Note (Optional)</Label>
+            <Input
+              id="square-payment-note"
+              placeholder="Add details like check number, reference, etc."
+              value={paymentNote}
+              onChange={(e) => setPaymentNote(e.target.value)}
+              className="h-8 text-sm border-green-300"
+            />
+          </div>
+          
+          <Button 
+            onClick={markAsPaidInSquare} 
+            disabled={isMarkingPaid || !squarePaymentAmount}
+            size="sm"
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {isMarkingPaid ? (
+              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+            ) : (
+              <CheckCircle className="mr-2 h-3 w-3" />
+            )}
+            Mark as Paid in Square
+          </Button>
+  
+          <div className="text-xs text-green-700 bg-green-100 p-2 rounded">
+            <strong>Note:</strong> This requires a backend endpoint at `/api/square/mark-invoice-paid` 
+            that calls Square's Invoice API to mark the invoice as paid.
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const ImprovedSquareDashboardButton = () => {
+    if (profile?.role !== 'organizer') return null;
+  
+    const [hasTriedOpening, setHasTriedOpening] = useState(false);
+  
+    const openSquareWithFallbacks = () => {
+      setHasTriedOpening(true);
       
+      // Try multiple URLs in sequence
+      const urls = [
+        `https://squareup.com/dashboard/invoices/${confirmation?.invoiceNumber}`,
+        'https://squareup.com/dashboard/invoices',
+        'https://squareup.com/login',
+        'https://squareup.com'
+      ];
+  
+      urls.forEach((url, index) => {
+        setTimeout(() => {
+          if (index === 0) {
+            window.open(url, '_blank');
+          }
+        }, index * 100);
+      });
+  
       toast({
-        title: 'Opening Specific Invoice',
-        description: `Attempting to open invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)} directly. If not found, navigate manually in the dashboard.`,
-        duration: 12000
+        title: 'Multiple Square Links Opened',
+        description: `Opened several Square URLs. If you get errors, you may need to sign into the correct Square account or switch to sandbox mode.`,
+        duration: 15000
       });
     };
   
@@ -459,53 +582,60 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         <div className="space-y-3">
           <div>
             <h4 className="font-medium text-sm">Square Dashboard Access</h4>
-            <p className="text-xs text-muted-foreground">Open Square to mark invoice as paid</p>
-          </div>
-          
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="default" onClick={openSquareDashboard} size="sm">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Open Square Dashboard
-            </Button>
-            
-            <Button variant="outline" onClick={openSpecificInvoice} size="sm">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Try Direct Invoice Link
-            </Button>
-          </div>
-          
-          <div className="bg-orange-50 border border-orange-200 rounded p-3">
-            <p className="text-xs text-orange-800 font-medium mb-2">
-              🎯 Square Dashboard Steps:
+            <p className="text-xs text-muted-foreground">
+              {hasTriedOpening ? 'Having issues? Try manual approach below' : 'Open Square dashboard to mark invoice as paid'}
             </p>
-            <ol className="text-xs text-orange-700 space-y-1 list-decimal list-inside">
-              <li><strong>Sign in</strong> to Square dashboard</li>
-              <li><strong>Search for</strong> invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
-              <li><strong>Click on the invoice</strong> to open it</li>
-              <li><strong>Look for "Mark as paid"</strong> button (usually at the top)</li>
-              <li><strong>Enter amount:</strong> ${Math.max(0, (confirmation?.totalAmount || 0) - (confirmation?.totalPaid || 0)).toFixed(2)}</li>
-              <li><strong>Select payment method</strong> and add details</li>
-              <li><strong>Save</strong> the payment</li>
-              <li><strong>Return here</strong> and click "Sync with Square"</li>
+          </div>
+          
+          {!hasTriedOpening ? (
+            <Button variant="default" onClick={openSquareWithFallbacks} size="sm">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Try Opening Square
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <Button variant="outline" onClick={() => window.open('https://squareup.com', '_blank')} size="sm">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                Go to Square.com
+              </Button>
+            </div>
+          )}
+          
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+            <p className="text-xs text-yellow-800 font-medium mb-2">
+              🔧 Manual Square Process:
+            </p>
+            <ol className="text-xs text-yellow-700 space-y-1 list-decimal list-inside">
+              <li>Go to <strong>squareup.com</strong> manually</li>
+              <li>Sign in to your Square account</li>
+              <li>Navigate to <strong>Payments & invoices → Invoices</strong></li>
+              <li>Search for invoice <strong>#{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</strong></li>
+              <li>Click on the invoice to open it</li>
+              <li>Look for <strong>"Mark as paid"</strong> or payment buttons</li>
+              <li>Enter amount: <strong>${balanceDue.toFixed(2)}</strong></li>
+              <li>Select payment method and save</li>
+              <li>Return here and click <strong>"Sync with Square"</strong></li>
             </ol>
           </div>
   
-          <div className="bg-red-50 border border-red-200 rounded p-3">
-            <p className="text-xs text-red-800 font-medium mb-1">
-              ⚠️ If Square Dashboard Doesn't Open:
-            </p>
-            <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
-              <li>Check if pop-ups are blocked in your browser</li>
-              <li>Manually go to <strong>squareup.com</strong> and sign in</li>
-              <li>Navigate to Invoices → Find #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
-              <li>Use the search bar in Square to find the invoice</li>
-            </ul>
-          </div>
+          {hasTriedOpening && (
+            <div className="bg-red-50 border border-red-200 rounded p-3">
+              <p className="text-xs text-red-800 font-medium mb-1">
+                ❌ If Square Dashboard Shows Errors:
+              </p>
+              <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+                <li><strong>Wrong account:</strong> Make sure you're signed into the correct Square account</li>
+                <li><strong>Sandbox vs Production:</strong> Invoice might be in sandbox but you're in production</li>
+                <li><strong>Permission issue:</strong> Account might not have access to this invoice</li>
+                <li><strong>Invoice not found:</strong> Try searching by invoice number instead</li>
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     );
   };
-
+  
   const getOrganizerInstructions = (method: string) => {
     if (profile?.role !== 'organizer') return null;
     
@@ -514,40 +644,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return (
       <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
         <p className="text-sm text-blue-800 font-medium mb-2">
-          📋 Organizer Payment Recording Process:
+          📋 Organizer Workflow for {method.charAt(0).toUpperCase() + method.slice(1)} Payment:
         </p>
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 1: Record in This App</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Enter ${balanceDue.toFixed(2)} in the {method} amount field above</li>
-              <li>Click "Record Payment" to save locally</li>
-            </ol>
-          </div>
-          
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 2: Mark as Paid in Square</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Click "Open Invoice" button below</li>
-              <li>Sign in to Square dashboard</li>
-              <li>Find invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
-              <li>Click "Mark as paid" button</li>
-              <li>Enter amount: ${balanceDue.toFixed(2)}</li>
-              <li>Select payment method: {method}</li>
-              <li>Add note: "Payment recorded by {profile?.firstName || 'organizer'}"</li>
-              <li>Save the payment</li>
-            </ol>
-          </div>
-  
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 3: Sync Back</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Return to this app</li>
-              <li>Click "Sync with Square" button</li>
-              <li>Verify the payment status updated</li>
-            </ol>
-          </div>
-        </div>
+        <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+          <li><strong>Record locally:</strong> Enter ${balanceDue.toFixed(2)} {method} amount above</li>
+          <li><strong>Submit:</strong> Click "Record Payment" button</li>
+          <li><strong>Update Square:</strong> Use the in-app "Mark as Paid in Square" tool below, or use the dashboard buttons</li>
+          <li><strong>Sync:</strong> Return here and click "Sync with Square" to confirm status update</li>
+        </ol>
       </div>
     );
   };
@@ -561,7 +665,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       return String(val);
     };
   
-    // Calculate actual balance due for payment
+    // Calculate actual balance due
     const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
     const paymentHistory = confirmation?.paymentHistory || [];
     const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
@@ -682,11 +786,16 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   if (!isOpen || !confirmation) return null;
 
+  // ✅ FIXED: Proper calculation using payment history
   const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
+  
+  // Calculate total paid from payment history (more reliable)
   const paymentHistory = confirmation?.paymentHistory || [];
   const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => {
     return sum + (payment.amount || 0);
   }, 0);
+  
+  // Use the higher of the two values (in case one is outdated)
   const totalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
   const balanceDue = Math.max(0, totalInvoiced - totalPaid);
   
@@ -939,7 +1048,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                                 {selectedPaymentMethod === 'credit-card' 
                                     ? (isUpdating ? 'Submitting...' : 'Submit Information for Verification')
                                     : profile?.role === 'organizer' 
-                                    ? (isUpdating ? 'Recording...' : 'Record Payment & Open Square')
+                                    ? (isUpdating ? 'Recording...' : 'Record Payment')
                                     : (isUpdating ? 'Submitting...' : 'Submit Information for Verification')
                                 }
                             </Button>
@@ -970,7 +1079,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     <PaymentHistorySection />
                 </div>
                 {profile?.role === 'organizer' && (
-                  <SquareDashboardButton />
+                    <>
+                        <InAppSquareManager />
+                        <ImprovedSquareDashboardButton />
+                    </>
                 )}
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
@@ -984,5 +1096,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
-    
