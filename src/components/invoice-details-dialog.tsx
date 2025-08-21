@@ -179,13 +179,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const getSquareDashboardUrl = (invoiceNumber: string) => {
-    // ✅ CORRECTED: Use the proper Square Sandbox dashboard URL
-    const baseUrl = 'https://sandbox.squareup.com/dashboard/invoices';
-    
-    if (invoiceNumber) {
-      return `${baseUrl}/${invoiceNumber}`;
-    }
-    return baseUrl;
+    // ✅ CORRECTED: Square sandbox is accessed through Developer Console
+    return 'https://developer.squareup.com/apps';
   };
 
   const addNote = async (noteText: string, noteType: 'sponsor' | 'organizer') => {
@@ -261,7 +256,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           return;
         }
   
-        // Record payment in your system first
+        // Record payment in your system
         const result = await recordPayment({
           invoiceId: confirmation.invoiceId,
           amount: paymentAmount,
@@ -269,7 +264,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           paymentDate: format(new Date(), 'yyyy-MM-dd'),
         });
   
-        // Update local state (same as before)
+        // Update local state (same logic as before)
         const paymentHistory = confirmation?.paymentHistory || [];
         const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
         const currentTotalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
@@ -302,7 +297,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           paymentHistory: [...(confirmation.paymentHistory || []), newPaymentEntry]
         };
   
-        // Update localStorage (same as before)
+        // Update localStorage
         const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
         const updatedAllInvoices = allInvoices.map((inv: any) => 
           inv.id === confirmation.id ? updatedConfirmationData : inv
@@ -324,14 +319,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         setZelleAmount('');
         setPoAmount('');
   
-        // ✅ FIXED: Try correct sandbox URL
-        const squareDashboardUrl = getSquareDashboardUrl(confirmation.invoiceNumber);
-        window.open(squareDashboardUrl, '_blank');
-        
+        // ✅ UPDATED: Don't redirect, just show success message
         toast({ 
-          title: 'Payment Recorded & Square Sandbox Opening', 
-          description: `Payment of $${paymentAmount.toFixed(2)} recorded. Opening Square Sandbox - use your developer account to sign in and find invoice #${confirmation.invoiceNumber || confirmation.id.slice(-8)}.`,
-          duration: 15000
+          title: 'Payment Recorded Successfully', 
+          description: `Payment of $${paymentAmount.toFixed(2)} recorded in your system. Use the Square management tools below to sync with Square Sandbox.`,
+          duration: 8000
         });
   
         window.dispatchEvent(new Event('storage'));
@@ -564,13 +556,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           </div>
         );
   
-      case 'cash-app':
-        return <div>Other payment methods coming soon</div>;
-      case 'zelle':
-        return <div>Other payment methods coming soon</div>;
-      case 'purchase-order':
-        return <div>Other payment methods coming soon</div>;
-  
       default:
         return null;
     }
@@ -579,34 +564,23 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const SquareDashboardButton = () => {
     if (profile?.role !== 'organizer') return null;
   
-    const openSquareDashboard = () => {
-      // Try the main sandbox dashboard first
-      const primaryUrl = 'https://sandbox.squareup.com/dashboard/invoices';
-      
-      // Fallback URLs if the primary doesn't work
-      const fallbackUrls = [
-        'https://connect.squareupsandbox.com/apps',
-        'https://squareup.com/login?redirect_to=https://sandbox.squareup.com/dashboard/invoices',
-        'https://developer.squareup.com/explorer/square'
-      ];
-  
-      window.open(primaryUrl, '_blank');
-      
-      toast({
-        title: 'Square Sandbox Opened',
-        description: `Opening Square Sandbox. Look for invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}. If it doesn't load, try the Square Developer Dashboard.`,
-        duration: 10000
-      });
-    };
-  
-    const openSquareDeveloperDashboard = () => {
-      // Direct link to Square Developer Dashboard where sandbox apps are managed
+    const openSquareDeveloperConsole = () => {
       window.open('https://developer.squareup.com/apps', '_blank');
       
       toast({
-        title: 'Square Developer Dashboard Opened',
-        description: 'Access your sandbox application and invoices from the developer dashboard.',
-        duration: 8000
+        title: 'Square Developer Console Opened',
+        description: `Sign in to view your sandbox application. Navigate to your app → Webhooks/API to manage sandbox data. Invoice: #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}`,
+        duration: 12000
+      });
+    };
+  
+    const openSquareAPIExplorer = () => {
+      window.open('https://developer.squareup.com/explorer/square/invoices-api', '_blank');
+      
+      toast({
+        title: 'Square API Explorer Opened',
+        description: 'Use the API Explorer to view, update, or mark invoices as paid in sandbox environment.',
+        duration: 10000
       });
     };
   
@@ -614,32 +588,32 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       <div className="border-t pt-4 mt-4">
         <div className="space-y-3">
           <div>
-            <h4 className="font-medium text-sm">Square Dashboard Access</h4>
-            <p className="text-xs text-muted-foreground">Manage payments directly in Square Sandbox</p>
+            <h4 className="font-medium text-sm">Square Sandbox Management</h4>
+            <p className="text-xs text-muted-foreground">Access sandbox tools for invoice management</p>
           </div>
           
           <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={openSquareDashboard} size="sm">
+            <Button variant="outline" onClick={openSquareDeveloperConsole} size="sm">
               <ExternalLink className="mr-2 h-4 w-4" />
-              Open Sandbox Dashboard
+              Developer Console
             </Button>
             
-            <Button variant="outline" onClick={openSquareDeveloperDashboard} size="sm">
+            <Button variant="outline" onClick={openSquareAPIExplorer} size="sm">
               <ExternalLink className="mr-2 h-4 w-4" />
-              Developer Dashboard
+              API Explorer
             </Button>
           </div>
           
-          <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
-            <p className="text-xs text-yellow-800 font-medium mb-1">
-              💡 Square Sandbox Access:
+          <div className="bg-blue-50 border border-blue-200 rounded p-3">
+            <p className="text-xs text-blue-800 font-medium mb-2">
+              📋 Square Sandbox Instructions:
             </p>
-            <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
-              <li>Use your Square Developer account credentials</li>
-              <li>Look for invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
-              <li>If sandbox dashboard doesn't load, use Developer Dashboard</li>
-              <li>Navigate to your sandbox application → Invoices</li>
-            </ul>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+              <li><strong>Developer Console:</strong> Sign in → Select your app → View webhook logs/data</li>
+              <li><strong>API Explorer:</strong> Use "List Invoices" to find invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
+              <li><strong>Update Payment:</strong> Use "Update Invoice" or payment endpoints</li>
+              <li><strong>Return here:</strong> Click "Sync with Square" to refresh status</li>
+            </ol>
           </div>
         </div>
       </div>
