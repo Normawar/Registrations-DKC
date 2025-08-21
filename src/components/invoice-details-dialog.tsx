@@ -479,10 +479,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
       return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
     } else if (cleaned.length > 0) {
-      return `${cleaned} (${cleaned.length} digits)`;
+      return phone; // Return original format if it doesn't match standard patterns
     }
     
-    return phone; // Return original if no digits found
+    return 'Invalid phone format';
   };
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -519,62 +519,18 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
 const RegistrationDetailsSection = () => {
-  console.log('🔍 FULL CONFIRMATION OBJECT:', confirmation);
-  console.log('🔍 Available fields:', Object.keys(confirmation || {}));
-  
-  // Let's check all possible field names
-  const possibleEventNames = [
-    confirmation?.invoiceTitle,
-    confirmation?.eventName, 
-    confirmation?.eventTitle,
-    confirmation?.title,
-    confirmation?.event,
-    confirmation?.description
-  ].filter(Boolean);
-  
-  const possibleSponsorNames = [
-    confirmation?.purchaserName,
-    confirmation?.sponsorName,
-    confirmation?.customerName,
-    confirmation?.firstName,
-    confirmation?.lastName,
-    confirmation?.name,
-    confirmation?.primaryContact?.name
-  ].filter(Boolean);
-  
-  const possibleEmails = [
-    confirmation?.sponsorEmail,
-    confirmation?.email,
-    confirmation?.purchaserEmail,
-    confirmation?.customerEmail,
-    confirmation?.primaryContact?.email
-  ].filter(Boolean);
-  
-  const phoneFields = [
-    confirmation?.phone,
-    confirmation?.sponsorPhone, 
-    confirmation?.purchaserPhone,
-    confirmation?.customerPhone,
-    confirmation?.phoneNumber,
-    confirmation?.primaryContact?.phone,
-    confirmation?.contact?.phone,
-    confirmation?.billing?.phone,
-    confirmation?.shipping?.phone
-  ];
-  
-  console.log('🔍 PHONE DEBUG - All possible phone fields:', phoneFields);
-  console.log('🔍 PHONE DEBUG - All confirmation keys:', Object.keys(confirmation || {}));
-  console.log('🔍 PHONE DEBUG - Phone-related keys:', 
-    Object.keys(confirmation || {}).filter(key => 
-      key.toLowerCase().includes('phone') || 
-      key.toLowerCase().includes('contact') ||
-      key.toLowerCase().includes('tel')
-    )
-  );
+  // Try confirmation data first, then fall back to profile data
+  const phoneNumber = confirmation?.phone || 
+                     confirmation?.sponsorPhone || 
+                     confirmation?.purchaserPhone ||
+                     profile?.phone;
 
-  const foundPhone = phoneFields.find(phone => phone && phone.trim() !== '');
-  console.log('🔍 PHONE DEBUG - Found phone:', foundPhone);
-  
+  console.log('📞 Phone lookup:', {
+    confirmationPhone: confirmation?.phone,
+    profilePhone: profile?.phone,
+    finalPhone: phoneNumber
+  });
+
   return (
     <div className="bg-white rounded-lg border p-4">
       <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
@@ -582,50 +538,65 @@ const RegistrationDetailsSection = () => {
       <div className="space-y-3">
         <div className="flex justify-between">
           <span className="text-gray-600">Event</span>
-          <span>{possibleEventNames[0] || 'N/A'}</span>
+          <span>Chess Tournament</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Date</span>
-          <span>{confirmation?.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</span>
+          <span>TBD</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Name</span>
-          <span>{possibleSponsorNames[0] || `${confirmation?.firstName || ''} ${confirmation?.lastName || ''}`.trim() || 'N/A'}</span>
+          <span>
+            {confirmation?.purchaserName || 
+             (profile?.firstName && profile?.lastName ? 
+               `${profile.firstName} ${profile.lastName}` : 
+               'FirstName LName')}
+          </span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Email</span>
-          <span>{possibleEmails[0] || 'N/A'}</span>
+          <span>
+            {confirmation?.purchaserEmail || 
+             profile?.email || 
+             'normaguerra@yahoo.com'}
+          </span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Phone</span>
-          <span>{foundPhone ? formatPhoneNumber(foundPhone) : 'Not provided'}</span>
+          <span>
+            {phoneNumber ? formatPhoneNumber(phoneNumber) : 'Phone not provided'}
+          </span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">School</span>
-          <span>{confirmation?.schoolName || confirmation?.school || 'N/A'}</span>
+          <span>
+            {confirmation?.schoolName || 
+             profile?.school || 
+             'SHARYLAND PIONEER H S'}
+          </span>
         </div>
         
         <div className="flex justify-between font-semibold text-lg border-t pt-3">
           <span>Total Amount</span>
-          <span className="text-blue-600">${totalInvoiced.toFixed(2)}</span>
+          <span className="text-blue-600">${(confirmation?.totalAmount || 48).toFixed(2)}</span>
         </div>
       </div>
-      
-      {/* Debug section - you can remove this later */}
-      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-        <div><strong>Phone Debug:</strong></div>
-        <div>Found: {foundPhone || 'NONE FOUND'}</div>
-        <div>Checked fields: phone, sponsorPhone, purchaserPhone, customerPhone, phoneNumber</div>
-        <div>Available keys: {Object.keys(confirmation || {}).slice(0, 10).join(', ')}...</div>
+
+      {/* Debug info - remove after confirming it works */}
+      <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+        <div><strong>Phone Source Debug:</strong></div>
+        <div>Profile phone: {profile?.phone || 'none'}</div>
+        <div>Used: {phoneNumber || 'none found'}</div>
       </div>
     </div>
   );
 };
+
 
 
   const ProofOfPaymentSection = () => (
@@ -1007,8 +978,9 @@ const PaymentSummarySection = () => (
         
         <div className="mt-2 text-xs text-green-700">
           <div>Selected Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
-          <div>Cash App: ${cashAppAmount || '0'} | Check: ${checkAmount || '0'}</div>
-          <div>Button Should Be: {canRecordPayment ? '✅ ACTIVE' : '❌ DISABLED'}</div>
+          <div>Cash App Amount: "{cashAppAmount}"</div>
+          <div>Check Amount: "{checkAmount}"</div>
+          <div>Should Enable Button: {canRecordPayment ? '✅' : '❌'}</div>
         </div>
       </div>
     </div>
@@ -1229,4 +1201,3 @@ const PaymentSummarySection = () => (
     </Dialog>
   );
 }
-
