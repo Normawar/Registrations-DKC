@@ -109,10 +109,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const isIndividualInvoice = confirmation?.schoolName === 'Individual Registration';
 
   // Calculate totals properly
-  const paymentHistory = confirmation?.paymentHistory || [];
-  const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => {
-    return sum + (payment.amount || 0);
-  }, 0);
+  const calculatedTotalPaid = useMemo(() => {
+    if (!confirmation?.paymentHistory) return 0;
+    return confirmation.paymentHistory.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
+  }, [confirmation?.paymentHistory]);
   
   // ✅ FIXED: Move these to component scope (not inside functions)
   const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
@@ -407,55 +407,30 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
   
 const canRecordPayment = useMemo(() => {
-  console.log('=== VALIDATION DEBUG ===');
-  console.log('selectedPaymentMethods:', selectedPaymentMethods);
-  console.log('checkAmount:', checkAmount, typeof checkAmount);
-  console.log('zelleAmount:', zelleAmount, typeof zelleAmount);
-  console.log('cashAppAmount:', cashAppAmount, typeof cashAppAmount);
+  // Check if at least one payment method is selected
+  const hasSelectedMethod = selectedPaymentMethods.length > 0;
   
-  if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
-    console.log('❌ No payment methods selected');
-    return false;
-  }
-
-  // Check each selected method for valid amount
-  const result = selectedPaymentMethods.some(method => {
-    let amount = 0;
-    
+  // Check if selected methods have valid amounts
+  const hasValidAmount = selectedPaymentMethods.some(method => {
     switch (method) {
       case 'check':
-        amount = parseFloat(checkAmount || '0');
-        console.log(`Check: "${checkAmount}" -> ${amount}`);
-        break;
+        return parseFloat(safeString(checkAmount)) > 0;
       case 'zelle':
-        amount = parseFloat(zelleAmount || '0');
-        console.log(`Zelle: "${zelleAmount}" -> ${amount}`);
-        break;
+        return parseFloat(safeString(zelleAmount)) > 0;
       case 'cashapp':
-        amount = parseFloat(cashAppAmount || '0');
-        console.log(`Cash App: "${cashAppAmount}" -> ${amount}`);
-        break;
+        return parseFloat(safeString(cashAppAmount)) > 0;
       case 'venmo':
-        amount = parseFloat(venmoAmount || '0');
-        break;
+        return parseFloat(safeString(venmoAmount)) > 0;
       case 'cash':
-        amount = parseFloat(cashAmount || '0');
-        break;
+        return parseFloat(safeString(cashAmount)) > 0;
       case 'other':
-        amount = parseFloat(otherAmount || '0');
-        break;
+        return parseFloat(safeString(otherAmount)) > 0;
       default:
         return false;
     }
-    
-    const isValid = !isNaN(amount) && amount > 0;
-    console.log(`Method ${method}: amount=${amount}, valid=${isValid}`);
-    return isValid;
   });
-  
-  console.log('Final validation result:', result);
-  console.log('=== END DEBUG ===');
-  return result;
+
+  return hasSelectedMethod && hasValidAmount;
 }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
 
