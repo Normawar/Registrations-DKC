@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle } from "lucide-react";
+import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle, UploadCloud } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { recordPayment } from '@/ai/flows/record-payment-flow';
@@ -87,19 +87,21 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     const playerIds = Object.keys(conf.selections);
     return masterDatabase.filter(player => playerIds.includes(player.id));
   };
-
+  
   const players = getRegisteredPlayers(confirmation);
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
   const isIndividualInvoice = confirmation?.schoolName === 'Individual Registration';
-  
+
   const paymentHistory = confirmation?.paymentHistory || [];
   const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => {
     return sum + (payment.amount || 0);
   }, 0);
+  
   const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
   const totalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
   const balanceDue = Math.max(0, totalInvoiced - totalPaid);
   const invoiceUrl = confirmation?.publicUrl || confirmation?.invoiceUrl;
+
 
   useEffect(() => {
     if (!isOpen) {
@@ -137,6 +139,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   useEffect(() => {
     if (confirmation && !initialPaymentValuesSet) {
+      // Initialize ALL fields as empty strings to prevent controlled/uncontrolled issues
       setCheckAmount(safeString(confirmation.checkAmount || ''));
       setCheckNumber(safeString(confirmation.checkNumber || ''));
       setZelleAmount(safeString(confirmation.zelleAmount || ''));
@@ -342,6 +345,192 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
   
+  const canRecordPayment = useMemo(() => {
+    // Check if at least one payment method is selected
+    const hasSelectedMethod = selectedPaymentMethods.length > 0;
+    
+    // Check if selected methods have valid amounts
+    const hasValidAmount = selectedPaymentMethods.some(method => {
+      switch (method) {
+        case 'check':
+          return parseFloat(safeString(checkAmount)) > 0;
+        case 'zelle':
+          return parseFloat(safeString(zelleAmount)) > 0;
+        case 'cashapp':
+          return parseFloat(safeString(cashAppAmount)) > 0;
+        case 'venmo':
+          return parseFloat(safeString(venmoAmount)) > 0;
+        case 'cash':
+          return parseFloat(safeString(cashAmount)) > 0;
+        case 'other':
+          return parseFloat(safeString(otherAmount)) > 0;
+        default:
+          return false;
+      }
+    });
+  
+    return hasSelectedMethod && hasValidAmount;
+  }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
+
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone) return 'N/A';
+    // Remove any non-digit characters
+    const cleaned = phone.replace(/\D/g, '');
+    // Format as (XXX) XXX-XXXX if 10 digits
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    }
+    return phone; // Return as-is if not standard format
+  };
+
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [fileUrls, setFileUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    
+    // Validate file types (images only)
+    const validFiles = files.filter(file => {
+      const isValidType = file.type.startsWith('image/');
+      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
+      return isValidType && isValidSize;
+    });
+  
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
+      
+      // Create preview URLs
+      const newUrls = validFiles.map(file => URL.createObjectURL(file));
+      setFileUrls(prev => [...prev, ...newUrls]);
+    }
+  
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setFileUrls(prev => {
+      // Revoke URL to prevent memory leaks
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const RegistrationDetailsSection = () => (
+    <div className="bg-white rounded-lg border p-4">
+      <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
+      
+      <div className="space-y-3">
+        <div className="flex justify-between">
+          <span className="text-gray-600">Event</span>
+          <span>{confirmation?.invoiceTitle || confirmation?.eventName || 'N/A'}</span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">Date</span>
+          <span>{confirmation?.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">Sponsor Name</span>
+          <span>{confirmation?.purchaserName || (confirmation?.firstName + ' ' + confirmation?.lastName) || 'N/A'}</span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">Sponsor Email</span>
+          <span>{confirmation?.sponsorEmail || confirmation?.email || 'N/A'}</span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">Sponsor Phone</span>
+          <span>{formatPhoneNumber(confirmation?.sponsorPhone || confirmation?.phone || '')}</span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">School</span>
+          <span>{confirmation?.schoolName || 'N/A'}</span>
+        </div>
+        
+        <div className="flex justify-between font-semibold text-lg border-t pt-3">
+          <span>Total Amount</span>
+          <span className="text-blue-600">${totalInvoiced.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const ProofOfPaymentSection = () => (
+    <div className="mt-4">
+      <h4 className="text-md font-medium mb-2">Proof of Payment</h4>
+      
+      {/* Upload Button */}
+      <div className="mb-3">
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          accept="image/*"
+          multiple
+          className="hidden"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full"
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Upload Screenshot/Photo
+        </Button>
+      </div>
+  
+      {/* Uploaded Files Preview */}
+      {fileUrls.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm text-gray-600">Uploaded files:</p>
+          <div className="grid grid-cols-2 gap-2">
+            {fileUrls.map((url, index) => (
+              <div key={index} className="relative">
+                <img
+                  src={url}
+                  alt={`Proof ${index + 1}`}
+                  className="w-full h-20 object-cover rounded border"
+                />
+                <button
+                  onClick={() => removeFile(index)}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const RecordPaymentButton = () => (
+    <Button
+      onClick={handlePaymentUpdate}
+      disabled={!canRecordPayment || isUpdating}
+      className="w-full"
+    >
+      {isUpdating ? (
+        <>
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Recording Payment...
+        </>
+      ) : (
+        'Record Payment'
+      )}
+    </Button>
+  );
+
   const renderPaymentMethodInputs = () => {
     return (
       <div className="space-y-4">
@@ -534,369 +723,102 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     );
   };
 
-  const SquareDashboardButton = () => {
-    if (profile?.role !== 'organizer') return null;
-  
-    const openDeveloperConsole = () => {
-      window.open('https://developer.squareup.com/apps', '_blank');
-      
-      toast({
-        title: 'Square Developer Console Opened',
-        description: `Opening Developer Console. Look for your app (likely "registrations"), then navigate to sandbox data to find invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}.`,
-        duration: 20000
-      });
-    };
-  
-    const openAPIExplorer = () => {
-      window.open('https://developer.squareup.com/explorer/square/invoices-api', '_blank');
-      
-      toast({
-        title: 'Square API Explorer Opened',
-        description: 'Use the API Explorer to search for and update invoices directly.',
-        duration: 15000
-      });
-    };
-  
-    const openSandboxTestAccounts = () => {
-      window.open('https://developer.squareup.com/console/en/apps/sandbox', '_blank');
-      
-      toast({
-        title: 'Sandbox Test Accounts Opened',
-        description: 'Access sandbox test accounts to view transactions and invoices.',
-        duration: 12000
-      });
-    };
-  
-    return (
-      <div className="border-t pt-4 mt-4">
-        <div className="space-y-3">
-          <div>
-            <h4 className="font-medium text-sm">Square Developer Console</h4>
-            <p className="text-xs text-muted-foreground">Access sandbox invoice management tools</p>
-          </div>
-          
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="default" onClick={openDeveloperConsole} size="sm">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Developer Console
-            </Button>
-            
-            <Button variant="outline" onClick={openAPIExplorer} size="sm">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              API Explorer
-            </Button>
-  
-            <Button variant="outline" onClick={openSandboxTestAccounts} size="sm">
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Sandbox Accounts
-            </Button>
-          </div>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded p-3">
-            <p className="text-xs text-blue-800 font-medium mb-2">
-              🔧 Developer Console Steps:
-            </p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
-              <li><strong>Click "Open" on your application</strong> (likely "registrations")</li>
-              <li><strong>Navigate to sandbox data/webhooks</strong> section</li>
-              <li><strong>Look for invoice data</strong> or webhook logs</li>
-              <li><strong>Find invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</strong></li>
-              <li><strong>Use API Explorer</strong> to update invoice status if needed</li>
-            </ol>
-          </div>
-  
-          <div className="bg-green-50 border border-green-200 rounded p-3">
-            <p className="text-xs text-green-800 font-medium mb-2">
-              📋 API Explorer Method (Recommended):
-            </p>
-            <ol className="text-xs text-green-700 space-y-1 list-decimal list-inside">
-              <li>Open <strong>"API Explorer"</strong> button above</li>
-              <li>Select <strong>"Invoices API"</strong> from dropdown</li>
-              <li>Choose <strong>"Search Invoices"</strong> endpoint</li>
-              <li>Add filter: <code>invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</code></li>
-              <li>Click <strong>"Run request"</strong> to find your invoice</li>
-              <li>Copy the <strong>invoice ID</strong> from results</li>
-              <li>Use <strong>"Update Invoice"</strong> endpoint to mark as paid</li>
-              <li>Return here and click <strong>"Sync with Square"</strong></li>
-            </ol>
-          </div>
-  
-          <div className="bg-orange-50 border border-orange-200 rounded p-3">
-            <p className="text-xs text-orange-800 font-medium mb-2">
-              🎯 Quick Invoice Details:
-            </p>
-            <div className="text-xs text-orange-700 space-y-1">
-              <p><strong>Invoice Number:</strong> {confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</p>
-              <p><strong>Invoice ID:</strong> {confirmation?.invoiceId || 'Use Search Invoices to find'}</p>
-              <p><strong>Amount to mark paid:</strong> ${balanceDue.toFixed(2)}</p>
-              <p><strong>Application:</strong> Likely "registrations" (based on your setup)</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const handleSync = () => {
+    // Placeholder for sync logic
+    console.log("Syncing with Square...");
   };
-  
-  const getOrganizerInstructions = (method: string) => {
-    if (profile?.role !== 'organizer') return null;
-    
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
-        <p className="text-sm text-blue-800 font-medium mb-2">
-          📋 Organizer Workflow for Square Sandbox:
-        </p>
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 1: Record Payment Locally</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Enter ${balanceDue.toFixed(2)} in the {method} amount field above</li>
-              <li>Click "Record Payment" to save locally and open API Explorer</li>
-            </ol>
-          </div>
-          
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 2: Update Square via API Explorer</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>API Explorer will open automatically</li>
-              <li>Select "Invoices API" → "Search Invoices"</li>
-              <li>Add filter: invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</li>
-              <li>Run request to find your invoice</li>
-              <li>Copy the invoice ID from results</li>
-              <li>Use "Update Invoice" to mark as paid</li>
-            </ol>
-          </div>
 
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 3: Sync Back</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Return to this app</li>
-              <li>Click "Sync with Square" button</li>
-              <li>Verify the payment status updated</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  const SquareReminderBanner = () => {
-    if (profile?.role !== 'organizer' || !showReminder) return null;
-    
-    const hasRecentPayment = confirmation?.paymentHistory?.some((payment: any) => {
-      if (payment.source !== 'manual') return false;
-      const paymentTime = new Date(payment.date);
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      return paymentTime > fiveMinutesAgo;
-    });
-  
-    if (!hasRecentPayment) return null;
-  
-    const openSquareNow = () => {
-        window.open('https://developer.squareup.com/apps', '_blank');
-    };
-  
-    return (
-      <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-4">
-        <div className="flex items-start gap-3">
-          <div className="text-yellow-600 mt-1">
-            <ExternalLink className="h-5 w-5" />
-          </div>
-          <div className="flex-1">
-            <h4 className="text-sm font-medium text-yellow-800 mb-1">
-              📌 Don't Forget: Update Square Dashboard
-            </h4>
-            <p className="text-xs text-yellow-700 mb-3">
-              You just recorded a payment locally. Now mark it as paid in Square to keep both systems synchronized.
-            </p>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={openSquareNow} className="bg-yellow-600 hover:bg-yellow-700 text-white">
-                Open Square Now
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setShowReminder(false)}>
-                I'll do it later
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const isSyncing = isRefreshing;
+
 
   if (!isOpen || !confirmation) return null;
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                <div className="flex justify-between items-start">
-                    <div>
-                        <DialogTitle className="text-2xl">{confirmation.invoiceTitle || confirmation.eventName}</DialogTitle>
-                         <div className="text-sm text-muted-foreground flex items-center gap-2 mt-2">
-                            {getStatusBadge(confirmation.invoiceStatus || confirmation.status, confirmation.totalPaid, confirmation.totalAmount || confirmation.totalInvoiced)}
-                            <span>
-                                Invoice #{confirmation.invoiceNumber || confirmation.id.slice(-8)}
-                            </span>
-                         </div>
-                    </div>
-                </div>
-            </DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                PARTIALLY PAID
+              </Badge>
+              Invoice #{confirmation?.invoiceNumber || 'Unknown'}
+            </div>
+          </DialogTitle>
+        </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                
-                <SquareReminderBanner />
-                <div className="grid gap-6 md:grid-cols-2">
-                    <Card>
-                        <CardHeader><CardTitle>Registration Details</CardTitle></CardHeader>
-                        <CardContent className="space-y-4 text-sm">
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Event</p>
-                                <p>{confirmation.eventName}</p>
-                            </div>
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Date</p>
-                                <p>{confirmation.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</p>
-                            </div>
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Sponsor Name</p>
-                                <p>{confirmation.purchaserName || 'N/A'}</p>
-                            </div>
-                             <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Sponsor Email</p>
-                                <p>
-                                    {confirmation?.sponsorEmail || 
-                                     confirmation?.purchaserEmail || 
-                                     confirmation?.contactEmail || 
-                                     profile?.email || 
-                                     'N/A'}
-                                </p>
-                            </div>
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">Sponsor Phone</p>
-                                <p>
-                                    {confirmation?.sponsorPhone || 
-                                     confirmation?.purchaserPhone || 
-                                     confirmation?.contactPhone || 
-                                     profile?.phone || 
-                                     'N/A'}
-                                </p>
-                            </div>
-                            <div className="flex justify-between">
-                                <p className="font-medium text-muted-foreground">School</p>
-                                <p>{confirmation.schoolName || 'N/A'}</p>
-                            </div>
-                            <Separator/>
-                            <div className="flex justify-between items-center text-base">
-                              <p className="font-medium">Total Amount</p>
-                              <p className="font-semibold">${totalInvoiced.toFixed(2)}</p>
-                            </div>
-                            {totalPaid > 0 && (
-                              <>
-                                <div className="flex justify-between items-center text-green-600">
-                                  <p className="font-medium">Amount Paid</p>
-                                  <p className="font-semibold">${totalPaid.toFixed(2)}</p>
-                                </div>
-                                <div className="flex justify-between items-center text-destructive font-bold text-lg">
-                                  <p>Balance Due</p>
-                                  <p>${balanceDue.toFixed(2)}</p>
-                                </div>
-                              </>
-                            )}
-                            <div className="flex justify-between items-center">
-                                <p className="font-medium text-muted-foreground">Invoice Link</p>
-                                {invoiceUrl ? (
-                                    <Button asChild variant="outline" size="sm">
-                                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
-                                        View on Square <ExternalLink className="ml-2 h-4 w-4" />
-                                    </a>
-                                    </Button>
-                                ) : (
-                                    <span className="text-sm text-muted-foreground">No external link available</span>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Submit Payment Information</CardTitle>
-                            <CardDescription>
-                                {profile?.role === 'organizer' 
-                                    ? 'Record payments or submit payment information for verification.' 
-                                    : 'Select a payment method and provide the necessary details. An organizer will verify your payment.'
-                                }
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            {authError && (
-                                <Alert variant="destructive">
-                                    <AlertTitle>File Uploads Disabled</AlertTitle>
-                                    <AlertDescription>{authError}</AlertDescription>
-                                </Alert>
-                            )}
-                            <div>
-                                <Label className="text-base font-medium mb-4 block">Payment Method</Label>
-                                {renderPaymentMethodInputs()}
-                            </div>
-    
-                            <Separator />
-                            
-                        </CardContent>
-                         <CardFooter>
-                            <Button 
-                                onClick={handlePaymentUpdate} 
-                                disabled={
-                                    isUpdating || 
-                                    !isAuthReady || 
-                                    (!!authError && !selectedPaymentMethods.includes('cash')) || 
-                                    isPaymentApproved ||
-                                    (profile?.role === 'organizer' && selectedPaymentMethods.length === 0)
-                                } 
-                                className="flex items-center gap-2"
-                            >
-                                {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                                {profile?.role === 'organizer' 
-                                    ? (isUpdating ? 'Recording...' : 'Record Payment')
-                                    : (isUpdating ? 'Submitting...' : 'Submit Information for Verification')
-                                }
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                </div>
-                
-                <div className="grid gap-6 md:grid-cols-2">
-                    <Card>
-                        <CardHeader><CardTitle>Registered Players</CardTitle></CardHeader>
-                        <CardContent>
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {players.map((player: any) => {
-                                    const selectionInfo = confirmation.selections[player.id] || {};
-                                    return (
-                                        <div key={player.id} className="flex justify-between items-center border-b pb-2 text-sm">
-                                            <div>
-                                                <p className="font-medium">{player.firstName} {player.lastName}</p>
-                                                <p className="text-muted-foreground">Section: {selectionInfo.section || player.section || 'N/A'}</p>
-                                            </div>
-                                            <Badge variant="secondary">{selectionInfo.uscfStatus || 'Current'}</Badge>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <PaymentHistoryDisplay confirmation={confirmation} />
-                </div>
-                {profile?.role === 'organizer' && (
-                  <SquareDashboardButton />
-                )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Left Column - Registration Details */}
+          <div>
+            <RegistrationDetailsSection />
+            
+            {/* Payment Summary */}
+            <div className="mt-4 bg-gray-50 rounded-lg p-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-green-600 font-medium">Amount Paid</span>
+                <span className="text-green-600 font-bold">${totalPaid.toFixed(2)}</span>
               </div>
-            <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                <Button variant="outline" onClick={handleRefreshStatus} disabled={isRefreshing} className="mr-auto">
-                    {isRefreshing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Sync with Square
-                </Button>
-                <Button variant="ghost" onClick={onClose}>Close</Button>
-            </DialogFooter>
-        </DialogContent>
+              <div className="flex justify-between items-center">
+                <span className="text-red-600 font-medium">Balance Due</span>
+                <span className="text-red-600 font-bold">${balanceDue.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Square Invoice Link */}
+            <div className="mt-4">
+              <label className="text-sm text-gray-600">Invoice Link</label>
+              <Button
+                variant="outline"
+                className="w-full mt-1"
+                onClick={() => window.open(confirmation?.invoiceUrl, '_blank')}
+              >
+                View on Square
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Right Column - Payment Methods */}
+          <div>
+            <div className="bg-white rounded-lg border p-4">
+              <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Record payments or submit payment information for verification.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Payment Method</label>
+                  <div className="mt-2">
+                    {renderPaymentMethodInputs()}
+                  </div>
+                </div>
+
+                {/* Add Proof of Payment Section */}
+                {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
+
+                {/* Record Payment Button */}
+                <RecordPaymentButton />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sync Button */}
+        <div className="mt-6 pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            Sync with Square
+          </Button>
+        </div>
+      </DialogContent>
     </Dialog>
   );
 }
+
+    
