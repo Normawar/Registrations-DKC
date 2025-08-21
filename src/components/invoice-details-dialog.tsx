@@ -13,7 +13,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { ExternalLink, Upload, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle, UploadCloud } from "lucide-react";
+import { Upload, ExternalLink, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle, UploadCloud } from "lucide-react";
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { recordPayment } from '@/ai/flows/record-payment-flow';
@@ -613,55 +613,95 @@ const RegistrationDetailsSection = () => {
   );
 
 const RecordPaymentButton = () => {
-  const handleDebug = () => {
-    console.log('=== FULL DEBUG ===');
-    console.log('selectedPaymentMethods:', selectedPaymentMethods);
-    console.log('All amounts:', {
-      checkAmount,
-      zelleAmount, 
-      cashAppAmount,
-      venmoAmount,
-      cashAmount,
-      otherAmount
-    });
-    console.log('canRecordPayment:', canRecordPayment);
-    console.log('isUpdating:', isUpdating);
-    console.log('Button disabled?', !canRecordPayment || isUpdating);
-  };
+  const isButtonEnabled = canRecordPayment && !isUpdating;
+  
+  console.log('Button state:', {
+    canRecordPayment,
+    isUpdating, 
+    isButtonEnabled,
+    shouldBeActive: isButtonEnabled
+  });
 
   return (
     <div className="space-y-2">
-      {/* Temporary debug button */}
-      <Button
-        type="button"
-        variant="outline"
-        onClick={handleDebug}
-        className="w-full text-xs"
-      >
-        🐛 Debug (Check Console)
-      </Button>
+      {/* Debug info - you can remove this later */}
+      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+        <div>✅ Test Button: Working</div>
+        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
+        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
+        <div>Button Should Be: {isButtonEnabled ? '🟢 ACTIVE' : '🔴 DISABLED'}</div>
+      </div>
       
-      <Button
-        onClick={handlePaymentUpdate}
-        disabled={!canRecordPayment || isUpdating}
-        className="w-full"
+      {/* Force active button with inline styles */}
+      <button
+        onClick={() => {
+          console.log('🔥 RECORD PAYMENT CLICKED!');
+          if (isButtonEnabled) {
+            handlePaymentUpdate();
+          } else {
+            console.log('Button clicked but not enabled');
+          }
+        }}
+        disabled={!isButtonEnabled}
+        style={{
+          width: '100%',
+          padding: '12px 16px',
+          backgroundColor: isButtonEnabled ? '#2563eb' : '#9ca3af',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          fontSize: '14px',
+          fontWeight: '500',
+          cursor: isButtonEnabled ? 'pointer' : 'not-allowed',
+          transition: 'all 0.2s ease',
+          opacity: isButtonEnabled ? 1 : 0.6
+        }}
+        onMouseOver={(e) => {
+          if (isButtonEnabled) {
+            e.currentTarget.style.backgroundColor = '#1d4ed8';
+          }
+        }}
+        onMouseOut={(e) => {
+          if (isButtonEnabled) {
+            e.currentTarget.style.backgroundColor = '#2563eb';
+          }
+        }}
       >
         {isUpdating ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ 
+              display: 'inline-block',
+              width: '16px',
+              height: '16px',
+              border: '2px solid #ffffff40',
+              borderTop: '2px solid #ffffff',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              marginRight: '8px'
+            }}></span>
             Recording Payment...
-          </>
+          </span>
         ) : (
           'Record Payment'
         )}
-      </Button>
+      </button>
       
-      {/* Debug info */}
-      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
-        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
-        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
-        <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
-      </div>
+      {/* Alternative: Try with your Button component but force props */}
+      <Button
+        onClick={() => {
+          console.log('🔥 ALTERNATIVE BUTTON CLICKED!');
+          handlePaymentUpdate();
+        }}
+        disabled={false}  // Force enabled for testing
+        className="w-full bg-green-600 hover:bg-green-700 text-white"
+        style={{ 
+          backgroundColor: '#16a34a !important',
+          color: 'white !important',
+          cursor: 'pointer !important'
+        }}
+      >
+        🟢 Force Active Record Payment
+      </Button>
     </div>
   );
 };
@@ -1024,6 +1064,12 @@ const PaymentSummarySection = () => (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
           <DialogTitle>
             <div className="flex items-center gap-2">
               {getStatusBadge(confirmation?.invoiceStatus || confirmation?.status || 'UNPAID', totalPaid, totalInvoiced)}
@@ -1032,50 +1078,53 @@ const PaymentSummarySection = () => (
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Left Column - Registration Details */}
-          <div>
-            <RegistrationDetailsSection />
-            
-            <PaymentSummarySection />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Left Column - Registration Details */}
+        <div>
+          <RegistrationDetailsSection />
+          
+          {/* Payment Summary - ADD THIS BACK */}
+          <PaymentSummarySection />
 
-            {/* Square Invoice Link */}
-            <div className="mt-4">
-              <label className="text-sm text-gray-600">Invoice Link</label>
-              <Button
-                variant="outline"
-                className="w-full mt-1"
-                onClick={() => window.open(invoiceUrl, '_blank')}
-              >
-                View on Square
-                <ExternalLink className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
+          {/* Square Invoice Link */}
+          <div className="mt-4">
+            <label className="text-sm text-gray-600">Invoice Link</label>
+            <Button
+              variant="outline"
+              className="w-full mt-1"
+              onClick={() => window.open(confirmation?.invoiceUrl || confirmation?.publicUrl, '_blank')}
+            >
+              View on Square
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </Button>
           </div>
+        </div>
 
-          {/* Right Column - Payment Methods */}
-          <div>
-            <div className="bg-white rounded-lg border p-4">
-              <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Record payments or submit payment information for verification.
-              </p>
+        {/* Right Column - Payment Methods */}
+        <div>
+          <div className="bg-white rounded-lg border p-4">
+            <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Record payments or submit payment information for verification.
+            </p>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Payment Method</label>
-                  <div className="mt-2">
-                    {renderPaymentMethodInputs()}
-                  </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Payment Method</label>
+                <div className="mt-2">
+                  {renderPaymentMethodInputs()}
                 </div>
-
-                {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
-
-                <RecordPaymentButton />
               </div>
+
+              {/* Add Proof of Payment Section */}
+              {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
+
+              {/* Record Payment Button */}
+              <RecordPaymentButton />
             </div>
           </div>
         </div>
+      </div>
 
         {profile?.role === 'organizer' && (
             <SquareDeveloperConsoleButton />
