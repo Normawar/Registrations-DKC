@@ -60,6 +60,28 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [organizerNote, setOrganizerNote] = useState<string>('');
   const [showReminder, setShowReminder] = useState(true);
 
+  // ✅ FIXED: Define balance calculation variables in main component scope
+  const getRegisteredPlayers = (conf: any) => {
+    if (!conf?.selections) return [];
+    const playerIds = Object.keys(conf.selections);
+    return masterDatabase.filter(player => playerIds.includes(player.id));
+  };
+  const players = getRegisteredPlayers(confirmation);
+  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
+  const isIndividualInvoice = confirmation?.schoolName === 'Individual Registration';
+
+  // Calculate totals properly
+  const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
+  const paymentHistory = confirmation?.paymentHistory || [];
+  const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => {
+    return sum + (payment.amount || 0);
+  }, 0);
+  const totalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
+  const balanceDue = Math.max(0, totalInvoiced - totalPaid);
+
+  // Invoice URL
+  const invoiceUrl = confirmation?.publicUrl || confirmation?.invoiceUrl;
+
   useEffect(() => {
     if (!isOpen) return;
   
@@ -107,12 +129,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return () => unsubscribe();
   }, [isOpen, confirmationId]);
 
-  const getRegisteredPlayers = (conf: any) => {
-    if (!conf?.selections) return [];
-    const playerIds = Object.keys(conf.selections);
-    return masterDatabase.filter(player => playerIds.includes(player.id));
-  };
-  
   const handleRefreshStatus = async () => {
     if (!confirmation?.invoiceId) {
         toast({ variant: 'destructive', title: 'Cannot Refresh', description: 'No invoice ID available for this confirmation' });
@@ -177,11 +193,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     } finally {
         setIsRefreshing(false);
     }
-  };
-
-  const getSquareDashboardUrl = (invoiceNumber: string) => {
-    // Direct to Square Developer Console Applications page
-    return 'https://developer.squareup.com/apps';
   };
 
   const addNote = async (noteText: string, noteType: 'sponsor' | 'organizer') => {
@@ -419,290 +430,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     );
   };
 
-  const getOrganizerInstructions = (method: string) => {
-    if (profile?.role !== 'organizer') return null;
-    
-    const balanceDue = Math.max(0, (confirmation?.totalAmount || 0) - (confirmation?.totalPaid || 0));
-    
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
-        <p className="text-sm text-blue-800 font-medium mb-2">
-          📋 Organizer Workflow for Square Sandbox:
-        </p>
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 1: Record Payment Locally</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Enter ${balanceDue.toFixed(2)} in the {method} amount field above</li>
-              <li>Click "Record Payment" to save locally and open API Explorer</li>
-            </ol>
-          </div>
-          
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 2: Update Square via API Explorer</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>API Explorer will open automatically</li>
-              <li>Select "Invoices API" → "Search Invoices"</li>
-              <li>Add filter: invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</li>
-              <li>Run request to find your invoice</li>
-              <li>Copy the invoice ID from results</li>
-              <li>Use "Update Invoice" to mark as paid</li>
-            </ol>
-          </div>
-  
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 3: Sync Back</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Return to this app</li>
-              <li>Click "Sync with Square" button</li>
-              <li>Verify the payment status updated</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    );
-  };
-  
-  const renderPaymentMethodInputs = () => {
-    const isOrganizer = profile?.role === 'organizer';
-    const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
-  
-    const ensureString = (val: any): string => {
-      if (val === null || val === undefined) return '';
-      return String(val);
-    };
-  
-    // Calculate actual balance due
-    const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
-    const paymentHistory = confirmation?.paymentHistory || [];
-    const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
-    const totalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
-    const actualBalanceDue = Math.max(0, totalInvoiced - totalPaid);
-    
-    // Check if Square invoice amount matches balance due
-    const squareAmountMatches = Math.abs(totalInvoiced - actualBalanceDue) < 0.01;
-  
-    switch (selectedPaymentMethod) {
-      case 'credit-card':
-        return (
-          <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800 mb-3">
-              <strong>Balance due: ${actualBalanceDue.toFixed(2)}</strong>
-            </p>
-            
-            {!squareAmountMatches ? (
-              // Show warning when Square amount doesn't match balance
-              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-3">
-                <p className="text-sm text-yellow-800 font-medium mb-2">
-                  ⚠️ Payment Amount Mismatch
-                </p>
-                <p className="text-xs text-yellow-700 mb-2">
-                  The Square invoice shows ${totalInvoiced.toFixed(2)}, but your balance due is ${actualBalanceDue.toFixed(2)}.
-                </p>
-                <p className="text-xs text-yellow-700 mb-3">
-                  <strong>Options:</strong>
-                </p>
-                <div className="text-left space-y-1 text-xs text-yellow-700">
-                  <p>• Pay ${totalInvoiced.toFixed(2)} in Square (overpayment will be refunded)</p>
-                  <p>• Use a different payment method for the exact amount</p>
-                  <p>• Contact support to create a new invoice for ${actualBalanceDue.toFixed(2)}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-blue-600 mb-3">
-                After payment, please use the refresh button to update the status here.
-              </p>
-            )}
-            
-            {confirmation?.invoiceUrl ? (
-              <div className="space-y-2">
-                <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                  <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
-                    Pay ${totalInvoiced.toFixed(2)} in Square <ExternalLink className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-                {!squareAmountMatches && (
-                  <p className="text-xs text-blue-600">
-                    (Will overpay by ${(totalInvoiced - actualBalanceDue).toFixed(2)})
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-red-600">Payment link not available</p>
-            )}
-          </div>
-        );
-  
-      case 'cash':
-        return (
-          <div>
-            <Label htmlFor="cash-amount">
-              {isOrganizer ? 'Cash Amount Received' : 'Cash Amount Paid'}
-            </Label>
-            <Input 
-              id="cash-amount" 
-              type="number" 
-              step="0.01" 
-              placeholder={`Enter amount (Balance: $${actualBalanceDue.toFixed(2)})`}
-              value={ensureString(cashAmount)}
-              onChange={(e) => setCashAmount(ensureString(e.target.value))}
-              disabled={isPaymentApproved} 
-            />
-            {getOrganizerInstructions('cash')}
-          </div>
-        );
-  
-      case 'check':
-        return (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="check-amount">
-                {isOrganizer ? 'Check Amount Received' : 'Check Amount'}
-              </Label>
-              <Input 
-                id="check-amount" 
-                type="number" 
-                step="0.01" 
-                placeholder={`Enter amount (Balance: $${actualBalanceDue.toFixed(2)})`}
-                value={ensureString(checkAmount)}
-                onChange={(e) => setCheckAmount(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div>
-              <Label htmlFor="check-proof">Upload Check Image</Label>
-              <Input 
-                id="check-proof" 
-                type="file" 
-                accept="image/*,.pdf" 
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                disabled={isPaymentApproved}
-              />
-            </div>
-            {getOrganizerInstructions('check')}
-          </div>
-        );
-  
-      case 'cash-app':
-        return (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="cashapp-amount">
-                {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
-              </Label>
-              <Input 
-                id="cashapp-amount" 
-                type="number" 
-                step="0.01" 
-                placeholder={`Enter amount (Balance: $${actualBalanceDue.toFixed(2)})`}
-                value={ensureString(cashAppAmount)}
-                onChange={(e) => setCashAppAmount(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div>
-              <Label htmlFor="cashapp-proof">Upload Cash App Screenshot</Label>
-              <Input 
-                id="cashapp-proof" 
-                type="file" 
-                accept="image/*,.pdf" 
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                disabled={isPaymentApproved}
-              />
-            </div>
-            {getOrganizerInstructions('Cash App')}
-          </div>
-        );
-  
-      case 'zelle':
-        return (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="zelle-amount">
-                {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
-              </Label>
-              <Input 
-                id="zelle-amount" 
-                type="number" 
-                step="0.01" 
-                placeholder={`Enter amount (Balance: $${actualBalanceDue.toFixed(2)})`}
-                value={ensureString(zelleAmount)}
-                onChange={(e) => setZelleAmount(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div>
-              <Label htmlFor="zelle-proof">Upload Zelle Confirmation</Label>
-              <Input 
-                id="zelle-proof" 
-                type="file" 
-                accept="image/*,.pdf" 
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                disabled={isPaymentApproved}
-              />
-            </div>
-            {getOrganizerInstructions('Zelle')}
-          </div>
-        );
-  
-      case 'purchase-order':
-        if (confirmation?.schoolName === 'Individual Registration') return null;
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="po-amount">
-                {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
-              </Label>
-              <Input 
-                id="po-amount" 
-                type="number" 
-                step="0.01" 
-                placeholder={`Enter amount (Balance: $${actualBalanceDue.toFixed(2)})`}
-                value={ensureString(poAmount)}
-                onChange={(e) => setPoAmount(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div>
-              <Label htmlFor="po-number">PO Number</Label>
-              <Input 
-                id="po-number" 
-                placeholder="Enter PO Number" 
-                value={ensureString(poNumber)}
-                onChange={(e) => setPoNumber(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div className="md:col-span-2">
-              <Label htmlFor="po-document">Upload PO Document</Label>
-              <Input 
-                id="po-document" 
-                type="file" 
-                accept=".pdf,.doc,.docx,.jpg,.png" 
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div className="md:col-span-2">
-              {getOrganizerInstructions('Purchase Order')}
-            </div>
-          </div>
-        );
-  
-      default:
-        return null;
-    }
-  };
-
-
-  if (!isOpen || !confirmation) return null;
-
-  const players = getRegisteredPlayers(confirmation);
-  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
-  const isIndividualInvoice = confirmation.schoolName === 'Individual Registration';
-  
-  const invoiceUrl = confirmation.publicUrl || confirmation.invoiceUrl;
-
   const SquareDeveloperConsoleButton = () => {
     if (profile?.role !== 'organizer') return null;
   
@@ -797,13 +524,248 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <div className="text-xs text-orange-700 space-y-1">
               <p><strong>Invoice Number:</strong> {confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</p>
               <p><strong>Invoice ID:</strong> {confirmation?.invoiceId || 'Use Search Invoices to find'}</p>
-              <p><strong>Amount to mark paid:</strong> ${Math.max(0, (confirmation?.totalAmount || 0) - (confirmation?.totalPaid || 0)).toFixed(2)}</p>
+              <p><strong>Amount to mark paid:</strong> ${balanceDue.toFixed(2)}</p>
               <p><strong>Application:</strong> Likely "registrations" (based on your setup)</p>
             </div>
           </div>
         </div>
       </div>
     );
+  };
+  
+  const getOrganizerInstructions = (method: string) => {
+    if (profile?.role !== 'organizer') return null;
+    
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
+        <p className="text-sm text-blue-800 font-medium mb-2">
+          📋 Organizer Workflow for Square Sandbox:
+        </p>
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs text-blue-700 font-medium">Step 1: Record Payment Locally</p>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
+              <li>Enter ${balanceDue.toFixed(2)} in the {method} amount field above</li>
+              <li>Click "Record Payment" to save locally and open API Explorer</li>
+            </ol>
+          </div>
+          
+          <div>
+            <p className="text-xs text-blue-700 font-medium">Step 2: Update Square via API Explorer</p>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
+              <li>API Explorer will open automatically</li>
+              <li>Select "Invoices API" → "Search Invoices"</li>
+              <li>Add filter: invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</li>
+              <li>Run request to find your invoice</li>
+              <li>Copy the invoice ID from results</li>
+              <li>Use "Update Invoice" to mark as paid</li>
+            </ol>
+          </div>
+
+          <div>
+            <p className="text-xs text-blue-700 font-medium">Step 3: Sync Back</p>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
+              <li>Return to this app</li>
+              <li>Click "Sync with Square" button</li>
+              <li>Verify the payment status updated</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const renderPaymentMethodInputs = () => {
+    const isOrganizer = profile?.role === 'organizer';
+
+    const ensureString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      return String(val);
+    };
+
+    switch (selectedPaymentMethod) {
+      case 'credit-card':
+        return (
+          <div className="text-center p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800 mb-3">
+              <strong>Balance due: ${balanceDue.toFixed(2)}</strong>
+            </p>
+            
+            <p className="text-xs text-blue-600 mb-3">
+              After payment, please use the refresh button to update the status here.
+            </p>
+            
+            {invoiceUrl ? (
+              <div className="space-y-2">
+                <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                  <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
+                    Pay Balance Due ${balanceDue.toFixed(2)} <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-red-600">Payment link not available</p>
+            )}
+          </div>
+        );
+
+      case 'cash':
+        return (
+          <div>
+            <Label htmlFor="cash-amount">
+              {isOrganizer ? 'Cash Amount Received' : 'Cash Amount Paid'}
+            </Label>
+            <Input 
+              id="cash-amount" 
+              type="number" 
+              step="0.01" 
+              placeholder={`Enter amount (Balance: $${balanceDue.toFixed(2)})`}
+              value={ensureString(cashAmount)}
+              onChange={(e) => setCashAmount(ensureString(e.target.value))}
+              disabled={isPaymentApproved} 
+            />
+            {getOrganizerInstructions('cash')}
+          </div>
+        );
+
+      case 'check':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="check-amount">
+                {isOrganizer ? 'Check Amount Received' : 'Check Amount'}
+              </Label>
+              <Input 
+                id="check-amount" 
+                type="number" 
+                step="0.01" 
+                placeholder={`Enter amount (Balance: $${balanceDue.toFixed(2)})`}
+                value={ensureString(checkAmount)}
+                onChange={(e) => setCheckAmount(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
+              />
+            </div>
+            <div>
+              <Label htmlFor="check-proof">Upload Check Image</Label>
+              <Input 
+                id="check-proof" 
+                type="file" 
+                accept="image/*,.pdf" 
+                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                disabled={isPaymentApproved}
+              />
+            </div>
+            {getOrganizerInstructions('check')}
+          </div>
+        );
+
+      case 'cash-app':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="cashapp-amount">
+                {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
+              </Label>
+              <Input 
+                id="cashapp-amount" 
+                type="number" 
+                step="0.01" 
+                placeholder={`Enter amount (Balance: $${balanceDue.toFixed(2)})`}
+                value={ensureString(cashAppAmount)}
+                onChange={(e) => setCashAppAmount(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
+              />
+            </div>
+            <div>
+              <Label htmlFor="cashapp-proof">Upload Cash App Screenshot</Label>
+              <Input 
+                id="cashapp-proof" 
+                type="file" 
+                accept="image/*,.pdf" 
+                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                disabled={isPaymentApproved}
+              />
+            </div>
+            {getOrganizerInstructions('cash-app')}
+          </div>
+        );
+
+      case 'zelle':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="zelle-amount">
+                {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
+              </Label>
+              <Input 
+                id="zelle-amount" 
+                type="number" 
+                step="0.01" 
+                placeholder={`Enter amount (Balance: $${balanceDue.toFixed(2)})`}
+                value={ensureString(zelleAmount)}
+                onChange={(e) => setZelleAmount(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
+              />
+            </div>
+            <div>
+              <Label htmlFor="zelle-proof">Upload Zelle Confirmation</Label>
+              <Input 
+                id="zelle-proof" 
+                type="file" 
+                accept="image/*,.pdf" 
+                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                disabled={isPaymentApproved}
+              />
+            </div>
+            {getOrganizerInstructions('zelle')}
+          </div>
+        );
+
+      case 'purchase-order':
+        if (isIndividualInvoice) return null;
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="po-amount">
+                {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
+              </Label>
+              <Input 
+                id="po-amount" 
+                type="number" 
+                step="0.01" 
+                placeholder={`Enter amount (Balance: $${balanceDue.toFixed(2)})`}
+                value={ensureString(poAmount)}
+                onChange={(e) => setPoAmount(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
+              />
+            </div>
+            <div>
+              <Label htmlFor="po-number">PO Number</Label>
+              <Input 
+                id="po-number" 
+                placeholder="Enter PO Number" 
+                value={ensureString(poNumber)}
+                onChange={(e) => setPoNumber(ensureString(e.target.value))}
+                disabled={isPaymentApproved} 
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label htmlFor="po-document">Upload PO Document</Label>
+              <Input 
+                id="po-document" 
+                type="file" 
+                accept=".pdf,.doc,.docx,.jpg,.png" 
+                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                disabled={isPaymentApproved} 
+              />
+            </div>
+            {getOrganizerInstructions('purchase-order')}
+          </div>
+        );
+
+      default:
+        return null;
+    }
   };
   
   const SquareReminderBanner = () => {
@@ -850,6 +812,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     );
   };
 
+  if (!isOpen || !confirmation) return null;
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 flex flex-col">
@@ -1078,7 +1042,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     <PaymentHistorySection />
                 </div>
                 {profile?.role === 'organizer' && (
-                    <SquareDeveloperConsoleButton />
+                  <SquareDeveloperConsoleButton />
                 )}
             </div>
             <DialogFooter className="p-6 pt-4 border-t shrink-0">
