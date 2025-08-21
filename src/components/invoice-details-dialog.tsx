@@ -56,20 +56,21 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   
   const [cashAmount, setCashAmount] = useState<string>('');
-  const [checkAmount, setCheckAmount] = useState<string>('');
-  const [creditCardAmount, setCreditCardAmount] = useState<string>('');
-  const [creditCardLast4, setCreditCardLast4] = useState<string>('');
-  const [cashAppAmount, setCashAppAmount] = useState<string>('');
-  const [cashAppHandle, setCashAppHandle] = useState<string>('');
-  const [venmoAmount, setVenmoAmount] = useState<string>('');
-  const [venmoHandle, setVenmoHandle] = useState<string>('');
-  const [otherAmount, setOtherAmount] = useState<string>('');
-  const [otherDescription, setOtherDescription] = useState<string>('');
-  const [zelleAmount, setZelleAmount] = useState<string>('');
-  const [zelleEmail, setZelleEmail] = useState<string>('');
-  const [poAmount, setPoAmount] = useState<string>('');
-  const [poNumber, setPoNumber] = useState<string>('');
+  const [checkAmount, setCheckAmount] = useState('');
+  const [creditCardAmount, setCreditCardAmount] = useState('');
+  const [creditCardLast4, setCreditCardLast4] = useState('');
+  const [cashAppAmount, setCashAppAmount] = useState('');
+  const [cashAppHandle, setCashAppHandle] = useState('');
+  const [venmoAmount, setVenmoAmount] = useState('');
+  const [venmoHandle, setVenmoHandle] = useState('');
+  const [otherAmount, setOtherAmount] = useState('');
+  const [otherDescription, setOtherDescription] = useState('');
+  const [zelleAmount, setZelleAmount] = useState('');
+  const [zelleEmail, setZelleEmail] = useState('');
+  const [poAmount, setPoAmount] = useState('');
+  const [poNumber, setPoNumber] = useState('');
   const [initialPaymentValuesSet, setInitialPaymentValuesSet] = useState(false);
+  const [checkNumber, setCheckNumber] = useState('');
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -111,7 +112,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
     const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
     if (currentConf) {
-      setConfirmation(currentConf);
+        setConfirmation(currentConf);
     }
   
     // Firebase Auth setup
@@ -345,77 +346,39 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
   
   const canRecordPayment = useMemo(() => {
-    console.log('=== RECORD PAYMENT VALIDATION DEBUG ===');
-    console.log('selectedPaymentMethods:', selectedPaymentMethods);
-    console.log('checkAmount:', checkAmount);
-    console.log('zelleAmount:', zelleAmount);
-    console.log('cashAppAmount:', cashAppAmount);
-    console.log('venmoAmount:', venmoAmount);
-    console.log('cashAmount:', cashAmount);
-    console.log('otherAmount:', otherAmount);
-  
-    // Check if at least one payment method is selected
-    const hasSelectedMethod = selectedPaymentMethods.length > 0;
-    console.log('hasSelectedMethod:', hasSelectedMethod);
-    
-    if (!hasSelectedMethod) {
-      console.log('❌ No payment method selected');
+    if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
       return false;
     }
-  
-    // Check if selected methods have valid amounts
-    const validAmounts = selectedPaymentMethods.map(method => {
+
+    // Check each selected method for valid amount
+    return selectedPaymentMethods.some(method => {
       let amount = 0;
-      let isValid = false;
       
       switch (method) {
         case 'check':
-          amount = parseFloat(safeString(checkAmount)) || 0;
-          isValid = amount > 0;
-          console.log(`Check: amount=${amount}, valid=${isValid}`);
+          amount = parseFloat(checkAmount || '0');
           break;
         case 'zelle':
-          amount = parseFloat(safeString(zelleAmount)) || 0;
-          isValid = amount > 0;
-          console.log(`Zelle: amount=${amount}, valid=${isValid}`);
+          amount = parseFloat(zelleAmount || '0');
           break;
         case 'cashapp':
-          amount = parseFloat(safeString(cashAppAmount)) || 0;
-          isValid = amount > 0;
-          console.log(`Cash App: amount=${amount}, valid=${isValid}`);
+          amount = parseFloat(cashAppAmount || '0');
           break;
         case 'venmo':
-          amount = parseFloat(safeString(venmoAmount)) || 0;
-          isValid = amount > 0;
-          console.log(`Venmo: amount=${amount}, valid=${isValid}`);
+          amount = parseFloat(venmoAmount || '0');
           break;
         case 'cash':
-          amount = parseFloat(safeString(cashAmount)) || 0;
-          isValid = amount > 0;
-          console.log(`Cash: amount=${amount}, valid=${isValid}`);
+          amount = parseFloat(cashAmount || '0');
           break;
         case 'other':
-          amount = parseFloat(safeString(otherAmount)) || 0;
-          isValid = amount > 0;
-          console.log(`Other: amount=${amount}, valid=${isValid}`);
+          amount = parseFloat(otherAmount || '0');
           break;
         default:
-          console.log(`Unknown method: ${method}`);
-          isValid = false;
+          return false;
       }
       
-      return { method, amount, isValid };
+      return !isNaN(amount) && amount > 0;
     });
-  
-    const hasValidAmount = validAmounts.some(item => item.isValid);
-    console.log('validAmounts:', validAmounts);
-    console.log('hasValidAmount:', hasValidAmount);
-  
-    const result = hasSelectedMethod && hasValidAmount;
-    console.log('Final canRecordPayment result:', result);
-    console.log('=== END DEBUG ===');
-  
-    return result;
   }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
   const formatPhoneNumber = (phone: string) => {
@@ -866,5 +829,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
-    
