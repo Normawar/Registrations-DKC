@@ -179,7 +179,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const getSquareDashboardUrl = (invoiceNumber: string) => {
-    const baseUrl = 'https://squareup.com/dashboard/invoices';
+    // Always use sandbox for development
+    const baseUrl = 'https://squareup.com/dashboard/sandbox/invoices';
+    
     if (invoiceNumber) {
       return `${baseUrl}/${invoiceNumber}`;
     }
@@ -323,9 +325,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         window.open(squareDashboardUrl, '_blank');
         
         toast({ 
-          title: 'Payment Recorded & Square Opened', 
-          description: `Payment of $${paymentAmount.toFixed(2)} recorded. New balance: $${Math.max(0, totalInvoiced - newTotalPaid).toFixed(2)}`,
-          duration: 10000
+          title: 'Payment Recorded & Square Sandbox Opened', 
+          description: `Payment of $${paymentAmount.toFixed(2)} recorded. Square Sandbox opened - find invoice #${confirmation.invoiceNumber || confirmation.id.slice(-8)} and add the payment manually.`,
+          duration: 12000
         });
   
         window.dispatchEvent(new Event('storage'));
@@ -437,6 +439,26 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     // Check if Square invoice amount matches balance due
     const squareAmountMatches = Math.abs(totalInvoiced - actualBalanceDue) < 0.01;
   
+    // Add organizer-specific messaging
+    const getOrganizerInstructions = (method: string) => {
+      if (!isOrganizer) return null;
+      
+      return (
+        <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
+          <p className="text-sm text-blue-800 font-medium mb-1">
+            📋 Organizer Instructions:
+          </p>
+          <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+            <li>Enter the {method} amount received above</li>
+            <li>Click "Record Payment & Open Square"</li>
+            <li>In Square Sandbox, find invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
+            <li>Click "Mark as paid" or "Add payment" in Square</li>
+            <li>Return here and click "Sync with Square" to update status</li>
+          </ol>
+        </div>
+      );
+    };
+
     switch (selectedPaymentMethod) {
       case 'credit-card':
         return (
@@ -503,11 +525,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               onChange={(e) => setCashAmount(ensureString(e.target.value))}
               disabled={isPaymentApproved} 
             />
-            {isOrganizer && (
-              <p className="text-xs text-muted-foreground mt-1">
-                This will record the payment and open Square for manual confirmation.
-              </p>
-            )}
+            {getOrganizerInstructions('cash')}
           </div>
         );
   
@@ -538,136 +556,55 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 disabled={isPaymentApproved}
               />
             </div>
-            {isOrganizer && (
-              <p className="text-xs text-muted-foreground">
-                This will record the payment and open Square for manual confirmation.
-              </p>
-            )}
+            {getOrganizerInstructions('check')}
           </div>
         );
   
       case 'cash-app':
-        return (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="cashapp-amount">
-                {isOrganizer ? 'Cash App Amount Received' : 'Cash App Amount'}
-              </Label>
-              <Input 
-                id="cashapp-amount" 
-                type="number" 
-                step="0.01" 
-                placeholder={`Enter amount (Balance: $${actualBalanceDue.toFixed(2)})`}
-                value={ensureString(cashAppAmount)}
-                onChange={(e) => setCashAppAmount(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div>
-              <Label htmlFor="cashapp-proof">Upload Cash App Screenshot</Label>
-              <Input 
-                id="cashapp-proof" 
-                type="file" 
-                accept="image/*,.pdf" 
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                disabled={isPaymentApproved}
-              />
-            </div>
-            {isOrganizer && (
-              <p className="text-xs text-muted-foreground">
-                This will record the payment and open Square for manual confirmation.
-              </p>
-            )}
-          </div>
-        );
-  
+        // No specific implementation provided for cash-app in this step
+        return <div>Other payment methods coming soon</div>;
       case 'zelle':
-        return (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="zelle-amount">
-                {isOrganizer ? 'Zelle Amount Received' : 'Zelle Amount'}
-              </Label>
-              <Input 
-                id="zelle-amount" 
-                type="number" 
-                step="0.01" 
-                placeholder={`Enter amount (Balance: $${actualBalanceDue.toFixed(2)})`}
-                value={ensureString(zelleAmount)}
-                onChange={(e) => setZelleAmount(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div>
-              <Label htmlFor="zelle-proof">Upload Zelle Confirmation</Label>
-              <Input 
-                id="zelle-proof" 
-                type="file" 
-                accept="image/*,.pdf" 
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                disabled={isPaymentApproved}
-              />
-            </div>
-            {isOrganizer && (
-              <p className="text-xs text-muted-foreground">
-                This will record the payment and open Square for manual confirmation.
-              </p>
-            )}
-          </div>
-        );
-  
+        // No specific implementation provided for zelle in this step
+        return <div>Other payment methods coming soon</div>;
       case 'purchase-order':
-        if (confirmation?.schoolName === 'Individual Registration') return null;
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="po-amount">
-                {isOrganizer ? 'PO Amount' : 'Purchase Order Amount'}
-              </Label>
-              <Input 
-                id="po-amount" 
-                type="number" 
-                step="0.01" 
-                placeholder={`Enter amount (Balance: $${actualBalanceDue.toFixed(2)})`}
-                value={ensureString(poAmount)}
-                onChange={(e) => setPoAmount(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div>
-              <Label htmlFor="po-number">PO Number</Label>
-              <Input 
-                id="po-number" 
-                placeholder="Enter PO Number" 
-                value={ensureString(poNumber)}
-                onChange={(e) => setPoNumber(ensureString(e.target.value))}
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            <div className="md:col-span-2">
-              <Label htmlFor="po-document">Upload PO Document</Label>
-              <Input 
-                id="po-document" 
-                type="file" 
-                accept=".pdf,.doc,.docx,.jpg,.png" 
-                onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
-                disabled={isPaymentApproved} 
-              />
-            </div>
-            {isOrganizer && (
-              <div className="md:col-span-2">
-                <p className="text-xs text-muted-foreground">
-                  This will record the PO and open Square for manual confirmation.
-                </p>
-              </div>
-            )}
-          </div>
-        );
-  
+        // No specific implementation provided for purchase-order in this step
+        return <div>Other payment methods coming soon</div>;
+
       default:
         return null;
     }
   };
+
+  const SquareDashboardButton = () => {
+    if (profile?.role !== 'organizer') return null;
+  
+    const openSquareDashboard = () => {
+      const squareUrl = getSquareDashboardUrl(confirmation?.invoiceNumber || '');
+      window.open(squareUrl, '_blank');
+      
+      toast({
+        title: 'Square Sandbox Opened',
+        description: `Find invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)} to manage payments directly in Square.`,
+        duration: 8000
+      });
+    };
+  
+    return (
+      <div className="border-t pt-4 mt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-medium text-sm">Square Dashboard Access</h4>
+            <p className="text-xs text-muted-foreground">Manage payments directly in Square Sandbox</p>
+          </div>
+          <Button variant="outline" onClick={openSquareDashboard} className="ml-4">
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Open Square Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
 
   if (!isOpen || !confirmation) return null;
 
@@ -683,15 +620,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   // Use the higher of the two values (in case one is outdated)
   const totalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
   const balanceDue = Math.max(0, totalInvoiced - totalPaid);
-
-  console.log('Payment calculation debug:', {
-    totalInvoiced,
-    paymentHistory,
-    calculatedTotalPaid,
-    storedTotalPaid: confirmation?.totalPaid,
-    finalTotalPaid: totalPaid,
-    balanceDue
-  });
   
   const players = getRegisteredPlayers(confirmation);
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
@@ -871,6 +799,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             <Separator />
                             
                             {renderPaymentMethodInputs()}
+
+                            {profile?.role === 'organizer' && (
+                              <SquareDashboardButton />
+                            )}
                             
                         </CardContent>
                          <CardFooter>
