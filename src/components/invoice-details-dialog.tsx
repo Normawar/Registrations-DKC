@@ -53,26 +53,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const { database: masterDatabase } = useMasterDb();
   
   const [confirmation, setConfirmation] = useState<any>(null);
-  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   
-  const [cashAmount, setCashAmount] = useState<string>('');
-  const [checkAmount, setCheckAmount] = useState('');
-  const [creditCardAmount, setCreditCardAmount] = useState('');
-  const [creditCardLast4, setCreditCardLast4] = useState('');
-  const [cashAppAmount, setCashAppAmount] = useState('');
-  const [cashAppHandle, setCashAppHandle] = useState('');
-  const [venmoAmount, setVenmoAmount] = useState('');
-  const [venmoHandle, setVenmoHandle] = useState('');
-  const [otherAmount, setOtherAmount] = useState('');
-  const [otherDescription, setOtherDescription] = useState('');
-  const [zelleAmount, setZelleAmount] = useState('');
-  const [zelleEmail, setZelleEmail] = useState('');
-  const [poAmount, setPoAmount] = useState('');
-  const [poNumber, setPoNumber] = useState('');
-  const [initialPaymentValuesSet, setInitialPaymentValuesSet] = useState(false);
-  const [checkNumber, setCheckNumber] = useState('');
-
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -83,13 +65,42 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [organizerNote, setOrganizerNote] = useState<string>('');
   const [showReminder, setShowReminder] = useState(true);
 
+  // Core payment method selection
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState<string[]>([]);
+  const [initialPaymentValuesSet, setInitialPaymentValuesSet] = useState(false);
+
+  // Check payment fields
+  const [checkAmount, setCheckAmount] = useState('');
+  const [checkNumber, setCheckNumber] = useState('');
+
+  // Zelle payment fields  
+  const [zelleAmount, setZelleAmount] = useState('');
+  const [zelleEmail, setZelleEmail] = useState('');
+
+  // Cash App payment fields
+  const [cashAppAmount, setCashAppAmount] = useState('');
+  const [cashAppHandle, setCashAppHandle] = useState('');
+
+  // Venmo payment fields
+  const [venmoAmount, setVenmoAmount] = useState('');
+  const [venmoHandle, setVenmoHandle] = useState('');
+
+  // Cash payment fields
+  const [cashAmount, setCashAmount] = useState('');
+
+  // Other payment fields
+  const [otherAmount, setOtherAmount] = useState('');
+  const [otherDescription, setOtherDescription] = useState('');
+  
+  const [poAmount, setPoAmount] = useState('');
+  const [poNumber, setPoNumber] = useState('');
+
   const getRegisteredPlayers = (conf: any) => {
     if (!conf?.selections) return [];
     const playerIds = Object.keys(conf.selections);
     return masterDatabase.filter(player => playerIds.includes(player.id));
   };
   
-    // ✅ FIXED: Define balance calculation variables in main component scope
   const players = getRegisteredPlayers(confirmation);
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
   const isIndividualInvoice = confirmation?.schoolName === 'Individual Registration';
@@ -108,21 +119,20 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
 
   useEffect(() => {
-    if (!isOpen) {
-      setInitialPaymentValuesSet(false); // Reset on close
-      return;
-    };
+    if (!isOpen) return;
   
     const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
     const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
     if (currentConf) {
         setConfirmation(currentConf);
+        // This is a simplified initialization now, more specific logic is in the next useEffect
+        setSelectedPaymentMethods(currentConf.selectedPaymentMethods || []);
     }
   
     // Firebase Auth setup
     if (!auth || !storage) {
         setAuthError("Firebase is not configured, so file uploads are disabled.");
-        setIsAuthReady(true);
+        setIsAuthReady(true); // Still set to true to allow UI to render without hanging
         return;
     }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -155,6 +165,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       setCashAmount(safeString(confirmation.cashAmount || ''));
       setOtherAmount(safeString(confirmation.otherAmount || ''));
       setOtherDescription(safeString(confirmation.otherDescription || ''));
+      setPoNumber(safeString(confirmation.poNumber || ''));
+      setPoAmount(safeString(confirmation.poAmount || ''));
       
       setInitialPaymentValuesSet(true);
     }
@@ -183,13 +195,15 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 unifiedPaymentHistory.push({
                     ...squarePayment,
                     squarePaymentId: squarePayment.id,
+                    method: squarePayment.method,
                     source: 'square'
                 });
             }
         }
         unifiedPaymentHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
-        const totalPaid = Math.max(result.totalPaid, unifiedPaymentHistory.reduce((sum, p) => sum + p.amount, 0));
+        const totalPaidFromHistory = unifiedPaymentHistory.reduce((sum, p) => sum + p.amount, 0);
+        const totalPaid = Math.max(result.totalPaid, totalPaidFromHistory);
         
         const updatedConfirmation = {
             ...confirmation,
@@ -273,24 +287,134 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const handlePaymentUpdate = async () => {
+    if (!confirmation) return;
+  
+    setIsUpdating(true);
+  
     try {
-      const paymentData = {
-        checkAmount: parseFloat(safeString(checkAmount)) || 0,
-        checkNumber: safeString(checkNumber),
-        zelleAmount: parseFloat(safeString(zelleAmount)) || 0,
-        zelleEmail: safeString(zelleEmail),
-        cashAppAmount: parseFloat(safeString(cashAppAmount)) || 0,
-        cashAppHandle: safeString(cashAppHandle),
-        venmoAmount: parseFloat(safeString(venmoAmount)) || 0,
-        venmoHandle: safeString(venmoHandle),
-        cashAmount: parseFloat(safeString(cashAmount)) || 0,
-        otherAmount: parseFloat(safeString(otherAmount)) || 0,
-        otherDescription: safeString(otherDescription),
-      };
-
-      // ... rest of your payment update logic
+      if (profile?.role === 'organizer' && selectedPaymentMethods.length > 0) {
+        
+        let paymentAmount = 0;
+        let paymentNotes = [];
+  
+        if (selectedPaymentMethods.includes('cash')) {
+            const amount = parseFloat(safeString(cashAmount) || '0');
+            if (amount > 0) {
+                paymentAmount += amount;
+                paymentNotes.push('Cash');
+            }
+        }
+        if (selectedPaymentMethods.includes('check')) {
+            const amount = parseFloat(safeString(checkAmount) || '0');
+            if (amount > 0) {
+                paymentAmount += amount;
+                paymentNotes.push(`Check #${safeString(checkNumber)}`);
+            }
+        }
+        if (selectedPaymentMethods.includes('cashapp')) {
+            const amount = parseFloat(safeString(cashAppAmount) || '0');
+             if (amount > 0) {
+                paymentAmount += amount;
+                paymentNotes.push(`Cash App from ${safeString(cashAppHandle)}`);
+            }
+        }
+        if (selectedPaymentMethods.includes('zelle')) {
+            const amount = parseFloat(safeString(zelleAmount) || '0');
+             if (amount > 0) {
+                paymentAmount += amount;
+                paymentNotes.push(`Zelle from ${safeString(zelleEmail)}`);
+            }
+        }
+        if (selectedPaymentMethods.includes('venmo')) {
+            const amount = parseFloat(safeString(venmoAmount) || '0');
+             if (amount > 0) {
+                paymentAmount += amount;
+                paymentNotes.push(`Venmo from ${safeString(venmoHandle)}`);
+            }
+        }
+        if (selectedPaymentMethods.includes('other')) {
+            const amount = parseFloat(safeString(otherAmount) || '0');
+            if (amount > 0) {
+                paymentAmount += amount;
+                paymentNotes.push(`Other: ${safeString(otherDescription)}`);
+            }
+        }
+  
+        if (!paymentAmount || paymentAmount <= 0) {
+          toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid payment amount for at least one selected method.' });
+          setIsUpdating(false);
+          return;
+        }
+  
+        // Record payment in your system first
+        const result = await recordPayment({
+          invoiceId: confirmation.invoiceId,
+          amount: paymentAmount,
+          note: `Payment recorded by ${profile?.firstName || 'organizer'}. Details: ${paymentNotes.join(', ')}`,
+          paymentDate: format(new Date(), 'yyyy-MM-dd'),
+        });
+  
+        // Update local state 
+        const newTotalPaid = totalPaid + paymentAmount;
+        
+        let actualStatus = 'UNPAID';
+        if (newTotalPaid >= totalInvoiced) actualStatus = 'PAID';
+        else if (newTotalPaid > 0) actualStatus = 'PARTIALLY_PAID';
+  
+        const newPaymentEntry = {
+          id: result.paymentId || `payment_${Date.now()}`,
+          amount: paymentAmount,
+          date: new Date().toISOString(),
+          method: selectedPaymentMethods.join(', '),
+          note: `Payment recorded by ${profile?.firstName || 'organizer'}. Details: ${paymentNotes.join(', ')}`,
+          source: 'manual',
+          recordedBy: profile?.firstName || 'organizer',
+        };
+  
+        const updatedConfirmationData = {
+          ...confirmation,
+          status: actualStatus,
+          invoiceStatus: actualStatus,
+          totalPaid: newTotalPaid,
+          paymentStatus: actualStatus === 'PAID' ? 'paid' : 'partially-paid',
+          lastUpdated: new Date().toISOString(),
+          paymentHistory: [...(confirmation.paymentHistory || []), newPaymentEntry]
+        };
+  
+        // Update localStorage
+        const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+        const updatedAllInvoices = allInvoices.map((inv: any) => 
+          inv.id === confirmation.id ? updatedConfirmationData : inv
+        );
+        localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+  
+        const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const updatedConfirmations = confirmations.map((conf: any) => 
+          conf.id === confirmation.id ? updatedConfirmationData : conf
+        );
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+  
+        setConfirmation(updatedConfirmationData);
+        
+        // Clear form
+        setCashAmount(''); setCheckAmount(''); setCashAppAmount(''); setZelleAmount(''); setPoAmount(''); setVenmoAmount(''); setOtherAmount('');
+        setCheckNumber(''); setZelleEmail(''); setCashAppHandle(''); setVenmoHandle(''); setOtherDescription('');
+        setSelectedPaymentMethods([]);
+  
+        toast({ 
+          title: 'Payment Recorded Successfully', 
+          description: `Total payment of $${paymentAmount.toFixed(2)} recorded locally. Use "Sync with Square" to update status.`,
+          duration: 8000
+        });
+  
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('all_invoices_updated'));
+      }
     } catch (error) {
-      console.error('Error updating payment:', error);
+      console.error('Failed to update payment:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update payment information.' });
+    } finally {
+      setIsUpdating(false);
     }
   };
   
@@ -350,56 +474,26 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
   
 const canRecordPayment = useMemo(() => {
-  console.log('=== VALIDATION DEBUG ===');
-  console.log('selectedPaymentMethods:', selectedPaymentMethods);
-  console.log('checkAmount:', checkAmount, typeof checkAmount);
-  console.log('zelleAmount:', zelleAmount, typeof zelleAmount);
-  console.log('cashAppAmount:', cashAppAmount, typeof cashAppAmount);
-  
   if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
-    console.log('❌ No payment methods selected');
     return false;
   }
 
-  // Check each selected method for valid amount
-  const result = selectedPaymentMethods.some(method => {
-    let amount = 0;
-    
+  return selectedPaymentMethods.some(method => {
+    let amount = '0';
     switch (method) {
-      case 'check':
-        amount = parseFloat(checkAmount || '0');
-        console.log(`Check: "${checkAmount}" -> ${amount}`);
-        break;
-      case 'zelle':
-        amount = parseFloat(zelleAmount || '0');
-        console.log(`Zelle: "${zelleAmount}" -> ${amount}`);
-        break;
-      case 'cashapp':
-        amount = parseFloat(cashAppAmount || '0');
-        console.log(`Cash App: "${cashAppAmount}" -> ${amount}`);
-        break;
-      case 'venmo':
-        amount = parseFloat(venmoAmount || '0');
-        break;
-      case 'cash':
-        amount = parseFloat(cashAmount || '0');
-        break;
-      case 'other':
-        amount = parseFloat(otherAmount || '0');
-        break;
-      default:
-        return false;
+      case 'check': amount = checkAmount; break;
+      case 'zelle': amount = zelleAmount; break;
+      case 'cashapp': amount = cashAppAmount; break;
+      case 'venmo': amount = venmoAmount; break;
+      case 'cash': amount = cashAmount; break;
+      case 'other': amount = otherAmount; break;
+      default: return false;
     }
-    
-    const isValid = !isNaN(amount) && amount > 0;
-    console.log(`Method ${method}: amount=${amount}, valid=${isValid}`);
-    return isValid;
+    const numericAmount = parseFloat(safeString(amount) || '0');
+    return !isNaN(numericAmount) && numericAmount > 0;
   });
-  
-  console.log('Final validation result:', result);
-  console.log('=== END DEBUG ===');
-  return result;
 }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
+
 
   const formatPhoneNumber = (phone: string) => {
     if (!phone) return 'N/A';
@@ -450,8 +544,6 @@ const canRecordPayment = useMemo(() => {
   };
 
 const RegistrationDetailsSection = () => {
-  console.log('Confirmation data:', confirmation);
-  
   return (
     <div className="bg-white rounded-lg border p-4">
       <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
@@ -555,34 +647,7 @@ const RegistrationDetailsSection = () => {
   );
 
 const RecordPaymentButton = () => {
-  const handleDebug = () => {
-    console.log('=== FULL DEBUG ===');
-    console.log('selectedPaymentMethods:', selectedPaymentMethods);
-    console.log('All amounts:', {
-      checkAmount,
-      zelleAmount, 
-      cashAppAmount,
-      venmoAmount,
-      cashAmount,
-      otherAmount
-    });
-    console.log('canRecordPayment:', canRecordPayment);
-    console.log('isUpdating:', isUpdating);
-    console.log('Button disabled?', !canRecordPayment || isUpdating);
-  };
-
   return (
-    <div className="space-y-2">
-      {/* Temporary debug button */}
-      <Button
-        type="button"
-        variant="outline"
-        onClick={handleDebug}
-        className="w-full text-xs"
-      >
-        🐛 Debug (Check Console)
-      </Button>
-      
       <Button
         onClick={handlePaymentUpdate}
         disabled={!canRecordPayment || isUpdating}
@@ -597,14 +662,6 @@ const RecordPaymentButton = () => {
           'Record Payment'
         )}
       </Button>
-      
-      {/* Debug info */}
-      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
-        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
-        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
-        <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
-      </div>
-    </div>
   );
 };
 
@@ -817,6 +874,151 @@ const PaymentSummarySection = () => (
 
   if (!isOpen || !confirmation) return null;
   
+  const SquareDeveloperConsoleButton = () => {
+    if (profile?.role !== 'organizer') return null;
+
+    const openDeveloperConsole = () => {
+      window.open('https://developer.squareup.com/apps', '_blank');
+      
+      toast({
+        title: 'Square Developer Console Opened',
+        description: `Opening Developer Console. Look for your app (likely "registrations"), then navigate to sandbox data to find invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}.`,
+        duration: 20000
+      });
+    };
+
+    const openAPIExplorer = () => {
+      window.open('https://developer.squareup.com/explorer/square/invoices-api', '_blank');
+      
+      toast({
+        title: 'Square API Explorer Opened',
+        description: 'Use the API Explorer to search for and update invoices directly.',
+        duration: 15000
+      });
+    };
+
+    const openSandboxTestAccounts = () => {
+      window.open('https://developer.squareup.com/console/en/apps/sandbox', '_blank');
+      
+      toast({
+        title: 'Sandbox Test Accounts Opened',
+        description: 'Access sandbox test accounts to view transactions and invoices.',
+        duration: 12000
+      });
+    };
+
+    return (
+      <div className="border-t pt-4 mt-4">
+        <div className="space-y-3">
+          <div>
+            <h4 className="font-medium text-sm">Square Developer Console</h4>
+            <p className="text-xs text-muted-foreground">Access sandbox invoice management tools</p>
+          </div>
+          
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="default" onClick={openDeveloperConsole} size="sm">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Developer Console
+            </Button>
+            
+            <Button variant="outline" onClick={openAPIExplorer} size="sm">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              API Explorer
+            </Button>
+
+            <Button variant="outline" onClick={openSandboxTestAccounts} size="sm">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Sandbox Accounts
+            </Button>
+          </div>
+          
+          <div className="bg-blue-50 border border-blue-200 rounded p-3">
+            <p className="text-xs text-blue-800 font-medium mb-2">
+              🔧 Developer Console Steps:
+            </p>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+              <li><strong>Click "Open" on your application</strong> (likely "registrations")</li>
+              <li><strong>Navigate to sandbox data/webhooks</strong> section</li>
+              <li><strong>Look for invoice data</strong> or webhook logs</li>
+              <li><strong>Find invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</strong></li>
+              <li><strong>Use API Explorer</strong> to update invoice status if needed</li>
+            </ol>
+          </div>
+
+          <div className="bg-green-50 border border-green-200 rounded p-3">
+            <p className="text-xs text-green-800 font-medium mb-2">
+              📋 API Explorer Method (Recommended):
+            </p>
+            <ol className="text-xs text-green-700 space-y-1 list-decimal list-inside">
+              <li>Open <strong>"API Explorer"</strong> button above</li>
+              <li>Select <strong>"Invoices API"</strong> from dropdown</li>
+              <li>Choose <strong>"Search Invoices"</strong> endpoint</li>
+              <li>Add filter: <code>invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</code></li>
+              <li>Click <strong>"Run request"</strong> to find your invoice</li>
+              <li>Copy the <strong>invoice ID</strong> from results</li>
+              <li>Use <strong>"Update Invoice"</strong> endpoint to mark as paid</li>
+              <li>Return here and click <strong>"Sync with Square"</strong></li>
+            </ol>
+          </div>
+
+          <div className="bg-orange-50 border border-orange-200 rounded p-3">
+            <p className="text-xs text-orange-800 font-medium mb-2">
+              🎯 Quick Invoice Details:
+            </p>
+            <div className="text-xs text-orange-700 space-y-1">
+              <p><strong>Invoice Number:</strong> {confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</p>
+              <p><strong>Invoice ID:</strong> {confirmation?.invoiceId || 'Use Search Invoices to find'}</p>
+              <p><strong>Amount to mark paid:</strong> ${balanceDue.toFixed(2)}</p>
+              <p><strong>Application:</strong> Likely "registrations" (based on your setup)</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
+  const getOrganizerInstructions = (method: string) => {
+    if (profile?.role !== 'organizer') return null;
+    
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
+        <p className="text-sm text-blue-800 font-medium mb-2">
+          📋 Organizer Workflow for Square Sandbox:
+        </p>
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs text-blue-700 font-medium">Step 1: Record Payment Locally</p>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
+              <li>Enter ${balanceDue.toFixed(2)} in the {method} amount field above</li>
+              <li>Click "Record Payment" to save locally and open API Explorer</li>
+            </ol>
+          </div>
+          
+          <div>
+            <p className="text-xs text-blue-700 font-medium">Step 2: Update Square via API Explorer</p>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
+              <li>API Explorer will open automatically</li>
+              <li>Select "Invoices API" → "Search Invoices"</li>
+              <li>Add filter: invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</li>
+              <li>Run request to find your invoice</li>
+              <li>Copy the invoice ID from results</li>
+              <li>Use "Update Invoice" to mark as paid</li>
+            </ol>
+          </div>
+
+          <div>
+            <p className="text-xs text-blue-700 font-medium">Step 3: Sync Back</p>
+            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
+              <li>Return to this app</li>
+              <li>Click "Sync with Square" button</li>
+              <li>Verify the payment status updated</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
     <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -834,7 +1036,6 @@ const PaymentSummarySection = () => (
         <div>
           <RegistrationDetailsSection />
           
-          {/* Payment Summary - ADD THIS BACK */}
           <PaymentSummarySection />
 
           {/* Square Invoice Link */}
@@ -843,7 +1044,7 @@ const PaymentSummarySection = () => (
             <Button
               variant="outline"
               className="w-full mt-1"
-              onClick={() => window.open(confirmation?.invoiceUrl || confirmation?.publicUrl, '_blank')}
+              onClick={() => window.open(invoiceUrl, '_blank')}
             >
               View on Square
               <ExternalLink className="w-4 h-4 ml-2" />
@@ -867,15 +1068,17 @@ const PaymentSummarySection = () => (
                 </div>
               </div>
 
-              {/* Add Proof of Payment Section */}
               {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
 
-              {/* Record Payment Button */}
               <RecordPaymentButton />
             </div>
           </div>
         </div>
       </div>
+
+      {profile?.role === 'organizer' && (
+          <SquareDeveloperConsoleButton />
+      )}
 
       {/* Sync Button */}
       <div className="mt-6 pt-4 border-t">
