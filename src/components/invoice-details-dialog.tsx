@@ -519,17 +519,37 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
 const RegistrationDetailsSection = () => {
-  // Try confirmation data first, then fall back to profile data
+  // First, let's see what's actually in the profile object
+  console.log('👤 FULL PROFILE OBJECT:', profile);
+  console.log('👤 PROFILE KEYS:', Object.keys(profile || {}));
+  
+  // Try many different possible phone field names
   const phoneNumber = confirmation?.phone || 
                      confirmation?.sponsorPhone || 
                      confirmation?.purchaserPhone ||
-                     profile?.phone;
+                     profile?.phone ||
+                     profile?.cellPhone ||
+                     profile?.phoneNumber ||
+                     profile?.cellPhoneNumber ||
+                     profile?.mobile ||
+                     profile?.contactPhone ||
+                     profile?.primaryPhone;
 
-  console.log('📞 Phone lookup:', {
-    confirmationPhone: confirmation?.phone,
-    profilePhone: profile?.phone,
-    finalPhone: phoneNumber
-  });
+  // Debug all possible phone fields in profile
+  const profilePhoneFields = {
+    phone: profile?.phone,
+    cellPhone: profile?.cellPhone,
+    phoneNumber: profile?.phoneNumber,
+    cellPhoneNumber: profile?.cellPhoneNumber,
+    mobile: profile?.mobile,
+    contactPhone: profile?.contactPhone,
+    primaryPhone: profile?.primaryPhone,
+    tel: profile?.tel,
+    telephone: profile?.telephone
+  };
+
+  console.log('📞 Profile phone fields check:', profilePhoneFields);
+  console.log('📞 Final phone number:', phoneNumber);
 
   return (
     <div className="bg-white rounded-lg border p-4">
@@ -587,15 +607,20 @@ const RegistrationDetailsSection = () => {
         </div>
       </div>
 
-      {/* Debug info - remove after confirming it works */}
+      {/* Enhanced debug info */}
       <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
         <div><strong>Phone Source Debug:</strong></div>
+        <div>Profile keys: {Object.keys(profile || {}).join(', ')}</div>
         <div>Profile phone: {profile?.phone || 'none'}</div>
+        <div>Profile cellPhone: {profile?.cellPhone || 'none'}</div>
+        <div>Profile phoneNumber: {profile?.phoneNumber || 'none'}</div>
+        <div>Profile cellPhoneNumber: {profile?.cellPhoneNumber || 'none'}</div>
         <div>Used: {phoneNumber || 'none found'}</div>
       </div>
     </div>
   );
 };
+
 
 
 
@@ -653,11 +678,12 @@ const RecordPaymentButton = () => {
 
   return (
     <div className="space-y-2">
-      {/* Debug info - you can remove this later */}
+      {/* Debug info */}
       <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
         <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
         <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
-        <div>Button Status: {isButtonEnabled ? '🟢 ACTIVE' : '🔴 DISABLED'}</div>
+        <div>Is Updating: {isUpdating ? '⏳ Yes' : '✅ No'}</div>
+        <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
       </div>
       
       {/* Working native button */}
@@ -928,6 +954,135 @@ const PaymentSummarySection = () => (
 
   if (!isOpen || !confirmation) return null;
   
+  const ProfileDebugComponent = () => {
+    useEffect(() => {
+      console.log('🔍 PROFILE DEBUGGING:');
+      console.log('Profile exists:', !!profile);
+      console.log('Profile type:', typeof profile);
+      
+      if (profile) {
+        console.log('Profile keys:', Object.keys(profile));
+        console.log('Full profile object:', JSON.stringify(profile, null, 2));
+        
+        // Check for phone-related keys specifically
+        const phoneKeys = Object.keys(profile).filter(key => 
+          key.toLowerCase().includes('phone') || 
+          key.toLowerCase().includes('cell') ||
+          key.toLowerCase().includes('mobile') ||
+          key.toLowerCase().includes('tel')
+        );
+        console.log('Phone-related keys in profile:', phoneKeys);
+        
+        // Check each phone key value
+        phoneKeys.forEach(key => {
+          console.log(`Profile.${key}:`, (profile as any)[key]);
+        });
+      }
+    }, [profile]);
+  
+    return null; // This component just logs, doesn't render anything
+  };
+
+  const getPhoneFromProfile = (profile: any) => {
+    if (!profile) return null;
+    
+    // Try different access patterns
+    const phonePatterns = [
+      profile.phone,
+      profile.cellPhone,
+      profile.phoneNumber,
+      profile.cellPhoneNumber,
+      profile.mobile,
+      profile.tel,
+      profile.telephone,
+      profile['phone'],
+      profile['cellPhone'],
+      profile['phoneNumber'],
+      profile['cell_phone'],
+      profile['phone_number'],
+      profile['Cell Phone Number'], // Exact match from UI
+      profile['cellPhoneNumber'],
+      profile.contact?.phone,
+      profile.personalInfo?.phone,
+      profile.details?.phone
+    ];
+    
+    // Return the first non-empty value
+    return phonePatterns.find(phone => phone && phone.trim() !== '');
+  };
+
+  const RegistrationDetailsSectionEnhanced = () => {
+    const phoneNumber = confirmation?.phone || 
+                       confirmation?.sponsorPhone || 
+                       confirmation?.purchaserPhone ||
+                       getPhoneFromProfile(profile);
+  
+    return (
+      <div className="bg-white rounded-lg border p-4">
+        <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
+        
+        <div className="space-y-3">
+          <div className="flex justify-between">
+            <span className="text-gray-600">Event</span>
+            <span>Chess Tournament</span>
+          </div>
+          
+          <div className="flex justify-between">
+            <span className="text-gray-600">Date</span>
+            <span>TBD</span>
+          </div>
+          
+          <div className="flex justify-between">
+            <span className="text-gray-600">Sponsor Name</span>
+            <span>
+              {confirmation?.purchaserName || 
+               (profile?.firstName && profile?.lastName ? 
+                 `${profile.firstName} ${profile.lastName}` : 
+                 'FirstName LName')}
+            </span>
+          </div>
+          
+          <div className="flex justify-between">
+            <span className="text-gray-600">Sponsor Email</span>
+            <span>
+              {confirmation?.purchaserEmail || 
+               profile?.email || 
+               'normaguerra@yahoo.com'}
+            </span>
+          </div>
+          
+          <div className="flex justify-between">
+            <span className="text-gray-600">Sponsor Phone</span>
+            <span>
+              {phoneNumber ? formatPhoneNumber(phoneNumber) : 'Phone not provided'}
+            </span>
+          </div>
+          
+          <div className="flex justify-between">
+            <span className="text-gray-600">School</span>
+            <span>
+              {confirmation?.schoolName || 
+               profile?.school || 
+               'SHARYLAND PIONEER H S'}
+            </span>
+          </div>
+          
+          <div className="flex justify-between font-semibold text-lg border-t pt-3">
+            <span>Total Amount</span>
+            <span className="text-blue-600">${(confirmation?.totalAmount || 48).toFixed(2)}</span>
+          </div>
+        </div>
+  
+        {/* Debug what we found */}
+        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+          <div><strong>Phone Debug Results:</strong></div>
+          <div>Found phone: {phoneNumber || 'NONE'}</div>
+          <div>From: {phoneNumber ? 'profile data' : 'not found'}</div>
+        </div>
+      </div>
+    );
+  };
+
   const QuickTestSection = () => (
     <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
       <h4 className="font-medium text-green-800 mb-2">🧪 Quick Test Section</h4>
@@ -955,7 +1110,6 @@ const PaymentSummarySection = () => (
             setCheckAmount('28');
             setCheckNumber('1234');
           }}
-          className="w-full text-xs"
         >
           Select Check $28
         </Button>
@@ -964,7 +1118,7 @@ const PaymentSummarySection = () => (
           size="sm"
           variant="outline"
           onClick={() => {
-            console.log('🧪 Reset test');
+            console.log('🧪 Clearing all selections');
             setSelectedPaymentMethods([]);
             setCashAppAmount('');
             setCashAppHandle('');
@@ -977,10 +1131,10 @@ const PaymentSummarySection = () => (
         </Button>
         
         <div className="mt-2 text-xs text-green-700">
-          <div>Selected Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
+          <div>Selected: {JSON.stringify(selectedPaymentMethods)}</div>
           <div>Cash App Amount: "{cashAppAmount}"</div>
           <div>Check Amount: "{checkAmount}"</div>
-          <div>Should Enable Button: {canRecordPayment ? '✅' : '❌'}</div>
+          <div>Should Enable Button: {selectedPaymentMethods.includes('cashapp') && parseFloat(cashAppAmount || '0') > 0 ? '✅' : '❌'}</div>
         </div>
       </div>
     </div>
@@ -1134,8 +1288,10 @@ const PaymentSummarySection = () => (
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <ButtonStyles />
+        <ProfileDebugComponent />
         <DialogHeader>
-          <ButtonStyles />
+          
           <DialogTitle>
             <div className="flex items-center gap-2">
               {getStatusBadge(confirmation?.invoiceStatus || confirmation?.status || 'UNPAID', totalPaid, totalInvoiced)}
@@ -1146,7 +1302,7 @@ const PaymentSummarySection = () => (
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <RegistrationDetailsSection />
+          <RegistrationDetailsSectionEnhanced />
           <PaymentSummarySection />
           <div className="mt-4">
             <label className="text-sm text-gray-600">Invoice Link</label>
