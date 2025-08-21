@@ -484,25 +484,34 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const renderPaymentMethodInputs = () => {
-    const isOrganizer = profile?.role === 'organizer';
-    const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
-  
-    const ensureString = (val: any): string => {
-      if (val === null || val === undefined) return '';
-      return String(val);
-    };
-  
-    switch (selectedPaymentMethod) {
-      case 'credit-card':
-        return <div>Credit card form will go here</div>;
-      
-      case 'check':
-        return <div>Check form will go here</div>;
-      
-      default:
-        return <div>Default case</div>;
-    }
+  const isOrganizer = profile?.role === 'organizer';
+  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
+
+  const ensureString = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    return String(val);
   };
+
+  switch (selectedPaymentMethod) {
+    case 'check':
+      return (
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="check-amount">Check Amount</Label>
+            <Input 
+              id="check-amount" 
+              type="number" 
+              value={ensureString(checkAmount)}
+              onChange={(e) => setCheckAmount(ensureString(e.target.value))}
+            />
+          </div>
+        </div>
+      );
+    
+    default:
+      return <div>Other payment methods coming soon</div>;
+  }
+};
 
   if (!isOpen || !confirmation) return null;
 
