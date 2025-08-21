@@ -13,7 +13,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { Upload, ExternalLink, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle, UploadCloud } from "lucide-react";
+import { Upload, ExternalLink, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle, UploadCloud } from 'lucide-react';
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { recordPayment } from '@/ai/flows/record-payment-flow';
@@ -411,76 +411,70 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
   
 const canRecordPayment = useMemo(() => {
-  console.log('=== RECORD PAYMENT VALIDATION DEBUG ===');
+  console.log('=== ENHANCED VALIDATION DEBUG ===');
   console.log('selectedPaymentMethods:', selectedPaymentMethods);
-  console.log('checkAmount:', checkAmount);
-  console.log('zelleAmount:', zelleAmount);
-  console.log('cashAppAmount:', cashAppAmount);
-  console.log('venmoAmount:', venmoAmount);
-  console.log('cashAmount:', cashAmount);
-  console.log('otherAmount:', otherAmount);
-
-  // Check if at least one payment method is selected
-  const hasSelectedMethod = selectedPaymentMethods.length > 0;
-  console.log('hasSelectedMethod:', hasSelectedMethod);
+  console.log('selectedPaymentMethods.length:', selectedPaymentMethods.length);
+  console.log('selectedPaymentMethods type:', typeof selectedPaymentMethods);
+  console.log('selectedPaymentMethods.includes("cashapp"):', selectedPaymentMethods.includes('cashapp'));
   
-  if (!hasSelectedMethod) {
-    console.log('❌ No payment method selected');
+  // Check all amounts
+  const amounts = {
+    checkAmount: checkAmount,
+    zelleAmount: zelleAmount,
+    cashAppAmount: cashAppAmount,
+    venmoAmount: venmoAmount,
+    cashAmount: cashAmount,
+    otherAmount: otherAmount
+  };
+  
+  console.log('All amounts:', amounts);
+  
+  if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
+    console.log('❌ No payment methods selected');
     return false;
   }
 
-  // Check if selected methods have valid amounts
-  const validAmounts = selectedPaymentMethods.map(method => {
+  // Check each selected method for valid amount
+  const result = selectedPaymentMethods.some(method => {
     let amount = 0;
-    let isValid = false;
     
     switch (method) {
       case 'check':
-        amount = parseFloat(safeString(checkAmount)) || 0;
-        isValid = amount > 0;
-        console.log(`Check: amount=${amount}, valid=${isValid}`);
+        amount = parseFloat(checkAmount || '0');
+        console.log(`✅ Check: "${checkAmount}" -> ${amount}, valid: ${amount > 0}`);
         break;
       case 'zelle':
-        amount = parseFloat(safeString(zelleAmount)) || 0;
-        isValid = amount > 0;
-        console.log(`Zelle: amount=${amount}, valid=${isValid}`);
+        amount = parseFloat(zelleAmount || '0');
+        console.log(`✅ Zelle: "${zelleAmount}" -> ${amount}, valid: ${amount > 0}`);
         break;
       case 'cashapp':
-        amount = parseFloat(safeString(cashAppAmount)) || 0;
-        isValid = amount > 0;
-        console.log(`Cash App: amount=${amount}, valid=${isValid}`);
+        amount = parseFloat(cashAppAmount || '0');
+        console.log(`✅ Cash App: "${cashAppAmount}" -> ${amount}, valid: ${amount > 0}`);
         break;
       case 'venmo':
-        amount = parseFloat(safeString(venmoAmount)) || 0;
-        isValid = amount > 0;
-        console.log(`Venmo: amount=${amount}, valid=${isValid}`);
+        amount = parseFloat(venmoAmount || '0');
+        console.log(`✅ Venmo: "${venmoAmount}" -> ${amount}, valid: ${amount > 0}`);
         break;
       case 'cash':
-        amount = parseFloat(safeString(cashAmount)) || 0;
-        isValid = amount > 0;
-        console.log(`Cash: amount=${amount}, valid=${isValid}`);
+        amount = parseFloat(cashAmount || '0');
+        console.log(`✅ Cash: "${cashAmount}" -> ${amount}, valid: ${amount > 0}`);
         break;
       case 'other':
-        amount = parseFloat(safeString(otherAmount)) || 0;
-        isValid = amount > 0;
-        console.log(`Other: amount=${amount}, valid=${isValid}`);
+        amount = parseFloat(otherAmount || '0');
+        console.log(`✅ Other: "${otherAmount}" -> ${amount}, valid: ${amount > 0}`);
         break;
       default:
-        console.log(`Unknown method: ${method}`);
-        isValid = false;
+        console.log(`❌ Unknown method: ${method}`);
+        return false;
     }
     
-    return { method, amount, isValid };
+    const isValid = !isNaN(amount) && amount > 0;
+    console.log(`Method ${method}: amount=${amount}, valid=${isValid}`);
+    return isValid;
   });
-
-  const hasValidAmount = validAmounts.some(item => item.isValid);
-  console.log('validAmounts:', validAmounts);
-  console.log('hasValidAmount:', hasValidAmount);
-
-  const result = hasSelectedMethod && hasValidAmount;
-  console.log('Final canRecordPayment result:', result);
-  console.log('=== END DEBUG ===');
-
+  
+  console.log('Final validation result:', result);
+  console.log('=== END ENHANCED DEBUG ===');
   return result;
 }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
@@ -740,7 +734,7 @@ const RecordPaymentButton = () => {
 
 
 
-  const renderPaymentMethodInputs = () => {
+const renderPaymentMethodInputs = () => {
     return (
       <div className="space-y-4">
         {/* Check Payment */}
