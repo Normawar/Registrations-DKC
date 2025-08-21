@@ -484,17 +484,25 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const renderPaymentMethodInputs = () => {
-  const isOrganizer = profile?.role === 'organizer';
-  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
-
-  // Simple helper to ensure string values
-  const ensureString = (val: any): string => {
-    if (val === null || val === undefined) return '';
-    return String(val);
+    const isOrganizer = profile?.role === 'organizer';
+    const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
+  
+    const ensureString = (val: any): string => {
+      if (val === null || val === undefined) return '';
+      return String(val);
+    };
+  
+    switch (selectedPaymentMethod) {
+      case 'credit-card':
+        return <div>Credit card form will go here</div>;
+      
+      case 'check':
+        return <div>Check form will go here</div>;
+      
+      default:
+        return <div>Default case</div>;
+    }
   };
-
-  return <div>Helper function added - {selectedPaymentMethod}</div>;
-};
 
   if (!isOpen || !confirmation) return null;
 
@@ -746,3 +754,4 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
+
