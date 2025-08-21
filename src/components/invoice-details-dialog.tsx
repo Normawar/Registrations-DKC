@@ -484,8 +484,17 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const renderPaymentMethodInputs = () => {
-    return <div>Payment inputs temporarily disabled</div>;
+  const isOrganizer = profile?.role === 'organizer';
+  const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
+
+  // Simple helper to ensure string values
+  const ensureString = (val: any): string => {
+    if (val === null || val === undefined) return '';
+    return String(val);
   };
+
+  return <div>Helper function added - {selectedPaymentMethod}</div>;
+};
 
   if (!isOpen || !confirmation) return null;
 
