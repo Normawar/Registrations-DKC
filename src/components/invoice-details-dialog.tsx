@@ -36,20 +36,18 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   
   const [confirmation, setConfirmation] = useState<any>(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('purchase-order');
-  const [poNumber, setPoNumber] = useState<string>('');
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   
-  // State for different payment methods
-  const [poAmount, setPoAmount] = useState<string>('');
-  const [checkAmount, setCheckAmount] = useState<string>('');
   const [cashAmount, setCashAmount] = useState<string>('');
+  const [checkAmount, setCheckAmount] = useState<string>('');
   const [creditCardAmount, setCreditCardAmount] = useState<string>('');
   const [creditCardLast4, setCreditCardLast4] = useState<string>('');
   const [cashAppAmount, setCashAppAmount] = useState<string>('');
   const [cashAppHandle, setCashAppHandle] = useState<string>('');
   const [zelleAmount, setZelleAmount] = useState<string>('');
   const [zelleEmail, setZelleEmail] = useState<string>('');
-
+  const [poAmount, setPoAmount] = useState<string>('');
+  const [poNumber, setPoNumber] = useState<string>('');
 
   const [isUpdating, setIsUpdating] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -57,8 +55,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  const [sponsorNote, setSponsorNote] = useState('');
-  const [organizerNote, setOrganizerNote] = useState('');
+  const [sponsorNote, setSponsorNote] = useState<string>('');
+  const [organizerNote, setOrganizerNote] = useState<string>('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -70,7 +68,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       setConfirmation(currentConf);
       setSelectedPaymentMethod(currentConf.paymentMethod || 'purchase-order');
       setPoNumber(currentConf.poNumber || '');
-      // Initialize all payment fields to empty strings
+      
+      // ✅ FIXED: Initialize ALL fields as empty strings, never undefined
       setCashAmount('');
       setCheckAmount('');
       setCreditCardAmount('');
@@ -390,7 +389,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         } else {
             confirmations.push(updatedConfirmationData);
         }
-        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+        localStorage.setItem('confirmations', JSON.stringify(confirmations));
 
         setConfirmation(updatedConfirmationData);
         setFileToUpload(null);
@@ -470,6 +469,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const NotesSection = () => {
+    if (!confirmation) return null;
+    
     const notes = confirmation.notes || [];
     const sponsorNotes = notes.filter((note: any) => note.type === 'sponsor');
     const organizerNotes = notes.filter((note: any) => note.type === 'organizer');
@@ -506,8 +507,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <Input
                     id="sponsor-note"
                     placeholder="Enter note..."
-                    value={sponsorNote}
-                    onChange={(e) => setSponsorNote(e.target.value)}
+                    value={sponsorNote ?? ''}
+                    onChange={(e) => setSponsorNote(e.target.value ?? '')}
                     className="flex-1"
                   />
                   <Button 
@@ -553,8 +554,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <Input
                     id="organizer-note"
                     placeholder="Enter note..."
-                    value={organizerNote}
-                    onChange={(e) => setOrganizerNote(e.target.value)}
+                    value={organizerNote ?? ''}
+                    onChange={(e) => setOrganizerNote(e.target.value ?? '')}
                     className="flex-1"
                   />
                   <Button 
@@ -581,12 +582,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   const renderPaymentMethodInputs = () => {
     const isOrganizer = profile?.role === 'organizer';
-    const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation.invoiceStatus?.toUpperCase());
+    const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
+    const invoiceUrl = confirmation?.publicUrl || confirmation?.invoiceUrl;
 
+    // ✅ FIXED: Always return string, never undefined
     const safeGetValue = (value: string | undefined | null): string => {
         return value ?? '';
     };
-    
+
     switch (selectedPaymentMethod) {
         case 'credit-card':
             return (
@@ -594,9 +597,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                     <p className="text-sm text-blue-800 mb-3">
                         Pay securely with your credit card through Square. After payment, please use the refresh button to update the status here.
                     </p>
-                    {confirmation.invoiceUrl ? (
+                    {invoiceUrl ? (
                         <Button asChild className="bg-blue-600 hover:bg-blue-700">
-                            <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                            <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
                                 Pay Now with Credit Card <ExternalLink className="ml-2 h-4 w-4" />
                             </a>
                         </Button>
@@ -618,7 +621,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                         step="0.01" 
                         placeholder="Enter amount" 
                         value={safeGetValue(cashAmount)} 
-                        onChange={(e) => setCashAmount(e.target.value)} 
+                        onChange={(e) => setCashAmount(e.target.value ?? '')} 
                         disabled={isPaymentApproved} 
                     />
                     {isOrganizer && (
@@ -642,7 +645,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             step="0.01" 
                             placeholder="Enter amount" 
                             value={safeGetValue(checkAmount)} 
-                            onChange={(e) => setCheckAmount(e.target.value)} 
+                            onChange={(e) => setCheckAmount(e.target.value ?? '')} 
                             disabled={isPaymentApproved} 
                         />
                     </div>
@@ -655,7 +658,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                             disabled={isPaymentApproved}
                         />
-                         {confirmation.paymentFileUrl && !fileToUpload && (
+                         {confirmation?.paymentFileUrl && !fileToUpload && (
                             <div className="text-sm mt-2 flex items-center justify-between">
                               <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                                 <Download className="h-4 w-4" />
@@ -696,7 +699,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             step="0.01" 
                             placeholder="Enter amount" 
                             value={safeGetValue(cashAppAmount)} 
-                            onChange={(e) => setCashAppAmount(e.target.value)} 
+                            onChange={(e) => setCashAppAmount(e.target.value ?? '')} 
                             disabled={isPaymentApproved} 
                         />
                     </div>
@@ -709,7 +712,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                             disabled={isPaymentApproved}
                         />
-                         {confirmation.paymentFileUrl && !fileToUpload && (
+                         {confirmation?.paymentFileUrl && !fileToUpload && (
                             <div className="text-sm mt-2 flex items-center justify-between">
                               <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                                 <Download className="h-4 w-4" />
@@ -750,7 +753,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             step="0.01" 
                             placeholder="Enter amount" 
                             value={safeGetValue(zelleAmount)} 
-                            onChange={(e) => setZelleAmount(e.target.value)} 
+                            onChange={(e) => setZelleAmount(e.target.value ?? '')} 
                             disabled={isPaymentApproved} 
                         />
                     </div>
@@ -763,7 +766,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                             disabled={isPaymentApproved}
                         />
-                         {confirmation.paymentFileUrl && !fileToUpload && (
+                         {confirmation?.paymentFileUrl && !fileToUpload && (
                             <div className="text-sm mt-2 flex items-center justify-between">
                               <a href={confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                                 <Download className="h-4 w-4" />
@@ -792,7 +795,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             );
 
         case 'purchase-order':
-            if (confirmation.schoolName === 'Individual Registration') return null;
+            if (confirmation?.schoolName === 'Individual Registration') return null;
             return (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -805,7 +808,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             step="0.01" 
                             placeholder="Enter amount" 
                             value={safeGetValue(poAmount)} 
-                            onChange={(e) => setPoAmount(e.target.value)} 
+                            onChange={(e) => setPoAmount(e.target.value ?? '')} 
                             disabled={isPaymentApproved} 
                         />
                     </div>
@@ -815,7 +818,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             id="po-number" 
                             placeholder="Enter PO Number" 
                             value={safeGetValue(poNumber)} 
-                            onChange={(e) => setPoNumber(e.target.value)} 
+                            onChange={(e) => setPoNumber(e.target.value ?? '')} 
                             disabled={isPaymentApproved} 
                         />
                     </div>
@@ -828,7 +831,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                             onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
                             disabled={isPaymentApproved} 
                         />
-                        {confirmation.poFileUrl && !fileToUpload && (
+                        {confirmation?.poFileUrl && !fileToUpload && (
                             <div className="text-sm mt-2 flex items-center justify-between">
                                 <a href={confirmation.poFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
                                     <Download className="h-4 w-4" />
