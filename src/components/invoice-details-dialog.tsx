@@ -104,7 +104,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return masterDatabase.filter(player => playerIds.includes(player.id));
   };
   
-  const players = getRegisteredPlayers(confirmation);
+  // ✅ FIXED: Define balance calculation variables in main component scope
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
   const isIndividualInvoice = confirmation?.schoolName === 'Individual Registration';
 
@@ -114,7 +114,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return confirmation.paymentHistory.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
   }, [confirmation?.paymentHistory]);
   
-  // ✅ FIXED: Move these to component scope (not inside functions)
   const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
   const totalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
   const balanceDue = Math.max(0, totalInvoiced - totalPaid);
@@ -129,8 +128,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
     const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
     if (currentConf) {
-        setConfirmation(currentConf);
-        setSelectedPaymentMethods(currentConf.selectedPaymentMethods || []);
+      console.log('📋 Loading confirmation:', currentConf);
+      setConfirmation(currentConf);
+      
+      // Load selected payment methods
+      const savedMethods = currentConf.selectedPaymentMethods || [];
+      console.log('📋 Loading saved payment methods:', savedMethods);
+      setSelectedPaymentMethods(savedMethods);
     }
   
     // Firebase Auth setup
@@ -407,31 +411,79 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
   
 const canRecordPayment = useMemo(() => {
+  console.log('=== RECORD PAYMENT VALIDATION DEBUG ===');
+  console.log('selectedPaymentMethods:', selectedPaymentMethods);
+  console.log('checkAmount:', checkAmount);
+  console.log('zelleAmount:', zelleAmount);
+  console.log('cashAppAmount:', cashAppAmount);
+  console.log('venmoAmount:', venmoAmount);
+  console.log('cashAmount:', cashAmount);
+  console.log('otherAmount:', otherAmount);
+
   // Check if at least one payment method is selected
   const hasSelectedMethod = selectedPaymentMethods.length > 0;
+  console.log('hasSelectedMethod:', hasSelectedMethod);
   
+  if (!hasSelectedMethod) {
+    console.log('❌ No payment method selected');
+    return false;
+  }
+
   // Check if selected methods have valid amounts
-  const hasValidAmount = selectedPaymentMethods.some(method => {
+  const validAmounts = selectedPaymentMethods.map(method => {
+    let amount = 0;
+    let isValid = false;
+    
     switch (method) {
       case 'check':
-        return parseFloat(safeString(checkAmount)) > 0;
+        amount = parseFloat(safeString(checkAmount)) || 0;
+        isValid = amount > 0;
+        console.log(`Check: amount=${amount}, valid=${isValid}`);
+        break;
       case 'zelle':
-        return parseFloat(safeString(zelleAmount)) > 0;
+        amount = parseFloat(safeString(zelleAmount)) || 0;
+        isValid = amount > 0;
+        console.log(`Zelle: amount=${amount}, valid=${isValid}`);
+        break;
       case 'cashapp':
-        return parseFloat(safeString(cashAppAmount)) > 0;
+        amount = parseFloat(safeString(cashAppAmount)) || 0;
+        isValid = amount > 0;
+        console.log(`Cash App: amount=${amount}, valid=${isValid}`);
+        break;
       case 'venmo':
-        return parseFloat(safeString(venmoAmount)) > 0;
+        amount = parseFloat(safeString(venmoAmount)) || 0;
+        isValid = amount > 0;
+        console.log(`Venmo: amount=${amount}, valid=${isValid}`);
+        break;
       case 'cash':
-        return parseFloat(safeString(cashAmount)) > 0;
+        amount = parseFloat(safeString(cashAmount)) || 0;
+        isValid = amount > 0;
+        console.log(`Cash: amount=${amount}, valid=${isValid}`);
+        break;
       case 'other':
-        return parseFloat(safeString(otherAmount)) > 0;
+        amount = parseFloat(safeString(otherAmount)) || 0;
+        isValid = amount > 0;
+        console.log(`Other: amount=${amount}, valid=${isValid}`);
+        break;
       default:
-        return false;
+        console.log(`Unknown method: ${method}`);
+        isValid = false;
     }
+    
+    return { method, amount, isValid };
   });
 
-  return hasSelectedMethod && hasValidAmount;
+  const hasValidAmount = validAmounts.some(item => item.isValid);
+  console.log('validAmounts:', validAmounts);
+  console.log('hasValidAmount:', hasValidAmount);
+
+  const result = hasSelectedMethod && hasValidAmount;
+  console.log('Final canRecordPayment result:', result);
+  console.log('=== END DEBUG ===');
+
+  return result;
 }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
+
 
 
   const formatPhoneNumber = (phone: string) => {
@@ -483,7 +535,49 @@ const canRecordPayment = useMemo(() => {
   };
 
 const RegistrationDetailsSection = () => {
-  console.log('Confirmation data:', confirmation);
+  console.log('🔍 FULL CONFIRMATION OBJECT:', confirmation);
+  console.log('🔍 Available fields:', Object.keys(confirmation || {}));
+  
+  // Let's check all possible field names
+  const possibleEventNames = [
+    confirmation?.invoiceTitle,
+    confirmation?.eventName, 
+    confirmation?.eventTitle,
+    confirmation?.title,
+    confirmation?.event,
+    confirmation?.description
+  ].filter(Boolean);
+  
+  const possibleSponsorNames = [
+    confirmation?.purchaserName,
+    confirmation?.sponsorName,
+    confirmation?.customerName,
+    confirmation?.firstName,
+    confirmation?.lastName,
+    confirmation?.name,
+    confirmation?.primaryContact?.name
+  ].filter(Boolean);
+  
+  const possibleEmails = [
+    confirmation?.sponsorEmail,
+    confirmation?.email,
+    confirmation?.purchaserEmail,
+    confirmation?.customerEmail,
+    confirmation?.primaryContact?.email
+  ].filter(Boolean);
+  
+  const possiblePhones = [
+    confirmation?.sponsorPhone,
+    confirmation?.phone,
+    confirmation?.purchaserPhone,
+    confirmation?.customerPhone,
+    confirmation?.primaryContact?.phone
+  ].filter(Boolean);
+  
+  console.log('🔍 Event names found:', possibleEventNames);
+  console.log('🔍 Sponsor names found:', possibleSponsorNames);
+  console.log('🔍 Emails found:', possibleEmails);
+  console.log('🔍 Phones found:', possiblePhones);
   
   return (
     <div className="bg-white rounded-lg border p-4">
@@ -492,7 +586,7 @@ const RegistrationDetailsSection = () => {
       <div className="space-y-3">
         <div className="flex justify-between">
           <span className="text-gray-600">Event</span>
-          <span>{confirmation?.invoiceTitle || confirmation?.eventName || confirmation?.eventTitle || 'N/A'}</span>
+          <span>{possibleEventNames[0] || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
@@ -502,23 +596,17 @@ const RegistrationDetailsSection = () => {
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Name</span>
-          <span>
-            {confirmation?.purchaserName || 
-             confirmation?.sponsorName ||
-             (confirmation?.firstName && confirmation?.lastName ? 
-               `${confirmation.firstName} ${confirmation.lastName}` : 
-               confirmation?.firstName || confirmation?.lastName || 'N/A')}
-          </span>
+          <span>{possibleSponsorNames[0] || `${confirmation?.firstName || ''} ${confirmation?.lastName || ''}`.trim() || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Email</span>
-          <span>{confirmation?.sponsorEmail || confirmation?.email || confirmation?.purchaserEmail || 'N/A'}</span>
+          <span>{possibleEmails[0] || 'N/A'}</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Phone</span>
-          <span>{formatPhoneNumber(confirmation?.sponsorPhone || confirmation?.phone || confirmation?.purchaserPhone || '')}</span>
+          <span>{formatPhoneNumber(possiblePhones[0] || '')}</span>
         </div>
         
         <div className="flex justify-between">
@@ -531,9 +619,18 @@ const RegistrationDetailsSection = () => {
           <span className="text-blue-600">${totalInvoiced.toFixed(2)}</span>
         </div>
       </div>
+      
+      {/* Debug section - you can remove this later */}
+      <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+        <div><strong>Debug - Available fields:</strong></div>
+        <div className="max-h-20 overflow-y-auto">
+          {Object.keys(confirmation || {}).join(', ')}
+        </div>
+      </div>
     </div>
   );
 };
+
 
 
   const ProofOfPaymentSection = () => (
@@ -588,98 +685,59 @@ const RegistrationDetailsSection = () => {
   );
 
 const RecordPaymentButton = () => {
-  const isButtonEnabled = canRecordPayment && !isUpdating;
-  
-  console.log('Button state:', {
-    canRecordPayment,
-    isUpdating, 
-    isButtonEnabled,
-    shouldBeActive: isButtonEnabled
-  });
+  const handleDebug = () => {
+    console.log('=== FULL DEBUG ===');
+    console.log('selectedPaymentMethods:', selectedPaymentMethods);
+    console.log('All amounts:', {
+      checkAmount,
+      zelleAmount, 
+      cashAppAmount,
+      venmoAmount,
+      cashAmount,
+      otherAmount
+    });
+    console.log('canRecordPayment:', canRecordPayment);
+    console.log('isUpdating:', isUpdating);
+    console.log('Button disabled?', !canRecordPayment || isUpdating);
+  };
 
   return (
     <div className="space-y-2">
-      {/* Debug info - you can remove this later */}
-      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
-        <div>✅ Test Button: Working</div>
-        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
-        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
-        <div>Button Should Be: {isButtonEnabled ? '🟢 ACTIVE' : '🔴 DISABLED'}</div>
-      </div>
+      {/* Temporary debug button */}
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleDebug}
+        className="w-full text-xs"
+      >
+        🐛 Debug (Check Console)
+      </Button>
       
-      {/* Force active button with inline styles */}
-      <button
-        onClick={() => {
-          console.log('🔥 RECORD PAYMENT CLICKED!');
-          if (isButtonEnabled) {
-            handlePaymentUpdate();
-          } else {
-            console.log('Button clicked but not enabled');
-          }
-        }}
-        disabled={!isButtonEnabled}
-        style={{
-          width: '100%',
-          padding: '12px 16px',
-          backgroundColor: isButtonEnabled ? '#2563eb' : '#9ca3af',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          fontSize: '14px',
-          fontWeight: '500',
-          cursor: isButtonEnabled ? 'pointer' : 'not-allowed',
-          transition: 'all 0.2s ease',
-          opacity: isButtonEnabled ? 1 : 0.6
-        }}
-        onMouseOver={(e) => {
-          if (isButtonEnabled) {
-            e.currentTarget.style.backgroundColor = '#1d4ed8';
-          }
-        }}
-        onMouseOut={(e) => {
-          if (isButtonEnabled) {
-            e.currentTarget.style.backgroundColor = '#2563eb';
-          }
-        }}
+      <Button
+        onClick={handlePaymentUpdate}
+        disabled={!canRecordPayment || isUpdating}
+        className="w-full"
       >
         {isUpdating ? (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ 
-              display: 'inline-block',
-              width: '16px',
-              height: '16px',
-              border: '2px solid #ffffff40',
-              borderTop: '2px solid #ffffff',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              marginRight: '8px'
-            }}></span>
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             Recording Payment...
-          </span>
+          </>
         ) : (
           'Record Payment'
         )}
-      </button>
-      
-      {/* Alternative: Try with your Button component but force props */}
-      <Button
-        onClick={() => {
-          console.log('🔥 ALTERNATIVE BUTTON CLICKED!');
-          handlePaymentUpdate();
-        }}
-        disabled={false}  // Force enabled for testing
-        className="w-full bg-green-600 hover:bg-green-700 text-white"
-        style={{ 
-          backgroundColor: '#16a34a !important',
-          color: 'white !important',
-          cursor: 'pointer !important'
-        }}
-      >
-        🟢 Force Active Record Payment
       </Button>
+      
+      {/* Debug info */}
+      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
+        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
+        <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
+      </div>
     </div>
   );
 };
+
 
 
   const renderPaymentMethodInputs = () => {
@@ -1034,6 +1092,44 @@ const PaymentSummarySection = () => (
       </div>
     );
   };
+
+  const QuickTestSection = () => (
+    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+      <h4 className="font-medium text-green-800 mb-2">🧪 Quick Test Section</h4>
+      <div className="space-y-2">
+        <Button
+          onClick={() => {
+            console.log('🧪 Quick test: Selecting Cash App');
+            setSelectedPaymentMethods(['cashapp']);
+            setCashAppAmount('10');
+            console.log('🧪 After setting: selectedPaymentMethods should be ["cashapp"], cashAppAmount should be "10"');
+          }}
+          className="w-full text-xs"
+          variant="outline"
+        >
+          🚀 Quick Test: Select Cash App + $10
+        </Button>
+        
+        <Button
+          onClick={() => {
+            console.log('🧪 Reset test');
+            setSelectedPaymentMethods([]);
+            setCashAppAmount('');
+          }}
+          className="w-full text-xs"
+          variant="outline"
+        >
+          🔄 Reset Form
+        </Button>
+        
+        <div className="text-xs text-green-700">
+          <div>Selected: {JSON.stringify(selectedPaymentMethods)}</div>
+          <div>Cash App Amount: "{cashAppAmount}"</div>
+          <div>Should Enable Button: {selectedPaymentMethods.includes('cashapp') && parseFloat(cashAppAmount || '0') > 0 ? '✅' : '❌'}</div>
+        </div>
+      </div>
+    </div>
+  );
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1058,7 +1154,6 @@ const PaymentSummarySection = () => (
         <div>
           <RegistrationDetailsSection />
           
-          {/* Payment Summary - ADD THIS BACK */}
           <PaymentSummarySection />
 
           {/* Square Invoice Link */}
@@ -1090,11 +1185,10 @@ const PaymentSummarySection = () => (
                   {renderPaymentMethodInputs()}
                 </div>
               </div>
+              <QuickTestSection />
 
-              {/* Add Proof of Payment Section */}
               {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
 
-              {/* Record Payment Button */}
               <RecordPaymentButton />
             </div>
           </div>
