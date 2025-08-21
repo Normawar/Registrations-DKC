@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -396,39 +395,26 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
   
 const canRecordPayment = useMemo(() => {
-    if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
-      return false;
-    }
+  if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
+    return false;
+  }
 
-    return selectedPaymentMethods.some(method => {
-      let amount = 0;
-      
-      switch (method) {
-        case 'check':
-          amount = parseFloat(checkAmount || '0');
-          break;
-        case 'zelle':
-          amount = parseFloat(zelleAmount || '0');
-          break;
-        case 'cashapp':
-          amount = parseFloat(cashAppAmount || '0');
-          break;
-        case 'venmo':
-          amount = parseFloat(venmoAmount || '0');
-          break;
-        case 'cash':
-          amount = parseFloat(cashAmount || '0');
-          break;
-        case 'other':
-          amount = parseFloat(otherAmount || '0');
-          break;
-        default:
-          return false;
-      }
-      
-      return !isNaN(amount) && amount > 0;
-    });
-  }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
+  // Direct check without complex logic
+  const amounts = {
+    check: checkAmount,
+    zelle: zelleAmount, 
+    cashapp: cashAppAmount,
+    venmo: venmoAmount,
+    cash: cashAmount,
+    other: otherAmount
+  };
+
+  return selectedPaymentMethods.some(method => {
+    const amount = amounts[method as keyof typeof amounts];
+    const numericAmount = parseFloat(String(amount || '0'));
+    return !isNaN(numericAmount) && numericAmount > 0;
+  });
+}, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
   const formatPhoneNumber = (phone: string) => {
     if (!phone) return 'N/A';
@@ -557,6 +543,7 @@ const RegistrationDetailsSection = () => {
   );
 };
 
+
   const ProofOfPaymentSection = () => (
     <div className="mt-4">
       <h4 className="text-md font-medium mb-2">Proof of Payment</h4>
@@ -608,15 +595,17 @@ const RegistrationDetailsSection = () => {
 
 const RecordPaymentButton = () => {
   const isButtonEnabled = canRecordPayment && !isUpdating;
-  
+
   return (
     <div className="space-y-2">
+      {/* Keep basic status for now, remove later */}
       <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
         <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
         <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
         <div>Button Status: {isButtonEnabled ? '🟢 ACTIVE' : '🔴 DISABLED'}</div>
       </div>
       
+      {/* Working native button */}
       <button
         onClick={() => {
           console.log('🔥 RECORD PAYMENT CLICKED!');
@@ -670,6 +659,7 @@ const RecordPaymentButton = () => {
     </div>
   );
 };
+
 
 
 const renderPaymentMethodInputs = () => {
@@ -965,7 +955,7 @@ const PaymentSummarySection = () => (
               <li>Add filter: <code>invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</code></li>
               <li>Click <strong>"Run request"</strong> to find your invoice</li>
               <li>Copy the <strong>invoice ID</strong> from results</li>
-              <li>Use <strong>"Update Invoice"</strong> endpoint to mark as paid</li>
+              <li>Use <strong>"Update Invoice"</strong> to mark as paid</li>
               <li>Return here and click <strong>"Sync with Square"</strong></li>
             </ol>
           </div>
@@ -1072,7 +1062,6 @@ const PaymentSummarySection = () => (
                   {renderPaymentMethodInputs()}
                 </div>
               </div>
-
               {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
 
               <RecordPaymentButton />
@@ -1100,3 +1089,4 @@ const PaymentSummarySection = () => (
     </Dialog>
   );
 }
+    
