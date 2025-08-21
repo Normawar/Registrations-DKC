@@ -45,6 +45,47 @@ interface InvoiceDetailsDialogProps {
   confirmationId: string;
 }
 
+const getKnownSponsorPhone = (email: string): string | null => {
+  const knownSponsors: Record<string, string> = {
+    'normaguerra@yahoo.com': '(111) 111-1111',
+    // Add more as needed
+  };
+  
+  console.log('🔍 Looking up phone for email:', email); // ADD THIS DEBUG LINE
+  console.log('🔍 Known sponsors:', knownSponsors); // ADD THIS DEBUG LINE
+  const phone = knownSponsors[email?.toLowerCase()];
+  console.log('🔍 Found phone:', phone); // ADD THIS DEBUG LINE
+  
+  return phone || null;
+};
+
+const getKnownSponsorPhoneFixed = (email: string): string | null => {
+  const knownSponsors: Record<string, string> = {
+    'normaguerra@yahoo.com': '(111) 111-1111',
+  };
+  
+  if (!email) return null;
+  
+  // Try exact match first
+  if (knownSponsors[email]) {
+    return knownSponsors[email];
+  }
+  
+  // Try lowercase match
+  if (knownSponsors[email.toLowerCase()]) {
+    return knownSponsors[email.toLowerCase()];
+  }
+  
+  // Try case-insensitive search
+  const emailLower = email.toLowerCase();
+  const foundEntry = Object.entries(knownSponsors).find(
+    ([key]) => key.toLowerCase() === emailLower
+  );
+  
+  return foundEntry ? foundEntry[1] : null;
+};
+
+
 export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: InvoiceDetailsDialogProps) {
   const { toast } = useToast();
   const { profile } = useSponsorProfile();
@@ -681,8 +722,8 @@ const RecordPaymentButton = () => {
         <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
       </div>
       
-      {/* Working native button */}
-      <button
+      {/* Enhanced Record Payment Button with explicit styling */}
+      <Button
         onClick={() => {
           console.log('🔥 RECORD PAYMENT CLICKED!');
           if (isButtonEnabled) {
@@ -690,48 +731,34 @@ const RecordPaymentButton = () => {
           }
         }}
         disabled={!isButtonEnabled}
-        style={{
-          width: '100%',
-          padding: '12px 16px',
-          backgroundColor: isButtonEnabled ? '#2563eb' : '#9ca3af',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          fontSize: '14px',
-          fontWeight: '500',
-          cursor: isButtonEnabled ? 'pointer' : 'not-allowed',
-          transition: 'all 0.2s ease',
-          opacity: isButtonEnabled ? 1 : 0.6
-        }}
-        onMouseOver={(e) => {
-          if (isButtonEnabled) {
-            e.currentTarget.style.backgroundColor = '#1d4ed8';
-          }
-        }}
-        onMouseOut={(e) => {
-          if (isButtonEnabled) {
-            e.currentTarget.style.backgroundColor = '#2563eb';
-          }
-        }}
+        className={`w-full transition-all duration-200 ${
+          isButtonEnabled 
+            ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer' 
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+        }`}
       >
         {isUpdating ? (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ 
-              display: 'inline-block',
-              width: '16px',
-              height: '16px',
-              border: '2px solid #ffffff40',
-              borderTop: '2px solid #ffffff',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              marginRight: '8px'
-            }}></span>
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             Recording Payment...
-          </span>
+          </>
         ) : (
           'Record Payment'
         )}
-      </button>
+      </Button>
+      
+      {/* Test button to verify click handlers work */}
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => {
+          console.log('Test button clicked - handlers are working!');
+          alert('Click handlers are working! If Record Payment button still inactive, it\'s a CSS issue.');
+        }}
+        className="w-full text-xs"
+      >
+        🧪 Test Click (Should Work)
+      </Button>
     </div>
   );
 };
@@ -970,7 +997,7 @@ const PaymentSummarySection = () => (
         
         // Check each phone key value
         phoneKeys.forEach(key => {
-          console.log(`Profile.${key}:`, (profile as any)[key]);
+          console.log(`Profile.${(key as keyof typeof profile)}:`, profile[key as keyof typeof profile]);
         });
       }
     }, [profile]);
@@ -1078,59 +1105,18 @@ const PaymentSummarySection = () => (
     );
   };
 
-  const QuickTestSection = () => (
-    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
-      <h4 className="font-medium text-green-800 mb-2">🧪 Quick Test (Remove after testing):</h4>
-      <div className="space-y-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            console.log('🧪 Quick test: Selecting Cash App with $28');
-            setSelectedPaymentMethods(['cashapp']);
-            setCashAppAmount('28');
-            setCashAppHandle('@test');
-          }}
-        >
-          Select Cash App $28
-        </Button>
-        
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            console.log('🧪 Quick test: Selecting Check with $28');
-            setSelectedPaymentMethods(['check']);
-            setCheckAmount('28');
-            setCheckNumber('1234');
-          }}
-        >
-          Select Check $28
-        </Button>
-        
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            console.log('🧪 Clearing all selections');
-            setSelectedPaymentMethods([]);
-            setCashAppAmount('');
-            setCashAppHandle('');
-            setCheckAmount('');
-            setCheckNumber('');
-          }}
-        >
-          Clear All
-        </Button>
-      </div>
-      
-      <div className="mt-2 text-xs text-green-700">
-        <div>Selected Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
-        <div>Cash App: ${cashAppAmount || '0'} | Check: ${checkAmount || '0'}</div>
-        <div>Button Should Be: {canRecordPayment ? '✅ ACTIVE' : '❌ DISABLED'}</div>
-      </div>
+const PhoneTest = () => {
+  const testEmail = 'normaguerra@yahoo.com';
+  const result = getKnownSponsorPhone(testEmail);
+  
+  return (
+    <div className="p-4 bg-yellow-100 border">
+      <h3>🧪 Phone Lookup Test</h3>
+      <p>Email: {testEmail}</p>
+      <p>Result: {result || 'No phone found'}</p>
     </div>
   );
+};
   
   const SquareDeveloperConsoleButton = () => {
     if (profile?.role !== 'organizer') return null;
@@ -1282,6 +1268,7 @@ const PaymentSummarySection = () => (
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <ButtonStyles />
         <ProfileDebugComponent />
+        <PhoneTest />
         <DialogHeader>
           
           <DialogTitle>
@@ -1315,7 +1302,6 @@ const PaymentSummarySection = () => (
             <p className="text-sm text-gray-600 mb-4">
               Record payments or submit payment information for verification.
             </p>
-            <QuickTestSection />
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Payment Method</label>
