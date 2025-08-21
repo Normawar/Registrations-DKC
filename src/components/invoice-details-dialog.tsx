@@ -70,7 +70,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       setSelectedPaymentMethod(currentConf.paymentMethod || 'purchase-order');
       setPoNumber(currentConf.poNumber || '');
       
-      // ✅ FIXED: Initialize ALL fields as empty strings, never undefined
+      // Force all to be empty strings
       setCashAmount('');
       setCheckAmount('');
       setCreditCardAmount('');
@@ -179,8 +179,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
   const getSquareDashboardUrl = (invoiceNumber: string) => {
-    // Always use sandbox for development
-    const baseUrl = 'https://squareup.com/dashboard/sandbox/invoices';
+    // ✅ CORRECTED: Use the proper Square Sandbox dashboard URL
+    const baseUrl = 'https://sandbox.squareup.com/dashboard/invoices';
     
     if (invoiceNumber) {
       return `${baseUrl}/${invoiceNumber}`;
@@ -261,6 +261,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           return;
         }
   
+        // Record payment in your system first
         const result = await recordPayment({
           invoiceId: confirmation.invoiceId,
           amount: paymentAmount,
@@ -268,9 +269,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           paymentDate: format(new Date(), 'yyyy-MM-dd'),
         });
   
-        // ✅ FIXED: Proper total calculation
-        const currentTotalPaid = confirmation.totalPaid || 0;
-        const newTotalPaid = currentTotalPaid + paymentAmount; // Add to existing total
+        // Update local state (same as before)
+        const paymentHistory = confirmation?.paymentHistory || [];
+        const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
+        const currentTotalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
+        const newTotalPaid = currentTotalPaid + paymentAmount;
         const totalInvoiced = confirmation.totalAmount || confirmation.totalInvoiced || 0;
         
         let actualStatus = 'UNPAID';
@@ -291,7 +294,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           ...confirmation,
           status: actualStatus,
           invoiceStatus: actualStatus,
-          totalPaid: newTotalPaid, // ✅ FIXED: Use calculated total
+          totalPaid: newTotalPaid,
           totalAmount: totalInvoiced,
           totalInvoiced: totalInvoiced,
           paymentStatus: actualStatus === 'PAID' ? 'paid' : 'partially-paid',
@@ -299,7 +302,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           paymentHistory: [...(confirmation.paymentHistory || []), newPaymentEntry]
         };
   
-        // Update localStorage
+        // Update localStorage (same as before)
         const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
         const updatedAllInvoices = allInvoices.map((inv: any) => 
           inv.id === confirmation.id ? updatedConfirmationData : inv
@@ -321,13 +324,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         setZelleAmount('');
         setPoAmount('');
   
+        // ✅ FIXED: Try correct sandbox URL
         const squareDashboardUrl = getSquareDashboardUrl(confirmation.invoiceNumber);
         window.open(squareDashboardUrl, '_blank');
         
         toast({ 
-          title: 'Payment Recorded & Square Sandbox Opened', 
-          description: `Payment of $${paymentAmount.toFixed(2)} recorded. Square Sandbox opened - find invoice #${confirmation.invoiceNumber || confirmation.id.slice(-8)} and add the payment manually.`,
-          duration: 12000
+          title: 'Payment Recorded & Square Sandbox Opening', 
+          description: `Payment of $${paymentAmount.toFixed(2)} recorded. Opening Square Sandbox - use your developer account to sign in and find invoice #${confirmation.invoiceNumber || confirmation.id.slice(-8)}.`,
+          duration: 15000
         });
   
         window.dispatchEvent(new Event('storage'));
@@ -336,7 +340,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         return;
       }
   
-      // ... rest of your handlePaymentUpdate function
+      // ... rest of your existing handlePaymentUpdate logic
     } catch (error) {
       console.error('Failed to update payment:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to update payment information.' });
@@ -429,7 +433,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       return String(val);
     };
   
-    // Calculate actual balance due
+    // Calculate actual balance due for payment
     const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
     const paymentHistory = confirmation?.paymentHistory || [];
     const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => sum + (payment.amount || 0), 0);
@@ -458,7 +462,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         </div>
       );
     };
-
+  
     switch (selectedPaymentMethod) {
       case 'credit-card':
         return (
@@ -561,15 +565,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         );
   
       case 'cash-app':
-        // No specific implementation provided for cash-app in this step
         return <div>Other payment methods coming soon</div>;
       case 'zelle':
-        // No specific implementation provided for zelle in this step
         return <div>Other payment methods coming soon</div>;
       case 'purchase-order':
-        // No specific implementation provided for purchase-order in this step
         return <div>Other payment methods coming soon</div>;
-
+  
       default:
         return null;
     }
@@ -579,27 +580,67 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     if (profile?.role !== 'organizer') return null;
   
     const openSquareDashboard = () => {
-      const squareUrl = getSquareDashboardUrl(confirmation?.invoiceNumber || '');
-      window.open(squareUrl, '_blank');
+      // Try the main sandbox dashboard first
+      const primaryUrl = 'https://sandbox.squareup.com/dashboard/invoices';
+      
+      // Fallback URLs if the primary doesn't work
+      const fallbackUrls = [
+        'https://connect.squareupsandbox.com/apps',
+        'https://squareup.com/login?redirect_to=https://sandbox.squareup.com/dashboard/invoices',
+        'https://developer.squareup.com/explorer/square'
+      ];
+  
+      window.open(primaryUrl, '_blank');
       
       toast({
         title: 'Square Sandbox Opened',
-        description: `Find invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)} to manage payments directly in Square.`,
+        description: `Opening Square Sandbox. Look for invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}. If it doesn't load, try the Square Developer Dashboard.`,
+        duration: 10000
+      });
+    };
+  
+    const openSquareDeveloperDashboard = () => {
+      // Direct link to Square Developer Dashboard where sandbox apps are managed
+      window.open('https://developer.squareup.com/apps', '_blank');
+      
+      toast({
+        title: 'Square Developer Dashboard Opened',
+        description: 'Access your sandbox application and invoices from the developer dashboard.',
         duration: 8000
       });
     };
   
     return (
       <div className="border-t pt-4 mt-4">
-        <div className="flex items-center justify-between">
+        <div className="space-y-3">
           <div>
             <h4 className="font-medium text-sm">Square Dashboard Access</h4>
             <p className="text-xs text-muted-foreground">Manage payments directly in Square Sandbox</p>
           </div>
-          <Button variant="outline" onClick={openSquareDashboard} className="ml-4">
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Open Square Dashboard
-          </Button>
+          
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={openSquareDashboard} size="sm">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Open Sandbox Dashboard
+            </Button>
+            
+            <Button variant="outline" onClick={openSquareDeveloperDashboard} size="sm">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              Developer Dashboard
+            </Button>
+          </div>
+          
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+            <p className="text-xs text-yellow-800 font-medium mb-1">
+              💡 Square Sandbox Access:
+            </p>
+            <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
+              <li>Use your Square Developer account credentials</li>
+              <li>Look for invoice #{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}</li>
+              <li>If sandbox dashboard doesn't load, use Developer Dashboard</li>
+              <li>Navigate to your sandbox application → Invoices</li>
+            </ul>
+          </div>
         </div>
       </div>
     );
@@ -610,13 +651,13 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   // ✅ FIXED: Proper calculation using payment history
   const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
-
+  
   // Calculate total paid from payment history (more reliable)
   const paymentHistory = confirmation?.paymentHistory || [];
   const calculatedTotalPaid = paymentHistory.reduce((sum: number, payment: any) => {
     return sum + (payment.amount || 0);
   }, 0);
-
+  
   // Use the higher of the two values (in case one is outdated)
   const totalPaid = Math.max(calculatedTotalPaid, confirmation?.totalPaid || 0);
   const balanceDue = Math.max(0, totalInvoiced - totalPaid);
