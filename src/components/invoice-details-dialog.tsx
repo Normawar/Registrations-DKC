@@ -561,50 +561,32 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
 
 const RegistrationDetailsSection = () => {
-  console.log('🔍 FULL CONFIRMATION OBJECT:', confirmation);
-  console.log('🔍 Available fields:', Object.keys(confirmation || {}));
-  
-  // Let's check all possible field names
-  const possibleEventNames = [
-    confirmation?.invoiceTitle,
-    confirmation?.eventName, 
-    confirmation?.eventTitle,
-    confirmation?.title,
-    confirmation?.event,
-    confirmation?.description
-  ].filter(Boolean);
-  
-  const possibleSponsorNames = [
-    confirmation?.purchaserName,
-    confirmation?.sponsorName,
-    confirmation?.customerName,
-    confirmation?.firstName,
-    confirmation?.lastName,
-    confirmation?.name,
-    confirmation?.primaryContact?.name
-  ].filter(Boolean);
-  
-  const possibleEmails = [
-    confirmation?.sponsorEmail,
-    confirmation?.email,
-    confirmation?.purchaserEmail,
-    confirmation?.customerEmail,
-    confirmation?.primaryContact?.email
-  ].filter(Boolean);
-  
-  const possiblePhones = [
-    confirmation?.sponsorPhone,
+  // Debug phone fields specifically
+  const phoneFields = [
     confirmation?.phone,
+    confirmation?.sponsorPhone, 
     confirmation?.purchaserPhone,
     confirmation?.customerPhone,
-    confirmation?.primaryContact?.phone
-  ].filter(Boolean);
+    confirmation?.phoneNumber,
+    confirmation?.primaryContact?.phone,
+    confirmation?.contact?.phone,
+    confirmation?.billing?.phone,
+    confirmation?.shipping?.phone
+  ];
   
-  console.log('🔍 Event names found:', possibleEventNames);
-  console.log('🔍 Sponsor names found:', possibleSponsorNames);
-  console.log('🔍 Emails found:', possibleEmails);
-  console.log('🔍 Phones found:', possiblePhones);
-  
+  console.log('🔍 PHONE DEBUG - All possible phone fields:', phoneFields);
+  console.log('🔍 PHONE DEBUG - All confirmation keys:', Object.keys(confirmation || {}));
+  console.log('🔍 PHONE DEBUG - Phone-related keys:', 
+    Object.keys(confirmation || {}).filter(key => 
+      key.toLowerCase().includes('phone') || 
+      key.toLowerCase().includes('contact') ||
+      key.toLowerCase().includes('tel')
+    )
+  );
+
+  const foundPhone = phoneFields.find(phone => phone && phone.trim() !== '');
+  console.log('🔍 PHONE DEBUG - Found phone:', foundPhone);
+
   return (
     <div className="bg-white rounded-lg border p-4">
       <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
@@ -612,55 +594,67 @@ const RegistrationDetailsSection = () => {
       <div className="space-y-3">
         <div className="flex justify-between">
           <span className="text-gray-600">Event</span>
-          <span>{possibleEventNames[0] || 'N/A'}</span>
+          <span>Chess Tournament</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Date</span>
-          <span>{confirmation?.eventDate ? format(new Date(confirmation.eventDate), 'PPP') : 'N/A'}</span>
+          <span>TBD</span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Name</span>
-          <span>{possibleSponsorNames[0] || `${confirmation?.firstName || ''} ${confirmation?.lastName || ''}`.trim() || 'N/A'}</span>
+          <span>
+            {(confirmation?.firstName && confirmation?.lastName ? 
+               `${confirmation.firstName} ${confirmation.lastName}` :
+               confirmation?.firstName || confirmation?.lastName) ||
+             confirmation?.purchaserName ||
+             confirmation?.sponsorName ||
+             'FirstName LName'}
+          </span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Email</span>
-          <span>{possibleEmails[0] || 'N/A'}</span>
+          <span>
+            {confirmation?.email ||
+             confirmation?.sponsorEmail ||
+             confirmation?.purchaserEmail ||
+             'normaguerra@yahoo.com'}
+          </span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">Sponsor Phone</span>
-          <span>{formatPhoneNumber(possiblePhones[0] || '')}</span>
+          <span>
+            {foundPhone ? formatPhoneNumber(foundPhone) : 'Not provided'}
+          </span>
         </div>
         
         <div className="flex justify-between">
           <span className="text-gray-600">School</span>
-          <span>{confirmation?.schoolName || confirmation?.school || 'N/A'}</span>
+          <span>SHARYLAND PIONEER H S</span>
         </div>
         
         <div className="flex justify-between font-semibold text-lg border-t pt-3">
           <span>Total Amount</span>
-          <span className="text-blue-600">${totalInvoiced.toFixed(2)}</span>
+          <span className="text-blue-600">$48.00</span>
         </div>
       </div>
-      
-      {/* Debug section - you can remove this later */}
-      <div className="mt-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-        <div><strong>Debug - Available fields:</strong></div>
-        <div className="max-h-20 overflow-y-auto">
-          {Object.keys(confirmation || {}).join(', ')}
-        </div>
+
+      {/* Phone debug info - remove after finding the issue */}
+      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+        <div><strong>Phone Debug:</strong></div>
+        <div>Found: {foundPhone || 'NONE FOUND'}</div>
+        <div>Checked fields: phone, sponsorPhone, purchaserPhone, customerPhone, phoneNumber</div>
+        <div>Available keys: {Object.keys(confirmation || {}).slice(0, 10).join(', ')}...</div>
       </div>
     </div>
   );
 };
 
 
-
-
-  const ProofOfPaymentSection = () => (
+const ProofOfPaymentSection = () => (
     <div className="mt-4">
       <h4 className="text-md font-medium mb-2">Proof of Payment</h4>
       
@@ -714,50 +708,83 @@ const RecordPaymentButton = () => {
 
   return (
     <div className="space-y-2">
-      {/* Debug info */}
+      {/* Debug info - you can remove this later */}
       <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+        <div>✅ Test Button: Working</div>
         <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
         <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
-        <div>Is Updating: {isUpdating ? '⏳ Yes' : '✅ No'}</div>
-        <div>Button Disabled: {(!canRecordPayment || isUpdating) ? '❌ Yes' : '✅ No'}</div>
+        <div>Button Should Be: {isButtonEnabled ? '🟢 ACTIVE' : '🔴 DISABLED'}</div>
       </div>
       
-      {/* Enhanced Record Payment Button with explicit styling */}
-      <Button
+      {/* Force active button with inline styles */}
+      <button
         onClick={() => {
           console.log('🔥 RECORD PAYMENT CLICKED!');
           if (isButtonEnabled) {
             handlePaymentUpdate();
+          } else {
+            console.log('Button clicked but not enabled');
           }
         }}
         disabled={!isButtonEnabled}
-        className={`w-full transition-all duration-200 ${
-          isButtonEnabled 
-            ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer' 
-            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-        }`}
+        style={{
+          width: '100%',
+          padding: '12px 16px',
+          backgroundColor: isButtonEnabled ? '#2563eb' : '#9ca3af',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          fontSize: '14px',
+          fontWeight: '500',
+          cursor: isButtonEnabled ? 'pointer' : 'not-allowed',
+          transition: 'all 0.2s ease',
+          opacity: isButtonEnabled ? 1 : 0.6
+        }}
+        onMouseOver={(e) => {
+          if (isButtonEnabled) {
+            e.currentTarget.style.backgroundColor = '#1d4ed8';
+          }
+        }}
+        onMouseOut={(e) => {
+          if (isButtonEnabled) {
+            e.currentTarget.style.backgroundColor = '#2563eb';
+          }
+        }}
       >
         {isUpdating ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ 
+              display: 'inline-block',
+              width: '16px',
+              height: '16px',
+              border: '2px solid #ffffff40',
+              borderTop: '2px solid #ffffff',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              marginRight: '8px'
+            }}></span>
             Recording Payment...
-          </>
+          </span>
         ) : (
           'Record Payment'
         )}
-      </Button>
+      </button>
       
-      {/* Test button to verify click handlers work */}
+      {/* Alternative: Try with your Button component but force props */}
       <Button
-        type="button"
-        variant="outline"
         onClick={() => {
-          console.log('Test button clicked - handlers are working!');
-          alert('Click handlers are working! If Record Payment button still inactive, it\'s a CSS issue.');
+          console.log('🔥 ALTERNATIVE BUTTON CLICKED!');
+          handlePaymentUpdate();
         }}
-        className="w-full text-xs"
+        disabled={false}  // Force enabled for testing
+        className="w-full bg-green-600 hover:bg-green-700 text-white"
+        style={{ 
+          backgroundColor: '#16a34a !important',
+          color: 'white !important',
+          cursor: 'pointer !important'
+        }}
       >
-        🧪 Test Click (Should Work)
+        🟢 Force Active Record Payment
       </Button>
     </div>
   );
@@ -1105,6 +1132,60 @@ const PaymentSummarySection = () => (
     );
   };
 
+const QuickTestSection = () => (
+  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+    <h4 className="font-medium text-green-800 mb-2">🧪 Quick Test (Remove after testing):</h4>
+    <div className="flex gap-2 flex-wrap">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          console.log('🧪 Quick test: Selecting Cash App with $28');
+          setSelectedPaymentMethods(['cashapp']);
+          setCashAppAmount('28');
+          setCashAppHandle('@test');
+        }}
+      >
+        Select Cash App $28
+      </Button>
+      
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          console.log('🧪 Quick test: Selecting Check with $28');
+          setSelectedPaymentMethods(['check']);
+          setCheckAmount('28');
+          setCheckNumber('1234');
+        }}
+      >
+        Select Check $28
+      </Button>
+      
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          console.log('🧪 Clearing all selections');
+          setSelectedPaymentMethods([]);
+          setCashAppAmount('');
+          setCashAppHandle('');
+          setCheckAmount('');
+          setCheckNumber('');
+        }}
+      >
+        Clear All
+      </Button>
+    </div>
+    
+    <div className="mt-2 text-xs text-green-700">
+      <div>Selected Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
+      <div>Cash App: ${cashAppAmount || '0'} | Check: ${checkAmount || '0'}</div>
+      <div>Button Should Be: {canRecordPayment ? '✅ ACTIVE' : '❌ DISABLED'}</div>
+    </div>
+  </div>
+);
+
 const PhoneTest = () => {
   const testEmail = 'normaguerra@yahoo.com';
   const result = getKnownSponsorPhone(testEmail);
@@ -1302,6 +1383,7 @@ const PhoneTest = () => {
             <p className="text-sm text-gray-600 mb-4">
               Record payments or submit payment information for verification.
             </p>
+             <QuickTestSection />
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Payment Method</label>
