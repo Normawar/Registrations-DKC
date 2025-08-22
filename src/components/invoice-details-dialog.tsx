@@ -114,24 +114,16 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const isPaymentApproved = ['PAID', 'COMPED'].includes(confirmation?.invoiceStatus?.toUpperCase() || '');
   const isIndividualInvoice = confirmation?.schoolName === 'Individual Registration';
 
-  // Invoice URL
-  const invoiceUrl = confirmation?.publicUrl || confirmation?.invoiceUrl;
-
-
   useEffect(() => {
     if (!isOpen) return;
 
     const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
     const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
     if (currentConf) {
-        console.log('📋 Loading confirmation:', currentConf);
-        console.log('📋 ALL CONFIRMATION KEYS:', Object.keys(currentConf).sort());
-        console.log('📋 FULL CONFIRMATION OBJECT:', JSON.stringify(currentConf, null, 2));
         setConfirmation(currentConf);
         
         // Load selected payment methods
         const savedMethods = currentConf.selectedPaymentMethods || [];
-        console.log('📋 Loading saved payment methods:', savedMethods);
         setSelectedPaymentMethods(savedMethods);
     }
   
@@ -843,121 +835,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         );
       };
 
-    const SquareDebugComponent = () => {
-        useEffect(() => {
-            console.log('🔍 SQUARE DEBUG INFO:');
-            console.log('confirmation.invoiceId:', confirmation?.invoiceId);
-            console.log('confirmation.invoiceUrl:', confirmation?.invoiceUrl);
-            console.log('confirmation.publicUrl:', confirmation?.publicUrl);
-            console.log('confirmation.invoiceNumber:', confirmation?.invoiceNumber);
-            console.log('Full confirmation object keys:', Object.keys(confirmation || {}));
-            
-            // Check for any URL patterns
-            const allKeys = Object.keys(confirmation || {});
-            const urlKeys = allKeys.filter(key => 
-            key.toLowerCase().includes('url') || 
-            key.toLowerCase().includes('link') ||
-            key.toLowerCase().includes('square')
-            );
-            console.log('URL-related keys:', urlKeys);
-            urlKeys.forEach(key => {
-            console.log(`${key}:`, confirmation[key]);
-            });
-        }, []);
-
-        return null; // Just for debugging, doesn't render anything
-    };
-
-    const handleRefreshStatus = async () => {
-        if (!confirmation?.invoiceId) {
-          toast({ 
-            variant: 'destructive', 
-            title: 'Cannot Sync', 
-            description: 'No Square invoice ID available. This invoice may need to be created in Square first.' 
-          });
-          return;
-        }
-      
-        setIsRefreshing(true);
-        try {
-          console.log('🔄 Syncing with Square invoice ID:', confirmation.invoiceId);
-          
-          const result = await getInvoiceStatusWithPayments({ invoiceId: confirmation.invoiceId });
-          
-          console.log('📥 Square sync result:', result);
-          
-          // Merge local and Square payment history
-          const localPayments = confirmation.paymentHistory || [];
-          const squarePayments = result.paymentHistory || [];
-          
-          const unifiedPaymentHistory = [...localPayments];
-          
-          for (const squarePayment of squarePayments) {
-            const existsLocally = localPayments.some((local: any) => 
-              local.squarePaymentId === squarePayment.id || 
-              (local.method === 'credit_card' && Math.abs(local.amount - squarePayment.amount) < 0.01)
-            );
-            if (!existsLocally) {
-              unifiedPaymentHistory.push({
-                ...squarePayment,
-                squarePaymentId: squarePayment.id,
-                method: squarePayment.method || 'credit_card',
-                source: 'square'
-              });
-            }
-          }
-          
-          unifiedPaymentHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-          
-          const totalPaidFromHistory = unifiedPaymentHistory.reduce((sum, p) => sum + p.amount, 0);
-          const totalPaid = Math.max(result.totalPaid, totalPaidFromHistory);
-          
-          const updatedConfirmation = {
-            ...confirmation,
-            invoiceStatus: result.status,
-            status: result.status,
-            invoiceNumber: result.invoiceNumber || confirmation.invoiceNumber,
-            totalPaid: totalPaid,
-            totalAmount: result.totalAmount || confirmation.totalAmount,
-            paymentHistory: unifiedPaymentHistory,
-            lastSquareSync: new Date().toISOString(),
-          };
-          
-          // Update localStorage
-          const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-          const updatedAllInvoices = allInvoices.map((inv: any) => 
-            inv.id === confirmation.id ? updatedConfirmation : inv
-          );
-          localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-          
-          const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-          const updatedConfirmations = confirmations.map((conf: any) =>
-            conf.id === confirmation.id ? updatedConfirmation : conf
-          );
-          localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-          
-          setConfirmation(updatedConfirmation);
-          
-          toast({ 
-            title: '✅ Square Sync Complete', 
-            description: `Status: ${result.status}, Total Paid: $${totalPaid.toFixed(2)}` 
-          });
-          
-          window.dispatchEvent(new Event('storage'));
-          window.dispatchEvent(new Event('all_invoices_updated'));
-          
-        } catch (error) {
-          console.error('Failed to sync with Square:', error);
-          toast({ 
-            variant: 'destructive', 
-            title: 'Square Sync Failed', 
-            description: 'Could not connect to Square. Check console for details.' 
-          });
-        } finally {
-          setIsRefreshing(false);
-        }
-      };
-      
     const EnhancedSquareDeveloperConsole = () => {
         if (profile?.role !== 'organizer') return null;
 
@@ -1123,12 +1000,101 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     )
   }
 
+  const handleRefreshStatus = async () => {
+        if (!confirmation?.invoiceId) {
+          toast({ 
+            variant: 'destructive', 
+            title: 'Cannot Sync', 
+            description: 'No Square invoice ID available. This invoice may need to be created in Square first.' 
+          });
+          return;
+        }
+      
+        setIsRefreshing(true);
+        try {
+          console.log('🔄 Syncing with Square invoice ID:', confirmation.invoiceId);
+          
+          const result = await getInvoiceStatusWithPayments({ invoiceId: confirmation.invoiceId });
+          
+          console.log('📥 Square sync result:', result);
+          
+          // Merge local and Square payment history
+          const localPayments = confirmation.paymentHistory || [];
+          const squarePayments = result.paymentHistory || [];
+          
+          const unifiedPaymentHistory = [...localPayments];
+          
+          for (const squarePayment of squarePayments) {
+            const existsLocally = localPayments.some((local: any) => 
+              local.squarePaymentId === squarePayment.id || 
+              (local.method === 'credit_card' && Math.abs(local.amount - squarePayment.amount) < 0.01)
+            );
+            if (!existsLocally) {
+              unifiedPaymentHistory.push({
+                ...squarePayment,
+                squarePaymentId: squarePayment.id,
+                method: squarePayment.method || 'credit_card',
+                source: 'square'
+              });
+            }
+          }
+          
+          unifiedPaymentHistory.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          
+          const totalPaidFromHistory = unifiedPaymentHistory.reduce((sum, p) => sum + p.amount, 0);
+          const totalPaid = Math.max(result.totalPaid, totalPaidFromHistory);
+          
+          const updatedConfirmation = {
+            ...confirmation,
+            invoiceStatus: result.status,
+            status: result.status,
+            invoiceNumber: result.invoiceNumber || confirmation.invoiceNumber,
+            totalPaid: totalPaid,
+            totalAmount: result.totalAmount || confirmation.totalAmount,
+            paymentHistory: unifiedPaymentHistory,
+            lastSquareSync: new Date().toISOString(),
+          };
+          
+          // Update localStorage
+          const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+          const updatedAllInvoices = allInvoices.map((inv: any) => 
+            inv.id === confirmation.id ? updatedConfirmation : inv
+          );
+          localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+          
+          const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+          const updatedConfirmations = confirmations.map((conf: any) =>
+            conf.id === confirmation.id ? updatedConfirmation : conf
+          );
+          localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+          
+          setConfirmation(updatedConfirmation);
+          
+          toast({ 
+            title: '✅ Square Sync Complete', 
+            description: `Status: ${result.status}, Total Paid: $${totalPaid.toFixed(2)}` 
+          });
+          
+          window.dispatchEvent(new Event('storage'));
+          window.dispatchEvent(new Event('all_invoices_updated'));
+          
+        } catch (error) {
+          console.error('Failed to sync with Square:', error);
+          toast({ 
+            variant: 'destructive', 
+            title: 'Square Sync Failed', 
+            description: 'Could not connect to Square. Check console for details.' 
+          });
+        } finally {
+          setIsRefreshing(false);
+        }
+      };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <ButtonStyles />
         {profile?.role === 'organizer' && <ProfileDebugComponent />}
-        <SquareDebugComponent />
         <DialogHeader>
           <DialogTitle>
             <div className="flex items-center gap-2">
