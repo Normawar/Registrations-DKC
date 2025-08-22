@@ -545,592 +545,595 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     });
   };
 
-const RegistrationDetailsSection = ({ invoice, profile }: { invoice: any, profile: SponsorProfile | null }) => {
-  const sponsorEmail = invoice.purchaserEmail || invoice.sponsorEmail || invoice.email;
-  const knownPhone = getKnownSponsorPhone(sponsorEmail);
-
-  return (
-    <div className="space-y-3">
-      <div className="flex justify-between">
-        <span className="text-gray-600">Event</span>
-        <span className="font-medium">{invoice.eventName || 'Chess Tournament'}</span>
-      </div>
-      
-      <div className="flex justify-between">
-        <span className="text-gray-600">Date</span>
-        <span className="font-medium">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'TBD'}</span>
-      </div>
-      
-      <div className="flex justify-between">
-        <span className="text-gray-600">Sponsor Name</span>
-        <span className="font-medium">{invoice.purchaserName || invoice.sponsorName || 'FirstName LName'}</span>
-      </div>
-      
-      <div className="flex justify-between">
-        <span className="text-gray-600">Sponsor Email</span>
-        <span className="font-medium">{sponsorEmail}</span>
-      </div>
-      
-      <div className="flex justify-between">
-        <span className="text-gray-600">Sponsor Phone</span>
-        <span className="font-medium">
-          {knownPhone 
-            ? `${knownPhone} (from records)`
-            : invoice.purchaserPhone || invoice.sponsorPhone || 'Phone not provided'
-          }
-        </span>
-      </div>
-      
-      <div className="flex justify-between">
-        <span className="text-gray-600">School</span>
-        <span className="font-medium">{invoice.schoolName || 'SHARYLAND PIONEER H S'}</span>
-      </div>
-
-      {profile?.role === 'organizer' && knownPhone && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="text-sm font-medium text-blue-800 mb-2">📞 Organizer Contact Info</h4>
-          <div className="text-sm space-y-1">
-            <div><strong>Phone:</strong> {knownPhone}</div>
-            <div><strong>Email:</strong> {sponsorEmail}</div>
-          </div>
-          <div className="flex gap-2 mt-2">
-            <button 
-              onClick={() => window.open(`tel:${knownPhone.replace(/\D/g, '')}`)}
-              className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-            >
-              📞 Call
-            </button>
-            <button 
-              onClick={() => window.open(`mailto:${sponsorEmail}`)}
-              className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-            >
-              ✉️ Email
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-
-const ProofOfPaymentSection = () => (
-    <div className="mt-4">
-      <h4 className="text-md font-medium mb-2">Proof of Payment</h4>
-      
-      <div className="mb-3">
-        <input
-          type="file"
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-          accept="image/*"
-          multiple
-          className="hidden"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => fileInputRef.current?.click()}
-          className="w-full"
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          Upload Screenshot/Photo
-        </Button>
-      </div>
+  const RegistrationDetailsSection = ({ invoice, profile }: { invoice: any, profile: SponsorProfile | null }) => {
+    const sponsorEmail = invoice.purchaserEmail || invoice.sponsorEmail || invoice.email;
+    const knownPhone = getKnownSponsorPhone(sponsorEmail);
   
-      {fileUrls.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm text-gray-600">Uploaded files:</p>
-          <div className="grid grid-cols-2 gap-2">
-            {fileUrls.map((url, index) => (
-              <div key={index} className="relative">
-                <img
-                  src={url}
-                  alt={`Proof ${index + 1}`}
-                  className="w-full h-20 object-cover rounded border"
-                />
-                <button
-                  onClick={() => removeFile(index)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
-  // Use the existing state variables from the main component
-  const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]);
-  const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
-  
-  const totalSelectedAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + amount, 0);
-  
-  // Calculate balance due from the main component's values
-  const balanceDue = Math.max(0, totalInvoiced - totalPaid);
-  
-  const isValidPayment = () => {
-    const hasSelectedMethod = localSelectedMethods.length > 0;
-    const hasValidAmount = totalSelectedAmount > 0;
-    const amountNotExceedsBalance = totalSelectedAmount <= balanceDue;
-    
-    console.log('🔍 Payment Validation:', {
-      hasSelectedMethod,
-      hasValidAmount,
-      amountNotExceedsBalance,
-      localSelectedMethods,
-      totalSelectedAmount,
-      balanceDue
-    });
-    
-    return hasSelectedMethod && hasValidAmount && amountNotExceedsBalance;
-  };
-
-  const handleMethodChange = (method: string, isChecked: boolean) => {
-    if (isChecked) {
-      setLocalSelectedMethods(prev => [...prev, method]);
-      // Auto-fill with remaining balance if it's the first method selected
-      if (localSelectedMethods.length === 0) {
-        setPaymentAmounts(prev => ({ ...prev, [method]: balanceDue }));
-      }
-    } else {
-      setLocalSelectedMethods(prev => prev.filter(m => m !== method));
-      setPaymentAmounts(prev => {
-        const newAmounts = { ...prev };
-        delete newAmounts[method];
-        return newAmounts;
-      });
-    }
-  };
-
-  const handleAmountChange = (method: string, amount: number) => {
-    setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
-  };
-
-  const quickTestCashApp = () => {
-    setLocalSelectedMethods(['Cash App']);
-    setPaymentAmounts({ 'Cash App': balanceDue });
-    setCashAppAmount(balanceDue.toString());
-  };
-
-  const quickTestCheck = () => {
-    setLocalSelectedMethods(['Check']);
-    setPaymentAmounts({ 'Check': balanceDue });
-    setCheckAmount(balanceDue.toString());
-  };
-
-  const handleRecordPayment = async () => {
-    if (!isValidPayment()) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Payment',
-        description: 'Please select a payment method and enter a valid amount'
-      });
-      return;
-    }
-
-    setIsUpdating(true);
-
-    try {
-      // Get organizer initials from profile
-      const organizerInitials = profile?.firstName && profile?.lastName 
-        ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase()
-        : profile?.email?.substring(0, 2).toUpperCase() || 'ORG';
-
-      // Create individual payment entries for each method
-      const newPayments = localSelectedMethods.map(method => ({
-        id: `payment_${Date.now()}_${method.toLowerCase().replace(/\s+/g, '_')}`,
-        amount: paymentAmounts[method] || 0,
-        method: method,
-        date: new Date().toISOString(),
-        dateFormatted: format(new Date(), 'MMM dd, yyyy HH:mm'),
-        source: 'manual',
-        status: 'completed',
-        organizerInitials: organizerInitials,
-        organizerName: profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : profile?.email || 'Organizer',
-        details: {
-          // Store method-specific details
-          ...(method === 'Check' && { 
-            checkNumber: checkNumber,
-            checkAmount: paymentAmounts[method]
-          }),
-          ...(method === 'Cash App' && { 
-            cashAppHandle: cashAppHandle,
-            cashAppAmount: paymentAmounts[method]
-          }),
-          ...(method === 'Zelle' && { 
-            zelleEmail: zelleEmail,
-            zelleAmount: paymentAmounts[method]
-          }),
-          ...(method === 'Venmo' && { 
-            venmoHandle: venmoHandle,
-            venmoAmount: paymentAmounts[method]
-          }),
-          ...(method === 'Cash' && { 
-            cashAmount: paymentAmounts[method]
-          }),
-        }
-      }));
-
-      // Update confirmation data
-      const updatedPaymentHistory = [...(confirmation.paymentHistory || []), ...newPayments];
-      const newTotalPaid = totalPaid + totalSelectedAmount;
-      const newBalanceDue = Math.max(0, totalInvoiced - newTotalPaid);
-      
-      // Determine new status
-      let newStatus = confirmation.invoiceStatus || 'UNPAID';
-      if (newTotalPaid >= totalInvoiced && newTotalPaid > 0) {
-        newStatus = 'PAID';
-      } else if (newTotalPaid > 0 && newTotalPaid < totalInvoiced) {
-        newStatus = 'PARTIALLY_PAID';
-      }
-
-      const updatedConfirmationData = {
-        ...confirmation,
-        paymentHistory: updatedPaymentHistory,
-        totalPaid: newTotalPaid,
-        invoiceStatus: newStatus,
-        status: newStatus,
-        lastUpdated: new Date().toISOString(),
-        lastPaymentBy: organizerInitials,
-        lastPaymentDate: new Date().toISOString(),
-      };
-
-      // Update localStorage
-      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const updatedAllInvoices = allInvoices.map((inv: any) =>
-        inv.id === confirmation.id ? updatedConfirmationData : inv
-      );
-      localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-
-      const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      const updatedConfirmations = confirmations.map((conf: any) =>
-        conf.id === confirmation.id ? updatedConfirmationData : conf
-      );
-      localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-
-      // Update component state
-      setConfirmation(updatedConfirmationData);
-
-      // Show success message with payment details
-      const paymentSummary = newPayments.map(p => `${p.method}: $${p.amount.toFixed(2)}`).join(', ');
-      toast({
-        title: `💳 Payment Recorded by ${organizerInitials}`,
-        description: `${paymentSummary}. New balance: $${newBalanceDue.toFixed(2)}`,
-        duration: 5000,
-      });
-
-      // Reset form
-      setLocalSelectedMethods([]);
-      setPaymentAmounts({});
-      
-      // Clear all payment fields
-      setCheckAmount('');
-      setCheckNumber('');
-      setCashAppAmount('');
-      setCashAppHandle('');
-      setZelleAmount('');
-      setZelleEmail('');
-      setVenmoAmount('');
-      setVenmoHandle('');
-      setCashAmount('');
-
-      // Trigger storage events to update other components
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('all_invoices_updated'));
-
-      // If fully paid, show special message
-      if (newStatus === 'PAID') {
-        setTimeout(() => {
-          toast({
-            title: `🎉 Invoice Fully Paid!`,
-            description: `Marked as PAID by ${organizerInitials} on ${format(new Date(), 'MMM dd, yyyy')}`,
-          });
-        }, 1500);
-      }
-
-    } catch (error) {
-      console.error('Error recording payment:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Payment Recording Failed',
-        description: 'Failed to record payment. Please try again.',
-      });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      {/* Debug Info - Shows current balance and validation status */}
-      <div className="p-3 bg-gray-100 border rounded text-sm">
-        <div><strong>Balance Due:</strong> ${balanceDue.toFixed(2)}</div>
-        <div><strong>Selected Methods:</strong> {localSelectedMethods.join(', ') || 'None'}</div>
-        <div><strong>Total Selected:</strong> ${totalSelectedAmount.toFixed(2)}</div>
-        <div><strong>Valid Payment:</strong> {isValidPayment() ? '🟢 YES' : '🔴 NO'}</div>
-        <div><strong>Recording as:</strong> {profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'}</div>
-      </div>
-
-      {/* Quick Test Buttons - Remove these in production */}
-      <div className="p-3 bg-yellow-100 border border-yellow-300 rounded">
-        <h4 className="font-medium mb-2">🧪 Quick Test (Remove after testing):</h4>
-        <div className="flex gap-2">
-          <button 
-            onClick={quickTestCashApp}
-            className="px-3 py-1 bg-green-600 text-white rounded text-sm"
-          >
-            Cash App ${balanceDue.toFixed(2)}
-          </button>
-          <button 
-            onClick={quickTestCheck}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-          >
-            Check ${balanceDue.toFixed(2)}
-          </button>
-        </div>
-      </div>
-
-      {/* Payment Method Selection - ALL OPTIONS */}
+    return (
       <div className="space-y-3">
-        <h3 className="font-medium">Payment Method</h3>
+        <div className="flex justify-between">
+          <span className="text-gray-600">Event</span>
+          <span className="font-medium">{invoice.eventName || 'Chess Tournament'}</span>
+        </div>
         
-        {/* Cash App */}
-        <div className="flex items-center justify-between p-2 border rounded">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={localSelectedMethods.includes('Cash App')}
-              onChange={(e) => handleMethodChange('Cash App', e.target.checked)}
-              className="mr-2"
-            />
-            <span className="font-medium">Cash App</span>
-          </label>
-          {localSelectedMethods.includes('Cash App') && (
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={paymentAmounts['Cash App'] || ''}
-                onChange={(e) => handleAmountChange('Cash App', parseFloat(e.target.value) || 0)}
-                placeholder="Amount"
-                className="w-24 px-2 py-1 border rounded"
-                step="0.01"
-                min="0"
-                max={balanceDue}
-              />
-              <input
-                type="text"
-                value={cashAppHandle}
-                onChange={(e) => setCashAppHandle(e.target.value)}
-                placeholder="$handle"
-                className="w-24 px-2 py-1 border rounded text-sm"
-              />
+        <div className="flex justify-between">
+          <span className="text-gray-600">Date</span>
+          <span className="font-medium">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'TBD'}</span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">Sponsor Name</span>
+          <span className="font-medium">{invoice.purchaserName || invoice.sponsorName || 'FirstName LName'}</span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">Sponsor Email</span>
+          <span className="font-medium">{sponsorEmail}</span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">Sponsor Phone</span>
+          <span className="font-medium">
+            {knownPhone 
+              ? `${knownPhone} (from records)`
+              : invoice.purchaserPhone || invoice.sponsorPhone || 'Phone not provided'
+            }
+          </span>
+        </div>
+        
+        <div className="flex justify-between">
+          <span className="text-gray-600">School</span>
+          <span className="font-medium">{invoice.schoolName || 'SHARYLAND PIONEER H S'}</span>
+        </div>
+  
+        {profile?.role === 'organizer' && knownPhone && (
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 className="text-sm font-medium text-blue-800 mb-2">📞 Organizer Contact Info</h4>
+            <div className="text-sm space-y-1">
+              <div><strong>Phone:</strong> {knownPhone}</div>
+              <div><strong>Email:</strong> {sponsorEmail}</div>
             </div>
-          )}
-        </div>
-
-        {/* Check */}
-        <div className="flex items-center justify-between p-2 border rounded">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={localSelectedMethods.includes('Check')}
-              onChange={(e) => handleMethodChange('Check', e.target.checked)}
-              className="mr-2"
-            />
-            <span className="font-medium">Check</span>
-          </label>
-          {localSelectedMethods.includes('Check') && (
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={paymentAmounts['Check'] || ''}
-                onChange={(e) => handleAmountChange('Check', parseFloat(e.target.value) || 0)}
-                placeholder="Amount"
-                className="w-24 px-2 py-1 border rounded"
-                step="0.01"
-                min="0"
-                max={balanceDue}
-              />
-              <input
-                type="text"
-                value={checkNumber}
-                onChange={(e) => setCheckNumber(e.target.value)}
-                placeholder="Check #"
-                className="w-20 px-2 py-1 border rounded text-sm"
-              />
+            <div className="flex gap-2 mt-2">
+              <button 
+                onClick={() => window.open(`tel:${knownPhone.replace(/\D/g, '')}`)}
+                className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+              >
+                📞 Call
+              </button>
+              <button 
+                onClick={() => window.open(`mailto:${sponsorEmail}`)}
+                className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+              >
+                ✉️ Email
+              </button>
             </div>
-          )}
-        </div>
-
-        {/* Cash */}
-        <div className="flex items-center justify-between p-2 border rounded">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={localSelectedMethods.includes('Cash')}
-              onChange={(e) => handleMethodChange('Cash', e.target.checked)}
-              className="mr-2"
-            />
-            <span className="font-medium">Cash</span>
-          </label>
-          {localSelectedMethods.includes('Cash') && (
-            <input
-              type="number"
-              value={paymentAmounts['Cash'] || ''}
-              onChange={(e) => handleAmountChange('Cash', parseFloat(e.target.value) || 0)}
-              placeholder="Amount"
-              className="w-24 px-2 py-1 border rounded"
-              step="0.01"
-              min="0"
-              max={balanceDue}
-            />
-          )}
-        </div>
-
-        {/* Zelle */}
-        <div className="flex items-center justify-between p-2 border rounded">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={localSelectedMethods.includes('Zelle')}
-              onChange={(e) => handleMethodChange('Zelle', e.target.checked)}
-              className="mr-2"
-            />
-            <span className="font-medium">Zelle</span>
-          </label>
-          {localSelectedMethods.includes('Zelle') && (
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={paymentAmounts['Zelle'] || ''}
-                onChange={(e) => handleAmountChange('Zelle', parseFloat(e.target.value) || 0)}
-                placeholder="Amount"
-                className="w-24 px-2 py-1 border rounded"
-                step="0.01"
-                min="0"
-                max={balanceDue}
-              />
-              <input
-                type="email"
-                value={zelleEmail}
-                onChange={(e) => setZelleEmail(e.target.value)}
-                placeholder="Email"
-                className="w-28 px-2 py-1 border rounded text-sm"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Venmo */}
-        <div className="flex items-center justify-between p-2 border rounded">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={localSelectedMethods.includes('Venmo')}
-              onChange={(e) => handleMethodChange('Venmo', e.target.checked)}
-              className="mr-2"
-            />
-            <span className="font-medium">Venmo</span>
-          </label>
-          {localSelectedMethods.includes('Venmo') && (
-            <div className="flex gap-2">
-              <input
-                type="number"
-                value={paymentAmounts['Venmo'] || ''}
-                onChange={(e) => handleAmountChange('Venmo', parseFloat(e.target.value) || 0)}
-                placeholder="Amount"
-                className="w-24 px-2 py-1 border rounded"
-                step="0.01"
-                min="0"
-                max={balanceDue}
-              />
-              <input
-                type="text"
-                value={venmoHandle}
-                onChange={(e) => setVenmoHandle(e.target.value)}
-                placeholder="@handle"
-                className="w-24 px-2 py-1 border rounded text-sm"
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Payment Summary */}
-      {totalSelectedAmount > 0 && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-          <div className="flex justify-between">
-            <span>Total Payment:</span>
-            <span className="font-medium">${totalSelectedAmount.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between">
-            <span>Remaining Balance:</span>
-            <span className="font-medium">${(balanceDue - totalSelectedAmount).toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>New Status:</span>
-            <span className="font-medium">
-              {(balanceDue - totalSelectedAmount) <= 0 ? '🟢 PAID' : '🔵 PARTIALLY_PAID'}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm text-gray-600">
-            <span>Recorded by:</span>
-            <span>{profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'} on {format(new Date(), 'MMM dd, yyyy')}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Record Payment Button */}
-      <button
-        onClick={handleRecordPayment}
-        disabled={!isValidPayment() || isUpdating}
-        className={`w-full py-2 px-4 rounded font-medium transition-colors ${
-          isValidPayment() && !isUpdating
-            ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-        }`}
-      >
-        {isUpdating ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-            Recording Payment...
-          </>
-        ) : isValidPayment() ? (
-          '💳 Record Payment'
-        ) : (
-          '⏸️ Select Payment Method'
         )}
-      </button>
+      </div>
+    );
+  };
 
-      {/* Payment History Display */}
-      {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 && (
-        <div className="mt-4 p-3 bg-gray-50 border rounded">
-          <h4 className="font-medium mb-2">💳 Payment History</h4>
-          <div className="space-y-2 max-h-32 overflow-y-auto">
-            {confirmation.paymentHistory.map((payment: any, index: number) => (
-              <div key={payment.id || index} className="text-sm flex justify-between items-center p-2 bg-white rounded border">
-                <div>
-                  <span className="font-medium">{payment.method}</span>
-                  <span className="text-gray-600 ml-2">${payment.amount.toFixed(2)}</span>
+
+
+  const ProofOfPaymentSection = () => (
+      <div className="mt-4">
+        <h4 className="text-md font-medium mb-2">Proof of Payment</h4>
+        
+        <div className="mb-3">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept="image/*"
+            multiple
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Upload Screenshot/Photo
+          </Button>
+        </div>
+    
+        {fileUrls.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600">Uploaded files:</p>
+            <div className="grid grid-cols-2 gap-2">
+              {fileUrls.map((url, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={url}
+                    alt={`Proof ${index + 1}`}
+                    className="w-full h-20 object-cover rounded border"
+                  />
+                  <button
+                    onClick={() => removeFile(index)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                  >
+                    ×
+                  </button>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {payment.organizerInitials && <span className="bg-blue-100 px-1 rounded mr-1">{payment.organizerInitials}</span>}
-                  {payment.dateFormatted || format(new Date(payment.date), 'MMM dd, HH:mm')}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+
+  const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
+    // Use the existing state variables from the main component
+    const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]);
+    const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
+    
+    const totalSelectedAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + amount, 0);
+    
+    // Calculate balance due from the main component's values
+    const balanceDue = Math.max(0, totalInvoiced - totalPaid);
+    
+    const isValidPayment = () => {
+      const hasSelectedMethod = localSelectedMethods.length > 0;
+      const hasValidAmount = totalSelectedAmount > 0;
+      const amountNotExceedsBalance = totalSelectedAmount <= balanceDue;
+      
+      console.log('🔍 Payment Validation:', {
+        hasSelectedMethod,
+        hasValidAmount,
+        amountNotExceedsBalance,
+        localSelectedMethods,
+        totalSelectedAmount,
+        balanceDue
+      });
+      
+      return hasSelectedMethod && hasValidAmount && amountNotExceedsBalance;
+    };
+  
+    const handleMethodChange = (method: string, isChecked: boolean) => {
+      if (isChecked) {
+        setLocalSelectedMethods(prev => [...prev, method]);
+        // Auto-fill with remaining balance if it's the first method selected
+        if (localSelectedMethods.length === 0) {
+          setPaymentAmounts(prev => ({ ...prev, [method]: balanceDue }));
+        }
+      } else {
+        setLocalSelectedMethods(prev => prev.filter(m => m !== method));
+        setPaymentAmounts(prev => {
+          const newAmounts = { ...prev };
+          delete newAmounts[method];
+          return newAmounts;
+        });
+      }
+    };
+  
+    const handleAmountChange = (method: string, amount: number) => {
+      setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
+    };
+  
+    const quickTestCashApp = () => {
+      setLocalSelectedMethods(['Cash App']);
+      setPaymentAmounts({ 'Cash App': balanceDue });
+      setCashAppAmount(balanceDue.toString());
+    };
+  
+    const quickTestCheck = () => {
+      setLocalSelectedMethods(['Check']);
+      setPaymentAmounts({ 'Check': balanceDue });
+      setCheckAmount(balanceDue.toString());
+    };
+  
+    const handleRecordPayment = async () => {
+      if (!isValidPayment()) {
+        toast({
+          variant: 'destructive',
+          title: 'Invalid Payment',
+          description: 'Please select a payment method and enter a valid amount'
+        });
+        return;
+      }
+  
+      setIsUpdating(true);
+  
+      try {
+        // Get organizer initials from profile
+        const organizerInitials = profile?.firstName && profile?.lastName 
+          ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase()
+          : profile?.email?.substring(0, 2).toUpperCase() || 'ORG';
+  
+        // Create individual payment entries for each method
+        const newPayments = localSelectedMethods.map(method => ({
+          id: `payment_${Date.now()}_${method.toLowerCase().replace(/\s+/g, '_')}`,
+          amount: paymentAmounts[method] || 0,
+          method: method,
+          date: new Date().toISOString(),
+          dateFormatted: format(new Date(), 'MMM dd, yyyy HH:mm'),
+          source: 'manual',
+          status: 'completed',
+          organizerInitials: organizerInitials,
+          organizerName: profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : profile?.email || 'Organizer',
+          details: {
+            // Store method-specific details
+            ...(method === 'Check' && { 
+              checkNumber: checkNumber,
+              checkAmount: paymentAmounts[method]
+            }),
+            ...(method === 'Cash App' && { 
+              cashAppHandle: cashAppHandle,
+              cashAppAmount: paymentAmounts[method]
+            }),
+            ...(method === 'Zelle' && { 
+              zelleEmail: zelleEmail,
+              zelleAmount: paymentAmounts[method]
+            }),
+            ...(method === 'Venmo' && { 
+              venmoHandle: venmoHandle,
+              venmoAmount: paymentAmounts[method]
+            }),
+            ...(method === 'Cash' && { 
+              cashAmount: paymentAmounts[method]
+            }),
+          }
+        }));
+  
+        // Update confirmation data
+        const updatedPaymentHistory = [...(confirmation.paymentHistory || []), ...newPayments];
+        const newTotalPaid = totalPaid + totalSelectedAmount;
+        const newBalanceDue = Math.max(0, totalInvoiced - newTotalPaid);
+        
+        // Determine new status
+        let newStatus = confirmation.invoiceStatus || 'UNPAID';
+        if (newTotalPaid >= totalInvoiced && newTotalPaid > 0) {
+          newStatus = 'PAID';
+        } else if (newTotalPaid > 0 && newTotalPaid < totalInvoiced) {
+          newStatus = 'PARTIALLY_PAID';
+        }
+  
+        const updatedConfirmationData = {
+          ...confirmation,
+          paymentHistory: updatedPaymentHistory,
+          totalPaid: newTotalPaid,
+          invoiceStatus: newStatus,
+          status: newStatus,
+          lastUpdated: new Date().toISOString(),
+          lastPaymentBy: organizerInitials,
+          lastPaymentDate: new Date().toISOString(),
+        };
+  
+        // Update localStorage
+        const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+        const updatedAllInvoices = allInvoices.map((inv: any) =>
+          inv.id === confirmation.id ? updatedConfirmationData : inv
+        );
+        localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+  
+        const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const updatedConfirmations = confirmations.map((conf: any) =>
+          conf.id === confirmation.id ? updatedConfirmationData : conf
+        );
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+  
+        // Update component state
+        setConfirmation(updatedConfirmationData);
+  
+        // Show success message with payment details
+        const paymentSummary = newPayments.map(p => `${p.method}: $${p.amount.toFixed(2)}`).join(', ');
+        toast({
+          title: `💳 Payment Recorded by ${organizerInitials}`,
+          description: `${paymentSummary}. New balance: $${newBalanceDue.toFixed(2)}`,
+          duration: 5000,
+        });
+  
+        // Reset form
+        setLocalSelectedMethods([]);
+        setPaymentAmounts({});
+        
+        // Clear all payment fields
+        setCheckAmount('');
+        setCheckNumber('');
+        setCashAppAmount('');
+        setCashAppHandle('');
+        setZelleAmount('');
+        setZelleEmail('');
+        setVenmoAmount('');
+        setVenmoHandle('');
+        setCashAmount('');
+  
+        // Trigger storage events to update other components
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('all_invoices_updated'));
+  
+        // If fully paid, show special message
+        if (newStatus === 'PAID') {
+          setTimeout(() => {
+            toast({
+              title: `🎉 Invoice Fully Paid!`,
+              description: `Marked as PAID by ${organizerInitials} on ${format(new Date(), 'MMM dd, yyyy')}`,
+            });
+          }, 1500);
+        }
+  
+      } catch (error) {
+        console.error('Error recording payment:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Payment Recording Failed',
+          description: 'Failed to record payment. Please try again.',
+        });
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+  
+    return (
+      <div className="space-y-4">
+        {/* Debug Info - Shows current balance and validation status */}
+        <div className="p-3 bg-gray-100 border rounded text-sm">
+          <div><strong>Balance Due:</strong> ${balanceDue.toFixed(2)}</div>
+          <div><strong>Selected Methods:</strong> {localSelectedMethods.join(', ') || 'None'}</div>
+          <div><strong>Total Selected:</strong> ${totalSelectedAmount.toFixed(2)}</div>
+          <div><strong>Valid Payment:</strong> {isValidPayment() ? '🟢 YES' : '🔴 NO'}</div>
+          <div><strong>Recording as:</strong> {profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'}</div>
+        </div>
+  
+        {/* Quick Test Buttons - Remove these in production */}
+        <div className="p-3 bg-yellow-100 border border-yellow-300 rounded">
+          <h4 className="font-medium mb-2">🧪 Quick Test (Remove after testing):</h4>
+          <div className="flex gap-2">
+            <button 
+              onClick={quickTestCashApp}
+              className="px-3 py-1 bg-green-600 text-white rounded text-sm"
+            >
+              Cash App ${balanceDue.toFixed(2)}
+            </button>
+            <button 
+              onClick={quickTestCheck}
+              className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+            >
+              Check ${balanceDue.toFixed(2)}
+            </button>
           </div>
         </div>
-      )}
+  
+        {/* Payment Method Selection - ALL OPTIONS */}
+        <div className="space-y-3">
+          <h3 className="font-medium">Payment Method</h3>
+          
+          {/* Cash App */}
+          <div className="flex items-center justify-between p-2 border rounded">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={localSelectedMethods.includes('Cash App')}
+                onChange={(e) => handleMethodChange('Cash App', e.target.checked)}
+                className="mr-2"
+              />
+              <span className="font-medium">Cash App</span>
+            </label>
+            {localSelectedMethods.includes('Cash App') && (
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={paymentAmounts['Cash App'] || ''}
+                  onChange={(e) => handleAmountChange('Cash App', parseFloat(e.target.value) || 0)}
+                  placeholder="Amount"
+                  className="w-24 px-2 py-1 border rounded"
+                  step="0.01"
+                  min="0"
+                  max={balanceDue}
+                />
+                <input
+                  type="text"
+                  value={cashAppHandle}
+                  onChange={(e) => setCashAppHandle(e.target.value)}
+                  placeholder="$handle"
+                  className="w-24 px-2 py-1 border rounded text-sm"
+                />
+              </div>
+            )}
+          </div>
+  
+          {/* Check */}
+          <div className="flex items-center justify-between p-2 border rounded">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={localSelectedMethods.includes('Check')}
+                onChange={(e) => handleMethodChange('Check', e.target.checked)}
+                className="mr-2"
+              />
+              <span className="font-medium">Check</span>
+            </label>
+            {localSelectedMethods.includes('Check') && (
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={paymentAmounts['Check'] || ''}
+                  onChange={(e) => handleAmountChange('Check', parseFloat(e.target.value) || 0)}
+                  placeholder="Amount"
+                  className="w-24 px-2 py-1 border rounded"
+                  step="0.01"
+                  min="0"
+                  max={balanceDue}
+                />
+                <input
+                  type="text"
+                  value={checkNumber}
+                  onChange={(e) => setCheckNumber(e.target.value)}
+                  placeholder="Check #"
+                  className="w-20 px-2 py-1 border rounded text-sm"
+                />
+              </div>
+            )}
+          </div>
+  
+          {/* Cash */}
+          <div className="flex items-center justify-between p-2 border rounded">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={localSelectedMethods.includes('Cash')}
+                onChange={(e) => handleMethodChange('Cash', e.target.checked)}
+                className="mr-2"
+              />
+              <span className="font-medium">Cash</span>
+            </label>
+            {localSelectedMethods.includes('Cash') && (
+              <input
+                type="number"
+                value={paymentAmounts['Cash'] || ''}
+                onChange={(e) => handleAmountChange('Cash', parseFloat(e.target.value) || 0)}
+                placeholder="Amount"
+                className="w-24 px-2 py-1 border rounded"
+                step="0.01"
+                min="0"
+                max={balanceDue}
+              />
+            )}
+          </div>
+  
+          {/* Zelle */}
+          <div className="flex items-center justify-between p-2 border rounded">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={localSelectedMethods.includes('Zelle')}
+                onChange={(e) => handleMethodChange('Zelle', e.target.checked)}
+                className="mr-2"
+              />
+              <span className="font-medium">Zelle</span>
+            </label>
+            {localSelectedMethods.includes('Zelle') && (
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={paymentAmounts['Zelle'] || ''}
+                  onChange={(e) => handleAmountChange('Zelle', parseFloat(e.target.value) || 0)}
+                  placeholder="Amount"
+                  className="w-24 px-2 py-1 border rounded"
+                  step="0.01"
+                  min="0"
+                  max={balanceDue}
+                />
+                <input
+                  type="email"
+                  value={zelleEmail}
+                  onChange={(e) => setZelleEmail(e.target.value)}
+                  placeholder="Email"
+                  className="w-28 px-2 py-1 border rounded text-sm"
+                />
+              </div>
+            )}
+          </div>
+  
+          {/* Venmo */}
+          <div className="flex items-center justify-between p-2 border rounded">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={localSelectedMethods.includes('Venmo')}
+                onChange={(e) => handleMethodChange('Venmo', e.target.checked)}
+                className="mr-2"
+              />
+              <span className="font-medium">Venmo</span>
+            </label>
+            {localSelectedMethods.includes('Venmo') && (
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={paymentAmounts['Venmo'] || ''}
+                  onChange={(e) => handleAmountChange('Venmo', parseFloat(e.target.value) || 0)}
+                  placeholder="Amount"
+                  className="w-24 px-2 py-1 border rounded"
+                  step="0.01"
+                  min="0"
+                  max={balanceDue}
+                />
+                <input
+                  type="text"
+                  value={venmoHandle}
+                  onChange={(e) => setVenmoHandle(e.target.value)}
+                  placeholder="@handle"
+                  className="w-24 px-2 py-1 border rounded text-sm"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+  
+        {/* Payment Summary */}
+        {totalSelectedAmount > 0 && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+            <div className="flex justify-between">
+              <span>Total Payment:</span>
+              <span className="font-medium">${totalSelectedAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Remaining Balance:</span>
+              <span className="font-medium">${(balanceDue - totalSelectedAmount).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>New Status:</span>
+              <span className="font-medium">
+                {(balanceDue - totalSelectedAmount) <= 0 ? '🟢 PAID' : '🔵 PARTIALLY_PAID'}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Recorded by:</span>
+              <span>{profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'} on {format(new Date(), 'MMM dd, yyyy')}</span>
+            </div>
+          </div>
+        )}
+  
+        {/* Record Payment Button */}
+        <button
+          onClick={handleRecordPayment}
+          disabled={!isValidPayment() || isUpdating}
+          className={`w-full py-2 px-4 rounded font-medium transition-colors ${
+            isValidPayment() && !isUpdating
+              ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          {isUpdating ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
+              Recording Payment...
+            </>
+          ) : isValidPayment() ? (
+            '💳 Record Payment'
+          ) : (
+            '⏸️ Select Payment Method'
+          )}
+        </button>
+  
+        {/* Payment History Display */}
+        {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 && (
+          <div className="mt-4 p-3 bg-gray-50 border rounded">
+            <h4 className="font-medium mb-2">💳 Payment History</h4>
+            <div className="space-y-2 max-h-32 overflow-y-auto">
+              {confirmation.paymentHistory.map((payment: any, index: number) => (
+                <div key={payment.id || index} className="text-sm flex justify-between items-center p-2 bg-white rounded border">
+                  <div>
+                    <span className="font-medium">{payment.method}</span>
+                    <span className="text-gray-600 ml-2">${payment.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {payment.organizerInitials && <span className="bg-blue-100 px-1 rounded mr-1">{payment.organizerInitials}</span>}
+                    {payment.dateFormatted || format(new Date(payment.date), 'MMM dd, HH:mm')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+  
+        {/* Proof of Payment Upload */}
+        <ProofOfPaymentSection />
+      </div>
+    );
+  };
+}
 
-      {/* Proof of Payment Upload */}
-      <ProofOfPaymentSection />
-    </div>
-  );
-};
+    
