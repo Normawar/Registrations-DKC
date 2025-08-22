@@ -910,109 +910,84 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       }
     };
     
-    const SquareDebugComponent = () => {
-      useEffect(() => {
-        console.log('🔍 SQUARE DEBUG INFO:');
-        console.log('confirmation.invoiceId:', confirmation?.invoiceId);
-        console.log('confirmation.invoiceUrl:', confirmation?.invoiceUrl);
-        console.log('confirmation.publicUrl:', confirmation?.publicUrl);
-        console.log('confirmation.invoiceNumber:', confirmation?.invoiceNumber);
-        console.log('Full confirmation object keys:', Object.keys(confirmation || {}));
-        
-        // Check for any URL patterns
-        const allKeys = Object.keys(confirmation || {});
-        const urlKeys = allKeys.filter(key => 
-          key.toLowerCase().includes('url') || 
-          key.toLowerCase().includes('link') ||
-          key.toLowerCase().includes('square')
-        );
-        console.log('URL-related keys:', urlKeys);
-        urlKeys.forEach(key => {
-          console.log(`${key}:`, confirmation[key]);
-        });
-      }, []);
-    
-      return null; // Just for debugging, doesn't render anything
-    };
-
     const EnhancedSquareButton = () => {
-        const handleOpenSquare = () => {
-          const invoiceUrl = confirmation?.invoiceUrl;
-          const invoiceId = confirmation?.invoiceId;
-          const invoiceNumber = confirmation?.invoiceNumber || confirmation?.id.slice(-8);
+      const handleOpenSquare = () => {
+        const invoiceUrl = confirmation?.invoiceUrl;
+        const invoiceId = confirmation?.invoiceId;
+        const invoiceNumber = confirmation?.invoiceNumber || confirmation?.id.slice(-8);
+        
+        console.log('🔗 Square button clicked:', { invoiceUrl, invoiceId, invoiceNumber });
+        
+        if (invoiceUrl) {
+          // Try the original URL first
+          console.log('🔗 Trying original URL:', invoiceUrl);
+          window.open(invoiceUrl, '_blank');
           
-          console.log('🔗 Square button clicked:', { invoiceUrl, invoiceId, invoiceNumber });
+          // Show helpful message
+          toast({
+            title: 'Opening Square Invoice',
+            description: `Opening invoice #${invoiceNumber}. If you see "Oops" error, the invoice may not exist in Square.`,
+            duration: 8000
+          });
           
-          if (invoiceUrl) {
-            // Try the original URL first
-            console.log('🔗 Trying original URL:', invoiceUrl);
-            window.open(invoiceUrl, '_blank');
-            
-            // Show helpful message
-            toast({
-              title: 'Opening Square Invoice',
-              description: `Opening invoice #${invoiceNumber}. If you see "Oops" error, the invoice may not exist in Square.`,
-              duration: 8000
-            });
-            
-            // Show backup instructions after a delay
-            setTimeout(() => {
-              if (profile?.role === 'organizer') {
-                toast({
-                  title: '💡 If Square shows "Oops" error:',
-                  description: `Use Developer Console below to search for invoice #${invoiceNumber} manually.`,
-                  duration: 10000
-                });
-              }
-            }, 3000);
-            
-          } else {
-            // No URL available, show developer console instructions
-            toast({
-              variant: 'destructive',
-              title: 'No Square URL Available',
-              description: `Invoice #${invoiceNumber} may not be created in Square yet. Use Developer Console to find or create it.`,
-              duration: 10000
-            });
-          }
-        };
-      
-        return (
-          <div className="mt-4">
-            <label className="text-sm text-gray-600">Invoice Link</label>
-            <Button
-              variant="outline"
-              className="w-full mt-1"
-              onClick={handleOpenSquare}
-            >
-              Open in Square
-              <ExternalLink className="w-4 h-4 ml-2" />
-            </Button>
-            
-            {/* Enhanced debug info for organizers */}
-            {profile?.role === 'organizer' && (
-              <div className="mt-2 p-3 bg-yellow-50 border border-yellow-300 rounded text-xs">
-                <h4 className="font-medium text-yellow-800 mb-2">🔍 Square Debug Info:</h4>
-                <div className="space-y-1 text-yellow-700">
-                  <p><strong>Invoice URL:</strong> {confirmation?.invoiceUrl || 'Not found'}</p>
-                  <p><strong>Invoice ID:</strong> {confirmation?.invoiceId || 'Not found'}</p>
-                  <p><strong>Invoice Number:</strong> {confirmation?.invoiceNumber || 'Not found'}</p>
-                  <p><strong>Public URL:</strong> {confirmation?.publicUrl || 'Not found'}</p>
-                </div>
-                
-                {confirmation?.invoiceUrl && (
-                  <div className="mt-2 p-2 bg-yellow-100 rounded">
-                    <p className="text-xs text-yellow-800">
-                      <strong>💡 If "Oops" error appears:</strong> The invoice URL exists but the invoice wasn't found in Square. 
-                      This usually means the invoice needs to be created manually in Square first.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
+          // Show backup instructions after a delay
+          setTimeout(() => {
+            if (profile?.role === 'organizer') {
+              toast({
+                title: '💡 If Square shows "Oops" error:',
+                description: `Use Developer Console below to search for invoice #${invoiceNumber} manually.`,
+                duration: 10000
+              });
+            }
+          }, 3000);
+          
+        } else {
+          // No URL available, show developer console instructions
+          toast({
+            variant: 'destructive',
+            title: 'No Square URL Available',
+            description: `Invoice #${invoiceNumber} may not be created in Square yet. Use Developer Console to find or create it.`,
+            duration: 10000
+          });
+        }
       };
+    
+      return (
+        <div className="mt-4">
+          <label className="text-sm text-gray-600">Invoice Link</label>
+          <Button
+            variant="outline"
+            className="w-full mt-1"
+            onClick={handleOpenSquare}
+          >
+            Open in Square
+            <ExternalLink className="w-4 h-4 ml-2" />
+          </Button>
+          
+          {/* Enhanced debug info for organizers */}
+          {profile?.role === 'organizer' && (
+            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-300 rounded text-xs">
+              <h4 className="font-medium text-yellow-800 mb-2">🔍 Square Debug Info:</h4>
+              <div className="space-y-1 text-yellow-700">
+                <p><strong>Invoice URL:</strong> {confirmation?.invoiceUrl || 'Not found'}</p>
+                <p><strong>Invoice ID:</strong> {confirmation?.invoiceId || 'Not found'}</p>
+                <p><strong>Invoice Number:</strong> {confirmation?.invoiceNumber || 'Not found'}</p>
+                <p><strong>Public URL:</strong> {confirmation?.publicUrl || 'Not found'}</p>
+              </div>
+              
+              {confirmation?.invoiceUrl && (
+                <div className="mt-2 p-2 bg-yellow-100 rounded">
+                  <p className="text-xs text-yellow-800">
+                    <strong>💡 If "Oops" error appears:</strong> The invoice URL exists but the invoice wasn't found in Square. 
+                    This usually means the invoice needs to be created manually in Square first.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    };
       
       const EnhancedSquareDeveloperConsole = () => {
         if (profile?.role !== 'organizer') return null;
@@ -1181,6 +1156,30 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   }
 
   
+  const SquareDebugComponent = () => {
+    useEffect(() => {
+      console.log('🔍 SQUARE DEBUG INFO:');
+      console.log('confirmation.invoiceId:', confirmation?.invoiceId);
+      console.log('confirmation.invoiceUrl:', confirmation?.invoiceUrl);
+      console.log('confirmation.publicUrl:', confirmation?.publicUrl);
+      console.log('confirmation.invoiceNumber:', confirmation?.invoiceNumber);
+      console.log('Full confirmation object keys:', Object.keys(confirmation || {}));
+      
+      // Check for any URL patterns
+      const allKeys = Object.keys(confirmation || {});
+      const urlKeys = allKeys.filter(key => 
+        key.toLowerCase().includes('url') || 
+        key.toLowerCase().includes('link') ||
+        key.toLowerCase().includes('square')
+      );
+      console.log('URL-related keys:', urlKeys);
+      urlKeys.forEach(key => {
+        console.log(`${key}:`, confirmation[key]);
+      });
+    }, []);
+  
+    return null; // Just for debugging, doesn't render anything
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1237,5 +1236,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
-    
