@@ -1244,4 +1244,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   );
 }
 
-    
