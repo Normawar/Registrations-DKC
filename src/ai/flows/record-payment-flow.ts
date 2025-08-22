@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Records a payment against a Square invoice using proper Square API methods.
@@ -15,6 +16,9 @@ const RecordPaymentInputSchema = z.object({
   amount: z.number().describe('The payment amount in dollars.'),
   note: z.string().optional().describe('A note for the payment, e.g., check number or transaction ID.'),
   paymentDate: z.string().optional().describe('The date of the payment in YYYY-MM-DD format.'),
+  paymentMethod: z.string().optional().describe('The method of payment (e.g., Check, Cash App).'),
+  externalPaymentId: z.string().optional().describe('A unique ID for the payment from the local system.'),
+  organizerInitials: z.string().optional().describe('Initials of the organizer recording the payment.'),
 });
 export type RecordPaymentInput = z.infer<typeof RecordPaymentInputSchema>;
 
@@ -89,8 +93,10 @@ const recordPaymentFlow = ai.defineFlow(
           currency: 'USD',
       };
       
+      const idempotencyKey = input.externalPaymentId || randomUUID();
+
       const createPaymentResponse = await paymentsApi.createPayment({
-          idempotencyKey: randomUUID(),
+          idempotencyKey: idempotencyKey,
           sourceId: 'EXTERNAL', 
           amountMoney: paymentAmount,
           note: input.note || 'Manual payment entry',
@@ -186,3 +192,5 @@ const recordPaymentFlow = ai.defineFlow(
     }
   }
 );
+
+    

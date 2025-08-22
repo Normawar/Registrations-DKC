@@ -593,16 +593,21 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             try {
               console.log('🔄 Recording payment through recordPayment flow...');
               
-              // Use your existing recordPayment function
-              const paymentResult = await recordPayment({
-                  invoiceId: confirmation.invoiceId,
-                  amount: totalSelectedAmount,
-                  note: `Manual entry by ${organizerInitials}: ${localSelectedMethods.join(', ')}`,
-              });
+                for (const payment of newPayments) {
+                     const paymentNote = [
+                        `${payment.method}: $${payment.amount.toFixed(2)}`,
+                        payment.organizerInitials ? `Recorded by: ${payment.organizerInitials}` : '',
+                     ].filter(Boolean).join(' | ');
+
+                    await recordPayment({
+                        invoiceId: confirmation.invoiceId,
+                        amount: payment.amount,
+                        note: paymentNote,
+                    });
+                }
               
-              console.log('✅ Payment recorded successfully:', paymentResult);
+              console.log('✅ Payment recorded successfully:');
               
-              // If recordPayment was successful, it should update Square automatically
               toast({
                   title: `💳 Payment Recorded by ${organizerInitials}`,
                   description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded and synced to Square`,
@@ -918,26 +923,34 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             console.log('🔗 Square button clicked:', { invoiceUrl, invoiceNumber });
             
             if (invoiceUrl) {
-                // Check if it's a sandbox URL
-                const isSandbox = invoiceUrl.includes('squareupsandbox.com');
-                
-                console.log('🔗 Opening URL:', invoiceUrl);
-                console.log('🔗 Environment:', isSandbox ? 'SANDBOX' : 'PRODUCTION');
-                
+                // Try the original URL first
+                console.log('🔗 Trying original URL:', invoiceUrl);
                 window.open(invoiceUrl, '_blank');
                 
-                // Show environment-specific message
+                // Show helpful message
                 toast({
-                    title: `Opening ${isSandbox ? 'Sandbox' : 'Production'} Square Invoice`,
-                    description: `Invoice #${invoiceNumber} in ${isSandbox ? 'sandbox' : 'production'} environment`,
+                    title: 'Opening Square Invoice',
+                    description: `Opening invoice #${invoiceNumber}. If you see "Oops" error, the invoice may not exist in Square.`,
                     duration: 8000
                 });
                 
+                // Show backup instructions after a delay
+                setTimeout(() => {
+                    if (profile?.role === 'organizer') {
+                        toast({
+                            title: '💡 If Square shows "Oops" error:',
+                            description: `Use Developer Console below to search for invoice #${invoiceNumber} manually.`,
+                            duration: 10000
+                        });
+                    }
+                }, 3000);
+                
             } else {
+                // No URL available, show developer console instructions
                 toast({
                     variant: 'destructive',
                     title: 'No Square URL Available',
-                    description: `Invoice #${invoiceNumber} may not be created in Square yet.`,
+                    description: `Invoice #${invoiceNumber} may not be created in Square yet. Use Developer Console to find or create it.`,
                     duration: 10000
                 });
             }
@@ -998,16 +1011,14 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         };
       
         const openSquareDashboard = () => {
-          console.log('🧪 Opening SANDBOX Dashboard (hardcoded)');
-          
-          // Always open sandbox
-          window.open('https://squareupsandbox.com/dashboard/invoices', '_blank');
-          
-          toast({
-            title: '🧪 Sandbox Dashboard',
-            description: 'Opening Square SANDBOX dashboard',
-            duration: 5000
-          });
+            // Always open sandbox
+            window.open('https://squareupsandbox.com/dashboard/invoices', '_blank');
+            
+            toast({
+              title: '🧪 Sandbox Dashboard',
+              description: 'Opening Square SANDBOX dashboard',
+              duration: 5000
+            });
         };
       
         return (
@@ -1213,3 +1224,4 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   );
 }
 
+    
