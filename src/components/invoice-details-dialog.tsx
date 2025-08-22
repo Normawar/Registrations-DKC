@@ -69,8 +69,6 @@ const formatPhoneNumber = (phone: string) => {
   // Remove any non-digit characters
   const cleaned = phone.replace(/\D/g, '');
   
-  console.log('📞 Formatting phone:', phone, '-> cleaned:', cleaned, '-> length:', cleaned.length);
-  
   // Format based on length
   if (cleaned.length === 10) {
     return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
@@ -616,6 +614,7 @@ const RegistrationDetailsSection = ({ invoice, profile }: { invoice: any, profil
 };
 
 
+
 const ProofOfPaymentSection = () => (
     <div className="mt-4">
       <h4 className="text-md font-medium mb-2">Proof of Payment</h4>
@@ -666,261 +665,207 @@ const ProofOfPaymentSection = () => (
   );
 
 const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
-  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
-  const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
-  
-  const totalSelectedAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + amount, 0);
-  
-  const balanceDue = invoice.totalAmount - (invoice.totalPaid || 0);
-  
-  const isValidPayment = () => {
-    const hasSelectedMethod = selectedMethods.length > 0;
-    const hasValidAmount = totalSelectedAmount > 0;
-    const amountNotExceedsBalance = totalSelectedAmount <= balanceDue;
+    const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
+    const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
     
-    console.log('🔍 Payment Validation:', {
-      hasSelectedMethod,
-      hasValidAmount,
-      amountNotExceedsBalance,
-      selectedMethods,
-      totalSelectedAmount,
-      balanceDue
-    });
+    const totalSelectedAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + amount, 0);
     
-    return hasSelectedMethod && hasValidAmount && amountNotExceedsBalance;
-  };
-
-  const handleMethodChange = (method: string, isChecked: boolean) => {
-    if (isChecked) {
-      setSelectedMethods(prev => [...prev, method]);
-      if (selectedMethods.length === 0) {
-        setPaymentAmounts(prev => ({ ...prev, [method]: balanceDue }));
-      }
-    } else {
-      setSelectedMethods(prev => prev.filter(m => m !== method));
-      setPaymentAmounts(prev => {
-        const newAmounts = { ...prev };
-        delete newAmounts[method];
-        return newAmounts;
-      });
-    }
-  };
-
-  const handleAmountChange = (method: string, amount: number) => {
-    setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
-  };
-
-  const quickTestCashApp = () => {
-    setSelectedMethods(['Cash App']);
-    setPaymentAmounts({ 'Cash App': balanceDue });
-  };
-
-  const quickTestCheck = () => {
-    setSelectedMethods(['Check']);
-    setPaymentAmounts({ 'Check': balanceDue });
-  };
-
-  const handleRecordPayment = () => {
-    if (!isValidPayment()) {
-      alert('Please select a payment method and enter a valid amount');
-      return;
-    }
-
-    const paymentData = {
-      invoiceId: invoice.id,
-      methods: selectedMethods,
-      amounts: paymentAmounts,
-      totalAmount: totalSelectedAmount,
-      timestamp: new Date().toISOString()
+    const balanceDue = invoice.totalAmount - (invoice.totalPaid || 0);
+    
+    const isValidPayment = () => {
+      const hasSelectedMethod = selectedMethods.length > 0;
+      const hasValidAmount = totalSelectedAmount > 0;
+      const amountNotExceedsBalance = totalSelectedAmount <= balanceDue;
+      
+      return hasSelectedMethod && hasValidAmount && amountNotExceedsBalance;
     };
+  
+    const handleMethodChange = (method: string, isChecked: boolean) => {
+      let newSelectedMethods: string[];
+      if (isChecked) {
+        newSelectedMethods = [...selectedMethods, method];
+      } else {
+        newSelectedMethods = selectedMethods.filter(m => m !== method);
+      }
+      setSelectedMethods(newSelectedMethods);
+      setSelectedPaymentMethods(newSelectedMethods);
+    };
+  
+    const handleAmountChange = (method: string, amount: number) => {
+        const newAmounts = { ...paymentAmounts, [method]: amount };
+        setPaymentAmounts(newAmounts);
 
-    console.log('💳 Recording payment:', paymentData);
-    
-    alert(`✅ Payment of $${totalSelectedAmount.toFixed(2)} recorded successfully!`);
-    
-    setSelectedMethods([]);
-    setPaymentAmounts({});
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="p-3 bg-gray-100 border rounded text-sm">
-        <div><strong>Balance Due:</strong> ${balanceDue.toFixed(2)}</div>
-        <div><strong>Selected Methods:</strong> {selectedMethods.join(', ') || 'None'}</div>
-        <div><strong>Total Selected:</strong> ${totalSelectedAmount.toFixed(2)}</div>
-        <div><strong>Valid Payment:</strong> {isValidPayment() ? '🟢 YES' : '🔴 NO'}</div>
-      </div>
-
-      <div className="p-3 bg-yellow-100 border border-yellow-300 rounded">
-        <h4 className="font-medium mb-2">🧪 Quick Test (Remove after testing):</h4>
-        <div className="flex gap-2">
-          <button 
-            onClick={quickTestCashApp}
-            className="px-3 py-1 bg-green-600 text-white rounded text-sm"
-          >
-            Cash App ${balanceDue.toFixed(2)}
-          </button>
-          <button 
-            onClick={quickTestCheck}
-            className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-          >
-            Check ${balanceDue.toFixed(2)}
-          </button>
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <h3 className="font-medium">Payment Method</h3>
+        if (method === 'Cash App') setCashAppAmount(amount.toString());
+        if (method === 'Check') setCheckAmount(amount.toString());
+        if (method === 'Cash') setCashAmount(amount.toString());
+        if (method === 'Zelle') setZelleAmount(amount.toString());
+        if (method === 'Venmo') setVenmoAmount(amount.toString());
+    };
+  
+    const handleRecordPayment = async () => {
+      if (!isValidPayment()) {
+        toast({
+          variant: 'destructive',
+          title: 'Invalid Payment',
+          description: 'Please select a payment method and enter a valid amount'
+        });
+        return;
+      }
+  
+      setIsUpdating(true);
+  
+      try {
+        const newPayment = {
+          id: `payment_${Date.now()}`,
+          amount: totalSelectedAmount,
+          method: selectedMethods.join(', '),
+          date: new Date().toISOString(),
+          source: 'manual',
+          status: 'completed',
+          details: {
+            selectedMethods,
+            amounts: paymentAmounts,
+            checkNumber: checkNumber,
+            zelleEmail: zelleEmail,
+            cashAppHandle: cashAppHandle,
+            venmoHandle: venmoHandle,
+          }
+        };
+  
+        const updatedPaymentHistory = [...(confirmation.paymentHistory || []), newPayment];
+        const newTotalPaid = totalPaid + totalSelectedAmount;
+        const newBalanceDue = Math.max(0, totalInvoiced - newTotalPaid);
         
-        <div className="flex items-center justify-between">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedMethods.includes('Cash App')}
-              onChange={(e) => handleMethodChange('Cash App', e.target.checked)}
-              className="mr-2"
-            />
-            Cash App
-          </label>
-          {selectedMethods.includes('Cash App') && (
-            <input
-              type="number"
-              value={paymentAmounts['Cash App'] || ''}
-              onChange={(e) => handleAmountChange('Cash App', parseFloat(e.target.value) || 0)}
-              placeholder="Amount"
-              className="w-24 px-2 py-1 border rounded"
-              step="0.01"
-              min="0"
-              max={balanceDue}
-            />
-          )}
+        let newStatus = confirmation.invoiceStatus || 'UNPAID';
+        if (newTotalPaid >= totalInvoiced && newTotalPaid > 0) {
+          newStatus = 'PAID';
+        } else if (newTotalPaid > 0 && newTotalPaid < totalInvoiced) {
+          newStatus = 'PARTIALLY_PAID';
+        }
+  
+        const updatedConfirmationData = {
+          ...confirmation,
+          paymentHistory: updatedPaymentHistory,
+          totalPaid: newTotalPaid,
+          invoiceStatus: newStatus,
+          status: newStatus,
+          lastUpdated: new Date().toISOString(),
+          checkAmount: selectedMethods.includes('Check') ? checkAmount : confirmation.checkAmount,
+          checkNumber: selectedMethods.includes('Check') ? checkNumber : confirmation.checkNumber,
+          cashAppAmount: selectedMethods.includes('Cash App') ? cashAppAmount : confirmation.cashAppAmount,
+          cashAppHandle: selectedMethods.includes('Cash App') ? cashAppHandle : confirmation.cashAppHandle,
+          zelleAmount: selectedMethods.includes('Zelle') ? zelleAmount : confirmation.zelleAmount,
+          zelleEmail: selectedMethods.includes('Zelle') ? zelleEmail : confirmation.zelleEmail,
+          venmoAmount: selectedMethods.includes('Venmo') ? venmoAmount : confirmation.venmoAmount,
+          venmoHandle: selectedMethods.includes('Venmo') ? venmoHandle : confirmation.venmoHandle,
+          cashAmount: selectedMethods.includes('Cash') ? cashAmount : confirmation.cashAmount,
+        };
+  
+        const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+        const updatedAllInvoices = allInvoices.map((inv: any) =>
+          inv.id === confirmation.id ? updatedConfirmationData : inv
+        );
+        localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+  
+        const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const updatedConfirmations = confirmations.map((conf: any) =>
+          conf.id === confirmation.id ? updatedConfirmationData : conf
+        );
+        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+  
+        setConfirmation(updatedConfirmationData);
+  
+        toast({
+          title: 'Payment Recorded Successfully! 💳',
+          description: `Recorded $${totalSelectedAmount.toFixed(2)} payment. New balance: $${newBalanceDue.toFixed(2)}`,
+        });
+  
+        setSelectedMethods([]);
+        setPaymentAmounts({});
+        setCheckAmount(''); setCheckNumber('');
+        setCashAppAmount(''); setCashAppHandle('');
+        setZelleAmount(''); setZelleEmail('');
+        setVenmoAmount(''); setVenmoHandle('');
+        setCashAmount('');
+  
+        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('all_invoices_updated'));
+  
+        if (newStatus === 'PAID') {
+          setTimeout(() => {
+            toast({
+              title: '🎉 Invoice Fully Paid!',
+              description: 'This invoice has been marked as PAID.',
+            });
+          }, 1000);
+        }
+  
+      } catch (error) {
+        console.error('Error recording payment:', error);
+        toast({
+          variant: 'destructive',
+          title: 'Payment Recording Failed',
+          description: 'Failed to record payment. Please try again.',
+        });
+      } finally {
+        setIsUpdating(false);
+      }
+    };
+  
+    return (
+      <div className="space-y-4">
+        <div className="p-3 bg-gray-100 border rounded text-sm">
+          <div><strong>Balance Due:</strong> ${balanceDue.toFixed(2)}</div>
         </div>
-
-        <div className="flex items-center justify-between">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedMethods.includes('Check')}
-              onChange={(e) => handleMethodChange('Check', e.target.checked)}
-              className="mr-2"
-            />
-            Check
-          </label>
-          {selectedMethods.includes('Check') && (
-            <input
-              type="number"
-              value={paymentAmounts['Check'] || ''}
-              onChange={(e) => handleAmountChange('Check', parseFloat(e.target.value) || 0)}
-              placeholder="Amount"
-              className="w-24 px-2 py-1 border rounded"
-              step="0.01"
-              min="0"
-              max={balanceDue}
-            />
-          )}
+  
+        <div className="space-y-3">
+          <h3 className="font-medium">Payment Method</h3>
+          
+          <div className="flex items-center justify-between">
+            <label className="flex items-center">
+              <input type="checkbox" checked={selectedMethods.includes('Cash App')} onChange={(e) => handleMethodChange('Cash App', e.target.checked)} className="mr-2" />
+              Cash App
+            </label>
+            {selectedMethods.includes('Cash App') && (
+              <input type="number" value={paymentAmounts['Cash App'] || ''} onChange={(e) => handleAmountChange('Cash App', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+            )}
+          </div>
+  
+          <div className="flex items-center justify-between">
+            <label className="flex items-center">
+              <input type="checkbox" checked={selectedMethods.includes('Check')} onChange={(e) => handleMethodChange('Check', e.target.checked)} className="mr-2" />
+              Check
+            </label>
+            {selectedMethods.includes('Check') && (
+              <div className="flex gap-2">
+                <input type="number" value={paymentAmounts['Check'] || ''} onChange={(e) => handleAmountChange('Check', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                <input type="text" value={checkNumber} onChange={(e) => setCheckNumber(e.target.value)} placeholder="Check #" className="w-20 px-2 py-1 border rounded text-sm" />
+              </div>
+            )}
+          </div>
         </div>
-
-        <div className="flex items-center justify-between">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedMethods.includes('Cash')}
-              onChange={(e) => handleMethodChange('Cash', e.target.checked)}
-              className="mr-2"
-            />
-            Cash
-          </label>
-          {selectedMethods.includes('Cash') && (
-            <input
-              type="number"
-              value={paymentAmounts['Cash'] || ''}
-              onChange={(e) => handleAmountChange('Cash', parseFloat(e.target.value) || 0)}
-              placeholder="Amount"
-              className="w-24 px-2 py-1 border rounded"
-              step="0.01"
-              min="0"
-              max={balanceDue}
-            />
-          )}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedMethods.includes('Zelle')}
-              onChange={(e) => handleMethodChange('Zelle', e.target.checked)}
-              className="mr-2"
-            />
-            Zelle
-          </label>
-          {selectedMethods.includes('Zelle') && (
-            <input
-              type="number"
-              value={paymentAmounts['Zelle'] || ''}
-              onChange={(e) => handleAmountChange('Zelle', parseFloat(e.target.value) || 0)}
-              placeholder="Amount"
-              className="w-24 px-2 py-1 border rounded"
-              step="0.01"
-              min="0"
-              max={balanceDue}
-            />
-          )}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={selectedMethods.includes('Venmo')}
-              onChange={(e) => handleMethodChange('Venmo', e.target.checked)}
-              className="mr-2"
-            />
-            Venmo
-          </label>
-          {selectedMethods.includes('Venmo') && (
-            <input
-              type="number"
-              value={paymentAmounts['Venmo'] || ''}
-              onChange={(e) => handleAmountChange('Venmo', parseFloat(e.target.value) || 0)}
-              placeholder="Amount"
-              className="w-24 px-2 py-1 border rounded"
-              step="0.01"
-              min="0"
-              max={balanceDue}
-            />
-          )}
-        </div>
+  
+        {totalSelectedAmount > 0 && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+            <div className="flex justify-between">
+              <span>Total Payment:</span>
+              <span className="font-medium">${totalSelectedAmount.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Remaining Balance:</span>
+              <span className="font-medium">${(balanceDue - totalSelectedAmount).toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+  
+        <button onClick={handleRecordPayment} disabled={!isValidPayment() || isUpdating} className={`w-full py-2 px-4 rounded font-medium transition-colors ${isValidPayment() && !isUpdating ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+          {isUpdating ? 'Recording...' : 'Record Payment'}
+        </button>
+  
+        <ProofOfPaymentSection />
       </div>
-
-      {totalSelectedAmount > 0 && (
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-          <div className="flex justify-between">
-            <span>Total Payment:</span>
-            <span className="font-medium">${totalSelectedAmount.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span>Remaining Balance:</span>
-            <span className="font-medium">${(balanceDue - totalSelectedAmount).toFixed(2)}</span>
-          </div>
-        </div>
-      )}
-
-      <button
-        onClick={handleRecordPayment}
-        disabled={!isValidPayment()}
-        className={`w-full py-2 px-4 rounded font-medium transition-colors ${
-          isValidPayment()
-            ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-        }`}
-      >
-        {isValidPayment() ? '💳 Record Payment' : '⏸️ Select Payment Method'}
-      </button>
-    </div>
-  );
-};
-
+    );
+  };
 
 
 const isSyncing = isRefreshing;
@@ -959,7 +904,6 @@ const PaymentSummarySection = () => (
           console.log('Profile keys:', Object.keys(profile));
           console.log('Full profile object:', JSON.stringify(profile, null, 2));
           
-          // Check for phone-related keys specifically
           const phoneKeys = Object.keys(profile).filter(key => 
             key.toLowerCase().includes('phone') || 
             key.toLowerCase().includes('cell') ||
@@ -968,14 +912,13 @@ const PaymentSummarySection = () => (
           );
           console.log('Phone-related keys in profile:', phoneKeys);
           
-          // Check each phone key value
           phoneKeys.forEach(key => {
             console.log(`Profile.${key}:`, (profile as any)[key]);
           });
         }
     }, [profile]);
   
-    return null; // This component just logs, doesn't render anything
+    return null;
   };
 
   
@@ -1147,3 +1090,4 @@ const PaymentSummarySection = () => (
     </Dialog>
   );
 }
+
