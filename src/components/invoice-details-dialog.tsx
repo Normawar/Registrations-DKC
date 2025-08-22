@@ -1018,21 +1018,17 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         };
       
         const openSquareDashboard = () => {
-            // Check if we're in sandbox based on invoice URL
-            const isSandbox = confirmation?.invoiceUrl?.includes('sandbox') || true; // Default to sandbox
-            
-            const dashboardUrl = isSandbox 
-              ? 'https://squareupsandbox.com/dashboard/invoices' 
-              : 'https://squareup.com/dashboard/invoices';
-            
-            window.open(dashboardUrl, '_blank');
-            
-            toast({
-              title: `📊 Opening ${isSandbox ? 'Sandbox' : 'Production'} Square Dashboard`,
-              description: `Search for invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}`,
-              duration: 10000
-            });
-          };
+          console.log('🧪 Opening SANDBOX Dashboard (hardcoded)');
+          
+          // Always open sandbox
+          window.open('https://squareupsandbox.com/dashboard/invoices', '_blank');
+          
+          toast({
+            title: '🧪 Sandbox Dashboard',
+            description: 'Opening Square SANDBOX dashboard',
+            duration: 5000
+          });
+        };
       
         return (
           <div className="border-t pt-4 mt-4">
@@ -1236,3 +1232,4 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
+
