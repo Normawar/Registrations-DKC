@@ -48,35 +48,12 @@ interface InvoiceDetailsDialogProps {
 const getKnownSponsorPhone = (email: string): string | null => {
   const knownSponsors: Record<string, string> = {
     'normaguerra@yahoo.com': '(111) 111-1111',
-    // Add more as needed
-  };
-  
-  console.log('🔍 Looking up phone for email:', email); // ADD THIS DEBUG LINE
-  console.log('🔍 Known sponsors:', knownSponsors); // ADD THIS DEBUG LINE
-  const phone = knownSponsors[email?.toLowerCase()];
-  console.log('🔍 Found phone:', phone); // ADD THIS DEBUG LINE
-  
-  return phone || null;
-};
-
-const getKnownSponsorPhoneFixed = (email: string): string | null => {
-  const knownSponsors: Record<string, string> = {
-    'normaguerra@yahoo.com': '(111) 111-1111',
+    // Add more sponsors here
   };
   
   if (!email) return null;
   
-  // Try exact match first
-  if (knownSponsors[email]) {
-    return knownSponsors[email];
-  }
-  
-  // Try lowercase match
-  if (knownSponsors[email.toLowerCase()]) {
-    return knownSponsors[email.toLowerCase()];
-  }
-  
-  // Try case-insensitive search
+  // Try case-insensitive match
   const emailLower = email.toLowerCase();
   const foundEntry = Object.entries(knownSponsors).find(
     ([key]) => key.toLowerCase() === emailLower
@@ -440,12 +417,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   };
   
   const canRecordPayment = useMemo(() => {
-    console.log('=== ENHANCED VALIDATION DEBUG ===');
-    console.log('selectedPaymentMethods:', selectedPaymentMethods);
-    console.log('selectedPaymentMethods.length:', selectedPaymentMethods.length);
-    console.log('selectedPaymentMethods type:', typeof selectedPaymentMethods);
-    console.log('selectedPaymentMethods.includes("cashapp"):', selectedPaymentMethods.includes('cashapp'));
-    
     // Check all amounts
     const amounts = {
       checkAmount: checkAmount,
@@ -456,10 +427,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       otherAmount: otherAmount
     };
     
-    console.log('All amounts:', amounts);
-    
     if (!selectedPaymentMethods || selectedPaymentMethods.length === 0) {
-      console.log('❌ No payment methods selected');
       return false;
     }
   
@@ -470,50 +438,38 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       switch (method) {
         case 'check':
           amount = parseFloat(checkAmount || '0');
-          console.log(`✅ Check: "${checkAmount}" -> ${amount}, valid: ${amount > 0}`);
           break;
         case 'zelle':
           amount = parseFloat(zelleAmount || '0');
-          console.log(`✅ Zelle: "${zelleAmount}" -> ${amount}, valid: ${amount > 0}`);
           break;
         case 'cashapp':
           amount = parseFloat(cashAppAmount || '0');
-          console.log(`✅ Cash App: "${cashAppAmount}" -> ${amount}, valid: ${amount > 0}`);
           break;
         case 'venmo':
           amount = parseFloat(venmoAmount || '0');
-          console.log(`✅ Venmo: "${venmoAmount}" -> ${amount}, valid: ${amount > 0}`);
           break;
         case 'cash':
           amount = parseFloat(cashAmount || '0');
-          console.log(`✅ Cash: "${cashAmount}" -> ${amount}, valid: ${amount > 0}`);
           break;
         case 'other':
           amount = parseFloat(otherAmount || '0');
-          console.log(`✅ Other: "${otherAmount}" -> ${amount}, valid: ${amount > 0}`);
           break;
         default:
-          console.log(`❌ Unknown method: ${method}`);
           return false;
       }
       
       const isValid = !isNaN(amount) && amount > 0;
-      console.log(`Method ${method}: amount=${amount}, valid=${isValid}`);
       return isValid;
     });
     
-    console.log('Final validation result:', result);
-    console.log('=== END ENHANCED DEBUG ===');
     return result;
   }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
   const formatPhoneNumber = (phone: string) => {
-    if (!phone || phone.trim() === '') return 'Not provided';
+    if (!phone || phone.trim() === '') return 'Phone not provided';
     
     // Remove any non-digit characters
     const cleaned = phone.replace(/\D/g, '');
-    
-    console.log('📞 Formatting phone:', phone, '-> cleaned:', cleaned, '-> length:', cleaned.length);
     
     // Format based on length
     if (cleaned.length === 10) {
@@ -560,95 +516,79 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     });
   };
 
-const RegistrationDetailsSection = () => {
-  // Debug phone fields specifically
-  const phoneFields = [
-    confirmation?.phone,
-    confirmation?.sponsorPhone, 
-    confirmation?.purchaserPhone,
-    confirmation?.customerPhone,
-    confirmation?.phoneNumber,
-    confirmation?.primaryContact?.phone,
-    confirmation?.contact?.phone,
-    confirmation?.billing?.phone,
-    confirmation?.shipping?.phone
-  ];
+const RegistrationDetailsSection = ({ invoice }: { invoice: any }) => {
+  // Get the sponsor email from the invoice
+  const sponsorEmail = invoice.purchaserEmail || invoice.sponsorEmail || invoice.email;
   
-  console.log('🔍 PHONE DEBUG - All possible phone fields:', phoneFields);
-  console.log('🔍 PHONE DEBUG - All confirmation keys:', Object.keys(confirmation || {}));
-  console.log('🔍 PHONE DEBUG - Phone-related keys:', 
-    Object.keys(confirmation || {}).filter(key => 
-      key.toLowerCase().includes('phone') || 
-      key.toLowerCase().includes('contact') ||
-      key.toLowerCase().includes('tel')
-    )
-  );
-
-  const foundPhone = phoneFields.find(phone => phone && phone.trim() !== '');
-  console.log('🔍 PHONE DEBUG - Found phone:', foundPhone);
+  // Look up the phone number
+  const knownPhone = getKnownSponsorPhone(sponsorEmail);
+  
+  // Debug logs (remove these after it works)
+  console.log('🔍 Registration Details - Email:', sponsorEmail);
+  console.log('🔍 Registration Details - Known Phone:', knownPhone);
 
   return (
-    <div className="bg-white rounded-lg border p-4">
-      <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
+    <div className="space-y-3">
+      <div className="flex justify-between">
+        <span className="text-gray-600">Event</span>
+        <span className="font-medium">{invoice.eventName || 'Chess Tournament'}</span>
+      </div>
       
-      <div className="space-y-3">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Event</span>
-          <span>Chess Tournament</span>
-        </div>
-        
-        <div className="flex justify-between">
-          <span className="text-gray-600">Date</span>
-          <span>TBD</span>
-        </div>
-        
-        <div className="flex justify-between">
-          <span className="text-gray-600">Sponsor Name</span>
-          <span>
-            {(confirmation?.firstName && confirmation?.lastName ? 
-               `${confirmation.firstName} ${confirmation.lastName}` :
-               confirmation?.firstName || confirmation?.lastName) ||
-             confirmation?.purchaserName ||
-             confirmation?.sponsorName ||
-             'FirstName LName'}
-          </span>
-        </div>
-        
-        <div className="flex justify-between">
-          <span className="text-gray-600">Sponsor Email</span>
-          <span>
-            {confirmation?.email ||
-             confirmation?.sponsorEmail ||
-             confirmation?.purchaserEmail ||
-             'normaguerra@yahoo.com'}
-          </span>
-        </div>
-        
-        <div className="flex justify-between">
-          <span className="text-gray-600">Sponsor Phone</span>
-          <span>
-            {foundPhone ? formatPhoneNumber(foundPhone) : 'Not provided'}
-          </span>
-        </div>
-        
-        <div className="flex justify-between">
-          <span className="text-gray-600">School</span>
-          <span>SHARYLAND PIONEER H S</span>
-        </div>
-        
-        <div className="flex justify-between font-semibold text-lg border-t pt-3">
-          <span>Total Amount</span>
-          <span className="text-blue-600">$48.00</span>
-        </div>
+      <div className="flex justify-between">
+        <span className="text-gray-600">Date</span>
+        <span className="font-medium">{invoice.eventDate || 'TBD'}</span>
+      </div>
+      
+      <div className="flex justify-between">
+        <span className="text-gray-600">Sponsor Name</span>
+        <span className="font-medium">{invoice.purchaserName || invoice.sponsorName || 'FirstName LName'}</span>
+      </div>
+      
+      <div className="flex justify-between">
+        <span className="text-gray-600">Sponsor Email</span>
+        <span className="font-medium">{sponsorEmail}</span>
+      </div>
+      
+      {/* 🎯 THIS IS THE KEY CHANGE - Using the lookup function */}
+      <div className="flex justify-between">
+        <span className="text-gray-600">Sponsor Phone</span>
+        <span className="font-medium">
+          {knownPhone 
+            ? `${knownPhone} (from records)`
+            : invoice.purchaserPhone || invoice.sponsorPhone || 'Phone not provided'
+          }
+        </span>
+      </div>
+      
+      <div className="flex justify-between">
+        <span className="text-gray-600">School</span>
+        <span className="font-medium">{invoice.schoolName || 'SHARYLAND PIONEER H S'}</span>
       </div>
 
-      {/* Phone debug info - remove after finding the issue */}
-      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-        <div><strong>Phone Debug:</strong></div>
-        <div>Found: {foundPhone || 'NONE FOUND'}</div>
-        <div>Checked fields: phone, sponsorPhone, purchaserPhone, customerPhone, phoneNumber</div>
-        <div>Available keys: {Object.keys(confirmation || {}).slice(0, 10).join(', ')}...</div>
-      </div>
+      {/* Organizer Contact Section - Only visible to organizers */}
+      {knownPhone && (
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-800 mb-2">📞 Organizer Contact Info</h4>
+          <div className="text-sm space-y-1">
+            <div><strong>Phone:</strong> {knownPhone}</div>
+            <div><strong>Email:</strong> {sponsorEmail}</div>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <button 
+              onClick={() => window.open(`tel:${knownPhone.replace(/\D/g, '')}`)}
+              className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+            >
+              📞 Call
+            </button>
+            <button 
+              onClick={() => window.open(`mailto:${sponsorEmail}`)}
+              className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+            >
+              ✉️ Email
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -708,22 +648,18 @@ const RecordPaymentButton = () => {
 
   return (
     <div className="space-y-2">
-      {/* Debug info - you can remove this later */}
+      {/* Keep basic status for now, remove later */}
       <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
-        <div>✅ Test Button: Working</div>
         <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
         <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
-        <div>Button Should Be: {isButtonEnabled ? '🟢 ACTIVE' : '🔴 DISABLED'}</div>
+        <div>Button Status: {isButtonEnabled ? '🟢 ACTIVE' : '🔴 DISABLED'}</div>
       </div>
       
-      {/* Force active button with inline styles */}
+      {/* Working native button */}
       <button
         onClick={() => {
-          console.log('🔥 RECORD PAYMENT CLICKED!');
           if (isButtonEnabled) {
             handlePaymentUpdate();
-          } else {
-            console.log('Button clicked but not enabled');
           }
         }}
         disabled={!isButtonEnabled}
@@ -769,23 +705,6 @@ const RecordPaymentButton = () => {
           'Record Payment'
         )}
       </button>
-      
-      {/* Alternative: Try with your Button component but force props */}
-      <Button
-        onClick={() => {
-          console.log('🔥 ALTERNATIVE BUTTON CLICKED!');
-          handlePaymentUpdate();
-        }}
-        disabled={false}  // Force enabled for testing
-        className="w-full bg-green-600 hover:bg-green-700 text-white"
-        style={{ 
-          backgroundColor: '#16a34a !important',
-          color: 'white !important',
-          cursor: 'pointer !important'
-        }}
-      >
-        🟢 Force Active Record Payment
-      </Button>
     </div>
   );
 };
@@ -1005,28 +924,6 @@ const PaymentSummarySection = () => (
   
   const ProfileDebugComponent = () => {
     useEffect(() => {
-      console.log('🔍 PROFILE DEBUGGING:');
-      console.log('Profile exists:', !!profile);
-      console.log('Profile type:', typeof profile);
-      
-      if (profile) {
-        console.log('Profile keys:', Object.keys(profile));
-        console.log('Full profile object:', JSON.stringify(profile, null, 2));
-        
-        // Check for phone-related keys specifically
-        const phoneKeys = Object.keys(profile).filter(key => 
-          key.toLowerCase().includes('phone') || 
-          key.toLowerCase().includes('cell') ||
-          key.toLowerCase().includes('mobile') ||
-          key.toLowerCase().includes('tel')
-        );
-        console.log('Phone-related keys in profile:', phoneKeys);
-        
-        // Check each phone key value
-        phoneKeys.forEach(key => {
-          console.log(`Profile.${(key as keyof typeof profile)}:`, profile[key as keyof typeof profile]);
-        });
-      }
     }, [profile]);
   
     return null; // This component just logs, doesn't render anything
@@ -1140,7 +1037,6 @@ const QuickTestSection = () => (
         size="sm"
         variant="outline"
         onClick={() => {
-          console.log('🧪 Quick test: Selecting Cash App with $28');
           setSelectedPaymentMethods(['cashapp']);
           setCashAppAmount('28');
           setCashAppHandle('@test');
@@ -1153,7 +1049,6 @@ const QuickTestSection = () => (
         size="sm"
         variant="outline"
         onClick={() => {
-          console.log('🧪 Quick test: Selecting Check with $28');
           setSelectedPaymentMethods(['check']);
           setCheckAmount('28');
           setCheckNumber('1234');
@@ -1166,7 +1061,6 @@ const QuickTestSection = () => (
         size="sm"
         variant="outline"
         onClick={() => {
-          console.log('🧪 Clearing all selections');
           setSelectedPaymentMethods([]);
           setCashAppAmount('');
           setCashAppHandle('');
@@ -1362,7 +1256,7 @@ const PhoneTest = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <RegistrationDetailsSectionEnhanced />
+          <RegistrationDetailsSection invoice={confirmation} />
           <PaymentSummarySection />
           <div className="mt-4">
             <label className="text-sm text-gray-600">Invoice Link</label>
@@ -1417,5 +1311,3 @@ const PhoneTest = () => {
     </Dialog>
   );
 }
-
-    
