@@ -45,71 +45,6 @@ interface InvoiceDetailsDialogProps {
   confirmationId: string;
 }
 
-const getKnownSponsorPhone = (email: string): string | null => {
-  const knownSponsors: Record<string, string> = {
-    'normaguerra@yahoo.com': '(111) 111-1111',
-    // Add more sponsors here
-  };
-  
-  if (!email) return null;
-  
-  // Try case-insensitive match
-  const emailLower = email.toLowerCase();
-  const foundEntry = Object.entries(knownSponsors).find(
-    ([key]) => key.toLowerCase() === emailLower
-  );
-  
-  return foundEntry ? foundEntry[1] : null;
-};
-
-
-const formatPhoneNumber = (phone: string) => {
-  if (!phone || phone.trim() === '') return 'Not provided';
-  
-  // Remove any non-digit characters
-  const cleaned = phone.replace(/\D/g, '');
-  
-  // Format based on length
-  if (cleaned.length === 10) {
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-  } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
-  } else if (cleaned.length > 0) {
-    return phone;
-  }
-  
-  return 'Invalid phone format';
-};
-
-const getPhoneFromProfile = (profile: any) => {
-  if (!profile) return null;
-  
-  // Try different access patterns
-  const phonePatterns = [
-    profile.phone,
-    profile.cellPhone,
-    profile.phoneNumber,
-    profile.cellPhoneNumber,
-    profile.mobile,
-    profile.tel,
-    profile.telephone,
-    profile['phone'],
-    profile['cellPhone'],
-    profile['phoneNumber'],
-    profile['cell_phone'],
-    profile['phone_number'],
-    profile['Cell Phone Number'], // Exact match from UI
-    profile['cellPhoneNumber'],
-    profile.contact?.phone,
-    profile.personalInfo?.phone,
-    profile.details?.phone
-  ];
-  
-  // Return the first non-empty value
-  return phonePatterns.find(phone => phone && phone.trim() !== '');
-};
-
-
 export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: InvoiceDetailsDialogProps) {
   const { toast } = useToast();
   const { profile } = useSponsorProfile();
@@ -545,75 +480,111 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     });
   };
 
-  const RegistrationDetailsSection = ({ invoice, profile }: { invoice: any, profile: SponsorProfile | null }) => {
-    const sponsorEmail = invoice.purchaserEmail || invoice.sponsorEmail || invoice.email;
-    const knownPhone = getKnownSponsorPhone(sponsorEmail);
-  
-    return (
-      <div className="space-y-3">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Event</span>
-          <span className="font-medium">{invoice.eventName || 'Chess Tournament'}</span>
-        </div>
+    const getKnownSponsorPhone = (email: string): string | null => {
+        const knownSponsors: Record<string, string> = {
+            'normaguerra@yahoo.com': '(111) 111-1111',
+            // Add more sponsors here
+        };
         
-        <div className="flex justify-between">
-          <span className="text-gray-600">Date</span>
-          <span className="font-medium">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'TBD'}</span>
-        </div>
+        if (!email) return null;
         
-        <div className="flex justify-between">
-          <span className="text-gray-600">Sponsor Name</span>
-          <span className="font-medium">{invoice.purchaserName || invoice.sponsorName || 'FirstName LName'}</span>
-        </div>
+        // Try case-insensitive match
+        const emailLower = email.toLowerCase();
+        const foundEntry = Object.entries(knownSponsors).find(
+            ([key]) => key.toLowerCase() === emailLower
+        );
         
-        <div className="flex justify-between">
-          <span className="text-gray-600">Sponsor Email</span>
-          <span className="font-medium">{sponsorEmail}</span>
-        </div>
-        
-        <div className="flex justify-between">
-          <span className="text-gray-600">Sponsor Phone</span>
-          <span className="font-medium">
-            {knownPhone 
-              ? `${knownPhone} (from records)`
-              : invoice.purchaserPhone || invoice.sponsorPhone || 'Phone not provided'
-            }
-          </span>
-        </div>
-        
-        <div className="flex justify-between">
-          <span className="text-gray-600">School</span>
-          <span className="font-medium">{invoice.schoolName || 'SHARYLAND PIONEER H S'}</span>
-        </div>
-  
-        {profile?.role === 'organizer' && knownPhone && (
-          <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-800 mb-2">📞 Organizer Contact Info</h4>
-            <div className="text-sm space-y-1">
-              <div><strong>Phone:</strong> {knownPhone}</div>
-              <div><strong>Email:</strong> {sponsorEmail}</div>
+        return foundEntry ? foundEntry[1] : null;
+    };
+
+    const RegistrationDetailsSection = ({ invoice, profile }: { invoice: any, profile: SponsorProfile | null }) => {
+        const sponsorEmail = invoice.purchaserEmail || invoice.sponsorEmail || invoice.email;
+        const knownPhone = getKnownSponsorPhone(sponsorEmail);
+      
+        return (
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Event</span>
+              <span className="font-medium">{invoice.eventName || 'Chess Tournament'}</span>
             </div>
-            <div className="flex gap-2 mt-2">
-              <button 
-                onClick={() => window.open(`tel:${knownPhone.replace(/\D/g, '')}`)}
-                className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-              >
-                📞 Call
-              </button>
-              <button 
-                onClick={() => window.open(`mailto:${sponsorEmail}`)}
-                className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
-              >
-                ✉️ Email
-              </button>
+            
+            <div className="flex justify-between">
+              <span className="text-gray-600">Date</span>
+              <span className="font-medium">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'TBD'}</span>
             </div>
+            
+            <div className="flex justify-between">
+              <span className="text-gray-600">Sponsor Name</span>
+              <span className="font-medium">{invoice.purchaserName || invoice.sponsorName || 'FirstName LName'}</span>
+            </div>
+            
+            <div className="flex justify-between">
+              <span className="text-gray-600">Sponsor Email</span>
+              <span className="font-medium">{sponsorEmail}</span>
+            </div>
+            
+            <div className="flex justify-between">
+              <span className="text-gray-600">Sponsor Phone</span>
+              <span className="font-medium">
+                {knownPhone 
+                  ? `${knownPhone} (from records)`
+                  : invoice.purchaserPhone || invoice.sponsorPhone || 'Phone not provided'
+                }
+              </span>
+            </div>
+            
+            <div className="flex justify-between">
+              <span className="text-gray-600">School</span>
+              <span className="font-medium">{invoice.schoolName || 'SHARYLAND PIONEER H S'}</span>
+            </div>
+      
+            {profile?.role === 'organizer' && knownPhone && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="text-sm font-medium text-blue-800 mb-2">📞 Organizer Contact Info</h4>
+                <div className="text-sm space-y-1">
+                  <div><strong>Phone:</strong> {knownPhone}</div>
+                  <div><strong>Email:</strong> {sponsorEmail}</div>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button 
+                    onClick={() => window.open(`tel:${knownPhone.replace(/\D/g, '')}`)}
+                    className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                  >
+                    📞 Call
+                  </button>
+                  <button 
+                    onClick={() => window.open(`mailto:${sponsorEmail}`)}
+                    className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                  >
+                    ✉️ Email
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        );
+      };
+
+    const PaymentSummarySection = () => (
+        <div className="mt-4">
+            <h4 className="text-md font-medium mb-2">Payment Summary</h4>
+            <div className="p-3 bg-gray-50 border rounded-md space-y-2 text-sm">
+                <div className="flex justify-between">
+                    <span>Total Invoiced</span>
+                    <span className="font-medium">${totalInvoiced.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                    <span>Total Paid</span>
+                    <span className="font-medium text-green-600">${totalPaid.toFixed(2)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-base font-semibold">
+                    <span>Balance Due</span>
+                    <span>${balanceDue.toFixed(2)}</span>
+                </div>
+            </div>
+        </div>
     );
-  };
-
-
 
   const ProofOfPaymentSection = () => (
       <div className="mt-4">
@@ -664,476 +635,387 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       </div>
     );
 
-  const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
-    // Use the existing state variables from the main component
-    const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]);
-    const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
-    
-    const totalSelectedAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + amount, 0);
-    
-    // Calculate balance due from the main component's values
-    const balanceDue = Math.max(0, totalInvoiced - totalPaid);
-    
-    const isValidPayment = () => {
-      const hasSelectedMethod = localSelectedMethods.length > 0;
-      const hasValidAmount = totalSelectedAmount > 0;
-      const amountNotExceedsBalance = totalSelectedAmount <= balanceDue;
-      
-      console.log('🔍 Payment Validation:', {
-        hasSelectedMethod,
-        hasValidAmount,
-        amountNotExceedsBalance,
-        localSelectedMethods,
-        totalSelectedAmount,
-        balanceDue
-      });
-      
-      return hasSelectedMethod && hasValidAmount && amountNotExceedsBalance;
-    };
-  
-    const handleMethodChange = (method: string, isChecked: boolean) => {
-      if (isChecked) {
-        setLocalSelectedMethods(prev => [...prev, method]);
-        // Auto-fill with remaining balance if it's the first method selected
-        if (localSelectedMethods.length === 0) {
-          setPaymentAmounts(prev => ({ ...prev, [method]: balanceDue }));
-        }
-      } else {
-        setLocalSelectedMethods(prev => prev.filter(m => m !== method));
-        setPaymentAmounts(prev => {
-          const newAmounts = { ...prev };
-          delete newAmounts[method];
-          return newAmounts;
-        });
-      }
-    };
-  
-    const handleAmountChange = (method: string, amount: number) => {
-      setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
-    };
-  
-    const quickTestCashApp = () => {
-      setLocalSelectedMethods(['Cash App']);
-      setPaymentAmounts({ 'Cash App': balanceDue });
-      setCashAppAmount(balanceDue.toString());
-    };
-  
-    const quickTestCheck = () => {
-      setLocalSelectedMethods(['Check']);
-      setPaymentAmounts({ 'Check': balanceDue });
-      setCheckAmount(balanceDue.toString());
-    };
-  
-    const handleRecordPayment = async () => {
-      if (!isValidPayment()) {
-        toast({
-          variant: 'destructive',
-          title: 'Invalid Payment',
-          description: 'Please select a payment method and enter a valid amount'
-        });
-        return;
-      }
-  
-      setIsUpdating(true);
-  
-      try {
-        // Get organizer initials from profile
-        const organizerInitials = profile?.firstName && profile?.lastName 
-          ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase()
-          : profile?.email?.substring(0, 2).toUpperCase() || 'ORG';
-  
-        // Create individual payment entries for each method
-        const newPayments = localSelectedMethods.map(method => ({
-          id: `payment_${Date.now()}_${method.toLowerCase().replace(/\s+/g, '_')}`,
-          amount: paymentAmounts[method] || 0,
-          method: method,
-          date: new Date().toISOString(),
-          dateFormatted: format(new Date(), 'MMM dd, yyyy HH:mm'),
-          source: 'manual',
-          status: 'completed',
-          organizerInitials: organizerInitials,
-          organizerName: profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : profile?.email || 'Organizer',
-          details: {
-            // Store method-specific details
-            ...(method === 'Check' && { 
-              checkNumber: checkNumber,
-              checkAmount: paymentAmounts[method]
-            }),
-            ...(method === 'Cash App' && { 
-              cashAppHandle: cashAppHandle,
-              cashAppAmount: paymentAmounts[method]
-            }),
-            ...(method === 'Zelle' && { 
-              zelleEmail: zelleEmail,
-              zelleAmount: paymentAmounts[method]
-            }),
-            ...(method === 'Venmo' && { 
-              venmoHandle: venmoHandle,
-              venmoAmount: paymentAmounts[method]
-            }),
-            ...(method === 'Cash' && { 
-              cashAmount: paymentAmounts[method]
-            }),
-          }
-        }));
-  
-        // Update confirmation data
-        const updatedPaymentHistory = [...(confirmation.paymentHistory || []), ...newPayments];
-        const newTotalPaid = totalPaid + totalSelectedAmount;
-        const newBalanceDue = Math.max(0, totalInvoiced - newTotalPaid);
+    const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
+        const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]);
+        const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
         
-        // Determine new status
-        let newStatus = confirmation.invoiceStatus || 'UNPAID';
-        if (newTotalPaid >= totalInvoiced && newTotalPaid > 0) {
-          newStatus = 'PAID';
-        } else if (newTotalPaid > 0 && newTotalPaid < totalInvoiced) {
-          newStatus = 'PARTIALLY_PAID';
-        }
-  
-        const updatedConfirmationData = {
-          ...confirmation,
-          paymentHistory: updatedPaymentHistory,
-          totalPaid: newTotalPaid,
-          invoiceStatus: newStatus,
-          status: newStatus,
-          lastUpdated: new Date().toISOString(),
-          lastPaymentBy: organizerInitials,
-          lastPaymentDate: new Date().toISOString(),
+        const totalSelectedAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + amount, 0);
+        
+        const balanceDue = Math.max(0, totalInvoiced - totalPaid);
+        
+        const isValidPayment = () => {
+            const hasSelectedMethod = localSelectedMethods.length > 0;
+            const hasValidAmount = totalSelectedAmount > 0;
+            const amountNotExceedsBalance = totalSelectedAmount <= balanceDue;
+            
+            console.log('🔍 Payment Validation:', { hasSelectedMethod, hasValidAmount, amountNotExceedsBalance, localSelectedMethods, totalSelectedAmount, balanceDue });
+            
+            return hasSelectedMethod && hasValidAmount && amountNotExceedsBalance;
         };
-  
-        // Update localStorage
-        const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-        const updatedAllInvoices = allInvoices.map((inv: any) =>
-          inv.id === confirmation.id ? updatedConfirmationData : inv
-        );
-        localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-  
-        const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-        const updatedConfirmations = confirmations.map((conf: any) =>
-          conf.id === confirmation.id ? updatedConfirmationData : conf
-        );
-        localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-  
-        // Update component state
-        setConfirmation(updatedConfirmationData);
-  
-        // Show success message with payment details
-        const paymentSummary = newPayments.map(p => `${p.method}: $${p.amount.toFixed(2)}`).join(', ');
-        toast({
-          title: `💳 Payment Recorded by ${organizerInitials}`,
-          description: `${paymentSummary}. New balance: $${newBalanceDue.toFixed(2)}`,
-          duration: 5000,
-        });
-  
-        // Reset form
-        setLocalSelectedMethods([]);
-        setPaymentAmounts({});
-        
-        // Clear all payment fields
-        setCheckAmount('');
-        setCheckNumber('');
-        setCashAppAmount('');
-        setCashAppHandle('');
-        setZelleAmount('');
-        setZelleEmail('');
-        setVenmoAmount('');
-        setVenmoHandle('');
-        setCashAmount('');
-  
-        // Trigger storage events to update other components
-        window.dispatchEvent(new Event('storage'));
-        window.dispatchEvent(new Event('all_invoices_updated'));
-  
-        // If fully paid, show special message
-        if (newStatus === 'PAID') {
-          setTimeout(() => {
-            toast({
-              title: `🎉 Invoice Fully Paid!`,
-              description: `Marked as PAID by ${organizerInitials} on ${format(new Date(), 'MMM dd, yyyy')}`,
-            });
-          }, 1500);
-        }
-  
-      } catch (error) {
-        console.error('Error recording payment:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Payment Recording Failed',
-          description: 'Failed to record payment. Please try again.',
-        });
-      } finally {
-        setIsUpdating(false);
-      }
-    };
-  
-    return (
-      <div className="space-y-4">
-        {/* Debug Info - Shows current balance and validation status */}
-        <div className="p-3 bg-gray-100 border rounded text-sm">
-          <div><strong>Balance Due:</strong> ${balanceDue.toFixed(2)}</div>
-          <div><strong>Selected Methods:</strong> {localSelectedMethods.join(', ') || 'None'}</div>
-          <div><strong>Total Selected:</strong> ${totalSelectedAmount.toFixed(2)}</div>
-          <div><strong>Valid Payment:</strong> {isValidPayment() ? '🟢 YES' : '🔴 NO'}</div>
-          <div><strong>Recording as:</strong> {profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'}</div>
-        </div>
-  
-        {/* Quick Test Buttons - Remove these in production */}
-        <div className="p-3 bg-yellow-100 border border-yellow-300 rounded">
-          <h4 className="font-medium mb-2">🧪 Quick Test (Remove after testing):</h4>
-          <div className="flex gap-2">
-            <button 
-              onClick={quickTestCashApp}
-              className="px-3 py-1 bg-green-600 text-white rounded text-sm"
-            >
-              Cash App ${balanceDue.toFixed(2)}
-            </button>
-            <button 
-              onClick={quickTestCheck}
-              className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
-            >
-              Check ${balanceDue.toFixed(2)}
-            </button>
-          </div>
-        </div>
-  
-        {/* Payment Method Selection - ALL OPTIONS */}
-        <div className="space-y-3">
-          <h3 className="font-medium">Payment Method</h3>
-          
-          {/* Cash App */}
-          <div className="flex items-center justify-between p-2 border rounded">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={localSelectedMethods.includes('Cash App')}
-                onChange={(e) => handleMethodChange('Cash App', e.target.checked)}
-                className="mr-2"
-              />
-              <span className="font-medium">Cash App</span>
-            </label>
-            {localSelectedMethods.includes('Cash App') && (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={paymentAmounts['Cash App'] || ''}
-                  onChange={(e) => handleAmountChange('Cash App', parseFloat(e.target.value) || 0)}
-                  placeholder="Amount"
-                  className="w-24 px-2 py-1 border rounded"
-                  step="0.01"
-                  min="0"
-                  max={balanceDue}
-                />
-                <input
-                  type="text"
-                  value={cashAppHandle}
-                  onChange={(e) => setCashAppHandle(e.target.value)}
-                  placeholder="$handle"
-                  className="w-24 px-2 py-1 border rounded text-sm"
-                />
-              </div>
-            )}
-          </div>
-  
-          {/* Check */}
-          <div className="flex items-center justify-between p-2 border rounded">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={localSelectedMethods.includes('Check')}
-                onChange={(e) => handleMethodChange('Check', e.target.checked)}
-                className="mr-2"
-              />
-              <span className="font-medium">Check</span>
-            </label>
-            {localSelectedMethods.includes('Check') && (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={paymentAmounts['Check'] || ''}
-                  onChange={(e) => handleAmountChange('Check', parseFloat(e.target.value) || 0)}
-                  placeholder="Amount"
-                  className="w-24 px-2 py-1 border rounded"
-                  step="0.01"
-                  min="0"
-                  max={balanceDue}
-                />
-                <input
-                  type="text"
-                  value={checkNumber}
-                  onChange={(e) => setCheckNumber(e.target.value)}
-                  placeholder="Check #"
-                  className="w-20 px-2 py-1 border rounded text-sm"
-                />
-              </div>
-            )}
-          </div>
-  
-          {/* Cash */}
-          <div className="flex items-center justify-between p-2 border rounded">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={localSelectedMethods.includes('Cash')}
-                onChange={(e) => handleMethodChange('Cash', e.target.checked)}
-                className="mr-2"
-              />
-              <span className="font-medium">Cash</span>
-            </label>
-            {localSelectedMethods.includes('Cash') && (
-              <input
-                type="number"
-                value={paymentAmounts['Cash'] || ''}
-                onChange={(e) => handleAmountChange('Cash', parseFloat(e.target.value) || 0)}
-                placeholder="Amount"
-                className="w-24 px-2 py-1 border rounded"
-                step="0.01"
-                min="0"
-                max={balanceDue}
-              />
-            )}
-          </div>
-  
-          {/* Zelle */}
-          <div className="flex items-center justify-between p-2 border rounded">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={localSelectedMethods.includes('Zelle')}
-                onChange={(e) => handleMethodChange('Zelle', e.target.checked)}
-                className="mr-2"
-              />
-              <span className="font-medium">Zelle</span>
-            </label>
-            {localSelectedMethods.includes('Zelle') && (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={paymentAmounts['Zelle'] || ''}
-                  onChange={(e) => handleAmountChange('Zelle', parseFloat(e.target.value) || 0)}
-                  placeholder="Amount"
-                  className="w-24 px-2 py-1 border rounded"
-                  step="0.01"
-                  min="0"
-                  max={balanceDue}
-                />
-                <input
-                  type="email"
-                  value={zelleEmail}
-                  onChange={(e) => setZelleEmail(e.target.value)}
-                  placeholder="Email"
-                  className="w-28 px-2 py-1 border rounded text-sm"
-                />
-              </div>
-            )}
-          </div>
-  
-          {/* Venmo */}
-          <div className="flex items-center justify-between p-2 border rounded">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={localSelectedMethods.includes('Venmo')}
-                onChange={(e) => handleMethodChange('Venmo', e.target.checked)}
-                className="mr-2"
-              />
-              <span className="font-medium">Venmo</span>
-            </label>
-            {localSelectedMethods.includes('Venmo') && (
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={paymentAmounts['Venmo'] || ''}
-                  onChange={(e) => handleAmountChange('Venmo', parseFloat(e.target.value) || 0)}
-                  placeholder="Amount"
-                  className="w-24 px-2 py-1 border rounded"
-                  step="0.01"
-                  min="0"
-                  max={balanceDue}
-                />
-                <input
-                  type="text"
-                  value={venmoHandle}
-                  onChange={(e) => setVenmoHandle(e.target.value)}
-                  placeholder="@handle"
-                  className="w-24 px-2 py-1 border rounded text-sm"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-  
-        {/* Payment Summary */}
-        {totalSelectedAmount > 0 && (
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-            <div className="flex justify-between">
-              <span>Total Payment:</span>
-              <span className="font-medium">${totalSelectedAmount.toFixed(2)}</span>
+      
+        const handleMethodChange = (method: string, isChecked: boolean) => {
+            if (isChecked) {
+                setLocalSelectedMethods(prev => [...prev, method]);
+                if (localSelectedMethods.length === 0) {
+                    setPaymentAmounts(prev => ({ ...prev, [method]: balanceDue }));
+                }
+            } else {
+                setLocalSelectedMethods(prev => prev.filter(m => m !== method));
+                setPaymentAmounts(prev => {
+                    const newAmounts = { ...prev };
+                    delete newAmounts[method];
+                    return newAmounts;
+                });
+            }
+        };
+      
+        const handleAmountChange = (method: string, amount: number) => {
+            setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
+        };
+      
+        const quickTestCashApp = () => {
+            setLocalSelectedMethods(['Cash App']);
+            setPaymentAmounts({ 'Cash App': balanceDue });
+            setCashAppAmount(balanceDue.toString());
+        };
+      
+        const quickTestCheck = () => {
+            setLocalSelectedMethods(['Check']);
+            setPaymentAmounts({ 'Check': balanceDue });
+            setCheckAmount(balanceDue.toString());
+        };
+      
+        const handleRecordPayment = async () => {
+            if (!isValidPayment()) {
+                toast({ variant: 'destructive', title: 'Invalid Payment', description: 'Please select a payment method and enter a valid amount' });
+                return;
+            }
+      
+            setIsUpdating(true);
+      
+            try {
+                const organizerInitials = profile?.firstName && profile?.lastName ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase() : profile?.email?.substring(0, 2).toUpperCase() || 'ORG';
+      
+                const newPayments = localSelectedMethods.map(method => ({
+                    id: `payment_${Date.now()}_${method.toLowerCase().replace(/\s+/g, '_')}`,
+                    amount: paymentAmounts[method] || 0,
+                    method: method,
+                    date: new Date().toISOString(),
+                    dateFormatted: format(new Date(), 'MMM dd, yyyy HH:mm'),
+                    source: 'manual',
+                    status: 'completed',
+                    organizerInitials: organizerInitials,
+                    organizerName: profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : profile?.email || 'Organizer',
+                    details: {
+                        ...(method === 'Check' && { checkNumber: checkNumber, checkAmount: paymentAmounts[method] }),
+                        ...(method === 'Cash App' && { cashAppHandle: cashAppHandle, cashAppAmount: paymentAmounts[method] }),
+                        ...(method === 'Zelle' && { zelleEmail: zelleEmail, zelleAmount: paymentAmounts[method] }),
+                        ...(method === 'Venmo' && { venmoHandle: venmoHandle, venmoAmount: paymentAmounts[method] }),
+                        ...(method === 'Cash' && { cashAmount: paymentAmounts[method] }),
+                    }
+                }));
+      
+                const updatedPaymentHistory = [...(confirmation.paymentHistory || []), ...newPayments];
+                const newTotalPaid = totalPaid + totalSelectedAmount;
+                const newBalanceDue = Math.max(0, totalInvoiced - newTotalPaid);
+                
+                let newStatus = confirmation.invoiceStatus || 'UNPAID';
+                if (newTotalPaid >= totalInvoiced && newTotalPaid > 0) newStatus = 'PAID';
+                else if (newTotalPaid > 0 && newTotalPaid < totalInvoiced) newStatus = 'PARTIALLY_PAID';
+      
+                const updatedConfirmationData = {
+                    ...confirmation,
+                    paymentHistory: updatedPaymentHistory,
+                    totalPaid: newTotalPaid,
+                    invoiceStatus: newStatus,
+                    status: newStatus,
+                    lastUpdated: new Date().toISOString(),
+                    lastPaymentBy: organizerInitials,
+                    lastPaymentDate: new Date().toISOString(),
+                };
+      
+                const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+                const updatedAllInvoices = allInvoices.map((inv: any) => inv.id === confirmation.id ? updatedConfirmationData : inv);
+                localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+      
+                const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+                const updatedConfirmations = confirmations.map((conf: any) => conf.id === confirmation.id ? updatedConfirmationData : conf);
+                localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+      
+                setConfirmation(updatedConfirmationData);
+      
+                const paymentSummary = newPayments.map(p => `${p.method}: $${p.amount.toFixed(2)}`).join(', ');
+                toast({ title: `💳 Payment Recorded by ${organizerInitials}`, description: `${paymentSummary}. New balance: $${newBalanceDue.toFixed(2)}`, duration: 5000 });
+      
+                setLocalSelectedMethods([]);
+                setPaymentAmounts({});
+                setCheckAmount(''); setCheckNumber(''); setCashAppAmount(''); setCashAppHandle(''); setZelleAmount(''); setZelleEmail(''); setVenmoAmount(''); setVenmoHandle(''); setCashAmount('');
+      
+                window.dispatchEvent(new Event('storage'));
+                window.dispatchEvent(new Event('all_invoices_updated'));
+      
+                if (newStatus === 'PAID') {
+                    setTimeout(() => {
+                        toast({ title: `🎉 Invoice Fully Paid!`, description: `Marked as PAID by ${organizerInitials} on ${format(new Date(), 'MMM dd, yyyy')}` });
+                    }, 1500);
+                }
+      
+            } catch (error) {
+                console.error('Error recording payment:', error);
+                toast({ variant: 'destructive', title: 'Payment Recording Failed', description: 'Failed to record payment. Please try again.' });
+            } finally {
+                setIsUpdating(false);
+            }
+        };
+      
+        return (
+          <div className="space-y-4">
+            <div className="p-3 bg-gray-100 border rounded text-sm">
+              <div><strong>Balance Due:</strong> ${balanceDue.toFixed(2)}</div>
+              <div><strong>Selected Methods:</strong> {localSelectedMethods.join(', ') || 'None'}</div>
+              <div><strong>Total Selected:</strong> ${totalSelectedAmount.toFixed(2)}</div>
+              <div><strong>Valid Payment:</strong> {isValidPayment() ? '🟢 YES' : '🔴 NO'}</div>
+              <div><strong>Recording as:</strong> {profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'}</div>
             </div>
-            <div className="flex justify-between">
-              <span>Remaining Balance:</span>
-              <span className="font-medium">${(balanceDue - totalSelectedAmount).toFixed(2)}</span>
+      
+            <div className="p-3 bg-yellow-100 border border-yellow-300 rounded">
+              <h4 className="font-medium mb-2">🧪 Quick Test (Remove after testing):</h4>
+              <div className="flex gap-2">
+                <button onClick={quickTestCashApp} className="px-3 py-1 bg-green-600 text-white rounded text-sm">Cash App ${balanceDue.toFixed(2)}</button>
+                <button onClick={quickTestCheck} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Check ${balanceDue.toFixed(2)}</button>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span>New Status:</span>
-              <span className="font-medium">
-                {(balanceDue - totalSelectedAmount) <= 0 ? '🟢 PAID' : '🔵 PARTIALLY_PAID'}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>Recorded by:</span>
-              <span>{profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'} on {format(new Date(), 'MMM dd, yyyy')}</span>
-            </div>
-          </div>
-        )}
-  
-        {/* Record Payment Button */}
-        <button
-          onClick={handleRecordPayment}
-          disabled={!isValidPayment() || isUpdating}
-          className={`w-full py-2 px-4 rounded font-medium transition-colors ${
-            isValidPayment() && !isUpdating
-              ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
-        >
-          {isUpdating ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-              Recording Payment...
-            </>
-          ) : isValidPayment() ? (
-            '💳 Record Payment'
-          ) : (
-            '⏸️ Select Payment Method'
-          )}
-        </button>
-  
-        {/* Payment History Display */}
-        {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 && (
-          <div className="mt-4 p-3 bg-gray-50 border rounded">
-            <h4 className="font-medium mb-2">💳 Payment History</h4>
-            <div className="space-y-2 max-h-32 overflow-y-auto">
-              {confirmation.paymentHistory.map((payment: any, index: number) => (
-                <div key={payment.id || index} className="text-sm flex justify-between items-center p-2 bg-white rounded border">
-                  <div>
-                    <span className="font-medium">{payment.method}</span>
-                    <span className="text-gray-600 ml-2">${payment.amount.toFixed(2)}</span>
+      
+            <div className="space-y-3">
+              <h3 className="font-medium">Payment Method</h3>
+              
+              <div className="flex items-center justify-between p-2 border rounded">
+                <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Cash App')} onChange={(e) => handleMethodChange('Cash App', e.target.checked)} className="mr-2" /> <span className="font-medium">Cash App</span> </label>
+                {localSelectedMethods.includes('Cash App') && (
+                  <div className="flex gap-2">
+                    <input type="number" value={paymentAmounts['Cash App'] || ''} onChange={(e) => handleAmountChange('Cash App', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                    <input type="text" value={cashAppHandle} onChange={(e) => setCashAppHandle(e.target.value)} placeholder="$handle" className="w-24 px-2 py-1 border rounded text-sm" />
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {payment.organizerInitials && <span className="bg-blue-100 px-1 rounded mr-1">{payment.organizerInitials}</span>}
-                    {payment.dateFormatted || format(new Date(payment.date), 'MMM dd, HH:mm')}
+                )}
+              </div>
+      
+              <div className="flex items-center justify-between p-2 border rounded">
+                <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Check')} onChange={(e) => handleMethodChange('Check', e.target.checked)} className="mr-2" /> <span className="font-medium">Check</span> </label>
+                {localSelectedMethods.includes('Check') && (
+                  <div className="flex gap-2">
+                    <input type="number" value={paymentAmounts['Check'] || ''} onChange={(e) => handleAmountChange('Check', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                    <input type="text" value={checkNumber} onChange={(e) => setCheckNumber(e.target.value)} placeholder="Check #" className="w-20 px-2 py-1 border rounded text-sm" />
                   </div>
+                )}
+              </div>
+      
+              <div className="flex items-center justify-between p-2 border rounded">
+                <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Cash')} onChange={(e) => handleMethodChange('Cash', e.target.checked)} className="mr-2" /> <span className="font-medium">Cash</span> </label>
+                {localSelectedMethods.includes('Cash') && ( <input type="number" value={paymentAmounts['Cash'] || ''} onChange={(e) => handleAmountChange('Cash', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} /> )}
+              </div>
+      
+              <div className="flex items-center justify-between p-2 border rounded">
+                <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Zelle')} onChange={(e) => handleMethodChange('Zelle', e.target.checked)} className="mr-2" /> <span className="font-medium">Zelle</span> </label>
+                {localSelectedMethods.includes('Zelle') && (
+                  <div className="flex gap-2">
+                    <input type="number" value={paymentAmounts['Zelle'] || ''} onChange={(e) => handleAmountChange('Zelle', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                    <input type="email" value={zelleEmail} onChange={(e) => setZelleEmail(e.target.value)} placeholder="Email" className="w-28 px-2 py-1 border rounded text-sm" />
+                  </div>
+                )}
+              </div>
+      
+              <div className="flex items-center justify-between p-2 border rounded">
+                <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Venmo')} onChange={(e) => handleMethodChange('Venmo', e.target.checked)} className="mr-2" /> <span className="font-medium">Venmo</span> </label>
+                {localSelectedMethods.includes('Venmo') && (
+                  <div className="flex gap-2">
+                    <input type="number" value={paymentAmounts['Venmo'] || ''} onChange={(e) => handleAmountChange('Venmo', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                    <input type="text" value={venmoHandle} onChange={(e) => setVenmoHandle(e.target.value)} placeholder="@handle" className="w-24 px-2 py-1 border rounded text-sm" />
+                  </div>
+                )}
+              </div>
+            </div>
+      
+            {totalSelectedAmount > 0 && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="flex justify-between"> <span>Total Payment:</span> <span className="font-medium">${totalSelectedAmount.toFixed(2)}</span> </div>
+                <div className="flex justify-between"> <span>Remaining Balance:</span> <span className="font-medium">${(balanceDue - totalSelectedAmount).toFixed(2)}</span> </div>
+                <div className="flex justify-between"> <span>New Status:</span> <span className="font-medium">{(balanceDue - totalSelectedAmount) <= 0 ? '🟢 PAID' : '🔵 PARTIALLY_PAID'}</span> </div>
+                <div className="flex justify-between text-sm text-gray-600"> <span>Recorded by:</span> <span>{profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'} on {format(new Date(), 'MMM dd, yyyy')}</span> </div>
+              </div>
+            )}
+      
+            <button onClick={handleRecordPayment} disabled={!isValidPayment() || isUpdating} className={`w-full py-2 px-4 rounded font-medium transition-colors ${isValidPayment() && !isUpdating ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
+                {isUpdating ? (<> <Loader2 className="w-4 h-4 mr-2 animate-spin inline" /> Recording Payment... </>) : isValidPayment() ? '💳 Record Payment' : '⏸️ Select Payment Method'}
+            </button>
+      
+            {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 && (
+              <div className="mt-4 p-3 bg-gray-50 border rounded">
+                <h4 className="font-medium mb-2">💳 Payment History</h4>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {confirmation.paymentHistory.map((payment: any, index: number) => (
+                    <div key={payment.id || index} className="text-sm flex justify-between items-center p-2 bg-white rounded border">
+                      <div> <span className="font-medium">{payment.method}</span> <span className="text-gray-600 ml-2">${payment.amount.toFixed(2)}</span> </div>
+                      <div className="text-xs text-gray-500"> {payment.organizerInitials && <span className="bg-blue-100 px-1 rounded mr-1">{payment.organizerInitials}</span>} {payment.dateFormatted || format(new Date(payment.date), 'MMM dd, HH:mm')} </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+      
+            <ProofOfPaymentSection />
+          </div>
+        );
+    };
+
+    const SquareDeveloperConsoleButton = () => {
+        if (profile?.role !== 'organizer') return null;
+
+        const openSquareDevConsole = () => {
+          const invoiceId = confirmation?.invoiceId;
+          if (invoiceId) {
+            const url = `https://squareup.com/dashboard/invoices/${invoiceId}`;
+            window.open(url, '_blank');
+          }
+        };
+
+        const hasSquareInvoice = confirmation?.invoiceId && confirmation.invoiceId.startsWith('inv:');
+
+        return (
+          <div className="border-t pt-4 mt-4">
+              <div className="space-y-3">
+                  <div>
+                      <h4 className="font-medium text-sm">Square Developer Console</h4>
+                      <p className="text-xs text-muted-foreground">For advanced actions, open this invoice in the Square Developer Console.</p>
+                  </div>
+                  <Button onClick={openSquareDevConsole} disabled={!hasSquareInvoice} variant="destructive" size="sm">
+                      Open in Square
+                  </Button>
+                  {!hasSquareInvoice && (
+                      <p className="text-xs text-destructive mt-1">
+                          This is a locally generated invoice and cannot be opened in Square.
+                      </p>
+                  )}
+              </div>
+          </div>
+        );
+    };
+
+
+  if (!confirmation) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Loading...</DialogTitle>
+          </DialogHeader>
+          <div className="py-8 flex justify-center items-center">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const ButtonStyles = () => (
+    <style>{`
+      .payment-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 0.375rem;
+        font-weight: 500;
+        transition: background-color 0.2s;
+      }
+      .payment-button.enabled {
+        background-color: #16a34a; /* green-600 */
+        color: white;
+        cursor: pointer;
+      }
+      .payment-button.enabled:hover {
+        background-color: #15803d; /* green-700 */
+      }
+      .payment-button.disabled {
+        background-color: #d1d5db; /* gray-300 */
+        color: #6b7280; /* gray-500 */
+        cursor: not-allowed;
+      }
+    `}</style>
+  );
+
+  const ProfileDebugComponent = () => {
+    return (
+      <div className="bg-yellow-100 border border-yellow-300 p-2 my-2 rounded-md text-xs">
+        <h4 className="font-bold">🧪 Debug - Profile Data</h4>
+        <p><strong>Role:</strong> {profile?.role}</p>
+        <p><strong>Email:</strong> {profile?.email}</p>
+        <p><strong>Name:</strong> {profile?.firstName} {profile?.lastName}</p>
+        <p><strong>Phone:</strong> {profile?.phone || 'N/A'}</p>
+      </div>
+    )
+  }
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <ButtonStyles />
+        {profile?.role === 'organizer' && <ProfileDebugComponent />}
+        <DialogHeader>
+          <DialogTitle>
+            <div className="flex items-center gap-2">
+              {getStatusBadge(confirmation?.invoiceStatus || confirmation?.status || 'UNPAID', totalPaid, totalInvoiced)}
+              Invoice #{confirmation?.invoiceNumber || 'Unknown'}
+            </div>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div className="bg-white rounded-lg border p-4">
+              <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
+              <RegistrationDetailsSection invoice={confirmation} profile={profile} />
+            </div>
+            <PaymentSummarySection />
+            <div className="mt-4">
+              {invoiceUrl && (
+                  <Button asChild variant="outline" className="w-full">
+                    <a href={invoiceUrl} target="_blank" rel="noopener noreferrer">
+                      View on Square
+                      <ExternalLink className="w-4 h-4 ml-2" />
+                    </a>
+                  </Button>
+              )}
             </div>
           </div>
-        )}
-  
-        {/* Proof of Payment Upload */}
-        <ProofOfPaymentSection />
-      </div>
-    );
-  };
-}
 
-    
+          <div>
+            <div className="bg-white rounded-lg border p-4">
+              <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Record payments or submit payment information for verification.
+              </p>
+              <PaymentFormComponent invoice={confirmation} />
+            </div>
+          </div>
+        </div>
+        
+        {profile?.role === 'organizer' && (
+          <SquareDeveloperConsoleButton />
+        )}
+
+        <div className="mt-6 pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={handleRefreshStatus}
+            disabled={isRefreshing}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            Sync with Square
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
