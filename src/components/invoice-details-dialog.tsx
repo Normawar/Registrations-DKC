@@ -1027,17 +1027,17 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         };
       
         const openSquareDashboard = () => {
-            // Always open sandbox
-            const sandboxUrl = 'https://squareupsandbox.com/dashboard/invoices';
+            // Use the correct Square sandbox developer console URL
+            const sandboxUrl = 'https://developer.squareup.com/apps';
             
-            console.log('🔗 Opening hardcoded sandbox URL:', sandboxUrl);
+            console.log('🔗 Opening Square Developer Apps:', sandboxUrl);
             
             window.open(sandboxUrl, '_blank');
             
             toast({
-              title: '🧪 Sandbox Dashboard',
-              description: 'Opening Square SANDBOX dashboard',
-              duration: 5000
+              title: '🛠️ Square Developer Console',
+              description: 'Opening Square Developer Apps. Click your app, then "Sandbox" tab to manage test invoices.',
+              duration: 10000
             });
         };
       
@@ -1243,4 +1243,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
