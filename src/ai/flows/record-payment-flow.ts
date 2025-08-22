@@ -101,8 +101,9 @@ const recordPaymentFlow = ai.defineFlow(
           amountMoney: paymentAmount,
           note: input.note || 'Manual payment entry',
           externalDetails: {
-            type: 'EXTERNAL',
-            source: input.note || 'Manual Payment',
+            type: 'OTHER', // Use OTHER for generic external payments
+            source: input.paymentMethod || 'Manual Payment', // Source can be the method
+            sourceId: input.externalPaymentId, // Unique ID for traceability
             sourceFeeMoney: {
               amount: BigInt(0),
               currency: 'USD'
@@ -120,6 +121,7 @@ const recordPaymentFlow = ai.defineFlow(
       // Use the Square Invoices API to record the payment properly
       // This should use the recordPayment endpoint as per Square documentation
       try {
+        console.log(`Attempting to link payment ${payment.id} to invoice ${input.invoiceId} using recordPayment...`);
         const recordResponse = await invoicesApi.recordPayment(input.invoiceId, {
           paymentId: payment.id,
           requestMethod: 'EXTERNAL'
@@ -129,7 +131,7 @@ const recordPaymentFlow = ai.defineFlow(
       } catch (recordError) {
         console.log('recordPayment API failed, falling back to updateInvoice method:', recordError);
         
-        // Fallback to updating the invoice manually
+        // Fallback to updating the invoice manually - THIS IS NOT RECOMMENDED but can be a last resort.
         await invoicesApi.updateInvoice(input.invoiceId, {
           invoice: {
               paymentRequests: [{
@@ -137,7 +139,7 @@ const recordPaymentFlow = ai.defineFlow(
                   requestType: paymentRequest.requestType,
                   dueDate: paymentRequest.dueDate,
                   reminders: paymentRequest.reminders,
-                  paymentId: payment.id,
+                  paymentId: payment.id, // Linking payment this way is less reliable
               }],
               version: invoice.version,
           },
@@ -152,17 +154,13 @@ const recordPaymentFlow = ai.defineFlow(
         throw new Error("Failed to fetch updated invoice after payment recording.");
       }
 
-      // Calculate the new total paid amount
-      const newTotalPaidDollars = currentPaidDollars + input.amount;
+      // Recalculate total paid amount from the final invoice for accuracy
+      const finalPaidCents = finalInvoice.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount ? Number(finalInvoice.paymentRequests[0].totalCompletedAmountMoney.amount) : 0;
+      const newTotalPaidDollars = finalPaidCents / 100;
       const isPartialPayment = newTotalPaidDollars < totalInvoicedDollars;
 
-      // Determine the correct status
-      let status = finalInvoice.status || 'UNPAID';
-      if (newTotalPaidDollars >= totalInvoicedDollars) {
-        status = 'PAID';
-      } else if (newTotalPaidDollars > 0) {
-        status = 'PARTIALLY_PAID';
-      }
+      // Use the status directly from the final invoice
+      let status = finalInvoice.status || 'UNKNOWN';
 
       console.log(`Payment processing complete:
         - Payment ID: ${payment.id}

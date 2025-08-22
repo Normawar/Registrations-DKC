@@ -598,6 +598,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         throw error;
       }
     };
+    
 
     const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
         const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]);
@@ -683,117 +684,85 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               source: 'manual',
               status: 'completed',
               organizerInitials: organizerInitials,
+              organizerName: profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : profile?.email || 'Organizer',
               details: {
-                ...(method === 'Check' && { checkNumber: checkNumber }),
-                ...(method === 'Cash App' && { cashAppHandle: cashAppHandle }),
-                ...(method === 'Zelle' && { zelleEmail: zelleEmail }),
-                ...(method === 'Venmo' && { venmoHandle: venmoHandle }),
+                // Store method-specific details
+                ...(method === 'Check' && { 
+                  checkNumber: checkNumber,
+                  checkAmount: paymentAmounts[method]
+                }),
+                ...(method === 'Cash App' && { 
+                  cashAppHandle: cashAppHandle,
+                  cashAppAmount: paymentAmounts[method]
+                }),
+                ...(method === 'Zelle' && { 
+                  zelleEmail: zelleEmail,
+                  zelleAmount: paymentAmounts[method]
+                }),
+                ...(method === 'Venmo' && { 
+                  venmoHandle: venmoHandle,
+                  venmoAmount: paymentAmounts[method]
+                }),
+                ...(method === 'Cash' && { 
+                  cashAmount: paymentAmounts[method]
+                }),
               }
             }));
         
-            // 🎯 SYNC EACH PAYMENT TO SQUARE USING REAL API
-            const squareSyncResults = [];
-            
-            for (const payment of newPayments) {
-              const paymentNote = [
-                `${payment.method}: $${payment.amount.toFixed(2)}`,
-                `Recorded by: ${payment.organizerInitials}`,
-                `Date: ${payment.dateFormatted}`,
-                payment.details?.checkNumber ? `Check #: ${payment.details.checkNumber}` : '',
-                payment.details?.cashAppHandle ? `Cash App: ${payment.details.cashAppHandle}` : '',
-                payment.details?.zelleEmail ? `Zelle: ${payment.details.zelleEmail}` : '',
-                payment.details?.venmoHandle ? `Venmo: ${payment.details.venmoHandle}` : '',
-              ].filter(Boolean).join(' | ');
+            // 🎯 CRITICAL: Record payment using your existing recordPayment function
+            try {
+              console.log('🔄 Recording payment through recordPayment flow...');
+              
+              // Use your existing recordPayment function
+              const paymentResult = await recordPayment({
+                confirmationId: confirmation.id,
+                invoiceId: confirmation.invoiceId,
+                payments: newPayments,
+                totalAmount: totalSelectedAmount,
+                organizerInitials: organizerInitials
+              });
+              
+              console.log('✅ Payment recorded successfully:', paymentResult);
+              
+              // If recordPayment was successful, it should update Square automatically
+              toast({
+                title: `💳 Payment Recorded by ${organizerInitials}`,
+                description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded and synced to Square`,
+                duration: 5000,
+              });
         
-              try {
-                console.log(`🔄 Making REAL Square API call for: ${paymentNote}`);
-        
-                // Try updating the invoice with payment details
-                const squareResult = await updateSquareInvoiceWithPayment({
-                  invoiceId: confirmation.invoiceId,
-                  amount: payment.amount,
-                  method: payment.method,
-                  note: paymentNote,
-                  organizerInitials: payment.organizerInitials,
-                });
-        
-                squareSyncResults.push({
-                  payment: payment,
-                  squareResult: squareResult,
-                  success: true
-                });
-        
-                console.log(`✅ Payment synced to Square API:`, squareResult);
-        
-              } catch (squareError) {
-                console.error(`❌ Square API sync failed for ${payment.method}:`, squareError);
-                squareSyncResults.push({
-                  payment: payment,
-                  error: squareError,
-                  success: false
-                });
-              }
+            } catch (squareError) {
+              console.log('⚠️ Square sync failed, recording locally only:', squareError);
+              
+              // If Square fails, still record locally
+              toast({
+                title: `💳 Payment Recorded Locally by ${organizerInitials}`,
+                description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded. Use "Sync with Square" to update Square manually.`,
+                duration: 7000,
+              });
             }
         
-            // Update local data regardless of Square success
-            const updatedPaymentHistory = [...(confirmation.paymentHistory || []), ...newPayments];
-            const newTotalPaid = totalPaid + totalSelectedAmount;
-            const newStatus = newTotalPaid >= totalInvoiced ? 'PAID' : 'PARTIALLY_PAID';
-        
-            const updatedConfirmationData = {
-              ...confirmation,
-              paymentHistory: updatedPaymentHistory,
-              totalPaid: newTotalPaid,
-              invoiceStatus: newStatus,
-              status: newStatus,
-              lastUpdated: new Date().toISOString(),
-              lastPaymentBy: organizerInitials,
-              lastPaymentDate: new Date().toISOString(),
-            };
-        
-            // Update localStorage
+            // Update localStorage regardless of Square success
             const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
             const updatedAllInvoices = allInvoices.map((inv: any) =>
               inv.id === confirmation.id ? updatedConfirmationData : inv
             );
             localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
         
+            const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+            const updatedConfirmations = confirmations.map((conf: any) =>
+              conf.id === confirmation.id ? updatedConfirmationData : conf
+            );
+            localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+        
+            // Update component state
             setConfirmation(updatedConfirmationData);
-        
-            // Show results
-            const successCount = squareSyncResults.filter(r => r.success).length;
-            
-            if (successCount > 0) {
-              toast({
-                title: `✅ Payment Synced to Square API by ${organizerInitials}`,
-                description: `${successCount} payment(s) sent to Square sandbox. Check Square interface to verify!`,
-                duration: 10000,
-              });
-        
-              // Open Square to verify
-              setTimeout(() => {
-                if (confirmation?.invoiceUrl) {
-                  window.open(confirmation.invoiceUrl, '_blank');
-                  toast({
-                    title: '🔍 Verify in Square',
-                    description: 'Check if the payment appears in the Square sandbox invoice',
-                    duration: 8000,
-                  });
-                }
-              }, 2000);
-        
-            } else {
-              toast({
-                variant: 'destructive',
-                title: 'Square API Sync Failed',
-                description: 'Payment recorded locally but not synced to Square. Check console for API errors.',
-                duration: 8000,
-              });
-            }
         
             // Reset form
             setLocalSelectedMethods([]);
             setPaymentAmounts({});
+            
+            // Clear all payment fields
             setCheckAmount('');
             setCheckNumber('');
             setCashAppAmount('');
@@ -804,15 +773,26 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             setVenmoHandle('');
             setCashAmount('');
         
+            // Trigger storage events to update other components
             window.dispatchEvent(new Event('storage'));
             window.dispatchEvent(new Event('all_invoices_updated'));
         
+            // If fully paid, show special message
+            if (newStatus === 'PAID') {
+              setTimeout(() => {
+                toast({
+                  title: `🎉 Invoice Fully Paid!`,
+                  description: `Marked as PAID by ${organizerInitials} on ${format(new Date(), 'MMM dd, yyyy')}`,
+                });
+              }, 1500);
+            }
+        
           } catch (error) {
-            console.error('❌ Payment recording failed:', error);
+            console.error('Error recording payment:', error);
             toast({
               variant: 'destructive',
               title: 'Payment Recording Failed',
-              description: 'Failed to record payment. Check console for details.',
+              description: 'Failed to record payment. Please try again.',
             });
           } finally {
             setIsUpdating(false);
@@ -1060,26 +1040,34 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         console.log('🔗 Square button clicked:', { invoiceUrl, invoiceNumber });
         
         if (invoiceUrl) {
-          // Check if it's a sandbox URL
-          const isSandbox = invoiceUrl.includes('squareupsandbox.com');
-          
-          console.log('🔗 Opening URL:', invoiceUrl);
-          console.log('🔗 Environment:', isSandbox ? 'SANDBOX' : 'PRODUCTION');
-          
+          // Try the original URL first
+          console.log('🔗 Trying original URL:', invoiceUrl);
           window.open(invoiceUrl, '_blank');
           
-          // Show environment-specific message
+          // Show helpful message
           toast({
-            title: `Opening ${isSandbox ? 'Sandbox' : 'Production'} Square Invoice`,
-            description: `Invoice #${invoiceNumber} in ${isSandbox ? 'sandbox' : 'production'} environment`,
+            title: 'Opening Square Invoice',
+            description: `Opening invoice #${invoiceNumber}. If you see "Oops" error, the invoice may not exist in Square.`,
             duration: 8000
           });
           
+          // Show backup instructions after a delay
+          setTimeout(() => {
+            if (profile?.role === 'organizer') {
+              toast({
+                title: '💡 If Square shows "Oops" error:',
+                description: `Use Developer Console below to search for invoice #${invoiceNumber} manually.`,
+                duration: 10000
+              });
+            }
+          }, 3000);
+          
         } else {
+          // No URL available, show developer console instructions
           toast({
             variant: 'destructive',
             title: 'No Square URL Available',
-            description: `Invoice #${invoiceNumber} may not be created in Square yet.`,
+            description: `Invoice #${invoiceNumber} may not be created in Square yet. Use Developer Console to find or create it.`,
             duration: 10000
           });
         }
@@ -1097,14 +1085,25 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             <ExternalLink className="w-4 h-4 ml-2" />
           </Button>
           
-          {/* Environment indicator */}
-          {confirmation?.invoiceUrl && (
-            <div className="mt-2 text-xs text-center">
-              <span className={`px-2 py-1 rounded text-white ${
-                confirmation.invoiceUrl.includes('sandbox') ? 'bg-orange-500' : 'bg-green-500'
-              }`}>
-                {confirmation.invoiceUrl.includes('sandbox') ? '🧪 SANDBOX' : '🚀 PRODUCTION'}
-              </span>
+          {/* Enhanced debug info for organizers */}
+          {profile?.role === 'organizer' && (
+            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-300 rounded text-xs">
+              <h4 className="font-medium text-yellow-800 mb-2">🔍 Square Debug Info:</h4>
+              <div className="space-y-1 text-yellow-700">
+                <p><strong>Invoice URL:</strong> {confirmation?.invoiceUrl || 'Not found'}</p>
+                <p><strong>Invoice ID:</strong> {confirmation?.invoiceId || 'Not found'}</p>
+                <p><strong>Invoice Number:</strong> {confirmation?.invoiceNumber || 'Not found'}</p>
+                <p><strong>Public URL:</strong> {confirmation?.publicUrl || 'Not found'}</p>
+              </div>
+              
+              {confirmation?.invoiceUrl && (
+                <div className="mt-2 p-2 bg-yellow-100 rounded">
+                  <p className="text-xs text-yellow-800">
+                    <strong>💡 If "Oops" error appears:</strong> The invoice URL exists but the invoice wasn't found in Square. 
+                    This usually means the invoice needs to be created manually in Square first.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1352,5 +1351,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
+
+    
 
     
