@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
+import { useSponsorProfile, type SponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
 import { Upload, ExternalLink, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle, UploadCloud } from 'lucide-react';
 import { format } from "date-fns";
@@ -60,6 +60,52 @@ const getKnownSponsorPhone = (email: string): string | null => {
   );
   
   return foundEntry ? foundEntry[1] : null;
+};
+
+const formatPhoneNumber = (phone: string) => {
+  if (!phone || phone.trim() === '') return 'Not provided';
+  
+  // Remove any non-digit characters
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // Format based on length
+  if (cleaned.length === 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+  } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+    return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+  } else if (cleaned.length > 0) {
+    return phone; // Return original format if it doesn't match standard patterns
+  }
+  
+  return 'Invalid phone format';
+};
+
+const getPhoneFromProfile = (profile: any) => {
+  if (!profile) return null;
+  
+  // Try different access patterns
+  const phonePatterns = [
+    profile.phone,
+    profile.cellPhone,
+    profile.phoneNumber,
+    profile.cellPhoneNumber,
+    profile.mobile,
+    profile.tel,
+    profile.telephone,
+    profile['phone'],
+    profile['cellPhone'],
+    profile['phoneNumber'],
+    profile['cell_phone'],
+    profile['phone_number'],
+    profile['Cell Phone Number'], // Exact match from UI
+    profile['cellPhoneNumber'],
+    profile.contact?.phone,
+    profile.personalInfo?.phone,
+    profile.details?.phone
+  ];
+  
+  // Return the first non-empty value
+  return phonePatterns.find(phone => phone && phone.trim() !== '');
 };
 
 
@@ -137,21 +183,21 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
 
   useEffect(() => {
-  if (!isOpen) return;
+    if (!isOpen) return;
 
-  const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-  const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
-  if (currentConf) {
-      console.log('📋 Loading confirmation:', currentConf);
-      console.log('📋 ALL CONFIRMATION KEYS:', Object.keys(currentConf).sort());
-      console.log('📋 FULL CONFIRMATION OBJECT:', JSON.stringify(currentConf, null, 2));
-      setConfirmation(currentConf);
-      
-      // Load selected payment methods
-      const savedMethods = currentConf.selectedPaymentMethods || [];
-      console.log('📋 Loading saved payment methods:', savedMethods);
-      setSelectedPaymentMethods(savedMethods);
-  }
+    const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+    const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
+    if (currentConf) {
+        console.log('📋 Loading confirmation:', currentConf);
+        console.log('📋 ALL CONFIRMATION KEYS:', Object.keys(currentConf).sort());
+        console.log('📋 FULL CONFIRMATION OBJECT:', JSON.stringify(currentConf, null, 2));
+        setConfirmation(currentConf);
+        
+        // Load selected payment methods
+        const savedMethods = currentConf.selectedPaymentMethods || [];
+        console.log('📋 Loading saved payment methods:', savedMethods);
+        setSelectedPaymentMethods(savedMethods);
+    }
   
     if (!auth || !storage) {
         setAuthError("Firebase is not configured, so file uploads are disabled.");
@@ -465,24 +511,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     return result;
   }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
-  const formatPhoneNumber = (phone: string) => {
-    if (!phone || phone.trim() === '') return 'Not provided';
-    
-    // Remove any non-digit characters
-    const cleaned = phone.replace(/\D/g, '');
-    
-    // Format based on length
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
-    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
-      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
-    } else if (cleaned.length > 0) {
-      return phone; // Return original format if it doesn't match standard patterns
-    }
-    
-    return 'Invalid phone format';
-  };
-
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [fileUrls, setFileUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -516,7 +544,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     });
   };
 
-const RegistrationDetailsSection = ({ invoice, profile }: { invoice: any, profile: any }) => {
+const RegistrationDetailsSection = ({ invoice, profile }: { invoice: any, profile: SponsorProfile | null }) => {
   const sponsorEmail = invoice.purchaserEmail || invoice.sponsorEmail || invoice.email;
   const knownPhone = getKnownSponsorPhone(sponsorEmail);
 
@@ -908,6 +936,28 @@ const PaymentSummarySection = () => (
   
   const ProfileDebugComponent = () => {
     useEffect(() => {
+        console.log('🔍 PROFILE DEBUGGING:');
+        console.log('Profile exists:', !!profile);
+        console.log('Profile type:', typeof profile);
+        
+        if (profile) {
+          console.log('Profile keys:', Object.keys(profile));
+          console.log('Full profile object:', JSON.stringify(profile, null, 2));
+          
+          // Check for phone-related keys specifically
+          const phoneKeys = Object.keys(profile).filter(key => 
+            key.toLowerCase().includes('phone') || 
+            key.toLowerCase().includes('cell') ||
+            key.toLowerCase().includes('mobile') ||
+            key.toLowerCase().includes('tel')
+          );
+          console.log('Phone-related keys in profile:', phoneKeys);
+          
+          // Check each phone key value
+          phoneKeys.forEach(key => {
+            console.log(`Profile.${key}:`, (profile as any)[key]);
+          });
+        }
     }, [profile]);
   
     return null; // This component just logs, doesn't render anything
@@ -993,7 +1043,7 @@ const PaymentSummarySection = () => (
               <li>Open <strong>"API Explorer"</strong> button above</li>
               <li>Select <strong>"Invoices API"</strong> from dropdown</li>
               <li>Choose <strong>"Search Invoices"</strong> endpoint</li>
-              <li>Add filter: code>invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</code></li>
+              <li>Add filter: <code>invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</code></li>
               <li>Run request to find your invoice</li>
               <li>Copy the <strong>invoice ID</strong> from results</li>
               <li>Use <strong>"Update Invoice"</strong> to mark as paid</li>
