@@ -1053,6 +1053,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                   <ExternalLink className="mr-1 h-3 w-3" />
                   API Explorer
                 </Button>
+                 <Button 
+                    onClick={() => window.open('https://squareupsandbox.com/dashboard/invoices', '_blank')}
+                    className="bg-red-500 text-white col-span-3 mt-2"
+                  >
+                    🧪 FORCE SANDBOX TEST
+                  </Button>
               </div>
               
               <div className="bg-blue-50 border border-blue-200 rounded p-3">
@@ -1232,4 +1238,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
