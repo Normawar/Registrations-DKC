@@ -466,7 +466,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   }, [selectedPaymentMethods, checkAmount, zelleAmount, cashAppAmount, venmoAmount, cashAmount, otherAmount]);
 
   const formatPhoneNumber = (phone: string) => {
-    if (!phone || phone.trim() === '') return 'Phone not provided';
+    if (!phone || phone.trim() === '') return 'Not provided';
     
     // Remove any non-digit characters
     const cleaned = phone.replace(/\D/g, '');
@@ -516,16 +516,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     });
   };
 
-const RegistrationDetailsSection = ({ invoice }: { invoice: any }) => {
-  // Get the sponsor email from the invoice
+const RegistrationDetailsSection = ({ invoice, profile }: { invoice: any, profile: any }) => {
   const sponsorEmail = invoice.purchaserEmail || invoice.sponsorEmail || invoice.email;
-  
-  // Look up the phone number
   const knownPhone = getKnownSponsorPhone(sponsorEmail);
-  
-  // Debug logs (remove these after it works)
-  console.log('🔍 Registration Details - Email:', sponsorEmail);
-  console.log('🔍 Registration Details - Known Phone:', knownPhone);
 
   return (
     <div className="space-y-3">
@@ -536,7 +529,7 @@ const RegistrationDetailsSection = ({ invoice }: { invoice: any }) => {
       
       <div className="flex justify-between">
         <span className="text-gray-600">Date</span>
-        <span className="font-medium">{invoice.eventDate || 'TBD'}</span>
+        <span className="font-medium">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'TBD'}</span>
       </div>
       
       <div className="flex justify-between">
@@ -549,7 +542,6 @@ const RegistrationDetailsSection = ({ invoice }: { invoice: any }) => {
         <span className="font-medium">{sponsorEmail}</span>
       </div>
       
-      {/* 🎯 THIS IS THE KEY CHANGE - Using the lookup function */}
       <div className="flex justify-between">
         <span className="text-gray-600">Sponsor Phone</span>
         <span className="font-medium">
@@ -565,8 +557,7 @@ const RegistrationDetailsSection = ({ invoice }: { invoice: any }) => {
         <span className="font-medium">{invoice.schoolName || 'SHARYLAND PIONEER H S'}</span>
       </div>
 
-      {/* Organizer Contact Section - Only visible to organizers */}
-      {knownPhone && (
+      {profile?.role === 'organizer' && knownPhone && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <h4 className="text-sm font-medium text-blue-800 mb-2">📞 Organizer Contact Info</h4>
           <div className="text-sm space-y-1">
@@ -648,16 +639,9 @@ const RecordPaymentButton = () => {
 
   return (
     <div className="space-y-2">
-      {/* Keep basic status for now, remove later */}
-      <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
-        <div>Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
-        <div>Can Record: {canRecordPayment ? '✅ Yes' : '❌ No'}</div>
-        <div>Button Status: {isButtonEnabled ? '🟢 ACTIVE' : '🔴 DISABLED'}</div>
-      </div>
-      
-      {/* Working native button */}
       <button
         onClick={() => {
+          console.log('🔥 RECORD PAYMENT CLICKED!');
           if (isButtonEnabled) {
             handlePaymentUpdate();
           }
@@ -929,169 +913,6 @@ const PaymentSummarySection = () => (
     return null; // This component just logs, doesn't render anything
   };
 
-  const getPhoneFromProfile = (profile: any) => {
-    if (!profile) return null;
-    
-    // Try different access patterns
-    const phonePatterns = [
-      profile.phone,
-      profile.cellPhone,
-      profile.phoneNumber,
-      profile.cellPhoneNumber,
-      profile.mobile,
-      profile.tel,
-      profile.telephone,
-      profile['phone'],
-      profile['cellPhone'],
-      profile['phoneNumber'],
-      profile['cell_phone'],
-      profile['phone_number'],
-      profile['Cell Phone Number'], // Exact match from UI
-      profile['cellPhoneNumber'],
-      profile.contact?.phone,
-      profile.personalInfo?.phone,
-      profile.details?.phone
-    ];
-    
-    // Return the first non-empty value
-    return phonePatterns.find(phone => phone && phone.trim() !== '');
-  };
-
-  const RegistrationDetailsSectionEnhanced = () => {
-    const phoneNumber = confirmation?.phone || 
-                       confirmation?.sponsorPhone || 
-                       confirmation?.purchaserPhone ||
-                       getPhoneFromProfile(profile);
-  
-    return (
-      <div className="bg-white rounded-lg border p-4">
-        <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
-        
-        <div className="space-y-3">
-          <div className="flex justify-between">
-            <span className="text-gray-600">Event</span>
-            <span>Chess Tournament</span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-gray-600">Date</span>
-            <span>TBD</span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-gray-600">Sponsor Name</span>
-            <span>
-              {confirmation?.purchaserName || 
-               (profile?.firstName && profile?.lastName ? 
-                 `${profile.firstName} ${profile.lastName}` : 
-                 'FirstName LName')}
-            </span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-gray-600">Sponsor Email</span>
-            <span>
-              {confirmation?.purchaserEmail || 
-               profile?.email || 
-               'normaguerra@yahoo.com'}
-            </span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-gray-600">Sponsor Phone</span>
-            <span>
-              {phoneNumber ? formatPhoneNumber(phoneNumber) : 'Phone not provided'}
-            </span>
-          </div>
-          
-          <div className="flex justify-between">
-            <span className="text-gray-600">School</span>
-            <span>
-              {confirmation?.schoolName || 
-               profile?.school || 
-               'SHARYLAND PIONEER H S'}
-            </span>
-          </div>
-          
-          <div className="flex justify-between font-semibold text-lg border-t pt-3">
-            <span>Total Amount</span>
-            <span className="text-blue-600">${(confirmation?.totalAmount || 48).toFixed(2)}</span>
-          </div>
-        </div>
-  
-        {/* Debug what we found */}
-        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-          <div><strong>Phone Debug Results:</strong></div>
-          <div>Found phone: {phoneNumber || 'NONE'}</div>
-          <div>From: {phoneNumber ? 'profile data' : 'not found'}</div>
-        </div>
-      </div>
-    );
-  };
-
-const QuickTestSection = () => (
-  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
-    <h4 className="font-medium text-green-800 mb-2">🧪 Quick Test (Remove after testing):</h4>
-    <div className="flex gap-2 flex-wrap">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          setSelectedPaymentMethods(['cashapp']);
-          setCashAppAmount('28');
-          setCashAppHandle('@test');
-        }}
-      >
-        Select Cash App $28
-      </Button>
-      
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          setSelectedPaymentMethods(['check']);
-          setCheckAmount('28');
-          setCheckNumber('1234');
-        }}
-      >
-        Select Check $28
-      </Button>
-      
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          setSelectedPaymentMethods([]);
-          setCashAppAmount('');
-          setCashAppHandle('');
-          setCheckAmount('');
-          setCheckNumber('');
-        }}
-      >
-        Clear All
-      </Button>
-    </div>
-    
-    <div className="mt-2 text-xs text-green-700">
-      <div>Selected Methods: {selectedPaymentMethods.join(', ') || 'none'}</div>
-      <div>Cash App: ${cashAppAmount || '0'} | Check: ${checkAmount || '0'}</div>
-      <div>Button Should Be: {canRecordPayment ? '✅ ACTIVE' : '❌ DISABLED'}</div>
-    </div>
-  </div>
-);
-
-const PhoneTest = () => {
-  const testEmail = 'normaguerra@yahoo.com';
-  const result = getKnownSponsorPhone(testEmail);
-  
-  return (
-    <div className="p-4 bg-yellow-100 border">
-      <h3>🧪 Phone Lookup Test</h3>
-      <p>Email: {testEmail}</p>
-      <p>Result: {result || 'No phone found'}</p>
-    </div>
-  );
-};
   
   const SquareDeveloperConsoleButton = () => {
     if (profile?.role !== 'organizer') return null;
@@ -1172,8 +993,8 @@ const PhoneTest = () => {
               <li>Open <strong>"API Explorer"</strong> button above</li>
               <li>Select <strong>"Invoices API"</strong> from dropdown</li>
               <li>Choose <strong>"Search Invoices"</strong> endpoint</li>
-              <li>Add filter: <code>invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</code></li>
-              <li>Click <strong>"Run request"</strong> to find your invoice</li>
+              <li>Add filter: code>invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</code></li>
+              <li>Run request to find your invoice</li>
               <li>Copy the <strong>invoice ID</strong> from results</li>
               <li>Use <strong>"Update Invoice"</strong> to mark as paid</li>
               <li>Return here and click <strong>"Sync with Square"</strong></li>
@@ -1243,7 +1064,6 @@ const PhoneTest = () => {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <ButtonStyles />
         <ProfileDebugComponent />
-        <PhoneTest />
         <DialogHeader>
           
           <DialogTitle>
@@ -1256,7 +1076,10 @@ const PhoneTest = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
-          <RegistrationDetailsSection invoice={confirmation} />
+          <div className="bg-white rounded-lg border p-4">
+              <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
+              <RegistrationDetailsSection invoice={confirmation} profile={profile} />
+          </div>
           <PaymentSummarySection />
           <div className="mt-4">
             <label className="text-sm text-gray-600">Invoice Link</label>
@@ -1277,7 +1100,6 @@ const PhoneTest = () => {
             <p className="text-sm text-gray-600 mb-4">
               Record payments or submit payment information for verification.
             </p>
-             <QuickTestSection />
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Payment Method</label>
