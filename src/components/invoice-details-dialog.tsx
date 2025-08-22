@@ -784,6 +784,65 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         );
     };
 
+    const EnhancedSquareButton = () => {
+        const handleOpenSquare = () => {
+          const invoiceUrl = confirmation?.invoiceUrl;
+          const invoiceNumber = confirmation?.invoiceNumber || confirmation?.id.slice(-8);
+          
+          console.log('🔗 Square button clicked:', { invoiceUrl, invoiceNumber });
+          
+          if (invoiceUrl) {
+            // Check if it's a sandbox URL
+            const isSandbox = invoiceUrl.includes('squareupsandbox.com');
+            
+            console.log('🔗 Opening URL:', invoiceUrl);
+            console.log('🔗 Environment:', isSandbox ? 'SANDBOX' : 'PRODUCTION');
+            
+            window.open(invoiceUrl, '_blank');
+            
+            // Show environment-specific message
+            toast({
+              title: `Opening ${isSandbox ? 'Sandbox' : 'Production'} Square Invoice`,
+              description: `Invoice #${invoiceNumber} in ${isSandbox ? 'sandbox' : 'production'} environment`,
+              duration: 8000
+            });
+            
+          } else {
+            toast({
+              variant: 'destructive',
+              title: 'No Square URL Available',
+              description: `Invoice #${invoiceNumber} may not be created in Square yet.`,
+              duration: 10000
+            });
+          }
+        };
+      
+        return (
+          <div className="mt-4">
+            <label className="text-sm text-gray-600">Invoice Link</label>
+            <Button
+              variant="outline"
+              className="w-full mt-1"
+              onClick={handleOpenSquare}
+            >
+              Open in Square
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </Button>
+            
+            {/* Environment indicator */}
+            {confirmation?.invoiceUrl && (
+              <div className="mt-2 text-xs text-center">
+                <span className={`px-2 py-1 rounded text-white ${
+                  confirmation.invoiceUrl.includes('sandbox') ? 'bg-orange-500' : 'bg-green-500'
+                }`}>
+                  {confirmation.invoiceUrl.includes('sandbox') ? '🧪 SANDBOX' : '🚀 PRODUCTION'}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      };
+
     const SquareDebugComponent = () => {
         useEffect(() => {
             console.log('🔍 SQUARE DEBUG INFO:');
@@ -898,6 +957,116 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           setIsRefreshing(false);
         }
       };
+      
+    const EnhancedSquareDeveloperConsole = () => {
+        if (profile?.role !== 'organizer') return null;
+
+        const invoiceNumber = confirmation?.invoiceNumber || confirmation?.id.slice(-8);
+        const invoiceId = confirmation?.invoiceId;
+
+        const openDeveloperConsole = () => {
+            window.open('https://developer.squareup.com/apps', '_blank');
+            
+            toast({
+            title: '🛠️ Square Developer Console',
+            description: `Look for invoice #${invoiceNumber} or ID: ${invoiceId || 'N/A'}`,
+            duration: 15000
+            });
+        };
+
+        const openAPIExplorer = () => {
+            window.open('https://developer.squareup.com/explorer/square/invoices-api', '_blank');
+            
+            setTimeout(() => {
+            toast({
+                title: '🔧 Step-by-Step Fix:',
+                description: `1. Select "Search Invoices" → 2. Add filter: invoice_number = "${invoiceNumber}" → 3. Run request`,
+                duration: 20000
+            });
+            }, 1000);
+        };
+
+        const openSquareDashboard = () => {
+            const isSandbox = confirmation?.invoiceUrl?.includes('sandbox') || true;
+            
+            const dashboardUrl = isSandbox 
+            ? 'https://squareupsandbox.com/dashboard/invoices' 
+            : 'https://squareup.com/dashboard/invoices';
+            
+            window.open(dashboardUrl, '_blank');
+            
+            toast({
+            title: `📊 Opening ${isSandbox ? 'Sandbox' : 'Production'} Square Dashboard`,
+            description: `Search for invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)}`,
+            duration: 10000
+            });
+        };
+
+        return (
+            <div className="border-t pt-4 mt-4">
+            <div className="space-y-3">
+                <div>
+                <h4 className="font-medium text-sm">🛠️ Square Developer Tools</h4>
+                <p className="text-xs text-muted-foreground">Manually find or create this invoice in Square</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <Button variant="default" onClick={openSquareDashboard} size="sm">
+                    <ExternalLink className="mr-1 h-3 w-3" />
+                    Square Dashboard
+                </Button>
+                
+                <Button variant="outline" onClick={openDeveloperConsole} size="sm">
+                    <ExternalLink className="mr-1 h-3 w-3" />
+                    Developer Console
+                </Button>
+                
+                <Button variant="outline" onClick={openAPIExplorer} size="sm">
+                    <ExternalLink className="mr-1 h-3 w-3" />
+                    API Explorer
+                </Button>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <h5 className="text-xs font-medium text-blue-800 mb-2">🎯 Quick Fix Options:</h5>
+                
+                <div className="space-y-2 text-xs text-blue-700">
+                    <div className="bg-white p-2 rounded border-l-2 border-blue-400">
+                    <p className="font-medium">Option 1: Find Existing Invoice</p>
+                    <ol className="list-decimal list-inside mt-1 space-y-1">
+                        <li>Click "Square Dashboard" above</li>
+                        <li>Search for invoice #{invoiceNumber}</li>
+                        <li>If found, copy the correct URL</li>
+                    </ol>
+                    </div>
+                    
+                    <div className="bg-white p-2 rounded border-l-2 border-green-400">
+                    <p className="font-medium">Option 2: Create New Invoice (Recommended)</p>
+                    <ol className="list-decimal list-inside mt-1 space-y-1">
+                        <li>Click "API Explorer" above</li>
+                        <li>Select "Create Invoice" endpoint</li>
+                        <li>Fill: amount = ${confirmation?.totalAmount || 48}, invoice_number = "{invoiceNumber}"</li>
+                        <li>Run request to create invoice</li>
+                        <li>Copy the returned invoice ID</li>
+                        <li>Return here and click "Sync with Square"</li>
+                    </ol>
+                    </div>
+                </div>
+                </div>
+
+                <div className="bg-orange-50 border border-orange-200 rounded p-3">
+                <h5 className="text-xs font-medium text-orange-800 mb-2">📋 Invoice Details for Square:</h5>
+                <div className="grid grid-cols-2 gap-2 text-xs text-orange-700">
+                    <div><strong>Invoice #:</strong> {invoiceNumber}</div>
+                    <div><strong>Amount:</strong> ${confirmation?.totalAmount || 48}</div>
+                    <div><strong>Customer:</strong> {confirmation?.purchaserEmail || 'N/A'}</div>
+                    <div><strong>Status Needed:</strong> {confirmation?.totalPaid >= confirmation?.totalAmount ? 'PAID' : 'PARTIALLY_PAID'}</div>
+                </div>
+                </div>
+            </div>
+            </div>
+        );
+        };
 
   if (!confirmation) {
     return (
