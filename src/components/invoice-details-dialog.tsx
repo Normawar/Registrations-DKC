@@ -62,11 +62,14 @@ const getKnownSponsorPhone = (email: string): string | null => {
   return foundEntry ? foundEntry[1] : null;
 };
 
+
 const formatPhoneNumber = (phone: string) => {
   if (!phone || phone.trim() === '') return 'Not provided';
   
   // Remove any non-digit characters
   const cleaned = phone.replace(/\D/g, '');
+  
+  console.log('📞 Formatting phone:', phone, '-> cleaned:', cleaned, '-> length:', cleaned.length);
   
   // Format based on length
   if (cleaned.length === 10) {
@@ -662,60 +665,257 @@ const ProofOfPaymentSection = () => (
     </div>
   );
 
-const RecordPaymentButton = () => {
-  const isButtonEnabled = canRecordPayment && !isUpdating;
+const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
+  const [selectedMethods, setSelectedMethods] = useState<string[]>([]);
+  const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
+  
+  const totalSelectedAmount = Object.values(paymentAmounts).reduce((sum, amount) => sum + amount, 0);
+  
+  const balanceDue = invoice.totalAmount - (invoice.totalPaid || 0);
+  
+  const isValidPayment = () => {
+    const hasSelectedMethod = selectedMethods.length > 0;
+    const hasValidAmount = totalSelectedAmount > 0;
+    const amountNotExceedsBalance = totalSelectedAmount <= balanceDue;
+    
+    console.log('🔍 Payment Validation:', {
+      hasSelectedMethod,
+      hasValidAmount,
+      amountNotExceedsBalance,
+      selectedMethods,
+      totalSelectedAmount,
+      balanceDue
+    });
+    
+    return hasSelectedMethod && hasValidAmount && amountNotExceedsBalance;
+  };
+
+  const handleMethodChange = (method: string, isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedMethods(prev => [...prev, method]);
+      if (selectedMethods.length === 0) {
+        setPaymentAmounts(prev => ({ ...prev, [method]: balanceDue }));
+      }
+    } else {
+      setSelectedMethods(prev => prev.filter(m => m !== method));
+      setPaymentAmounts(prev => {
+        const newAmounts = { ...prev };
+        delete newAmounts[method];
+        return newAmounts;
+      });
+    }
+  };
+
+  const handleAmountChange = (method: string, amount: number) => {
+    setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
+  };
+
+  const quickTestCashApp = () => {
+    setSelectedMethods(['Cash App']);
+    setPaymentAmounts({ 'Cash App': balanceDue });
+  };
+
+  const quickTestCheck = () => {
+    setSelectedMethods(['Check']);
+    setPaymentAmounts({ 'Check': balanceDue });
+  };
+
+  const handleRecordPayment = () => {
+    if (!isValidPayment()) {
+      alert('Please select a payment method and enter a valid amount');
+      return;
+    }
+
+    const paymentData = {
+      invoiceId: invoice.id,
+      methods: selectedMethods,
+      amounts: paymentAmounts,
+      totalAmount: totalSelectedAmount,
+      timestamp: new Date().toISOString()
+    };
+
+    console.log('💳 Recording payment:', paymentData);
+    
+    alert(`✅ Payment of $${totalSelectedAmount.toFixed(2)} recorded successfully!`);
+    
+    setSelectedMethods([]);
+    setPaymentAmounts({});
+  };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
+      <div className="p-3 bg-gray-100 border rounded text-sm">
+        <div><strong>Balance Due:</strong> ${balanceDue.toFixed(2)}</div>
+        <div><strong>Selected Methods:</strong> {selectedMethods.join(', ') || 'None'}</div>
+        <div><strong>Total Selected:</strong> ${totalSelectedAmount.toFixed(2)}</div>
+        <div><strong>Valid Payment:</strong> {isValidPayment() ? '🟢 YES' : '🔴 NO'}</div>
+      </div>
+
+      <div className="p-3 bg-yellow-100 border border-yellow-300 rounded">
+        <h4 className="font-medium mb-2">🧪 Quick Test (Remove after testing):</h4>
+        <div className="flex gap-2">
+          <button 
+            onClick={quickTestCashApp}
+            className="px-3 py-1 bg-green-600 text-white rounded text-sm"
+          >
+            Cash App ${balanceDue.toFixed(2)}
+          </button>
+          <button 
+            onClick={quickTestCheck}
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm"
+          >
+            Check ${balanceDue.toFixed(2)}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="font-medium">Payment Method</h3>
+        
+        <div className="flex items-center justify-between">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectedMethods.includes('Cash App')}
+              onChange={(e) => handleMethodChange('Cash App', e.target.checked)}
+              className="mr-2"
+            />
+            Cash App
+          </label>
+          {selectedMethods.includes('Cash App') && (
+            <input
+              type="number"
+              value={paymentAmounts['Cash App'] || ''}
+              onChange={(e) => handleAmountChange('Cash App', parseFloat(e.target.value) || 0)}
+              placeholder="Amount"
+              className="w-24 px-2 py-1 border rounded"
+              step="0.01"
+              min="0"
+              max={balanceDue}
+            />
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectedMethods.includes('Check')}
+              onChange={(e) => handleMethodChange('Check', e.target.checked)}
+              className="mr-2"
+            />
+            Check
+          </label>
+          {selectedMethods.includes('Check') && (
+            <input
+              type="number"
+              value={paymentAmounts['Check'] || ''}
+              onChange={(e) => handleAmountChange('Check', parseFloat(e.target.value) || 0)}
+              placeholder="Amount"
+              className="w-24 px-2 py-1 border rounded"
+              step="0.01"
+              min="0"
+              max={balanceDue}
+            />
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectedMethods.includes('Cash')}
+              onChange={(e) => handleMethodChange('Cash', e.target.checked)}
+              className="mr-2"
+            />
+            Cash
+          </label>
+          {selectedMethods.includes('Cash') && (
+            <input
+              type="number"
+              value={paymentAmounts['Cash'] || ''}
+              onChange={(e) => handleAmountChange('Cash', parseFloat(e.target.value) || 0)}
+              placeholder="Amount"
+              className="w-24 px-2 py-1 border rounded"
+              step="0.01"
+              min="0"
+              max={balanceDue}
+            />
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectedMethods.includes('Zelle')}
+              onChange={(e) => handleMethodChange('Zelle', e.target.checked)}
+              className="mr-2"
+            />
+            Zelle
+          </label>
+          {selectedMethods.includes('Zelle') && (
+            <input
+              type="number"
+              value={paymentAmounts['Zelle'] || ''}
+              onChange={(e) => handleAmountChange('Zelle', parseFloat(e.target.value) || 0)}
+              placeholder="Amount"
+              className="w-24 px-2 py-1 border rounded"
+              step="0.01"
+              min="0"
+              max={balanceDue}
+            />
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={selectedMethods.includes('Venmo')}
+              onChange={(e) => handleMethodChange('Venmo', e.target.checked)}
+              className="mr-2"
+            />
+            Venmo
+          </label>
+          {selectedMethods.includes('Venmo') && (
+            <input
+              type="number"
+              value={paymentAmounts['Venmo'] || ''}
+              onChange={(e) => handleAmountChange('Venmo', parseFloat(e.target.value) || 0)}
+              placeholder="Amount"
+              className="w-24 px-2 py-1 border rounded"
+              step="0.01"
+              min="0"
+              max={balanceDue}
+            />
+          )}
+        </div>
+      </div>
+
+      {totalSelectedAmount > 0 && (
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+          <div className="flex justify-between">
+            <span>Total Payment:</span>
+            <span className="font-medium">${totalSelectedAmount.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Remaining Balance:</span>
+            <span className="font-medium">${(balanceDue - totalSelectedAmount).toFixed(2)}</span>
+          </div>
+        </div>
+      )}
+
       <button
-        onClick={() => {
-          console.log('🔥 RECORD PAYMENT CLICKED!');
-          if (isButtonEnabled) {
-            handlePaymentUpdate();
-          }
-        }}
-        disabled={!isButtonEnabled}
-        style={{
-          width: '100%',
-          padding: '12px 16px',
-          backgroundColor: isButtonEnabled ? '#2563eb' : '#9ca3af',
-          color: 'white',
-          border: 'none',
-          borderRadius: '6px',
-          fontSize: '14px',
-          fontWeight: '500',
-          cursor: isButtonEnabled ? 'pointer' : 'not-allowed',
-          transition: 'all 0.2s ease',
-          opacity: isButtonEnabled ? 1 : 0.6
-        }}
-        onMouseOver={(e) => {
-          if (isButtonEnabled) {
-            e.currentTarget.style.backgroundColor = '#1d4ed8';
-          }
-        }}
-        onMouseOut={(e) => {
-          if (isButtonEnabled) {
-            e.currentTarget.style.backgroundColor = '#2563eb';
-          }
-        }}
+        onClick={handleRecordPayment}
+        disabled={!isValidPayment()}
+        className={`w-full py-2 px-4 rounded font-medium transition-colors ${
+          isValidPayment()
+            ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer'
+            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+        }`}
       >
-        {isUpdating ? (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ 
-              display: 'inline-block',
-              width: '16px',
-              height: '16px',
-              border: '2px solid #ffffff40',
-              borderTop: '2px solid #ffffff',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              marginRight: '8px'
-            }}></span>
-            Recording Payment...
-          </span>
-        ) : (
-          'Record Payment'
-        )}
+        {isValidPayment() ? '💳 Record Payment' : '⏸️ Select Payment Method'}
       </button>
     </div>
   );
@@ -723,192 +923,7 @@ const RecordPaymentButton = () => {
 
 
 
-const renderPaymentMethodInputs = () => {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="check"
-            checked={selectedPaymentMethods.includes('check')}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedPaymentMethods(prev => [...prev, 'check']);
-              } else {
-                setSelectedPaymentMethods(prev => prev.filter(method => method !== 'check'));
-                setCheckAmount('');
-                setCheckNumber('');
-              }
-            }}
-          />
-          <label htmlFor="check" className="text-sm font-medium">Check</label>
-        </div>
-        {selectedPaymentMethods.includes('check') && (
-          <div className="ml-6 space-y-2">
-            <Input
-              placeholder="Check amount"
-              value={safeString(checkAmount)}
-              onChange={createSafeOnChange(setCheckAmount)}
-            />
-            <Input
-              placeholder="Check number"
-              value={safeString(checkNumber)}
-              onChange={createSafeOnChange(setCheckNumber)}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="zelle"
-            checked={selectedPaymentMethods.includes('zelle')}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedPaymentMethods(prev => [...prev, 'zelle']);
-              } else {
-                setSelectedPaymentMethods(prev => prev.filter(method => method !== 'zelle'));
-                setZelleAmount('');
-                setZelleEmail('');
-              }
-            }}
-          />
-          <label htmlFor="zelle" className="text-sm font-medium">Zelle</label>
-        </div>
-        {selectedPaymentMethods.includes('zelle') && (
-          <div className="ml-6 space-y-2">
-            <Input
-              placeholder="Zelle amount"
-              value={safeString(zelleAmount)}
-              onChange={createSafeOnChange(setZelleAmount)}
-            />
-            <Input
-              placeholder="Zelle email"
-              value={safeString(zelleEmail)}
-              onChange={createSafeOnChange(setZelleEmail)}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="cashapp"
-            checked={selectedPaymentMethods.includes('cashapp')}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedPaymentMethods(prev => [...prev, 'cashapp']);
-              } else {
-                setSelectedPaymentMethods(prev => prev.filter(method => method !== 'cashapp'));
-                setCashAppAmount('');
-                setCashAppHandle('');
-              }
-            }}
-          />
-          <label htmlFor="cashapp" className="text-sm font-medium">Cash App</label>
-        </div>
-        {selectedPaymentMethods.includes('cashapp') && (
-          <div className="ml-6 space-y-2">
-            <Input
-              placeholder="Cash App amount"
-              value={safeString(cashAppAmount)}
-              onChange={createSafeOnChange(setCashAppAmount)}
-            />
-            <Input
-              placeholder="Cash App handle"
-              value={safeString(cashAppHandle)}
-              onChange={createSafeOnChange(setCashAppHandle)}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="venmo"
-            checked={selectedPaymentMethods.includes('venmo')}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedPaymentMethods(prev => [...prev, 'venmo']);
-              } else {
-                setSelectedPaymentMethods(prev => prev.filter(method => method !== 'venmo'));
-                setVenmoAmount('');
-                setVenmoHandle('');
-              }
-            }}
-          />
-          <label htmlFor="venmo" className="text-sm font-medium">Venmo</label>
-        </div>
-        {selectedPaymentMethods.includes('venmo') && (
-          <div className="ml-6 space-y-2">
-            <Input
-              placeholder="Venmo amount"
-              value={safeString(venmoAmount)}
-              onChange={createSafeOnChange(setVenmoAmount)}
-            />
-            <Input
-              placeholder="Venmo handle"
-              value={safeString(venmoHandle)}
-              onChange={createSafeOnChange(setVenmoHandle)}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="cash"
-            checked={selectedPaymentMethods.includes('cash')}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedPaymentMethods(prev => [...prev, 'cash']);
-              } else {
-                setSelectedPaymentMethods(prev => prev.filter(method => method !== 'cash'));
-                setCashAmount('');
-              }
-            }}
-          />
-          <label htmlFor="cash" className="text-sm font-medium">Cash</label>
-        </div>
-        {selectedPaymentMethods.includes('cash') && (
-          <div className="ml-6 space-y-2">
-            <Input
-              placeholder="Cash amount"
-              value={safeString(cashAmount)}
-              onChange={createSafeOnChange(setCashAmount)}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="other"
-            checked={selectedPaymentMethods.includes('other')}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedPaymentMethods(prev => [...prev, 'other']);
-              } else {
-                setSelectedPaymentMethods(prev => prev.filter(method => method !== 'other'));
-                setOtherAmount('');
-                setOtherDescription('');
-              }
-            }}
-          />
-          <label htmlFor="other" className="text-sm font-medium">Other</label>
-        </div>
-        {selectedPaymentMethods.includes('other') && (
-          <div className="ml-6 space-y-2">
-            <Input
-              placeholder="Other amount"
-              value={safeString(otherAmount)}
-              onChange={createSafeOnChange(setOtherAmount)}
-            />
-            <Input
-              placeholder="Description"
-              value={safeString(otherDescription)}
-              onChange={createSafeOnChange(setOtherDescription)}
-            />
-          </div>
-        )}
-      </div>
-    );
-  };
-  const isSyncing = isRefreshing;
+const isSyncing = isRefreshing;
 
 const PaymentSummarySection = () => (
   <div className="mt-4 bg-gray-50 rounded-lg p-4">
@@ -1067,48 +1082,6 @@ const PaymentSummarySection = () => (
     );
   };
   
-  const getOrganizerInstructions = (method: string) => {
-    if (profile?.role !== 'organizer') return null;
-    
-    return (
-      <div className="bg-blue-50 border border-blue-200 rounded p-3 mt-3">
-        <p className="text-sm text-blue-800 font-medium mb-2">
-          📋 Organizer Workflow for Square Sandbox:
-        </p>
-        <div className="space-y-3">
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 1: Record Payment Locally</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Enter ${balanceDue.toFixed(2)} in the {method} amount field above</li>
-              <li>Click "Record Payment" to save locally and open API Explorer</li>
-            </ol>
-          </div>
-          
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 2: Update Square via API Explorer</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>API Explorer will open automatically</li>
-              <li>Select "Invoices API" → "Search Invoices"</li>
-              <li>Add filter: invoice_number = "{confirmation?.invoiceNumber || confirmation?.id.slice(-8)}"</li>
-              <li>Run request to find your invoice</li>
-              <li>Copy the invoice ID from results</li>
-              <li>Use "Update Invoice" to mark as paid</li>
-            </ol>
-          </div>
-
-          <div>
-            <p className="text-xs text-blue-700 font-medium">Step 3: Sync Back</p>
-            <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside ml-2">
-              <li>Return to this app</li>
-              <li>Click "Sync with Square" button</li>
-              <li>Verify the payment status updated</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1145,22 +1118,13 @@ const PaymentSummarySection = () => (
         </div>
 
         <div>
-          <div className="bg-white rounded-lg border p-4">
-            <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Record payments or submit payment information for verification.
-            </p>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Payment Method</label>
-                <div className="mt-2">
-                  {renderPaymentMethodInputs()}
-                </div>
-              </div>
-              {selectedPaymentMethods.length > 0 && <ProofOfPaymentSection />}
-              <RecordPaymentButton />
+            <div className="bg-white rounded-lg border p-4">
+                <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                    Record payments or submit payment information for verification.
+                </p>
+                <PaymentFormComponent invoice={confirmation} />
             </div>
-          </div>
         </div>
       </div>
 
