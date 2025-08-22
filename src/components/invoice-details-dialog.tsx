@@ -513,169 +513,169 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         };
       
         const handleRecordPayment = async () => {
-            if (!isValidPayment()) {
-              toast({
-                variant: 'destructive',
-                title: 'Invalid Payment',
-                description: 'Please select a payment method and enter a valid amount'
-              });
-              return;
+          if (!isValidPayment()) {
+            toast({
+              variant: 'destructive',
+              title: 'Invalid Payment',
+              description: 'Please select a payment method and enter a valid amount'
+            });
+            return;
+          }
+      
+          setIsUpdating(true);
+      
+          try {
+            // Get organizer initials from profile
+            const organizerInitials = profile?.firstName && profile?.lastName 
+              ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase()
+              : profile?.email?.substring(0, 2).toUpperCase() || 'ORG';
+      
+            // Create individual payment entries for each method
+            const newPayments = localSelectedMethods.map(method => ({
+              id: `payment_${Date.now()}_${method.toLowerCase().replace(/\s+/g, '_')}`,
+              amount: paymentAmounts[method] || 0,
+              method: method,
+              date: new Date().toISOString(),
+              dateFormatted: format(new Date(), 'MMM dd, yyyy HH:mm'),
+              source: 'manual',
+              status: 'completed',
+              organizerInitials: organizerInitials,
+              organizerName: profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : profile?.email || 'Organizer',
+              details: {
+                // Store method-specific details
+                ...(method === 'Check' && { 
+                  checkNumber: checkNumber,
+                  checkAmount: paymentAmounts[method]
+                }),
+                ...(method === 'Cash App' && { 
+                  cashAppHandle: cashAppHandle,
+                  cashAppAmount: paymentAmounts[method]
+                }),
+                ...(method === 'Zelle' && { 
+                  zelleEmail: zelleEmail,
+                  zelleAmount: paymentAmounts[method]
+                }),
+                ...(method === 'Venmo' && { 
+                  venmoHandle: venmoHandle,
+                  venmoAmount: paymentAmounts[method]
+                }),
+                ...(method === 'Cash' && { 
+                  cashAmount: paymentAmounts[method]
+                }),
+              }
+            }));
+      
+            // Update confirmation data
+            const updatedPaymentHistory = [...(confirmation.paymentHistory || []), ...newPayments];
+            const newTotalPaid = totalPaid + totalSelectedAmount;
+            const newBalanceDue = Math.max(0, totalInvoiced - newTotalPaid);
+            
+            // Determine new status
+            let newStatus = confirmation.invoiceStatus || 'UNPAID';
+            if (newTotalPaid >= totalInvoiced && newTotalPaid > 0) {
+              newStatus = 'PAID';
+            } else if (newTotalPaid > 0 && newTotalPaid < totalInvoiced) {
+              newStatus = 'PARTIALLY_PAID';
             }
-        
-            setIsUpdating(true);
-        
+      
+            const updatedConfirmationData = {
+              ...confirmation,
+              paymentHistory: updatedPaymentHistory,
+              totalPaid: newTotalPaid,
+              invoiceStatus: newStatus,
+              status: newStatus,
+              lastUpdated: new Date().toISOString(),
+              lastPaymentBy: organizerInitials,
+              lastPaymentDate: new Date().toISOString(),
+            };
+      
+            // 🎯 CRITICAL: Record payment using your existing recordPayment function
             try {
-              // Get organizer initials from profile
-              const organizerInitials = profile?.firstName && profile?.lastName 
-                ? `${profile.firstName.charAt(0)}${profile.lastName.charAt(0)}`.toUpperCase()
-                : profile?.email?.substring(0, 2).toUpperCase() || 'ORG';
-        
-              // Create individual payment entries for each method
-              const newPayments = localSelectedMethods.map(method => ({
-                id: `payment_${Date.now()}_${method.toLowerCase().replace(/\s+/g, '_')}`,
-                amount: paymentAmounts[method] || 0,
-                method: method,
-                date: new Date().toISOString(),
-                dateFormatted: format(new Date(), 'MMM dd, yyyy HH:mm'),
-                source: 'manual',
-                status: 'completed',
-                organizerInitials: organizerInitials,
-                organizerName: profile?.firstName ? `${profile.firstName} ${profile.lastName || ''}`.trim() : profile?.email || 'Organizer',
-                details: {
-                  // Store method-specific details
-                  ...(method === 'Check' && { 
-                    checkNumber: checkNumber,
-                    checkAmount: paymentAmounts[method]
-                  }),
-                  ...(method === 'Cash App' && { 
-                    cashAppHandle: cashAppHandle,
-                    cashAppAmount: paymentAmounts[method]
-                  }),
-                  ...(method === 'Zelle' && { 
-                    zelleEmail: zelleEmail,
-                    zelleAmount: paymentAmounts[method]
-                  }),
-                  ...(method === 'Venmo' && { 
-                    venmoHandle: venmoHandle,
-                    venmoAmount: paymentAmounts[method]
-                  }),
-                  ...(method === 'Cash' && { 
-                    cashAmount: paymentAmounts[method]
-                  }),
-                }
-              }));
-        
-              // Update confirmation data
-              const updatedPaymentHistory = [...(confirmation.paymentHistory || []), ...newPayments];
-              const newTotalPaid = totalPaid + totalSelectedAmount;
-              const newBalanceDue = Math.max(0, totalInvoiced - newTotalPaid);
+              console.log('🔄 Recording payment through recordPayment flow...');
               
-              // Determine new status
-              let newStatus = confirmation.invoiceStatus || 'UNPAID';
-              if (newTotalPaid >= totalInvoiced && newTotalPaid > 0) {
-                newStatus = 'PAID';
-              } else if (newTotalPaid > 0 && newTotalPaid < totalInvoiced) {
-                newStatus = 'PARTIALLY_PAID';
-              }
-        
-              const updatedConfirmationData = {
-                ...confirmation,
-                paymentHistory: updatedPaymentHistory,
-                totalPaid: newTotalPaid,
-                invoiceStatus: newStatus,
-                status: newStatus,
-                lastUpdated: new Date().toISOString(),
-                lastPaymentBy: organizerInitials,
-                lastPaymentDate: new Date().toISOString(),
-              };
-        
-              // 🎯 CRITICAL: Record payment using your existing recordPayment function
-              try {
-                console.log('🔄 Recording payment through recordPayment flow...');
-                
-                // Use your existing recordPayment function
-                const paymentResult = await recordPayment({
-                    invoiceId: confirmation.invoiceId,
-                    amount: totalSelectedAmount,
-                    note: `Manual entry by ${organizerInitials}: ${localSelectedMethods.join(', ')}`,
-                });
-                
-                console.log('✅ Payment recorded successfully:', paymentResult);
-                
-                // If recordPayment was successful, it should update Square automatically
-                toast({
-                    title: `💳 Payment Recorded by ${organizerInitials}`,
-                    description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded and synced to Square`,
-                    duration: 5000,
-                });
-        
-              } catch (squareError) {
-                console.log('⚠️ Square sync failed, recording locally only:', squareError);
-                
-                // If Square fails, still record locally
-                toast({
-                    title: `💳 Payment Recorded Locally by ${organizerInitials}`,
-                    description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded. Use "Sync with Square" to update Square manually.`,
-                    duration: 7000,
-                });
-              }
-        
-              // Update localStorage regardless of Square success
-              const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-              const updatedAllInvoices = allInvoices.map((inv: any) =>
-                inv.id === confirmation.id ? updatedConfirmationData : inv
-              );
-              localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
-        
-              const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-              const updatedConfirmations = confirmations.map((conf: any) =>
-                conf.id === confirmation.id ? updatedConfirmationData : conf
-              );
-              localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-        
-              // Update component state
-              setConfirmation(updatedConfirmationData);
-        
-              // Reset form
-              setLocalSelectedMethods([]);
-              setPaymentAmounts({});
-              
-              // Clear all payment fields
-              setCheckAmount('');
-              setCheckNumber('');
-              setCashAppAmount('');
-              setCashAppHandle('');
-              setZelleAmount('');
-              setZelleEmail('');
-              setVenmoAmount('');
-              setVenmoHandle('');
-              setCashAmount('');
-        
-              // Trigger storage events to update other components
-              window.dispatchEvent(new Event('storage'));
-              window.dispatchEvent(new Event('all_invoices_updated'));
-        
-              // If fully paid, show special message
-              if (newStatus === 'PAID') {
-                setTimeout(() => {
-                  toast({
-                    title: `🎉 Invoice Fully Paid!`,
-                    description: `Marked as PAID by ${organizerInitials} on ${format(new Date(), 'MMM dd, yyyy')}`,
-                  });
-                }, 1500);
-              }
-        
-            } catch (error) {
-              console.error('Error recording payment:', error);
-              toast({
-                variant: 'destructive',
-                title: 'Payment Recording Failed',
-                description: 'Failed to record payment. Please try again.',
+              // Use your existing recordPayment function
+              const paymentResult = await recordPayment({
+                  invoiceId: confirmation.invoiceId,
+                  amount: totalSelectedAmount,
+                  note: `Manual entry by ${organizerInitials}: ${localSelectedMethods.join(', ')}`,
               });
-            } finally {
-              setIsUpdating(false);
+              
+              console.log('✅ Payment recorded successfully:', paymentResult);
+              
+              // If recordPayment was successful, it should update Square automatically
+              toast({
+                  title: `💳 Payment Recorded by ${organizerInitials}`,
+                  description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded and synced to Square`,
+                  duration: 5000,
+              });
+      
+            } catch (squareError) {
+              console.log('⚠️ Square sync failed, recording locally only:', squareError);
+              
+              // If Square fails, still record locally
+              toast({
+                  title: `💳 Payment Recorded Locally by ${organizerInitials}`,
+                  description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded. Use "Sync with Square" to update Square manually.`,
+                  duration: 7000,
+              });
             }
-        };
+      
+            // Update localStorage regardless of Square success
+            const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
+            const updatedAllInvoices = allInvoices.map((inv: any) =>
+              inv.id === confirmation.id ? updatedConfirmationData : inv
+            );
+            localStorage.setItem('all_invoices', JSON.stringify(updatedAllInvoices));
+      
+            const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+            const updatedConfirmations = confirmations.map((conf: any) =>
+              conf.id === confirmation.id ? updatedConfirmationData : conf
+            );
+            localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+      
+            // Update component state
+            setConfirmation(updatedConfirmationData);
+      
+            // Reset form
+            setLocalSelectedMethods([]);
+            setPaymentAmounts({});
+            
+            // Clear all payment fields
+            setCheckAmount('');
+            setCheckNumber('');
+            setCashAppAmount('');
+            setCashAppHandle('');
+            setZelleAmount('');
+            setZelleEmail('');
+            setVenmoAmount('');
+            setVenmoHandle('');
+            setCashAmount('');
+      
+            // Trigger storage events to update other components
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new Event('all_invoices_updated'));
+      
+            // If fully paid, show special message
+            if (newStatus === 'PAID') {
+              setTimeout(() => {
+                toast({
+                  title: `🎉 Invoice Fully Paid!`,
+                  description: `Marked as PAID by ${organizerInitials} on ${format(new Date(), 'MMM dd, yyyy')}`,
+                });
+              }, 1500);
+            }
+      
+          } catch (error) {
+            console.error('Error recording payment:', error);
+            toast({
+              variant: 'destructive',
+              title: 'Payment Recording Failed',
+              description: 'Failed to record payment. Please try again.',
+            });
+          } finally {
+            setIsUpdating(false);
+          }
+      };
       
         return (
           <div className="space-y-4">
@@ -966,7 +966,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           
           {/* Enhanced debug info for organizers */}
           {profile?.role === 'organizer' && (
-            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-300 rounded text-xs">
+            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
               <h4 className="font-medium text-yellow-800 mb-2">🔍 Square Debug Info:</h4>
               <div className="space-y-1 text-yellow-700">
                 <p><strong>Invoice URL:</strong> {confirmation?.invoiceUrl || 'Not found'}</p>
