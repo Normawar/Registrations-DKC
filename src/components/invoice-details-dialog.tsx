@@ -1040,34 +1040,26 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         console.log('🔗 Square button clicked:', { invoiceUrl, invoiceNumber });
         
         if (invoiceUrl) {
-          // Try the original URL first
-          console.log('🔗 Trying original URL:', invoiceUrl);
+          // Check if it's a sandbox URL
+          const isSandbox = invoiceUrl.includes('squareupsandbox.com');
+          
+          console.log('🔗 Opening URL:', invoiceUrl);
+          console.log('🔗 Environment:', isSandbox ? 'SANDBOX' : 'PRODUCTION');
+          
           window.open(invoiceUrl, '_blank');
           
-          // Show helpful message
+          // Show environment-specific message
           toast({
-            title: 'Opening Square Invoice',
-            description: `Opening invoice #${invoiceNumber}. If you see "Oops" error, the invoice may not exist in Square.`,
+            title: `Opening ${isSandbox ? 'Sandbox' : 'Production'} Square Invoice`,
+            description: `Invoice #${invoiceNumber} in ${isSandbox ? 'sandbox' : 'production'} environment`,
             duration: 8000
           });
           
-          // Show backup instructions after a delay
-          setTimeout(() => {
-            if (profile?.role === 'organizer') {
-              toast({
-                title: '💡 If Square shows "Oops" error:',
-                description: `Use Developer Console below to search for invoice #${invoiceNumber} manually.`,
-                duration: 10000
-              });
-            }
-          }, 3000);
-          
         } else {
-          // No URL available, show developer console instructions
           toast({
             variant: 'destructive',
             title: 'No Square URL Available',
-            description: `Invoice #${invoiceNumber} may not be created in Square yet. Use Developer Console to find or create it.`,
+            description: `Invoice #${invoiceNumber} may not be created in Square yet.`,
             duration: 10000
           });
         }
@@ -1076,34 +1068,46 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       return (
         <div className="mt-4">
           <label className="text-sm text-gray-600">Invoice Link</label>
-          <Button
-            variant="outline"
-            className="w-full mt-1"
-            onClick={handleOpenSquare}
-          >
-            Open in Square
-            <ExternalLink className="w-4 h-4 ml-2" />
-          </Button>
+          <div className="space-y-2">
+  <Button
+    variant="outline"
+    className="w-full"
+    onClick={handleOpenSquare}
+  >
+    💳 Open Square Invoice
+    <ExternalLink className="w-4 h-4 ml-2" />
+  </Button>
+  
+  <Button
+    variant="outline"
+    className="w-full"
+    onClick={() => {
+      window.open('https://squareupsandbox.com/dashboard/invoices', '_blank');
+      toast({
+        title: '📊 Square Dashboard',
+        description: `Look for invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)} and click "Collect Payment"`,
+        duration: 10000
+      });
+    }}
+  >
+    📊 Open Square Dashboard
+    <ExternalLink className="w-4 h-4 ml-2" />
+  </Button>
+  
+  <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+    <p className="font-medium text-blue-800">🎯 To record payment in Square:</p>
+    <p className="text-blue-700">1. Click button above → 2. Find invoice #{confirmation?.invoiceNumber || 'Unknown'} → 3. Click "Collect Payment" → 4. Enter ${balanceDue.toFixed(2)} → 5. Record payment</p>
+  </div>
+</div>
           
-          {/* Enhanced debug info for organizers */}
-          {profile?.role === 'organizer' && (
-            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-300 rounded text-xs">
-              <h4 className="font-medium text-yellow-800 mb-2">🔍 Square Debug Info:</h4>
-              <div className="space-y-1 text-yellow-700">
-                <p><strong>Invoice URL:</strong> {confirmation?.invoiceUrl || 'Not found'}</p>
-                <p><strong>Invoice ID:</strong> {confirmation?.invoiceId || 'Not found'}</p>
-                <p><strong>Invoice Number:</strong> {confirmation?.invoiceNumber || 'Not found'}</p>
-                <p><strong>Public URL:</strong> {confirmation?.publicUrl || 'Not found'}</p>
-              </div>
-              
-              {confirmation?.invoiceUrl && (
-                <div className="mt-2 p-2 bg-yellow-100 rounded">
-                  <p className="text-xs text-yellow-800">
-                    <strong>💡 If "Oops" error appears:</strong> The invoice URL exists but the invoice wasn't found in Square. 
-                    This usually means the invoice needs to be created manually in Square first.
-                  </p>
-                </div>
-              )}
+          {/* Environment indicator */}
+          {confirmation?.invoiceUrl && (
+            <div className="mt-2 text-xs text-center">
+              <span className={`px-2 py-1 rounded text-white ${
+                confirmation.invoiceUrl.includes('sandbox') ? 'bg-orange-500' : 'bg-green-500'
+              }`}>
+                {confirmation.invoiceUrl.includes('sandbox') ? '🧪 SANDBOX' : '🚀 PRODUCTION'}
+              </span>
             </div>
           )}
         </div>
@@ -1351,7 +1355,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
-
-    
-
-    
