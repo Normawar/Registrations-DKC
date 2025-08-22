@@ -454,152 +454,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         )}
       </div>
     );
-
-    const recordPaymentToSquareAPI = async (paymentData: {
-      invoiceId: string;
-      amount: number;
-      method: string;
-      note: string;
-      organizerInitials: string;
-    }) => {
-      // This should use your actual Square API credentials
-      const SQUARE_SANDBOX_TOKEN = process.env.NEXT_PUBLIC_SQUARE_SANDBOX_ACCESS_TOKEN;
-      const SQUARE_APPLICATION_ID = process.env.NEXT_PUBLIC_SQUARE_SANDBOX_APPLICATION_ID;
     
-      if (!SQUARE_SANDBOX_TOKEN || !SQUARE_APPLICATION_ID) {
-        throw new Error('Square sandbox credentials not configured');
-      }
-    
-      console.log('🔄 Making REAL Square API call...');
-      console.log('📋 Payment data:', paymentData);
-    
-      try {
-        // Use Square's Create Payment API
-        const response = await fetch('https://connect.squareupsandbox.com/v2/payments', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SQUARE_SANDBOX_TOKEN}`,
-            'Square-Version': '2023-10-18'
-          },
-          body: JSON.stringify({
-            source_id: 'EXTERNAL', // For manually recorded payments
-            amount_money: {
-              amount: Math.round(paymentData.amount * 100), // Convert to cents
-              currency: 'USD'
-            },
-            app_fee_money: {
-              amount: 0,
-              currency: 'USD'
-            },
-            note: paymentData.note,
-            external_details: {
-              type: 'OTHER',
-              source: {
-                type: 'OTHER',
-                id: `manual_${paymentData.organizerInitials}_${Date.now()}`
-              }
-            },
-            reference_id: `invoice_${paymentData.invoiceId}_${Date.now()}`,
-            order_id: paymentData.invoiceId
-          })
-        });
-    
-        const result = await response.json();
-        
-        if (!response.ok) {
-          console.error('❌ Square API error:', result);
-          throw new Error(`Square API error: ${result.errors?.[0]?.detail || 'Unknown error'}`);
-        }
-    
-        console.log('✅ Square API success:', result);
-        return result;
-    
-      } catch (error) {
-        console.error('❌ Square API call failed:', error);
-        throw error;
-      }
-    };
-    
-    // Alternative: Use Square's Update Invoice API to add payment
-    const updateSquareInvoiceWithPayment = async (paymentData: {
-      invoiceId: string;
-      amount: number;
-      method: string;
-      note: string;
-      organizerInitials: string;
-    }) => {
-      const SQUARE_SANDBOX_TOKEN = process.env.NEXT_PUBLIC_SQUARE_SANDBOX_ACCESS_TOKEN;
-    
-      if (!SQUARE_SANDBOX_TOKEN) {
-        throw new Error('Square sandbox token not configured');
-      }
-    
-      console.log('🔄 Updating Square invoice with payment...');
-    
-      try {
-        // First, get current invoice
-        const getResponse = await fetch(`https://connect.squareupsandbox.com/v2/invoices/${paymentData.invoiceId}`, {
-          headers: {
-            'Authorization': `Bearer ${SQUARE_SANDBOX_TOKEN}`,
-            'Square-Version': '2023-10-18'
-          }
-        });
-    
-        if (!getResponse.ok) {
-          throw new Error('Failed to get invoice from Square');
-        }
-    
-        const invoiceData = await getResponse.json();
-        console.log('📋 Current invoice:', invoiceData);
-    
-        // Update invoice with payment information
-        const updateResponse = await fetch(`https://connect.squareupsandbox.com/v2/invoices/${paymentData.invoiceId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SQUARE_SANDBOX_TOKEN}`,
-            'Square-Version': '2023-10-18'
-          },
-          body: JSON.stringify({
-            invoice: {
-              ...invoiceData.invoice,
-              version: invoiceData.invoice.version,
-              // Add payment information to invoice
-              invoice_recipients: invoiceData.invoice.invoice_recipients,
-              payment_requests: [
-                ...invoiceData.invoice.payment_requests || [],
-                {
-                  request_type: 'BALANCE',
-                  due_date: new Date().toISOString().split('T')[0]
-                }
-              ],
-              description: `${invoiceData.invoice.description || ''}\n\nPayment recorded: ${paymentData.method} $${paymentData.amount.toFixed(2)} by ${paymentData.organizerInitials}`,
-              order_details: {
-                ...invoiceData.invoice.order_details,
-                // You might need to update order details here
-              }
-            }
-          })
-        });
-    
-        const updateResult = await updateResponse.json();
-        
-        if (!updateResponse.ok) {
-          console.error('❌ Square invoice update error:', updateResult);
-          throw new Error(`Square update error: ${updateResult.errors?.[0]?.detail || 'Unknown error'}`);
-        }
-    
-        console.log('✅ Square invoice updated:', updateResult);
-        return updateResult;
-    
-      } catch (error) {
-        console.error('❌ Square invoice update failed:', error);
-        throw error;
-      }
-    };
-    
-
     const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
         const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]);
         const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
@@ -709,40 +564,69 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               }
             }));
         
-            // 🎯 CRITICAL: Record payment using your existing recordPayment function
-            try {
-              console.log('🔄 Recording payment through recordPayment flow...');
-              
-              // Use your existing recordPayment function
-              const paymentResult = await recordPayment({
-                confirmationId: confirmation.id,
-                invoiceId: confirmation.invoiceId,
-                payments: newPayments,
-                totalAmount: totalSelectedAmount,
-                organizerInitials: organizerInitials
-              });
-              
-              console.log('✅ Payment recorded successfully:', paymentResult);
-              
-              // If recordPayment was successful, it should update Square automatically
-              toast({
-                title: `💳 Payment Recorded by ${organizerInitials}`,
-                description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded and synced to Square`,
-                duration: 5000,
-              });
+            // Calculate new totals
+            const newTotalPaid = totalPaid + totalSelectedAmount;
+            const newBalanceDue = Math.max(0, totalInvoiced - newTotalPaid);
+            const newStatus = newBalanceDue <= 0 ? 'PAID' : 'PARTIALLY_PAID';
         
-            } catch (squareError) {
-              console.log('⚠️ Square sync failed, recording locally only:', squareError);
+            // 🎯 DEFINE updatedConfirmationData HERE (before it's used)
+            const updatedConfirmationData = {
+              ...confirmation,
+              paymentHistory: [...(confirmation.paymentHistory || []), ...newPayments],
+              totalPaid: newTotalPaid,
+              invoiceStatus: newStatus,
+              status: newStatus,
+              lastUpdated: new Date().toISOString(),
+            };
+        
+            // Try Square sync (optional, won't block if it fails)
+            try {
+              console.log('🔄 Attempting Square sync...');
               
-              // If Square fails, still record locally
-              toast({
-                title: `💳 Payment Recorded Locally by ${organizerInitials}`,
-                description: `Payment of $${totalSelectedAmount.toFixed(2)} recorded. Use "Sync with Square" to update Square manually.`,
-                duration: 7000,
-              });
+              if (confirmation?.invoiceId) {
+                await recordPayment({
+                  invoiceId: confirmation.invoiceId,
+                  amount: totalSelectedAmount,
+                  note: `${newPayments.map(p => `${p.method}: $${p.amount}`).join(', ')} recorded by ${organizerInitials}`,
+                  paymentMethod: newPayments.map(p => p.method).join(', '),
+                  organizerInitials: organizerInitials
+                });
+                
+                console.log('✅ Square sync successful');
+                toast({
+                  title: `💳 Payment Synced to Square by ${organizerInitials}`,
+                  description: `$${totalSelectedAmount.toFixed(2)} recorded and synced to Square API`,
+                  duration: 5000,
+                });
+              } else {
+                console.log('ℹ️ No Square invoice ID, recording locally only');
+                toast({
+                  title: `💳 Payment Recorded Locally by ${organizerInitials}`,
+                  description: `$${totalSelectedAmount.toFixed(2)} recorded. Square invoice may need to be created manually.`,
+                  duration: 5000,
+                });
+              }
+        
+            } catch (squareError: any) {
+              console.log('⚠️ Square sync failed, but local recording successful:', squareError);
+              
+              const errorMessage = squareError?.message || 'Unknown error';
+              if (errorMessage.includes('not found') || errorMessage.includes('404')) {
+                toast({
+                  title: `💳 Payment Recorded Locally by ${organizerInitials}`,
+                  description: `$${totalSelectedAmount.toFixed(2)} recorded. The invoice wasn't found in Square. This usually means the invoice needs to be created manually in Square first.`,
+                  duration: 8000,
+                });
+              } else {
+                toast({
+                  title: `💳 Payment Recorded Locally by ${organizerInitials}`,
+                  description: `$${totalSelectedAmount.toFixed(2)} recorded. Square sync failed: ${errorMessage}`,
+                  duration: 7000,
+                });
+              }
             }
         
-            // Update localStorage regardless of Square success
+            // Update localStorage (always do this, regardless of Square sync)
             const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
             const updatedAllInvoices = allInvoices.map((inv: any) =>
               inv.id === confirmation.id ? updatedConfirmationData : inv
@@ -1001,7 +885,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('all_invoices_updated'));
         
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Square sync failed:', error);
         
         // More detailed error messages
@@ -1068,37 +952,37 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       return (
         <div className="mt-4">
           <label className="text-sm text-gray-600">Invoice Link</label>
-          <div className="space-y-2">
-  <Button
-    variant="outline"
-    className="w-full"
-    onClick={handleOpenSquare}
-  >
-    💳 Open Square Invoice
-    <ExternalLink className="w-4 h-4 ml-2" />
-  </Button>
-  
-  <Button
-    variant="outline"
-    className="w-full"
-    onClick={() => {
-      window.open('https://squareupsandbox.com/dashboard/invoices', '_blank');
-      toast({
-        title: '📊 Square Dashboard',
-        description: `Look for invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)} and click "Collect Payment"`,
-        duration: 10000
-      });
-    }}
-  >
-    📊 Open Square Dashboard
-    <ExternalLink className="w-4 h-4 ml-2" />
-  </Button>
-  
-  <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-    <p className="font-medium text-blue-800">🎯 To record payment in Square:</p>
-    <p className="text-blue-700">1. Click button above → 2. Find invoice #{confirmation?.invoiceNumber || 'Unknown'} → 3. Click "Collect Payment" → 4. Enter ${balanceDue.toFixed(2)} → 5. Record payment</p>
-  </div>
-</div>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleOpenSquare}
+              >
+                💳 Open Square Invoice
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+              
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  window.open('https://squareupsandbox.com/dashboard/invoices', '_blank');
+                  toast({
+                    title: '📊 Square Dashboard',
+                    description: `Look for invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)} and click "Collect Payment"`,
+                    duration: 10000
+                  });
+                }}
+              >
+                📊 Open Square Dashboard
+                <ExternalLink className="w-4 h-4 ml-2" />
+              </Button>
+              
+              <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                <p className="font-medium text-blue-800">🎯 To record payment in Square:</p>
+                <p className="text-blue-700">1. Click button above → 2. Find invoice #{confirmation?.invoiceNumber || 'Unknown'} → 3. Click "Collect Payment" → 4. Enter ${balanceDue.toFixed(2)} → 5. Record payment</p>
+              </div>
+            </div>
           
           {/* Environment indicator */}
           {confirmation?.invoiceUrl && (
@@ -1144,7 +1028,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       
         const openSquareDashboard = () => {
             // Always open sandbox
-            window.open('https://squareupsandbox.com/dashboard/invoices', '_blank');
+            const sandboxUrl = 'https://squareupsandbox.com/dashboard/invoices';
+            
+            console.log('🔗 Opening hardcoded sandbox URL:', sandboxUrl);
+            
+            window.open(sandboxUrl, '_blank');
             
             toast({
               title: '🧪 Sandbox Dashboard',
@@ -1355,3 +1243,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
+
+    
