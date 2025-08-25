@@ -1106,15 +1106,55 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           </div>
         );
       };
-
-      const SquareConfigDebug = () => {
+      
+    const SquareConfigDebug = () => {
         useEffect(() => {
-          console.log('Square Config Check:');
-          console.log('- Invoice ID format:', confirmation?.invoiceId);
-          console.log('- Environment:', confirmation?.invoiceUrl?.includes('sandbox') ? 'SANDBOX' : 'PRODUCTION');
-          console.log('- Location ID available:', !!process.env.SQUARE_LOCATION_ID);
-        }, []);
-        return null;
+          console.log('🔧 SQUARE CONFIGURATION DEBUG:');
+          console.log('- Environment:', process.env.NODE_ENV);
+          console.log('- Square Location ID exists:', !!process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID);
+          console.log('- Square Token exists:', !!process.env.SQUARE_SANDBOX_TOKEN);
+          console.log('- Expected Location ID:', process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID);
+          
+          // Check if we're using sandbox or production URLs
+          const invoiceUrl = confirmation?.invoiceUrl || confirmation?.publicUrl;
+          if (invoiceUrl) {
+            const environment = invoiceUrl.includes('sandbox') ? 'SANDBOX' : 'PRODUCTION';
+            console.log('- Invoice Environment:', environment);
+            console.log('- Invoice URL:', invoiceUrl);
+            
+            if (environment === 'PRODUCTION' && process.env.NODE_ENV !== 'production') {
+              console.warn('⚠️ WARNING: Production Square invoice detected in development environment!');
+            }
+          }
+          
+          // Validate configuration
+          const issues = [];
+          if (!process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID) {
+            issues.push('Missing NEXT_PUBLIC_SQUARE_LOCATION_ID');
+          }
+          if (!process.env.SQUARE_SANDBOX_TOKEN) {
+            issues.push('Missing SQUARE_SANDBOX_TOKEN');
+          }
+          
+          if (issues.length > 0) {
+            console.error('❌ Configuration Issues:', issues);
+          } else {
+            console.log('✅ Square configuration appears valid');
+          }
+          
+        }, [confirmation]);
+      
+        return (
+          <div className="bg-orange-100 border border-orange-300 p-3 rounded-md text-sm">
+            <h4 className="font-bold text-orange-800">🔧 Square Config Debug</h4>
+            <div className="mt-2 space-y-1 text-orange-700">
+              <div>Location ID: {process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ? '✅ Set' : '❌ Missing'}</div>
+              <div>Sandbox Token: {process.env.SQUARE_SANDBOX_TOKEN ? '✅ Set' : '❌ Missing'}</div>
+              <div>Invoice Environment: {confirmation?.invoiceUrl?.includes('sandbox') ? '🧪 Sandbox' : confirmation?.invoiceUrl ? '🚀 Production' : '❓ Unknown'}</div>
+              <div>Invoice ID Format: {confirmation?.invoiceId?.startsWith('inv:') ? '✅ Correct' : '❌ Invalid'}</div>
+            </div>
+          </div>
+        );
       };
 
   if (!confirmation) {
@@ -1201,10 +1241,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <SquareConfigDebug />
         <ButtonStyles />
         <ProfileDebugComponent />
         <SquareDebugComponent />
+        <SquareConfigDebug />
         <DialogHeader>
           <DialogTitle>
             <div className="flex items-center gap-2">

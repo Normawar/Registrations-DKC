@@ -31,19 +31,21 @@ const RecordPaymentOutputSchema = z.object({
 export type RecordPaymentOutput = z.infer<typeof RecordPaymentOutputSchema>;
 
 // This function now makes a direct API call to Square to create a payment.
+export interface RecordPaymentParams {
+  invoiceId: string;
+  amount: number;
+  paymentMethod: string;
+  note: string;
+  organizerInitials: string;
+}
+
 export const recordPayment = async ({
   invoiceId,
   amount,
   paymentMethod,
   note,
   organizerInitials
-}: {
-  invoiceId: string;
-  amount: number;
-  paymentMethod: string;
-  note: string;
-  organizerInitials: string;
-}) => {
+}: RecordPaymentParams) => {
   const { isConfigured } = await checkSquareConfig();
   if (!isConfigured) {
     console.log(`Square not configured. Mock-recording payment for invoice ${invoiceId}.`);
@@ -65,7 +67,7 @@ export const recordPayment = async ({
       amount: BigInt(Math.round(amount * 100)), // Convert to cents
       currency: 'USD',
     },
-    invoiceId: invoiceId,
+    invoiceIds: [invoiceId],
     locationId: locationId,
     note: note,
     externalDetails: {
@@ -81,16 +83,14 @@ export const recordPayment = async ({
 
   console.log('✅ Square API success:', result);
 
-  // Now, link this payment to the invoice by calling the recordPayment endpoint
-  const { result: recordResult } = await squareClient.invoicesApi.recordPayment(invoiceId, {
-      paymentId: result.payment.id!
-  });
+  // Now, get the updated invoice status
+  const { result: invoiceResult } = await squareClient.invoicesApi.getInvoice(invoiceId);
 
   return {
     paymentId: result.payment.id!,
-    status: recordResult.invoice?.status || 'UNKNOWN',
-    totalPaid: Number(recordResult.invoice?.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount || 0) / 100,
-    totalInvoiced: Number(recordResult.invoice?.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100,
+    status: invoiceResult.invoice?.status || 'UNKNOWN',
+    totalPaid: Number(invoiceResult.invoice?.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount || 0) / 100,
+    totalInvoiced: Number(invoiceResult.invoice?.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100,
   };
 };
 
@@ -107,7 +107,7 @@ export const recordPaymentFlow = ai.defineFlow(
         amount: input.amount,
         paymentMethod: input.paymentMethod || 'manual',
         note: input.note || 'No note provided',
-        organizerInitials: input.organizerInitials || 'N/A'
+        organizerInitials: input.organizerInitials || 'N/A',
     });
   }
 );
