@@ -1027,17 +1027,17 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         };
       
         const openSquareDashboard = () => {
-            // Use the correct Square sandbox developer console URL
-            const sandboxUrl = 'https://developer.squareup.com/apps';
+            // Always open sandbox
+            const sandboxUrl = 'https://squareupsandbox.com/dashboard/invoices';
             
-            console.log('🔗 Opening Square Developer Apps:', sandboxUrl);
+            console.log('🔗 Opening hardcoded sandbox URL:', sandboxUrl);
             
             window.open(sandboxUrl, '_blank');
             
             toast({
-              title: '🛠️ Square Developer Console',
-              description: 'Opening Square Developer Apps. Click your app, then "Sandbox" tab to manage test invoices.',
-              duration: 10000
+              title: '🧪 Sandbox Dashboard',
+              description: 'Opening Square SANDBOX dashboard',
+              duration: 5000
             });
         };
       
@@ -1105,6 +1105,16 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             </div>
           </div>
         );
+      };
+
+      const SquareConfigDebug = () => {
+        useEffect(() => {
+          console.log('Square Config Check:');
+          console.log('- Invoice ID format:', confirmation?.invoiceId);
+          console.log('- Environment:', confirmation?.invoiceUrl?.includes('sandbox') ? 'SANDBOX' : 'PRODUCTION');
+          console.log('- Location ID available:', !!process.env.SQUARE_LOCATION_ID);
+        }, []);
+        return null;
       };
 
   if (!confirmation) {
@@ -1191,6 +1201,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <SquareConfigDebug />
         <ButtonStyles />
         <ProfileDebugComponent />
         <SquareDebugComponent />

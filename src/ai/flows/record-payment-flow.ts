@@ -1,13 +1,13 @@
 
 'use server';
 /**
- * @fileOverview Records a payment against a Square invoice using proper Square API methods.
+ * @fileOverview Records a payment against a Square invoice using the Square API.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type Money, type Payment } from 'square';
+import { ApiError } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 
@@ -23,172 +23,91 @@ const RecordPaymentInputSchema = z.object({
 export type RecordPaymentInput = z.infer<typeof RecordPaymentInputSchema>;
 
 const RecordPaymentOutputSchema = z.object({
-  invoiceId: z.string(),
   paymentId: z.string(),
   status: z.string(),
   totalPaid: z.number(),
   totalInvoiced: z.number(),
-  isPartialPayment: z.boolean(),
 });
 export type RecordPaymentOutput = z.infer<typeof RecordPaymentOutputSchema>;
 
-export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentOutput> {
-  return recordPaymentFlow(input);
-}
+// This function now makes a direct API call to Square to create a payment.
+export const recordPayment = async ({
+  invoiceId,
+  amount,
+  paymentMethod,
+  note,
+  organizerInitials
+}: {
+  invoiceId: string;
+  amount: number;
+  paymentMethod: string;
+  note: string;
+  organizerInitials: string;
+}) => {
+  const { isConfigured } = await checkSquareConfig();
+  if (!isConfigured) {
+    console.log(`Square not configured. Mock-recording payment for invoice ${invoiceId}.`);
+    return {
+        id: `MOCK_PAY_${randomUUID()}`,
+        status: 'COMPLETED',
+        amount_money: { amount: amount * 100, currency: 'USD' }
+    };
+  }
 
-const recordPaymentFlow = ai.defineFlow(
+  const squareClient = await getSquareClient();
+  const locationId = process.env.SQUARE_LOCATION_ID;
+
+  // Use the Square SDK to create a payment
+  const { result } = await squareClient.paymentsApi.createPayment({
+    sourceId: 'EXTERNAL', // For manually recorded payments
+    idempotencyKey: `payment_${invoiceId}_${Date.now()}_${organizerInitials}`,
+    amountMoney: {
+      amount: BigInt(Math.round(amount * 100)), // Convert to cents
+      currency: 'USD',
+    },
+    invoiceId: invoiceId,
+    locationId: locationId,
+    note: note,
+    externalDetails: {
+      type: 'OTHER',
+      source: paymentMethod || 'Manual',
+      sourceId: `local-${Date.now()}`
+    }
+  });
+
+  if (!result.payment) {
+    throw new Error('Square payment creation failed.');
+  }
+
+  console.log('✅ Square API success:', result);
+
+  // Now, link this payment to the invoice by calling the recordPayment endpoint
+  const { result: recordResult } = await squareClient.invoicesApi.recordPayment(invoiceId, {
+      paymentId: result.payment.id!
+  });
+
+  return {
+    paymentId: result.payment.id!,
+    status: recordResult.invoice?.status || 'UNKNOWN',
+    totalPaid: Number(recordResult.invoice?.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount || 0) / 100,
+    totalInvoiced: Number(recordResult.invoice?.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100,
+  };
+};
+
+// The Genkit flow remains as the primary public interface.
+export const recordPaymentFlow = ai.defineFlow(
   {
     name: 'recordPaymentFlow',
     inputSchema: RecordPaymentInputSchema,
     outputSchema: RecordPaymentOutputSchema,
   },
   async (input) => {
-    const { isConfigured } = await checkSquareConfig();
-    if (!isConfigured) {
-      console.log(`Square not configured. Mock-recording payment for invoice ${input.invoiceId}.`);
-      
-      // For mock mode, simulate realistic behavior
-      const mockTotalInvoiced = 40; // Use a realistic amount
-      const isPartial = input.amount < mockTotalInvoiced;
-      
-      return {
+    return recordPayment({
         invoiceId: input.invoiceId,
-        paymentId: `MOCK_PAY_${randomUUID()}`,
-        status: isPartial ? 'PARTIALLY_PAID' : 'PAID',
-        totalPaid: input.amount,
-        totalInvoiced: mockTotalInvoiced,
-        isPartialPayment: isPartial,
-      };
-    }
-
-    const squareClient = await getSquareClient();
-    const { invoicesApi, paymentsApi } = squareClient;
-      
-    try {
-      console.log(`Fetching invoice ${input.invoiceId} to get current details...`);
-      const { result: { invoice } } = await invoicesApi.getInvoice(input.invoiceId);
-      
-      if (!invoice || !invoice.version) {
-        throw new Error(`Could not find invoice or version for invoice: ${input.invoiceId}`);
-      }
-
-      if (!invoice.paymentRequests || invoice.paymentRequests.length === 0) {
-        throw new Error(`Invoice ${input.invoiceId} has no payment requests to apply payment to.`);
-      }
-
-      // Get the total invoice amount
-      const paymentRequest = invoice.paymentRequests[0];
-      const totalInvoicedCents = paymentRequest.requestedMoney?.amount ? Number(paymentRequest.requestedMoney.amount) : 0;
-      const totalInvoicedDollars = totalInvoicedCents / 100;
-
-      // Get current paid amount
-      const currentPaidCents = paymentRequest.totalCompletedAmountMoney?.amount ? Number(paymentRequest.totalCompletedAmountMoney.amount) : 0;
-      const currentPaidDollars = currentPaidCents / 100;
-
-      console.log(`Invoice details - Total: $${totalInvoicedDollars}, Currently Paid: $${currentPaidDollars}, New Payment: $${input.amount}`);
-
-      // Create the external payment record
-      const paymentAmount: Money = {
-          amount: BigInt(Math.round(input.amount * 100)),
-          currency: 'USD',
-      };
-      
-      const idempotencyKey = input.externalPaymentId || randomUUID();
-
-      const createPaymentResponse = await paymentsApi.createPayment({
-          idempotencyKey: idempotencyKey,
-          sourceId: 'EXTERNAL', 
-          amountMoney: paymentAmount,
-          note: input.note || 'Manual payment entry',
-          externalDetails: {
-            type: 'OTHER', // Use OTHER for generic external payments
-            source: input.paymentMethod || 'Manual Payment', // Source can be the method
-            sourceId: input.externalPaymentId, // Unique ID for traceability
-            sourceFeeMoney: {
-              amount: BigInt(0),
-              currency: 'USD'
-            }
-          }
-      });
-
-      const payment = createPaymentResponse.result.payment as Payment;
-      if (!payment || !payment.id) {
-        throw new Error("Failed to create payment record in Square.");
-      }
-      
-      console.log(`Successfully created payment ${payment.id}. Now linking to invoice...`);
-      
-      // Use the Square Invoices API to record the payment properly
-      // This should use the recordPayment endpoint as per Square documentation
-      try {
-        console.log(`Attempting to link payment ${payment.id} to invoice ${input.invoiceId} using recordPayment...`);
-        const recordResponse = await invoicesApi.recordPayment(input.invoiceId, {
-          paymentId: payment.id,
-          requestMethod: 'EXTERNAL'
-        });
-        
-        console.log('Payment recorded via recordPayment API:', recordResponse.result);
-      } catch (recordError) {
-        console.log('recordPayment API failed, falling back to updateInvoice method:', recordError);
-        
-        // Fallback to updating the invoice manually - THIS IS NOT RECOMMENDED but can be a last resort.
-        await invoicesApi.updateInvoice(input.invoiceId, {
-          invoice: {
-              paymentRequests: [{
-                  uid: paymentRequest.uid,
-                  requestType: paymentRequest.requestType,
-                  dueDate: paymentRequest.dueDate,
-                  reminders: paymentRequest.reminders,
-                  paymentId: payment.id, // Linking payment this way is less reliable
-              }],
-              version: invoice.version,
-          },
-          idempotencyKey: randomUUID(),
-        });
-      }
-
-      // Fetch the updated invoice to get the final status
-      const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(input.invoiceId);
-      
-      if (!finalInvoice) {
-        throw new Error("Failed to fetch updated invoice after payment recording.");
-      }
-
-      // Recalculate total paid amount from the final invoice for accuracy
-      const finalPaidCents = finalInvoice.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount ? Number(finalInvoice.paymentRequests[0].totalCompletedAmountMoney.amount) : 0;
-      const newTotalPaidDollars = finalPaidCents / 100;
-      const isPartialPayment = newTotalPaidDollars < totalInvoicedDollars;
-
-      // Use the status directly from the final invoice
-      let status = finalInvoice.status || 'UNKNOWN';
-
-      console.log(`Payment processing complete:
-        - Payment ID: ${payment.id}
-        - Status: ${status}
-        - Total Paid: $${newTotalPaidDollars}
-        - Invoice Total: $${totalInvoicedDollars}
-        - Is Partial: ${isPartialPayment}`);
-
-      return {
-        invoiceId: finalInvoice.id!,
-        paymentId: payment.id,
-        status: status,
-        totalPaid: newTotalPaidDollars,
-        totalInvoiced: totalInvoicedDollars,
-        isPartialPayment: isPartialPayment,
-      };
-      
-    } catch (error) {
-      if (error instanceof ApiError) {
-        console.error('Square API Error in recordPaymentFlow:', JSON.stringify(error.result, null, 2));
-        const errors = Array.isArray(error.result.errors) ? error.result.errors : [];
-        const errorMessage = errors.map((e: any) => `[${e.code}] ${e.detail}`).join(', ');
-        throw new Error(`Square Error: ${errorMessage}`);
-      }
-      console.error('An unexpected error occurred during payment recording:', error);
-      throw new Error(error instanceof Error ? error.message : 'An unexpected error occurred.');
-    }
+        amount: input.amount,
+        paymentMethod: input.paymentMethod || 'manual',
+        note: input.note || 'No note provided',
+        organizerInitials: input.organizerInitials || 'N/A'
+    });
   }
 );
-
-    
