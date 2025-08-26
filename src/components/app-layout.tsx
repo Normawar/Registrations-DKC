@@ -49,6 +49,7 @@ const sponsorMenuItems = [
 const districtCoordinatorMenuItems = [
     { href: "/profile", icon: User, label: "Profile" },
     { href: "/district-dashboard", icon: LayoutDashboard, label: "District Dashboard" },
+    { href: "/roster", icon: PawnIcon, label: "District Rosters" },
     { href: "/invoices", icon: Receipt, label: "District Invoices" },
     { href: "/requests", icon: KnightIcon, label: "District Requests" },
     { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },

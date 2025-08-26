@@ -41,7 +41,7 @@ export default function DistrictDashboardPage() {
     if (!profile?.district) return [];
     return allPlayers.filter(p => p.district === profile.district);
   }, [allPlayers, profile?.district]);
-
+  
   const districtSchools = useMemo(() => {
     if (!profile?.district) return [];
     const schools = districtPlayers
@@ -52,12 +52,11 @@ export default function DistrictDashboardPage() {
 
   const districtStats = useMemo(() => {
     if (!profile?.district) return { totalPlayers: 0, totalSchools: 0 };
-    const totalSchools = new Set(districtPlayers.map(p => p.school).filter(Boolean)).size;
     return {
         totalPlayers: districtPlayers.length,
-        totalSchools: totalSchools,
+        totalSchools: districtSchools.length,
     };
-  }, [districtPlayers, profile?.district]);
+  }, [districtPlayers, districtSchools, profile?.district]);
 
 
   return (
@@ -106,64 +105,6 @@ export default function DistrictDashboardPage() {
                 </CardContent>
             </Card>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>School Rosters</CardTitle>
-            <CardDescription>A view of all player rosters for each school in your district.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {clientReady && districtSchools.map(school => {
-                const schoolRoster = districtPlayers.filter(p => p.school === school);
-                return (
-                    <Card key={school}>
-                        <CardHeader>
-                            <CardTitle className="text-lg">{school}</CardTitle>
-                            <CardDescription>{schoolRoster.length} player(s)</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <ScrollArea className="h-72">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                    <TableHead>Player</TableHead>
-                                    <TableHead>USCF ID</TableHead>
-                                    <TableHead className="text-right">Rating</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {schoolRoster.map((player) => (
-                                    <TableRow key={player.id}>
-                                        <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-9 w-9">
-                                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                                            <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                            <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                                {player.email}
-                                            </div>
-                                            </div>
-                                        </div>
-                                        </TableCell>
-                                        <TableCell>{player.uscfId}</TableCell>
-                                        <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
-                                    </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                          </ScrollArea>
-                        </CardContent>
-                    </Card>
-                )
-            })}
-             {!clientReady && Array.from({length: 3}).map((_, i) => (
-                <Card key={i}><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
-            ))}
-          </CardContent>
-        </Card>
       </div>
     </AppLayout>
   );
