@@ -45,22 +45,22 @@ export default function DistrictDashboardPage() {
       const schools = allPlayers
           .filter(p => p.district === profile.district)
           .map(p => p.school);
-      return [...new Set(schools)].sort();
+      return ['All Schools', ...[...new Set(schools)].sort()];
   }, [allPlayers, profile]);
 
-  const [selectedSchool, setSelectedSchool] = useState<string>('');
+  const [selectedSchool, setSelectedSchool] = useState<string>('All Schools');
 
   useEffect(() => {
     setClientReady(true);
-    if (districtSchools.length > 0) {
-        setSelectedSchool(districtSchools[0]);
-    }
-  }, [districtSchools]);
+  }, []);
 
   const schoolRoster = useMemo(() => {
-    if (!selectedSchool) return [];
+    if (!profile?.district) return [];
+    if (selectedSchool === 'All Schools') {
+        return allPlayers.filter(p => p.district === profile.district);
+    }
     return allPlayers.filter(p => p.school === selectedSchool);
-  }, [allPlayers, selectedSchool]);
+  }, [allPlayers, selectedSchool, profile?.district]);
 
   const districtStats = useMemo(() => {
     if (!profile?.district) return { totalPlayers: 0, totalSchools: 0 };
@@ -149,13 +149,14 @@ export default function DistrictDashboardPage() {
                         <TableHeader>
                             <TableRow>
                             <TableHead>Player</TableHead>
+                            <TableHead>School</TableHead>
                             <TableHead>USCF ID</TableHead>
                             <TableHead className="text-right">Rating</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {!clientReady && Array.from({length: 5}).map((_, i) => (
-                                <TableRow key={i}><TableCell colSpan={3}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
+                                <TableRow key={i}><TableCell colSpan={4}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
                             ))}
                             {clientReady && schoolRoster.map((player) => (
                             <TableRow key={player.id}>
@@ -173,6 +174,7 @@ export default function DistrictDashboardPage() {
                                     </div>
                                 </div>
                                 </TableCell>
+                                <TableCell>{player.school}</TableCell>
                                 <TableCell>{player.uscfId}</TableCell>
                                 <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
                             </TableRow>
