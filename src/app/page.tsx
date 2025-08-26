@@ -24,9 +24,30 @@ export default function LoginPage() {
     
     // This script will run on the client and display the users for us to see.
     const usersRaw = localStorage.getItem('users');
-    if (usersRaw) {
-        console.log("Found users in system:", JSON.parse(usersRaw));
-        setUserList(JSON.parse(usersRaw));
+    let users = usersRaw ? JSON.parse(usersRaw) : [];
+
+    const organizerEmail = 'organizer@test.com';
+    const organizerExists = users.some((user: {email: string}) => user.email === organizerEmail);
+
+    if (!organizerExists) {
+        users.push({ email: organizerEmail, role: 'organizer' });
+        localStorage.setItem('users', JSON.stringify(users));
+
+        const profilesRaw = localStorage.getItem('sponsor_profile');
+        let profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
+        profiles[organizerEmail] = {
+            email: organizerEmail,
+            role: 'organizer',
+            firstName: 'Test',
+            lastName: 'Organizer',
+            avatarType: 'icon',
+            avatarValue: 'Wrench',
+        };
+        localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
+    }
+    
+    if (users) {
+        setUserList(users);
     } else {
         console.log("No users found in the system.");
     }
