@@ -69,9 +69,10 @@ export default function QuickStartGuidePage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm">1. Go to the <a href="/dashboard" className="font-medium underline">Dashboard</a> or <a href="/events" className="font-medium underline">Register for Event</a> page.</p>
-                  <p className="text-sm">2. Find an upcoming event and click the <strong>Register Players</strong> or <strong>Manage Registration</strong> button.</p>
-                  <div className="border rounded-lg p-4 bg-muted/50">
-                     <Image src="https://picsum.photos/600/400" alt="A screenshot showing the event list with the register button highlighted." width={600} height={400} className="rounded-md" data-ai-hint="event registration list" />
+                  <p className="text-sm">2. Find an upcoming event and click the <strong>Register for event</strong> button.</p>
+                  <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
+                     <Image src="https://drive.google.com/uc?export=view&id=1M1fuDS6gpQEiUfu_AjPSUgzObNmUZMd5" alt="A screenshot showing the event list with the register button highlighted." width={600} height={400} className="rounded-md" data-ai-hint="event registration list" />
+                     <Image src="https://drive.google.com/uc?export=view&id=1L5jZas7XBqEz8RzUaTgFiqz2GeOJnUi2" alt="A screenshot of the registration dialog." width={600} height={400} className="rounded-md" data-ai-hint="registration dialog" />
                   </div>
                   <p className="text-sm">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
                   <p className="text-sm">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
