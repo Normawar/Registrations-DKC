@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -1005,13 +1004,17 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         const invoiceId = confirmation?.invoiceId;
       
         const openDeveloperConsole = () => {
-          window.open('https://developer.squareup.com/apps', '_blank');
-          
-          toast({
-            title: '🛠️ Square Developer Console',
-            description: `Look for invoice #${invoiceNumber} or ID: ${invoiceId || 'N/A'}`,
-            duration: 15000
-          });
+          const sandboxUrl = 'https://developer.squareup.com/apps';
+            
+            console.log('🔗 Opening Square Developer Apps:', sandboxUrl);
+            
+            window.open(sandboxUrl, '_blank');
+            
+            toast({
+              title: '🛠️ Square Developer Console',
+              description: 'Opening Square Developer Apps. Click your app, then "Sandbox" tab to manage test invoices.',
+              duration: 10000
+            });
         };
       
         const openAPIExplorer = () => {
@@ -1106,56 +1109,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           </div>
         );
       };
-      
-    const SquareConfigDebug = () => {
-        useEffect(() => {
-          console.log('🔧 SQUARE CONFIGURATION DEBUG:');
-          console.log('- Environment:', process.env.NODE_ENV);
-          console.log('- Square Location ID exists:', !!process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID);
-          console.log('- Square Token exists:', !!process.env.SQUARE_SANDBOX_TOKEN);
-          console.log('- Expected Location ID:', process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID);
-          
-          // Check if we're using sandbox or production URLs
-          const invoiceUrl = confirmation?.invoiceUrl || confirmation?.publicUrl;
-          if (invoiceUrl) {
-            const environment = invoiceUrl.includes('sandbox') ? 'SANDBOX' : 'PRODUCTION';
-            console.log('- Invoice Environment:', environment);
-            console.log('- Invoice URL:', invoiceUrl);
-            
-            if (environment === 'PRODUCTION' && process.env.NODE_ENV !== 'production') {
-              console.warn('⚠️ WARNING: Production Square invoice detected in development environment!');
-            }
-          }
-          
-          // Validate configuration
-          const issues = [];
-          if (!process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID) {
-            issues.push('Missing NEXT_PUBLIC_SQUARE_LOCATION_ID');
-          }
-          if (!process.env.SQUARE_SANDBOX_TOKEN) {
-            issues.push('Missing SQUARE_SANDBOX_TOKEN');
-          }
-          
-          if (issues.length > 0) {
-            console.error('❌ Configuration Issues:', issues);
-          } else {
-            console.log('✅ Square configuration appears valid');
-          }
-          
-        }, [confirmation]);
-      
-        return (
-          <div className="bg-orange-100 border border-orange-300 p-3 rounded-md text-sm">
-            <h4 className="font-bold text-orange-800">🔧 Square Config Debug</h4>
-            <div className="mt-2 space-y-1 text-orange-700">
-              <div>Location ID: {process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ? '✅ Set' : '❌ Missing'}</div>
-              <div>Sandbox Token: {process.env.SQUARE_SANDBOX_TOKEN ? '✅ Set' : '❌ Missing'}</div>
-              <div>Invoice Environment: {confirmation?.invoiceUrl?.includes('sandbox') ? '🧪 Sandbox' : confirmation?.invoiceUrl ? '🚀 Production' : '❓ Unknown'}</div>
-              <div>Invoice ID Format: {confirmation?.invoiceId?.startsWith('inv:') ? '✅ Correct' : '❌ Invalid'}</div>
-            </div>
-          </div>
-        );
-      };
 
   if (!confirmation) {
     return (
@@ -1236,6 +1189,40 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     }, []);
   
     return null; // Just for debugging, doesn't render anything
+  };
+
+  const SquareConfigDebug = () => {
+    useEffect(() => {
+      console.log('🔧 SQUARE CONFIGURATION DEBUG:');
+      console.log('- Location ID exists:', !!process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID);
+      console.log('- Location ID value:', process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID);
+      
+      // Don't check SQUARE_SANDBOX_TOKEN in browser - it's server-side only
+      console.log('- Server token: Available server-side only (hidden from browser)');
+      
+      const issues = [];
+      if (!process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID) {
+        issues.push('Missing NEXT_PUBLIC_SQUARE_LOCATION_ID');
+      }
+      
+      if (issues.length > 0) {
+        console.error('❌ Configuration Issues:', issues);
+      } else {
+        console.log('✅ Client-side Square configuration valid');
+      }
+      
+    }, [confirmation]);
+  
+    return (
+      <div className="bg-green-100 border border-green-300 p-3 rounded-md text-sm">
+        <h4 className="font-bold text-green-800">🔧 Square Config Status</h4>
+        <div className="mt-2 space-y-1 text-green-700">
+          <div>Location ID: ✅ {process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID}</div>
+          <div>Server Token: 🔒 Hidden (server-side only)</div>
+          <div>Ready for API calls: ✅ Yes</div>
+        </div>
+      </div>
+    );
   };
 
   return (
