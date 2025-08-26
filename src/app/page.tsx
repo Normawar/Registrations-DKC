@@ -1,21 +1,18 @@
 
 'use client';
 
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
+import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 export default function EmergencyLoginPage() {
-  const { updateProfile } = useSponsorProfile();
   const router = useRouter();
   
-  useEffect(() => {
-    updateProfile(null);
-  }, [updateProfile]);
-
   const createTestUser = (role: 'sponsor' | 'individual' | 'organizer', email: string, isPsja: boolean = false) => {
+    // Manually clear any existing user profile from localStorage first
+    localStorage.removeItem('current_user_profile');
+
     // Create test user in localStorage
     const usersRaw = localStorage.getItem('users');
     const users: {email: string; role: string}[] = usersRaw ? JSON.parse(usersRaw) : [];
@@ -33,7 +30,7 @@ export default function EmergencyLoginPage() {
       email: email.toLowerCase(),
       role: role,
       firstName: isPsja ? 'PSJA' : 'Test',
-      lastName: 'Sponsor',
+      lastName: role === 'sponsor' ? 'Sponsor' : role === 'organizer' ? 'Organizer' : 'User',
       phone: '5551234567',
       district: isPsja ? 'PHARR-SAN JUAN-ALAMO ISD' : 'Test District',
       school: isPsja ? 'PSJA NORTH EARLY COLLEGE H S' : 'Test School',
@@ -45,7 +42,7 @@ export default function EmergencyLoginPage() {
       schoolPhone: ''
     };
 
-    updateProfile(profileData);
+    localStorage.setItem('current_user_profile', JSON.stringify(profileData));
 
     // Redirect based on role
     if (role === 'sponsor') {
@@ -97,7 +94,7 @@ export default function EmergencyLoginPage() {
           </Button>
 
           <div className="mt-4 p-3 bg-muted rounded-lg text-xs text-muted-foreground">
-            <strong>Note:</strong> This creates test accounts automatically. Use "Login as Organizer" to access the data upload features you need. The "Sponsor" login is pre-configured for a PSJA school.
+            <strong>Note:</strong> The "Sponsor" login is pre-configured for a PSJA school.
           </div>
         </CardContent>
       </Card>
