@@ -428,6 +428,7 @@ function RosterPageContent() {
                 </div>
                 {districtSchools.map(school => {
                     const schoolRoster = districtPlayers.filter(p => p.school === school);
+                    if (schoolRoster.length === 0) return null;
                     return (
                         <Card key={school}>
                             <CardHeader>

@@ -49,16 +49,20 @@ export default function UnifiedInvoiceRegistrations() {
 
   const loadData = useCallback(() => {
     try {
-      const allInvoices = localStorage.getItem('all_invoices');
-      
-      let invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
+      const allInvoicesRaw = localStorage.getItem('all_invoices');
+      let invoicesArray = allInvoicesRaw ? JSON.parse(allInvoicesRaw) : [];
 
-      if (profile?.role === 'sponsor' && profile.isDistrictCoordinator) {
+      // Filter by role
+      if (profile?.role === 'district_coordinator') {
           invoicesArray = invoicesArray.filter((inv: any) => inv.district === profile.district);
+          // Special filter for PSJA
+          if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+            invoicesArray = invoicesArray.filter((inv: any) => inv.gtCoordinatorEmail && inv.gtCoordinatorEmail.trim() !== '');
+          }
       } else if (profile?.role === 'sponsor') {
-        invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
+          invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
       } else if (profile?.role === 'individual') {
-        invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
+          invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
       }
       
       const mapped = invoicesArray.map((invoice: any) => {
@@ -72,30 +76,23 @@ export default function UnifiedInvoiceRegistrations() {
           registrations = invoice.registrations;
         }
 
-        // FIXED TITLE LOGIC - Priority: invoiceTitle > eventName > fallback
         const getInvoiceTitle = () => {
-          // MOST IMPORTANT: Always check invoiceTitle first and trust it if it exists
           if (invoice.invoiceTitle && typeof invoice.invoiceTitle === 'string' && invoice.invoiceTitle.trim() !== '') {
             return invoice.invoiceTitle.trim();
           }
-          
-          // Second priority: eventName for event registrations
           if (invoice.eventName && typeof invoice.eventName === 'string' && invoice.eventName.trim() !== '') {
             return invoice.eventName.trim();
           }
-          
-          // Last resort fallback for legacy data
           if (invoice.membershipType) {
             return `USCF ${invoice.membershipType}`;
           }
-          
           return 'Unknown Event';
         };
 
         return {
-          ...invoice, // Spread all properties
+          ...invoice,
           id: invoice.id || invoice.invoiceId,
-          invoiceTitle: getInvoiceTitle(), // Use improved logic
+          invoiceTitle: getInvoiceTitle(),
           companyName: invoice.schoolName || invoice.purchaserName || 'Unknown',
           contactEmail: invoice.sponsorEmail || invoice.purchaserEmail || 'Unknown',
           totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
