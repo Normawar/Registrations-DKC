@@ -10,7 +10,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -34,6 +34,7 @@ import { Label } from '@/components/ui/label';
 import { schoolData } from '@/lib/data/school-data';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
+type DistrictSortableColumnKey = SortableColumnKey | 'gt';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -410,6 +411,7 @@ function DistrictRosterView() {
     const { profile } = useSponsorProfile();
     const { database: allPlayers, isDbLoaded } = useMasterDb();
     const [selectedSchool, setSelectedSchool] = useState('all');
+    const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
 
     const districtPlayers = useMemo(() => {
         if (!isDbLoaded || !profile) return [];
@@ -418,7 +420,6 @@ function DistrictRosterView() {
 
     const districtSchools = useMemo(() => {
         if (!profile?.district) return [];
-        // Filter the master schoolData to get all schools for the current district.
         return schoolData
             .filter(school => school.district === profile.district)
             .map(school => school.schoolName)
@@ -431,6 +432,44 @@ function DistrictRosterView() {
         }
         return districtSchools.filter(school => school === selectedSchool);
     }, [selectedSchool, districtSchools]);
+
+    const requestSort = (key: DistrictSortableColumnKey) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (sortConfig?.key === key && sortConfig.direction === 'ascending') {
+          direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (columnKey: DistrictSortableColumnKey) => {
+        if (!sortConfig || sortConfig.key !== columnKey) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+        return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+    };
+    
+    const sortedPlayersForSchool = (schoolRoster: MasterPlayer[]) => {
+      let sortablePlayers = [...schoolRoster];
+      if (sortConfig) {
+        sortablePlayers.sort((a, b) => {
+          const key = sortConfig.key;
+          let aVal: any = a[key as keyof MasterPlayer] ?? '';
+          let bVal: any = b[key as keyof MasterPlayer] ?? '';
+
+          if (key === 'teamCode') {
+            aVal = generateTeamCode({ schoolName: a.school, district: a.district, studentType: a.studentType });
+            bVal = generateTeamCode({ schoolName: b.school, district: b.district, studentType: b.studentType });
+          } else if (key === 'gt') {
+             aVal = a.studentType === 'gt' ? 1 : 0;
+             bVal = b.studentType === 'gt' ? 1 : 0;
+          } else if (typeof aVal === 'string' && typeof bVal === 'string') {
+            return sortConfig.direction === 'ascending' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+          }
+          
+          const result = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+          return sortConfig.direction === 'ascending' ? result : -result;
+        });
+      }
+      return sortablePlayers;
+    };
     
     return (
         <div className="space-y-8">
@@ -457,6 +496,8 @@ function DistrictRosterView() {
 
             {displayedSchools.map(school => {
                 const schoolRoster = districtPlayers.filter(p => p.school === school);
+                const sortedSchoolRoster = sortedPlayersForSchool(schoolRoster);
+
                 if (schoolRoster.length === 0 && selectedSchool !== 'all') {
                      return (
                         <Card key={school}>
@@ -472,7 +513,7 @@ function DistrictRosterView() {
                         </Card>
                      );
                 }
-                if (schoolRoster.length === 0) return null; // Don't show empty cards in 'All' view
+                if (schoolRoster.length === 0) return null;
                 return (
                     <Card key={school}>
                         <CardHeader>
@@ -484,30 +525,33 @@ function DistrictRosterView() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Player</TableHead>
-                                        <TableHead>USCF ID</TableHead>
-                                        <TableHead className="text-right">Rating</TableHead>
+                                        <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')}>Player Name {getSortIcon('lastName')}</Button></TableHead>
+                                        <TableHead><Button variant="ghost" onClick={() => requestSort('teamCode')}>Team Code {getSortIcon('teamCode')}</Button></TableHead>
+                                        <TableHead><Button variant="ghost" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
+                                        <TableHead><Button variant="ghost" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
+                                        <TableHead><Button variant="ghost" onClick={() => requestSort('grade')}>Grade {getSortIcon('grade')}</Button></TableHead>
+                                        <TableHead><Button variant="ghost" onClick={() => requestSort('section')}>Section {getSortIcon('section')}</Button></TableHead>
+                                        {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                            <TableHead><Button variant="ghost" onClick={() => requestSort('gt')}>GT {getSortIcon('gt')}</Button></TableHead>
+                                        )}
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {schoolRoster.map((player) => (
+                                    {sortedSchoolRoster.map((player) => (
                                     <TableRow key={player.id}>
                                         <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-9 w-9">
-                                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                                            <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                            <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                                {player.email}
-                                            </div>
-                                            </div>
-                                        </div>
+                                          <div className="font-medium">{player.lastName}, {player.firstName}</div>
                                         </TableCell>
+                                        <TableCell>{generateTeamCode({ schoolName: player.school, district: player.district, studentType: player.studentType })}</TableCell>
                                         <TableCell>{player.uscfId}</TableCell>
                                         <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
+                                        <TableCell>{player.grade}</TableCell>
+                                        <TableCell>{player.section}</TableCell>
+                                        {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                            <TableCell>
+                                                {player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                     ))}
                                 </TableBody>
