@@ -41,37 +41,38 @@ export default function DistrictDashboardPage() {
   const [clientReady, setClientReady] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<string>('All Schools');
 
+  const districtPlayers = useMemo(() => {
+    if (!profile?.district) return [];
+    return allPlayers.filter(p => p.district === profile.district);
+  }, [allPlayers, profile?.district]);
+
   const districtSchools = useMemo(() => {
       if (!profile?.district) return [];
-      const schools = allPlayers
-          .filter(p => p.district === profile.district && p.school)
-          .map(p => p.school!);
+      const schools = districtPlayers
+          .map(p => p.school)
+          .filter(Boolean) as string[];
       return ['All Schools', ...[...new Set(schools)].sort()];
-  }, [allPlayers, profile]);
+  }, [districtPlayers, profile?.district]);
 
   useEffect(() => {
     setClientReady(true);
   }, []);
 
   const schoolRoster = useMemo(() => {
-    if (!profile?.district) return [];
-    const districtPlayers = allPlayers.filter(p => p.district === profile.district);
-    
     if (selectedSchool === 'All Schools') {
         return districtPlayers;
     }
     return districtPlayers.filter(p => p.school === selectedSchool);
-  }, [allPlayers, selectedSchool, profile?.district]);
+  }, [districtPlayers, selectedSchool]);
 
   const districtStats = useMemo(() => {
     if (!profile?.district) return { totalPlayers: 0, totalSchools: 0 };
-    const districtPlayers = allPlayers.filter(p => p.district === profile.district);
     const totalSchools = new Set(districtPlayers.map(p => p.school).filter(Boolean)).size;
     return {
         totalPlayers: districtPlayers.length,
         totalSchools: totalSchools,
     };
-  }, [allPlayers, profile]);
+  }, [districtPlayers, profile?.district]);
 
 
   return (
