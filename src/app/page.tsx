@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -13,44 +13,36 @@ import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-prof
 export default function LoginPage() {
   const { updateProfile } = useSponsorProfile();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState('sponsor');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [userList, setUserList] = useState<{email: string, role: string}[]>([]);
   
   useEffect(() => {
     updateProfile(null);
-  }, [updateProfile]);
-
-  useEffect(() => {
-    // This script will run on the client and print the users to the console for us to see.
+    
+    // This script will run on the client and display the users for us to see.
     const usersRaw = localStorage.getItem('users');
     if (usersRaw) {
         console.log("Found users in system:", JSON.parse(usersRaw));
+        setUserList(JSON.parse(usersRaw));
     } else {
         console.log("No users found in the system.");
     }
-  }, []);
+  }, [updateProfile]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Get current active tab
-    const activeTab = document.querySelector('.tab-button.active')?.getAttribute('data-tab') || 'sponsor';
-    
-    // Get form values
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    
-    // Clear any previous errors
-    const errorElement = document.getElementById('error-message');
-    if (errorElement) errorElement.textContent = '';
+    setError('');
     
     if (!email) {
-      if (errorElement) errorElement.textContent = 'Email is required';
+      setError('Email is required');
       return;
     }
     
     if (!password) {
-      if (errorElement) errorElement.textContent = 'Password is required';
+      setError('Password is required');
       return;
     }
 
@@ -61,12 +53,12 @@ export default function LoginPage() {
     const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
 
     if (!existingUser) {
-        if (errorElement) errorElement.textContent = 'This email is not registered. Please sign up.';
+        setError('This email is not registered. Please sign up.');
         return;
     }
 
     if (existingUser.role !== activeTab) {
-      if (errorElement) errorElement.textContent = `This email is registered as a ${existingUser.role}. Please use the correct tab to sign in.`;
+      setError(`This email is registered as a ${existingUser.role}. Please use the correct tab to sign in.`);
       return;
     }
     
@@ -105,54 +97,13 @@ export default function LoginPage() {
     }
   };
 
-  useEffect(() => {
-    // Set up tab functionality with direct DOM manipulation
-    const handleTabClick = (tabName: string) => {
-      console.log(`Switching to ${tabName}`);
-      
-      // Update button states
-      const buttons = document.querySelectorAll('.tab-button');
-      buttons.forEach(btn => {
-        btn.classList.remove('active');
-      });
-      
-      const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
-      if (activeButton) {
-        activeButton.classList.add('active');
-      }
-      
-      // Update submit button text
-      const submitBtn = document.getElementById('submit-btn');
-      if (submitBtn) {
-        submitBtn.textContent = `Sign In as ${tabName}`;
-      }
-      
-      // Clear form
-      const form = document.querySelector('form') as HTMLFormElement;
-      if (form) {
-        form.reset();
-      }
-      
-      // Clear errors
-      const errorElement = document.getElementById('error-message');
-      if (errorElement) errorElement.textContent = '';
-    };
-
-    // Add event listeners
-    document.getElementById('sponsor-tab')?.addEventListener('click', () => handleTabClick('sponsor'));
-    document.getElementById('individual-tab')?.addEventListener('click', () => handleTabClick('individual'));
-    document.getElementById('organizer-tab')?.addEventListener('click', () => handleTabClick('organizer'));
-
-    // Set initial state
-    handleTabClick('sponsor');
-
-    return () => {
-      // Cleanup event listeners
-      document.getElementById('sponsor-tab')?.removeEventListener('click', () => handleTabClick('sponsor'));
-      document.getElementById('individual-tab')?.removeEventListener('click', () => handleTabClick('individual'));
-      document.getElementById('organizer-tab')?.removeEventListener('click', () => handleTabClick('organizer'));
-    };
-  }, []);
+  const handleTabClick = (tab: string) => {
+    console.log(`Switching to ${tab} tab`);
+    setActiveTab(tab);
+    setEmail('');
+    setPassword('');
+    setError('');
+  };
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
@@ -171,75 +122,56 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         
-        {/* Tabs with direct DOM manipulation */}
-        <div style={{ width: '100%', padding: '0 24px', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        {/* Simple custom tabs */}
+        <div className="w-full px-6 mb-4">
+          <div className="flex space-x-1 rounded-lg bg-muted p-1">
             <button
-              id="sponsor-tab"
               type="button"
-              className="tab-button"
-              data-tab="sponsor"
-              style={{
-                padding: '12px 16px',
-                border: '2px solid #ccc',
-                backgroundColor: '#f3f4f6',
-                color: '#374151',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                flex: 1,
-                fontWeight: 'bold'
-              }}
+              onClick={() => handleTabClick('sponsor')}
+              className={`px-4 py-2 text-sm font-medium rounded-md flex-1 transition-colors ${
+                activeTab === 'sponsor' 
+                  ? 'bg-primary text-primary-foreground shadow' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
               Sponsor
             </button>
             <button
-              id="individual-tab"
               type="button"
-              className="tab-button"
-              data-tab="individual"
-              style={{
-                padding: '12px 16px',
-                border: '2px solid #ccc',
-                backgroundColor: '#f3f4f6',
-                color: '#374151',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                flex: 1,
-                fontWeight: 'bold'
-              }}
+              onClick={() => handleTabClick('individual')}
+              className={`px-4 py-2 text-sm font-medium rounded-md flex-1 transition-colors ${
+                activeTab === 'individual' 
+                  ? 'bg-primary text-primary-foreground shadow' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
               Individual
             </button>
             <button
-              id="organizer-tab"
               type="button"
-              className="tab-button"
-              data-tab="organizer"
-              style={{
-                padding: '12px 16px',
-                border: '2px solid #ccc',
-                backgroundColor: '#f3f4f6',
-                color: '#374151',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                flex: 1,
-                fontWeight: 'bold'
-              }}
+              onClick={() => handleTabClick('organizer')}
+              className={`px-4 py-2 text-sm font-medium rounded-md flex-1 transition-colors ${
+                activeTab === 'organizer' 
+                  ? 'bg-primary text-primary-foreground shadow' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
               Organizer
             </button>
           </div>
         </div>
 
+        {/* Single form for all tabs */}
         <form onSubmit={handleSubmit}>
           <CardContent className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input 
                 id="email" 
-                name="email"
                 type="email" 
                 placeholder="name@example.com" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
                 required 
               />
             </div>
@@ -252,45 +184,42 @@ export default function LoginPage() {
               </div>
               <Input 
                 id="password" 
-                name="password"
                 type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required 
               />
             </div>
-            <p id="error-message" className="text-sm font-medium text-destructive px-1"></p>
-            <Button id="submit-btn" type="submit" className="w-full">
-              Sign In as sponsor
-            </Button>
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or sign in with</span></div>
-            </div>
-            <Button type="button" variant="outline" className="w-full">
-              <svg aria-hidden="true" className="mr-2 h-4 w-4" width="18" height="18" viewBox="0 0 18 18">
-                <path d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6c1.52-1.4 2.37-3.47 2.37-6.05 0-.59-.05-1.16-.14-1.72Z" fill="#4285F4"></path>
-                <path d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-2.7 1.01c-2.12 0-3.92-1.42-4.57-3.33H1.9v2.05A9 9 0 0 0 8.98 17Z" fill="#34A853"></path>
-                <path d="M4.41 10.1c-.2-.58-.0-1.22-.0-1.82s0-1.24.2-1.82V4.41H1.9a9 9 0 0 0 0 8.18l2.5-2.05Z" fill="#FBBC05"></path>
-                <path d="M8.98 3.33c1.18 0 2.24.4 3.06 1.2l2.3-2.3A9 9 0 0 0 8.98 1Z" fill="#EA4335"></path>
-              </svg>
-              Google
+            {error && <p className="text-sm font-medium text-destructive px-1">{error}</p>}
+            <Button type="submit" className="w-full">
+              Sign In as {activeTab}
             </Button>
           </CardContent>
-          <CardFooter className="justify-center text-sm">
-            <p className="text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>
-                Sign up
-              </Link>
-            </p>
-          </CardFooter>
         </form>
-
-        <style jsx>{`
-          .tab-button.active {
-            background-color: #1e40af !important;
-            color: white !important;
-          }
-        `}</style>
+        
+        {/* User List for Debugging */}
+        <CardFooter className="flex flex-col items-start text-sm">
+            <h3 className="font-bold mb-2">Existing Users (for testing):</h3>
+            {userList.length > 0 ? (
+                <ul className="list-disc pl-5">
+                    {userList.map(user => (
+                        <li key={user.email}>
+                           <span className="font-mono">{user.email}</span> ({user.role})
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-muted-foreground">No users found in localStorage.</p>
+            )}
+            <div className="w-full text-center mt-4">
+              <p className="text-muted-foreground">
+                Don't have an account?{" "}
+                <Link href="/signup" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>
+                  Sign up
+                </Link>
+              </p>
+            </div>
+        </CardFooter>
       </Card>
     </div>
   );
