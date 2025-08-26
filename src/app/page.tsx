@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect } from 'react';
@@ -76,7 +77,7 @@ export default function EmergencyLoginPage() {
             className="w-full"
             variant="default"
           >
-            Login as PSJA Sponsor
+            Login as Sponsor
           </Button>
           
           <Button 
@@ -96,7 +97,7 @@ export default function EmergencyLoginPage() {
           </Button>
 
           <div className="mt-4 p-3 bg-muted rounded-lg text-xs text-muted-foreground">
-            <strong>Note:</strong> This creates test accounts automatically. Use "Login as Organizer" to access the data upload features you need.
+            <strong>Note:</strong> This creates test accounts automatically. Use "Login as Organizer" to access the data upload features you need. The "Sponsor" login is pre-configured for a PSJA school.
           </div>
         </CardContent>
       </Card>
