@@ -11,7 +11,7 @@ import Image from 'next/image';
 
 export default function RoleSelectionPage() {
   const router = useRouter();
-  const { profile, isProfileLoaded } = useSponsorProfile();
+  const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
 
   useEffect(() => {
     // Only redirect if the profile is loaded and it's confirmed to be null
@@ -29,7 +29,10 @@ export default function RoleSelectionPage() {
     );
   }
 
-  const handleRoleSelection = (path: string) => {
+  const handleRoleSelection = (path: string, role: 'sponsor' | 'district_coordinator') => {
+    if (profile) {
+      updateProfile({ ...profile, role });
+    }
     router.push(path);
   };
 
@@ -52,7 +55,7 @@ export default function RoleSelectionPage() {
         
         <div className="grid md:grid-cols-2 gap-6">
           <Card 
-            onClick={() => handleRoleSelection('/district-dashboard')}
+            onClick={() => handleRoleSelection('/district-dashboard', 'district_coordinator')}
             className="cursor-pointer hover:shadow-lg hover:border-primary transition-all duration-200"
           >
             <CardHeader className="flex flex-row items-center gap-4">
@@ -70,7 +73,7 @@ export default function RoleSelectionPage() {
           </Card>
 
           <Card 
-            onClick={() => handleRoleSelection('/dashboard')}
+            onClick={() => handleRoleSelection('/dashboard', 'sponsor')}
             className="cursor-pointer hover:shadow-lg hover:border-primary transition-all duration-200"
           >
             <CardHeader className="flex flex-row items-center gap-4">

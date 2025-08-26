@@ -16,7 +16,7 @@ export type SponsorProfile = {
   bookkeeperEmail?: string;
   avatarType: 'icon' | 'upload';
   avatarValue: string; // Icon name or image URL
-  role: 'sponsor' | 'organizer' | 'individual';
+  role: 'sponsor' | 'organizer' | 'individual' | 'district_coordinator';
   isDistrictCoordinator?: boolean;
 };
 

@@ -5,8 +5,9 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent, type ElementTyp
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth';
+import { onAuthStateChanged, signInAnonymously, type User as FirebaseUser } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { KingIcon, QueenIcon, RookIcon, BishopIcon, KnightIcon, PawnIcon } from '@/components/icons/chess-icons';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { auth, storage } from '@/lib/firebase';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Building, User } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateTeamCode } from '@/lib/school-utils';
@@ -131,6 +132,7 @@ const ProfilePageSkeleton = () => (
 export default function ProfilePage() {
   const { toast } = useToast();
   const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
+  const router = useRouter();
 
   const [schoolData, setSchoolData] = useState<School[]>([]);
   const [uniqueDistricts, setUniqueDistricts] = useState<string[]>([]);
@@ -144,7 +146,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'icon' | 'upload'>('icon');
   const [isSavingPicture, setIsSavingPicture] = useState(false);
 
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -226,6 +228,7 @@ export default function ProfilePage() {
             setSelectedIconName('');
         }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProfileLoaded, profile]);
 
   useEffect(() => {
@@ -378,27 +381,34 @@ export default function ProfilePage() {
           </p>
         </div>
         
-        {profile?.role === 'sponsor' && (
-            <Card className="bg-secondary/50 border-dashed">
-                <CardHeader>
-                    <CardTitle className="text-lg">Team Information</CardTitle>
-                    <CardDescription>Your school's district, name, and auto-generated team code.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid sm:grid-cols-3 gap-4">
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">District</p>
-                        <p className="font-semibold">{profile.district}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">School</p>
-                        <p className="font-semibold">{profile.school}</p>
-                    </div>
-                    <div>
-                        <p className="text-sm font-medium text-muted-foreground">Team Code</p>
-                        <p className="font-semibold font-mono">{teamCode}</p>
-                    </div>
-                </CardContent>
-            </Card>
+        {profile?.isDistrictCoordinator && (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <Label className="text-sm font-medium text-blue-800">Current Role</Label>
+            <div className="mt-2 flex items-center gap-3">
+              {profile.role === 'district_coordinator' ? (
+                <>
+                  <Building className="h-5 w-5 text-blue-600" />
+                  <span className="font-medium">District Coordinator</span>
+                  <span className="text-sm text-blue-600">({profile.district})</span>
+                </>
+              ) : (
+                <>
+                  <User className="h-5 w-5 text-green-600" />
+                  <span className="font-medium">Sponsor</span>
+                  <span className="text-sm text-green-600">({profile.school})</span>
+                </>
+              )}
+            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-3"
+              onClick={() => router.push('/auth/role-selection')}
+            >
+              Switch Role
+            </Button>
+          </div>
         )}
 
         {authError && (
