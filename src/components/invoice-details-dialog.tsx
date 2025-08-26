@@ -481,23 +481,33 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         };
       
         const handleMethodChange = (method: string, isChecked: boolean) => {
-            if (isChecked) {
-                setLocalSelectedMethods(prev => [...prev, method]);
-                if (localSelectedMethods.length === 0) {
-                    setPaymentAmounts(prev => ({ ...prev, [method]: balanceDue }));
-                }
-            } else {
-                setLocalSelectedMethods(prev => prev.filter(m => m !== method));
-                setPaymentAmounts(prev => {
-                    const newAmounts = { ...prev };
-                    delete newAmounts[method];
-                    return newAmounts;
-                });
+          console.log('Method change triggered:', method, isChecked);
+          console.log('Current selected methods before change:', localSelectedMethods);
+          
+          if (isChecked) {
+            setLocalSelectedMethods(prev => [...prev, method]);
+            if (localSelectedMethods.length === 0) {
+              setPaymentAmounts(prev => ({ ...prev, [method]: balanceDue }));
             }
+          } else {
+            setLocalSelectedMethods(prev => prev.filter(m => m !== method));
+            setPaymentAmounts(prev => {
+              const newAmounts = { ...prev };
+              delete newAmounts[method];
+              return newAmounts;
+            });
+          }
+          console.log('Selected methods after change:', localSelectedMethods);
         };
       
         const handleAmountChange = (method: string, amount: number) => {
-            setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
+          console.log('Amount change triggered:', method, amount);
+          console.log('Current selected methods before change:', localSelectedMethods);
+          console.log('Current payment amounts before change:', paymentAmounts);
+          
+          setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
+          
+          console.log('Payment amounts updated');
         };
 
         const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, method: string) => {
