@@ -100,8 +100,9 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">1. Navigate to the <a href="/invoices" className="font-medium underline">Invoices & Payments</a> page from the sidebar.</p>
                   <p className="text-sm">2. Here you will see a list of all your invoices and their current status (e.g., Paid, Unpaid, Canceled).</p>
                   <p className="text-sm">3. Click on an invoice to view its full details, see the list of registered players, and access the secure Square payment link.</p>
-                   <div className="border rounded-lg p-4 bg-muted/50">
-                     <Image src="https://picsum.photos/600/300" alt="A screenshot of the invoice details view." width={600} height={300} className="rounded-md" data-ai-hint="invoice details modal" />
+                   <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
+                    <Image src="https://drive.google.com/uc?export=view&id=1sWg-9mNqA5mk8y45jlOUG1nbqnmrl1pO" alt="A screenshot of the invoice details view." width={600} height={400} className="rounded-md" data-ai-hint="invoice details modal" />
+                    <Image src="https://drive.google.com/uc?export=view&id=1ATxdq8q8RL-0DhnGmXTK9KMQ2HjFEVzJ" alt="A screenshot of the invoice details view showing payment options." width={600} height={400} className="rounded-md" data-ai-hint="invoice payment options" />
                   </div>
                 </CardContent>
               </Card>
