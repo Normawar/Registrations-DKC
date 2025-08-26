@@ -29,8 +29,8 @@ const PlayerInfoSchema = z.object({
 const CreateMembershipInvoiceInputSchema = z.object({
     purchaserName: z.string().describe('The name of the person paying for the membership.'),
     purchaserEmail: z.string().email().describe('The email of the person paying for the membership.'),
-    bookkeeperEmail: z.string().email().optional().describe('The email of the bookkeeper to be CCed.'),
-    gtCoordinatorEmail: z.string().email().optional().describe('The email of the GT Coordinator to be CCed.'),
+    bookkeeperEmail: z.string().email().optional().or(z.literal('')).describe('The email of the bookkeeper to be CCed.'),
+    gtCoordinatorEmail: z.string().email().optional().or(z.literal('')).describe('The email of the GT Coordinator to be CCed.'),
     schoolName: z.string().describe('The name of the school associated with the purchaser.'),
     schoolAddress: z.string().optional().describe('The address of the school.'),
     schoolPhone: z.string().optional().describe('The phone number of the school.'),
