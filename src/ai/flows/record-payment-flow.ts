@@ -6,10 +6,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { randomUUID } from 'crypto';
-import { ApiError } from 'square';
-import { getSquareClient } from '@/lib/square-client';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const RecordPaymentInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to record a payment for.'),
@@ -39,59 +35,19 @@ export interface RecordPaymentParams {
   organizerInitials: string;
 }
 
-export const recordPayment = async ({
-  invoiceId,
-  amount,
-  paymentMethod,
-  note,
-  organizerInitials
-}: RecordPaymentParams) => {
-  const { isConfigured } = await checkSquareConfig();
-  if (!isConfigured) {
-    console.log(`Square not configured. Mock-recording payment for invoice ${invoiceId}.`);
-    return {
-        id: `MOCK_PAY_${randomUUID()}`,
-        status: 'COMPLETED',
-        amount_money: { amount: amount * 100, currency: 'USD' }
-    };
-  }
-
-  const squareClient = await getSquareClient();
-  const locationId = process.env.SQUARE_LOCATION_ID;
-
-  // Use the Square SDK to create a payment
-  const { result } = await squareClient.paymentsApi.createPayment({
-    sourceId: 'EXTERNAL', // For manually recorded payments
-    idempotencyKey: `payment_${invoiceId}_${Date.now()}_${organizerInitials}`,
-    amountMoney: {
-      amount: BigInt(Math.round(amount * 100)), // Convert to cents
-      currency: 'USD',
-    },
-    invoiceIds: [invoiceId],
-    locationId: locationId,
-    note: note,
-    externalDetails: {
-      type: 'OTHER',
-      source: paymentMethod || 'Manual',
-      sourceId: `local-${Date.now()}`
-    }
+export const recordPayment = async ({ invoiceId, amount, paymentMethod, note, organizerInitials }: RecordPaymentParams) => {
+  const response = await fetch('/api/record-payment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invoiceId, amount, paymentMethod, note, organizerInitials })
   });
-
-  if (!result.payment) {
-    throw new Error('Square payment creation failed.');
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(`Payment failed: ${JSON.stringify(errorData.error)}`);
   }
-
-  console.log('✅ Square API success:', result);
-
-  // Now, get the updated invoice status
-  const { result: invoiceResult } = await squareClient.invoicesApi.getInvoice(invoiceId);
-
-  return {
-    paymentId: result.payment.id!,
-    status: invoiceResult.invoice?.status || 'UNKNOWN',
-    totalPaid: Number(invoiceResult.invoice?.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount || 0) / 100,
-    totalInvoiced: Number(invoiceResult.invoice?.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100,
-  };
+  
+  return await response.json();
 };
 
 // The Genkit flow remains as the primary public interface.
