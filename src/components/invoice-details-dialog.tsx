@@ -1495,19 +1495,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         )}
 
         <div className="mt-6 pt-4 border-t">
-          <Button
-            variant="outline"
-            onClick={handleEnhancedSquareSync}
-            disabled={isRefreshing}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Sync with Square
-          </Button>
+            {profile?.role !== 'sponsor' && (
+              <Button
+                variant="outline"
+                onClick={handleEnhancedSquareSync}
+                disabled={isRefreshing}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Sync with Square
+              </Button>
+            )}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-
-    
