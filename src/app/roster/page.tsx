@@ -74,82 +74,6 @@ const playerFormSchema = z.object({
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
-function DistrictRosterView() {
-    const { profile } = useSponsorProfile();
-    const { database: allPlayers } = useMasterDb();
-
-    const districtPlayers = useMemo(() => {
-        if (!profile?.district) return [];
-        return allPlayers.filter(p => p.district === profile.district);
-    }, [allPlayers, profile?.district]);
-
-    const districtSchools = useMemo(() => {
-        if (!profile?.district) return [];
-        const schools = districtPlayers
-            .map(p => p.school)
-            .filter((school): school is string => !!school);
-        return [...Array.from(new Set(schools))].sort();
-    }, [districtPlayers, profile?.district]);
-
-    return (
-        <div className="space-y-8">
-            <div>
-                <h1 className="text-3xl font-bold font-headline">District Rosters</h1>
-                <p className="text-muted-foreground">
-                    An overview of all player rosters for each school in your district: {profile?.district}
-                </p>
-            </div>
-            {districtSchools.map(school => {
-                const schoolRoster = districtPlayers.filter(p => p.school === school);
-                return (
-                    <Card key={school}>
-                        <CardHeader>
-                            <CardTitle className="text-lg">{school}</CardTitle>
-                            <CardDescription>{schoolRoster.length} player(s)</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <ScrollArea className="h-72">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Player</TableHead>
-                                        <TableHead>USCF ID</TableHead>
-                                        <TableHead className="text-right">Rating</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {schoolRoster.map((player) => (
-                                    <TableRow key={player.id}>
-                                        <TableCell>
-                                        <div className="flex items-center gap-3">
-                                            <Avatar className="h-9 w-9">
-                                            <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                                            <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                                            </Avatar>
-                                            <div>
-                                            <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                                            <div className="text-sm text-muted-foreground">
-                                                {player.email}
-                                            </div>
-                                            </div>
-                                        </div>
-                                        </TableCell>
-                                        <TableCell>{player.uscfId}</TableCell>
-                                        <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
-                                    </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                          </ScrollArea>
-                        </CardContent>
-                    </Card>
-                )
-            })}
-        </div>
-    );
-}
-
-
 function SponsorRosterView() {
   const { toast } = useToast();
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
@@ -339,7 +263,7 @@ function SponsorRosterView() {
                     <TableRow key={player.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8"><AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback></Avatar>
+                          <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" /><AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback></Avatar>
                           <div>
                             <div className="font-medium">{player.firstName} {player.lastName}</div>
                             <div className="text-sm text-muted-foreground">{player.email}</div>
@@ -484,14 +408,72 @@ function SponsorRosterView() {
 
 function RosterPageContent() {
     const { profile, isProfileLoaded } = useSponsorProfile();
-    const { isDbLoaded } = useMasterDb();
+    const { database: allPlayers, isDbLoaded } = useMasterDb();
 
     if (!isProfileLoaded || !isDbLoaded) {
         return <AppLayout><Skeleton className="h-[60vh] w-full" /></AppLayout>;
     }
 
     if (profile?.role === 'district_coordinator') {
-        return <DistrictRosterView />;
+        const districtPlayers = allPlayers.filter(p => p.district === profile.district);
+        const districtSchools = [...new Set(districtPlayers.map(p => p.school).filter(Boolean))].sort() as string[];
+
+        return (
+            <div className="space-y-8">
+                <div>
+                    <h1 className="text-3xl font-bold font-headline">District Rosters</h1>
+                    <p className="text-muted-foreground">
+                        An overview of all player rosters for each school in your district: {profile?.district}
+                    </p>
+                </div>
+                {districtSchools.map(school => {
+                    const schoolRoster = districtPlayers.filter(p => p.school === school);
+                    return (
+                        <Card key={school}>
+                            <CardHeader>
+                                <CardTitle className="text-lg">{school}</CardTitle>
+                                <CardDescription>{schoolRoster.length} player(s)</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <ScrollArea className="h-72">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Player</TableHead>
+                                            <TableHead>USCF ID</TableHead>
+                                            <TableHead className="text-right">Rating</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {schoolRoster.map((player) => (
+                                        <TableRow key={player.id}>
+                                            <TableCell>
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-9 w-9">
+                                                <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                                <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
+                                                </Avatar>
+                                                <div>
+                                                <div className="font-medium">{player.lastName}, {player.firstName}</div>
+                                                <div className="text-sm text-muted-foreground">
+                                                    {player.email}
+                                                </div>
+                                                </div>
+                                            </div>
+                                            </TableCell>
+                                            <TableCell>{player.uscfId}</TableCell>
+                                            <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
+                                        </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                              </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    )
+                })}
+            </div>
+        );
     }
 
     return <SponsorRosterView />;
@@ -506,3 +488,5 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
+
+    
