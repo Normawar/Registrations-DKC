@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 export default function EmergencyLoginPage() {
@@ -14,7 +14,7 @@ export default function EmergencyLoginPage() {
     updateProfile(null);
   }, [updateProfile]);
 
-  const createTestUser = (role: 'sponsor' | 'individual' | 'organizer', email: string) => {
+  const createTestUser = (role: 'sponsor' | 'individual' | 'organizer', email: string, isPsja: boolean = false) => {
     // Create test user in localStorage
     const usersRaw = localStorage.getItem('users');
     const users: {email: string; role: string}[] = usersRaw ? JSON.parse(usersRaw) : [];
@@ -31,11 +31,11 @@ export default function EmergencyLoginPage() {
     const profileData: SponsorProfile = {
       email: email.toLowerCase(),
       role: role,
-      firstName: 'Test',
-      lastName: 'User',
+      firstName: isPsja ? 'PSJA' : 'Test',
+      lastName: 'Sponsor',
       phone: '5551234567',
-      district: 'Test District',
-      school: 'Test School',
+      district: isPsja ? 'PHARR-SAN JUAN-ALAMO ISD' : 'Test District',
+      school: isPsja ? 'PSJA NORTH EARLY COLLEGE H S' : 'Test School',
       avatarType: 'icon',
       avatarValue: role === 'sponsor' ? 'KingIcon' : role === 'organizer' ? 'RookIcon' : 'PawnIcon',
       gtCoordinatorEmail: '',
@@ -61,9 +61,9 @@ export default function EmergencyLoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold">Emergency Login</CardTitle>
-          <CardDescription className="text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Quick access while tabs are being fixed
-          </CardDescription>
+          </p>
         </CardHeader>
         
         <CardContent className="grid gap-4">
@@ -77,6 +77,14 @@ export default function EmergencyLoginPage() {
             variant="default"
           >
             Login as Sponsor
+          </Button>
+
+           <Button 
+            onClick={() => createTestUser('sponsor', 'test-psja-sponsor@example.com', true)}
+            className="w-full"
+            variant="default"
+          >
+            Login as PSJA Sponsor
           </Button>
           
           <Button 
