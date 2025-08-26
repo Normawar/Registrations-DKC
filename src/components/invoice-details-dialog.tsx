@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -498,6 +499,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         const handleAmountChange = (method: string, amount: number) => {
             setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
         };
+
+        const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, method: string) => {
+            e.stopPropagation();
+            handleAmountChange(method, parseFloat(e.target.value) || 0);
+        };
       
         const quickTestCashApp = () => {
             setLocalSelectedMethods(['Cash App']);
@@ -707,8 +713,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Cash App')} onChange={(e) => handleMethodChange('Cash App', e.target.checked)} className="mr-2" /> <span className="font-medium">Cash App</span> </label>
                 {localSelectedMethods.includes('Cash App') && (
                   <div className="flex gap-2">
-                    <input type="number" value={paymentAmounts['Cash App'] || ''} onChange={(e) => handleAmountChange('Cash App', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
-                    <input type="text" value={cashAppHandle} onChange={(e) => setCashAppHandle(e.target.value)} placeholder="$handle" className="w-24 px-2 py-1 border rounded text-sm" />
+                    <input type="number" value={paymentAmounts['Cash App'] || ''} onChange={(e) => handleInputChange(e, 'Cash App')} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                    <input type="text" value={cashAppHandle} onChange={(e) => { e.stopPropagation(); setCashAppHandle(e.target.value); }} placeholder="$handle" className="w-24 px-2 py-1 border rounded text-sm" />
                   </div>
                 )}
               </div>
@@ -717,23 +723,23 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Check')} onChange={(e) => handleMethodChange('Check', e.target.checked)} className="mr-2" /> <span className="font-medium">Check</span> </label>
                 {localSelectedMethods.includes('Check') && (
                   <div className="flex gap-2">
-                    <input type="number" value={paymentAmounts['Check'] || ''} onChange={(e) => handleAmountChange('Check', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
-                    <input type="text" value={checkNumber} onChange={(e) => setCheckNumber(e.target.value)} placeholder="Check #" className="w-20 px-2 py-1 border rounded text-sm" />
+                    <input type="number" value={paymentAmounts['Check'] || ''} onChange={(e) => handleInputChange(e, 'Check')} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                    <input type="text" value={checkNumber} onChange={(e) => { e.stopPropagation(); setCheckNumber(e.target.value); }} placeholder="Check #" className="w-20 px-2 py-1 border rounded text-sm" />
                   </div>
                 )}
               </div>
       
               <div className="flex items-center justify-between p-2 border rounded">
                 <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Cash')} onChange={(e) => handleMethodChange('Cash', e.target.checked)} className="mr-2" /> <span className="font-medium">Cash</span> </label>
-                {localSelectedMethods.includes('Cash') && ( <input type="number" value={paymentAmounts['Cash'] || ''} onChange={(e) => handleAmountChange('Cash', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} /> )}
+                {localSelectedMethods.includes('Cash') && ( <input type="number" value={paymentAmounts['Cash'] || ''} onChange={(e) => handleInputChange(e, 'Cash')} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} /> )}
               </div>
       
               <div className="flex items-center justify-between p-2 border rounded">
                 <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Zelle')} onChange={(e) => handleMethodChange('Zelle', e.target.checked)} className="mr-2" /> <span className="font-medium">Zelle</span> </label>
                 {localSelectedMethods.includes('Zelle') && (
                   <div className="flex gap-2">
-                    <input type="number" value={paymentAmounts['Zelle'] || ''} onChange={(e) => handleAmountChange('Zelle', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
-                    <input type="email" value={zelleEmail} onChange={(e) => setZelleEmail(e.target.value)} placeholder="Email" className="w-28 px-2 py-1 border rounded text-sm" />
+                    <input type="number" value={paymentAmounts['Zelle'] || ''} onChange={(e) => handleInputChange(e, 'Zelle')} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                    <input type="email" value={zelleEmail} onChange={(e) => { e.stopPropagation(); setZelleEmail(e.target.value); }} placeholder="Email" className="w-28 px-2 py-1 border rounded text-sm" />
                   </div>
                 )}
               </div>
@@ -742,8 +748,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 <label className="flex items-center"> <input type="checkbox" checked={localSelectedMethods.includes('Venmo')} onChange={(e) => handleMethodChange('Venmo', e.target.checked)} className="mr-2" /> <span className="font-medium">Venmo</span> </label>
                 {localSelectedMethods.includes('Venmo') && (
                   <div className="flex gap-2">
-                    <input type="number" value={paymentAmounts['Venmo'] || ''} onChange={(e) => handleAmountChange('Venmo', parseFloat(e.target.value) || 0)} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
-                    <input type="text" value={venmoHandle} onChange={(e) => setVenmoHandle(e.target.value)} placeholder="@handle" className="w-24 px-2 py-1 border rounded text-sm" />
+                    <input type="number" value={paymentAmounts['Venmo'] || ''} onChange={(e) => handleInputChange(e, 'Venmo')} placeholder="Amount" className="w-24 px-2 py-1 border rounded" step="0.01" min="0" max={balanceDue} />
+                    <input type="text" value={venmoHandle} onChange={(e) => { e.stopPropagation(); setVenmoHandle(e.target.value); }} placeholder="@handle" className="w-24 px-2 py-1 border rounded text-sm" />
                   </div>
                 )}
               </div>
@@ -1004,7 +1010,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         const invoiceId = confirmation?.invoiceId;
       
         const openDeveloperConsole = () => {
-          const sandboxUrl = 'https://developer.squareup.com/apps';
+          // Use the correct Square sandbox developer console URL
+            const sandboxUrl = 'https://developer.squareup.com/apps';
             
             console.log('🔗 Opening Square Developer Apps:', sandboxUrl);
             
