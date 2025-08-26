@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
+import { schoolData } from '@/lib/data/school-data';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
@@ -416,9 +417,13 @@ function DistrictRosterView() {
     }, [allPlayers, isDbLoaded, profile]);
 
     const districtSchools = useMemo(() => {
-        if (!districtPlayers) return [];
-        return [...new Set(districtPlayers.map(p => p.school).filter(Boolean))].sort();
-    }, [districtPlayers]);
+        if (!profile?.district) return [];
+        // Filter the master schoolData to get all schools for the current district.
+        return schoolData
+            .filter(school => school.district === profile.district)
+            .map(school => school.schoolName)
+            .sort();
+    }, [profile?.district]);
     
     const displayedSchools = useMemo(() => {
         if (selectedSchool === 'all') {
@@ -452,7 +457,22 @@ function DistrictRosterView() {
 
             {displayedSchools.map(school => {
                 const schoolRoster = districtPlayers.filter(p => p.school === school);
-                if (schoolRoster.length === 0) return null;
+                if (schoolRoster.length === 0 && selectedSchool !== 'all') {
+                     return (
+                        <Card key={school}>
+                            <CardHeader>
+                                <CardTitle className="text-lg">{school}</CardTitle>
+                                <CardDescription>0 player(s)</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-center py-8 text-muted-foreground">
+                                    This school does not have any players on the roster yet.
+                                </div>
+                            </CardContent>
+                        </Card>
+                     );
+                }
+                if (schoolRoster.length === 0) return null; // Don't show empty cards in 'All' view
                 return (
                     <Card key={school}>
                         <CardHeader>
@@ -497,7 +517,7 @@ function DistrictRosterView() {
                     </Card>
                 )
             })}
-            {displayedSchools.length === 0 && (
+            {displayedSchools.length === 0 && selectedSchool !== 'all' && (
                 <Card>
                     <CardContent className="pt-6 text-center text-muted-foreground">
                         No players found for the selected school.
