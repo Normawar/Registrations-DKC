@@ -39,7 +39,7 @@ export const recordPayment = async ({ invoiceId, amount, paymentMethod, note, or
   const response = await fetch('/api/record-payment', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ invoiceId, amount, paymentMethod, note, organizerInitials })
+    body: JSON.stringify({ amount, paymentMethod, note, organizerInitials })
   });
   
   if (!response.ok) {
