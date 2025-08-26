@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -17,6 +17,16 @@ export default function LoginPage() {
   useEffect(() => {
     updateProfile(null);
   }, [updateProfile]);
+
+  useEffect(() => {
+    // This script will run on the client and print the users to the console for us to see.
+    const usersRaw = localStorage.getItem('users');
+    if (usersRaw) {
+        console.log("Found users in system:", JSON.parse(usersRaw));
+    } else {
+        console.log("No users found in the system.");
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
