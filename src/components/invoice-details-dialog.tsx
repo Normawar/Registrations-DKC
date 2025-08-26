@@ -1304,18 +1304,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         const invoiceUrl = confirmation?.invoiceUrl;
         const invoiceNumber = confirmation?.invoiceNumber || confirmation?.id.slice(-8);
         
-        
         if (invoiceUrl) {
-          const isSandbox = invoiceUrl.includes('squareupsandbox.com');
-          
           window.open(invoiceUrl, '_blank');
-          
-          toast({
-            title: `Opening ${isSandbox ? 'Sandbox' : 'Production'} Square Invoice`,
-            description: `Invoice #${invoiceNumber} in ${isSandbox ? 'sandbox' : 'production'} environment`,
-            duration: 8000
-          });
-          
         } else {
           toast({
             variant: 'destructive',
@@ -1338,38 +1328,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 💳 Open Square Invoice
                 <ExternalLink className="w-4 h-4 ml-2" />
               </Button>
-              
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  window.open('https://squareupsandbox.com/dashboard/invoices', '_blank');
-                  toast({
-                    title: '📊 Square Dashboard',
-                    description: `Look for invoice #${confirmation?.invoiceNumber || confirmation?.id.slice(-8)} and click "Collect Payment"`,
-                    duration: 10000
-                  });
-                }}
-              >
-                📊 Open Square Dashboard
-                <ExternalLink className="w-4 h-4 ml-2" />
-              </Button>
-              
-              <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                <p className="font-medium text-blue-800">🎯 To record payment in Square:</p>
-                <p className="text-blue-700">1. Click button above → 2. Find invoice #{confirmation?.invoiceNumber || 'Unknown'} → 3. Click "Collect Payment" → 4. Enter ${balanceDue.toFixed(2)} → 5. Record payment</p>
-              </div>
             </div>
-          
-          {confirmation?.invoiceUrl && (
-            <div className="mt-2 text-xs text-center">
-              <span className={`px-2 py-1 rounded text-white ${
-                confirmation.invoiceUrl.includes('sandbox') ? 'bg-orange-500' : 'bg-green-500'
-              }`}>
-                {confirmation.invoiceUrl.includes('sandbox') ? '🧪 SANDBOX' : '🚀 PRODUCTION'}
-              </span>
-            </div>
-          )}
         </div>
       );
     };
@@ -1550,3 +1509,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     </Dialog>
   );
 }
+
+    
