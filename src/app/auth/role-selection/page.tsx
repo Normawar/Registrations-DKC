@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,11 +13,15 @@ export default function RoleSelectionPage() {
   const router = useRouter();
   const { profile } = useSponsorProfile();
 
-  if (!profile) {
-    // Redirect to login if profile is not loaded
-    if (typeof window !== 'undefined') {
-        router.push('/');
+  useEffect(() => {
+    // Redirect to login if profile is not loaded after the component mounts
+    if (!profile) {
+      router.push('/');
     }
+  }, [profile, router]);
+
+  if (!profile) {
+    // Render nothing while redirecting
     return null;
   }
 
