@@ -119,7 +119,6 @@ export default function LoginPage() {
   };
 
   const handleTabClick = (tab: string) => {
-    console.log(`Switching to ${tab} tab`);
     setActiveTab(tab);
     setEmail('');
     setPassword('');
@@ -213,7 +212,7 @@ export default function LoginPage() {
             </div>
             {error && <p className="text-sm font-medium text-destructive px-1">{error}</p>}
             <Button type="submit" className="w-full">
-              Sign In as {activeTab}
+              Sign In as {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
             </Button>
           </CardContent>
         </form>
