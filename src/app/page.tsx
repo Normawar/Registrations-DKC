@@ -63,17 +63,18 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
         updateProfile(minimalProfile);
     }
 
-    let path = '/profile'; // Default redirect to profile page
+    // Role-based redirection logic
     if (userProfile?.role === 'sponsor' && userProfile?.isDistrictCoordinator) {
-        path = '/district-dashboard';
+        router.push('/auth/role-selection');
     } else if (userProfile?.role === 'sponsor') {
-        path = '/dashboard';
+        router.push('/dashboard');
     } else if (role === 'individual') {
-      path = '/individual-dashboard';
+      router.push('/individual-dashboard');
     } else if (role === 'organizer') {
-      path = '/manage-events';
+      router.push('/manage-events');
+    } else {
+      router.push('/profile'); // Default redirect
     }
-    router.push(path);
   };
 
   return (

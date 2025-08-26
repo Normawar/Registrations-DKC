@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import * as React from "react";
@@ -156,10 +157,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     router.push('/');
   };
 
+  const isDistrictDashboard = pathname.startsWith('/district-dashboard');
+  
   const menuItems = 
     profile?.role === 'organizer' ? organizerMenuItems :
     profile?.role === 'individual' ? individualMenuItems :
-    profile?.isDistrictCoordinator ? districtCoordinatorMenuItems :
+    profile?.isDistrictCoordinator && isDistrictDashboard ? districtCoordinatorMenuItems :
     sponsorMenuItems;
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
