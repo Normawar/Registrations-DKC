@@ -39,14 +39,18 @@ const createSafeOnChange = (setter: (value: string) => void) => {
   };
 };
 
-// Add this component to your invoice-details-dialog.tsx
-
 const SponsorPaymentComponent = () => {
-    const { toast } = useToast();
+  const { toast } = useToast();
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [fileUrls, setFileUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Payment method specific fields
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [poNumber, setPoNumber] = useState('');
+  const [checkNumber, setCheckNumber] = useState('');
+  const [payByCheckAtTournament, setPayByCheckAtTournament] = useState(false);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -78,11 +82,54 @@ const SponsorPaymentComponent = () => {
   };
 
   const handleSubmitProof = () => {
-    if (!selectedPaymentMethod || uploadedFiles.length === 0) {
+    // Validation based on payment method
+    if (!selectedPaymentMethod) {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
-        description: 'Please select a payment method and upload proof of payment.'
+        description: 'Please select a payment method.'
+      });
+      return;
+    }
+
+    if (selectedPaymentMethod === 'Check' && payByCheckAtTournament) {
+      // For pay by check at tournament, only amount is required
+      if (!paymentAmount) {
+        toast({
+          variant: 'destructive',
+          title: 'Missing Information', 
+          description: 'Please enter the payment amount.'
+        });
+        return;
+      }
+    } else {
+      // For all other methods, amount and upload are required
+      if (!paymentAmount || uploadedFiles.length === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Missing Information',
+          description: 'Please enter payment amount and upload proof of payment.'
+        });
+        return;
+      }
+    }
+
+    // PO specific validation
+    if (selectedPaymentMethod === 'PO' && !poNumber) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Information',
+        description: 'Please enter the PO number.'
+      });
+      return;
+    }
+
+    // Check specific validation
+    if (selectedPaymentMethod === 'Check' && !payByCheckAtTournament && !checkNumber) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Information',
+        description: 'Please enter the check number.'
       });
       return;
     }
@@ -92,7 +139,20 @@ const SponsorPaymentComponent = () => {
     
     toast({
       title: 'Proof of Payment Submitted',
-      description: 'Your payment proof has been submitted for verification.'
+      description: 'Your payment information has been submitted and will be reviewed and approved by the Organizer.',
+      duration: 8000
+    });
+
+    // Reset form
+    setSelectedPaymentMethod(null);
+    setPaymentAmount('');
+    setPoNumber('');
+    setCheckNumber('');
+    setPayByCheckAtTournament(false);
+    setUploadedFiles([]);
+    setFileUrls(prev => {
+      prev.forEach(url => URL.revokeObjectURL(url));
+      return [];
     });
   };
 
@@ -130,6 +190,99 @@ const SponsorPaymentComponent = () => {
               </p>
             </div>
           </div>
+          
+          {selectedPaymentMethod === 'PO' && (
+            <div className="mt-3 pl-8 space-y-3">
+              <div>
+                <Label htmlFor="po-amount">Payment Amount ($)</Label>
+                <Input
+                  id="po-amount"
+                  type="number"
+                  placeholder="0.00"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="po-number">PO Number</Label>
+                <Input
+                  id="po-number"
+                  type="text"
+                  placeholder="Enter PO number"
+                  value={poNumber}
+                  onChange={(e) => setPoNumber(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Check Option */}
+        <div 
+          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+            selectedPaymentMethod === 'Check' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+          }`}
+          onClick={() => setSelectedPaymentMethod('Check')}
+        >
+          <div className="flex items-center">
+            <input 
+              type="radio" 
+              checked={selectedPaymentMethod === 'Check'} 
+              onChange={() => setSelectedPaymentMethod('Check')}
+              className="mr-3"
+            />
+            <div>
+              <h5 className="font-medium">Pay by Check</h5>
+              <p className="text-sm text-gray-600">
+                Submit payment information for check processing
+              </p>
+            </div>
+          </div>
+          
+          {selectedPaymentMethod === 'Check' && (
+            <div className="mt-3 pl-8 space-y-3">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="pay-at-tournament"
+                  checked={payByCheckAtTournament}
+                  onChange={(e) => setPayByCheckAtTournament(e.target.checked)}
+                  className="rounded"
+                />
+                <Label htmlFor="pay-at-tournament" className="text-sm">
+                  Pay by check at tournament
+                </Label>
+              </div>
+              
+              <div>
+                <Label htmlFor="check-amount">Check Amount ($)</Label>
+                <Input
+                  id="check-amount"
+                  type="number"
+                  placeholder="0.00"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  step="0.01"
+                  min="0"
+                />
+              </div>
+              
+              {!payByCheckAtTournament && (
+                <div>
+                  <Label htmlFor="check-number">Check Number</Label>
+                  <Input
+                    id="check-number"
+                    type="text"
+                    placeholder="Enter check number"
+                    value={checkNumber}
+                    onChange={(e) => setCheckNumber(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* CashApp Option */}
@@ -156,6 +309,21 @@ const SponsorPaymentComponent = () => {
               </p>
             </div>
           </div>
+          
+          {selectedPaymentMethod === 'CashApp' && (
+            <div className="mt-3 pl-8">
+              <Label htmlFor="cashapp-amount">Payment Amount ($)</Label>
+              <Input
+                id="cashapp-amount"
+                type="number"
+                placeholder="0.00"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                step="0.01"
+                min="0"
+              />
+            </div>
+          )}
         </div>
 
         {/* Zelle Option */}
@@ -182,6 +350,21 @@ const SponsorPaymentComponent = () => {
               </p>
             </div>
           </div>
+          
+          {selectedPaymentMethod === 'Zelle' && (
+            <div className="mt-3 pl-8">
+              <Label htmlFor="zelle-amount">Payment Amount ($)</Label>
+              <Input
+                id="zelle-amount"
+                type="number"
+                placeholder="0.00"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                step="0.01"
+                min="0"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -192,28 +375,36 @@ const SponsorPaymentComponent = () => {
           <p className="text-sm text-gray-600">
             {selectedPaymentMethod === 'PO' ? 
               'Upload a copy of your purchase order or confirmation' :
+            selectedPaymentMethod === 'Check' && payByCheckAtTournament ?
+              'No upload required for pay at tournament option' :
+            selectedPaymentMethod === 'Check' ?
+              'Upload a photo of your check or bank confirmation' :
               'Upload a screenshot of your payment confirmation'
             }
           </p>
           
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            accept="image/*,application/pdf"
-            multiple
-            className="hidden"
-          />
-          
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            className="w-full"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            {selectedPaymentMethod === 'PO' ? 'Upload PO Copy' : 'Upload Screenshot'}
-          </Button>
+          {!(selectedPaymentMethod === 'Check' && payByCheckAtTournament) && (
+            <>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept="image/*,application/pdf"
+                multiple
+                className="hidden"
+              />
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {selectedPaymentMethod === 'PO' ? 'Upload PO Copy' : 'Upload Screenshot'}
+              </Button>
+            </>
+          )}
 
           {/* Display uploaded files */}
           {fileUrls.length > 0 && (
@@ -251,13 +442,30 @@ const SponsorPaymentComponent = () => {
           )}
 
           {/* Submit Button */}
-          <Button
-            onClick={handleSubmitProof}
-            disabled={!selectedPaymentMethod || uploadedFiles.length === 0}
-            className="w-full mt-4"
-          >
-            Submit Proof of Payment
-          </Button>
+          <div className="space-y-3 mt-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-sm text-amber-800 font-medium">
+                📋 Review & Approval Process
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                All payment submissions will be reviewed and approved by the Tournament Organizer. 
+                You will receive confirmation once your payment is verified.
+              </p>
+            </div>
+            
+            <Button
+              onClick={handleSubmitProof}
+              disabled={!selectedPaymentMethod || 
+                       !paymentAmount || 
+                       (selectedPaymentMethod === 'PO' && !poNumber) ||
+                       (selectedPaymentMethod === 'Check' && !payByCheckAtTournament && !checkNumber) ||
+                       (selectedPaymentMethod !== 'Check' || !payByCheckAtTournament) && uploadedFiles.length === 0
+              }
+              className="w-full"
+            >
+              Submit Payment Information
+            </Button>
+          </div>
         </div>
       )}
     </div>
