@@ -155,13 +155,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new Event('storage'));
     router.push('/');
   };
-
-  const isDistrictDashboard = pathname.startsWith('/district-dashboard');
   
   const menuItems = 
     profile?.role === 'organizer' ? organizerMenuItems :
     profile?.role === 'individual' ? individualMenuItems :
-    (profile?.isDistrictCoordinator && isDistrictDashboard) ? districtCoordinatorMenuItems :
+    profile?.role === 'district_coordinator' ? districtCoordinatorMenuItems :
     sponsorMenuItems;
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
@@ -209,6 +207,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {profile?.role === 'individual' && (
                         <p className="text-xs text-sidebar-primary truncate font-semibold">
                             Individual Player
+                        </p>
+                    )}
+                     {profile?.role === 'district_coordinator' && (
+                        <p className="text-xs text-sidebar-primary truncate font-semibold">
+                            District Coordinator
                         </p>
                     )}
                 </div>
