@@ -2,41 +2,46 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { amount, paymentMethod, note, organizerInitials } = await request.json();
+    const { invoiceId, amount } = await request.json();
     
-    const amountInCents = Math.round(amount * 100);
-    const idempotencyKey = `payment_${Date.now()}_${organizerInitials}_${Math.random().toString(36).substr(2, 9)}`;
+    // First get current invoice
+    const getResponse = await fetch(`https://connect.squareupsandbox.com/v2/invoices/${invoiceId}`, {
+      headers: {
+        'Authorization': `Bearer ${process.env.SQUARE_SANDBOX_TOKEN}`,
+        'Square-Version': '2025-07-16'
+      }
+    });
     
-    const paymentData = {
-      source_id: 'CASH',
-      idempotency_key: idempotencyKey,
-      amount_money: {
-        amount: amountInCents,
+    const invoiceData = await getResponse.json();
+    const invoice = invoiceData.invoice;
+    
+    // Update payment requests to show completed amount
+    const updatedPaymentRequests = invoice.payment_requests.map(pr => ({
+      ...pr,
+      total_completed_amount_money: {
+        amount: Math.round(amount * 100),
         currency: 'USD'
-      },
-      location_id: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID,
-      note: `${note} - Recorded by ${organizerInitials}`
-    };
+      }
+    }));
     
-    const response = await fetch('https://connect.squareupsandbox.com/v2/payments', {
-      method: 'POST',
+    // Update the invoice
+    const updateResponse = await fetch(`https://connect.squareupsandbox.com/v2/invoices/${invoiceId}`, {
+      method: 'PUT',
       headers: {
         'Authorization': `Bearer ${process.env.SQUARE_SANDBOX_TOKEN}`,
         'Square-Version': '2025-07-16',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(paymentData)
+      body: JSON.stringify({
+        invoice: {
+          version: invoice.version,
+          payment_requests: updatedPaymentRequests
+        }
+      })
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      return NextResponse.json({ error: errorData }, { status: response.status });
-    }
-    
-    const result = await response.json();
-    return NextResponse.json(result);
-    
+    return NextResponse.json(await updateResponse.json());
   } catch (error) {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Update failed' }, { status: 500 });
   }
 }
