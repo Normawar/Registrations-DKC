@@ -46,7 +46,7 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">2. Click the <strong>Add Player from Database</strong> button. This will open a search dialog.</p>
                   <p className="text-sm">3. Search for your student by name or USCF ID. The master database contains thousands of players.</p>
                   <div className="border rounded-lg p-4 bg-muted/50">
-                     <Image src="https://picsum.photos/600/350" alt="A screenshot of the player search dialog." width={600} height={350} className="rounded-md" data-ai-hint="player search dialog" />
+                     <Image src="https://firebasestorage.googleapis.com/v0/b/firebase-studio-users.appspot.com/o/imagereplacements%2F6241b714-c13f-42a9-9528-9a3d467793d5?alt=media&token=e573a5a7-96a3-4940-a3d5-0370f1a9425a" alt="A screenshot of the player search dialog." width={600} height={350} className="rounded-md" data-ai-hint="player search dialog" />
                   </div>
                   <p className="text-sm">4. Once you find your student, click <strong>Select</strong> or <strong>Add & Complete</strong>. If their profile is missing information (like Grade, Section, DOB), you will be prompted to fill it in. The player will then be added to your school's roster.</p>
                 </CardContent>
