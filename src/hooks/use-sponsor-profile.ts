@@ -17,6 +17,7 @@ export type SponsorProfile = {
   avatarType: 'icon' | 'upload';
   avatarValue: string; // Icon name or image URL
   role: 'sponsor' | 'organizer' | 'individual';
+  isDistrictCoordinator?: boolean;
 };
 
 export function useSponsorProfile() {

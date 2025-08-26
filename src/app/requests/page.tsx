@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -54,14 +55,20 @@ export default function RequestsPage() {
       allConfirmations.forEach((conf: any) => confirmationMap.set(conf.id, conf));
       setConfirmationsMap(confirmationMap);
 
-      if (profile?.role === 'sponsor') {
+      if (profile?.role === 'sponsor' && profile.isDistrictCoordinator) {
+          const districtConfirmationIds = new Set(
+              allConfirmations
+                  .filter((c: any) => c.district === profile.district)
+                  .map((c: any) => c.id)
+          );
+          setRequests(allRequests.filter(req => districtConfirmationIds.has(req.confirmationId)));
+      } else if (profile?.role === 'sponsor') {
           const sponsorConfirmationIds = new Set(
               allConfirmations
                   .filter((c: any) => c.schoolName === profile.school && c.district === profile.district)
                   .map((c: any) => c.id)
           );
-          const sponsorRequests = allRequests.filter(req => sponsorConfirmationIds.has(req.confirmationId));
-          setRequests(sponsorRequests);
+          setRequests(allRequests.filter(req => sponsorConfirmationIds.has(req.confirmationId)));
       } else {
           setRequests(allRequests);
       }

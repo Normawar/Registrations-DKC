@@ -53,7 +53,9 @@ export default function UnifiedInvoiceRegistrations() {
       
       let invoicesArray = allInvoices ? JSON.parse(allInvoices) : [];
 
-      if (profile?.role === 'sponsor') {
+      if (profile?.role === 'sponsor' && profile.isDistrictCoordinator) {
+          invoicesArray = invoicesArray.filter((inv: any) => inv.district === profile.district);
+      } else if (profile?.role === 'sponsor') {
         invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
       } else if (profile?.role === 'individual') {
         invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
@@ -526,4 +528,3 @@ export default function UnifiedInvoiceRegistrations() {
     </AppLayout>
   );
 }
-

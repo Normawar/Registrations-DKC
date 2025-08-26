@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
 import { districts as uniqueDistricts } from '@/lib/data/districts';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type User = {
     email: string;
@@ -29,6 +30,7 @@ type User = {
     lastName?: string;
     school?: string;
     district?: string;
+    isDistrictCoordinator?: boolean;
 };
 
 const userFormSchema = z.object({
@@ -38,6 +40,7 @@ const userFormSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   school: z.string().optional(),
   district: z.string().optional(),
+  isDistrictCoordinator: z.boolean().optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -114,6 +117,7 @@ export default function UsersPage() {
             lastName: editingUser.lastName || '',
             school: editingUser.school || '',
             district: initialDistrict,
+            isDistrictCoordinator: editingUser.isDistrictCoordinator || false,
         });
         handleDistrictChange(initialDistrict, false);
       }
@@ -173,6 +177,7 @@ export default function UsersPage() {
     };
 
     const selectedDistrict = form.watch('district');
+    const selectedRole = form.watch('role');
 
     return (
         <AppLayout>
@@ -203,7 +208,10 @@ export default function UsersPage() {
                                     <TableRow key={user.email}>
                                         <TableCell className="font-mono">{user.email}</TableCell>
                                         <TableCell>{user.firstName} {user.lastName}</TableCell>
-                                        <TableCell className='capitalize'>{user.role}</TableCell>
+                                        <TableCell className='capitalize'>
+                                            {user.role}
+                                            {user.isDistrictCoordinator && <span className="text-xs text-primary font-semibold ml-2">(Coordinator)</span>}
+                                        </TableCell>
                                         <TableCell>{user.school || 'N/A'}{user.district ? ` / ${user.district}`: ''}</TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
@@ -246,6 +254,30 @@ export default function UsersPage() {
                                         </Select><FormMessage />
                                         </FormItem>
                                     )} />
+                                    {selectedRole === 'sponsor' && (
+                                        <FormField
+                                            control={form.control}
+                                            name="isDistrictCoordinator"
+                                            render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
+                                                <FormControl>
+                                                    <Checkbox
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                    />
+                                                </FormControl>
+                                                <div className="space-y-1 leading-none">
+                                                    <FormLabel>
+                                                    District Coordinator
+                                                    </FormLabel>
+                                                    <FormDescription>
+                                                        Grants this sponsor view access to all schools and registrations in their district.
+                                                    </FormDescription>
+                                                </div>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    )}
                                     <FormField control={form.control} name="district" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>District</FormLabel>

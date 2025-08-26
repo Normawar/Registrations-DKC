@@ -44,9 +44,12 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
   useEffect(() => {
     if (isOpen) {
       const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      const sponsorConfirmations = allConfirmations.filter((c: any) => 
-        c.schoolName === profile.school && c.district === profile.district
-      );
+      let sponsorConfirmations = [];
+      if (profile.isDistrictCoordinator) {
+          sponsorConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
+      } else {
+          sponsorConfirmations = allConfirmations.filter((c: any) => c.schoolName === profile.school && c.district === profile.district);
+      }
       setConfirmations(sponsorConfirmations);
     } else {
       // Reset form on close
@@ -61,7 +64,7 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
       setPlayerToWithdraw('');
       setAdditionalNotes('');
     }
-  }, [isOpen, profile.school, profile.district]);
+  }, [isOpen, profile.school, profile.district, profile.isDistrictCoordinator]);
 
   const selectedConfirmation = useMemo(() => {
     return confirmations.find(c => c.id === selectedConfirmationId);
@@ -78,7 +81,12 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
 
   const availableRosterPlayers = useMemo(() => {
     if (!profile) return [];
-    const roster = masterDb.filter(p => p.school === profile.school && p.district === profile.district);
+    let roster = [];
+    if (profile.isDistrictCoordinator) {
+        roster = masterDb.filter(p => p.district === profile.district);
+    } else {
+        roster = masterDb.filter(p => p.school === profile.school && p.district === profile.district);
+    }
     const registeredIds = new Set(registeredPlayers.map(p => p.id));
     return roster.filter(p => !registeredIds.has(p.id));
   }, [masterDb, profile, registeredPlayers]);

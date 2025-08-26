@@ -27,7 +27,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo } from 'react';
@@ -43,6 +43,16 @@ const sponsorMenuItems = [
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
   { href: "/previous-events", icon: History, label: "Previous Events" },
+];
+
+const districtCoordinatorMenuItems = [
+    { href: "/profile", icon: User, label: "Profile" },
+    { href: "/district-dashboard", icon: LayoutDashboard, label: "District Dashboard" },
+    { href: "/events", icon: RookIcon, label: "Register for event" },
+    { href: "/invoices", icon: Receipt, label: "District Invoices" },
+    { href: "/requests", icon: KnightIcon, label: "District Requests" },
+    { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+    { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
 const organizerMenuItems = [
@@ -116,6 +126,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         return changeRequests.filter(r => r.status === 'Pending').length;
     }
     
+    if (profile.role === 'sponsor' && profile.isDistrictCoordinator) {
+        const districtConfirmationIds = new Set(confirmations
+            .filter(c => c.district === profile.district)
+            .map(c => c.id));
+        return changeRequests.filter(req => req.status === 'Pending' && districtConfirmationIds.has(req.confirmationId)).length;
+    }
+
     if (profile.role === 'sponsor') {
         const sponsorConfirmationIds = new Set(confirmations
             .filter(c => c.schoolName === profile.school && c.district === profile.district)
@@ -142,6 +159,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const menuItems = 
     profile?.role === 'organizer' ? organizerMenuItems :
     profile?.role === 'individual' ? individualMenuItems :
+    profile?.isDistrictCoordinator ? districtCoordinatorMenuItems :
     sponsorMenuItems;
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
@@ -172,9 +190,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {profile?.role === 'sponsor' && (
                       <>
                         <p className="text-xs text-sidebar-foreground/80 truncate">
-                            {profile.school || 'School Name'}
+                            {profile.isDistrictCoordinator ? `${profile.district} Coordinator` : profile.school || 'School Name'}
                         </p>
-                        {teamCode && (
+                        {teamCode && !profile.isDistrictCoordinator && (
                           <p className="text-xs font-bold text-sidebar-primary truncate font-mono">
                             {teamCode}
                           </p>

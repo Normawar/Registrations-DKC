@@ -64,7 +64,11 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
     }
 
     let path = '/profile'; // Default redirect to profile page
-    if (role === 'individual') {
+    if (userProfile?.role === 'sponsor' && userProfile?.isDistrictCoordinator) {
+        path = '/district-dashboard';
+    } else if (userProfile?.role === 'sponsor') {
+        path = '/dashboard';
+    } else if (role === 'individual') {
       path = '/individual-dashboard';
     } else if (role === 'organizer') {
       path = '/manage-events';
