@@ -1300,35 +1300,50 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     };
     
     const EnhancedSquareButton = () => {
-      const handleOpenSquare = () => {
-        const invoiceUrl = confirmation?.invoiceUrl;
-        const invoiceNumber = confirmation?.invoiceNumber || confirmation?.id.slice(-8);
+      const handleOpenSquareInvoice = () => {
+        const invoiceUrl = confirmation?.invoiceUrl || confirmation?.publicUrl;
         
         if (invoiceUrl) {
+          // Open the specific invoice in Square
           window.open(invoiceUrl, '_blank');
-        } else {
+          
           toast({
-            variant: 'destructive',
-            title: 'No Square URL Available',
-            description: `Invoice #${invoiceNumber} may not be created in Square yet.`,
+            title: 'Square Invoice Opened',
+            description: 'Manually record the payment in Square after reviewing local payment details.',
+            duration: 8000
+          });
+        } else {
+          // Fallback to dashboard search
+          window.open('https://squareup.com/dashboard/invoices', '_blank');
+          
+          toast({
+            title: 'Square Dashboard Opened',
+            description: `Search for invoice #${confirmation?.invoiceNumber} to record payment manually.`,
             duration: 10000
           });
         }
       };
-    
+
       return (
         <div className="mt-4">
-          <label className="text-sm text-gray-600">Invoice Link</label>
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleOpenSquare}
-              >
-                💳 Open Square Invoice
-                <ExternalLink className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleOpenSquareInvoice}
+          >
+            Open Square Invoice for Manual Update
+            <ExternalLink className="w-4 h-4 ml-2" />
+          </Button>
+          
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+            <p className="font-medium text-blue-800">Manual Update Instructions:</p>
+            <p className="text-blue-700">
+              1. Review payment details in this dialog → 
+              2. Click button above to open Square → 
+              3. Record payment manually in Square → 
+              4. Payment status will remain tracked locally
+            </p>
+          </div>
         </div>
       );
     };
@@ -1491,11 +1506,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         </div>
         
         {profile?.role === 'organizer' && (
-          <EnhancedSquareDeveloperConsole />
-        )}
-
-        <div className="mt-6 pt-4 border-t">
-            {profile?.role !== 'sponsor' && (
+            <div className="mt-6 pt-4 border-t">
               <Button
                 variant="outline"
                 onClick={handleEnhancedSquareSync}
@@ -1505,8 +1516,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Sync with Square
               </Button>
-            )}
-        </div>
+            </div>
+        )}
       </DialogContent>
     </Dialog>
   );
