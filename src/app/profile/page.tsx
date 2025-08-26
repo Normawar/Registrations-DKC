@@ -370,6 +370,7 @@ export default function ProfilePage() {
   }
   
   const isSavePictureDisabled = isSavingPicture || !isAuthReady;
+  const isSponsorOrCoordinator = profile?.role === 'sponsor' || profile?.role === 'district_coordinator';
 
   return (
     <AppLayout>
@@ -495,7 +496,7 @@ export default function ProfilePage() {
                             <FormField control={profileForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={profileForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Cell Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
-                        {profile?.role === 'sponsor' && (
+                        {isSponsorOrCoordinator && (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
