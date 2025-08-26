@@ -1,25 +1,23 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
+// Note: All UI components and the useSponsorProfile hook have been removed for this test.
 
-const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) => {
+export default function BarebonesLoginPage() {
   const router = useRouter();
-  const { updateProfile } = useSponsorProfile();
+  const [activeTab, setActiveTab] = useState('sponsor');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  
+
+  // Minimal setup on component mount
+  useEffect(() => {
+    localStorage.removeItem('current_user_profile');
+  }, []);
+
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent the default form submission (page reload)
     setError('');
     
     if (!email) {
@@ -31,184 +29,89 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
       setError('Password is required');
       return;
     }
-
-    const usersRaw = localStorage.getItem('users');
-    const users: {email: string; role: string}[] = usersRaw ? JSON.parse(usersRaw) : [];
     
-    const lowercasedEmail = email.toLowerCase();
-    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
+    alert(`Attempting to sign in as ${email} with role ${activeTab}. If you see this alert, the JavaScript is working.`);
+
+    // Simplified login logic for testing
+    const usersRaw = localStorage.getItem('users');
+    const users = usersRaw ? JSON.parse(usersRaw) : [];
+    const existingUser = users.find((user: any) => user.email.toLowerCase() === email.toLowerCase());
 
     if (!existingUser) {
-        setError('This email is not registered. Please sign up.');
+        setError('This email is not registered.');
         return;
     }
-
-    if (existingUser.role !== role) {
-      setError(`This email is registered as a ${existingUser.role}. Please use the correct tab to sign in.`);
-      return;
+    if (existingUser.role !== activeTab) {
+        setError(`This email is registered as a ${existingUser.role}. Please use the correct tab.`);
+        return;
     }
     
-    const profilesRaw = localStorage.getItem('sponsor_profile');
-    const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    const userProfile = profiles[lowercasedEmail]; 
-
-    if (userProfile) {
-        updateProfile(userProfile);
-    } else {
-        const minimalProfile: SponsorProfile = { 
-            email: lowercasedEmail, 
-            role: role, 
-            firstName: 'User', 
-            lastName: '', 
-            phone: '', 
-            district: '', 
-            school: '',
-            avatarType: 'icon',
-            avatarValue: 'PawnIcon'
-        };
-        updateProfile(minimalProfile);
-    }
-
-    // Role-based redirection logic
-    if (userProfile?.role === 'sponsor' && userProfile?.isDistrictCoordinator) {
-        router.push('/auth/role-selection');
-    } else if (userProfile?.role === 'sponsor') {
-        router.push('/dashboard');
-    } else if (role === 'individual') {
-      router.push('/individual-dashboard');
-    } else if (role === 'organizer') {
-      router.push('/manage-events');
-    } else {
-      router.push('/profile'); // Default redirect
-    }
+    // On success, redirect
+    router.push('/dashboard');
   };
 
+  const handleTabClick = (tab: string) => {
+    setActiveTab(tab);
+    setEmail('');
+    setPassword('');
+    setError('');
+  };
+
+  // Basic inline styles to keep the layout usable for the test
+  const formStyle = {
+    maxWidth: '400px',
+    margin: '50px auto',
+    padding: '20px',
+    border: '1px solid #ccc',
+    borderRadius: '8px',
+  };
+  const inputStyle = { width: '100%', padding: '8px', margin: '5px 0 15px 0' };
+  const buttonStyle = { width: '100%', padding: '10px' };
+
   return (
-    <form onSubmit={handleSubmit}>
-      <CardContent className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor={`email-${role}`}>Email</Label>
-          <Input 
-            id={`email-${role}`} 
+    <div style={formStyle}>
+      <h1 style={{ textAlign: 'center' }}>Barebones Login Test</h1>
+      
+      <div style={{ display: 'flex', marginBottom: '20px', gap: '5px' }}>
+        <button type="button" onClick={() => handleTabClick('sponsor')} style={{ flex: 1, backgroundColor: activeTab === 'sponsor' ? '#ddd' : '#fff' }}>
+          Sponsor
+        </button>
+        <button type="button" onClick={() => handleTabClick('individual')} style={{ flex: 1, backgroundColor: activeTab === 'individual' ? '#ddd' : '#fff' }}>
+          Individual
+        </button>
+        <button type="button" onClick={() => handleTabClick('organizer')} style={{ flex: 1, backgroundColor: activeTab === 'organizer' ? '#ddd' : '#fff' }}>
+          Organizer
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label htmlFor="email">Email</label>
+          <input 
+            id="email" 
             type="email" 
-            placeholder="name@example.com" 
             value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
+            onChange={(e) => setEmail(e.target.value)}
+            style={inputStyle}
             required 
           />
         </div>
-        <div className="grid gap-2">
-          <div className="flex items-center">
-            <Label htmlFor={`password-${role}`}>Password</Label>
-            <Link href="#" className="ml-auto inline-block text-sm text-primary underline-offset-4 hover:underline" prefetch={false}>
-              Forgot password?
-            </Link>
-          </div>
-          <Input 
-            id={`password-${role}`} 
+        <div>
+          <label htmlFor="password">Password</label>
+          <input 
+            id="password" 
             type="password" 
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            style={inputStyle}
             required 
           />
         </div>
-        {error && <p className="text-sm font-medium text-destructive px-1">{error}</p>}
-        <Button type="submit" className="w-full">
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        <button type="submit" style={buttonStyle}>
           Sign In
-        </Button>
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-          <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or sign in with</span></div>
-        </div>
-        <Button type="button" variant="outline" className="w-full">
-          <svg aria-hidden="true" className="mr-2 h-4 w-4" width="18" height="18" viewBox="0 0 18 18">
-            <path d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6c1.52-1.4 2.37-3.47 2.37-6.05 0-.59-.05-1.16-.14-1.72Z" fill="#4285F4"></path>
-            <path d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-2.7 1.01c-2.12 0-3.92-1.42-4.57-3.33H1.9v2.05A9 9 0 0 0 8.98 17Z" fill="#34A853"></path>
-            <path d="M4.41 10.1c-.2-.58-.2-1.22-.2-1.82s0-1.24.2-1.82V4.41H1.9a9 9 0 0 0 0 8.18l2.5-2.05Z" fill="#FBBC05"></path>
-            <path d="M8.98 3.33c1.18 0 2.24.4 3.06 1.2l2.3-2.3A9 9 0 0 0 8.98 1Z" fill="#EA4335"></path>
-          </svg>
-          Google
-        </Button>
-      </CardContent>
-      <CardFooter className="justify-center text-sm">
-        <p className="text-muted-foreground">
-          Don&apos;t have an account?{" "}
-          <Link href="/signup" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>
-            Sign up
-          </Link>
-        </p>
-      </CardFooter>
-    </form>
-  );
-};
-
-export default function LoginPage() {
-  const { updateProfile } = useSponsorProfile();
-  const [activeTab, setActiveTab] = useState<'sponsor' | 'individual' | 'organizer'>('sponsor');
-  
-  useEffect(() => {
-    updateProfile(null);
-  }, [updateProfile]);
-
-  // Custom tab styles
-  const tabButtonClass = (isActive: boolean) => 
-    `px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary ${
-      isActive 
-        ? 'bg-primary text-primary-foreground shadow' 
-        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-    }`;
-
-  return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="space-y-1 text-center flex flex-col items-center">
-          <Image
-            src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/DK%20Logo%20SVG.png?alt=media&token=23cd3dee-8099-4453-bbc6-8a729424105d"
-            width={80}
-            height={80}
-            alt="Dark Knight Chess Logo"
-            className="mb-4"
-           />
-          <CardTitle className="text-3xl font-bold font-headline">Dark Knight Chess</CardTitle>
-          <CardDescription>
-            Choose your tab to login to the correct portal
-          </CardDescription>
-        </CardHeader>
-        
-        {/* Custom tabs without shadcn Tabs component */}
-        <div className="w-full px-6">
-          <div className="flex space-x-1 rounded-lg bg-muted p-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab('sponsor')}
-              className={`${tabButtonClass(activeTab === 'sponsor')} rounded-md flex-1`}
-            >
-              Sponsor
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('individual')}
-              className={`${tabButtonClass(activeTab === 'individual')} rounded-md flex-1`}
-            >
-              Individual
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('organizer')}
-              className={`${tabButtonClass(activeTab === 'organizer')} rounded-md flex-1`}
-            >
-              Organizer
-            </button>
-          </div>
-        </div>
-
-        {/* Tab content */}
-        <div className="mt-4">
-          {activeTab === 'sponsor' && <AuthForm role="sponsor" />}
-          {activeTab === 'individual' && <AuthForm role="individual" />}
-          {activeTab === 'organizer' && <AuthForm role="organizer" />}
-        </div>
-      </Card>
+        </button>
+      </form>
     </div>
   );
 }
