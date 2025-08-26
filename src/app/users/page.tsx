@@ -20,7 +20,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
-import { districts as uniqueDistricts } from '@/lib/data/districts';
 import { Checkbox } from '@/components/ui/checkbox';
 
 type User = {
@@ -53,6 +52,12 @@ export default function UsersPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+    
+    const uniqueDistricts = useMemo(() => {
+        const districts = new Set(schoolData.map(s => s.district));
+        return ['None', ...Array.from(districts)].sort();
+    }, []);
+
     const allSchoolNames = useMemo(() => {
         const schoolNames = schoolData.map(s => s.schoolName);
         const uniqueSchoolNames = [...new Set(schoolNames)].sort();
