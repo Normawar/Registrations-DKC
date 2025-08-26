@@ -17,12 +17,20 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
   const router = useRouter();
   const { updateProfile } = useSponsorProfile();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   
-  const handleLogin = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
+    
     if (!email) {
-      // Let browser validation handle it if needed
+      setError('Email is required');
+      return;
+    }
+    
+    if (!password) {
+      setError('Password is required');
       return;
     }
 
@@ -78,11 +86,18 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
   };
 
   return (
-    <>
+    <form onSubmit={handleSubmit}>
       <CardContent className="grid gap-4">
         <div className="grid gap-2">
           <Label htmlFor={`email-${role}`}>Email</Label>
-          <Input id={`email-${role}`} type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input 
+            id={`email-${role}`} 
+            type="email" 
+            placeholder="name@example.com" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
+            required 
+          />
         </div>
         <div className="grid gap-2">
           <div className="flex items-center">
@@ -91,17 +106,23 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
               Forgot password?
             </Link>
           </div>
-          <Input id={`password-${role}`} type="password" required />
+          <Input 
+            id={`password-${role}`} 
+            type="password" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required 
+          />
         </div>
         {error && <p className="text-sm font-medium text-destructive px-1">{error}</p>}
-        <Button type="button" className="w-full" onClick={handleLogin}>
+        <Button type="submit" className="w-full">
           Sign In
         </Button>
         <div className="relative">
           <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
           <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">Or sign in with</span></div>
         </div>
-        <Button variant="outline" className="w-full">
+        <Button type="button" variant="outline" className="w-full">
           <svg aria-hidden="true" className="mr-2 h-4 w-4" width="18" height="18" viewBox="0 0 18 18">
             <path d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6c1.52-1.4 2.37-3.47 2.37-6.05 0-.59-.05-1.16-.14-1.72Z" fill="#4285F4"></path>
             <path d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-2.7 1.01c-2.12 0-3.92-1.42-4.57-3.33H1.9v2.05A9 9 0 0 0 8.98 17Z" fill="#34A853"></path>
@@ -119,7 +140,7 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
           </Link>
         </p>
       </CardFooter>
-    </>
+    </form>
   );
 };
 
