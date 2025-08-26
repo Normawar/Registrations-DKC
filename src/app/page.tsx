@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) => {
@@ -145,11 +144,19 @@ const AuthForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =>
 
 export default function LoginPage() {
   const { updateProfile } = useSponsorProfile();
+  const [activeTab, setActiveTab] = useState<'sponsor' | 'individual' | 'organizer'>('sponsor');
   
   useEffect(() => {
-    // A null profile effectively logs the user out.
     updateProfile(null);
   }, [updateProfile]);
+
+  // Custom tab styles
+  const tabButtonClass = (isActive: boolean) => 
+    `px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary ${
+      isActive 
+        ? 'bg-primary text-primary-foreground shadow' 
+        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+    }`;
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
@@ -167,22 +174,40 @@ export default function LoginPage() {
             Choose your tab to login to the correct portal
           </CardDescription>
         </CardHeader>
-        <Tabs defaultValue="sponsor" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="sponsor">Sponsor</TabsTrigger>
-            <TabsTrigger value="individual">Individual</TabsTrigger>
-            <TabsTrigger value="organizer">Organizer</TabsTrigger>
-          </TabsList>
-          <TabsContent value="sponsor">
-            <AuthForm role="sponsor" />
-          </TabsContent>
-          <TabsContent value="individual">
-            <AuthForm role="individual" />
-          </TabsContent>
-          <TabsContent value="organizer">
-            <AuthForm role="organizer" />
-          </TabsContent>
-        </Tabs>
+        
+        {/* Custom tabs without shadcn Tabs component */}
+        <div className="w-full px-6">
+          <div className="flex space-x-1 rounded-lg bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setActiveTab('sponsor')}
+              className={`${tabButtonClass(activeTab === 'sponsor')} rounded-md flex-1`}
+            >
+              Sponsor
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('individual')}
+              className={`${tabButtonClass(activeTab === 'individual')} rounded-md flex-1`}
+            >
+              Individual
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('organizer')}
+              className={`${tabButtonClass(activeTab === 'organizer')} rounded-md flex-1`}
+            >
+              Organizer
+            </button>
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <div className="mt-4">
+          {activeTab === 'sponsor' && <AuthForm role="sponsor" />}
+          {activeTab === 'individual' && <AuthForm role="individual" />}
+          {activeTab === 'organizer' && <AuthForm role="organizer" />}
+        </div>
       </Card>
     </div>
   );
