@@ -11,18 +11,22 @@ import Image from 'next/image';
 
 export default function RoleSelectionPage() {
   const router = useRouter();
-  const { profile } = useSponsorProfile();
+  const { profile, isProfileLoaded } = useSponsorProfile();
 
   useEffect(() => {
-    // Redirect to login if profile is not loaded after the component mounts
-    if (!profile) {
+    // Only redirect if the profile is loaded and it's confirmed to be null
+    if (isProfileLoaded && !profile) {
       router.push('/');
     }
-  }, [profile, router]);
+  }, [isProfileLoaded, profile, router]);
 
-  if (!profile) {
-    // Render nothing while redirecting
-    return null;
+  if (!isProfileLoaded || !profile) {
+    // Render a loading state or nothing while waiting for profile
+    return (
+        <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
+            <p>Loading your profile...</p>
+        </div>
+    );
   }
 
   const handleRoleSelection = (path: string) => {
