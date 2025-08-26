@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { PlusCircle, MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Download, Trash2, Edit, Upload, ClipboardPaste, Delete } from "lucide-react";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
@@ -27,7 +27,7 @@ type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'g
 
 function PlayersPageContent() {
   const { toast } = useToast();
-  const { database, deletePlayer, isDbLoaded, addBulkPlayers, dbPlayerCount, clearDatabase } = useMasterDb();
+  const { database, deletePlayer, isDbLoaded, addBulkPlayers, dbPlayerCount, clearDatabase, dbDistricts } = useMasterDb();
   const { events } = useEvents();
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -118,21 +118,30 @@ function PlayersPageContent() {
     setPlayerToDelete(null);
   };
   
-  const handleExport = () => {
-    if (database.length === 0) {
-      toast({ variant: 'destructive', title: 'No Data to Export', description: 'The player database is empty.' });
+  const handleExport = (district?: string) => {
+    let playersToExport = database;
+    let fileName = 'master_player_database.csv';
+
+    if (district) {
+      playersToExport = database.filter(p => p.district === district);
+      fileName = `${district.replace(/\s+/g, '_')}_players.csv`;
+    }
+
+    if (playersToExport.length === 0) {
+      toast({ variant: 'destructive', title: 'No Data to Export', description: district ? `No players found for ${district}.` : 'The player database is empty.' });
       return;
     }
-    const csv = Papa.unparse(database);
+
+    const csv = Papa.unparse(playersToExport);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'master_player_database.csv';
+    a.download = fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    toast({ title: 'Export Complete', description: 'The master player database has been downloaded.' });
+    toast({ title: 'Export Complete', description: `${playersToExport.length} players exported.` });
   };
   
   const processImportData = (data: any[]) => {
@@ -330,7 +339,23 @@ function PlayersPageContent() {
               </DropdownMenuContent>
             </DropdownMenu>
             <Button variant="outline" onClick={() => setIsSearchOpen(true)}><Search className="mr-2 h-4 w-4" />Search Players</Button>
-            <Button variant="secondary" onClick={handleExport}><Download className="mr-2 h-4 w-4" />Export All</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary"><Download className="mr-2 h-4 w-4" />Export</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => handleExport()}>
+                    Export All Players
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Export by District</DropdownMenuLabel>
+                {dbDistricts.map(district => (
+                    <DropdownMenuItem key={district} onSelect={() => handleExport(district)}>
+                        {district}
+                    </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="destructive" onClick={() => setIsClearAlertOpen(true)}><Delete className="mr-2 h-4 w-4" />Clear Database</Button>
         </div>
       </div>
