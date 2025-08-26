@@ -1,103 +1,502 @@
 
 'use client';
 
+import { useState, useMemo, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
-export default function EmergencyLoginPage() {
-  const router = useRouter();
-  
-  const createTestUser = (role: 'sponsor' | 'individual' | 'organizer', email: string, isPsja: boolean = false) => {
-    // Manually clear any existing user profile from localStorage first
-    localStorage.removeItem('current_user_profile');
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import Link from "next/link";
+import Image from "next/image";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 
-    // Create test user in localStorage
-    const usersRaw = localStorage.getItem('users');
-    const users: {email: string; role: string}[] = usersRaw ? JSON.parse(usersRaw) : [];
-    
-    // Check if user already exists
-    const existingUser = users.find(user => user.email.toLowerCase() === email.toLowerCase());
-    if (!existingUser) {
-      const newUser = { email: email.toLowerCase(), role: role };
-      const updatedUsers = [...users, newUser];
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
+const sponsorFormSchema = z.object({
+  firstName: z.string().min(1, { message: "First name is required." }),
+  lastName: z.string().min(1, { message: "Last name is required." }),
+  district: z.string({ required_error: "Please select a district."}).min(1, "District is required."),
+  school: z.string({ required_error: "Please select a school."}).min(1, "School is required."),
+  email: z.string().email({ message: "Please enter a valid email." }),
+  phone: z.string().min(10, { message: "Please enter a valid 10-digit phone number." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
+  gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+  bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+}).refine(data => {
+    if (data.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+        return data.gtCoordinatorEmail && data.gtCoordinatorEmail.length > 0;
     }
+    return true;
+}, {
+    message: "GT Coordinator Email is required for this district.",
+    path: ["gtCoordinatorEmail"],
+});
 
-    // Create test profile
-    const profileData: SponsorProfile = {
-      email: email.toLowerCase(),
-      role: role,
-      firstName: isPsja ? 'PSJA' : 'Test',
-      lastName: role === 'sponsor' ? 'Sponsor' : role === 'organizer' ? 'Organizer' : 'User',
-      phone: '5551234567',
-      district: isPsja ? 'PHARR-SAN JUAN-ALAMO ISD' : 'Test District',
-      school: isPsja ? 'PSJA NORTH EARLY COLLEGE H S' : 'Test School',
-      avatarType: 'icon',
-      avatarValue: role === 'sponsor' ? 'KingIcon' : role === 'organizer' ? 'RookIcon' : 'PawnIcon',
-      gtCoordinatorEmail: '',
-      bookkeeperEmail: '',
-      schoolAddress: '',
-      schoolPhone: ''
-    };
+const SponsorSignUpForm = () => {
+  const router = useRouter();
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+  const { updateProfile } = useSponsorProfile();
+  
+  const [schoolData, setSchoolData] = useState<School[]>([]);
+  const [uniqueDistricts, setUniqueDistricts] = useState<string[]>([]);
 
-    localStorage.setItem('current_user_profile', JSON.stringify(profileData));
+  useEffect(() => {
+    const storedSchoolData = localStorage.getItem('school_data');
+    const data = storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData;
+    setSchoolData(data);
+    const districts = [...new Set(data.map((s: School) => s.district))].sort();
+    if (!districts.includes('None')) {
+      districts.unshift('None');
+    }
+    setUniqueDistricts(districts);
+  }, []);
 
-    // Redirect based on role
-    if (role === 'sponsor') {
-      router.push('/dashboard');
-    } else if (role === 'individual') {
-      router.push('/individual-dashboard');
-    } else if (role === 'organizer') {
-      router.push('/manage-events');
+  const allSchoolNames = useMemo(() => {
+    const schoolNames = schoolData.map(s => s.schoolName);
+    const uniqueSchoolNames = [...new Set(schoolNames)].sort();
+    if (!uniqueSchoolNames.includes('Homeschool')) {
+        return ['Homeschool', ...uniqueSchoolNames];
+    }
+    return uniqueSchoolNames;
+  }, [schoolData]);
+  
+  const form = useForm<z.infer<typeof sponsorFormSchema>>({
+    resolver: zodResolver(sponsorFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      district: "None",
+      school: "Homeschool",
+      email: "",
+      phone: "",
+      password: "",
+      gtCoordinatorEmail: "",
+      bookkeeperEmail: "",
+    },
+  });
+
+  const selectedDistrict = form.watch('district');
+
+  const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
+    form.setValue('district', district);
+    let filteredSchools: string[];
+    if (district === 'None') {
+      filteredSchools = allSchoolNames;
+    } else {
+        filteredSchools = schoolData
+            .filter((school) => school.district === district)
+            .map((school) => school.schoolName)
+            .sort();
+    }
+    setSchoolsForDistrict([...new Set(filteredSchools)]);
+
+    if (resetSchool) {
+        if (district === 'None') {
+            form.setValue('school', 'Homeschool');
+        } else {
+            form.setValue('school', '');
+        }
     }
   };
 
+  useEffect(() => {
+    handleDistrictChange(form.getValues('district'), false); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolData]); // Depend on schoolData to re-run when it loads
+  
+  function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
+    const lowercasedEmail = values.email.toLowerCase();
+    const usersRaw = localStorage.getItem('users');
+    const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
+    
+    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
+
+    if (existingUser) {
+        form.setError('email', {
+            type: 'manual',
+            message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
+        });
+        return;
+    }
+
+    const newUser = { email: lowercasedEmail, role: 'sponsor' };
+    const updatedUsers = [...users, newUser];
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
+    
+    const { password, ...profileValues } = values;
+    const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
+
+    const profileData: SponsorProfile = {
+      ...profileValues,
+      email: lowercasedEmail,
+      role: 'sponsor',
+      avatarType: 'icon',
+      avatarValue: 'KingIcon',
+      schoolAddress: schoolInfo?.streetAddress || '',
+      schoolPhone: schoolInfo?.phone || '',
+    };
+    
+    updateProfile(profileData);
+    
+    router.push('/profile');
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>First Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="John" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Doe" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="district"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>District</FormLabel>
+                <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a district" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {uniqueDistricts.map((district) => (
+                      <SelectItem key={district} value={district}>
+                        {district}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="school"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>School</FormLabel>
+                 <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a school" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {schoolsForDistrict.map((school) => (
+                      <SelectItem key={school} value={school}>
+                        {school}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="name@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+           <FormField
+            control={form.control}
+            name="bookkeeperEmail"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Bookkeeper/Secretary Email (Optional)</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="bookkeeper@example.com" {...field} />
+                </FormControl>
+                <FormDescription>This email will receive a copy of all invoices.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+              <FormField
+                  control={form.control}
+                  name="gtCoordinatorEmail"
+                  render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>GT Coordinator Email</FormLabel>
+                      <FormControl>
+                      <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
+                      </FormControl>
+                      <FormDescription>This email will be CC'd on invoices for this district.</FormDescription>
+                      <FormMessage />
+                  </FormItem>
+                  )}
+              />
+          )}
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cell Phone Number</FormLabel>
+                <FormControl>
+                  <Input type="tel" placeholder="(555) 555-5555" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+        <CardFooter className="flex flex-col gap-4">
+          <Button type="submit" className="w-full">
+            Create Account
+          </Button>
+          <div className="text-sm text-center text-muted-foreground">
+            Already have an account?{" "}
+            <Link
+              href="/"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              prefetch={false}
+            >
+              Sign In
+            </Link>
+          </div>
+        </CardFooter>
+      </form>
+    </Form>
+  );
+};
+
+
+const individualFormSchema = z.object({
+  firstName: z.string().min(1, { message: "First name is required." }),
+  lastName: z.string().min(1, { message: "Last name is required." }),
+  email: z.string().email({ message: "Please enter a valid email." }),
+  password: z.string().min(8, { message: "Password must be at least 8 characters." }),
+});
+
+const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) => {
+  const router = useRouter();
+  const { updateProfile } = useSponsorProfile();
+  const [schoolData, setSchoolData] = useState<School[]>([]);
+
+  useEffect(() => {
+    const storedSchoolData = localStorage.getItem('school_data');
+    setSchoolData(storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData);
+  }, []);
+  
+  const form = useForm<z.infer<typeof individualFormSchema>>({
+    resolver: zodResolver(individualFormSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+    },
+  });
+
+  function onSubmit(values: z.infer<typeof individualFormSchema>) {
+    const lowercasedEmail = values.email.toLowerCase();
+    const usersRaw = localStorage.getItem('users');
+    const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
+
+    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
+
+    if (existingUser) {
+        form.setError('email', {
+            type: 'manual',
+            message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
+        });
+        return;
+    }
+
+    const newUser = { email: lowercasedEmail, role: role };
+    const updatedUsers = [...users, newUser];
+    localStorage.setItem('users', JSON.stringify(updatedUsers));
+    
+    const { password, ...profileValues } = values;
+
+    const profileData: SponsorProfile = {
+        ...profileValues,
+        email: lowercasedEmail,
+        phone: '',
+        district: 'None',
+        school: 'Homeschool',
+        gtCoordinatorEmail: '',
+        bookkeeperEmail: '',
+        schoolAddress: '',
+        schoolPhone: '',
+        role: role,
+        avatarType: 'icon',
+        avatarValue: 'PawnIcon',
+    };
+    
+    updateProfile(profileData);
+
+    let path = '/dashboard';
+    if (role === 'individual') {
+      path = '/individual-dashboard';
+    } else if (role === 'organizer') {
+      path = '/manage-events';
+    }
+    router.push(path);
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <CardContent className="grid gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="firstName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>First Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Max" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="lastName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Robinson" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="name@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </CardContent>
+        <CardFooter className="flex flex-col gap-4">
+          <Button type="submit" className="w-full">
+            Create Account
+          </Button>
+          <div className="text-sm text-center text-muted-foreground">
+            Already have an account?{" "}
+            <Link
+              href="/"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+              prefetch={false}
+            >
+              Sign In
+            </Link>
+          </div>
+        </CardFooter>
+      </form>
+    </Form>
+  )
+};
+
+export default function Page() {
+  const router = useRouter();
+
+  // Redirect to the dashboard by default.
+  // This bypasses the login page entirely.
+  useEffect(() => {
+    router.replace('/dashboard');
+  }, [router]);
+
+  // We render a simple loading state while redirecting.
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold">Emergency Login</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Quick access while tabs are being fixed
-          </p>
-        </CardHeader>
-        
-        <CardContent className="grid gap-4">
-          <div className="text-center text-sm text-muted-foreground mb-4">
-            Click a button to create a test account and login immediately:
-          </div>
-          
-          <Button 
-            onClick={() => createTestUser('sponsor', 'test-psja-sponsor@example.com', true)}
-            className="w-full"
-            variant="default"
-          >
-            Login as Sponsor
-          </Button>
-          
-          <Button 
-            onClick={() => createTestUser('individual', 'test-individual@example.com')}
-            className="w-full"
-            variant="secondary"
-          >
-            Login as Individual
-          </Button>
-          
-          <Button 
-            onClick={() => createTestUser('organizer', 'test-organizer@example.com')}
-            className="w-full"
-            variant="outline"
-          >
-            Login as Organizer
-          </Button>
-
-          <div className="mt-4 p-3 bg-muted rounded-lg text-xs text-muted-foreground">
-            <strong>Note:</strong> The "Sponsor" login is pre-configured for a PSJA school.
-          </div>
-        </CardContent>
-      </Card>
+      <p>Loading...</p>
     </div>
   );
 }

@@ -28,7 +28,7 @@ import { format, isSameDay } from "date-fns";
 import { Info, FileText, ImageIcon, Lock } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useMasterDb } from "@/context/master-db-context";
-import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
+import { useSponsorProfile, type SponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -38,12 +38,36 @@ import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dia
 export default function DashboardPage() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
-  const { profile } = useSponsorProfile();
+  const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [clientReady, setClientReady] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
+
+  // This effect will automatically create a test profile if none exists,
+  // effectively logging the user in when they land on this page.
+  useEffect(() => {
+    if (isProfileLoaded && !profile) {
+      console.log("No profile found, creating a default sponsor profile.");
+      const defaultProfile: SponsorProfile = {
+        email: 'test-sponsor@example.com',
+        role: 'sponsor',
+        firstName: 'Test',
+        lastName: 'Sponsor',
+        phone: '5551234567',
+        district: 'Test District',
+        school: 'Test School',
+        avatarType: 'icon',
+        avatarValue: 'KingIcon',
+        gtCoordinatorEmail: '',
+        bookkeeperEmail: '',
+        schoolAddress: '',
+        schoolPhone: ''
+      };
+      updateProfile(defaultProfile);
+    }
+  }, [isProfileLoaded, profile, updateProfile]);
 
 
   useEffect(() => {
