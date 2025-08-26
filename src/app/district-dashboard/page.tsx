@@ -47,12 +47,13 @@ export default function DistrictDashboardPage() {
   }, [allPlayers, profile?.district]);
 
   const districtSchools = useMemo(() => {
-      if (!profile?.district) return [];
-      const schools = districtPlayers
-          .map(p => p.school)
-          .filter(Boolean) as string[];
-      return ['All Schools', ...[...new Set(schools)].sort()];
+    if (!profile?.district) return [];
+    const schools = districtPlayers
+      .map(p => p.school)
+      .filter((school): school is string => !!school); 
+    return ['All Schools', ...Array.from(new Set(schools)).sort()];
   }, [districtPlayers, profile?.district]);
+
 
   useEffect(() => {
     setClientReady(true);
