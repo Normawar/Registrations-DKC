@@ -161,7 +161,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const menuItems = 
     profile?.role === 'organizer' ? organizerMenuItems :
     profile?.role === 'individual' ? individualMenuItems :
-    profile?.isDistrictCoordinator && isDistrictDashboard ? districtCoordinatorMenuItems :
+    (profile?.isDistrictCoordinator && isDistrictDashboard) ? districtCoordinatorMenuItems :
     sponsorMenuItems;
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;

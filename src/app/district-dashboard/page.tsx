@@ -39,16 +39,15 @@ export default function DistrictDashboardPage() {
   const { profile } = useSponsorProfile();
   const { database: allPlayers } = useMasterDb();
   const [clientReady, setClientReady] = useState(false);
+  const [selectedSchool, setSelectedSchool] = useState<string>('All Schools');
 
   const districtSchools = useMemo(() => {
       if (!profile?.district) return [];
       const schools = allPlayers
-          .filter(p => p.district === profile.district)
-          .map(p => p.school);
+          .filter(p => p.district === profile.district && p.school)
+          .map(p => p.school!);
       return ['All Schools', ...[...new Set(schools)].sort()];
   }, [allPlayers, profile]);
-
-  const [selectedSchool, setSelectedSchool] = useState<string>('All Schools');
 
   useEffect(() => {
     setClientReady(true);
@@ -56,16 +55,18 @@ export default function DistrictDashboardPage() {
 
   const schoolRoster = useMemo(() => {
     if (!profile?.district) return [];
+    const districtPlayers = allPlayers.filter(p => p.district === profile.district);
+    
     if (selectedSchool === 'All Schools') {
-        return allPlayers.filter(p => p.district === profile.district);
+        return districtPlayers;
     }
-    return allPlayers.filter(p => p.school === selectedSchool);
+    return districtPlayers.filter(p => p.school === selectedSchool);
   }, [allPlayers, selectedSchool, profile?.district]);
 
   const districtStats = useMemo(() => {
     if (!profile?.district) return { totalPlayers: 0, totalSchools: 0 };
     const districtPlayers = allPlayers.filter(p => p.district === profile.district);
-    const totalSchools = new Set(districtPlayers.map(p => p.school)).size;
+    const totalSchools = new Set(districtPlayers.map(p => p.school).filter(Boolean)).size;
     return {
         totalPlayers: districtPlayers.length,
         totalSchools: totalSchools,
