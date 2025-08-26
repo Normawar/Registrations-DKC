@@ -72,14 +72,6 @@ export default function EmergencyLoginPage() {
           </div>
           
           <Button 
-            onClick={() => createTestUser('sponsor', 'test-sponsor@example.com')}
-            className="w-full"
-            variant="default"
-          >
-            Login as Sponsor
-          </Button>
-
-           <Button 
             onClick={() => createTestUser('sponsor', 'test-psja-sponsor@example.com', true)}
             className="w-full"
             variant="default"
