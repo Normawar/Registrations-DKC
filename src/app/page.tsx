@@ -1,245 +1,104 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 
-export default function LoginPage() {
+export default function EmergencyLoginPage() {
   const { updateProfile } = useSponsorProfile();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('sponsor');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [userList, setUserList] = useState<{email: string, role: string}[]>([]);
   
   useEffect(() => {
     updateProfile(null);
-    
-    // This script will run on the client and display the users for us to see.
-    const usersRaw = localStorage.getItem('users');
-    let users = usersRaw ? JSON.parse(usersRaw) : [];
-
-    const organizerEmail = 'organizer@test.com';
-    const organizerExists = users.some((user: {email: string}) => user.email === organizerEmail);
-
-    if (!organizerExists) {
-        users.push({ email: organizerEmail, role: 'organizer' });
-        localStorage.setItem('users', JSON.stringify(users));
-
-        const profilesRaw = localStorage.getItem('sponsor_profile');
-        let profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-        profiles[organizerEmail] = {
-            email: organizerEmail,
-            role: 'organizer',
-            firstName: 'Test',
-            lastName: 'Organizer',
-            avatarType: 'icon',
-            avatarValue: 'Wrench',
-        };
-        localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
-    }
-    
-    if (users) {
-        setUserList(users);
-    } else {
-        console.log("No users found in the system.");
-    }
   }, [updateProfile]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    
-    if (!email) {
-      setError('Email is required');
-      return;
-    }
-    
-    if (!password) {
-      setError('Password is required');
-      return;
-    }
-
+  const createTestUser = (role: 'sponsor' | 'individual' | 'organizer', email: string) => {
+    // Create test user in localStorage
     const usersRaw = localStorage.getItem('users');
     const users: {email: string; role: string}[] = usersRaw ? JSON.parse(usersRaw) : [];
     
-    const lowercasedEmail = email.toLowerCase();
-    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
-
+    // Check if user already exists
+    const existingUser = users.find(user => user.email.toLowerCase() === email.toLowerCase());
     if (!existingUser) {
-        setError('This email is not registered. Please sign up.');
-        return;
+      const newUser = { email: email.toLowerCase(), role: role };
+      const updatedUsers = [...users, newUser];
+      localStorage.setItem('users', JSON.stringify(updatedUsers));
     }
 
-    if (existingUser.role !== activeTab) {
-      setError(`This email is registered as a ${existingUser.role}. Please use the correct tab to sign in.`);
-      return;
-    }
-    
-    const profilesRaw = localStorage.getItem('sponsor_profile');
-    const profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-    const userProfile = profiles[lowercasedEmail]; 
+    // Create test profile
+    const profileData: SponsorProfile = {
+      email: email.toLowerCase(),
+      role: role,
+      firstName: 'Test',
+      lastName: 'User',
+      phone: '5551234567',
+      district: 'Test District',
+      school: 'Test School',
+      avatarType: 'icon',
+      avatarValue: role === 'sponsor' ? 'KingIcon' : role === 'organizer' ? 'RookIcon' : 'PawnIcon',
+      gtCoordinatorEmail: '',
+      bookkeeperEmail: '',
+      schoolAddress: '',
+      schoolPhone: ''
+    };
 
-    if (userProfile) {
-        updateProfile(userProfile);
-    } else {
-        const minimalProfile: SponsorProfile = { 
-            email: lowercasedEmail, 
-            role: activeTab as 'sponsor' | 'individual' | 'organizer', 
-            firstName: 'User', 
-            lastName: '', 
-            phone: '', 
-            district: '', 
-            school: '',
-            avatarType: 'icon',
-            avatarValue: 'PawnIcon'
-        };
-        updateProfile(minimalProfile);
-    }
+    updateProfile(profileData);
 
-    // Role-based redirection logic
-    if (userProfile?.role === 'sponsor' && userProfile?.isDistrictCoordinator) {
-        router.push('/auth/role-selection');
-    } else if (userProfile?.role === 'sponsor') {
-        router.push('/dashboard');
-    } else if (activeTab === 'individual') {
+    // Redirect based on role
+    if (role === 'sponsor') {
+      router.push('/dashboard');
+    } else if (role === 'individual') {
       router.push('/individual-dashboard');
-    } else if (activeTab === 'organizer') {
+    } else if (role === 'organizer') {
       router.push('/manage-events');
-    } else {
-      router.push('/profile');
     }
-  };
-
-  const handleTabClick = (tab: string) => {
-    setActiveTab(tab);
-    setEmail('');
-    setPassword('');
-    setError('');
   };
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="space-y-1 text-center flex flex-col items-center">
-          <Image
-            src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/DK%20Logo%20SVG.png?alt=media&token=23cd3dee-8099-4453-bbc6-8a729424105d"
-            width={80}
-            height={80}
-            alt="Dark Knight Chess Logo"
-            className="mb-4"
-           />
-          <CardTitle className="text-3xl font-bold font-headline">Dark Knight Chess</CardTitle>
-          <CardDescription>
-            Choose your tab to login to the correct portal
+        <CardHeader className="text-center">
+          <CardTitle className="text-3xl font-bold">Emergency Login</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">
+            Quick access while tabs are being fixed
           </CardDescription>
         </CardHeader>
         
-        {/* Simple custom tabs */}
-        <div className="w-full px-6 mb-4">
-          <div className="flex space-x-1 rounded-lg bg-muted p-1">
-            <button
-              type="button"
-              onClick={() => handleTabClick('sponsor')}
-              className={`px-4 py-2 text-sm font-medium rounded-md flex-1 transition-colors ${
-                activeTab === 'sponsor' 
-                  ? 'bg-primary text-primary-foreground shadow' 
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Sponsor
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabClick('individual')}
-              className={`px-4 py-2 text-sm font-medium rounded-md flex-1 transition-colors ${
-                activeTab === 'individual' 
-                  ? 'bg-primary text-primary-foreground shadow' 
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Individual
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabClick('organizer')}
-              className={`px-4 py-2 text-sm font-medium rounded-md flex-1 transition-colors ${
-                activeTab === 'organizer' 
-                  ? 'bg-primary text-primary-foreground shadow' 
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Organizer
-            </button>
+        <CardContent className="grid gap-4">
+          <div className="text-center text-sm text-muted-foreground mb-4">
+            Click a button to create a test account and login immediately:
           </div>
-        </div>
+          
+          <Button 
+            onClick={() => createTestUser('sponsor', 'test-sponsor@example.com')}
+            className="w-full"
+            variant="default"
+          >
+            Login as Sponsor
+          </Button>
+          
+          <Button 
+            onClick={() => createTestUser('individual', 'test-individual@example.com')}
+            className="w-full"
+            variant="secondary"
+          >
+            Login as Individual
+          </Button>
+          
+          <Button 
+            onClick={() => createTestUser('organizer', 'test-organizer@example.com')}
+            className="w-full"
+            variant="outline"
+          >
+            Login as Organizer
+          </Button>
 
-        {/* Single form for all tabs */}
-        <form onSubmit={handleSubmit}>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="name@example.com" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                required 
-              />
-            </div>
-            <div className="grid gap-2">
-              <div className="flex items-center">
-                <Label htmlFor="password">Password</Label>
-                <Link href="#" className="ml-auto inline-block text-sm text-primary underline-offset-4 hover:underline" prefetch={false}>
-                  Forgot password?
-                </Link>
-              </div>
-              <Input 
-                id="password" 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-              />
-            </div>
-            {error && <p className="text-sm font-medium text-destructive px-1">{error}</p>}
-            <Button type="submit" className="w-full">
-              Sign In as {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
-            </Button>
-          </CardContent>
-        </form>
-        
-        {/* User List for Debugging */}
-        <CardFooter className="flex flex-col items-start text-sm">
-            <h3 className="font-bold mb-2">Existing Users (for testing):</h3>
-            {userList.length > 0 ? (
-                <ul className="list-disc pl-5">
-                    {userList.map(user => (
-                        <li key={user.email}>
-                           <span className="font-mono">{user.email}</span> ({user.role})
-                        </li>
-                    ))}
-                </ul>
-            ) : (
-                <p className="text-muted-foreground">No users found in localStorage.</p>
-            )}
-            <div className="w-full text-center mt-4">
-              <p className="text-muted-foreground">
-                Don't have an account?{" "}
-                <Link href="/signup" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>
-                  Sign up
-                </Link>
-              </p>
-            </div>
-        </CardFooter>
+          <div className="mt-4 p-3 bg-muted rounded-lg text-xs text-muted-foreground">
+            <strong>Note:</strong> This creates test accounts automatically. Use "Login as Organizer" to access the data upload features you need.
+          </div>
+        </CardContent>
       </Card>
     </div>
   );
