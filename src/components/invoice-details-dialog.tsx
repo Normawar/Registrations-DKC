@@ -39,6 +39,232 @@ const createSafeOnChange = (setter: (value: string) => void) => {
   };
 };
 
+// Add this component to your invoice-details-dialog.tsx
+
+const SponsorPaymentComponent = () => {
+    const { toast } = useToast();
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [fileUrls, setFileUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    
+    const validFiles = files.filter(file => {
+      const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf';
+      const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB limit
+      return isValidType && isValidSize;
+    });
+
+    if (validFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...validFiles]);
+      
+      const newUrls = validFiles.map(file => URL.createObjectURL(file));
+      setFileUrls(prev => [...prev, ...newUrls]);
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setFileUrls(prev => {
+      URL.revokeObjectURL(prev[index]);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+
+  const handleSubmitProof = () => {
+    if (!selectedPaymentMethod || uploadedFiles.length === 0) {
+      toast({
+        variant: 'destructive',
+        title: 'Missing Information',
+        description: 'Please select a payment method and upload proof of payment.'
+      });
+      return;
+    }
+
+    // Here you would handle submitting the proof of payment
+    // This could involve uploading files to Firebase Storage and updating the invoice record
+    
+    toast({
+      title: 'Proof of Payment Submitted',
+      description: 'Your payment proof has been submitted for verification.'
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h3 className="font-medium text-blue-800 mb-2">Payment Instructions</h3>
+        <p className="text-sm text-blue-700 mb-3">
+          Please submit payment using one of the methods below, then upload proof of payment for verification.
+        </p>
+      </div>
+
+      {/* Payment Method Selection */}
+      <div className="space-y-3">
+        <h4 className="font-medium">Select Payment Method</h4>
+        
+        {/* Purchase Order Option */}
+        <div 
+          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+            selectedPaymentMethod === 'PO' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+          }`}
+          onClick={() => setSelectedPaymentMethod('PO')}
+        >
+          <div className="flex items-center">
+            <input 
+              type="radio" 
+              checked={selectedPaymentMethod === 'PO'} 
+              onChange={() => setSelectedPaymentMethod('PO')}
+              className="mr-3"
+            />
+            <div>
+              <h5 className="font-medium">Purchase Order (PO)</h5>
+              <p className="text-sm text-gray-600">
+                Submit a purchase order through your school's accounting department
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* CashApp Option */}
+        <div 
+          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+            selectedPaymentMethod === 'CashApp' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+          }`}
+          onClick={() => setSelectedPaymentMethod('CashApp')}
+        >
+          <div className="flex items-center">
+            <input 
+              type="radio" 
+              checked={selectedPaymentMethod === 'CashApp'} 
+              onChange={() => setSelectedPaymentMethod('CashApp')}
+              className="mr-3"
+            />
+            <div>
+              <h5 className="font-medium">Cash App</h5>
+              <p className="text-sm text-gray-600">
+                Send payment to: <span className="font-mono font-semibold text-green-700">$DKChess</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Please include invoice number in the payment note
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Zelle Option */}
+        <div 
+          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+            selectedPaymentMethod === 'Zelle' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+          }`}
+          onClick={() => setSelectedPaymentMethod('Zelle')}
+        >
+          <div className="flex items-center">
+            <input 
+              type="radio" 
+              checked={selectedPaymentMethod === 'Zelle'} 
+              onChange={() => setSelectedPaymentMethod('Zelle')}
+              className="mr-3"
+            />
+            <div>
+              <h5 className="font-medium">Zelle</h5>
+              <p className="text-sm text-gray-600">
+                Send payment to: <span className="font-mono font-semibold text-blue-700">956-393-8875</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Please include invoice number in the payment note
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* File Upload Section */}
+      {selectedPaymentMethod && (
+        <div className="space-y-3">
+          <h4 className="font-medium">Upload Proof of Payment</h4>
+          <p className="text-sm text-gray-600">
+            {selectedPaymentMethod === 'PO' ? 
+              'Upload a copy of your purchase order or confirmation' :
+              'Upload a screenshot of your payment confirmation'
+            }
+          </p>
+          
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept="image/*,application/pdf"
+            multiple
+            className="hidden"
+          />
+          
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            {selectedPaymentMethod === 'PO' ? 'Upload PO Copy' : 'Upload Screenshot'}
+          </Button>
+
+          {/* Display uploaded files */}
+          {fileUrls.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Uploaded files:</p>
+              <div className="grid grid-cols-2 gap-3">
+                {fileUrls.map((url, index) => (
+                  <div key={index} className="relative">
+                    <div className="border rounded-lg p-3 bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm truncate">
+                          {uploadedFiles[index]?.name || `File ${index + 1}`}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {uploadedFiles[index]?.type.startsWith('image/') && (
+                        <img
+                          src={url}
+                          alt="Payment proof"
+                          className="mt-2 w-full h-20 object-cover rounded"
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Submit Button */}
+          <Button
+            onClick={handleSubmitProof}
+            disabled={!selectedPaymentMethod || uploadedFiles.length === 0}
+            className="w-full mt-4"
+          >
+            Submit Proof of Payment
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 interface InvoiceDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -468,22 +694,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
             const hasValidAmount = totalSelectedAmount > 0;
             const amountNotExceedsBalance = totalSelectedAmount <= balanceDue;
             
-            console.log('🔍 Payment Validation:', {
-                hasSelectedMethod,
-                hasValidAmount,
-                amountNotExceedsBalance,
-                localSelectedMethods,
-                totalSelectedAmount,
-                balanceDue
-            });
-            
             return hasSelectedMethod && hasValidAmount && amountNotExceedsBalance;
         };
       
         const handleMethodChange = (method: string, isChecked: boolean) => {
-          console.log('Method change triggered:', method, isChecked);
-          console.log('Current selected methods before change:', localSelectedMethods);
-          
           if (isChecked) {
             setLocalSelectedMethods(prev => [...prev, method]);
             if (localSelectedMethods.length === 0) {
@@ -497,17 +711,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               return newAmounts;
             });
           }
-          console.log('Selected methods after change:', localSelectedMethods);
         };
       
         const handleAmountChange = (method: string, amount: number) => {
-          console.log('Amount change triggered:', method, amount);
-          console.log('Current selected methods before change:', localSelectedMethods);
-          console.log('Current payment amounts before change:', paymentAmounts);
-          
           setPaymentAmounts(prev => ({ ...prev, [method]: amount }));
-          
-          console.log('Payment amounts updated');
         };
 
         const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, method: string) => {
@@ -596,25 +803,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         
             // Try Square sync (optional, won't block if it fails)
             try {
-              console.log('🔄 Attempting Square sync...');
-              
               if (confirmation?.invoiceId) {
                 await recordPayment({
                   invoiceId: confirmation.invoiceId,
                   amount: totalSelectedAmount,
                   note: `${newPayments.map(p => `${p.method}: $${p.amount}`).join(', ')} recorded by ${organizerInitials}`,
-                  paymentMethod: newPayments.map(p => p.method).join(', '),
-                  organizerInitials: organizerInitials
                 });
                 
-                console.log('✅ Square sync successful');
                 toast({
                   title: `💳 Payment Synced to Square by ${organizerInitials}`,
                   description: `$${totalSelectedAmount.toFixed(2)} recorded and synced to Square API`,
                   duration: 5000,
                 });
               } else {
-                console.log('ℹ️ No Square invoice ID, recording locally only');
                 toast({
                   title: `💳 Payment Recorded Locally by ${organizerInitials}`,
                   description: `$${totalSelectedAmount.toFixed(2)} recorded. Square invoice may need to be created manually.`,
@@ -623,7 +824,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               }
         
             } catch (squareError: any) {
-              console.log('⚠️ Square sync failed, but local recording successful:', squareError);
               
               const errorMessage = squareError?.message || 'Unknown error';
               if (errorMessage.includes('not found') || errorMessage.includes('404')) {
@@ -700,22 +900,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       
         return (
           <div className="space-y-4">
-            <div className="p-3 bg-gray-100 border rounded text-sm">
-              <div><strong>Balance Due:</strong> ${balanceDue.toFixed(2)}</div>
-              <div><strong>Selected Methods:</strong> {localSelectedMethods.join(', ') || 'None'}</div>
-              <div><strong>Total Selected:</strong> ${totalSelectedAmount.toFixed(2)}</div>
-              <div><strong>Valid Payment:</strong> {isValidPayment() ? '🟢 YES' : '🔴 NO'}</div>
-              <div><strong>Recording as:</strong> {profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'}</div>
-            </div>
-      
-            <div className="p-3 bg-yellow-100 border border-yellow-300 rounded">
-              <h4 className="font-medium mb-2">🧪 Quick Test (Remove after testing):</h4>
-              <div className="flex gap-2">
-                <button onClick={quickTestCashApp} className="px-3 py-1 bg-green-600 text-white rounded text-sm">Cash App ${balanceDue.toFixed(2)}</button>
-                <button onClick={quickTestCheck} className="px-3 py-1 bg-blue-600 text-white rounded text-sm">Check ${balanceDue.toFixed(2)}</button>
-              </div>
-            </div>
-      
             <div className="space-y-3">
               <h3 className="font-medium">Payment Method</h3>
               
@@ -765,15 +949,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               </div>
             </div>
       
-            {totalSelectedAmount > 0 && (
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="flex justify-between"> <span>Total Payment:</span> <span className="font-medium">${totalSelectedAmount.toFixed(2)}</span> </div>
-                <div className="flex justify-between"> <span>Remaining Balance:</span> <span className="font-medium">${(balanceDue - totalSelectedAmount).toFixed(2)}</span> </div>
-                <div className="flex justify-between"> <span>New Status:</span> <span className="font-medium">{(balanceDue - totalSelectedAmount) <= 0 ? '🟢 PAID' : '🔵 PARTIALLY_PAID'}</span> </div>
-                <div className="flex justify-between text-sm text-gray-600"> <span>Recorded by:</span> <span>{profile?.firstName ? `${profile.firstName.charAt(0)}${profile?.lastName?.charAt(0) || ''}`.toUpperCase() : 'ORG'} on {format(new Date(), 'MMM dd, yyyy')}</span> </div>
-              </div>
-            )}
-      
             <button onClick={handleRecordPayment} disabled={!isValidPayment() || isUpdating} className={`w-full py-2 px-4 rounded font-medium transition-colors ${isValidPayment() && !isUpdating ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>
                 {isUpdating ? (<> <Loader2 className="w-4 h-4 mr-2 animate-spin inline" /> Recording Payment... </>) : isValidPayment() ? '💳 Record Payment' : '⏸️ Select Payment Method'}
             </button>
@@ -798,12 +973,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     };
 
     const handleEnhancedSquareSync = async () => {
-      console.log('🔄 Enhanced Square Sync starting...');
-      
       if (!confirmation?.invoiceId) {
-        console.log('❌ No invoice ID found');
-        
-        // Try to find the invoice in Square by searching
         toast({
           variant: 'destructive',
           title: 'No Square Invoice ID',
@@ -828,16 +998,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       setIsRefreshing(true);
       
       try {
-        console.log('🔄 Syncing with Square invoice ID:', confirmation.invoiceId);
-        
-        // Try the sync
         const result = await getInvoiceStatusWithPayments({ 
           invoiceId: confirmation.invoiceId 
         });
         
-        console.log('📥 Square sync successful:', result);
-        
-        // Process the result (same as before)
         const localPayments = confirmation.paymentHistory || [];
         const squarePayments = result.paymentHistory || [];
         
@@ -872,12 +1036,10 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
           totalAmount: result.totalAmount || confirmation.totalAmount,
           paymentHistory: unifiedPaymentHistory,
           lastSquareSync: new Date().toISOString(),
-          // Update URLs if provided
           invoiceUrl: result.invoiceUrl || confirmation.invoiceUrl,
           publicUrl: result.publicUrl || confirmation.publicUrl,
         };
         
-        // Update localStorage
         const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
         const updatedAllInvoices = allInvoices.map((inv: any) => 
           inv.id === confirmation.id ? updatedConfirmation : inv
@@ -901,9 +1063,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         window.dispatchEvent(new Event('all_invoices_updated'));
         
       } catch (error: any) {
-        console.error('❌ Square sync failed:', error);
         
-        // More detailed error messages
         if (error.message?.includes('404') || error.message?.includes('not found')) {
           toast({ 
             variant: 'destructive', 
@@ -936,18 +1096,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         const invoiceUrl = confirmation?.invoiceUrl;
         const invoiceNumber = confirmation?.invoiceNumber || confirmation?.id.slice(-8);
         
-        console.log('🔗 Square button clicked:', { invoiceUrl, invoiceNumber });
         
         if (invoiceUrl) {
-          // Check if it's a sandbox URL
           const isSandbox = invoiceUrl.includes('squareupsandbox.com');
-          
-          console.log('🔗 Opening URL:', invoiceUrl);
-          console.log('🔗 Environment:', isSandbox ? 'SANDBOX' : 'PRODUCTION');
           
           window.open(invoiceUrl, '_blank');
           
-          // Show environment-specific message
           toast({
             title: `Opening ${isSandbox ? 'Sandbox' : 'Production'} Square Invoice`,
             description: `Invoice #${invoiceNumber} in ${isSandbox ? 'sandbox' : 'production'} environment`,
@@ -999,7 +1153,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               </div>
             </div>
           
-          {/* Environment indicator */}
           {confirmation?.invoiceUrl && (
             <div className="mt-2 text-xs text-center">
               <span className={`px-2 py-1 rounded text-white ${
@@ -1020,10 +1173,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         const invoiceId = confirmation?.invoiceId;
       
         const openDeveloperConsole = () => {
-          // Use the correct Square sandbox developer console URL
             const sandboxUrl = 'https://developer.squareup.com/apps';
-            
-            console.log('🔗 Opening Square Developer Apps:', sandboxUrl);
             
             window.open(sandboxUrl, '_blank');
             
@@ -1047,10 +1197,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         };
       
         const openSquareDashboard = () => {
-            // Always open sandbox
             const sandboxUrl = 'https://squareupsandbox.com/dashboard/invoices';
-            
-            console.log('🔗 Opening hardcoded sandbox URL:', sandboxUrl);
             
             window.open(sandboxUrl, '_blank');
             
@@ -1142,113 +1289,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
     );
   }
 
-  const ButtonStyles = () => (
-    <style>{`
-      .payment-button {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        padding: 0.75rem;
-        border-radius: 0.375rem;
-        font-weight: 500;
-        transition: background-color 0.2s;
-      }
-      .payment-button.enabled {
-        background-color: #16a34a; /* green-600 */
-        color: white;
-        cursor: pointer;
-      }
-      .payment-button.enabled:hover {
-        background-color: #15803d; /* green-700 */
-      }
-      .payment-button.disabled {
-        background-color: #d1d5db; /* gray-300 */
-        color: #6b7280; /* gray-500 */
-        cursor: not-allowed;
-      }
-    `}</style>
-  );
-
-  const ProfileDebugComponent = () => {
-    return (
-      <div className="bg-yellow-100 border border-yellow-300 p-2 my-2 rounded-md text-xs">
-        <h4 className="font-bold">🧪 Debug - Profile Data</h4>
-        <p><strong>Role:</strong> {profile?.role}</p>
-        <p><strong>Email:</strong> {profile?.email}</p>
-        <p><strong>Name:</strong> {profile?.firstName} {profile?.lastName}</p>
-        <p><strong>Phone:</strong> {profile?.phone || 'N/A'}</p>
-      </div>
-    )
-  }
-
-  
-  const SquareDebugComponent = () => {
-    useEffect(() => {
-      console.log('🔍 SQUARE DEBUG INFO:');
-      console.log('confirmation.invoiceId:', confirmation?.invoiceId);
-      console.log('confirmation.invoiceUrl:', confirmation?.invoiceUrl);
-      console.log('confirmation.publicUrl:', confirmation?.publicUrl);
-      console.log('confirmation.invoiceNumber:', confirmation?.invoiceNumber);
-      console.log('Full confirmation object keys:', Object.keys(confirmation || {}));
-      
-      // Check for any URL patterns
-      const allKeys = Object.keys(confirmation || {});
-      const urlKeys = allKeys.filter(key => 
-        key.toLowerCase().includes('url') || 
-        key.toLowerCase().includes('link') ||
-        key.toLowerCase().includes('square')
-      );
-      console.log('URL-related keys:', urlKeys);
-      urlKeys.forEach(key => {
-        console.log(`${key}:`, confirmation[key]);
-      });
-    }, []);
-  
-    return null; // Just for debugging, doesn't render anything
-  };
-
-  const SquareConfigDebug = () => {
-    useEffect(() => {
-      console.log('🔧 SQUARE CONFIGURATION DEBUG:');
-      console.log('- Location ID exists:', !!process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID);
-      console.log('- Location ID value:', process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID);
-      
-      // Don't check SQUARE_SANDBOX_TOKEN in browser - it's server-side only
-      console.log('- Server token: Available server-side only (hidden from browser)');
-      
-      const issues = [];
-      if (!process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID) {
-        issues.push('Missing NEXT_PUBLIC_SQUARE_LOCATION_ID');
-      }
-      
-      if (issues.length > 0) {
-        console.error('❌ Configuration Issues:', issues);
-      } else {
-        console.log('✅ Client-side Square configuration valid');
-      }
-      
-    }, [confirmation]);
-  
-    return (
-      <div className="bg-green-100 border border-green-300 p-3 rounded-md text-sm">
-        <h4 className="font-bold text-green-800">🔧 Square Config Status</h4>
-        <div className="mt-2 space-y-1 text-green-700">
-          <div>Location ID: ✅ {process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID}</div>
-          <div>Server Token: 🔒 Hidden (server-side only)</div>
-          <div>Ready for API calls: ✅ Yes</div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <ButtonStyles />
-        <ProfileDebugComponent />
-        <SquareDebugComponent />
-        <SquareConfigDebug />
         <DialogHeader>
           <DialogTitle>
             <div className="flex items-center gap-2">
@@ -1270,11 +1313,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
           <div>
             <div className="bg-white rounded-lg border p-4">
-              <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Record payments or submit payment information for verification.
-              </p>
-              <PaymentFormComponent invoice={confirmation} />
+                <h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>
+                {profile?.role === 'sponsor' || isIndividualInvoice ? (
+                    <SponsorPaymentComponent />
+                ) : (
+                    <PaymentFormComponent invoice={confirmation} />
+                )}
             </div>
           </div>
         </div>
