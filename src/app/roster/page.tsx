@@ -405,7 +405,6 @@ function SponsorRosterView() {
   );
 }
 
-
 function RosterPageContent() {
     const { profile, isProfileLoaded } = useSponsorProfile();
     const { database: allPlayers, isDbLoaded } = useMasterDb();
