@@ -298,28 +298,25 @@ export default function ManageEventsPage() {
     };
     
     data.forEach((row: any) => {
-        if (!row || Object.values(row).every(val => val === '' || val === null || val === undefined)) {
-            return;
-        }
-
         try {
-            let dateStr = getFieldValue(row, ['date', 'Date']);
-            if (!dateStr && !getFieldValue(row, ['location', 'Location'])) {
+            if (!row || Object.values(row).every(val => val === null || val === '')) {
                 return;
             }
-            if (!dateStr) { 
-                throw new Error("Missing required field: date");
+
+            let dateStr = getFieldValue(row, ['date', 'Date']);
+            let location = getFieldValue(row, ['location', 'Location']);
+            
+            if (!dateStr && !location) {
+                return;
             }
+            if (!dateStr) throw new Error("Missing required field: date");
+            if (!location) throw new Error("Missing required field: location");
+
             if (typeof dateStr === 'string' && dateStr.includes('-')) { dateStr = dateStr.split('-')[0].trim(); }
             
             const date = new Date(dateStr);
             if (!isValid(date)) throw new Error(`Invalid date format: "${dateStr}"`);
             
-            const location = getFieldValue(row, ['location', 'Location']);
-            if (!location) {
-                throw new Error("Missing required field: location");
-            }
-
             let name = getFieldValue(row, ['name', 'Name', 'Tournament']);
             if (!name) {
                 name = `Event at ${location} on ${format(date, 'PPP')}`;
@@ -816,4 +813,3 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
-
