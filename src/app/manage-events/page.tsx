@@ -283,36 +283,48 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
-  const processEventImportData = (data: any[]) => {
+ const processEventImportData = (data: any[]) => {
     const newEvents: Event[] = [];
     let errors = 0;
 
+    const getFieldValue = (row: any, fieldNames: string[]) => {
+      for (const name of fieldNames) {
+        const key = Object.keys(row).find(k => k.toLowerCase().trim() === name.toLowerCase());
+        if (key && row[key]) {
+          return row[key];
+        }
+      }
+      return undefined;
+    };
+    
     data.forEach((row: any) => {
         try {
-            let dateStr = row['date'] || row['Date'];
+            let dateStr = getFieldValue(row, ['date', 'Date']);
             if (!dateStr) { errors++; return; }
-            if (dateStr.includes('-')) { dateStr = dateStr.split('-')[0].trim(); }
+            if (typeof dateStr === 'string' && dateStr.includes('-')) { dateStr = dateStr.split('-')[0].trim(); }
+            
             const date = new Date(dateStr);
             if (!isValid(date)) throw new Error(`Invalid date format: "${dateStr}"`);
             
             const eventData = {
                 id: `evt-${Date.now()}-${Math.random()}`,
-                name: row['name'] || row['Name'] || row['Tournament'],
+                name: getFieldValue(row, ['name', 'Name', 'Tournament']),
                 date: date.toISOString(),
-                location: row['location'] || row['Location'],
-                rounds: row['rounds'] || row['Rounds'] || 5,
-                regularFee: row['regularFee'] || row['Regular Fee'] || 25,
-                lateFee: row['lateFee'] || row['Late Fee'] || 30,
-                veryLateFee: row['veryLateFee'] || row['Very Late Fee'] || 35,
-                dayOfFee: row['dayOfFee'] || row['Day of Fee'] || 40,
-                imageUrl: row['imageUrl'] || row['Image URL'] || undefined,
-                imageName: row['imageName'] || row['Image Name'] || undefined,
-                pdfUrl: row['pdfUrl'] || row['PDF URL'] || undefined,
-                pdfName: row['pdfName'] || row['PDF Name'] || undefined,
-                isClosed: row['isClosed'] === 'true' || row['isClosed'] === true,
+                location: getFieldValue(row, ['location', 'Location']),
+                rounds: getFieldValue(row, ['rounds', 'Rounds']) || 5,
+                regularFee: getFieldValue(row, ['regularFee', 'Regular Fee']) || 25,
+                lateFee: getFieldValue(row, ['lateFee', 'Late Fee']) || 30,
+                veryLateFee: getFieldValue(row, ['veryLateFee', 'Very Late Fee']) || 35,
+                dayOfFee: getFieldValue(row, ['dayOfFee', 'Day of Fee']) || 40,
+                imageUrl: getFieldValue(row, ['imageUrl', 'Image URL']),
+                imageName: getFieldValue(row, ['imageName', 'Image Name']),
+                pdfUrl: getFieldValue(row, ['pdfUrl', 'PDF URL']),
+                pdfName: getFieldValue(row, ['pdfName', 'PDF Name']),
+                isClosed: getFieldValue(row, ['isClosed']) === 'true' || getFieldValue(row, ['isClosed']) === true,
+                isPsjaOnly: getFieldValue(row, ['isPsjaOnly']) === 'true' || getFieldValue(row, ['isPsjaOnly']) === true,
             };
 
-            const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location', 'rounds', 'regularFee', 'lateFee', 'veryLateFee', 'dayOfFee'];
+            const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location'];
             for (const field of requiredFields) { if (eventData[field] === undefined || eventData[field] === null) { throw new Error(`Missing required field: ${field}`); } }
             
             newEvents.push(eventData as Event);
@@ -323,7 +335,7 @@ export default function ManageEventsPage() {
     });
     
     if (newEvents.length === 0 && data.length > 0) {
-        toast({ variant: 'destructive', title: 'Import Failed', description: `Could not import any events.` });
+        toast({ variant: 'destructive', title: 'Import Failed', description: `Could not import any events. Please check your column headers (e.g., 'Name', 'Date', 'Location').` });
         return;
     }
     addBulkEvents(newEvents);
@@ -759,7 +771,7 @@ export default function ManageEventsPage() {
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
-                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/confirmations#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
+                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
                             <TableCell>{status}</TableCell>
                         </TableRow>
                     )
