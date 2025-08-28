@@ -45,31 +45,6 @@ export default function DashboardPage() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
 
-  // This effect will automatically create a test profile if none exists,
-  // effectively logging the user in when they land on this page.
-  useEffect(() => {
-    if (isProfileLoaded && !profile) {
-      console.log("No profile found, creating a default sponsor profile.");
-      const defaultProfile: SponsorProfile = {
-        email: 'test-sponsor@example.com',
-        role: 'sponsor',
-        firstName: 'Test',
-        lastName: 'Sponsor',
-        phone: '5551234567',
-        district: 'Test District',
-        school: 'Test School',
-        avatarType: 'icon',
-        avatarValue: 'KingIcon',
-        gtCoordinatorEmail: '',
-        bookkeeperEmail: '',
-        schoolAddress: '',
-        schoolPhone: ''
-      };
-      updateProfile(defaultProfile);
-    }
-  }, [isProfileLoaded, profile, updateProfile]);
-
-
   useEffect(() => {
     // This ensures client-specific code runs only after mounting
     setClientReady(true);
