@@ -298,7 +298,6 @@ export default function ManageEventsPage() {
     };
     
     data.forEach((row: any) => {
-        // Skip fully empty rows
         if (Object.values(row).every(val => val === '' || val === null || val === undefined)) {
             return;
         }
@@ -313,11 +312,21 @@ export default function ManageEventsPage() {
             const date = new Date(dateStr);
             if (!isValid(date)) throw new Error(`Invalid date format: "${dateStr}"`);
             
+            const location = getFieldValue(row, ['location', 'Location']);
+            if (!location) {
+                throw new Error("Missing required field: location");
+            }
+
+            let name = getFieldValue(row, ['name', 'Name', 'Tournament']);
+            if (!name) {
+                name = `Event at ${location} on ${format(date, 'PPP')}`;
+            }
+
             const eventData = {
                 id: `evt-${Date.now()}-${Math.random()}`,
-                name: getFieldValue(row, ['name', 'Name', 'Tournament']),
+                name: name,
                 date: date.toISOString(),
-                location: getFieldValue(row, ['location', 'Location']),
+                location: location,
                 rounds: getFieldValue(row, ['rounds', 'Rounds']) || 5,
                 regularFee: getFieldValue(row, ['regularFee', 'Regular Fee']) || 25,
                 lateFee: getFieldValue(row, ['lateFee', 'Late Fee']) || 30,
@@ -330,9 +339,6 @@ export default function ManageEventsPage() {
                 isClosed: getFieldValue(row, ['isClosed']) === 'true' || getFieldValue(row, ['isClosed']) === true,
                 isPsjaOnly: getFieldValue(row, ['isPsjaOnly']) === 'true' || getFieldValue(row, ['isPsjaOnly']) === true,
             };
-
-            const requiredFields: (keyof typeof eventData)[] = ['name', 'date', 'location'];
-            for (const field of requiredFields) { if (eventData[field] === undefined || eventData[field] === null) { throw new Error(`Missing required field: ${field}`); } }
             
             newEvents.push(eventData as Event);
         } catch(e) {
@@ -342,7 +348,7 @@ export default function ManageEventsPage() {
     });
     
     if (newEvents.length === 0 && data.length > 0) {
-        toast({ variant: 'destructive', title: 'Import Failed', description: `Could not import any events. Please check your column headers (e.g., 'Name', 'Date', 'Location').` });
+        toast({ variant: 'destructive', title: 'Import Failed', description: `Could not import any events. Please check your column headers (e.g., 'Date', 'Location').` });
         return;
     }
     addBulkEvents(newEvents);
