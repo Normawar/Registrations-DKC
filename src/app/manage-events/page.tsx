@@ -299,6 +299,7 @@ export default function ManageEventsPage() {
     
     data.forEach((row: any) => {
         try {
+            // Robust check to skip empty or invalid rows early
             if (!row || Object.values(row).every(val => val === null || val === '')) {
                 return;
             }
@@ -306,12 +307,10 @@ export default function ManageEventsPage() {
             let dateStr = getFieldValue(row, ['date', 'Date']);
             let location = getFieldValue(row, ['location', 'Location']);
             
-            if (!dateStr && !location) {
+            if (!dateStr || !location) {
+                // If the most essential fields are missing, skip the row silently.
                 return;
             }
-            if (!dateStr) throw new Error("Missing required field: date");
-            if (!location) throw new Error("Missing required field: location");
-
             if (typeof dateStr === 'string' && dateStr.includes('-')) { dateStr = dateStr.split('-')[0].trim(); }
             
             const date = new Date(dateStr);
