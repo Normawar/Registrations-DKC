@@ -1,38 +1,11 @@
 
+
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
+import UsersPage from './users/page';
 
+// This component now directly renders the User Management page to ensure
+// the user lands on the correct page, bypassing previous redirection issues.
 export default function Page() {
-  const router = useRouter();
-  const { updateProfile } = useSponsorProfile();
-
-  useEffect(() => {
-    // Define the organizer profile for norma@dkchess.com
-    const organizerProfile: SponsorProfile = {
-      email: 'norma@dkchess.com',
-      role: 'organizer',
-      firstName: 'Norma',
-      lastName: 'Guerra',
-      phone: '555-123-4567',
-      district: '',
-      school: '',
-      avatarType: 'icon',
-      avatarValue: 'Wrench',
-    };
-
-    // Set the profile to be an organizer
-    updateProfile(organizerProfile);
-
-    // Redirect to the user management page
-    router.replace('/users');
-  }, [router, updateProfile]);
-
-  return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-      <p>Redirecting to User Management...</p>
-    </div>
-  );
+  return <UsersPage />;
 }
