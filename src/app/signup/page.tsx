@@ -287,13 +287,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
 };
 
 export default function SignUpPage() {
-  const { updateProfile } = useSponsorProfile();
-
-  useEffect(() => {
-    updateProfile(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-2xl">
