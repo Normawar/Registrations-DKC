@@ -298,12 +298,12 @@ export default function ManageEventsPage() {
     };
     
     data.forEach((row: any) => {
-        try {
-            // Robust check to skip empty or invalid rows early
-            if (!row || Object.values(row).every(val => val === null || val === '')) {
-                return;
-            }
+        // Robust check to skip empty or invalid rows early
+        if (!row || Object.values(row).every(val => val === null || val === '' || val === undefined)) {
+            return;
+        }
 
+        try {
             let dateStr = getFieldValue(row, ['date', 'Date']);
             let location = getFieldValue(row, ['location', 'Location']);
             
@@ -812,3 +812,4 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
+
