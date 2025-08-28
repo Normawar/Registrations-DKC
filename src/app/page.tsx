@@ -57,8 +57,8 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
             const userProfile = profiles[lowercasedEmail];
             
             if (existingUser && userProfile) {
-                // Allow organizer login on either sponsor or organizer tab for convenience
-                const isOrganizerTryingOtherTabs = userProfile.role === 'organizer' && (role === 'sponsor' || role === 'organizer');
+                // Allow organizer/coordinator login on either sponsor or organizer tab for convenience
+                const isOrganizerTryingOtherTabs = (userProfile.role === 'organizer' || userProfile.role === 'district_coordinator') && (role === 'sponsor' || role === 'organizer');
                 
                 if (existingUser.role !== role && !isOrganizerTryingOtherTabs) {
                     form.setError("email", {
