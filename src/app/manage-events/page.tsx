@@ -298,8 +298,8 @@ export default function ManageEventsPage() {
     };
     
     data.forEach((row: any) => {
-        if (Object.values(row).every(val => val === '' || val === null || val === undefined)) {
-            return;
+        if (!row || Object.values(row).every(val => val === '' || val === null || val === undefined)) {
+            return; // Skip empty or effectively empty rows
         }
 
         try {
@@ -813,3 +813,4 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
+
