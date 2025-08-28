@@ -120,7 +120,8 @@ export default function LoginPage() {
 
     useEffect(() => {
         updateProfile(null);
-    }, [updateProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
         <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
