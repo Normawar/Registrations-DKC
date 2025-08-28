@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -45,7 +46,6 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
         try {
             const lowercasedEmail = values.email.toLowerCase();
             
-            // Use a timeout to prevent blocking the UI
             await new Promise(resolve => setTimeout(resolve, 100));
             
             const usersRaw = localStorage.getItem('users');
@@ -57,19 +57,21 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
             const userProfile = profiles[lowercasedEmail];
             
             if (existingUser && userProfile) {
-                // Allow organizer/coordinator login on either sponsor or organizer tab for convenience
-                const isOrganizerTryingOtherTabs = (userProfile.role === 'organizer' || userProfile.role === 'district_coordinator') && (role === 'sponsor' || role === 'organizer');
-                
-                if (existingUser.role !== role && !isOrganizerTryingOtherTabs) {
+                const isCorrectTab = (
+                    (userProfile.role === role) ||
+                    (userProfile.role === 'organizer' && (role === 'sponsor' || role === 'organizer')) ||
+                    (userProfile.role === 'district_coordinator' && (role === 'sponsor' || role === 'organizer'))
+                );
+
+                if (!isCorrectTab) {
                     form.setError("email", {
                         type: "manual",
-                        message: `This email is registered as a ${existingUser.role}. Please use the correct tab.`,
+                        message: `This email is for a ${userProfile.role}. Please use the correct tab.`,
                     });
                     setIsLoading(false);
                     return;
                 }
 
-                // Update profile without triggering effects
                 updateProfile(userProfile);
                 
                 toast({
@@ -77,9 +79,8 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                     description: `Welcome back, ${userProfile.firstName}!`,
                 });
                 
-                // Use setTimeout to ensure state updates complete before navigation
+                // Use a short delay for state updates before navigating
                 setTimeout(() => {
-                    // Redirect based on role
                     switch (userProfile.role) {
                         case 'organizer':
                             router.push('/manage-events');
@@ -101,11 +102,13 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                             router.push('/dashboard');
                     }
                 }, 100);
+
             } else {
                 form.setError("email", {
                     type: "manual",
                     message: "No account found with this email, or password was incorrect.",
                 });
+                setIsLoading(false);
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -113,10 +116,7 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                 type: "manual",
                 message: "An error occurred during login. Please try again.",
             });
-        } finally {
-            if (form.formState.isSubmitting) {
-                setIsLoading(false);
-            }
+            setIsLoading(false);
         }
     }
 
