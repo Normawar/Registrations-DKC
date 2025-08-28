@@ -1,8 +1,6 @@
-
-
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,6 +23,7 @@ import { Loader2, PlusCircle, Trash2, ExternalLink, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const lineItemSchema = z.object({
   id: z.string().optional(), // Hold player ID if applicable
@@ -45,7 +44,7 @@ const invoiceFormSchema = z.object({
 
 type InvoiceFormValues = z.infer<typeof invoiceFormSchema>;
 
-export default function OrganizerInvoicePage() {
+function OrganizerInvoiceContent() {
   const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -95,13 +94,13 @@ export default function OrganizerInvoicePage() {
                 if(details.status === 'withdrawn') return;
 
                 const player = allPlayers.find(p => p.id === playerId);
-                const playerName = player ? `${player.firstName} ${player.lastName}` : `Player ${playerId}`;
+                const playerName = player ? `${'${player.firstName}'} ${'${player.lastName}'}` : `Player ${'${playerId}'}`;
                 const registrationFee = invoiceToEdit.totalInvoiced / Object.keys(invoiceToEdit.selections).length;
 
-                lineItems.push({ id: playerId, name: `Registration for ${playerName}`, amount: registrationFee, note: `Event: ${eventDetails.name}, Section: ${details.section}` });
+                lineItems.push({ id: playerId, name: `Registration for ${'${playerName}'}`, amount: registrationFee, note: `Event: ${'${eventDetails.name}'}, Section: ${'${details.section}'}` });
                 
                 if (details.uscfStatus === 'new' || details.uscfStatus === 'renewing') {
-                  lineItems.push({ id: playerId, name: `USCF Membership for ${playerName}`, amount: uscfFee, note: `Status: ${details.uscfStatus}`, isUscf: true });
+                  lineItems.push({ id: playerId, name: `USCF Membership for ${'${playerName}'}`, amount: uscfFee, note: `Status: ${'${details.uscfStatus}'}`, isUscf: true });
                 }
               });
             }
@@ -157,10 +156,10 @@ export default function OrganizerInvoicePage() {
 
     const playersToInvoice = playerItems.map(item => {
         const player = allPlayers.find(p => p.id === item.id);
-        if (!player) throw new Error(`Could not find player data for ${item.name}`);
+        if (!player) throw new Error(`Could not find player data for ${'${item.name}'}`);
         const lateFee = item.amount - eventDetails.regularFee;
         return {
-            playerName: `${player.firstName} ${player.lastName}`,
+            playerName: `${'${player.firstName}'} ${'${player.lastName}'}`,
             uscfId: player.uscfId,
             baseRegistrationFee: eventDetails.regularFee,
             lateFee: lateFee > 0 ? lateFee : 0,
@@ -211,7 +210,7 @@ export default function OrganizerInvoicePage() {
 
     toast({
         title: "Event Invoice Recreated",
-        description: `Invoice ${result.newInvoiceNumber} has been created to replace the old one.`
+        description: `Invoice ${'${result.newInvoiceNumber}'} has been created to replace the old one.`
     });
     router.push('/confirmations');
   }
@@ -288,11 +287,11 @@ export default function OrganizerInvoicePage() {
   
   const toastSuccess = (result: any, isUpdate: boolean) => {
       toast({
-        title: `Invoice ${isUpdate ? 'Updated' : 'Created'} Successfully!`,
+        title: `Invoice ${'${isUpdate ? \'Updated\' : \'Created\'}'} Successfully!`,
         description: (
             <p>
-              Invoice {result.invoiceNumber || result.invoiceId} has been {isUpdate ? 'recreated' : 'created'}.
-              <a href={result.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
+              Invoice {'${result.invoiceNumber || result.invoiceId}'} has been {'${isUpdate ? \'recreated\' : \'created\'}'}.
+              <a href={'${result.invoiceUrl}'} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
                 View Invoice
               </a>
             </p>
@@ -393,7 +392,7 @@ export default function OrganizerInvoicePage() {
                     <div className='grid grid-cols-1 md:grid-cols-[1fr,1fr] gap-4'>
                       <FormField
                         control={form.control}
-                        name={`lineItems.${index}.name`}
+                        name={`lineItems.${'${index}'}.name`}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Item Name</FormLabel>
@@ -404,7 +403,7 @@ export default function OrganizerInvoicePage() {
                       />
                       <FormField
                         control={form.control}
-                        name={`lineItems.${index}.amount`}
+                        name={`lineItems.${'${index}'}.amount`}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Amount ($)</FormLabel>
@@ -416,7 +415,7 @@ export default function OrganizerInvoicePage() {
                       <div className="col-span-full">
                           <FormField
                               control={form.control}
-                              name={`lineItems.${index}.note`}
+                              name={`lineItems.${'${index}'}.note`}
                               render={({ field }) => (
                                   <FormItem>
                                   <FormLabel>Notes (Optional)</FormLabel>
@@ -459,3 +458,48 @@ export default function OrganizerInvoicePage() {
   );
 }
 
+function OrganizerInvoicePageSkeleton() {
+    return (
+        <AppLayout>
+            <div className="space-y-8">
+                <div>
+                    <Skeleton className="h-9 w-1/2" />
+                    <Skeleton className="h-4 w-3/4 mt-2" />
+                </div>
+                <div className="space-y-8">
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-6 w-1/4" />
+                            <Skeleton className="h-4 w-1/2" />
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <Skeleton className="h-10 w-full" />
+                            <Skeleton className="h-10 w-full" />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-6 w-1/4" />
+                            <Skeleton className="h-4 w-1/2" />
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <Skeleton className="h-24 w-full" />
+                            <Skeleton className="h-10 w-32" />
+                        </CardContent>
+                        <CardFooter>
+                            <Skeleton className="h-10 w-48" />
+                        </CardFooter>
+                    </Card>
+                </div>
+            </div>
+        </AppLayout>
+    );
+}
+
+export default function OrganizerInvoicePage() {
+    return (
+        <Suspense fallback={<OrganizerInvoicePageSkeleton />}>
+            <OrganizerInvoiceContent />
+        </Suspense>
+    );
+}
