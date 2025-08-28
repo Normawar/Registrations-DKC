@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -33,64 +32,85 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
     const router = useRouter();
     const { toast } = useToast();
     const { updateProfile } = useSponsorProfile();
+    const [isLoading, setIsLoading] = useState(false);
 
     const form = useForm<z.infer<typeof loginFormSchema>>({
         resolver: zodResolver(loginFormSchema),
         defaultValues: { email: "", password: "" },
     });
 
-    function onSubmit(values: z.infer<typeof loginFormSchema>) {
-        const lowercasedEmail = values.email.toLowerCase();
-        const usersRaw = localStorage.getItem('users');
-        const users: {email: string; role: 'sponsor' | 'individual' | 'organizer' | 'district_coordinator'}[] = usersRaw ? JSON.parse(usersRaw) : [];
-        const profilesRaw = localStorage.getItem('sponsor_profile');
-        const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
-
-        const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
-        const userProfile = profiles[lowercasedEmail];
+    async function onSubmit(values: z.infer<typeof loginFormSchema>) {
+        setIsLoading(true);
         
-        if (existingUser && userProfile) {
-            if (existingUser.role !== role) {
+        try {
+            const lowercasedEmail = values.email.toLowerCase();
+            
+            // Use a timeout to prevent blocking the UI
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const usersRaw = localStorage.getItem('users');
+            const users: {email: string; role: 'sponsor' | 'individual' | 'organizer' | 'district_coordinator'}[] = usersRaw ? JSON.parse(usersRaw) : [];
+            const profilesRaw = localStorage.getItem('sponsor_profile');
+            const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
+
+            const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
+            const userProfile = profiles[lowercasedEmail];
+            
+            if (existingUser && userProfile) {
+                if (existingUser.role !== role) {
+                    form.setError("email", {
+                        type: "manual",
+                        message: `This email is registered as a ${existingUser.role}. Please use the correct tab.`,
+                    });
+                    return;
+                }
+
+                // Update profile without triggering effects
+                updateProfile(userProfile);
+                
+                toast({
+                    title: "Login Successful",
+                    description: `Welcome back, ${userProfile.firstName}!`,
+                });
+                
+                // Use setTimeout to ensure state updates complete before navigation
+                setTimeout(() => {
+                    // Redirect based on role
+                    switch (userProfile.role) {
+                        case 'organizer':
+                            router.push('/manage-events');
+                            break;
+                        case 'district_coordinator':
+                            router.push('/district-dashboard');
+                            break;
+                        case 'sponsor':
+                            if (userProfile.isDistrictCoordinator) {
+                                router.push('/auth/role-selection');
+                            } else {
+                                router.push('/dashboard');
+                            }
+                            break;
+                        case 'individual':
+                            router.push('/individual-dashboard');
+                            break;
+                        default:
+                            router.push('/dashboard');
+                    }
+                }, 100);
+            } else {
                 form.setError("email", {
                     type: "manual",
-                    message: `This email is registered as a ${existingUser.role}. Please use the correct tab.`,
+                    message: "No account found with this email, or password was incorrect.",
                 });
-                return;
             }
-
-            updateProfile(userProfile);
-            
-            toast({
-                title: "Login Successful",
-                description: `Welcome back, ${userProfile.firstName}!`,
-            });
-            
-            // Redirect based on role
-            switch (userProfile.role) {
-                case 'organizer':
-                    router.push('/manage-events');
-                    break;
-                case 'district_coordinator':
-                    router.push('/district-dashboard');
-                    break;
-                case 'sponsor':
-                    if (userProfile.isDistrictCoordinator) {
-                        router.push('/auth/role-selection');
-                    } else {
-                        router.push('/dashboard');
-                    }
-                    break;
-                case 'individual':
-                    router.push('/individual-dashboard');
-                    break;
-                default:
-                    router.push('/dashboard');
-            }
-        } else {
+        } catch (error) {
+            console.error('Login error:', error);
             form.setError("email", {
                 type: "manual",
-                message: "No account found with this email, or password was incorrect.",
+                message: "An error occurred during login. Please try again.",
             });
+        } finally {
+            setIsLoading(false);
         }
     }
 
@@ -98,11 +118,13 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="grid gap-4">
-              <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-              <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+              <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
+              <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
-              <Button type="submit" className="w-full">Sign In</Button>
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? "Signing In..." : "Sign In"}
+              </Button>
               <div className="text-sm text-center text-muted-foreground">
                 Don't have an account?{" "}
                 <Link href="/signup" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -57,20 +56,25 @@ const SponsorSignUpForm = () => {
   const { toast } = useToast();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
+  const [isLoading, setIsLoading] = useState(false);
   
   const [schoolData, setSchoolData] = useState<School[]>([]);
   const [uniqueDistricts, setUniqueDistricts] = useState<string[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    const storedSchoolData = localStorage.getItem('school_data');
-    const data = storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData;
-    setSchoolData(data);
-    const districts = [...new Set(data.map((s: School) => s.district))].sort();
-    if (!districts.includes('None')) {
-      districts.unshift('None');
+    if (!isInitialized) {
+      const storedSchoolData = localStorage.getItem('school_data');
+      const data = storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData;
+      setSchoolData(data);
+      const districts = [...new Set(data.map((s: School) => s.district))].sort();
+      if (!districts.includes('None')) {
+        districts.unshift('None');
+      }
+      setUniqueDistricts(districts);
+      setIsInitialized(true);
     }
-    setUniqueDistricts(districts);
-  }, []);
+  }, [isInitialized]);
 
   const allSchoolNames = useMemo(() => {
     const schoolNames = schoolData.map(s => s.schoolName);
@@ -121,49 +125,70 @@ const SponsorSignUpForm = () => {
   };
 
   useEffect(() => {
-    handleDistrictChange(form.getValues('district'), false); 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [schoolData]); // Depend on schoolData to re-run when it loads
-  
-  function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
-    const lowercasedEmail = values.email.toLowerCase();
-    const usersRaw = localStorage.getItem('users');
-    const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
-    
-    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
-
-    if (existingUser) {
-        form.setError('email', {
-            type: 'manual',
-            message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
-        });
-        return;
+    if (isInitialized && schoolData.length > 0) {
+      handleDistrictChange(form.getValues('district'), false);
     }
+  }, [isInitialized, schoolData, form]);
+  
+  async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
+    setIsLoading(true);
+    
+    try {
+      const lowercasedEmail = values.email.toLowerCase();
+      
+      // Add a small delay to prevent UI blocking
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const usersRaw = localStorage.getItem('users');
+      const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
+      
+      const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
 
-    const newUser = { email: lowercasedEmail, role: 'sponsor' };
-    const updatedUsers = [...users, newUser];
-    localStorage.setItem('users', JSON.stringify(updatedUsers));
-    
-    const { password, ...profileValues } = values;
-    const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
+      if (existingUser) {
+          form.setError('email', {
+              type: 'manual',
+              message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
+          });
+          return;
+      }
 
-    const profileData: SponsorProfile = {
-      ...profileValues,
-      email: lowercasedEmail,
-      role: 'sponsor',
-      avatarType: 'icon',
-      avatarValue: 'KingIcon',
-      schoolAddress: schoolInfo?.streetAddress || '',
-      schoolPhone: schoolInfo?.phone || '',
-    };
-    
-    updateProfile(profileData);
-    
-    toast({
-        title: "Account Created!",
-        description: "Your sponsor account has been created. Please complete your profile.",
-    });
-    router.push('/profile');
+      const newUser = { email: lowercasedEmail, role: 'sponsor' };
+      const updatedUsers = [...users, newUser];
+      localStorage.setItem('users', JSON.stringify(updatedUsers));
+      
+      const { password, ...profileValues } = values;
+      const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
+
+      const profileData: SponsorProfile = {
+        ...profileValues,
+        email: lowercasedEmail,
+        role: 'sponsor',
+        avatarType: 'icon',
+        avatarValue: 'KingIcon',
+        schoolAddress: schoolInfo?.streetAddress || '',
+        schoolPhone: schoolInfo?.phone || '',
+      };
+      
+      updateProfile(profileData);
+      
+      toast({
+          title: "Account Created!",
+          description: "Your sponsor account has been created. Please complete your profile.",
+      });
+      
+      // Use setTimeout to ensure all state updates complete before navigation
+      setTimeout(() => {
+        router.push('/profile');
+      }, 100);
+    } catch (error) {
+      console.error('Signup error:', error);
+      toast({
+        title: "Error",
+        description: "An error occurred while creating your account. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -171,21 +196,23 @@ const SponsorSignUpForm = () => {
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-2 gap-4">
-            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
+            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
           </div>
-          <FormField control={form.control} name="district" render={({ field }) => ( <FormItem> <FormLabel>District</FormLabel> <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}> <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl> <SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )}/>
-          <FormField control={form.control} name="school" render={({ field }) => ( <FormItem> <FormLabel>School</FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select> <FormMessage /> </FormItem> )}/>
-          <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-          <FormField control={form.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="district" render={({ field }) => ( <FormItem> <FormLabel>District</FormLabel> <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value} disabled={isLoading}> <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl> <SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+          <FormField control={form.control} name="school" render={({ field }) => ( <FormItem> <FormLabel>School</FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict || isLoading}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select> <FormMessage /> </FormItem> )}/>
+          <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} disabled={isLoading} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )}/>
           {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-            <FormField control={form.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} /></FormControl><FormDescription>This email will be CC'd on invoices for this district.</FormDescription><FormMessage /></FormItem> )}/>
+            <FormField control={form.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} disabled={isLoading} /></FormControl><FormDescription>This email will be CC'd on invoices for this district.</FormDescription><FormMessage /></FormItem> )}/>
           )}
-          <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Cell Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-          <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Cell Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full">Create Account</Button>
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Creating Account..." : "Create Account"}
+          </Button>
           <div className="text-sm text-center text-muted-foreground">
             Already have an account?{" "}
             <Link href="/" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>Sign In</Link>
@@ -208,59 +235,80 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
   const router = useRouter();
   const { toast } = useToast();
   const { updateProfile } = useSponsorProfile();
+  const [isLoading, setIsLoading] = useState(false);
   
   const form = useForm<z.infer<typeof individualFormSchema>>({
     resolver: zodResolver(individualFormSchema),
     defaultValues: { firstName: "", lastName: "", email: "", password: "" },
   });
 
-  function onSubmit(values: z.infer<typeof individualFormSchema>) {
-    const lowercasedEmail = values.email.toLowerCase();
-    const usersRaw = localStorage.getItem('users');
-    const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
+  async function onSubmit(values: z.infer<typeof individualFormSchema>) {
+    setIsLoading(true);
+    
+    try {
+      const lowercasedEmail = values.email.toLowerCase();
+      
+      // Add delay to prevent UI blocking
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const usersRaw = localStorage.getItem('users');
+      const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
 
-    const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
+      const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
 
-    if (existingUser) {
-        form.setError('email', {
-            type: 'manual',
-            message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
-        });
-        return;
+      if (existingUser) {
+          form.setError('email', {
+              type: 'manual',
+              message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
+          });
+          return;
+      }
+
+      const newUser = { email: lowercasedEmail, role: role };
+      const updatedUsers = [...users, newUser];
+      localStorage.setItem('users', JSON.stringify(updatedUsers));
+      
+      const { password, ...profileValues } = values;
+
+      const profileData: SponsorProfile = {
+          ...profileValues,
+          email: lowercasedEmail,
+          phone: '',
+          district: 'None',
+          school: 'Homeschool',
+          gtCoordinatorEmail: '',
+          bookkeeperEmail: '',
+          schoolAddress: '',
+          schoolPhone: '',
+          role: role,
+          avatarType: 'icon',
+          avatarValue: 'PawnIcon',
+      };
+      
+      updateProfile(profileData);
+      
+      toast({
+          title: "Account Created!",
+          description: `Your new ${role} account has been successfully created.`,
+      });
+
+      let path = '/dashboard';
+      if (role === 'individual') path = '/individual-dashboard';
+      else if (role === 'organizer') path = '/manage-events';
+      
+      // Use setTimeout to ensure all updates complete before navigation
+      setTimeout(() => {
+        router.push(path);
+      }, 100);
+    } catch (error) {
+      console.error('Signup error:', error);
+      toast({
+        title: "Error",
+        description: "An error occurred while creating your account. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    const newUser = { email: lowercasedEmail, role: role };
-    const updatedUsers = [...users, newUser];
-    localStorage.setItem('users', JSON.stringify(updatedUsers));
-    
-    const { password, ...profileValues } = values;
-
-    const profileData: SponsorProfile = {
-        ...profileValues,
-        email: lowercasedEmail,
-        phone: '',
-        district: 'None',
-        school: 'Homeschool',
-        gtCoordinatorEmail: '',
-        bookkeeperEmail: '',
-        schoolAddress: '',
-        schoolPhone: '',
-        role: role,
-        avatarType: 'icon',
-        avatarValue: 'PawnIcon',
-    };
-    
-    updateProfile(profileData);
-    
-    toast({
-        title: "Account Created!",
-        description: `Your new ${role} account has been successfully created.`,
-    });
-
-    let path = '/dashboard';
-    if (role === 'individual') path = '/individual-dashboard';
-    else if (role === 'organizer') path = '/manage-events';
-    router.push(path);
   }
 
   return (
@@ -268,14 +316,16 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-2 gap-4">
-            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="Max" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Robinson" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="Max" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
+            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Robinson" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
           </div>
-          <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-          <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full">Create Account</Button>
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? "Creating Account..." : "Create Account"}
+          </Button>
           <div className="text-sm text-center text-muted-foreground">
             Already have an account?{" "}
             <Link href="/" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>Sign In</Link>
