@@ -30,6 +30,7 @@ import {
 import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useToast } from '@/hooks/use-toast';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -53,6 +54,7 @@ const sponsorFormSchema = z.object({
 
 const SponsorSignUpForm = () => {
   const router = useRouter();
+  const { toast } = useToast();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
   
@@ -157,6 +159,10 @@ const SponsorSignUpForm = () => {
     
     updateProfile(profileData);
     
+    toast({
+        title: "Account Created!",
+        description: "Your sponsor account has been created. Please complete your profile.",
+    });
     router.push('/profile');
   }
 
@@ -165,164 +171,24 @@ const SponsorSignUpForm = () => {
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>First Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Last Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )}/>
           </div>
-          <FormField
-            control={form.control}
-            name="district"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>District</FormLabel>
-                <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a district" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {uniqueDistricts.map((district) => (
-                      <SelectItem key={district} value={district}>
-                        {district}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="school"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>School</FormLabel>
-                 <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a school" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {schoolsForDistrict.map((school) => (
-                      <SelectItem key={school} value={school}>
-                        {school}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="name@example.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-           <FormField
-            control={form.control}
-            name="bookkeeperEmail"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Bookkeeper/Secretary Email (Optional)</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="bookkeeper@example.com" {...field} />
-                </FormControl>
-                <FormDescription>This email will receive a copy of all invoices.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <FormField control={form.control} name="district" render={({ field }) => ( <FormItem> <FormLabel>District</FormLabel> <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}> <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl> <SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+          <FormField control={form.control} name="school" render={({ field }) => ( <FormItem> <FormLabel>School</FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select> <FormMessage /> </FormItem> )}/>
+          <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )}/>
           {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-              <FormField
-                  control={form.control}
-                  name="gtCoordinatorEmail"
-                  render={({ field }) => (
-                  <FormItem>
-                      <FormLabel>GT Coordinator Email</FormLabel>
-                      <FormControl>
-                      <Input type="email" placeholder="gt.coordinator@example.com" {...field} />
-                      </FormControl>
-                      <FormDescription>This email will be CC'd on invoices for this district.</FormDescription>
-                      <FormMessage />
-                  </FormItem>
-                  )}
-              />
+            <FormField control={form.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} /></FormControl><FormDescription>This email will be CC'd on invoices for this district.</FormDescription><FormMessage /></FormItem> )}/>
           )}
-          <FormField
-            control={form.control}
-            name="phone"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cell Phone Number</FormLabel>
-                <FormControl>
-                  <Input type="tel" placeholder="(555) 555-5555" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input type="password" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Cell Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem> )}/>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full">
-            Create Account
-          </Button>
+          <Button type="submit" className="w-full">Create Account</Button>
           <div className="text-sm text-center text-muted-foreground">
             Already have an account?{" "}
-            <Link
-              href="/"
-              className="font-medium text-primary underline-offset-4 hover:underline"
-              prefetch={false}
-            >
-              Sign In
-            </Link>
+            <Link href="/" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>Sign In</Link>
           </div>
         </CardFooter>
       </form>
@@ -340,22 +206,12 @@ const individualFormSchema = z.object({
 
 const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) => {
   const router = useRouter();
+  const { toast } = useToast();
   const { updateProfile } = useSponsorProfile();
-  const [schoolData, setSchoolData] = useState<School[]>([]);
-
-  useEffect(() => {
-    const storedSchoolData = localStorage.getItem('school_data');
-    setSchoolData(storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData);
-  }, []);
   
   const form = useForm<z.infer<typeof individualFormSchema>>({
     resolver: zodResolver(individualFormSchema),
-    defaultValues: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      password: "",
-    },
+    defaultValues: { firstName: "", lastName: "", email: "", password: "" },
   });
 
   function onSubmit(values: z.infer<typeof individualFormSchema>) {
@@ -395,13 +251,15 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     };
     
     updateProfile(profileData);
+    
+    toast({
+        title: "Account Created!",
+        description: `Your new ${role} account has been successfully created.`,
+    });
 
     let path = '/dashboard';
-    if (role === 'individual') {
-      path = '/individual-dashboard';
-    } else if (role === 'organizer') {
-      path = '/manage-events';
-    }
+    if (role === 'individual') path = '/individual-dashboard';
+    else if (role === 'organizer') path = '/manage-events';
     router.push(path);
   }
 
@@ -410,73 +268,17 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <CardContent className="grid gap-4">
           <div className="grid grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="firstName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>First Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Max" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="lastName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Last Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Robinson" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="Max" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+            <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Robinson" {...field} /></FormControl><FormMessage /></FormItem> )}/>
           </div>
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="name@example.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input type="password" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+          <FormField control={form.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem> )}/>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full">
-            Create Account
-          </Button>
+          <Button type="submit" className="w-full">Create Account</Button>
           <div className="text-sm text-center text-muted-foreground">
             Already have an account?{" "}
-            <Link
-              href="/"
-              className="font-medium text-primary underline-offset-4 hover:underline"
-              prefetch={false}
-            >
-              Sign In
-            </Link>
+            <Link href="/" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>Sign In</Link>
           </div>
         </CardFooter>
       </form>
