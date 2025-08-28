@@ -298,9 +298,16 @@ export default function ManageEventsPage() {
     };
     
     data.forEach((row: any) => {
+        // Skip fully empty rows
+        if (Object.values(row).every(val => val === '' || val === null || val === undefined)) {
+            return;
+        }
+
         try {
             let dateStr = getFieldValue(row, ['date', 'Date']);
-            if (!dateStr) { errors++; return; }
+            if (!dateStr) { 
+                throw new Error("Missing required field: date");
+            }
             if (typeof dateStr === 'string' && dateStr.includes('-')) { dateStr = dateStr.split('-')[0].trim(); }
             
             const date = new Date(dateStr);
