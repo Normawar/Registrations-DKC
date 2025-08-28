@@ -299,11 +299,14 @@ export default function ManageEventsPage() {
     
     data.forEach((row: any) => {
         if (!row || Object.values(row).every(val => val === '' || val === null || val === undefined)) {
-            return; // Skip empty or effectively empty rows
+            return;
         }
 
         try {
             let dateStr = getFieldValue(row, ['date', 'Date']);
+            if (!dateStr && !getFieldValue(row, ['location', 'Location'])) {
+                return;
+            }
             if (!dateStr) { 
                 throw new Error("Missing required field: date");
             }
