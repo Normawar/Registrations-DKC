@@ -379,28 +379,52 @@ export default function ManageEventsPage() {
 
     Papa.parse(file, {
       header: true,
-      skipEmptyLines: true,
-      complete: (results) => processEventImportData(results.data),
-      error: (error) => { toast({ variant: 'destructive', title: 'Import Failed', description: error.message }); },
+      skipEmptyLines: 'greedy', // This is key - skips lines that are completely empty
+      transformHeader: (header: string) => header.trim(), // Clean headers
+      complete: (results) => {
+        // Additional filtering before processing
+        const cleanedData = results.data.filter((row: any) => {
+          return row && typeof row === 'object' && 
+                 Object.keys(row).length > 0 &&
+                 !Object.values(row).every(val => val === null || val === '' || val === undefined);
+        });
+        processEventImportData(cleanedData);
+      },
+      error: (error) => { 
+        toast({ variant: 'destructive', title: 'Import Failed', description: error.message }); 
+      },
     });
     if (e.target) e.target.value = '';
   };
   
   const handlePasteImport = () => {
-    if (!pasteData) { toast({ variant: 'destructive', title: 'No data', description: 'Please paste data.' }); return; }
+    if (!pasteData) { 
+      toast({ variant: 'destructive', title: 'No data', description: 'Please paste data.' }); 
+      return; 
+    }
+    
     Papa.parse(pasteData, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (resultsWithHeader) => {
-            if (resultsWithHeader.data.length > 0 && resultsWithHeader.meta.fields) {
-                processEventImportData(resultsWithHeader.data);
-            } else {
-                 toast({ variant: 'destructive', title: 'Import Failed', description: 'No data parsed.' });
-            }
-            setIsPasteDialogOpen(false);
-            setPasteData('');
-        },
-        error: (error) => { toast({ variant: 'destructive', title: 'Parse Failed', description: error.message }); }
+      header: true,
+      skipEmptyLines: 'greedy', // This is key - skips lines that are completely empty
+      transformHeader: (header: string) => header.trim(), // Clean headers
+      complete: (resultsWithHeader) => {
+        if (resultsWithHeader.data.length > 0 && resultsWithHeader.meta.fields) {
+          // Additional filtering before processing
+          const cleanedData = resultsWithHeader.data.filter((row: any) => {
+            return row && typeof row === 'object' && 
+                   Object.keys(row).length > 0 &&
+                   !Object.values(row).every(val => val === null || val === '' || val === undefined);
+          });
+          processEventImportData(cleanedData);
+        } else {
+          toast({ variant: 'destructive', title: 'Import Failed', description: 'No data parsed.' });
+        }
+        setIsPasteDialogOpen(false);
+        setPasteData('');
+      },
+      error: (error) => { 
+        toast({ variant: 'destructive', title: 'Parse Failed', description: error.message }); 
+      }
     });
   };
 
