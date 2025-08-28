@@ -30,20 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                const profile = localStorage.getItem('current_user_profile');
-                if (profile && JSON.parse(profile).email !== 'norma@dkchess.com') {
-                  localStorage.removeItem('current_user_profile');
-                }
-              } catch (e) {
-                console.error('Failed to clear profile', e);
-              }
-            `,
-          }}
-        />
+        
       </head>
       <body className={`${playfair.variable} ${ptSans.variable} font-body antialiased`}>
         <Providers>
