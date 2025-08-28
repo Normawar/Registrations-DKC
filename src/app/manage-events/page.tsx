@@ -298,7 +298,7 @@ export default function ManageEventsPage() {
     };
     
     data.forEach((row: any) => {
-        // Robust check to skip empty or invalid rows early
+        // More robust check to skip empty or invalid rows early
         if (!row || Object.values(row).every(val => val === null || val === '' || val === undefined)) {
             return;
         }
@@ -813,3 +813,4 @@ export default function ManageEventsPage() {
   );
 }
 
+    
