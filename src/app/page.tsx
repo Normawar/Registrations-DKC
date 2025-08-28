@@ -26,13 +26,13 @@ export default function Page() {
     // Set the profile to be an organizer
     updateProfile(organizerProfile);
 
-    // Redirect to the organizer dashboard
-    router.replace('/manage-events');
+    // Redirect to the user management page
+    router.replace('/users');
   }, [router, updateProfile]);
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
-      <p>Redirecting to Organizer Dashboard...</p>
+      <p>Redirecting to User Management...</p>
     </div>
   );
 }
