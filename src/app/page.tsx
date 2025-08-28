@@ -7,16 +7,16 @@ import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-prof
 
 export default function Page() {
   const router = useRouter();
-  const { profile, updateProfile } = useSponsorProfile();
+  const { updateProfile } = useSponsorProfile();
 
   useEffect(() => {
-    // Define the organizer profile
+    // Define the organizer profile for norma@dkchess.com
     const organizerProfile: SponsorProfile = {
-      email: 'organizer@test.com',
+      email: 'norma@dkchess.com',
       role: 'organizer',
-      firstName: 'Test',
-      lastName: 'Organizer',
-      phone: '5551234567',
+      firstName: 'Norma',
+      lastName: 'Guerra',
+      phone: '555-123-4567',
       district: '',
       school: '',
       avatarType: 'icon',
