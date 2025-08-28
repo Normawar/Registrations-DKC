@@ -291,7 +291,7 @@ export default function ManageEventsPage() {
   const getFieldValue = (row: any, fieldNames: string[]) => {
     for (const name of fieldNames) {
       const key = Object.keys(row).find(k => k.toLowerCase().trim() === name.toLowerCase());
-      if (key && row[key]) {
+      if (key && row[key] !== null && row[key] !== undefined && row[key] !== '') {
         return row[key];
       }
     }
@@ -299,7 +299,7 @@ export default function ManageEventsPage() {
   };
   
   data.forEach((row: any, index: number) => {
-    // More robust check to skip empty or invalid rows early
+    // Skip empty or invalid rows
     if (!row || 
         typeof row !== 'object' || 
         Object.keys(row).length === 0 ||
@@ -309,12 +309,13 @@ export default function ManageEventsPage() {
     }
 
     try {
-      let dateStr = getFieldValue(row, ['date', 'Date', 'EVENT_DATE', 'event_date']);
-      let location = getFieldValue(row, ['location', 'Location', 'LOCATION', 'venue', 'Venue']);
+      let dateStr = getFieldValue(row, ['date', 'Date']);
+      let location = getFieldValue(row, ['location', 'Location']);
       
       // Skip rows that don't have the essential fields
       if (!dateStr || !location) {
         console.log(`Skipping row ${index + 1}: missing essential fields (date: "${dateStr}", location: "${location}")`);
+        skippedEmptyRows++;
         return;
       }
 
@@ -328,27 +329,25 @@ export default function ManageEventsPage() {
         throw new Error(`Invalid date format: "${dateStr}"`);
       }
       
-      let name = getFieldValue(row, ['name', 'Name', 'Tournament', 'EVENT_NAME', 'event_name', 'title', 'Title']);
-      if (!name) {
-        name = `Event at ${location} on ${format(date, 'PPP')}`;
-      }
+      // Since your CSV doesn't have a name field, generate one from location and date
+      const name = `Event at ${location} on ${format(date, 'PPP')}`;
 
       const eventData = {
         id: `evt-${Date.now()}-${Math.random()}`,
         name: name,
         date: date.toISOString(),
         location: location,
-        rounds: Number(getFieldValue(row, ['rounds', 'Rounds', 'ROUNDS']) || 5),
-        regularFee: Number(getFieldValue(row, ['regularFee', 'Regular Fee', 'REGULAR_FEE', 'regular_fee']) || 25),
-        lateFee: Number(getFieldValue(row, ['lateFee', 'Late Fee', 'LATE_FEE', 'late_fee']) || 30),
-        veryLateFee: Number(getFieldValue(row, ['veryLateFee', 'Very Late Fee', 'VERY_LATE_FEE', 'very_late_fee']) || 35),
-        dayOfFee: Number(getFieldValue(row, ['dayOfFee', 'Day of Fee', 'DAY_OF_FEE', 'day_of_fee']) || 40),
-        imageUrl: getFieldValue(row, ['imageUrl', 'Image URL', 'IMAGE_URL', 'image_url']) || '',
-        imageName: getFieldValue(row, ['imageName', 'Image Name', 'IMAGE_NAME', 'image_name']) || '',
-        pdfUrl: getFieldValue(row, ['pdfUrl', 'PDF URL', 'PDF_URL', 'pdf_url']) || '',
-        pdfName: getFieldValue(row, ['pdfName', 'PDF Name', 'PDF_NAME', 'pdf_name']) || '',
-        isClosed: getFieldValue(row, ['isClosed', 'Is Closed', 'IS_CLOSED', 'is_closed']) === 'true' || getFieldValue(row, ['isClosed', 'Is Closed', 'IS_CLOSED', 'is_closed']) === true,
-        isPsjaOnly: getFieldValue(row, ['isPsjaOnly', 'PSJA Only', 'PSJA_ONLY', 'psja_only']) === 'true' || getFieldValue(row, ['isPsjaOnly', 'PSJA Only', 'PSJA_ONLY', 'psja_only']) === true,
+        rounds: Number(getFieldValue(row, ['rounds', 'Rounds']) || 5),
+        regularFee: Number(getFieldValue(row, ['regular fee', 'regularFee', 'Regular Fee']) || 25),
+        lateFee: Number(getFieldValue(row, ['late fee', 'lateFee', 'Late Fee']) || 30),
+        veryLateFee: Number(getFieldValue(row, ['very late fee', 'veryLateFee', 'Very Late Fee']) || 35),
+        dayOfFee: Number(getFieldValue(row, ['Day of Fee', 'dayOfFee', 'Day of Fee']) || 40),
+        imageUrl: getFieldValue(row, ['imageUrl', 'Image URL']) || '',
+        imageName: getFieldValue(row, ['imageName', 'Image Name']) || '',
+        pdfUrl: getFieldValue(row, ['pdfUrl', 'PDF URL']) || '',
+        pdfName: getFieldValue(row, ['pdfName', 'PDF Name']) || '',
+        isClosed: getFieldValue(row, ['status']) === 'Closed',
+        isPsjaOnly: false, // Default since not in your CSV
       };
       
       newEvents.push(eventData as Event);
@@ -360,8 +359,8 @@ export default function ManageEventsPage() {
   
   if (newEvents.length === 0 && data.length > 0) {
     const message = skippedEmptyRows > 0 
-      ? `Could not import any events. Skipped ${skippedEmptyRows} empty rows. Please check your column headers (e.g., 'Date', 'Location').`
-      : `Could not import any events. Please check your column headers (e.g., 'Date', 'Location').`;
+      ? `Could not import any events. Skipped ${skippedEmptyRows} empty rows. Please check your column headers.`
+      : `Could not import any events. Please check your column headers.`;
     toast({ variant: 'destructive', title: 'Import Failed', description: message });
     return;
   }
