@@ -57,11 +57,15 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
             const userProfile = profiles[lowercasedEmail];
             
             if (existingUser && userProfile) {
-                if (existingUser.role !== role) {
+                // Allow organizer login on either sponsor or organizer tab for convenience
+                const isOrganizerTryingOtherTabs = userProfile.role === 'organizer' && (role === 'sponsor' || role === 'organizer');
+                
+                if (existingUser.role !== role && !isOrganizerTryingOtherTabs) {
                     form.setError("email", {
                         type: "manual",
                         message: `This email is registered as a ${existingUser.role}. Please use the correct tab.`,
                     });
+                    setIsLoading(false);
                     return;
                 }
 
@@ -110,7 +114,9 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                 message: "An error occurred during login. Please try again.",
             });
         } finally {
-            setIsLoading(false);
+            if (form.formState.isSubmitting) {
+                setIsLoading(false);
+            }
         }
     }
 
