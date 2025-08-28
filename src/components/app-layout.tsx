@@ -66,7 +66,7 @@ const organizerMenuItems = [
   { href: "/users", icon: Users, label: "User Management" },
   { href: "/invoices", icon: Receipt, label: "All Invoices" },
   { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
-  { href: "/events", icon: RookIcon, label: "Upcoming Events" },
+  { href: "/organizer-registration", icon: RookIcon, label: "Register for Event" },
   { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/previous-events", icon: History, label: "Previous Events" },
@@ -88,6 +88,7 @@ const icons: { [key: string]: React.ElementType } = {
   BishopIcon,
   KnightIcon,
   PawnIcon,
+  Wrench,
 };
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
