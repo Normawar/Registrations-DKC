@@ -285,22 +285,39 @@ export default function ManageEventsPage() {
   }, [isDialogOpen, editingEvent, form]);
 
 const processEventImportData = (data: any[]) => {
+  console.log("🚀 FINAL DEBUG VERSION RUNNING");
+  console.log("Total rows:", data.length);
+  
+  if (data.length > 0) {
+    console.log("📋 ACTUAL HEADERS:", JSON.stringify(Object.keys(data[0])));
+    console.log("📊 FIRST ROW DATA:", JSON.stringify(data[0]));
+  }
+
   const newEvents: Event[] = [];
   let errors = 0;
   let skippedEmptyRows = 0;
 
-  const getFieldValue = (row: any, fieldNames: string[]) => {
-    for (const name of fieldNames) {
-      const key = Object.keys(row).find(k => k.toLowerCase().trim() === name.toLowerCase());
-      if (key && row[key] !== null && row[key] !== undefined && row[key] !== '') {
-        return row[key];
+  // Ultra-flexible field matching - will find ANY column that contains these words
+  const findColumn = (row: any, searchTerms: string[]) => {
+    const keys = Object.keys(row);
+    for (const term of searchTerms) {
+      const found = keys.find(key => 
+        key.toLowerCase().includes(term.toLowerCase()) && 
+        row[key] !== null && 
+        row[key] !== undefined && 
+        String(row[key]).trim() !== ''
+      );
+      if (found) {
+        console.log(`✅ Found "${term}" in column "${found}" with value:`, row[found]);
+        return row[found];
       }
     }
-    return undefined;
+    console.log(`❌ Could not find any of:`, searchTerms, "in columns:", keys);
+    return null;
   };
   
   data.forEach((row: any, index: number) => {
-    // More robust check to skip empty or invalid rows early
+    // Skip completely empty rows
     if (!row || 
         typeof row !== 'object' || 
         Object.keys(row).length === 0 ||
@@ -309,70 +326,83 @@ const processEventImportData = (data: any[]) => {
       return;
     }
 
+    // Only debug first few rows to avoid spam
+    if (index < 3) {
+      console.log(`\n🔍 Processing row ${index}:`, JSON.stringify(row));
+    }
+
     try {
-      let dateStr = getFieldValue(row, ['date', 'Date', 'EVENT_DATE', 'event_date']);
-      let location = getFieldValue(row, ['location', 'Location', 'LOCATION', 'venue', 'Venue']);
+      // Look for date in any column containing "date"
+      const dateStr = findColumn(row, ['date']);
+      // Look for location in any column containing "location"  
+      const location = findColumn(row, ['location']);
       
-      // Skip rows that don't have the essential fields
       if (!dateStr || !location) {
-        console.log(`Skipping row ${index + 1}: missing essential fields (date: "${dateStr}", location: "${location}")`);
+        if (index < 5) console.log(`⏭️ Skipping row ${index}: missing date or location`);
+        skippedEmptyRows++;
         return;
       }
 
-      // Clean up date string if it contains additional text
-      if (typeof dateStr === 'string' && dateStr.includes('-')) { 
-        dateStr = dateStr.split('-')[0].trim(); 
-      }
-      
+      // Parse the date
       const date = new Date(dateStr);
       if (!isValid(date)) {
-        throw new Error(`Invalid date format: "${dateStr}"`);
+        console.log(`❌ Invalid date in row ${index}: "${dateStr}"`);
+        errors++;
+        return;
       }
       
-      let name = getFieldValue(row, ['name', 'Name', 'Tournament', 'EVENT_NAME', 'event_name', 'title', 'Title']);
-      if (!name) {
-        const formattedDate = format(date, 'PPP');
-        name = `Event at ${location} on ${formattedDate}`;
-      }
-
+      // Generate event name
+      const formattedDate = format(date, 'PPP');
+      const name = `Event at ${location} on ${formattedDate}`;
+      
       const eventData = {
         id: `evt-${Date.now()}-${Math.random()}`,
         name: name,
         date: date.toISOString(),
         location: location,
-        rounds: Number(getFieldValue(row, ['rounds', 'Rounds', 'ROUNDS']) || 5),
-        regularFee: Number(getFieldValue(row, ['regularFee', 'Regular Fee', 'REGULAR_FEE', 'regular_fee']) || 25),
-        lateFee: Number(getFieldValue(row, ['lateFee', 'Late Fee', 'LATE_FEE', 'late_fee']) || 30),
-        veryLateFee: Number(getFieldValue(row, ['veryLateFee', 'Very Late Fee', 'VERY_LATE_FEE', 'very_late_fee']) || 35),
-        dayOfFee: Number(getFieldValue(row, ['dayOfFee', 'Day of Fee', 'DAY_OF_FEE', 'day_of_fee']) || 40),
-        imageUrl: getFieldValue(row, ['imageUrl', 'Image URL', 'IMAGE_URL', 'image_url']) || '',
-        imageName: getFieldValue(row, ['imageName', 'Image Name', 'IMAGE_NAME', 'image_name']) || '',
-        pdfUrl: getFieldValue(row, ['pdfUrl', 'PDF URL', 'PDF_URL', 'pdf_url']) || '',
-        pdfName: getFieldValue(row, ['pdfName', 'PDF Name', 'PDF_NAME', 'pdf_name']) || '',
-        isClosed: getFieldValue(row, ['isClosed', 'Is Closed', 'IS_CLOSED', 'is_closed']) === 'true' || getFieldValue(row, ['isClosed', 'Is Closed', 'IS_CLOSED', 'is_closed']) === true,
-        isPsjaOnly: getFieldValue(row, ['isPsjaOnly', 'PSJA Only', 'PSJA_ONLY', 'psja_only']) === 'true' || getFieldValue(row, ['isPsjaOnly', 'PSJA Only', 'PSJA_ONLY', 'psja_only']) === true,
+        rounds: Number(findColumn(row, ['round']) || 5),
+        regularFee: Number(findColumn(row, ['regular', 'fee']) || 25),
+        lateFee: Number(findColumn(row, ['late']) || 30),
+        veryLateFee: Number(findColumn(row, ['very']) || 35),
+        dayOfFee: Number(findColumn(row, ['day']) || 40),
+        imageUrl: '',
+        imageName: '',
+        pdfUrl: '',
+        pdfName: '',
+        isClosed: String(findColumn(row, ['status']) || '').toLowerCase() === 'closed',
+        isPsjaOnly: false,
       };
+      
+      if (index < 3) {
+        console.log(`✨ Created event:`, eventData);
+      }
       
       newEvents.push(eventData as Event);
     } catch(e) {
       errors++;
-      console.error(`Error parsing event row ${index + 1}:`, row, e);
+      console.error(`💥 Error in row ${index}:`, e);
     }
   });
   
+  console.log("📈 FINAL RESULTS:");
+  console.log("✅ Events created:", newEvents.length);
+  console.log("❌ Errors:", errors);  
+  console.log("⏭️ Empty rows skipped:", skippedEmptyRows);
+  
   if (newEvents.length === 0 && data.length > 0) {
-    const message = skippedEmptyRows > 0 
-      ? `Could not import any events. Skipped ${skippedEmptyRows} empty rows. Please check your column headers (e.g., 'Date', 'Location').`
-      : `Could not import any events. Please check your column headers (e.g., 'Date', 'Location').`;
-    toast({ variant: 'destructive', title: 'Import Failed', description: message });
+    toast({ 
+      variant: 'destructive', 
+      title: 'Import Failed', 
+      description: `No events could be created. Check console for column details. Skipped ${skippedEmptyRows} empty rows, ${errors} errors.` 
+    });
     return;
   }
 
   addBulkEvents(newEvents);
-  const successMessage = `Successfully imported ${newEvents.length} events.` + 
-    (skippedEmptyRows > 0 ? ` Skipped ${skippedEmptyRows} empty rows.` : '') +
-    (errors > 0 ? ` ${errors} rows had errors.` : '');
-  toast({ title: "Import Complete", description: successMessage });
+  toast({ 
+    title: "Import Complete", 
+    description: `Successfully imported ${newEvents.length} events! Skipped ${skippedEmptyRows} empty rows.` 
+  });
 };
 
 
@@ -862,4 +892,5 @@ const processEventImportData = (data: any[]) => {
     
 
     
+
 
