@@ -284,98 +284,98 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
-const processEventImportData = (data: any[]) => {
-  const newEvents: Event[] = [];
-  let errors = 0;
-  let skippedEmptyRows = 0;
-
-  // Flexible field matching - finds columns containing the search terms
-  const findColumn = (row: any, searchTerms: string[]) => {
-    const keys = Object.keys(row);
-    for (const term of searchTerms) {
-      const found = keys.find(key => 
-        key.toLowerCase().includes(term.toLowerCase()) && 
-        row[key] !== null && 
-        row[key] !== undefined && 
-        String(row[key]).trim() !== ''
-      );
-      if (found) {
-        return row[found];
-      }
-    }
-    return null;
-  };
+  const processEventImportData = (data: any[]) => {
+    const newEvents: Event[] = [];
+    let errors = 0;
+    let skippedEmptyRows = 0;
   
-  data.forEach((row: any, index: number) => {
-    // Skip completely empty rows
-    if (!row || 
-        typeof row !== 'object' || 
-        Object.keys(row).length === 0 ||
-        Object.values(row).every(val => val === null || val === '' || val === undefined)) {
-      skippedEmptyRows++;
-      return;
-    }
-
-    try {
-      // Look for date and location columns
-      const dateStr = findColumn(row, ['date']);
-      const location = findColumn(row, ['location']);
-      
-      if (!dateStr || !location) {
+    // Flexible field matching - finds columns containing the search terms
+    const findColumn = (row: any, searchTerms: string[]) => {
+      const keys = Object.keys(row);
+      for (const term of searchTerms) {
+        const found = keys.find(key => 
+          key.toLowerCase().includes(term.toLowerCase()) && 
+          row[key] !== null && 
+          row[key] !== undefined && 
+          String(row[key]).trim() !== ''
+        );
+        if (found) {
+          return row[found];
+        }
+      }
+      return null;
+    };
+    
+    data.forEach((row: any, index: number) => {
+      // Skip completely empty rows
+      if (!row || 
+          typeof row !== 'object' || 
+          Object.keys(row).length === 0 ||
+          Object.values(row).every(val => val === null || val === '' || val === undefined)) {
         skippedEmptyRows++;
         return;
       }
-
-      // Parse the date
-      const date = new Date(dateStr);
-      if (!isValid(date)) {
-        errors++;
-        return;
-      }
-      
-      // Generate event name
-      const name = `Event at ${location} on ${format(date, 'PPP')}`;
-      
-      const eventData = {
-        id: `evt-${Date.now()}-${Math.random()}`,
-        name: name,
-        date: date.toISOString(),
-        location: location,
-        rounds: Number(findColumn(row, ['round']) || 5),
-        regularFee: Number(findColumn(row, ['regular', 'fee']) || 25),
-        lateFee: Number(findColumn(row, ['late']) || 30),
-        veryLateFee: Number(findColumn(row, ['very']) || 35),
-        dayOfFee: Number(findColumn(row, ['day']) || 40),
-        imageUrl: '',
-        imageName: '',
-        pdfUrl: '',
-        pdfName: '',
-        isClosed: String(findColumn(row, ['status']) || '').toLowerCase() === 'closed',
-        isPsjaOnly: false,
-      };
-      
-      newEvents.push(eventData as Event);
-    } catch(e) {
-      errors++;
-      console.error(`Error parsing event row ${index + 1}:`, e);
-    }
-  });
   
-  if (newEvents.length === 0) {
-    toast({ 
-      variant: 'destructive', 
-      title: 'Import Failed', 
-      description: `No events could be created. Skipped ${skippedEmptyRows} empty rows, ${errors} errors.` 
+      try {
+        // Look for date and location columns
+        const dateStr = findColumn(row, ['date']);
+        const location = findColumn(row, ['location']);
+        
+        if (!dateStr || !location) {
+          skippedEmptyRows++;
+          return;
+        }
+  
+        // Parse the date
+        const date = new Date(dateStr);
+        if (!isValid(date)) {
+          errors++;
+          return;
+        }
+        
+        // Generate event name
+        const name = `Event at ${location} on ${format(date, 'PPP')}`;
+        
+        const eventData = {
+          id: `evt-${Date.now()}-${Math.random()}`,
+          name: name,
+          date: date.toISOString(),
+          location: location,
+          rounds: Number(findColumn(row, ['round']) || 5),
+          regularFee: Number(findColumn(row, ['regular', 'fee']) || 25),
+          lateFee: Number(findColumn(row, ['late']) || 30),
+          veryLateFee: Number(findColumn(row, ['very']) || 35),
+          dayOfFee: Number(findColumn(row, ['day']) || 40),
+          imageUrl: '',
+          imageName: '',
+          pdfUrl: '',
+          pdfName: '',
+          isClosed: String(findColumn(row, ['status']) || '').toLowerCase() === 'closed',
+          isPsjaOnly: false,
+        };
+        
+        newEvents.push(eventData as Event);
+      } catch(e) {
+        errors++;
+        console.error(`Error parsing event row ${index + 1}:`, e);
+      }
     });
-    return;
-  }
-
-  addBulkEvents(newEvents);
-  toast({ 
-    title: "Import Complete", 
-    description: `Successfully imported ${newEvents.length} events! Skipped ${skippedEmptyRows} empty rows.` 
-  });
-};
+    
+    if (newEvents.length === 0) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Import Failed', 
+        description: `No events could be created. Skipped ${skippedEmptyRows} empty rows, ${errors} errors.` 
+      });
+      return;
+    }
+  
+    addBulkEvents(newEvents);
+    toast({ 
+      title: "Import Complete", 
+      description: `Successfully imported ${newEvents.length} events! Skipped ${skippedEmptyRows} empty rows.` 
+    });
+  };
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -498,11 +498,12 @@ const processEventImportData = (data: any[]) => {
   };
 
   function onSubmit(values: EventFormValues) {
-    const eventData = { ...values, date: values.date.toISOString() };
     if (editingEvent) {
+      const eventData = { ...values, id: editingEvent.id, date: values.date.toISOString() };
       updateEvent(eventData as Event);
       toast({ title: "Event Updated", description: `"${values.name}" has been successfully updated.` });
     } else {
+      const eventData = { ...values, date: values.date.toISOString() };
       addBulkEvents([{ ...eventData, id: Date.now().toString() }]);
       toast({ title: "Event Added", description: `"${values.name}" has been successfully created.` });
     }
@@ -863,6 +864,7 @@ const processEventImportData = (data: any[]) => {
     
 
     
+
 
 
 
