@@ -284,6 +284,18 @@ export default function ManageEventsPage() {
   }, [isDialogOpen, editingEvent, form]);
 
  const processEventImportData = (data: any[]) => {
+  console.log("=== CSV DEBUG INFO ===");
+  console.log("Total rows:", data.length);
+  
+  // Log the first few rows in detail
+  data.slice(0, 3).forEach((row, index) => {
+    console.log(`Row ${index}:`, row);
+    console.log(`Row ${index} keys:`, Object.keys(row));
+    console.log(`Row ${index} values:`, Object.values(row));
+    console.log(`Row ${index} typeof:`, typeof row);
+    console.log("---");
+  });
+
   const newEvents: Event[] = [];
   let errors = 0;
   let skippedEmptyRows = 0;
@@ -292,25 +304,35 @@ export default function ManageEventsPage() {
     for (const name of fieldNames) {
       const key = Object.keys(row).find(k => k.toLowerCase().trim() === name.toLowerCase());
       if (key && row[key] !== null && row[key] !== undefined && row[key] !== '') {
+        console.log(`Found field "${name}" as key "${key}" with value:`, row[key]);
         return row[key];
       }
     }
+    console.log(`Field not found for any of:`, fieldNames);
     return undefined;
   };
   
   data.forEach((row: any, index: number) => {
+    console.log(`\n=== Processing Row ${index} ===`);
+    console.log("Row data:", row);
+    
     // Skip empty or invalid rows
     if (!row || 
         typeof row !== 'object' || 
         Object.keys(row).length === 0 ||
         Object.values(row).every(val => val === null || val === '' || val === undefined)) {
+      console.log(`Skipping row ${index}: empty or invalid`);
       skippedEmptyRows++;
       return;
     }
 
     try {
+      console.log("Looking for date field...");
       let dateStr = getFieldValue(row, ['date', 'Date']);
+      console.log("Looking for location field...");
       let location = getFieldValue(row, ['location', 'Location']);
+      
+      console.log(`Found date: "${dateStr}", location: "${location}"`);
       
       // Skip rows that don't have the essential fields
       if (!dateStr || !location) {
@@ -331,6 +353,7 @@ export default function ManageEventsPage() {
       
       // Since your CSV doesn't have a name field, generate one from location and date
       const name = `Event at ${location} on ${format(date, 'PPP')}`;
+      console.log(`Generated name: "${name}"`);
 
       const eventData = {
         id: `evt-${Date.now()}-${Math.random()}`,
@@ -341,21 +364,27 @@ export default function ManageEventsPage() {
         regularFee: Number(getFieldValue(row, ['regular fee', 'regularFee', 'Regular Fee']) || 25),
         lateFee: Number(getFieldValue(row, ['late fee', 'lateFee', 'Late Fee']) || 30),
         veryLateFee: Number(getFieldValue(row, ['very late fee', 'veryLateFee', 'Very Late Fee']) || 35),
-        dayOfFee: Number(getFieldValue(row, ['Day of Fee', 'dayOfFee', 'Day of Fee']) || 40),
-        imageUrl: getFieldValue(row, ['imageUrl', 'Image URL']) || '',
-        imageName: getFieldValue(row, ['imageName', 'Image Name']) || '',
-        pdfUrl: getFieldValue(row, ['pdfUrl', 'PDF URL']) || '',
-        pdfName: getFieldValue(row, ['pdfName', 'PDF Name']) || '',
+        dayOfFee: Number(getFieldValue(row, ['Day of Fee', 'dayOfFee']) || 40),
+        imageUrl: '',
+        imageName: '',
+        pdfUrl: '',
+        pdfName: '',
         isClosed: getFieldValue(row, ['status']) === 'Closed',
-        isPsjaOnly: false, // Default since not in your CSV
+        isPsjaOnly: false,
       };
       
+      console.log("Created event data:", eventData);
       newEvents.push(eventData as Event);
     } catch(e) {
       errors++;
       console.error(`Error parsing event row ${index + 1}:`, row, e);
     }
   });
+  
+  console.log("=== FINAL RESULTS ===");
+  console.log("New events created:", newEvents.length);
+  console.log("Errors:", errors);
+  console.log("Skipped empty rows:", skippedEmptyRows);
   
   if (newEvents.length === 0 && data.length > 0) {
     const message = skippedEmptyRows > 0 
@@ -854,5 +883,7 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
+
+    
 
     
