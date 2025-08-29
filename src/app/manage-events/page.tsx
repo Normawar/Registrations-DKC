@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
@@ -283,116 +284,95 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
-// Replace your processEventImportData function with this version that shows ALL headers:
-
 const processEventImportData = (data: any[]) => {
-  console.log("=== DETAILED CSV DEBUG ===");
-  console.log("Total rows received:", data.length);
-  
-  if (data.length > 0) {
-    console.log("FIRST ROW HEADERS:", Object.keys(data[0]));
-    console.log("FIRST ROW VALUES:", Object.values(data[0]));
-    console.log("FIRST ROW COMPLETE:", JSON.stringify(data[0], null, 2));
-    
-    if (data.length > 1) {
-      console.log("SECOND ROW:", JSON.stringify(data[1], null, 2));
-    }
-  }
-
   const newEvents: Event[] = [];
   let errors = 0;
   let skippedEmptyRows = 0;
 
-  // More flexible field matching
   const getFieldValue = (row: any, fieldNames: string[]) => {
-    console.log("Available keys in row:", Object.keys(row));
     for (const name of fieldNames) {
-      const key = Object.keys(row).find(k => 
-        k.toLowerCase().trim() === name.toLowerCase().trim()
-      );
+      const key = Object.keys(row).find(k => k.toLowerCase().trim() === name.toLowerCase());
       if (key && row[key] !== null && row[key] !== undefined && row[key] !== '') {
-        console.log(`✅ Found field "${'${name}'}" as key "${'${key}'}" with value:`, row[key]);
         return row[key];
       }
     }
-    console.log(`❌ Field not found for any of:`, fieldNames);
     return undefined;
   };
   
-  // Only process first few rows for debugging
-  data.slice(0, 5).forEach((row: any, index: number) => {
-    console.log(`\n=== Processing Row ${'${index}'} ===`);
-    
-    // Skip empty rows
+  data.forEach((row: any, index: number) => {
+    // More robust check to skip empty or invalid rows early
     if (!row || 
         typeof row !== 'object' || 
         Object.keys(row).length === 0 ||
         Object.values(row).every(val => val === null || val === '' || val === undefined)) {
-      console.log(`Skipping row ${'${index}'}: empty`);
       skippedEmptyRows++;
       return;
     }
 
     try {
-      // Try to find date field with exact matching
-      let dateStr = getFieldValue(row, ['Date', 'date', 'EVENT_DATE', 'event_date']);
-      let location = getFieldValue(row, ['Location', 'location', 'LOCATION', 'venue']);
+      let dateStr = getFieldValue(row, ['date', 'Date', 'EVENT_DATE', 'event_date']);
+      let location = getFieldValue(row, ['location', 'Location', 'LOCATION', 'venue', 'Venue']);
       
-      console.log(`Date found: "${'${dateStr}'}", Location found: "${'${location}'}"`);
-      
+      // Skip rows that don't have the essential fields
       if (!dateStr || !location) {
-        console.log(`❌ Skipping row ${'${index}'}: missing fields`);
-        skippedEmptyRows++;
+        console.log(`Skipping row ${index + 1}: missing essential fields (date: "${dateStr}", location: "${location}")`);
         return;
       }
 
-      // If we get here, we found both fields - create the event
-      const date = new Date(dateStr);
-      if (!isValid(date)) {
-        throw new Error(`Invalid date: "${'${dateStr}'}"`);
+      // Clean up date string if it contains additional text
+      if (typeof dateStr === 'string' && dateStr.includes('-')) { 
+        dateStr = dateStr.split('-')[0].trim(); 
       }
       
-      const name = `Event at ${'${location}'} on ${'${format(date, 'PPP')}'}`;
+      const date = new Date(dateStr);
+      if (!isValid(date)) {
+        throw new Error(`Invalid date format: "${dateStr}"`);
+      }
       
+      let name = getFieldValue(row, ['name', 'Name', 'Tournament', 'EVENT_NAME', 'event_name', 'title', 'Title']);
+      if (!name) {
+        const formattedDate = format(date, 'PPP');
+        name = `Event at ${location} on ${formattedDate}`;
+      }
+
       const eventData = {
         id: `evt-${Date.now()}-${Math.random()}`,
         name: name,
         date: date.toISOString(),
         location: location,
-        rounds: Number(getFieldValue(row, ['rounds', 'Rounds']) || 5),
-        regularFee: Number(getFieldValue(row, ['regular fee', 'regularFee']) || 25),
-        lateFee: Number(getFieldValue(row, ['late fee', 'lateFee']) || 30),
-        veryLateFee: Number(getFieldValue(row, ['very late fee', 'veryLateFee']) || 35),
-        dayOfFee: Number(getFieldValue(row, ['Day of Fee', 'dayOfFee']) || 40),
-        imageUrl: '',
-        imageName: '',
-        pdfUrl: '',
-        pdfName: '',
-        isClosed: getFieldValue(row, ['status']) === 'Closed',
-        isPsjaOnly: false,
+        rounds: Number(getFieldValue(row, ['rounds', 'Rounds', 'ROUNDS']) || 5),
+        regularFee: Number(getFieldValue(row, ['regularFee', 'Regular Fee', 'REGULAR_FEE', 'regular_fee']) || 25),
+        lateFee: Number(getFieldValue(row, ['lateFee', 'Late Fee', 'LATE_FEE', 'late_fee']) || 30),
+        veryLateFee: Number(getFieldValue(row, ['veryLateFee', 'Very Late Fee', 'VERY_LATE_FEE', 'very_late_fee']) || 35),
+        dayOfFee: Number(getFieldValue(row, ['dayOfFee', 'Day of Fee', 'DAY_OF_FEE', 'day_of_fee']) || 40),
+        imageUrl: getFieldValue(row, ['imageUrl', 'Image URL', 'IMAGE_URL', 'image_url']) || '',
+        imageName: getFieldValue(row, ['imageName', 'Image Name', 'IMAGE_NAME', 'image_name']) || '',
+        pdfUrl: getFieldValue(row, ['pdfUrl', 'PDF URL', 'PDF_URL', 'pdf_url']) || '',
+        pdfName: getFieldValue(row, ['pdfName', 'PDF Name', 'PDF_NAME', 'pdf_name']) || '',
+        isClosed: getFieldValue(row, ['isClosed', 'Is Closed', 'IS_CLOSED', 'is_closed']) === 'true' || getFieldValue(row, ['isClosed', 'Is Closed', 'IS_CLOSED', 'is_closed']) === true,
+        isPsjaOnly: getFieldValue(row, ['isPsjaOnly', 'PSJA Only', 'PSJA_ONLY', 'psja_only']) === 'true' || getFieldValue(row, ['isPsjaOnly', 'PSJA Only', 'PSJA_ONLY', 'psja_only']) === true,
       };
       
-      console.log("✅ Successfully created event:", eventData);
       newEvents.push(eventData as Event);
-      
     } catch(e) {
       errors++;
-      console.error(`❌ Error in row ${'${index}'}:`, e);
+      console.error(`Error parsing event row ${index + 1}:`, row, e);
     }
   });
   
-  console.log("=== DEBUG SUMMARY ===");
-  console.log("Events created:", newEvents.length);
-  console.log("Errors:", errors);
-  console.log("Empty rows:", skippedEmptyRows);
-  
-  // For debugging, let's try to import even if we only got a few
-  if (newEvents.length > 0) {
-    addBulkEvents(newEvents);
-    toast({ title: "Debug Import", description: `Created ${'${newEvents.length}'} events from first 5 rows` });
-  } else {
-    toast({ variant: 'destructive', title: 'Debug Failed', description: 'Check console for header details' });
+  if (newEvents.length === 0 && data.length > 0) {
+    const message = skippedEmptyRows > 0 
+      ? `Could not import any events. Skipped ${skippedEmptyRows} empty rows. Please check your column headers (e.g., 'Date', 'Location').`
+      : `Could not import any events. Please check your column headers (e.g., 'Date', 'Location').`;
+    toast({ variant: 'destructive', title: 'Import Failed', description: message });
+    return;
   }
+
+  addBulkEvents(newEvents);
+  const successMessage = `Successfully imported ${newEvents.length} events.` + 
+    (skippedEmptyRows > 0 ? ` Skipped ${skippedEmptyRows} empty rows.` : '') +
+    (errors > 0 ? ` ${errors} rows had errors.` : '');
+  toast({ title: "Import Complete", description: successMessage });
 };
 
 
@@ -559,7 +539,7 @@ const processEventImportData = (data: any[]) => {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_updates';
-    link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, '_')}_${'${fileNameSuffix}'}.csv`);
+    link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, '_')}_${fileNameSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -573,7 +553,7 @@ const processEventImportData = (data: any[]) => {
       setDownloadedPlayers(updatedDownloads);
       localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
     }
-    toast({ title: 'Download Complete', description: `${'${playersToDownload.length}'} registrations downloaded.`});
+    toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations downloaded.`});
   };
 
   const handleRenameDistrict = () => {
@@ -703,7 +683,7 @@ const processEventImportData = (data: any[]) => {
                       <TableCell className="font-medium">{event.name}</TableCell>
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                       <TableCell>{event.location}</TableCell>
-                      <TableCell>{`$${'${event.regularFee}'} / $${'${event.lateFee}'} / $${'${event.veryLateFee}'} / $${'${event.dayOfFee}'}`}</TableCell>
+                      <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
                       <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -712,7 +692,7 @@ const processEventImportData = (data: any[]) => {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${'${event.id}'}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
+                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -849,7 +829,7 @@ const processEventImportData = (data: any[]) => {
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
-                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${'${invoiceId}'}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
+                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
                             <TableCell>{status}</TableCell>
                         </TableRow>
                     )
@@ -882,3 +862,4 @@ const processEventImportData = (data: any[]) => {
     
 
     
+
