@@ -135,7 +135,18 @@ export function useEvents() {
   }, []);
 
   const updateEvent = useCallback((updatedEvent: Event) => {
-    setEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+    setEvents(prevEvents => {
+      const newEvents = prevEvents.map(event =>
+        event.id === updatedEvent.id ? updatedEvent : event
+      );
+      // Persist the new state to localStorage immediately after setting it
+      try {
+        localStorage.setItem('chess_events', JSON.stringify(newEvents));
+      } catch (error) {
+        console.error("Failed to save updated events to localStorage", error);
+      }
+      return newEvents;
+    });
   }, []);
 
   const deleteEvent = useCallback((eventId: string) => {
