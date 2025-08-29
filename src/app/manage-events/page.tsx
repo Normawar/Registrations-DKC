@@ -283,87 +283,86 @@ export default function ManageEventsPage() {
     }
   }, [isDialogOpen, editingEvent, form]);
 
- const processEventImportData = (data: any[]) => {
-  console.log("=== CSV DEBUG INFO ===");
-  console.log("Total rows:", data.length);
+// Replace your processEventImportData function with this version that shows ALL headers:
+
+const processEventImportData = (data: any[]) => {
+  console.log("=== DETAILED CSV DEBUG ===");
+  console.log("Total rows received:", data.length);
   
-  // Log the first few rows in detail
-  data.slice(0, 3).forEach((row, index) => {
-    console.log(`Row ${index}:`, row);
-    console.log(`Row ${index} keys:`, Object.keys(row));
-    console.log(`Row ${index} values:`, Object.values(row));
-    console.log(`Row ${index} typeof:`, typeof row);
-    console.log("---");
-  });
+  if (data.length > 0) {
+    console.log("FIRST ROW HEADERS:", Object.keys(data[0]));
+    console.log("FIRST ROW VALUES:", Object.values(data[0]));
+    console.log("FIRST ROW COMPLETE:", JSON.stringify(data[0], null, 2));
+    
+    if (data.length > 1) {
+      console.log("SECOND ROW:", JSON.stringify(data[1], null, 2));
+    }
+  }
 
   const newEvents: Event[] = [];
   let errors = 0;
   let skippedEmptyRows = 0;
 
+  // More flexible field matching
   const getFieldValue = (row: any, fieldNames: string[]) => {
+    console.log("Available keys in row:", Object.keys(row));
     for (const name of fieldNames) {
-      const key = Object.keys(row).find(k => k.toLowerCase().trim() === name.toLowerCase());
+      const key = Object.keys(row).find(k => 
+        k.toLowerCase().trim() === name.toLowerCase().trim()
+      );
       if (key && row[key] !== null && row[key] !== undefined && row[key] !== '') {
-        console.log(`Found field "${name}" as key "${key}" with value:`, row[key]);
+        console.log(`✅ Found field "${'${name}'}" as key "${'${key}'}" with value:`, row[key]);
         return row[key];
       }
     }
-    console.log(`Field not found for any of:`, fieldNames);
+    console.log(`❌ Field not found for any of:`, fieldNames);
     return undefined;
   };
   
-  data.forEach((row: any, index: number) => {
-    console.log(`\n=== Processing Row ${index} ===`);
-    console.log("Row data:", row);
+  // Only process first few rows for debugging
+  data.slice(0, 5).forEach((row: any, index: number) => {
+    console.log(`\n=== Processing Row ${'${index}'} ===`);
     
-    // Skip empty or invalid rows
+    // Skip empty rows
     if (!row || 
         typeof row !== 'object' || 
         Object.keys(row).length === 0 ||
         Object.values(row).every(val => val === null || val === '' || val === undefined)) {
-      console.log(`Skipping row ${index}: empty or invalid`);
+      console.log(`Skipping row ${'${index}'}: empty`);
       skippedEmptyRows++;
       return;
     }
 
     try {
-      console.log("Looking for date field...");
-      let dateStr = getFieldValue(row, ['date', 'Date']);
-      console.log("Looking for location field...");
-      let location = getFieldValue(row, ['location', 'Location']);
+      // Try to find date field with exact matching
+      let dateStr = getFieldValue(row, ['Date', 'date', 'EVENT_DATE', 'event_date']);
+      let location = getFieldValue(row, ['Location', 'location', 'LOCATION', 'venue']);
       
-      console.log(`Found date: "${dateStr}", location: "${location}"`);
+      console.log(`Date found: "${'${dateStr}'}", Location found: "${'${location}'}"`);
       
-      // Skip rows that don't have the essential fields
       if (!dateStr || !location) {
-        console.log(`Skipping row ${index + 1}: missing essential fields (date: "${dateStr}", location: "${location}")`);
+        console.log(`❌ Skipping row ${'${index}'}: missing fields`);
         skippedEmptyRows++;
         return;
       }
 
-      // Clean up date string if it contains additional text
-      if (typeof dateStr === 'string' && dateStr.includes('-')) { 
-        dateStr = dateStr.split('-')[0].trim(); 
-      }
-      
+      // If we get here, we found both fields - create the event
       const date = new Date(dateStr);
       if (!isValid(date)) {
-        throw new Error(`Invalid date format: "${dateStr}"`);
+        throw new Error(`Invalid date: "${'${dateStr}'}"`);
       }
       
-      // Since your CSV doesn't have a name field, generate one from location and date
-      const name = `Event at ${location} on ${format(date, 'PPP')}`;
-      console.log(`Generated name: "${name}"`);
-
+      const name = `Event at ${'${location}'} on ${'${format(date, 'PPP')}'}`;
+      
       const eventData = {
         id: `evt-${Date.now()}-${Math.random()}`,
         name: name,
         date: date.toISOString(),
         location: location,
         rounds: Number(getFieldValue(row, ['rounds', 'Rounds']) || 5),
-        regularFee: Number(getFieldValue(row, ['regular fee', 'regularFee', 'Regular Fee']) || 25),
-        lateFee: Number(getFieldValue(row, ['late fee', 'lateFee', 'Late Fee']) || 30),
-        veryLateFee: Number(getFieldValue(row, ['very late fee', 'veryLateFee', 'Very Late Fee']) || 35),
+        regularFee: Number(getFieldValue(row, ['regular fee', 'regularFee']) || 25),
+        lateFee: Number(getFieldValue(row, ['late fee', 'lateFee']) || 30),
+        veryLateFee: Number(getFieldValue(row, ['very late fee', 'veryLateFee']) || 35),
         dayOfFee: Number(getFieldValue(row, ['Day of Fee', 'dayOfFee']) || 40),
         imageUrl: '',
         imageName: '',
@@ -373,33 +372,29 @@ export default function ManageEventsPage() {
         isPsjaOnly: false,
       };
       
-      console.log("Created event data:", eventData);
+      console.log("✅ Successfully created event:", eventData);
       newEvents.push(eventData as Event);
+      
     } catch(e) {
       errors++;
-      console.error(`Error parsing event row ${index + 1}:`, row, e);
+      console.error(`❌ Error in row ${'${index}'}:`, e);
     }
   });
   
-  console.log("=== FINAL RESULTS ===");
-  console.log("New events created:", newEvents.length);
+  console.log("=== DEBUG SUMMARY ===");
+  console.log("Events created:", newEvents.length);
   console.log("Errors:", errors);
-  console.log("Skipped empty rows:", skippedEmptyRows);
+  console.log("Empty rows:", skippedEmptyRows);
   
-  if (newEvents.length === 0 && data.length > 0) {
-    const message = skippedEmptyRows > 0 
-      ? `Could not import any events. Skipped ${skippedEmptyRows} empty rows. Please check your column headers.`
-      : `Could not import any events. Please check your column headers.`;
-    toast({ variant: 'destructive', title: 'Import Failed', description: message });
-    return;
+  // For debugging, let's try to import even if we only got a few
+  if (newEvents.length > 0) {
+    addBulkEvents(newEvents);
+    toast({ title: "Debug Import", description: `Created ${'${newEvents.length}'} events from first 5 rows` });
+  } else {
+    toast({ variant: 'destructive', title: 'Debug Failed', description: 'Check console for header details' });
   }
-
-  addBulkEvents(newEvents);
-  const successMessage = `Successfully imported ${newEvents.length} events.` + 
-    (skippedEmptyRows > 0 ? ` Skipped ${skippedEmptyRows} empty rows.` : '') +
-    (errors > 0 ? ` ${errors} rows had errors.` : '');
-  toast({ title: "Import Complete", description: successMessage });
 };
+
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -564,7 +559,7 @@ export default function ManageEventsPage() {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_updates';
-    link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, '_')}_${fileNameSuffix}.csv`);
+    link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, '_')}_${'${fileNameSuffix}'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -578,7 +573,7 @@ export default function ManageEventsPage() {
       setDownloadedPlayers(updatedDownloads);
       localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
     }
-    toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations downloaded.`});
+    toast({ title: 'Download Complete', description: `${'${playersToDownload.length}'} registrations downloaded.`});
   };
 
   const handleRenameDistrict = () => {
@@ -708,7 +703,7 @@ export default function ManageEventsPage() {
                       <TableCell className="font-medium">{event.name}</TableCell>
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                       <TableCell>{event.location}</TableCell>
-                      <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
+                      <TableCell>{`$${'${event.regularFee}'} / $${'${event.lateFee}'} / $${'${event.veryLateFee}'} / $${'${event.dayOfFee}'}`}</TableCell>
                       <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -717,7 +712,7 @@ export default function ManageEventsPage() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
+                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${'${event.id}'}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -854,7 +849,7 @@ export default function ManageEventsPage() {
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
-                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
+                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${'${invoiceId}'}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
                             <TableCell>{status}</TableCell>
                         </TableRow>
                     )
