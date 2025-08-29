@@ -499,7 +499,17 @@ export default function ManageEventsPage() {
 
   function onSubmit(values: EventFormValues) {
     if (editingEvent) {
-      const eventData = { ...values, id: editingEvent.id, date: values.date.toISOString() };
+      const eventData = { 
+        ...editingEvent,
+        ...values, 
+        id: editingEvent.id, 
+        date: values.date.toISOString() 
+      };
+      
+      // Debug logging
+      console.log('Updating event:', eventData);
+      console.log('isClosed value:', eventData.isClosed);
+      
       updateEvent(eventData as Event);
       toast({ title: "Event Updated", description: `"${values.name}" has been successfully updated.` });
     } else {
@@ -864,6 +874,7 @@ export default function ManageEventsPage() {
     
 
     
+
 
 
 
