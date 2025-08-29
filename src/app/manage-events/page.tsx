@@ -285,19 +285,11 @@ export default function ManageEventsPage() {
   }, [isDialogOpen, editingEvent, form]);
 
 const processEventImportData = (data: any[]) => {
-  console.log("🚀 FINAL DEBUG VERSION RUNNING");
-  console.log("Total rows:", data.length);
-  
-  if (data.length > 0) {
-    console.log("📋 ACTUAL HEADERS:", JSON.stringify(Object.keys(data[0])));
-    console.log("📊 FIRST ROW DATA:", JSON.stringify(data[0]));
-  }
-
   const newEvents: Event[] = [];
   let errors = 0;
   let skippedEmptyRows = 0;
 
-  // Ultra-flexible field matching - will find ANY column that contains these words
+  // Flexible field matching - finds columns containing the search terms
   const findColumn = (row: any, searchTerms: string[]) => {
     const keys = Object.keys(row);
     for (const term of searchTerms) {
@@ -308,11 +300,9 @@ const processEventImportData = (data: any[]) => {
         String(row[key]).trim() !== ''
       );
       if (found) {
-        console.log(`✅ Found "${term}" in column "${found}" with value:`, row[found]);
         return row[found];
       }
     }
-    console.log(`❌ Could not find any of:`, searchTerms, "in columns:", keys);
     return null;
   };
   
@@ -326,19 +316,12 @@ const processEventImportData = (data: any[]) => {
       return;
     }
 
-    // Only debug first few rows to avoid spam
-    if (index < 3) {
-      console.log(`\n🔍 Processing row ${index}:`, JSON.stringify(row));
-    }
-
     try {
-      // Look for date in any column containing "date"
+      // Look for date and location columns
       const dateStr = findColumn(row, ['date']);
-      // Look for location in any column containing "location"  
       const location = findColumn(row, ['location']);
       
       if (!dateStr || !location) {
-        if (index < 5) console.log(`⏭️ Skipping row ${index}: missing date or location`);
         skippedEmptyRows++;
         return;
       }
@@ -346,14 +329,12 @@ const processEventImportData = (data: any[]) => {
       // Parse the date
       const date = new Date(dateStr);
       if (!isValid(date)) {
-        console.log(`❌ Invalid date in row ${index}: "${dateStr}"`);
         errors++;
         return;
       }
       
       // Generate event name
-      const formattedDate = format(date, 'PPP');
-      const name = `Event at ${location} on ${formattedDate}`;
+      const name = `Event at ${location} on ${format(date, 'PPP')}`;
       
       const eventData = {
         id: `evt-${Date.now()}-${Math.random()}`,
@@ -373,27 +354,18 @@ const processEventImportData = (data: any[]) => {
         isPsjaOnly: false,
       };
       
-      if (index < 3) {
-        console.log(`✨ Created event:`, eventData);
-      }
-      
       newEvents.push(eventData as Event);
     } catch(e) {
       errors++;
-      console.error(`💥 Error in row ${index}:`, e);
+      console.error(`Error parsing event row ${index + 1}:`, e);
     }
   });
   
-  console.log("📈 FINAL RESULTS:");
-  console.log("✅ Events created:", newEvents.length);
-  console.log("❌ Errors:", errors);  
-  console.log("⏭️ Empty rows skipped:", skippedEmptyRows);
-  
-  if (newEvents.length === 0 && data.length > 0) {
+  if (newEvents.length === 0) {
     toast({ 
       variant: 'destructive', 
       title: 'Import Failed', 
-      description: `No events could be created. Check console for column details. Skipped ${skippedEmptyRows} empty rows, ${errors} errors.` 
+      description: `No events could be created. Skipped ${skippedEmptyRows} empty rows, ${errors} errors.` 
     });
     return;
   }
@@ -892,5 +864,6 @@ const processEventImportData = (data: any[]) => {
     
 
     
+
 
 
