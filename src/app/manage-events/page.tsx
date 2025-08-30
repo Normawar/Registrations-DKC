@@ -39,7 +39,8 @@ import {
     ClipboardPaste,
     Download,
     Check,
-    Edit
+    Edit,
+    Delete
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -112,7 +113,7 @@ const eventFormSchema = z.object({
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
-type SortableColumnKey = 'name' | 'date' | 'location' | 'regularFee' | 'status';
+type SortableColumnKey = 'name' | 'date' | 'location' | 'regularFee' | 'status' | 'district';
 
 type StoredConfirmation = {
   id: string;
@@ -140,12 +141,13 @@ type StoredDownloads = {
 
 export default function ManageEventsPage() {
   const { toast } = useToast();
-  const { events, addBulkEvents, updateEvent, deleteEvent } = useEvents();
+  const { events, addBulkEvents, updateEvent, deleteEvent, clearAllEvents } = useEvents();
   const { database: allPlayers, isDbLoaded, updateSchoolDistrict } = useMasterDb();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'date', direction: 'ascending' });
   
@@ -163,6 +165,11 @@ export default function ManageEventsPage() {
   const uniqueDistricts = useMemo(() => {
     return [...new Set(schoolData.map(s => s.district).filter(Boolean))].sort();
   }, []);
+
+  const getDistrictForLocation = (location: string): string => {
+    const school = schoolData.find(s => s.schoolName === location);
+    return school?.district || 'Unknown';
+  };
   
   const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
     if (event.isClosed) return "Closed";
@@ -170,17 +177,17 @@ export default function ManageEventsPage() {
   };
 
   const sortedEvents = useMemo(() => {
-    const schoolsInDistrict = districtFilter === 'all' 
-      ? [] 
-      : schoolData.filter(s => s.district === districtFilter).map(s => s.schoolName);
-    
-    const filteredEvents = districtFilter === 'all'
-      ? [...events]
-      : events.filter(event => schoolsInDistrict.includes(event.location));
+    let filteredEvents = [...events];
 
-    const sortableEvents = [...filteredEvents];
+    if (districtFilter !== 'all') {
+      filteredEvents = events.filter(event => {
+        const district = getDistrictForLocation(event.location);
+        return district === districtFilter;
+      });
+    }
+
     if (sortConfig !== null) {
-      sortableEvents.sort((a, b) => {
+      filteredEvents.sort((a, b) => {
         const aStatus = getEventStatus(a);
         const bStatus = getEventStatus(b);
         if (aStatus === 'Open' && bStatus !== 'Open') return -1;
@@ -188,8 +195,17 @@ export default function ManageEventsPage() {
         if (aStatus === 'Closed' && bStatus === 'Completed') return -1;
         if (aStatus === 'Completed' && bStatus === 'Closed') return 1;
 
-        let aValue: any = a[sortConfig.key as keyof Event];
-        let bValue: any = b[sortConfig.key as keyof Event];
+        let aValue: any;
+        let bValue: any;
+
+        if (sortConfig.key === 'district') {
+            aValue = getDistrictForLocation(a.location);
+            bValue = getDistrictForLocation(b.location);
+        } else {
+            aValue = a[sortConfig.key as keyof Event];
+        }
+
+        bValue = sortConfig.key === 'district' ? getDistrictForLocation(b.location) : b[sortConfig.key as keyof Event];
         
         if (sortConfig.key === 'date') {
             aValue = new Date(a.date).getTime();
@@ -208,7 +224,7 @@ export default function ManageEventsPage() {
         return 0;
       });
     }
-    return sortableEvents;
+    return filteredEvents;
   }, [events, sortConfig, districtFilter]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -301,7 +317,7 @@ export default function ManageEventsPage() {
       const keys = Object.keys(row);
       for (const term of searchTerms) {
         const found = keys.find(key => 
-          key.toLowerCase().includes(term.toLowerCase()) && 
+          key.toLowerCase().trim().replace(/ /g, '').includes(term.toLowerCase().replace(/ /g, '')) && 
           row[key] !== null && 
           row[key] !== undefined && 
           String(row[key]).trim() !== ''
@@ -324,7 +340,7 @@ export default function ManageEventsPage() {
   
       try {
         const dateStr = findColumn(row, ['date']);
-        const location = findColumn(row, ['location']);
+        const location = findColumn(row, ['location', 'school']);
         
         if (!dateStr || !location) {
           skippedEmptyRows++;
@@ -337,18 +353,18 @@ export default function ManageEventsPage() {
           return;
         }
         
-        const name = `Event at ${location} on ${format(date, 'PPP')}`;
+        const name = `${location} on ${format(date, 'PPP')}`;
         
         const eventData = {
           id: `evt-${Date.now()}-${Math.random()}`,
           name: name,
           date: date.toISOString(),
           location: location,
-          rounds: Number(findColumn(row, ['round']) || 5),
-          regularFee: Number(findColumn(row, ['regular', 'fee']) || 25),
-          lateFee: Number(findColumn(row, ['late']) || 30),
-          veryLateFee: Number(findColumn(row, ['very']) || 35),
-          dayOfFee: Number(findColumn(row, ['day']) || 40),
+          rounds: Number(findColumn(row, ['rounds', 'round']) || 5),
+          regularFee: Number(findColumn(row, ['regularfee', 'regular']) || 25),
+          lateFee: Number(findColumn(row, ['latefee', 'late']) || 30),
+          veryLateFee: Number(findColumn(row, ['verylatefee', 'very']) || 35),
+          dayOfFee: Number(findColumn(row, ['dayoffee', 'dayof']) || 40),
           imageUrl: '',
           imageName: '',
           pdfUrl: '',
@@ -364,7 +380,7 @@ export default function ManageEventsPage() {
       }
     });
     
-    if (newEvents.length === 0) {
+    if (newEvents.length === 0 && data.length > 0) {
       toast({ 
         variant: 'destructive', 
         title: 'Import Failed', 
@@ -446,6 +462,12 @@ export default function ManageEventsPage() {
   const handleDeleteEvent = (event: Event) => {
     setEventToDelete(event);
     setIsAlertOpen(true);
+  };
+  
+  const handleClearEvents = () => {
+    clearAllEvents();
+    toast({ title: 'All Events Cleared', description: 'The event list is now empty.' });
+    setIsClearAlertOpen(false);
   };
 
   const handleViewRegistrations = (event: Event) => {
@@ -630,6 +652,9 @@ export default function ManageEventsPage() {
             <Button onClick={handleAddEvent}>
               <PlusCircle className="mr-2 h-4 w-4" /> Add New Event
             </Button>
+             <Button variant="destructive" onClick={() => setIsClearAlertOpen(true)}>
+              <Delete className="mr-2 h-4 w-4" /> Clear All Events
+            </Button>
           </div>
         </div>
         
@@ -695,6 +720,7 @@ export default function ManageEventsPage() {
                 <TableRow>
                   <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>Event Name {getSortIcon('name')}</Button></TableHead>
                   <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('date')}>Date {getSortIcon('date')}</Button></TableHead>
+                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('district')}>District {getSortIcon('district')}</Button></TableHead>
                   <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('location')}>Location {getSortIcon('location')}</Button></TableHead>
                   <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>Fees {getSortIcon('regularFee')}</Button></TableHead>
                   <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('status')}>Status {getSortIcon('status')}</Button></TableHead>
@@ -704,12 +730,14 @@ export default function ManageEventsPage() {
               <TableBody>
                 {sortedEvents.map((event) => {
                   const status = getEventStatus(event);
+                  const district = getDistrictForLocation(event.location);
                   return (
                     <TableRow key={event.id}>
                       <TableCell className="font-medium">{event.name}</TableCell>
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
+                      <TableCell>{district}</TableCell>
                       <TableCell>{event.location}</TableCell>
-                      <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
+                      <TableCell>${event.regularFee} / ${event.lateFee} / ${event.veryLateFee} / ${event.dayOfFee}</TableCell>
                       <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -826,6 +854,13 @@ export default function ManageEventsPage() {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the event "{eventToDelete?.name}".</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Clear All Events?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete all events from the list.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">Clear Events</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 

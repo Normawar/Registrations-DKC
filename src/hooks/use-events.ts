@@ -152,6 +152,10 @@ export function useEvents() {
   const deleteEvent = useCallback((eventId: string) => {
     setEvents(prev => prev.filter(e => e.id !== eventId));
   }, []);
+  
+  const clearAllEvents = useCallback(() => {
+    setEvents([]);
+  }, []);
 
-  return { events, addEvent, addBulkEvents, updateEvent, deleteEvent };
+  return { events, addEvent, addBulkEvents, updateEvent, deleteEvent, clearAllEvents };
 }
