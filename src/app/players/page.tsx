@@ -171,18 +171,19 @@ function PlayersPageContent() {
           return;
         }
 
-        const uscfId = findColumn(row, ['uscf id', 'uscf_id', 'id']);
-        const lastName = findColumn(row, ['last name', 'lname', 'last_name']);
+        const uscfId = findColumn(row, ['uscfId', 'uscf id']);
+        const lastName = findColumn(row, ['lastName', 'last name']);
 
         if (!uscfId || !lastName) {
           skippedIncomplete++;
           return;
         }
         
-        const firstName = findColumn(row, ['first name', 'fname', 'first_name']) || 'Unknown';
-        const middleName = findColumn(row, ['middle name', 'mname', 'middle_name']) || '';
-        const ratingStr = findColumn(row, ['rating', 'regularrating', 'rtng']);
-        const expiresStr = findColumn(row, ['expires', 'expiration']);
+        const firstName = findColumn(row, ['firstName', 'first name']) || 'Unknown';
+        const middleName = findColumn(row, ['middleName', 'middle name']) || '';
+        const ratingStr = findColumn(row, ['regularRating', 'rating']);
+        const expiresStr = findColumn(row, ['uscfExpiration', 'expires']);
+        const dobStr = findColumn(row, ['dob']);
 
         const playerData: MasterPlayer = {
           id: uscfId,
@@ -197,13 +198,13 @@ function PlayersPageContent() {
           section: findColumn(row, ['section']) || '',
           email: findColumn(row, ['email']) || '',
           phone: findColumn(row, ['phone']) || '',
-          dob: undefined, // DOB parsing can be added if needed
-          zipCode: findColumn(row, ['zip']) || '',
+          dob: dobStr && isValid(new Date(dobStr)) ? new Date(dobStr).toISOString() : undefined,
+          zipCode: findColumn(row, ['zipCode', 'zip']) || '',
           studentType: undefined,
           school: findColumn(row, ['school']) || '',
           district: findColumn(row, ['district']) || '',
-          events: 0,
-          eventIds: [],
+          events: Number(findColumn(row, ['events']) || 0),
+          eventIds: findColumn(row, ['eventIds'])?.split(',') || [],
         };
         newPlayers.push(playerData);
       } catch(e) {
@@ -216,7 +217,7 @@ function PlayersPageContent() {
       toast({ 
         variant: 'destructive', 
         title: 'Import Failed', 
-        description: `No valid players found. Skipped ${skippedIncomplete} incomplete rows. Check headers like 'USCF ID' and 'Last Name'.` 
+        description: `No valid players found. Skipped ${skippedIncomplete} incomplete rows. Check headers like 'uscfId' and 'lastName'.` 
       });
       return;
     }
