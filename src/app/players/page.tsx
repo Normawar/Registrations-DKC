@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useCallback, Suspense, useEffect, useRef, type ChangeEvent } from 'react';
@@ -179,6 +180,7 @@ function PlayersPageContent() {
         }
         
         const firstName = findColumn(row, ['first name']) || 'Unknown';
+        const middleName = findColumn(row, ['middle name']) || '';
         const ratingStr = findColumn(row, ['rating']);
         const expiresStr = findColumn(row, ['expires', 'expiration']);
 
@@ -187,10 +189,10 @@ function PlayersPageContent() {
           uscfId: uscfId,
           firstName: firstName,
           lastName: lastName,
+          middleName: middleName,
           state: findColumn(row, ['state', 'st']) || 'TX',
           regularRating: ratingStr && !isNaN(parseInt(ratingStr)) ? parseInt(ratingStr) : undefined,
           uscfExpiration: expiresStr && isValid(new Date(expiresStr)) ? new Date(expiresStr).toISOString() : undefined,
-          middleName: findColumn(row, ['middle name']) || '',
           grade: findColumn(row, ['grade']) || '',
           section: findColumn(row, ['section']) || '',
           email: findColumn(row, ['email']) || '',

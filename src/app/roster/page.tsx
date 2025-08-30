@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -267,7 +268,7 @@ function SponsorRosterView() {
                         <div className="flex items-center space-x-3">
                           <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" /><AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback></Avatar>
                           <div>
-                            <div className="font-medium">{player.firstName} {player.lastName}</div>
+                            <div className="font-medium">{`${player.firstName} ${player.middleName || ''} ${player.lastName}`.replace(/\s+/g, ' ').trim()}</div>
                             <div className="text-sm text-muted-foreground">{player.email}</div>
                           </div>
                         </div>
