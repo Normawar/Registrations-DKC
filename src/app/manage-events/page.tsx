@@ -165,8 +165,19 @@ export default function ManageEventsPage() {
   }, []);
 
   const getDistrictForLocation = (location: string): string => {
-    const school = schoolData.find(s => s.schoolName === location);
-    return school?.district || 'Unknown';
+    const lowerLocation = location.toLowerCase();
+    // Prioritize finding a full school name first to avoid partial matches like "Don"
+    let foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
+
+    // If no full match, try matching parts of the school name
+    if (!foundSchool) {
+      foundSchool = schoolData.find(s => {
+        const schoolNameParts = s.schoolName.toLowerCase().split(' ').filter(p => p.length > 2 && !['el', 'ms', 'hs'].includes(p));
+        return schoolNameParts.some(part => lowerLocation.includes(part));
+      });
+    }
+    
+    return foundSchool?.district || 'Unknown';
   };
   
   const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
