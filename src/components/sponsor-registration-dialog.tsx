@@ -112,42 +112,48 @@ export function SponsorRegistrationDialog({
       }
     }));
   };
+  
+  const getFeeForEvent = () => {
+      if (!event) return { fee: 0, type: 'Regular Registration' };
+      
+      const eventDate = new Date(event.date);
+      const now = new Date();
+
+      if (isSameDay(eventDate, now)) {
+          return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
+      }
+      
+      const hoursUntilEvent = differenceInHours(eventDate, now);
+      
+      if (hoursUntilEvent <= 24) {
+          return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
+      } else if (hoursUntilEvent <= 48) {
+          return { fee: event.lateFee || event.regularFee, type: 'Late Registration' };
+      }
+      
+      return { fee: event.regularFee, type: 'Regular Registration' };
+  };
 
   // Calculate fees with breakdown
   const calculateFeeBreakdown = () => {
     if (!event) return { registrationFees: 0, lateFees: 0, uscfFees: 0, total: 0, feeType: 'Regular Registration' };
     
-    // Calculate current registration fee based on timing
-    let registrationFeePerPlayer = event.regularFee;
-    const eventDate = new Date(event.date);
-    const now = new Date();
-    
-    if (isSameDay(eventDate, now)) {
-      registrationFeePerPlayer = event.dayOfFee || event.regularFee;
-    } else {
-      const hoursUntilEvent = differenceInHours(eventDate, now);
-      if (hoursUntilEvent <= 24) {
-        registrationFeePerPlayer = event.veryLateFee || event.regularFee;
-      } else if (hoursUntilEvent <= 48) {
-        registrationFeePerPlayer = event.lateFee || event.regularFee;
-      }
-    }
+    const { fee: currentFee, type: feeType } = getFeeForEvent();
     
     const selectedCount = Object.keys(selectedStudents).length;
-    const lateFeePerPlayer = registrationFeePerPlayer - event.regularFee;
+    const baseTotal = selectedCount * event.regularFee;
+    const lateFeeTotal = selectedCount * (currentFee - event.regularFee);
+    
     const uscfCount = Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current').length;
     const uscfFee = 24;
+    const uscfTotal = uscfCount * uscfFee;
     
     return {
-      registrationFees: selectedCount * event.regularFee,
-      lateFees: selectedCount * lateFeePerPlayer,
-      uscfFees: uscfCount * uscfFee,
-      total: (selectedCount * registrationFeePerPlayer) + (uscfCount * uscfFee),
-      feeType: lateFeePerPlayer > 0 ? (
-        isSameDay(eventDate, now) ? 'Day-of Registration' :
-        differenceInHours(eventDate, now) <= 24 ? 'Very Late Registration' :
-        'Late Registration'
-      ) : 'Regular Registration'
+      registrationFees: baseTotal,
+      lateFees: lateFeeTotal,
+      uscfFees: uscfTotal,
+      total: baseTotal + lateFeeTotal + uscfTotal,
+      feeType: feeType
     };
   };
 
@@ -171,25 +177,12 @@ export function SponsorRegistrationDialog({
     setIsSubmitting(true);
 
     try {
-      
-      // Calculate current registration fee based on timing
-      let registrationFeePerPlayer = event.regularFee;
-      const eventDate = new Date(event.date);
-      const now = new Date();
-      const hoursUntilEvent = Math.ceil((eventDate.getTime() - now.getTime()) / (1000 * 60 * 60));
-      
-      if (hoursUntilEvent <= 0) {
-        registrationFeePerPlayer = event.dayOfFee || event.regularFee;
-      } else if (hoursUntilEvent <= 24) {
-        registrationFeePerPlayer = event.veryLateFee || event.regularFee;
-      } else if (hoursUntilEvent <= 48) {
-        registrationFeePerPlayer = event.lateFee || event.regularFee;
-      }
+      const { fee: currentFee } = getFeeForEvent();
+      const lateFeeAmount = currentFee - event.regularFee;
 
       // Prepare players for invoice
       const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
         const student = rosterPlayers.find(p => p.id === playerId);
-        const lateFeeAmount = registrationFeePerPlayer - event.regularFee;
         
         return {
           playerName: `${student?.firstName} ${student?.lastName}`,
@@ -568,7 +561,7 @@ export function SponsorRegistrationDialog({
               Back to Selection
             </Button>
             <Button onClick={handleCreateInvoice} disabled={isSubmitting}>
-              {isSubmitting ? 'Creating Invoice...' : `Create Invoice (${feeBreakdown.total.toFixed(2)})`}
+              {isSubmitting ? 'Creating Invoice...' : `Create Invoice ($${feeBreakdown.total.toFixed(2)})`}
             </Button>
           </DialogFooter>
         </DialogContent>
