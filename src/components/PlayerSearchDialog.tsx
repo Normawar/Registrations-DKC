@@ -57,6 +57,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPla
     excludeIds: portalType === 'sponsor' ? excludeIds : [], // Only exclude for sponsors
     searchUnassigned: portalType === 'sponsor',
     sponsorProfile: portalType === 'sponsor' ? profile : null,
+    portalType: portalType,
   });
   
 const handleSelect = (player: MasterPlayer) => {

@@ -42,6 +42,7 @@ export type SearchCriteria = {
   maxResults?: number;
   searchUnassigned?: boolean;
   sponsorProfile?: SponsorProfile | null;
+  portalType?: 'sponsor' | 'organizer' | 'individual';
 }
 
 // --- Constants ---
@@ -194,7 +195,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const {
         firstName, middleName, lastName, uscfId, state, grade, section, school, district,
         minRating, maxRating, excludeIds = [], maxResults = 1000,
-        searchUnassigned, sponsorProfile
+        searchUnassigned, sponsorProfile, portalType
     } = criteria;
     
     const lowerFirstName = firstName?.trim().toLowerCase();
@@ -235,7 +236,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         if (lowerLastName && !p.lastName?.toLowerCase().includes(lowerLastName)) return false;
         
         // USCF ID filtering
-        if (lowerUscfId && !p.uscfId?.toString().includes(lowerUscfId)) return false;
+        if (lowerUscfId && p.uscfId && !p.uscfId.toString().includes(lowerUscfId)) return false;
         
         // Grade and section filtering
         if (grade && grade.trim() && p.grade !== grade) return false;
