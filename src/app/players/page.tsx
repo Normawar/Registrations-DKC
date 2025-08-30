@@ -154,7 +154,7 @@ function PlayersPageContent() {
       const keys = Object.keys(row);
       for (const term of searchTerms) {
         const found = keys.find(key => 
-          key.toLowerCase().includes(term.toLowerCase()) && 
+          key.toLowerCase().trim().includes(term.toLowerCase()) && 
           row[key] !== null && 
           row[key] !== undefined && 
           String(row[key]).trim() !== ''
@@ -171,17 +171,17 @@ function PlayersPageContent() {
           return;
         }
 
-        const uscfId = findColumn(row, ['uscf id', 'id']);
-        const lastName = findColumn(row, ['last name']);
+        const uscfId = findColumn(row, ['uscf id', 'uscf_id', 'id']);
+        const lastName = findColumn(row, ['last name', 'lname', 'last_name']);
 
         if (!uscfId || !lastName) {
           skippedIncomplete++;
           return;
         }
         
-        const firstName = findColumn(row, ['first name']) || 'Unknown';
-        const middleName = findColumn(row, ['middle name']) || '';
-        const ratingStr = findColumn(row, ['rating']);
+        const firstName = findColumn(row, ['first name', 'fname', 'first_name']) || 'Unknown';
+        const middleName = findColumn(row, ['middle name', 'mname', 'middle_name']) || '';
+        const ratingStr = findColumn(row, ['rating', 'regularrating', 'rtng']);
         const expiresStr = findColumn(row, ['expires', 'expiration']);
 
         const playerData: MasterPlayer = {
@@ -353,7 +353,7 @@ function PlayersPageContent() {
                                 <div className="flex items-center gap-3">
                                   <Avatar className="h-9 w-9"><AvatarFallback>{player.firstName?.charAt(0)}{player.lastName?.charAt(0)}</AvatarFallback></Avatar>
                                   <div>
-                                    {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
+                                    {`${player.firstName} ${player.middleName || ''} ${player.lastName}`.trim()}
                                     <div className="text-sm text-muted-foreground">{player.email}</div>
                                   </div>
                                 </div>
