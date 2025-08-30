@@ -285,97 +285,114 @@ export default function ManageEventsPage() {
   }, [isDialogOpen, editingEvent, form]);
 
   const processEventImportData = (data: any[]) => {
-    const newEvents: Event[] = [];
-    let errors = 0;
-    let skippedEmptyRows = 0;
+  console.log('Raw import data:', data);
+  console.log('Number of rows:', data.length);
   
-    // Flexible field matching - finds columns containing the search terms
-    const findColumn = (row: any, searchTerms: string[]) => {
-      const keys = Object.keys(row);
-      for (const term of searchTerms) {
-        const found = keys.find(key => 
-          key.toLowerCase().includes(term.toLowerCase()) && 
-          row[key] !== null && 
-          row[key] !== undefined && 
-          String(row[key]).trim() !== ''
-        );
-        if (found) {
-          return row[found];
-        }
-      }
-      return null;
-    };
+  const newEvents: Event[] = [];
+  let errors = 0;
+  let skippedEmptyRows = 0;
+
+  // Flexible field matching - finds columns containing the search terms
+  const findColumn = (row: any, searchTerms: string[]) => {
+    const keys = Object.keys(row);
+    console.log('Available columns:', keys);
     
-    data.forEach((row: any, index: number) => {
-      // Skip completely empty rows
-      if (!row || 
-          typeof row !== 'object' || 
-          Object.keys(row).length === 0 ||
-          Object.values(row).every(val => val === null || val === '' || val === undefined)) {
+    for (const term of searchTerms) {
+      const found = keys.find(key => 
+        key.toLowerCase().includes(term.toLowerCase()) && 
+        row[key] !== null && 
+        row[key] !== undefined && 
+        String(row[key]).trim() !== ''
+      );
+      if (found) {
+        console.log(`Found column "${'${found}'}" for term "${'${term}'}":`, row[found]);
+        return row[found];
+      }
+    }
+    console.log(`No column found for terms:`, searchTerms);
+    return null;
+  };
+  
+  data.forEach((row: any, index: number) => {
+    console.log(`Processing row ${'${index + 1}'}:`, row);
+    
+    // Skip completely empty rows
+    if (!row || 
+        typeof row !== 'object' || 
+        Object.keys(row).length === 0 ||
+        Object.values(row).every(val => val === null || val === '' || val === undefined)) {
+      console.log(`Skipping empty row ${'${index + 1}'}`);
+      skippedEmptyRows++;
+      return;
+    }
+
+    try {
+      // Look for date and location columns
+      const dateStr = findColumn(row, ['date']);
+      const location = findColumn(row, ['location']);
+      
+      console.log(`Row ${'${index + 1}'} - Date: "${'${dateStr}'}", Location: "${'${location}'}"`);
+      
+      if (!dateStr || !location) {
+        console.log(`Row ${'${index + 1}'} - Missing required fields, skipping`);
         skippedEmptyRows++;
         return;
       }
-  
-      try {
-        // Look for date and location columns
-        const dateStr = findColumn(row, ['date']);
-        const location = findColumn(row, ['location']);
-        
-        if (!dateStr || !location) {
-          skippedEmptyRows++;
-          return;
-        }
-  
-        // Parse the date
-        const date = new Date(dateStr);
-        if (!isValid(date)) {
-          errors++;
-          return;
-        }
-        
-        // Generate event name
-        const name = `Event at ${location} on ${format(date, 'PPP')}`;
-        
-        const eventData = {
-          id: `evt-${Date.now()}-${Math.random()}`,
-          name: name,
-          date: date.toISOString(),
-          location: location,
-          rounds: Number(findColumn(row, ['round']) || 5),
-          regularFee: Number(findColumn(row, ['regular', 'fee']) || 25),
-          lateFee: Number(findColumn(row, ['late']) || 30),
-          veryLateFee: Number(findColumn(row, ['very']) || 35),
-          dayOfFee: Number(findColumn(row, ['day']) || 40),
-          imageUrl: '',
-          imageName: '',
-          pdfUrl: '',
-          pdfName: '',
-          isClosed: String(findColumn(row, ['status']) || '').toLowerCase() === 'closed',
-          isPsjaOnly: false,
-        };
-        
-        newEvents.push(eventData as Event);
-      } catch(e) {
+
+      // Parse the date
+      const date = new Date(dateStr);
+      if (!isValid(date)) {
+        console.log(`Row ${'${index + 1}'} - Invalid date: "${'${dateStr}'}"`);
         errors++;
-        console.error(`Error parsing event row ${index + 1}:`, e);
+        return;
       }
-    });
-    
-    if (newEvents.length === 0) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Import Failed', 
-        description: `No events could be created. Skipped ${skippedEmptyRows} empty rows, ${errors} errors.` 
-      });
-      return;
+      
+      // Generate event name
+      const name = `Event at ${'${location}'} on ${'${format(date, "PPP")}'}`;
+      
+      const eventData = {
+        id: `evt-${Date.now()}-${Math.random()}`,
+        name: name,
+        date: date.toISOString(),
+        location: location,
+        rounds: Number(findColumn(row, ['round']) || 5),
+        regularFee: Number(findColumn(row, ['regular', 'fee']) || 25),
+        lateFee: Number(findColumn(row, ['late']) || 30),
+        veryLateFee: Number(findColumn(row, ['very']) || 35),
+        dayOfFee: Number(findColumn(row, ['day']) || 40),
+        imageUrl: '',
+        imageName: '',
+        pdfUrl: '',
+        pdfName: '',
+        isClosed: String(findColumn(row, ['status']) || '').toLowerCase() === 'closed',
+        isPsjaOnly: false,
+      };
+      
+      console.log(`Row ${'${index + 1}'} - Created event:`, eventData);
+      newEvents.push(eventData as Event);
+    } catch(e) {
+      console.error(`Error parsing event row ${'${index + 1}'}:`, e, row);
+      errors++;
     }
+  });
   
-    addBulkEvents(newEvents);
+  console.log(`Import summary - Created: ${'${newEvents.length}'}, Errors: ${'${errors}'}, Skipped: ${'${skippedEmptyRows}'}`);
+  
+  if (newEvents.length === 0) {
     toast({ 
-      title: "Import Complete", 
-      description: `Successfully imported ${newEvents.length} events! Skipped ${skippedEmptyRows} empty rows.` 
+      variant: 'destructive', 
+      title: 'Import Failed', 
+      description: `No events could be created. Skipped ${'${skippedEmptyRows}'} empty rows, ${'${errors}'} errors. Check console for details.` 
     });
-  };
+    return;
+  }
+
+  addBulkEvents(newEvents);
+  toast({ 
+    title: "Import Complete", 
+    description: `Successfully imported ${'${newEvents.length}'} events! Skipped ${'${skippedEmptyRows}'} empty rows.` 
+  });
+};
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -491,7 +508,7 @@ export default function ManageEventsPage() {
   const confirmDelete = () => {
     if (eventToDelete) {
       deleteEvent(eventToDelete.id);
-      toast({ title: "Event Deleted", description: `"${eventToDelete.name}" has been removed.` });
+      toast({ title: "Event Deleted", description: `"${'${eventToDelete.name}'}" has been removed.` });
     }
     setIsAlertOpen(false);
     setEventToDelete(null);
@@ -506,11 +523,11 @@ export default function ManageEventsPage() {
         date: values.date.toISOString() 
       };
       updateEvent(eventData as Event);
-      toast({ title: "Event Updated", description: `"${values.name}" has been successfully updated.` });
+      toast({ title: "Event Updated", description: `"${'${values.name}'}" has been successfully updated.` });
     } else {
       const eventData = { ...values, date: values.date.toISOString() };
       addBulkEvents([{ ...eventData, id: Date.now().toString() }]);
-      toast({ title: "Event Added", description: `"${values.name}" has been successfully created.` });
+      toast({ title: "Event Added", description: `"${'${values.name}'}" has been successfully created.` });
     }
     setIsDialogOpen(false);
   }
@@ -546,7 +563,7 @@ export default function ManageEventsPage() {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_updates';
-    link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, '_')}_${fileNameSuffix}.csv`);
+    link.setAttribute('download', `${'${selectedEventForReg.name.replace(/\s+/g, "_")}'}_${'${fileNameSuffix}'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -560,7 +577,7 @@ export default function ManageEventsPage() {
       setDownloadedPlayers(updatedDownloads);
       localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
     }
-    toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations downloaded.`});
+    toast({ title: 'Download Complete', description: `${'${playersToDownload.length}'} registrations downloaded.`});
   };
 
   const handleRenameDistrict = () => {
@@ -577,7 +594,7 @@ export default function ManageEventsPage() {
 
     toast({
       title: 'District Renamed',
-      description: `All schools under "${selectedDistrictToEdit}" have been moved to "${newDistrictName.trim()}".`,
+      description: `All schools under "${'${selectedDistrictToEdit}'}" have been moved to "${'${newDistrictName.trim()}'}".`,
     });
     
     setSelectedDistrictToEdit(null);
@@ -690,7 +707,7 @@ export default function ManageEventsPage() {
                       <TableCell className="font-medium">{event.name}</TableCell>
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                       <TableCell>{event.location}</TableCell>
-                      <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
+                      <TableCell>{`$${'${event.regularFee}'} / $${'${event.lateFee}'} / $${'${event.veryLateFee}'} / $${'${event.dayOfFee}'}`}</TableCell>
                       <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -699,7 +716,7 @@ export default function ManageEventsPage() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
+                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${'${event.id}'}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -836,7 +853,7 @@ export default function ManageEventsPage() {
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
-                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
+                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${'${invoiceId}'}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
                             <TableCell>{status}</TableCell>
                         </TableRow>
                     )
@@ -869,6 +886,7 @@ export default function ManageEventsPage() {
     
 
     
+
 
 
 
