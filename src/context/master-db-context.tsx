@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
 
 // --- Types ---
 
@@ -46,6 +47,7 @@ export type SearchCriteria = {
 
 const DB_STORAGE_KEY = 'master_player_database';
 const TIMESTAMP_KEY = 'master_player_database_timestamp';
+const SCHOOL_DATA_KEY = 'school_data';
 
 
 // --- Context Definition ---
@@ -158,13 +160,31 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateSchoolDistrict = (oldDistrict: string, newDistrict: string) => {
-    const newDb = database.map(p => {
+    // Update player database
+    const newPlayerDb = database.map(p => {
       if (p.district === oldDistrict) {
         return { ...p, district: newDistrict };
       }
       return p;
     });
-    persistDatabase(newDb);
+    persistDatabase(newPlayerDb);
+
+    // Update school database in localStorage
+    try {
+        const storedSchoolsRaw = localStorage.getItem(SCHOOL_DATA_KEY);
+        const storedSchools = storedSchoolsRaw ? JSON.parse(storedSchoolsRaw) : initialSchoolData;
+        const updatedSchools = storedSchools.map((school: School) => {
+            if (school.district === oldDistrict) {
+                return { ...school, district: newDistrict };
+            }
+            return school;
+        });
+        localStorage.setItem(SCHOOL_DATA_KEY, JSON.stringify(updatedSchools));
+        // Dispatch an event to notify other components of the change
+        window.dispatchEvent(new Event('storage'));
+    } catch(e) {
+        console.error("Failed to update school data during district rename:", e);
+    }
   };
   
   const searchPlayers = useCallback((criteria: Partial<SearchCriteria>): MasterPlayer[] => {

@@ -142,7 +142,7 @@ type StoredDownloads = {
 export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent, clearAllEvents } = useEvents();
-  const { database: allPlayers, isDbLoaded, updateSchoolDistrict } = useMasterDb();
+  const { database: allPlayers, isDbLoaded } = useMasterDb();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -158,8 +158,6 @@ export default function ManageEventsPage() {
   const [pasteData, setPasteData] = useState('');
   const [downloadedPlayers, setDownloadedPlayers] = useState<StoredDownloads>({});
 
-  const [selectedDistrictToEdit, setSelectedDistrictToEdit] = useState<string | null>(null);
-  const [newDistrictName, setNewDistrictName] = useState('');
   const [districtFilter, setDistrictFilter] = useState('all');
 
   const uniqueDistricts = useMemo(() => {
@@ -584,27 +582,6 @@ export default function ManageEventsPage() {
     }
     toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations downloaded.`});
   };
-
-  const handleRenameDistrict = () => {
-    if (!selectedDistrictToEdit || !newDistrictName.trim()) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Input',
-        description: 'Please select a district and provide a new name.',
-      });
-      return;
-    }
-
-    updateSchoolDistrict(selectedDistrictToEdit, newDistrictName.trim());
-
-    toast({
-      title: 'District Renamed',
-      description: `All schools under "${selectedDistrictToEdit}" have been moved to "${newDistrictName.trim()}".`,
-    });
-    
-    setSelectedDistrictToEdit(null);
-    setNewDistrictName('');
-  };
   
   const handleMarkAllAsNew = () => {
     if (!selectedEventForReg) return;
@@ -658,42 +635,6 @@ export default function ManageEventsPage() {
           </div>
         </div>
         
-        <Card>
-          <CardHeader>
-            <CardTitle>Edit District Name</CardTitle>
-            <CardDescription>
-              Select a district to rename. This will update all schools associated with it.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="grid gap-1.5 flex-1">
-              <Label htmlFor="district-to-edit">District to Rename</Label>
-              <Select onValueChange={setSelectedDistrictToEdit} value={selectedDistrictToEdit || ''}>
-                <SelectTrigger id="district-to-edit">
-                  <SelectValue placeholder="Select a district..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5 flex-1">
-              <Label htmlFor="new-district-name">New District Name</Label>
-              <Input
-                id="new-district-name"
-                value={newDistrictName}
-                onChange={(e) => setNewDistrictName(e.target.value)}
-                disabled={!selectedDistrictToEdit}
-                placeholder='Enter new name...'
-              />
-            </div>
-            <Button onClick={handleRenameDistrict} disabled={!selectedDistrictToEdit || !newDistrictName.trim()}>
-              <Edit className="mr-2 h-4 w-4" />
-              Rename District
-            </Button>
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
               <CardTitle>All Events</CardTitle>
