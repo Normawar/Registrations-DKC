@@ -205,5 +205,24 @@ export const fullMasterPlayerData: MasterPlayer[] = [
         "zipCode": "78572",
         "events": 0,
         "eventIds": []
+    },
+    {
+        "id": "p11",
+        "uscfId": "12815593",
+        "firstName": "ANTHONY",
+        "middleName": "J",
+        "lastName": "GUERRA",
+        "state": "TX",
+        "uscfExpiration": "2026-01-31T00:00:00.000Z",
+        "regularRating": 1107,
+        "grade": "8th Grade",
+        "section": "Middle School K-8",
+        "email": "anthony.guerra@example.com",
+        "school": "MEMORIAL MIDDLE",
+        "district": "EDINBURG CISD",
+        "dob": "2010-02-18T00:00:00.000Z",
+        "zipCode": "78540",
+        "events": 0,
+        "eventIds": []
     }
 ];
