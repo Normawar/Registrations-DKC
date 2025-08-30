@@ -85,6 +85,7 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import { schoolData } from '@/lib/data/school-data';
 import Papa from 'papaparse';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -157,42 +158,27 @@ export default function ManageEventsPage() {
 
   const [selectedDistrictToEdit, setSelectedDistrictToEdit] = useState<string | null>(null);
   const [newDistrictName, setNewDistrictName] = useState('');
+  const [districtFilter, setDistrictFilter] = useState('all');
+
+  const uniqueDistricts = useMemo(() => {
+    return [...new Set(schoolData.map(s => s.district).filter(Boolean))].sort();
+  }, []);
   
-  const getDistricts = useCallback(() => {
-    return [...new Set(allPlayers.map(p => p.district).filter(Boolean))].sort() as string[];
-  }, [allPlayers]);
-
-  const uniqueDistricts = useMemo(() => getDistricts(), [getDistricts]);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const form = useForm<EventFormValues>({
-    resolver: zodResolver(eventFormSchema),
-    defaultValues: {
-      name: '',
-      date: new Date(),
-      location: '',
-      rounds: 5,
-      regularFee: 25,
-      lateFee: 30,
-      veryLateFee: 35,
-      dayOfFee: 40,
-      imageUrl: '',
-      imageName: '',
-      pdfUrl: '',
-      pdfName: '',
-      isClosed: false,
-      isPsjaOnly: false,
-    },
-  });
-
   const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
     if (event.isClosed) return "Closed";
     return new Date(event.date) < new Date() ? "Completed" : "Open";
   };
 
   const sortedEvents = useMemo(() => {
-    const sortableEvents = [...events];
+    const schoolsInDistrict = districtFilter === 'all' 
+      ? [] 
+      : schoolData.filter(s => s.district === districtFilter).map(s => s.schoolName);
+    
+    const filteredEvents = districtFilter === 'all'
+      ? [...events]
+      : events.filter(event => schoolsInDistrict.includes(event.location));
+
+    const sortableEvents = [...filteredEvents];
     if (sortConfig !== null) {
       sortableEvents.sort((a, b) => {
         const aStatus = getEventStatus(a);
@@ -223,7 +209,29 @@ export default function ManageEventsPage() {
       });
     }
     return sortableEvents;
-  }, [events, sortConfig]);
+  }, [events, sortConfig, districtFilter]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const form = useForm<EventFormValues>({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: {
+      name: '',
+      date: new Date(),
+      location: '',
+      rounds: 5,
+      regularFee: 25,
+      lateFee: 30,
+      veryLateFee: 35,
+      dayOfFee: 40,
+      imageUrl: '',
+      imageName: '',
+      pdfUrl: '',
+      pdfName: '',
+      isClosed: false,
+      isPsjaOnly: false,
+    },
+  });
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -285,114 +293,92 @@ export default function ManageEventsPage() {
   }, [isDialogOpen, editingEvent, form]);
 
   const processEventImportData = (data: any[]) => {
-  console.log('Raw import data:', data);
-  console.log('Number of rows:', data.length);
+    const newEvents: Event[] = [];
+    let errors = 0;
+    let skippedEmptyRows = 0;
   
-  const newEvents: Event[] = [];
-  let errors = 0;
-  let skippedEmptyRows = 0;
-
-  // Flexible field matching - finds columns containing the search terms
-  const findColumn = (row: any, searchTerms: string[]) => {
-    const keys = Object.keys(row);
-    console.log('Available columns:', keys);
-    
-    for (const term of searchTerms) {
-      const found = keys.find(key => 
-        key.toLowerCase().includes(term.toLowerCase()) && 
-        row[key] !== null && 
-        row[key] !== undefined && 
-        String(row[key]).trim() !== ''
-      );
-      if (found) {
-        console.log(`Found column "${'${found}'}" for term "${'${term}'}":`, row[found]);
-        return row[found];
+    const findColumn = (row: any, searchTerms: string[]) => {
+      const keys = Object.keys(row);
+      for (const term of searchTerms) {
+        const found = keys.find(key => 
+          key.toLowerCase().includes(term.toLowerCase()) && 
+          row[key] !== null && 
+          row[key] !== undefined && 
+          String(row[key]).trim() !== ''
+        );
+        if (found) {
+          return row[found];
+        }
       }
-    }
-    console.log(`No column found for terms:`, searchTerms);
-    return null;
-  };
-  
-  data.forEach((row: any, index: number) => {
-    console.log(`Processing row ${'${index + 1}'}:`, row);
+      return null;
+    };
     
-    // Skip completely empty rows
-    if (!row || 
-        typeof row !== 'object' || 
-        Object.keys(row).length === 0 ||
-        Object.values(row).every(val => val === null || val === '' || val === undefined)) {
-      console.log(`Skipping empty row ${'${index + 1}'}`);
-      skippedEmptyRows++;
-      return;
-    }
-
-    try {
-      // Look for date and location columns
-      const dateStr = findColumn(row, ['date']);
-      const location = findColumn(row, ['location']);
-      
-      console.log(`Row ${'${index + 1}'} - Date: "${'${dateStr}'}", Location: "${'${location}'}"`);
-      
-      if (!dateStr || !location) {
-        console.log(`Row ${'${index + 1}'} - Missing required fields, skipping`);
+    data.forEach((row: any, index: number) => {
+      if (!row || 
+          typeof row !== 'object' || 
+          Object.keys(row).length === 0 ||
+          Object.values(row).every(val => val === null || val === '' || val === undefined)) {
         skippedEmptyRows++;
         return;
       }
-
-      // Parse the date
-      const date = new Date(dateStr);
-      if (!isValid(date)) {
-        console.log(`Row ${'${index + 1}'} - Invalid date: "${'${dateStr}'}"`);
+  
+      try {
+        const dateStr = findColumn(row, ['date']);
+        const location = findColumn(row, ['location']);
+        
+        if (!dateStr || !location) {
+          skippedEmptyRows++;
+          return;
+        }
+  
+        const date = new Date(dateStr);
+        if (!isValid(date)) {
+          errors++;
+          return;
+        }
+        
+        const name = `Event at ${location} on ${format(date, 'PPP')}`;
+        
+        const eventData = {
+          id: `evt-${Date.now()}-${Math.random()}`,
+          name: name,
+          date: date.toISOString(),
+          location: location,
+          rounds: Number(findColumn(row, ['round']) || 5),
+          regularFee: Number(findColumn(row, ['regular', 'fee']) || 25),
+          lateFee: Number(findColumn(row, ['late']) || 30),
+          veryLateFee: Number(findColumn(row, ['very']) || 35),
+          dayOfFee: Number(findColumn(row, ['day']) || 40),
+          imageUrl: '',
+          imageName: '',
+          pdfUrl: '',
+          pdfName: '',
+          isClosed: String(findColumn(row, ['status']) || '').toLowerCase() === 'closed',
+          isPsjaOnly: false,
+        };
+        
+        newEvents.push(eventData as Event);
+      } catch(e) {
         errors++;
-        return;
+        console.error(`Error parsing event row ${index + 1}:`, e);
       }
-      
-      // Generate event name
-      const name = `Event at ${'${location}'} on ${'${format(date, "PPP")}'}`;
-      
-      const eventData = {
-        id: `evt-${Date.now()}-${Math.random()}`,
-        name: name,
-        date: date.toISOString(),
-        location: location,
-        rounds: Number(findColumn(row, ['round']) || 5),
-        regularFee: Number(findColumn(row, ['regular', 'fee']) || 25),
-        lateFee: Number(findColumn(row, ['late']) || 30),
-        veryLateFee: Number(findColumn(row, ['very']) || 35),
-        dayOfFee: Number(findColumn(row, ['day']) || 40),
-        imageUrl: '',
-        imageName: '',
-        pdfUrl: '',
-        pdfName: '',
-        isClosed: String(findColumn(row, ['status']) || '').toLowerCase() === 'closed',
-        isPsjaOnly: false,
-      };
-      
-      console.log(`Row ${'${index + 1}'} - Created event:`, eventData);
-      newEvents.push(eventData as Event);
-    } catch(e) {
-      console.error(`Error parsing event row ${'${index + 1}'}:`, e, row);
-      errors++;
-    }
-  });
-  
-  console.log(`Import summary - Created: ${'${newEvents.length}'}, Errors: ${'${errors}'}, Skipped: ${'${skippedEmptyRows}'}`);
-  
-  if (newEvents.length === 0) {
-    toast({ 
-      variant: 'destructive', 
-      title: 'Import Failed', 
-      description: `No events could be created. Skipped ${'${skippedEmptyRows}'} empty rows, ${'${errors}'} errors. Check console for details.` 
     });
-    return;
-  }
-
-  addBulkEvents(newEvents);
-  toast({ 
-    title: "Import Complete", 
-    description: `Successfully imported ${'${newEvents.length}'} events! Skipped ${'${skippedEmptyRows}'} empty rows.` 
-  });
-};
+    
+    if (newEvents.length === 0) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Import Failed', 
+        description: `No events could be created. Skipped ${skippedEmptyRows} empty rows, ${errors} errors.` 
+      });
+      return;
+    }
+  
+    addBulkEvents(newEvents);
+    toast({ 
+      title: "Import Complete", 
+      description: `Successfully imported ${newEvents.length} events! Skipped ${skippedEmptyRows} empty rows.` 
+    });
+  };
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -400,10 +386,9 @@ export default function ManageEventsPage() {
 
     Papa.parse(file, {
       header: true,
-      skipEmptyLines: 'greedy', // This is key - skips lines that are completely empty
-      transformHeader: (header: string) => header.trim(), // Clean headers
+      skipEmptyLines: 'greedy', 
+      transformHeader: (header: string) => header.trim(), 
       complete: (results) => {
-        // Additional filtering before processing
         const cleanedData = results.data.filter((row: any) => {
           return row && typeof row === 'object' && 
                  Object.keys(row).length > 0 &&
@@ -426,11 +411,10 @@ export default function ManageEventsPage() {
     
     Papa.parse(pasteData, {
       header: true,
-      skipEmptyLines: 'greedy', // This is key - skips lines that are completely empty
-      transformHeader: (header: string) => header.trim(), // Clean headers
+      skipEmptyLines: 'greedy', 
+      transformHeader: (header: string) => header.trim(),
       complete: (resultsWithHeader) => {
         if (resultsWithHeader.data.length > 0 && resultsWithHeader.meta.fields) {
-          // Additional filtering before processing
           const cleanedData = resultsWithHeader.data.filter((row: any) => {
             return row && typeof row === 'object' && 
                    Object.keys(row).length > 0 &&
@@ -508,7 +492,7 @@ export default function ManageEventsPage() {
   const confirmDelete = () => {
     if (eventToDelete) {
       deleteEvent(eventToDelete.id);
-      toast({ title: "Event Deleted", description: `"${'${eventToDelete.name}'}" has been removed.` });
+      toast({ title: "Event Deleted", description: `"${eventToDelete.name}" has been removed.` });
     }
     setIsAlertOpen(false);
     setEventToDelete(null);
@@ -519,7 +503,6 @@ export default function ManageEventsPage() {
       const eventData = { 
         ...editingEvent,
         ...values, 
-        id: editingEvent.id, 
         date: values.date.toISOString() 
       };
       updateEvent(eventData as Event);
@@ -563,7 +546,7 @@ export default function ManageEventsPage() {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_updates';
-    link.setAttribute('download', `${'${selectedEventForReg.name.replace(/\s+/g, "_")}'}_${'${fileNameSuffix}'}.csv`);
+    link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, "_")}_${fileNameSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -577,7 +560,7 @@ export default function ManageEventsPage() {
       setDownloadedPlayers(updatedDownloads);
       localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
     }
-    toast({ title: 'Download Complete', description: `${'${playersToDownload.length}'} registrations downloaded.`});
+    toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations downloaded.`});
   };
 
   const handleRenameDistrict = () => {
@@ -594,7 +577,7 @@ export default function ManageEventsPage() {
 
     toast({
       title: 'District Renamed',
-      description: `All schools under "${'${selectedDistrictToEdit}'}" have been moved to "${'${newDistrictName.trim()}'}".`,
+      description: `All schools under "${selectedDistrictToEdit}" have been moved to "${newDistrictName.trim()}".`,
     });
     
     setSelectedDistrictToEdit(null);
@@ -687,6 +670,25 @@ export default function ManageEventsPage() {
         </Card>
 
         <Card>
+          <CardHeader>
+              <CardTitle>All Events</CardTitle>
+              <div className="flex justify-between items-center">
+                <CardDescription>
+                  A list of all upcoming and past events.
+                </CardDescription>
+                <div className="w-64">
+                  <Select value={districtFilter} onValueChange={setDistrictFilter}>
+                      <SelectTrigger>
+                          <SelectValue placeholder="Filter by district..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">All Districts</SelectItem>
+                          {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+                </div>
+              </div>
+          </CardHeader>
           <CardContent className="pt-6">
             <Table>
               <TableHeader>
@@ -716,7 +718,7 @@ export default function ManageEventsPage() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${'${event.id}'}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
+                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -853,7 +855,7 @@ export default function ManageEventsPage() {
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
-                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${'${invoiceId}'}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
+                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
                             <TableCell>{status}</TableCell>
                         </TableRow>
                     )
@@ -882,16 +884,3 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
-
-    
-
-    
-
-
-
-
-
-
-
-
-
