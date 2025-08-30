@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import Papa from 'papaparse';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -145,137 +145,86 @@ function PlayersPageContent() {
   };
   
   const processImportData = (data: any[]) => {
-    console.log('🔍 CSV Import Debug - Raw data length:', data.length);
-    console.log('🔍 CSV Import Debug - First 3 rows:', data.slice(0, 3));
-    console.log('🔍 CSV Import Debug - Sample row keys:', data[0] ? Object.keys(data[0]) : 'No data');
-
-    const newPlayers: any[] = [];
+    const newPlayers: MasterPlayer[] = [];
     let errors = 0;
-    let emptyRows = 0;
     let skippedIncomplete = 0;
 
-    data.forEach((row: any, index: number) => {
-        try {
-            // Skip completely empty rows
-            if (!row || Object.keys(row).length === 0 || 
-                Object.values(row).every(val => !val || String(val).trim() === '')) {
-                emptyRows++;
-                return;
-            }
+    const findColumn = (row: any, searchTerms: string[]) => {
+      const keys = Object.keys(row);
+      for (const term of searchTerms) {
+        const found = keys.find(key => 
+          key.toLowerCase().includes(term.toLowerCase()) && 
+          row[key] !== null && 
+          row[key] !== undefined && 
+          String(row[key]).trim() !== ''
+        );
+        if (found) return row[found];
+      }
+      return null;
+    };
 
-            // Try multiple possible column names for each field
-            const getFieldValue = (possibleNames: string[]) => {
-                for (const name of possibleNames) {
-                    if (row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') {
-                        return String(row[name]).trim();
-                    }
-                }
-                return '';
-            };
-
-            const uscfId = getFieldValue(['USCF ID', 'uscfId', 'ID', 'id']);
-            const firstName = getFieldValue(['First Name', 'firstName', 'FirstName', 'first_name']);
-            const lastName = getFieldValue(['Last Name', 'lastName', 'LastName', 'last_name']);
-            const state = getFieldValue(['state', 'State', 'ST']) || 'TX';
-            const rating = getFieldValue(['rating', 'Rating', 'RATING']);
-            const expires = getFieldValue(['expires', 'Expires', 'USCF Expiration', 'uscfExpiration', 'expiration']);
-
-            // More lenient validation - only require USCF ID and at least last name
-            if (!uscfId || !lastName) {
-                console.log(`⚠️ Row ${index + 1} skipped - missing essential data:`, {
-                    hasUscfId: !!uscfId,
-                    hasLastName: !!lastName,
-                    row: row
-                });
-                skippedIncomplete++;
-                return; // Skip this row instead of throwing error
-            }
-
-            // Handle missing first name gracefully
-            const cleanFirstName = firstName || 'UNKNOWN';
-            const cleanLastName = lastName;
-
-            // If first name is missing, log it but continue
-            if (!firstName) {
-                console.log(`⚠️ Row ${index + 1} has missing first name, using 'UNKNOWN':`, {
-                    uscfId, lastName, fullRow: row
-                });
-            }
-
-            const playerData = {
-                id: uscfId,
-                uscfId: uscfId,
-                firstName: cleanFirstName,
-                lastName: cleanLastName,
-                state: state,
-                
-                // Parse rating
-                regularRating: (() => {
-                    if (!rating || rating === '0') return undefined;
-                    const numRating = parseInt(rating);
-                    return isNaN(numRating) ? undefined : numRating;
-                })(),
-                
-                // Parse expiration date
-                uscfExpiration: (() => {
-                    if (!expires) return undefined;
-                    try {
-                        const date = new Date(expires);
-                        return isNaN(date.getTime()) ? undefined : date.toISOString();
-                    } catch {
-                        return undefined;
-                    }
-                })(),
-                
-                // Initialize other fields
-                middleName: '',
-                grade: '',
-                section: '',
-                email: '',
-                phone: '',
-                dob: undefined,
-                zipCode: '',
-                studentType: '',
-                school: '',
-                district: '',
-                events: 0,
-                eventIds: [],
-            };
-
-            newPlayers.push(playerData);
-            
-        } catch(e) {
-            errors++;
-            console.error(`❌ Error parsing row ${index + 1}:`, row, e);
+    data.forEach((row: any) => {
+      try {
+        if (!row || Object.keys(row).length === 0) {
+          skippedIncomplete++;
+          return;
         }
-    });
-    
-    console.log('🔍 Import Summary:', {
-        totalRows: data.length,
-        emptyRows,
-        skippedIncomplete,
-        successfulImports: newPlayers.length,
-        errors
+
+        const uscfId = findColumn(row, ['uscf id', 'id']);
+        const lastName = findColumn(row, ['last name']);
+
+        if (!uscfId || !lastName) {
+          skippedIncomplete++;
+          return;
+        }
+        
+        const firstName = findColumn(row, ['first name']) || 'Unknown';
+        const ratingStr = findColumn(row, ['rating']);
+        const expiresStr = findColumn(row, ['expires', 'expiration']);
+
+        const playerData: MasterPlayer = {
+          id: uscfId,
+          uscfId: uscfId,
+          firstName: firstName,
+          lastName: lastName,
+          state: findColumn(row, ['state', 'st']) || 'TX',
+          regularRating: ratingStr && !isNaN(parseInt(ratingStr)) ? parseInt(ratingStr) : undefined,
+          uscfExpiration: expiresStr && isValid(new Date(expiresStr)) ? new Date(expiresStr).toISOString() : undefined,
+          middleName: findColumn(row, ['middle name']) || '',
+          grade: findColumn(row, ['grade']) || '',
+          section: findColumn(row, ['section']) || '',
+          email: findColumn(row, ['email']) || '',
+          phone: findColumn(row, ['phone']) || '',
+          dob: undefined, // DOB parsing can be added if needed
+          zipCode: findColumn(row, ['zip']) || '',
+          studentType: undefined,
+          school: findColumn(row, ['school']) || '',
+          district: findColumn(row, ['district']) || '',
+          events: 0,
+          eventIds: [],
+        };
+        newPlayers.push(playerData);
+      } catch(e) {
+        errors++;
+        console.error("Error processing player row:", row, e);
+      }
     });
 
     if (newPlayers.length === 0) {
-        toast({ 
-            variant: 'destructive', 
-            title: 'Import Failed', 
-            description: `No valid players found. Check console for details.` 
-        });
-        return;
+      toast({ 
+        variant: 'destructive', 
+        title: 'Import Failed', 
+        description: `No valid players found. Skipped ${skippedIncomplete} incomplete rows. Check headers like 'USCF ID' and 'Last Name'.` 
+      });
+      return;
     }
 
-    // Clear existing database and add new players
-    clearDatabase();
     addBulkPlayers(newPlayers);
-    
     toast({ 
-        title: "Player Import Complete", 
-        description: `Successfully imported ${newPlayers.length} players. Skipped ${emptyRows} empty rows, ${skippedIncomplete} incomplete rows, and ${errors} invalid rows.` 
+      title: "Player Import Complete", 
+      description: `Successfully imported ${newPlayers.length} players. Skipped ${skippedIncomplete} rows.` 
     });
-};
+  };
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
