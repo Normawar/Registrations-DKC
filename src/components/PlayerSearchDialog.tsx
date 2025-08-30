@@ -160,78 +160,78 @@ const handleSelect = (player: MasterPlayer) => {
                 )}
             </div>
 
-    <div className="flex flex-col flex-1 min-h-0">
-        {hasResults && (
-            <div className="py-2 text-sm text-muted-foreground shrink-0">
-                Found {searchResults.length} player{searchResults.length !== 1 ? 's' : ''}
-            </div>
-        )}
-        
-        <div className="flex-1 overflow-hidden border rounded-md">
-            <div className="h-full overflow-y-auto">
-                <div className="p-4">
-                    {isLoading && (
-                        <div className="flex items-center justify-center p-8 text-muted-foreground">
-                            <Loader2 className="mr-2 h-5 w-5 animate-spin"/>Searching...
-                        </div>
-                    )}
-                    {!isLoading && !hasResults && hasActiveFilters && (
-                        <div className="text-center p-8 text-muted-foreground">
-                            No players found matching your criteria.
-                        </div>
-                    )}
-                    {!isLoading && !hasActiveFilters && (
-                        <div className="text-center p-8 text-muted-foreground">
-                            Enter search criteria above to find players.
-                        </div>
-                    )}
-                    {hasResults && (
-                        <div className="space-y-2">
-                            {searchResults.map((player, index) => {
-                                const missingFields = (portalType === 'sponsor' || portalType === 'individual') ? [
-                                    !player.dob && 'DOB',
-                                    !player.grade && 'Grade', 
-                                    !player.section && 'Section',
-                                    !player.email && 'Email',
-                                    !player.zipCode && 'Zip'
-                                ].filter(Boolean) : [];
-                                
-                                const isIncomplete = missingFields.length > 0;
-                                
-                                return (
-                                    <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
-                                        <div className="flex-1">
-                                            <p className="font-semibold">{player.firstName} {player.lastName}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                ID: {player.uscfId} | Rating: {player.regularRating || 'UNR'} | School: {player.school || 'N/A'}
-                                            </p>
-                                            {isIncomplete && (portalType === 'sponsor' || portalType === 'individual') && (
-                                                <p className="text-xs text-blue-600 mt-1">
-                                                    📝 Needs completion: {missingFields.join(', ')}
+            <div className="flex flex-col flex-1 min-h-0">
+                {hasResults && (
+                    <div className="py-2 text-sm text-muted-foreground shrink-0">
+                        Found {searchResults.length} player{searchResults.length !== 1 ? 's' : ''}
+                    </div>
+                )}
+                
+                <ScrollArea className="flex-1 border rounded-md">
+                    <div className="p-4">
+                        {isLoading && (
+                            <div className="flex items-center justify-center p-8 text-muted-foreground">
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin"/>Searching...
+                            </div>
+                        )}
+                        {!isLoading && !hasResults && hasActiveFilters && (
+                            <div className="text-center p-8 text-muted-foreground">
+                                No players found matching your criteria.
+                            </div>
+                        )}
+                        {!isLoading && !hasActiveFilters && (
+                            <div className="text-center p-8 text-muted-foreground">
+                                Enter search criteria above to find players.
+                            </div>
+                        )}
+                        {hasResults && (
+                            <div className="space-y-2">
+                                {searchResults.map((player, index) => {
+                                    const missingFields = (portalType === 'sponsor' || portalType === 'individual') ? [
+                                        !player.dob && 'DOB',
+                                        !player.grade && 'Grade', 
+                                        !player.section && 'Section',
+                                        !player.email && 'Email',
+                                        !player.zipCode && 'Zip'
+                                    ].filter(Boolean) : [];
+                                    
+                                    const isIncomplete = missingFields.length > 0;
+                                    const fullName = [player.firstName, player.middleName, player.lastName].filter(Boolean).join(' ');
+
+                                    
+                                    return (
+                                        <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
+                                            <div className="flex-1">
+                                                <p className="font-semibold">{fullName}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    ID: {player.uscfId} | Rating: {player.regularRating || 'UNR'} | School: {player.school || 'N/A'}
                                                 </p>
-                                            )}
-                                            {!isIncomplete && (portalType === 'sponsor' || portalType === 'individual') && (
-                                                <p className="text-xs text-green-600 mt-1">
-                                                    ✅ Complete profile
-                                                </p>
-                                            )}
+                                                {isIncomplete && (portalType === 'sponsor' || portalType === 'individual') && (
+                                                    <p className="text-xs text-blue-600 mt-1">
+                                                        📝 Needs completion: {missingFields.join(', ')}
+                                                    </p>
+                                                )}
+                                                {!isIncomplete && (portalType === 'sponsor' || portalType === 'individual') && (
+                                                    <p className="text-xs text-green-600 mt-1">
+                                                        ✅ Complete profile
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <Button 
+                                                variant="secondary"
+                                                size="sm" 
+                                                onClick={() => handleSelect(player)}
+                                            >
+                                                {(isIncomplete && (portalType === 'sponsor' || portalType === 'individual')) ? 'Add & Complete' : 'Select'}
+                                            </Button>
                                         </div>
-                                        <Button 
-                                            variant="secondary"
-                                            size="sm" 
-                                            onClick={() => handleSelect(player)}
-                                        >
-                                            {(isIncomplete && (portalType === 'sponsor' || portalType === 'individual')) ? 'Add & Complete' : 'Select'}
-                                        </Button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                </ScrollArea>
             </div>
-        </div>
-    </div>
             
             <DialogFooter className="shrink-0">
                 <DialogClose asChild>
