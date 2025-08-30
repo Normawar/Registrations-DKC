@@ -100,8 +100,8 @@ function PlayersPageContent() {
       toast({ variant: 'destructive', title: 'No Event Selected', description: 'Please select an event from the dropdown to add this player.' });
       return;
     }
-    toast({ title: 'Player Added to Event', description: `${player.firstName} ${player.lastName} has been staged for registration in the selected event.` });
-    console.log(`Staging player ${player.id} for event ${selectedEventId}`);
+    toast({ title: 'Player Added to Event', description: `${'${player.firstName}'} ${'${player.lastName}'} has been staged for registration in the selected event.` });
+    console.log(`Staging player ${'${player.id}'} for event ${'${selectedEventId}'}`);
   };
 
   const handleDeletePlayer = (player: MasterPlayer) => {
@@ -112,7 +112,7 @@ function PlayersPageContent() {
   const confirmDelete = () => {
     if (playerToDelete) {
       deletePlayer(playerToDelete.id);
-      toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed.` });
+      toast({ title: "Player removed", description: `${'${playerToDelete.firstName}'} ${'${playerToDelete.lastName}'} has been removed.` });
     }
     setIsAlertOpen(false);
     setPlayerToDelete(null);
@@ -124,7 +124,7 @@ function PlayersPageContent() {
 
     if (district) {
       playersToExport = database.filter(p => p.district === district);
-      fileName = `${district.replace(/\s+/g, '_')}_players.csv`;
+      fileName = `${'${district.replace(/\s+/g, '_')}'}_players.csv`;
     }
 
     if (playersToExport.length === 0) {
@@ -141,7 +141,7 @@ function PlayersPageContent() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    toast({ title: 'Export Complete', description: `${playersToExport.length} players exported.` });
+    toast({ title: 'Export Complete', description: `${'${playersToExport.length}'} players exported.` });
   };
   
   const processImportData = (data: any[]) => {
@@ -182,7 +182,7 @@ function PlayersPageContent() {
 
             // More lenient validation - only require USCF ID and at least last name
             if (!uscfId || !lastName) {
-                console.log(`⚠️ Row ${index + 1} skipped - missing essential data:`, {
+                console.log(`⚠️ Row ${'${index + 1}'} skipped - missing essential data:`, {
                     hasUscfId: !!uscfId,
                     hasLastName: !!lastName,
                     row: row
@@ -197,7 +197,7 @@ function PlayersPageContent() {
 
             // If first name is missing, log it but continue
             if (!firstName) {
-                console.log(`⚠️ Row ${index + 1} has missing first name, using 'UNKNOWN':`, {
+                console.log(`⚠️ Row ${'${index + 1}'} has missing first name, using 'UNKNOWN':`, {
                     uscfId, lastName, fullRow: row
                 });
             }
@@ -246,7 +246,7 @@ function PlayersPageContent() {
             
         } catch(e) {
             errors++;
-            console.error(`❌ Error parsing row ${index + 1}:`, row, e);
+            console.error(`❌ Error parsing row ${'${index + 1}'}:`, row, e);
         }
     });
     
@@ -273,7 +273,7 @@ function PlayersPageContent() {
     
     toast({ 
         title: "Player Import Complete", 
-        description: `Successfully imported ${newPlayers.length} players. Skipped ${emptyRows} empty rows, ${skippedIncomplete} incomplete rows, and ${errors} invalid rows.` 
+        description: `Successfully imported ${'${newPlayers.length}'} players. Skipped ${'${emptyRows}'} empty rows, ${'${skippedIncomplete}'} incomplete rows, and ${'${errors}'} invalid rows.` 
     });
 };
 
@@ -402,7 +402,7 @@ function PlayersPageContent() {
                                 <div className="flex items-center gap-3">
                                   <Avatar className="h-9 w-9"><AvatarFallback>{player.firstName?.charAt(0)}{player.lastName?.charAt(0)}</AvatarFallback></Avatar>
                                   <div>
-                                    {`${player.lastName}, ${player.firstName} ${player.middleName || ''}`.trim()}
+                                    {`${'${player.lastName}'}, ${'${player.firstName}'} ${'${player.middleName || \'\''}'}`.trim()}
                                     <div className="text-sm text-muted-foreground">{player.email}</div>
                                   </div>
                                 </div>
@@ -433,10 +433,10 @@ function PlayersPageContent() {
           <CardFooter className="flex items-center justify-between pt-6">
             {clientReady && isDbLoaded ? (
                 <>
-                    <div className="text-sm text-muted-foreground">Showing <strong>{(currentPage - 1) * ROWS_PER_PAGE + 1}</strong> to <strong>{Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}</strong> of <strong>{sortedPlayers.length.toLocaleString()}</strong> players</div>
+                    <div className="text-sm text-muted-foreground">Showing <strong>{'${(currentPage - 1) * ROWS_PER_PAGE + 1}'}</strong> to <strong>{'${Math.min(currentPage * ROWS_PER_PAGE, sortedPlayers.length)}'}</strong> of <strong>{'${sortedPlayers.length.toLocaleString()}'}</strong> players</div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(p - 1, 1))} disabled={currentPage === 1}>Previous</Button>
-                        <span className="text-sm font-medium">Page {currentPage.toLocaleString()} of {totalPages.toLocaleString()}</span>
+                        <span className="text-sm font-medium">Page {'${currentPage.toLocaleString()}'} of {'${totalPages.toLocaleString()}'}</span>
                         <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))} disabled={currentPage === totalPages}>Next</Button>
                     </div>
                 </>
@@ -457,7 +457,7 @@ function PlayersPageContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently remove {playerToDelete?.firstName} {playerToDelete?.lastName} from the master database.</AlertDialogDescription>
+            <AlertDialogDescription>This will permanently remove {'${playerToDelete?.firstName}'} {'${playerToDelete?.lastName}'} from the master database.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
