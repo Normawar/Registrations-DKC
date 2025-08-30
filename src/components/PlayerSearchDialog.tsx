@@ -103,10 +103,14 @@ const handleSelect = (player: MasterPlayer) => {
             </DialogHeader>
 
             <div className="border rounded-md p-4 space-y-4 shrink-0">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <Label htmlFor="search-first-name">First Name</Label>
                         <Input id="search-first-name" placeholder="John" value={filters.firstName || ''} onChange={(e) => updateFilter('firstName', e.target.value)} />
+                    </div>
+                    <div>
+                        <Label htmlFor="search-middle-name">Middle Name</Label>
+                        <Input id="search-middle-name" placeholder="M" value={filters.middleName || ''} onChange={(e) => updateFilter('middleName', e.target.value)} />
                     </div>
                     <div>
                         <Label htmlFor="search-last-name">Last Name</Label>

@@ -28,6 +28,7 @@ interface MasterDbContextType {
 
 export type SearchCriteria = {
   firstName?: string;
+  middleName?: string;
   lastName?: string;
   uscfId?: string;
   state?: string;
@@ -190,55 +191,60 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const searchPlayers = useCallback((criteria: Partial<SearchCriteria>): MasterPlayer[] => {
     if (!isDbLoaded) return [];
 
-    // DEBUG: Check what's actually in the database
-    if (database.length > 0) {
-        const firstPlayer = database[0];
-        console.log('🗃️ Database sample - First player (full object):', firstPlayer);
-        console.log('🗃️ First player properties:');
-        Object.keys(firstPlayer).forEach(key => {
-            console.log(`  ${key}:`, firstPlayer[key as keyof MasterPlayer], typeof firstPlayer[key as keyof MasterPlayer]);
-        });
-        
-        // Look for players with ratings
-        const playersWithRatings = database.filter(p => p.regularRating && p.regularRating !== 'UNR').slice(0, 3);
-        console.log('🗃️ Players with ratings:', playersWithRatings.length);
-        if (playersWithRatings.length > 0) {
-            console.log('🗃️ Sample rated player:', playersWithRatings[0]);
-        }
-    }
-
     const {
-        firstName, lastName, uscfId, state, grade, section, school, district,
+        firstName, middleName, lastName, uscfId, state, grade, section, school, district,
         minRating, maxRating, excludeIds = [], maxResults = 1000,
         searchUnassigned, sponsorProfile
     } = criteria;
     
-    const lowerFirstName = firstName?.toLowerCase();
-    const lowerLastName = lastName?.toLowerCase();
+    const lowerFirstName = firstName?.trim().toLowerCase();
+    const lowerMiddleName = middleName?.trim().toLowerCase();
+    const lowerLastName = lastName?.trim().toLowerCase();
+    const lowerUscfId = uscfId?.trim();
     const excludeSet = new Set(excludeIds);
 
     const results = database.filter(p => {
         if (excludeSet.has(p.id)) return false;
 
+        // Handle sponsor context search
         if (searchUnassigned && sponsorProfile) {
+            // For sponsors, search players who are unassigned OR already belong to them.
+            // This is primarily for the roster page search.
             const isUnassigned = !p.school || p.school.trim() === '';
             const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
             if (!isUnassigned && !belongsToSponsor) return false;
-        } else {
-            if (school && !p.school?.toLowerCase().includes(school.toLowerCase())) return false;
-            if (district && !p.district?.toLowerCase().includes(district.toLowerCase())) return false;
+        } else if (portalType === 'organizer') {
+            // For organizers, search the whole database based on school/district filters
+            if (school && school.trim() && p.school !== school) return false;
+            if (district && district.trim() && p.district !== district) return false;
         }
 
-        if (state && state !== 'ALL' && p.state !== state) return false;
-        if (lowerFirstName && !p.firstName?.toLowerCase().includes(lowerFirstName)) return false;
-        if (lowerLastName && !p.lastName?.toLowerCase().includes(lowerLastName)) return false;
-        if (uscfId && !p.uscfId?.includes(uscfId)) return false;
-        if (grade && p.grade !== grade) return false;
-        if (section && p.section !== section) return false;
 
+        // State filtering
+        if (state && state !== 'ALL') {
+            if (state === 'NO_STATE') {
+                if (p.state && p.state.trim() !== '') return false;
+            } else {
+                if (p.state !== state) return false;
+            }
+        }
+
+        // Name filtering
+        if (lowerFirstName && !p.firstName?.toLowerCase().includes(lowerFirstName)) return false;
+        if (lowerMiddleName && !p.middleName?.toLowerCase().includes(lowerMiddleName)) return false;
+        if (lowerLastName && !p.lastName?.toLowerCase().includes(lowerLastName)) return false;
+        
+        // USCF ID filtering
+        if (lowerUscfId && !p.uscfId?.toString().includes(lowerUscfId)) return false;
+        
+        // Grade and section filtering
+        if (grade && grade.trim() && p.grade !== grade) return false;
+        if (section && section.trim() && p.section !== section) return false;
+
+        // Rating filtering
         const rating = p.regularRating;
-        if (minRating && (!rating || rating < minRating)) return false;
-        if (maxRating && (!rating || rating > maxRating)) return false;
+        if (minRating !== undefined && (!rating || rating < minRating)) return false;
+        if (maxRating !== undefined && (!rating || rating > maxRating)) return false;
 
         return true;
     });
