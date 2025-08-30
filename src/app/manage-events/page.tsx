@@ -523,11 +523,11 @@ export default function ManageEventsPage() {
         date: values.date.toISOString() 
       };
       updateEvent(eventData as Event);
-      toast({ title: "Event Updated", description: `"${'${values.name}'}" has been successfully updated.` });
+      toast({ title: "Event Updated", description: `"${values.name}" has been successfully updated.` });
     } else {
       const eventData = { ...values, date: values.date.toISOString() };
       addBulkEvents([{ ...eventData, id: Date.now().toString() }]);
-      toast({ title: "Event Added", description: `"${'${values.name}'}" has been successfully created.` });
+      toast({ title: "Event Added", description: `"${values.name}" has been successfully created.` });
     }
     setIsDialogOpen(false);
   }
@@ -707,7 +707,7 @@ export default function ManageEventsPage() {
                       <TableCell className="font-medium">{event.name}</TableCell>
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                       <TableCell>{event.location}</TableCell>
-                      <TableCell>{`$${'${event.regularFee}'} / $${'${event.lateFee}'} / $${'${event.veryLateFee}'} / $${'${event.dayOfFee}'}`}</TableCell>
+                      <TableCell>{`$${event.regularFee} / $${event.lateFee} / $${event.veryLateFee} / $${event.dayOfFee}`}</TableCell>
                       <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</Badge></TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -886,6 +886,7 @@ export default function ManageEventsPage() {
     
 
     
+
 
 
 
