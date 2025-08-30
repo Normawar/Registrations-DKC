@@ -683,11 +683,12 @@ export default function ManageEventsPage() {
                 {sortedEvents.map((event) => {
                   const status = getEventStatus(event);
                   const district = getDistrictForLocation(event.location);
+                  const displayDistrict = district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'PSJA' : district;
                   return (
                     <TableRow key={event.id}>
                       <TableCell className="font-medium">{event.name}</TableCell>
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
-                      <TableCell>{district}</TableCell>
+                      <TableCell>{displayDistrict}</TableCell>
                       <TableCell>{event.location}</TableCell>
                       <TableCell>${event.regularFee} / ${event.lateFee} / ${event.veryLateFee} / ${event.dayOfFee}</TableCell>
                       <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</Badge></TableCell>
