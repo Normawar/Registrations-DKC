@@ -273,7 +273,7 @@ export default function UsersPage() {
                                                 </FormControl>
                                                 <div className="space-y-1 leading-none">
                                                     <FormLabel>
-                                                    District Coordinator
+                                                    Approve as District Coordinator
                                                     </FormLabel>
                                                     <FormDescription>
                                                         Grants this sponsor view access to all schools and registrations in their district.
