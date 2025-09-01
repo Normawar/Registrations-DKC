@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -24,7 +23,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 type User = {
     email: string;
-    role: 'sponsor' | 'organizer' | 'individual';
+    role: 'sponsor' | 'organizer' | 'individual' | 'district_coordinator';
     firstName?: string;
     lastName?: string;
     school?: string;
@@ -34,7 +33,7 @@ type User = {
 
 const userFormSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['sponsor', 'organizer', 'individual']),
+  role: z.enum(['sponsor', 'organizer', 'individual', 'district_coordinator']),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   school: z.string().optional(),
@@ -250,11 +249,12 @@ export default function UsersPage() {
                                     <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="role" render={({ field }) => (
                                         <FormItem><FormLabel>Role</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                        <Select onValueChange={(value) => form.setValue('role', value as User['role'])} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 <SelectItem value="sponsor">Sponsor</SelectItem>
                                                 <SelectItem value="organizer">Organizer</SelectItem>
                                                 <SelectItem value="individual">Individual</SelectItem>
+                                                <SelectItem value="district_coordinator">District Coordinator</SelectItem>
                                             </SelectContent>
                                         </Select><FormMessage />
                                         </FormItem>

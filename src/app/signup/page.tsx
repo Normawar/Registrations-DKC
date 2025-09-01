@@ -129,7 +129,8 @@ const SponsorSignUpForm = () => {
     if (isInitialized && schoolData.length > 0) {
       handleDistrictChange(form.getValues('district'), false);
     }
-  }, [isInitialized, schoolData, form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitialized, schoolData]);
   
   async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     setIsLoading(true);
@@ -150,6 +151,7 @@ const SponsorSignUpForm = () => {
               type: 'manual',
               message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
           });
+          setIsLoading(false);
           return;
       }
 
@@ -271,6 +273,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
               type: 'manual',
               message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
           });
+          setIsLoading(false);
           return;
       }
 

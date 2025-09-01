@@ -55,7 +55,7 @@ export default function RequestsPage() {
       allConfirmations.forEach((conf: any) => confirmationMap.set(conf.id, conf));
       setConfirmationsMap(confirmationMap);
 
-      if (profile?.role === 'sponsor' && profile.isDistrictCoordinator) {
+      if (profile?.role === 'district_coordinator') {
           const districtConfirmationIds = new Set(
               allConfirmations
                   .filter((c: any) => c.district === profile.district)
