@@ -191,33 +191,35 @@ export default function DistrictRegistrationsPage() {
               <Accordion type="single" collapsible className="w-full">
                 {upcomingEventsWithRegistrations.map(event => (
                   <AccordionItem key={event.id} value={event.id}>
-                    <AccordionTrigger>
-                      <div className="flex justify-between items-center w-full pr-4">
-                        <div className='text-left'>
-                          <p className="font-semibold">{event.name}</p>
-                          <p className="text-sm text-muted-foreground">{format(new Date(event.date), 'PPP')}</p>
+                    <div className="flex items-center w-full pr-4 py-4 border-b">
+                      <AccordionTrigger className="flex-1 p-0">
+                        <div className="flex justify-between items-center w-full">
+                          <div className='text-left'>
+                            <p className="font-semibold">{event.name}</p>
+                            <p className="text-sm text-muted-foreground">{format(new Date(event.date), 'PPP')}</p>
+                          </div>
+                          <div className="flex items-center gap-4 mr-4">
+                            {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                  <div className="flex items-center gap-4 text-sm">
+                                      <Badge variant="secondary">All: {event.registrationCount}</Badge>
+                                      <Badge variant="outline">GT: {event.gtCount}</Badge>
+                                      <Badge variant="outline">Ind: {event.independentCount}</Badge>
+                                  </div>
+                            )}
+                            {profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD' && (
+                              <Badge variant="secondary" className="text-sm">
+                                  <Users className="mr-2 h-4 w-4" />
+                                  {event.registrationCount} Registered
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                           {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                                <div className="flex items-center gap-4 text-sm">
-                                    <Badge variant="secondary">All: {event.registrationCount}</Badge>
-                                    <Badge variant="outline">GT: {event.gtCount}</Badge>
-                                    <Badge variant="outline">Ind: {event.independentCount}</Badge>
-                                </div>
-                           )}
-                           {profile?.district !== 'PHARR-SAN JUAN-ALAMO ISD' && (
-                             <Badge variant="secondary" className="text-sm">
-                                <Users className="mr-2 h-4 w-4" />
-                                {event.registrationCount} Registered
-                             </Badge>
-                           )}
-                          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleDownload(event);}} disabled={event.registrationCount === 0}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Download Roster
-                          </Button>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
+                      </AccordionTrigger>
+                      <Button size="sm" variant="outline" onClick={() => handleDownload(event)} disabled={event.registrationCount === 0} className="ml-4">
+                          <Download className="h-4 w-4 mr-2" />
+                          Download Roster
+                      </Button>
+                    </div>
                     <AccordionContent className="p-4 bg-muted/50 rounded-b-md">
                         {event.registrationCount > 0 ? (
                             <EventRegistrationsTable event={event} />
@@ -241,4 +243,3 @@ export default function DistrictRegistrationsPage() {
     </AppLayout>
   );
 }
-
