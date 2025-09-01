@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -247,6 +248,15 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     
     try {
       const lowercasedEmail = values.email.toLowerCase();
+
+      if (role === 'organizer' && !lowercasedEmail.endsWith('@dkchess.com')) {
+        form.setError('email', {
+          type: 'manual',
+          message: 'Only @dkchess.com emails can register as organizers.',
+        });
+        setIsLoading(false);
+        return;
+      }
       
       // Add delay to prevent UI blocking
       await new Promise(resolve => setTimeout(resolve, 100));
