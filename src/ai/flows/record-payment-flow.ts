@@ -6,6 +6,10 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { ApiError, CreatePaymentRequest, Money } from 'square';
+import { randomUUID } from 'crypto';
+import { getSquareClient } from '@/lib/square-client';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const RecordPaymentInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to record a payment for.'),
@@ -26,44 +30,88 @@ const RecordPaymentOutputSchema = z.object({
 });
 export type RecordPaymentOutput = z.infer<typeof RecordPaymentOutputSchema>;
 
-// This function now makes a direct API call to Square to create a payment.
-export interface RecordPaymentParams {
-  invoiceId: string;
-  amount: number;
-  paymentMethod: string;
-  note: string;
-  organizerInitials: string;
+export async function recordPayment(input: RecordPaymentInput): Promise<RecordPaymentOutput> {
+  return recordPaymentFlow(input);
 }
 
-export const recordPayment = async ({ invoiceId, amount, paymentMethod, note, organizerInitials }: RecordPaymentParams) => {
-  const response = await fetch('/api/record-payment', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount, paymentMethod, note, organizerInitials })
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(`Payment failed: ${JSON.stringify(errorData.error)}`);
-  }
-  
-  return await response.json();
-};
 
-// The Genkit flow remains as the primary public interface.
-export const recordPaymentFlow = ai.defineFlow(
+const recordPaymentFlow = ai.defineFlow(
   {
     name: 'recordPaymentFlow',
     inputSchema: RecordPaymentInputSchema,
     outputSchema: RecordPaymentOutputSchema,
   },
   async (input) => {
-    return recordPayment({
-        invoiceId: input.invoiceId,
-        amount: input.amount,
-        paymentMethod: input.paymentMethod || 'manual',
-        note: input.note || 'No note provided',
-        organizerInitials: input.organizerInitials || 'N/A',
-    });
+    const { isConfigured } = await checkSquareConfig();
+    if (!isConfigured) {
+      console.log(`Square not configured. Mock-recording payment for invoice ${input.invoiceId}.`);
+      return {
+        paymentId: `MOCK_PAY_${randomUUID()}`,
+        status: 'PAID',
+        totalPaid: input.amount,
+        totalInvoiced: input.amount,
+      };
+    }
+    
+    const squareClient = await getSquareClient();
+    const { paymentsApi, invoicesApi } = squareClient;
+
+    try {
+        console.log(`Fetching invoice ${input.invoiceId} to get details...`);
+        const { result: { invoice } } = await invoicesApi.getInvoice(input.invoiceId);
+        
+        if (!invoice?.orderId) {
+            throw new Error('Cannot record payment for an invoice without an associated order.');
+        }
+
+        const amountMoney: Money = {
+            amount: BigInt(Math.round(input.amount * 100)),
+            currency: 'USD',
+        };
+
+        const payment: CreatePaymentRequest = {
+            sourceId: 'EXTERNAL',
+            idempotencyKey: input.externalPaymentId || randomUUID(),
+            amountMoney: amountMoney,
+            orderId: invoice.orderId,
+            note: input.note,
+            externalDetails: {
+                type: 'OTHER',
+                source: input.paymentMethod || 'Manual',
+                sourceFeeMoney: { amount: BigInt(0), currency: 'USD' }
+            },
+        };
+
+        console.log("Creating payment object for Square:", JSON.stringify(payment, (k,v) => typeof v === 'bigint' ? v.toString() : v));
+        const { result: { payment: createdPayment } } = await paymentsApi.createPayment(payment);
+        
+        // After creating a payment, we need to fetch the invoice again to get the updated status
+        const { result: { invoice: updatedInvoice } } = await invoicesApi.getInvoice(input.invoiceId);
+
+        const totalPaid = updatedInvoice?.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount;
+        const totalInvoiced = updatedInvoice?.paymentRequests?.[0]?.computedAmountMoney?.amount;
+
+        return {
+            paymentId: createdPayment.id!,
+            status: updatedInvoice!.status!,
+            totalPaid: totalPaid ? Number(totalPaid) / 100 : 0,
+            totalInvoiced: totalInvoiced ? Number(totalInvoiced) / 100 : 0,
+        };
+
+    } catch (error) {
+        if (error instanceof ApiError) {
+            const errorResult = error.result || {};
+            const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
+            console.error('Square API Error in recordPaymentFlow:', JSON.stringify(errorResult, null, 2));
+            const errorMessage = errors.map((e: any) => `[${e.category}/${e.code}]: ${e.detail}`).join(', ');
+            throw new Error(`Square Error: ${errorMessage}`);
+        } else {
+            console.error('An unexpected error occurred during payment recording:', error);
+            if (error instanceof Error) {
+                throw new Error(`${error.message}`);
+            }
+            throw new Error('An unexpected error occurred during payment recording.');
+        }
+    }
   }
 );
