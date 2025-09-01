@@ -28,7 +28,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo } from 'react';
@@ -50,6 +50,7 @@ const sponsorMenuItems = [
 const districtCoordinatorMenuItems = [
     { href: "/profile", icon: User, label: "Profile" },
     { href: "/district-dashboard", icon: LayoutDashboard, label: "District Dashboard" },
+    { href: "/district-registrations", icon: UserCheck, label: "District Registrations" },
     { href: "/roster", icon: PawnIcon, label: "District Rosters" },
     { href: "/invoices", icon: Receipt, label: "District Invoices" },
     { href: "/requests", icon: KnightIcon, label: "District Requests" },
