@@ -30,7 +30,7 @@ export async function getSquareClient(): Promise<Client> {
   checkSquareCredentials();
   return new Client({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
-    environment: Environment.Sandbox,
+    environment: Environment.Production,
   });
 }
 
