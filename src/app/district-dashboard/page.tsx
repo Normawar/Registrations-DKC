@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
 import { useState, useMemo, useEffect } from "react";
-import { Building, Users, FileText } from 'lucide-react';
+import { Building, Users, FileText, Award } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -51,10 +51,11 @@ export default function DistrictDashboardPage() {
   }, [districtPlayers, profile?.district]);
 
   const districtStats = useMemo(() => {
-    if (!profile?.district) return { totalPlayers: 0, totalSchools: 0 };
+    if (!profile?.district) return { totalPlayers: 0, totalSchools: 0, totalGtPlayers: 0 };
     return {
         totalPlayers: districtPlayers.length,
         totalSchools: districtSchools.length,
+        totalGtPlayers: districtPlayers.filter(p => p.studentType === 'gt').length
     };
   }, [districtPlayers, districtSchools, profile?.district]);
 
@@ -69,7 +70,7 @@ export default function DistrictDashboardPage() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Schools</CardTitle>
@@ -94,6 +95,20 @@ export default function DistrictDashboardPage() {
                     <p className="text-xs text-muted-foreground">across all schools in the district</p>
                 </CardContent>
             </Card>
+             {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">GT Players</CardTitle>
+                        <Award className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        {clientReady ? (
+                            <div className="text-2xl font-bold">{districtStats.totalGtPlayers}</div>
+                        ) : <Skeleton className="h-8 w-1/2" />}
+                        <p className="text-xs text-muted-foreground">identified as Gifted & Talented</p>
+                    </CardContent>
+                </Card>
+            )}
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Quick Links</CardTitle>

@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { schoolData } from '@/lib/data/school-data';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 type DistrictSortableColumnKey = SortableColumnKey | 'gt';
@@ -413,6 +414,7 @@ function DistrictRosterView() {
     const { database: allPlayers, isDbLoaded } = useMasterDb();
     const [selectedSchool, setSelectedSchool] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
+    const [playerTypeFilter, setPlayerTypeFilter] = useState('all');
 
     const districtPlayers = useMemo(() => {
         if (!isDbLoaded || !profile) return [];
@@ -448,7 +450,16 @@ function DistrictRosterView() {
     };
     
     const sortedPlayersForSchool = (schoolRoster: MasterPlayer[]) => {
-      let sortablePlayers = [...schoolRoster];
+      let filteredRoster = schoolRoster;
+      if (profile?.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+        if (playerTypeFilter === 'gt') {
+            filteredRoster = schoolRoster.filter(p => p.studentType === 'gt');
+        } else if (playerTypeFilter === 'independent') {
+            filteredRoster = schoolRoster.filter(p => p.studentType === 'independent');
+        }
+      }
+      
+      let sortablePlayers = [...filteredRoster];
       if (sortConfig) {
         sortablePlayers.sort((a, b) => {
           const key = sortConfig.key;
@@ -480,46 +491,57 @@ function DistrictRosterView() {
                     An overview of all player rosters for each school in your district: {profile?.district}
                 </p>
             </div>
-            <div className="w-full sm:w-64">
-                <Label htmlFor="school-filter">Filter by School</Label>
-                <Select value={selectedSchool} onValueChange={setSelectedSchool}>
-                    <SelectTrigger id="school-filter">
-                        <SelectValue placeholder="Select a school" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Schools</SelectItem>
-                        {districtSchools.map(school => (
-                            <SelectItem key={school} value={school}>{school}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+            <div className="flex flex-col sm:flex-row gap-4">
+                <div className="w-full sm:w-64">
+                    <Label htmlFor="school-filter">Filter by School</Label>
+                    <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+                        <SelectTrigger id="school-filter">
+                            <SelectValue placeholder="Select a school" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Schools</SelectItem>
+                            {districtSchools.map(school => (
+                                <SelectItem key={school} value={school}>{school}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                 {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                    <div className="w-full sm:w-64">
+                        <Label>Filter by Player Type</Label>
+                        <RadioGroup defaultValue="all" onValueChange={setPlayerTypeFilter} className="flex items-center space-x-4 pt-2">
+                           <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all">All</Label></div>
+                           <div className="flex items-center space-x-2"><RadioGroupItem value="gt" id="gt" /><Label htmlFor="gt">GT</Label></div>
+                           <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent">Independent</Label></div>
+                        </RadioGroup>
+                    </div>
+                 )}
             </div>
 
             {displayedSchools.map(school => {
                 const schoolRoster = districtPlayers.filter(p => p.school === school);
                 const sortedSchoolRoster = sortedPlayersForSchool(schoolRoster);
 
-                if (schoolRoster.length === 0 && selectedSchool !== 'all') {
+                if (sortedSchoolRoster.length === 0) {
                      return (
                         <Card key={school}>
                             <CardHeader>
                                 <CardTitle className="text-lg">{school}</CardTitle>
-                                <CardDescription>0 player(s)</CardDescription>
+                                <CardDescription>0 player(s) matching filter</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-center py-8 text-muted-foreground">
-                                    This school does not have any players on the roster yet.
+                                    No players found for the selected filter.
                                 </div>
                             </CardContent>
                         </Card>
                      );
                 }
-                if (schoolRoster.length === 0) return null;
                 return (
                     <Card key={school}>
                         <CardHeader>
                             <CardTitle className="text-lg">{school}</CardTitle>
-                            <CardDescription>{schoolRoster.length} player(s)</CardDescription>
+                            <CardDescription>{sortedSchoolRoster.length} player(s) found</CardDescription>
                         </CardHeader>
                         <CardContent>
                           <ScrollArea className="h-72">
@@ -562,13 +584,6 @@ function DistrictRosterView() {
                     </Card>
                 )
             })}
-            {displayedSchools.length === 0 && selectedSchool !== 'all' && (
-                <Card>
-                    <CardContent className="pt-6 text-center text-muted-foreground">
-                        No players found for the selected school.
-                    </CardContent>
-                </Card>
-            )}
         </div>
     );
 }
