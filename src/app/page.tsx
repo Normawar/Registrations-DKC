@@ -159,7 +159,7 @@ export default function LoginPage() {
                     Welcome Back
                 </CardTitle>
                 <CardDescription>
-                    Enter your credentials to access your dashboard.
+                    Enter your credentials to access Registrations for chess tournaments.  If you are a parent or student who is not registering with a school team, please sign up as an Individual.
                 </CardDescription>
                 </CardHeader>
                 <Tabs defaultValue="sponsor" className="w-full">
