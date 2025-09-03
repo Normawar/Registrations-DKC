@@ -64,7 +64,7 @@ function OrganizerInvoiceContent() {
       sponsorName: '',
       sponsorEmail: '',
       invoiceTitle: '',
-      lineItems: [{ name: '', amount: 0, note: '' }],
+      lineItems: [{ name: '', amount: 0, note: '', isUscf: false }],
     },
   });
 
@@ -95,13 +95,13 @@ function OrganizerInvoiceContent() {
                 if(details.status === 'withdrawn') return;
 
                 const player = allPlayers.find(p => p.id === playerId);
-                const playerName = player ? `${'${player.firstName}'} ${'${player.lastName}'}` : `Player ${'${playerId}'}`;
+                const playerName = player ? `${player.firstName} ${player.lastName}` : `Player ${playerId}`;
                 const registrationFee = invoiceToEdit.totalInvoiced / Object.keys(invoiceToEdit.selections).length;
 
-                lineItems.push({ id: playerId, name: `Registration for ${'${playerName}'}`, amount: registrationFee, note: `Event: ${'${eventDetails.name}'}, Section: ${'${details.section}'}` });
+                lineItems.push({ id: playerId, name: `Registration for ${playerName}`, amount: registrationFee, note: `Event: ${eventDetails.name}, Section: ${details.section}` });
                 
                 if (details.uscfStatus === 'new' || details.uscfStatus === 'renewing') {
-                  lineItems.push({ id: playerId, name: `USCF Membership for ${'${playerName}'}`, amount: uscfFee, note: `Status: ${'${details.uscfStatus}'}`, isUscf: true });
+                  lineItems.push({ id: playerId, name: `USCF Membership for ${playerName}`, amount: uscfFee, note: `Status: ${details.uscfStatus}`, isUscf: true });
                 }
               });
             }
@@ -109,14 +109,28 @@ function OrganizerInvoiceContent() {
             lineItems = invoiceToEdit.lineItems;
           }
           
-          form.reset({
-            invoiceId: invoiceToEdit.invoiceId,
-            schoolName: invoiceToEdit.schoolName,
-            sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName,
-            sponsorEmail: invoiceToEdit.sponsorEmail || '',
-            invoiceTitle: (invoiceToEdit.description || invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim(),
-            lineItems: lineItems.length > 0 ? lineItems : [{ name: '', amount: 0, note: '' }],
-          });
+          // In your useEffect, ensure no undefined values
+form.reset({
+  invoiceId: invoiceToEdit.invoiceId || '',
+  schoolName: invoiceToEdit.schoolName || '',
+  sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName || '',
+  sponsorEmail: invoiceToEdit.sponsorEmail || '',
+  invoiceTitle: (invoiceToEdit.description || invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim(),
+  lineItems: lineItems.length > 0 ? lineItems.map(item => ({
+    ...item,
+    id: item.id || '',
+    name: item.name || '',
+    amount: item.amount || 0,
+    note: item.note || '',
+    isUscf: item.isUscf || false
+  })) : [{ 
+    id: '', 
+    name: '', 
+    amount: 0, 
+    note: '', 
+    isUscf: false 
+  }],
+});
         }
       }
     }
@@ -157,10 +171,10 @@ function OrganizerInvoiceContent() {
 
     const playersToInvoice = playerItems.map(item => {
         const player = allPlayers.find(p => p.id === item.id);
-        if (!player) throw new Error(`Could not find player data for ${'${item.name}'}`);
+        if (!player) throw new Error(`Could not find player data for ${item.name}`);
         const lateFee = item.amount - eventDetails.regularFee;
         return {
-            playerName: `${'${player.firstName}'} ${'${player.lastName}'}`,
+            playerName: `${player.firstName} ${player.lastName}`,
             uscfId: player.uscfId,
             baseRegistrationFee: eventDetails.regularFee,
             lateFee: lateFee > 0 ? lateFee : 0,
@@ -211,7 +225,7 @@ function OrganizerInvoiceContent() {
 
     toast({
         title: "Event Invoice Recreated",
-        description: `Invoice ${'${result.newInvoiceNumber}'} has been created to replace the old one.`
+        description: `Invoice ${result.newInvoiceNumber} has been created to replace the old one.`
     });
     router.push('/confirmations');
   }
@@ -288,11 +302,11 @@ function OrganizerInvoiceContent() {
   
   const toastSuccess = (result: any, isUpdate: boolean) => {
       toast({
-        title: `Invoice ${'${isUpdate ? \'Updated\' : \'Created\'}'} Successfully!`,
+        title: `Invoice ${isUpdate ? 'Updated' : 'Created'} Successfully!`,
         description: (
             <p>
-              Invoice {'${result.invoiceNumber || result.invoiceId}'} has been {'${isUpdate ? \'recreated\' : \'created\'}'}.
-              <a href={'${result.invoiceUrl}'} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
+              Invoice ${result.invoiceNumber || result.invoiceId} has been ${isUpdate ? 'recreated' : 'created'}.
+              <a href={result.invoiceUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-primary underline ml-2">
                 View Invoice
               </a>
             </p>
@@ -393,7 +407,7 @@ function OrganizerInvoiceContent() {
                     <div className='grid grid-cols-1 md:grid-cols-[1fr,1fr] gap-4'>
                       <FormField
                         control={form.control}
-                        name={`lineItems.${'${index}'}.name`}
+                        name={`lineItems.${index}.name`}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Item Name</FormLabel>
@@ -404,7 +418,7 @@ function OrganizerInvoiceContent() {
                       />
                       <FormField
                         control={form.control}
-                        name={`lineItems.${'${index}'}.amount`}
+                        name={`lineItems.${index}.amount`}
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Amount ($)</FormLabel>
@@ -416,7 +430,7 @@ function OrganizerInvoiceContent() {
                       <div className="col-span-full">
                           <FormField
                               control={form.control}
-                              name={`lineItems.${'${index}'}.note`}
+                              name={`lineItems.${index}.note`}
                               render={({ field }) => (
                                   <FormItem>
                                   <FormLabel>Notes (Optional)</FormLabel>
