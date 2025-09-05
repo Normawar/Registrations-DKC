@@ -1,3 +1,4 @@
+
 // src/app/signup/page.tsx - Updated with Firebase Auth
 'use client';
 
@@ -134,17 +135,31 @@ const SponsorSignUpForm = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, schoolData]);
   
-  async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
+async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     setIsLoading(true);
     
     try {
+      // Import the simple auth functions
+      const { simpleSignUp, checkFirebaseConfig } = await import('@/lib/simple-auth');
+      
+      // Check Firebase configuration first
+      if (!checkFirebaseConfig()) {
+        toast({
+          variant: 'destructive',
+          title: 'Configuration Error',
+          description: 'Firebase is not properly configured. Please contact support.',
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
       const role = isCoordinator ? 'district_coordinator' : 'sponsor';
 
       const { password, email, ...profileValues } = values;
       const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
 
-      const profileData: Omit<SponsorProfile, 'email'> = {
+      const profileData = {
         ...profileValues,
         role: role,
         avatarType: 'icon',
@@ -154,36 +169,30 @@ const SponsorSignUpForm = () => {
         isDistrictCoordinator: isCoordinator,
       };
       
-      // Use Firebase Auth to create user and Firestore profile
-      const { user, profile } = await AuthService.signUp(email, password, profileData);
+      // Use the simple signup function
+      const result = await simpleSignUp(email, password, profileData);
       
-      // Update local profile state
-      await updateProfile(profile);
-      
-      toast({
-          title: "Account Created!",
-          description: `Your ${role} account has been created successfully.`,
-      });
-      
-      setTimeout(() => {
-        router.push('/profile');
-      }, 100);
+      if (result.success) {
+        // Update local profile state if you have the context
+        // await updateProfile(result.profile);
+        
+        toast({
+            title: "Account Created!",
+            description: `Your ${role} account has been created successfully.`,
+        });
+        
+        setTimeout(() => {
+          router.push('/profile');
+        }, 100);
+      }
     } catch (error) {
       console.error('Signup error:', error);
       
-      // Handle specific errors
-      if (error instanceof Error) {
-        form.setError('email', {
-          type: 'manual',
-          message: error.message,
-        });
-      } else {
-        toast({
-          variant: 'destructive',
-          title: "Error",
-          description: "An error occurred while creating your account. Please try again.",
-        });
-      }
+      toast({
+        variant: 'destructive',
+        title: "Signup Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -239,10 +248,23 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     defaultValues: { firstName: "", lastName: "", email: "", password: "" },
   });
 
-  async function onSubmit(values: z.infer<typeof individualFormSchema>) {
+async function onSubmit(values: z.infer<typeof individualFormSchema>) {
     setIsLoading(true);
     
     try {
+      const { simpleSignUp, checkFirebaseConfig } = await import('@/lib/simple-auth');
+      
+      // Check Firebase configuration first
+      if (!checkFirebaseConfig()) {
+        toast({
+          variant: 'destructive',
+          title: 'Configuration Error',
+          description: 'Firebase is not properly configured. Please contact support.',
+        });
+        setIsLoading(false);
+        return;
+      }
+
       const { password, email, ...profileValues } = values;
 
       if (role === 'organizer' && !email.toLowerCase().endsWith('@dkchess.com')) {
@@ -254,7 +276,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         return;
       }
 
-      const profileData: Omit<SponsorProfile, 'email'> = {
+      const profileData = {
           ...profileValues,
           phone: '',
           district: 'None',
@@ -268,39 +290,30 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
           avatarValue: 'PawnIcon',
       };
       
-      // Use Firebase Auth to create user and Firestore profile
-      const { user, profile } = await AuthService.signUp(email, password, profileData);
+      const result = await simpleSignUp(email, password, profileData);
       
-      // Update local profile state
-      await updateProfile(profile);
-      
-      toast({
-          title: "Account Created!",
-          description: `Your new ${role} account has been successfully created.`,
-      });
+      if (result.success) {
+        toast({
+            title: "Account Created!",
+            description: `Your new ${role} account has been successfully created.`,
+        });
 
-      let path = '/dashboard';
-      if (role === 'individual') path = '/individual-dashboard';
-      else if (role === 'organizer') path = '/manage-events';
-      
-      setTimeout(() => {
-        router.push(path);
-      }, 100);
+        let path = '/dashboard';
+        if (role === 'individual') path = '/individual-dashboard';
+        else if (role === 'organizer') path = '/manage-events';
+        
+        setTimeout(() => {
+          router.push(path);
+        }, 100);
+      }
     } catch (error) {
       console.error('Signup error:', error);
       
-      if (error instanceof Error) {
-        form.setError('email', {
-          type: 'manual',
-          message: error.message,
-        });
-      } else {
-        toast({
-          variant: 'destructive',
-          title: "Error",
-          description: "An error occurred while creating your account. Please try again.",
-        });
-      }
+      toast({
+        variant: 'destructive',
+        title: "Signup Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
+      });
     } finally {
       setIsLoading(false);
     }
