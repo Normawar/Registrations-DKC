@@ -46,41 +46,32 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
         setIsLoading(true);
         
         try {
-            if (!db) {
-                toast({ variant: 'destructive', title: 'Error', description: 'Database service is not available.' });
+            // Import the simple auth functions
+            const { simpleSignIn, checkFirebaseConfig } = await import('@/lib/simple-auth');
+            
+            // Check Firebase configuration first
+            if (!checkFirebaseConfig()) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Configuration Error',
+                    description: 'Firebase is not properly configured. Please contact support.',
+                });
                 setIsLoading(false);
                 return;
             }
-            const lowercasedEmail = values.email.toLowerCase();
-            const userDocRef = doc(db, "users", lowercasedEmail);
-            const userDoc = await getDoc(userDocRef);
-
-            if (userDoc.exists()) {
-                const userProfile = userDoc.data() as SponsorProfile;
-
-                const isCorrectTab = 
-                  (role === 'sponsor' && (userProfile.role === 'sponsor' || userProfile.role === 'district_coordinator')) ||
-                  (role === 'organizer' && userProfile.role === 'organizer') ||
-                  (role === 'individual' && userProfile.role === 'individual');
-
-                if (!isCorrectTab) {
-                    form.setError("email", {
-                        type: "manual",
-                        message: `This email is for a ${userProfile.role}. Please use the correct tab.`,
-                    });
-                    setIsLoading(false);
-                    return;
-                }
-
-                updateProfile(userProfile);
-                
+    
+            // Use the simple signin function
+            const result = await simpleSignIn(values.email, values.password);
+            
+            if (result.success) {
+                await updateProfile(result.profile as SponsorProfile);
                 toast({
                     title: "Login Successful",
-                    description: `Welcome back, ${userProfile.firstName}!`,
+                    description: `Welcome back, ${result.profile.firstName}!`,
                 });
                 
                 setTimeout(() => {
-                    switch (userProfile.role) {
+                    switch (result.profile.role) {
                         case 'organizer':
                             router.push('/manage-events');
                             break;
@@ -88,7 +79,7 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                             router.push('/district-dashboard');
                             break;
                         case 'sponsor':
-                            if (userProfile.isDistrictCoordinator) {
+                             if (result.profile.isDistrictCoordinator) {
                                 router.push('/auth/role-selection');
                             } else {
                                 router.push('/dashboard');
@@ -101,21 +92,16 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                             router.push('/dashboard');
                     }
                 }, 100);
-
-            } else {
-                form.setError("email", {
-                    type: "manual",
-                    message: "No account found with this email, or password was incorrect.",
-                });
             }
         } catch (error) {
             console.error('Login error:', error);
+            
             form.setError("email", {
                 type: "manual",
-                message: "An error occurred during login. Please try again.",
+                message: error instanceof Error ? error.message : "An error occurred during login. Please try again.",
             });
         } finally {
-          setIsLoading(false);
+            setIsLoading(false);
         }
     }
 
