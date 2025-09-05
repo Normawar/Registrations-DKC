@@ -72,9 +72,6 @@ const SponsorSignUpForm = () => {
       if (!districts.includes('None')) {
         districts.unshift('None');
       }
-       if (!districts.includes('All')) {
-        districts.unshift('All');
-    }
       setUniqueDistricts(districts);
       setIsInitialized(true);
     }
@@ -110,22 +107,19 @@ const SponsorSignUpForm = () => {
     form.setValue('district', district);
     let filteredSchools: string[];
     if (district === 'None') {
-      filteredSchools = allSchoolNames;
-    } else if (district === 'All') {
-      filteredSchools = ['All'];
+        filteredSchools = allSchoolNames;
     } else {
         filteredSchools = schoolData
             .filter((school) => school.district === district)
             .map((school) => school.schoolName)
             .sort();
+        filteredSchools.unshift("All Schools"); // Add "All Schools" option
     }
     setSchoolsForDistrict([...new Set(filteredSchools)]);
 
     if (resetSchool) {
         if (district === 'None') {
             form.setValue('school', 'Homeschool');
-        } else if (district === 'All') {
-            form.setValue('school', 'All');
         } else {
             form.setValue('school', '');
         }
@@ -162,7 +156,7 @@ const SponsorSignUpForm = () => {
           return;
       }
       
-      const isCoordinator = values.district === 'All' && values.school === 'All';
+      const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
       const role = isCoordinator ? 'district_coordinator' : 'sponsor';
 
       const newUser = { email: lowercasedEmail, role: role };
@@ -214,7 +208,7 @@ const SponsorSignUpForm = () => {
             <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
           </div>
           <FormField control={form.control} name="district" render={({ field }) => ( <FormItem> <FormLabel>District</FormLabel> <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value} disabled={isLoading}> <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl> <SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )}/>
-          <FormField control={form.control} name="school" render={({ field }) => ( <FormItem> <FormLabel>School</FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict || isLoading || selectedDistrict === 'All'}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select> <FormMessage /> </FormItem> )}/>
+          <FormField control={form.control} name="school" render={({ field }) => ( <FormItem> <FormLabel>School</FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select> <FormMessage /> </FormItem> )}/>
           <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} disabled={isLoading} /></FormControl><FormMessage /></FormItem> )}/>
           <FormField control={form.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} disabled={isLoading} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )}/>
           {selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
