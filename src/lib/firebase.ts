@@ -40,5 +40,13 @@ if (isConfigValid) {
     }
 }
 
+// Function to force re-authentication
+export const forceReauth = async () => {
+    if (auth) {
+        await auth.currentUser?.getIdToken(true);
+        console.log("Forced token refresh.");
+    }
+};
+
 
 export { app, auth, storage, db };
