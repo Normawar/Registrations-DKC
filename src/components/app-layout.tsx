@@ -65,6 +65,7 @@ const organizerMenuItems = [
   { href: "/payment-authorization", icon: ShieldCheck, label: "Payment Authorization" },
   { href: "/players", icon: PawnIcon, label: "Master Player Database" },
   { href: "/schools", icon: School, label: "Schools & Districts" },
+  { href: "/roster", icon: Users, label: "District Rosters" },
   { href: "/users", icon: Users, label: "User Management" },
   { href: "/invoices", icon: Receipt, label: "All Invoices" },
   { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },

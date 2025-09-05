@@ -16,6 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Papa from 'papaparse';
 import { DistrictCoordinatorGuard } from '@/components/auth-guard';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 type RegistrationInfo = {
   player: MasterPlayer;
@@ -35,6 +37,7 @@ function DistrictRegistrationsContent() {
   
   const [confirmations, setConfirmations] = useState<any[]>([]);
   const [upcomingEventsWithRegistrations, setUpcomingEventsWithRegistrations] = useState<any[]>([]);
+  const [showActiveOnly, setShowActiveOnly] = useState(false);
 
   useEffect(() => {
     const loadData = () => {
@@ -110,10 +113,19 @@ function DistrictRegistrationsContent() {
   const EventRegistrationsTable = ({ event }: { event: any }) => {
     const [playerTypeFilter, setPlayerTypeFilter] = useState('all');
 
-    const schools = useMemo(() => {
+    const schoolsWithRegistrations = useMemo(() => {
         const schoolSet = new Set(event.registrations.map((r: RegistrationInfo) => r.player.school));
         return Array.from(schoolSet).sort();
     }, [event.registrations]);
+
+    const displayedSchools = useMemo(() => {
+        if (!showActiveOnly) {
+            return schoolsWithRegistrations;
+        }
+        return schoolsWithRegistrations.filter(school => 
+            event.registrations.some((r: RegistrationInfo) => r.player.school === school)
+        );
+    }, [schoolsWithRegistrations, event.registrations, showActiveOnly]);
     
     const filteredRegistrations = useMemo(() => {
         if (!profile || profile.district !== 'PHARR-SAN JUAN-ALAMO ISD' || playerTypeFilter === 'all') {
@@ -133,7 +145,7 @@ function DistrictRegistrationsContent() {
             </TabsList>
           </Tabs>
         )}
-        {schools.map(school => {
+        {displayedSchools.map(school => {
           const schoolRegistrations = filteredRegistrations.filter((r: RegistrationInfo) => r.player.school === school);
           if (schoolRegistrations.length === 0) return null;
           
@@ -184,8 +196,16 @@ function DistrictRegistrationsContent() {
         
         <Card>
           <CardHeader>
-            <CardTitle>Upcoming Events</CardTitle>
-            <CardDescription>Click on an event to see detailed registration information.</CardDescription>
+            <div className="flex items-center justify-between">
+                <div>
+                    <CardTitle>Upcoming Events</CardTitle>
+                    <CardDescription>Click on an event to see detailed registration information.</CardDescription>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox id="active-schools-filter" checked={showActiveOnly} onCheckedChange={(checked) => setShowActiveOnly(!!checked)} />
+                    <Label htmlFor="active-schools-filter" className="text-sm font-medium">Show only schools with registrations</Label>
+                </div>
+            </div>
           </CardHeader>
           <CardContent>
             {upcomingEventsWithRegistrations.length > 0 ? (

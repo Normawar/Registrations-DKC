@@ -34,6 +34,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { schoolData } from '@/lib/data/school-data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 type DistrictSortableColumnKey = SortableColumnKey | 'gt';
@@ -411,30 +412,48 @@ function SponsorRosterView() {
 
 function DistrictRosterView() {
     const { profile } = useSponsorProfile();
-    const { database: allPlayers, isDbLoaded } = useMasterDb();
+    const { database: allPlayers, isDbLoaded, dbDistricts } = useMasterDb();
     const [selectedSchool, setSelectedSchool] = useState('all');
+    const [selectedDistrict, setSelectedDistrict] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
     const [playerTypeFilter, setPlayerTypeFilter] = useState('all');
+    const [showActiveOnly, setShowActiveOnly] = useState(false);
 
+    useEffect(() => {
+        if (profile?.role === 'district_coordinator' && profile.district) {
+            setSelectedDistrict(profile.district);
+        }
+    }, [profile]);
+    
     const districtPlayers = useMemo(() => {
         if (!isDbLoaded || !profile) return [];
-        return allPlayers.filter(p => p.district === profile.district);
-    }, [allPlayers, isDbLoaded, profile]);
+        if (selectedDistrict === 'all') {
+            return allPlayers;
+        }
+        return allPlayers.filter(p => p.district === selectedDistrict);
+    }, [allPlayers, isDbLoaded, profile, selectedDistrict]);
 
     const districtSchools = useMemo(() => {
-        if (!profile?.district) return [];
+        if (selectedDistrict === 'all') {
+             return [...new Set(allPlayers.map(p => p.school).filter(Boolean))].sort();
+        }
         return schoolData
-            .filter(school => school.district === profile.district)
+            .filter(school => school.district === selectedDistrict)
             .map(school => school.schoolName)
             .sort();
-    }, [profile?.district]);
+    }, [allPlayers, selectedDistrict]);
     
     const displayedSchools = useMemo(() => {
-        if (selectedSchool === 'all') {
-            return districtSchools;
+        let schoolsToDisplay = districtSchools;
+        if (selectedSchool !== 'all') {
+            schoolsToDisplay = schoolsToDisplay.filter(school => school === selectedSchool);
         }
-        return districtSchools.filter(school => school === selectedSchool);
-    }, [selectedSchool, districtSchools]);
+        if (showActiveOnly) {
+            const activeSchools = new Set(districtPlayers.map(p => p.school));
+            schoolsToDisplay = schoolsToDisplay.filter(school => activeSchools.has(school));
+        }
+        return schoolsToDisplay;
+    }, [selectedSchool, districtSchools, showActiveOnly, districtPlayers]);
 
     const requestSort = (key: DistrictSortableColumnKey) => {
         let direction: 'ascending' | 'descending' = 'ascending';
@@ -451,7 +470,7 @@ function DistrictRosterView() {
     
     const sortedPlayersForSchool = (schoolRoster: MasterPlayer[]) => {
       let filteredRoster = schoolRoster;
-      if (profile?.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+      if (profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') {
         if (playerTypeFilter === 'gt') {
             filteredRoster = schoolRoster.filter(p => p.studentType === 'gt');
         } else if (playerTypeFilter === 'independent') {
@@ -488,16 +507,26 @@ function DistrictRosterView() {
             <div>
                 <h1 className="text-3xl font-bold font-headline">District Rosters</h1>
                 <p className="text-muted-foreground">
-                    An overview of all player rosters for each school in your district: {profile?.district}
+                    An overview of all player rosters for each school in {profile?.role === 'organizer' ? 'all districts' : `your district: ${profile?.district}`}
                 </p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+                {profile?.role === 'organizer' && (
+                    <div className="w-full sm:w-64">
+                        <Label htmlFor="district-filter">Filter by District</Label>
+                        <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                            <SelectTrigger id="district-filter"><SelectValue placeholder="Select a district" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Districts</SelectItem>
+                                {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
                 <div className="w-full sm:w-64">
                     <Label htmlFor="school-filter">Filter by School</Label>
                     <Select value={selectedSchool} onValueChange={setSelectedSchool}>
-                        <SelectTrigger id="school-filter">
-                            <SelectValue placeholder="Select a school" />
-                        </SelectTrigger>
+                        <SelectTrigger id="school-filter"><SelectValue placeholder="Select a school" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Schools</SelectItem>
                             {districtSchools.map(school => (
@@ -506,80 +535,77 @@ function DistrictRosterView() {
                         </SelectContent>
                     </Select>
                 </div>
-                 {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                    <div className="w-full sm:w-64">
+                 {(profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') && (
+                    <div className="w-full sm:w-auto">
                         <Label>Filter by Player Type</Label>
-                        <RadioGroup defaultValue="all" onValueChange={setPlayerTypeFilter} className="flex items-center space-x-4 pt-2">
-                           <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all">All</Label></div>
-                           <div className="flex items-center space-x-2"><RadioGroupItem value="gt" id="gt" /><Label htmlFor="gt">GT</Label></div>
-                           <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent">Independent</Label></div>
+                        <RadioGroup value={playerTypeFilter} onValueChange={setPlayerTypeFilter} className="flex items-center space-x-4 pt-2">
+                           <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all" className="cursor-pointer">All</Label></div>
+                           <div className="flex items-center space-x-2"><RadioGroupItem value="gt" id="gt" /><Label htmlFor="gt" className="cursor-pointer">GT</Label></div>
+                           <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent" className="cursor-pointer">Independent</Label></div>
                         </RadioGroup>
                     </div>
                  )}
+                 <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox id="active-schools" checked={showActiveOnly} onCheckedChange={(checked) => setShowActiveOnly(!!checked)} />
+                    <Label htmlFor="active-schools" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Show only schools with players
+                    </Label>
+                </div>
             </div>
 
             {displayedSchools.map(school => {
                 const schoolRoster = districtPlayers.filter(p => p.school === school);
                 const sortedSchoolRoster = sortedPlayersForSchool(schoolRoster);
 
-                if (sortedSchoolRoster.length === 0) {
-                     return (
-                        <Card key={school}>
-                            <CardHeader>
-                                <CardTitle className="text-lg">{school}</CardTitle>
-                                <CardDescription>0 player(s) matching filter</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-center py-8 text-muted-foreground">
-                                    No players found for the selected filter.
-                                </div>
-                            </CardContent>
-                        </Card>
-                     );
-                }
+                if (sortedSchoolRoster.length === 0 && showActiveOnly) return null;
+                
                 return (
                     <Card key={school}>
                         <CardHeader>
                             <CardTitle className="text-lg">{school}</CardTitle>
-                            <CardDescription>{sortedSchoolRoster.length} player(s) found</CardDescription>
+                            <CardDescription>{sortedSchoolRoster.length} player(s) found {playerTypeFilter !== 'all' ? `matching '${playerTypeFilter}'` : ''}</CardDescription>
                         </CardHeader>
                         <CardContent>
-                          <ScrollArea className="h-72">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')}>Player Name {getSortIcon('lastName')}</Button></TableHead>
-                                        <TableHead><Button variant="ghost" onClick={() => requestSort('teamCode')}>Team Code {getSortIcon('teamCode')}</Button></TableHead>
-                                        <TableHead><Button variant="ghost" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
-                                        <TableHead><Button variant="ghost" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
-                                        <TableHead><Button variant="ghost" onClick={() => requestSort('grade')}>Grade {getSortIcon('grade')}</Button></TableHead>
-                                        <TableHead><Button variant="ghost" onClick={() => requestSort('section')}>Section {getSortIcon('section')}</Button></TableHead>
-                                        {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                                            <TableHead><Button variant="ghost" onClick={() => requestSort('gt')}>GT {getSortIcon('gt')}</Button></TableHead>
-                                        )}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {sortedSchoolRoster.map((player) => (
-                                    <TableRow key={player.id}>
-                                        <TableCell>
-                                          <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                                        </TableCell>
-                                        <TableCell>{generateTeamCode({ schoolName: player.school, district: player.district, studentType: player.studentType })}</TableCell>
-                                        <TableCell>{player.uscfId}</TableCell>
-                                        <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
-                                        <TableCell>{player.grade}</TableCell>
-                                        <TableCell>{player.section}</TableCell>
-                                        {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                          {sortedSchoolRoster.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">No players found.</div>
+                          ) : (
+                            <ScrollArea className="h-72">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')}>Player Name {getSortIcon('lastName')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" onClick={() => requestSort('teamCode')}>Team Code {getSortIcon('teamCode')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" onClick={() => requestSort('grade')}>Grade {getSortIcon('grade')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" onClick={() => requestSort('section')}>Section {getSortIcon('section')}</Button></TableHead>
+                                            {(profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') && (
+                                                <TableHead><Button variant="ghost" onClick={() => requestSort('gt')}>GT {getSortIcon('gt')}</Button></TableHead>
+                                            )}
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {sortedSchoolRoster.map((player) => (
+                                        <TableRow key={player.id}>
                                             <TableCell>
-                                                {player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
+                                              <div className="font-medium">{player.lastName}, {player.firstName}</div>
                                             </TableCell>
-                                        )}
-                                    </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                          </ScrollArea>
+                                            <TableCell>{generateTeamCode({ schoolName: player.school, district: player.district, studentType: player.studentType })}</TableCell>
+                                            <TableCell>{player.uscfId}</TableCell>
+                                            <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
+                                            <TableCell>{player.grade}</TableCell>
+                                            <TableCell>{player.section}</TableCell>
+                                            {(profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') && (
+                                                <TableCell>
+                                                    {player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
+                                                </TableCell>
+                                            )}
+                                        </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                          )}
                         </CardContent>
                     </Card>
                 )
@@ -596,7 +622,7 @@ function RosterPageContent() {
         return <AppLayout><Skeleton className="h-[60vh] w-full" /></AppLayout>;
     }
 
-    if (profile?.role === 'district_coordinator') {
+    if (profile?.role === 'district_coordinator' || profile?.role === 'organizer') {
         return <DistrictRosterView />;
     }
 
