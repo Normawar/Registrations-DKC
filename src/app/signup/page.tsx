@@ -137,7 +137,7 @@ const SponsorSignUpForm = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitialized, schoolData]);
   
-async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
+  async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     setIsLoading(true);
     
     try {
@@ -157,23 +157,15 @@ async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
       const { password, email, ...profileValues } = values;
       const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
       
-      const existingProfileSnap = await getDoc(doc(db, 'users', email.toLowerCase()));
-      let profileData = {};
-
-      if (existingProfileSnap.exists()) {
-        console.log("Existing profile found, linking to new Auth account.");
-        profileData = { ...existingProfileSnap.data(), ...profileValues, role, isDistrictCoordinator: isCoordinator };
-      } else {
-        profileData = {
-          ...profileValues,
-          role: role,
-          avatarType: 'icon',
-          avatarValue: 'KingIcon',
-          schoolAddress: schoolInfo?.streetAddress || '',
-          schoolPhone: schoolInfo?.phone || '',
-          isDistrictCoordinator: isCoordinator,
-        };
-      }
+      const profileData = {
+        ...profileValues,
+        role: role,
+        avatarType: 'icon',
+        avatarValue: 'KingIcon',
+        schoolAddress: schoolInfo?.streetAddress || '',
+        schoolPhone: schoolInfo?.phone || '',
+        isDistrictCoordinator: isCoordinator,
+      };
       
       const result = await simpleSignUp(email, password, profileData);
       
@@ -252,10 +244,13 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     defaultValues: { firstName: "", lastName: "", email: "", password: "" },
   });
 
-async function onSubmit(values: z.infer<typeof individualFormSchema>) {
+  async function onSubmit(values: z.infer<typeof individualFormSchema>) {
     setIsLoading(true);
     
     try {
+      const { simpleSignUp, checkFirebaseConfig } = await import('@/lib/simple-auth');
+      
+      // Check Firebase configuration first
       if (!checkFirebaseConfig()) {
         toast({
           variant: 'destructive',
@@ -277,33 +272,23 @@ async function onSubmit(values: z.infer<typeof individualFormSchema>) {
         return;
       }
 
-      const existingProfileSnap = await getDoc(doc(db, 'users', email.toLowerCase()));
-      let profileData = {};
-
-      if (existingProfileSnap.exists()) {
-        console.log("Existing profile found, linking to new Auth account.");
-        profileData = { ...existingProfileSnap.data(), ...profileValues, role };
-      } else {
-        profileData = {
-            ...profileValues,
-            phone: '',
-            district: 'None',
-            school: 'Homeschool',
-            gtCoordinatorEmail: '',
-            bookkeeperEmail: '',
-            schoolAddress: '',
-            schoolPhone: '',
-            role: role,
-            avatarType: 'icon',
-            avatarValue: 'PawnIcon',
-        };
-      }
+      const profileData = {
+          ...profileValues,
+          phone: '',
+          district: 'None',
+          school: 'Homeschool',
+          gtCoordinatorEmail: '',
+          bookkeeperEmail: '',
+          schoolAddress: '',
+          schoolPhone: '',
+          role: role,
+          avatarType: 'icon',
+          avatarValue: 'PawnIcon',
+      };
       
       const result = await simpleSignUp(email, password, profileData);
       
       if (result.success) {
-        await updateProfile(result.profile as SponsorProfile);
-        
         toast({
             title: "Account Created!",
             description: `Your new ${role} account has been successfully created.`,
