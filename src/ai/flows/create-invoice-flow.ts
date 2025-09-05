@@ -202,10 +202,10 @@ const createInvoiceFlow = ai.defineFlow(
       const formattedEventDate = format(new Date(input.eventDate), 'MM/dd/yyyy');
 
       const ccRecipients: InvoiceRecipient[] = [];
-      if (input.bookkeeperEmail) {
+      if (input.bookkeeperEmail && input.bookkeeperEmail.trim() !== '') {
           ccRecipients.push({ emailAddress: input.bookkeeperEmail });
       }
-      if (input.gtCoordinatorEmail) {
+      if (input.gtCoordinatorEmail && input.gtCoordinatorEmail.trim() !== '') {
           ccRecipients.push({ emailAddress: input.gtCoordinatorEmail });
       }
 
@@ -217,12 +217,12 @@ const createInvoiceFlow = ai.defineFlow(
           primaryRecipient: {
             customerId: customerId,
           },
-          ccRecipients: ccRecipients,
+          ccRecipients: ccRecipients.length > 0 ? ccRecipients : undefined,
           paymentRequests: [{
             requestType: 'BALANCE',
             dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
           }],
-          deliveryMethod: 'SHARE_MANUALLY',
+          deliveryMethod: 'EMAIL',
           acceptedPaymentMethods: {
             card: true,
             squareGiftCard: true,

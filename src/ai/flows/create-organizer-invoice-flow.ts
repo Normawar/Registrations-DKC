@@ -154,10 +154,10 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
       dueDate.setDate(dueDate.getDate() + 14); // Invoice due in 14 days
 
       const ccRecipients: InvoiceRecipient[] = [];
-      if (input.bookkeeperEmail) {
+      if (input.bookkeeperEmail && input.bookkeeperEmail.trim() !== '') {
           ccRecipients.push({ emailAddress: input.bookkeeperEmail });
       }
-      if (input.gtCoordinatorEmail) {
+      if (input.gtCoordinatorEmail && input.gtCoordinatorEmail.trim() !== '') {
           ccRecipients.push({ emailAddress: input.gtCoordinatorEmail });
       }
 
@@ -169,12 +169,12 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
           primaryRecipient: {
             customerId: customerId,
           },
-          ccRecipients: ccRecipients,
+          ccRecipients: ccRecipients.length > 0 ? ccRecipients : undefined,
           paymentRequests: [{
             requestType: 'BALANCE',
             dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
           }],
-          deliveryMethod: 'SHARE_MANUALLY',
+          deliveryMethod: 'EMAIL',
           acceptedPaymentMethods: {
             card: true,
             squareGiftCard: true,
