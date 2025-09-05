@@ -33,9 +33,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dialog";
+import { SponsorGuard } from "@/components/auth-guard";
 
 
-export default function DashboardPage() {
+function DashboardContent() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
   const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
@@ -290,5 +291,13 @@ export default function DashboardPage() {
         event={selectedEvent}
       />
     </>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <SponsorGuard>
+      <DashboardContent />
+    </SponsorGuard>
   );
 }

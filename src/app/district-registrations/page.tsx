@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Papa from 'papaparse';
+import { DistrictCoordinatorGuard } from '@/components/auth-guard';
 
 type RegistrationInfo = {
   player: MasterPlayer;
@@ -27,7 +28,7 @@ type RegistrationInfo = {
   invoiceNumber?: string;
 };
 
-export default function DistrictRegistrationsPage() {
+function DistrictRegistrationsContent() {
   const { profile } = useSponsorProfile();
   const { events } = useEvents();
   const { database: allPlayers, isDbLoaded } = useMasterDb();
@@ -242,4 +243,12 @@ export default function DistrictRegistrationsPage() {
       </div>
     </AppLayout>
   );
+}
+
+export default function DistrictRegistrationsPage() {
+    return (
+        <DistrictCoordinatorGuard>
+            <DistrictRegistrationsContent />
+        </DistrictCoordinatorGuard>
+    );
 }

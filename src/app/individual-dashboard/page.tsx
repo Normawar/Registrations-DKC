@@ -35,9 +35,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { IndividualRegistrationDialog } from "@/components/individual-registration-dialog";
 import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 import { useToast } from "@/hooks/use-toast";
+import { IndividualGuard } from "@/components/auth-guard";
 
 
-export default function IndividualDashboardPage() {
+function IndividualDashboardContent() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
   const { profile } = useSponsorProfile();
@@ -286,4 +287,12 @@ export default function IndividualDashboardPage() {
       )}
     </>
   );
+}
+
+export default function IndividualDashboardPage() {
+    return (
+        <IndividualGuard>
+            <IndividualDashboardContent />
+        </IndividualGuard>
+    );
 }

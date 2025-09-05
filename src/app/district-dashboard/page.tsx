@@ -26,9 +26,10 @@ import { useState, useMemo, useEffect } from "react";
 import { Building, Users, FileText, Award } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DistrictCoordinatorGuard } from "@/components/auth-guard";
 
 
-export default function DistrictDashboardPage() {
+function DistrictDashboardContent() {
   const { profile } = useSponsorProfile();
   const { database: allPlayers } = useMasterDb();
   const [clientReady, setClientReady] = useState(false);
@@ -123,4 +124,12 @@ export default function DistrictDashboardPage() {
       </div>
     </AppLayout>
   );
+}
+
+export default function DistrictDashboardPage() {
+    return (
+        <DistrictCoordinatorGuard>
+            <DistrictDashboardContent />
+        </DistrictCoordinatorGuard>
+    );
 }
