@@ -1,6 +1,8 @@
 
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 import { auth, db } from '@/lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+
 
 // Simple signup function with detailed error logging
 export async function simpleSignUp(email: string, password: string, userData: any) {
@@ -145,43 +147,14 @@ export async function simpleSignIn(email: string, password: string) {
     
     let userFriendlyMessage = 'An error occurred during login.';
     
-    // --- THIS IS THE CRITICAL FIX ---
-    // If credential is invalid, check if a profile exists and create an Auth user for them.
+    // If sign-in fails, check for a legacy profile and prompt user to sign up
+    // to complete the migration.
     if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-        console.log('Login failed. Checking for existing profile to migrate...');
-        const { doc, getDoc, setDoc } = await import('firebase/firestore');
-        const { createUserWithEmailAndPassword } = await import('firebase/auth');
-        
         const legacyDocRef = doc(db, 'users', email.toLowerCase());
         const legacyDoc = await getDoc(legacyDocRef);
         
         if (legacyDoc.exists()) {
-            console.log('Legacy profile found. Creating Auth account...');
-            try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                const user = userCredential.user;
-                const profileData = legacyDoc.data();
-
-                // Update the document to be keyed by UID instead of email
-                await setDoc(doc(db, 'users', user.uid), {
-                    ...profileData,
-                    uid: user.uid,
-                    migratedAt: new Date().toISOString()
-                });
-                // We could delete the old email-keyed doc, but let's leave it for now.
-                
-                console.log(`✅ Successfully created Auth account for ${email} and migrated profile.`);
-                
-                return {
-                    success: true,
-                    user: user,
-                    profile: profileData
-                };
-
-            } catch (creationError: any) {
-                console.error('Failed to create auth account during migration:', creationError);
-                userFriendlyMessage = 'Your account needs to be setup. Please try signing up first.';
-            }
+            userFriendlyMessage = "Your account needs to be updated. Please use the 'Sign Up' tab to create a new password for your existing account.";
         } else {
             userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
         }

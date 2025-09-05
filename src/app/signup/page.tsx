@@ -7,6 +7,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +34,7 @@ import { schoolData as initialSchoolData, type School } from '@/lib/data/school-
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
-import { AuthService } from '@/lib/auth'; // New auth service
+import { simpleSignUp, checkFirebaseConfig } from '@/lib/simple-auth';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -139,10 +141,6 @@ async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     setIsLoading(true);
     
     try {
-      // Import the simple auth functions
-      const { simpleSignUp, checkFirebaseConfig } = await import('@/lib/simple-auth');
-      
-      // Check Firebase configuration first
       if (!checkFirebaseConfig()) {
         toast({
           variant: 'destructive',
@@ -158,23 +156,29 @@ async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
 
       const { password, email, ...profileValues } = values;
       const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
-
-      const profileData = {
-        ...profileValues,
-        role: role,
-        avatarType: 'icon',
-        avatarValue: 'KingIcon',
-        schoolAddress: schoolInfo?.streetAddress || '',
-        schoolPhone: schoolInfo?.phone || '',
-        isDistrictCoordinator: isCoordinator,
-      };
       
-      // Use the simple signup function
+      const existingProfileSnap = await getDoc(doc(db, 'users', email.toLowerCase()));
+      let profileData = {};
+
+      if (existingProfileSnap.exists()) {
+        console.log("Existing profile found, linking to new Auth account.");
+        profileData = { ...existingProfileSnap.data(), ...profileValues, role, isDistrictCoordinator: isCoordinator };
+      } else {
+        profileData = {
+          ...profileValues,
+          role: role,
+          avatarType: 'icon',
+          avatarValue: 'KingIcon',
+          schoolAddress: schoolInfo?.streetAddress || '',
+          schoolPhone: schoolInfo?.phone || '',
+          isDistrictCoordinator: isCoordinator,
+        };
+      }
+      
       const result = await simpleSignUp(email, password, profileData);
       
       if (result.success) {
-        // Update local profile state if you have the context
-        // await updateProfile(result.profile);
+        await updateProfile(result.profile as SponsorProfile);
         
         toast({
             title: "Account Created!",
@@ -252,9 +256,6 @@ async function onSubmit(values: z.infer<typeof individualFormSchema>) {
     setIsLoading(true);
     
     try {
-      const { simpleSignUp, checkFirebaseConfig } = await import('@/lib/simple-auth');
-      
-      // Check Firebase configuration first
       if (!checkFirebaseConfig()) {
         toast({
           variant: 'destructive',
@@ -276,23 +277,33 @@ async function onSubmit(values: z.infer<typeof individualFormSchema>) {
         return;
       }
 
-      const profileData = {
-          ...profileValues,
-          phone: '',
-          district: 'None',
-          school: 'Homeschool',
-          gtCoordinatorEmail: '',
-          bookkeeperEmail: '',
-          schoolAddress: '',
-          schoolPhone: '',
-          role: role,
-          avatarType: 'icon',
-          avatarValue: 'PawnIcon',
-      };
+      const existingProfileSnap = await getDoc(doc(db, 'users', email.toLowerCase()));
+      let profileData = {};
+
+      if (existingProfileSnap.exists()) {
+        console.log("Existing profile found, linking to new Auth account.");
+        profileData = { ...existingProfileSnap.data(), ...profileValues, role };
+      } else {
+        profileData = {
+            ...profileValues,
+            phone: '',
+            district: 'None',
+            school: 'Homeschool',
+            gtCoordinatorEmail: '',
+            bookkeeperEmail: '',
+            schoolAddress: '',
+            schoolPhone: '',
+            role: role,
+            avatarType: 'icon',
+            avatarValue: 'PawnIcon',
+        };
+      }
       
       const result = await simpleSignUp(email, password, profileData);
       
       if (result.success) {
+        await updateProfile(result.profile as SponsorProfile);
+        
         toast({
             title: "Account Created!",
             description: `Your new ${role} account has been successfully created.`,
