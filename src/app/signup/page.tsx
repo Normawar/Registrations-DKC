@@ -1,4 +1,4 @@
-
+// src/app/signup/page.tsx - Updated with Firebase Auth
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -6,7 +6,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +31,7 @@ import { schoolData as initialSchoolData, type School } from '@/lib/data/school-
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/services/firestore-service';
+import { AuthService } from '@/lib/auth'; // New auth service
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -115,7 +114,7 @@ const SponsorSignUpForm = () => {
             .filter((school) => school.district === district)
             .map((school) => school.schoolName)
             .sort();
-        filteredSchools.unshift("All Schools"); // Add "All Schools" option
+        filteredSchools.unshift("All Schools");
     }
     setSchoolsForDistrict([...new Set(filteredSchools)]);
 
@@ -139,35 +138,14 @@ const SponsorSignUpForm = () => {
     setIsLoading(true);
     
     try {
-      if (!db) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Database service is not available.' });
-          setIsLoading(false);
-          return;
-      }
-      const lowercasedEmail = values.email.toLowerCase();
-      
-      const userDocRef = doc(db, "users", lowercasedEmail);
-      const userDoc = await getDoc(userDocRef);
-      
-      if (userDoc.exists()) {
-          const existingUser = userDoc.data() as SponsorProfile;
-          form.setError('email', {
-              type: 'manual',
-              message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
-          });
-          setIsLoading(false);
-          return;
-      }
-      
       const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
       const role = isCoordinator ? 'district_coordinator' : 'sponsor';
 
-      const { password, ...profileValues } = values;
+      const { password, email, ...profileValues } = values;
       const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
 
-      const profileData: SponsorProfile = {
+      const profileData: Omit<SponsorProfile, 'email'> = {
         ...profileValues,
-        email: lowercasedEmail,
         role: role,
         avatarType: 'icon',
         avatarValue: 'KingIcon',
@@ -176,11 +154,15 @@ const SponsorSignUpForm = () => {
         isDistrictCoordinator: isCoordinator,
       };
       
-      await updateProfile(profileData);
+      // Use Firebase Auth to create user and Firestore profile
+      const { user, profile } = await AuthService.signUp(email, password, profileData);
+      
+      // Update local profile state
+      await updateProfile(profile);
       
       toast({
           title: "Account Created!",
-          description: `Your ${role} account has been created. Please complete your profile.`,
+          description: `Your ${role} account has been created successfully.`,
       });
       
       setTimeout(() => {
@@ -188,10 +170,20 @@ const SponsorSignUpForm = () => {
       }, 100);
     } catch (error) {
       console.error('Signup error:', error);
-      toast({
-        title: "Error",
-        description: "An error occurred while creating your account. Please try again.",
-      });
+      
+      // Handle specific errors
+      if (error instanceof Error) {
+        form.setError('email', {
+          type: 'manual',
+          message: error.message,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: "Error",
+          description: "An error occurred while creating your account. Please try again.",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -229,7 +221,6 @@ const SponsorSignUpForm = () => {
   );
 };
 
-
 const individualFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
   lastName: z.string().min(1, { message: "Last name is required." }),
@@ -252,14 +243,9 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     setIsLoading(true);
     
     try {
-      if (!db) {
-          toast({ variant: 'destructive', title: 'Error', description: 'Database service is not available.' });
-          setIsLoading(false);
-          return;
-      }
-      const lowercasedEmail = values.email.toLowerCase();
+      const { password, email, ...profileValues } = values;
 
-      if (role === 'organizer' && !lowercasedEmail.endsWith('@dkchess.com')) {
+      if (role === 'organizer' && !email.toLowerCase().endsWith('@dkchess.com')) {
         form.setError('email', {
           type: 'manual',
           message: 'Only @dkchess.com emails can register as organizers.',
@@ -267,25 +253,9 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         setIsLoading(false);
         return;
       }
-      
-      const userDocRef = doc(db, "users", lowercasedEmail);
-      const userDoc = await getDoc(userDocRef);
 
-      if (userDoc.exists()) {
-          const existingUser = userDoc.data() as SponsorProfile;
-          form.setError('email', {
-              type: 'manual',
-              message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
-          });
-          setIsLoading(false);
-          return;
-      }
-
-      const { password, ...profileValues } = values;
-
-      const profileData: SponsorProfile = {
+      const profileData: Omit<SponsorProfile, 'email'> = {
           ...profileValues,
-          email: lowercasedEmail,
           phone: '',
           district: 'None',
           school: 'Homeschool',
@@ -298,7 +268,11 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
           avatarValue: 'PawnIcon',
       };
       
-      await updateProfile(profileData);
+      // Use Firebase Auth to create user and Firestore profile
+      const { user, profile } = await AuthService.signUp(email, password, profileData);
+      
+      // Update local profile state
+      await updateProfile(profile);
       
       toast({
           title: "Account Created!",
@@ -314,10 +288,19 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       }, 100);
     } catch (error) {
       console.error('Signup error:', error);
-      toast({
-        title: "Error",
-        description: "An error occurred while creating your account. Please try again.",
-      });
+      
+      if (error instanceof Error) {
+        form.setError('email', {
+          type: 'manual',
+          message: error.message,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: "Error",
+          description: "An error occurred while creating your account. Please try again.",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
