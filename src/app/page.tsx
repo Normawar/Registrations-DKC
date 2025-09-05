@@ -64,7 +64,6 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
             const result = await simpleSignIn(values.email, values.password);
             
             if (result.success) {
-                await updateProfile(result.profile as SponsorProfile);
                 toast({
                     title: "Login Successful",
                     description: `Welcome back, ${result.profile.firstName}!`,
