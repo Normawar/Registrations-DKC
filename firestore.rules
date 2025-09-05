@@ -3,11 +3,8 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read and write access to all documents for the next 30 days.
-    // This is a temporary rule for development and should be replaced
-    // with more secure rules before launching your application.
     match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2025, 1, 1);
+      allow read, write: if request.time < timestamp.date(2024, 8, 20);
     }
   }
 }
