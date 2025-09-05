@@ -4,8 +4,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { User } from 'firebase/auth';
+import { AuthService } from '@/lib/auth';
 
 export type SponsorProfile = {
   firstName: string;
@@ -22,47 +22,24 @@ export type SponsorProfile = {
   avatarValue: string; // Icon name or image URL
   role: 'sponsor' | 'organizer' | 'individual' | 'district_coordinator';
   isDistrictCoordinator?: boolean;
+  uid?: string; // Ensure UID is part of the profile
 };
 
 // This hook now manages the auth user and their profile data together
 export function useSponsorProfile() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<SponsorProfile | null>(null);
-  const [isProfileLoaded, setIsProfileLoaded] = useState(false);
-
-  const fetchProfile = useCallback(async (uid: string) => {
-    if (!db) {
-      console.error("Firestore is not initialized.");
-      setIsProfileLoaded(true);
-      return;
-    }
-    const docRef = doc(db, "users", uid);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      setProfile(docSnap.data() as SponsorProfile);
-    } else {
-      console.log("No such profile!");
-      setProfile(null);
-    }
-    setIsProfileLoaded(true);
-  }, []);
+  const [loading, setLoading] = useState(true);
 
   // Listen for auth state changes to keep user and profile in sync
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (authUser) => {
-      if (authUser) {
+    const unsubscribe = AuthService.onAuthStateChanged((authUser, userProfile) => {
         setUser(authUser);
-        fetchProfile(authUser.uid);
-      } else {
-        setUser(null);
-        setProfile(null);
-        setIsProfileLoaded(true);
-      }
+        setProfile(userProfile);
+        setLoading(false);
     });
-
     return () => unsubscribe();
-  }, [fetchProfile]);
+  }, []);
 
 
   const updateProfile = useCallback(async (newProfileData: Partial<SponsorProfile> | null) => {
@@ -76,12 +53,11 @@ export function useSponsorProfile() {
     }
 
     if (newProfileData === null) {
-      // This is now handled by signOut, but we keep it for safety
       setProfile(null);
       return;
     }
 
-    const updatedProfile = { ...(profile || {}), ...newProfileData, email: user.email } as SponsorProfile;
+    const updatedProfile = { ...(profile || {}), ...newProfileData, email: user.email, uid: user.uid } as SponsorProfile;
 
     try {
         const docRef = doc(db, "users", user.uid);
@@ -93,5 +69,5 @@ export function useSponsorProfile() {
 
   }, [profile, user]);
   
-  return { user, profile, updateProfile, isProfileLoaded };
+  return { user, profile, updateProfile, isProfileLoaded: !loading, loading };
 }

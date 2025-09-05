@@ -1,3 +1,4 @@
+
 // src/components/auth-guard.tsx - Route protection component
 'use client';
 
@@ -13,12 +14,12 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuardProps) {
-  const { profile, isProfileLoaded } = useSponsorProfile();
+  const { profile, loading } = useSponsorProfile();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isProfileLoaded) {
-      return; // Wait until profile is loaded
+    if (loading) {
+      return; // Wait until loading is complete
     }
 
     if (!profile) {
@@ -31,7 +32,9 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       // Check if user has required role
       const hasRequiredRole = 
         profile.role === requiredRole || 
-        (requiredRole === 'sponsor' && profile.role === 'district_coordinator');
+        (requiredRole === 'sponsor' && profile.role === 'district_coordinator') ||
+        (requiredRole === 'district_coordinator' && profile.role === 'organizer');
+
 
       if (!hasRequiredRole) {
         // User doesn't have required role, redirect to appropriate dashboard
@@ -43,7 +46,11 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
             router.push('/district-dashboard');
             break;
           case 'sponsor':
-            router.push('/dashboard');
+            if (profile.isDistrictCoordinator) {
+              router.push('/auth/role-selection');
+            } else {
+              router.push('/dashboard');
+            }
             break;
           case 'individual':
             router.push('/individual-dashboard');
@@ -54,10 +61,10 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
         return;
       }
     }
-  }, [profile, isProfileLoaded, requiredRole, router, redirectTo]);
+  }, [profile, loading, requiredRole, router, redirectTo]);
 
   // Show loading state while checking authentication
-  if (!isProfileLoaded) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="space-y-4">
@@ -68,9 +75,16 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       </div>
     );
   }
+  
+    const hasRequiredRoleCheck = !requiredRole || (profile && (
+        profile.role === requiredRole ||
+        (requiredRole === 'sponsor' && profile.role === 'district_coordinator') ||
+        (requiredRole === 'district_coordinator' && profile.role === 'organizer')
+    ));
+
 
   // Don't render children if user is not authenticated or doesn't have the role yet
-  if (!profile || (requiredRole && profile.role !== requiredRole && !(requiredRole === 'sponsor' && profile.role === 'district_coordinator'))) {
+  if (!profile || !hasRequiredRoleCheck) {
     return null;
   }
 
