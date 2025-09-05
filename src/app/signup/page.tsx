@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
+import { doc, getDoc } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +32,7 @@ import { schoolData as initialSchoolData, type School } from '@/lib/data/school-
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/services/firestore-service';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -137,17 +139,18 @@ const SponsorSignUpForm = () => {
     setIsLoading(true);
     
     try {
+      if (!db) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Database service is not available.' });
+          setIsLoading(false);
+          return;
+      }
       const lowercasedEmail = values.email.toLowerCase();
       
-      // Add a small delay to prevent UI blocking
-      await new Promise(resolve => setTimeout(resolve, 100));
+      const userDocRef = doc(db, "users", lowercasedEmail);
+      const userDoc = await getDoc(userDocRef);
       
-      const usersRaw = localStorage.getItem('users');
-      const users: {email: string; role: 'sponsor' | 'individual' | 'organizer' | 'district_coordinator'}[] = usersRaw ? JSON.parse(usersRaw) : [];
-      
-      const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
-
-      if (existingUser) {
+      if (userDoc.exists()) {
+          const existingUser = userDoc.data() as SponsorProfile;
           form.setError('email', {
               type: 'manual',
               message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
@@ -159,10 +162,6 @@ const SponsorSignUpForm = () => {
       const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
       const role = isCoordinator ? 'district_coordinator' : 'sponsor';
 
-      const newUser = { email: lowercasedEmail, role: role };
-      const updatedUsers = [...users, newUser];
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
-      
       const { password, ...profileValues } = values;
       const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
 
@@ -177,14 +176,13 @@ const SponsorSignUpForm = () => {
         isDistrictCoordinator: isCoordinator,
       };
       
-      updateProfile(profileData);
+      await updateProfile(profileData);
       
       toast({
           title: "Account Created!",
           description: `Your ${role} account has been created. Please complete your profile.`,
       });
       
-      // Use setTimeout to ensure all state updates complete before navigation
       setTimeout(() => {
         router.push('/profile');
       }, 100);
@@ -254,6 +252,11 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     setIsLoading(true);
     
     try {
+      if (!db) {
+          toast({ variant: 'destructive', title: 'Error', description: 'Database service is not available.' });
+          setIsLoading(false);
+          return;
+      }
       const lowercasedEmail = values.email.toLowerCase();
 
       if (role === 'organizer' && !lowercasedEmail.endsWith('@dkchess.com')) {
@@ -265,15 +268,11 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         return;
       }
       
-      // Add delay to prevent UI blocking
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      const usersRaw = localStorage.getItem('users');
-      const users: {email: string; role: 'sponsor' | 'individual' | 'organizer'}[] = usersRaw ? JSON.parse(usersRaw) : [];
+      const userDocRef = doc(db, "users", lowercasedEmail);
+      const userDoc = await getDoc(userDocRef);
 
-      const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
-
-      if (existingUser) {
+      if (userDoc.exists()) {
+          const existingUser = userDoc.data() as SponsorProfile;
           form.setError('email', {
               type: 'manual',
               message: `This email is already registered as a ${existingUser.role}. Please sign in.`,
@@ -282,10 +281,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
           return;
       }
 
-      const newUser = { email: lowercasedEmail, role: role };
-      const updatedUsers = [...users, newUser];
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
-      
       const { password, ...profileValues } = values;
 
       const profileData: SponsorProfile = {
@@ -303,7 +298,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
           avatarValue: 'PawnIcon',
       };
       
-      updateProfile(profileData);
+      await updateProfile(profileData);
       
       toast({
           title: "Account Created!",
@@ -314,7 +309,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       if (role === 'individual') path = '/individual-dashboard';
       else if (role === 'organizer') path = '/manage-events';
       
-      // Use setTimeout to ensure all updates complete before navigation
       setTimeout(() => {
         router.push(path);
       }, 100);

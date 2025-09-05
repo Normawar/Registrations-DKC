@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
+import { doc, getDoc } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { db } from '@/lib/services/firestore-service';
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -44,24 +46,22 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
         setIsLoading(true);
         
         try {
+            if (!db) {
+                toast({ variant: 'destructive', title: 'Error', description: 'Database service is not available.' });
+                setIsLoading(false);
+                return;
+            }
             const lowercasedEmail = values.email.toLowerCase();
-            
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            const usersRaw = localStorage.getItem('users');
-            const users: {email: string; role: 'sponsor' | 'individual' | 'organizer' | 'district_coordinator'}[] = usersRaw ? JSON.parse(usersRaw) : [];
-            const profilesRaw = localStorage.getItem('sponsor_profile');
-            const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
+            const userDocRef = doc(db, "users", lowercasedEmail);
+            const userDoc = await getDoc(userDocRef);
 
-            const existingUser = users.find(user => user.email.toLowerCase() === lowercasedEmail);
-            const userProfile = profiles[lowercasedEmail];
-            
-            if (existingUser && userProfile) {
-                const isCorrectTab = (
-                    (userProfile.role === role) ||
-                    (userProfile.role === 'organizer' && role === 'organizer') ||
-                    (userProfile.role === 'district_coordinator' && role === 'organizer')
-                );
+            if (userDoc.exists()) {
+                const userProfile = userDoc.data() as SponsorProfile;
+
+                const isCorrectTab = 
+                  (role === 'sponsor' && (userProfile.role === 'sponsor' || userProfile.role === 'district_coordinator')) ||
+                  (role === 'organizer' && userProfile.role === 'organizer') ||
+                  (role === 'individual' && userProfile.role === 'individual');
 
                 if (!isCorrectTab) {
                     form.setError("email", {
@@ -79,7 +79,6 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                     description: `Welcome back, ${userProfile.firstName}!`,
                 });
                 
-                // Use a short delay for state updates before navigating
                 setTimeout(() => {
                     switch (userProfile.role) {
                         case 'organizer':
@@ -108,7 +107,6 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                     type: "manual",
                     message: "No account found with this email, or password was incorrect.",
                 });
-                setIsLoading(false);
             }
         } catch (error) {
             console.error('Login error:', error);
@@ -116,7 +114,8 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                 type: "manual",
                 message: "An error occurred during login. Please try again.",
             });
-            setIsLoading(false);
+        } finally {
+          setIsLoading(false);
         }
     }
 

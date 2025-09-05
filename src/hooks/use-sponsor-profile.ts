@@ -2,6 +2,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 export type SponsorProfile = {
   firstName: string;
@@ -20,35 +22,56 @@ export type SponsorProfile = {
   isDistrictCoordinator?: boolean;
 };
 
+// This key will now only store the email of the currently logged-in user.
+const CURRENT_USER_SESSION_KEY = 'current_user_email';
+
 export function useSponsorProfile() {
   const [profile, setProfile] = useState<SponsorProfile | null>(null);
   const [isProfileLoaded, setIsProfileLoaded] = useState(false);
 
-  // Load profile from localStorage on initial mount
-  useEffect(() => {
-    try {
-      const storedProfileRaw = localStorage.getItem('current_user_profile');
-      if (storedProfileRaw) {
-        setProfile(JSON.parse(storedProfileRaw));
-      }
-    } catch (error) {
-      console.error("Failed to load sponsor profile from localStorage", error);
-      setProfile(null);
-    } finally {
-      setIsProfileLoaded(true);
+  const fetchProfile = useCallback(async (email: string) => {
+    if (!db) {
+        console.error("Firestore is not initialized.");
+        setIsProfileLoaded(true);
+        return;
     }
+    const docRef = doc(db, "users", email.toLowerCase());
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      setProfile(docSnap.data() as SponsorProfile);
+    } else {
+      console.log("No such profile!");
+      setProfile(null);
+      localStorage.removeItem(CURRENT_USER_SESSION_KEY);
+    }
+    setIsProfileLoaded(true);
   }, []);
 
-  // Listen for changes from other tabs
+  // Load profile from session on initial mount
+  useEffect(() => {
+    try {
+      const userEmail = localStorage.getItem(CURRENT_USER_SESSION_KEY);
+      if (userEmail) {
+        fetchProfile(userEmail);
+      } else {
+        setIsProfileLoaded(true); // No user logged in
+      }
+    } catch (error) {
+      console.error("Failed to load user session from localStorage", error);
+      setIsProfileLoaded(true);
+    }
+  }, [fetchProfile]);
+  
+  // Listen for changes from other tabs (logout)
   useEffect(() => {
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'current_user_profile') {
-            try {
-                const newProfileRaw = event.newValue;
-                setProfile(newProfileRaw ? JSON.parse(newProfileRaw) : null);
-            } catch (error) {
-                console.error("Failed to handle storage change:", error);
-                setProfile(null);
+        if (event.key === CURRENT_USER_SESSION_KEY) {
+            const newEmail = event.newValue;
+            if (newEmail) {
+              fetchProfile(newEmail);
+            } else {
+              setProfile(null);
             }
         }
     };
@@ -58,38 +81,44 @@ export function useSponsorProfile() {
     return () => {
         window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [fetchProfile]);
 
-  // Update function that sets state and saves to localStorage
-  const updateProfile = useCallback((newProfileData: Partial<SponsorProfile> | null) => {
+  const updateProfile = useCallback(async (newProfileData: Partial<SponsorProfile> | null) => {
+    if (!db) {
+        console.error("Firestore is not initialized. Cannot update profile.");
+        return;
+    }
+
     if (newProfileData === null) {
-      localStorage.removeItem('current_user_profile');
+      localStorage.removeItem(CURRENT_USER_SESSION_KEY);
       setProfile(null);
       return;
     }
+    
+    // The first time a profile is created (during signup), we set the session.
+    // On subsequent updates, we just update the data.
+    const emailToUpdate = (newProfileData.email || profile?.email)?.toLowerCase();
+    if (!emailToUpdate) {
+        console.error("Cannot update profile without an email.");
+        return;
+    }
 
-    setProfile(prevProfile => {
-      const updatedProfile = { ...(prevProfile || {}), ...newProfileData } as SponsorProfile;
-      
-      try {
-        const lowercasedEmail = updatedProfile.email.toLowerCase();
-        
-        // Save the currently active profile
-        localStorage.setItem('current_user_profile', JSON.stringify(updatedProfile));
+    // Set session for new logins/signups
+    if (newProfileData.email) {
+        localStorage.setItem(CURRENT_USER_SESSION_KEY, emailToUpdate);
+    }
 
-        // Update the master list of all profiles
-        const allProfilesRaw = localStorage.getItem('sponsor_profile');
-        const allProfiles = allProfilesRaw ? JSON.parse(allProfilesRaw) : {};
-        allProfiles[lowercasedEmail] = { ...allProfiles[lowercasedEmail], ...updatedProfile };
-        localStorage.setItem('sponsor_profile', JSON.stringify(allProfiles));
-        
-      } catch (error) {
-        console.error("Failed to save sponsor profile to localStorage", error);
-      }
-      
-      return updatedProfile;
-    });
-  }, []);
+    const updatedProfile = { ...(profile || {}), ...newProfileData } as SponsorProfile;
+
+    try {
+        const docRef = doc(db, "users", emailToUpdate);
+        await setDoc(docRef, updatedProfile, { merge: true });
+        setProfile(updatedProfile);
+    } catch (error) {
+        console.error("Failed to save sponsor profile to Firestore", error);
+    }
+
+  }, [profile]);
   
   return { profile, updateProfile, isProfileLoaded };
 }

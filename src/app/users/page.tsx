@@ -5,6 +5,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { collection, getDocs, doc, deleteDoc, setDoc } from 'firebase/firestore';
+
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -20,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
+import { db } from '@/lib/services/firestore-service';
 
 type User = {
     email: string;
@@ -67,26 +70,17 @@ export default function UsersPage() {
     }, []);
 
 
+    const loadUsers = async () => {
+        if (!db) return;
+        const usersCol = collection(db, 'users');
+        const userSnapshot = await getDocs(usersCol);
+        const userList = userSnapshot.docs.map(doc => doc.data() as User);
+        setUsers(userList);
+    };
+
     useEffect(() => {
         loadUsers();
     }, []);
-
-    const loadUsers = () => {
-        const usersRaw = localStorage.getItem('users');
-        const profilesRaw = localStorage.getItem('sponsor_profile');
-        const allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
-        const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
-
-        const enrichedUsers = allUsers.map(user => {
-            const profile = profiles[user.email];
-            return {
-                ...user,
-                ...(profile || {}),
-            };
-        });
-        
-        setUsers(enrichedUsers);
-    };
 
     const form = useForm<UserFormValues>({
         resolver: zodResolver(userFormSchema),
@@ -137,47 +131,36 @@ export default function UsersPage() {
         setIsAlertOpen(true);
     };
 
-    const confirmDelete = () => {
-        if (!userToDelete) return;
+    const confirmDelete = async () => {
+        if (!userToDelete || !db) return;
 
-        const usersRaw = localStorage.getItem('users');
-        let allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
-        allUsers = allUsers.filter(u => u.email !== userToDelete.email);
-        localStorage.setItem('users', JSON.stringify(allUsers));
+        try {
+            await deleteDoc(doc(db, "users", userToDelete.email));
+            loadUsers(); 
+            toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
+        } catch (error) {
+            console.error("Error deleting user:", error);
+            toast({ variant: 'destructive', title: "Deletion Failed", description: "Could not remove user from the database." });
+        }
         
-        const profilesRaw = localStorage.getItem('sponsor_profile');
-        let profiles = profilesRaw ? JSON.parse(profilesRaw) : {};
-        delete profiles[userToDelete.email];
-        localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
-
-        loadUsers(); 
-        toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
         setIsAlertOpen(false);
     };
 
-    const onSubmit = (values: UserFormValues) => {
-        if (!editingUser) return;
+    const onSubmit = async (values: UserFormValues) => {
+        if (!editingUser || !db) return;
 
-        const usersRaw = localStorage.getItem('users');
-        let allUsers: User[] = usersRaw ? JSON.parse(usersRaw) : [];
-        allUsers = allUsers.map(u => 
-            u.email === editingUser.email ? { ...u, role: values.role } : u
-        );
-        localStorage.setItem('users', JSON.stringify(allUsers));
-
-        const profilesRaw = localStorage.getItem('sponsor_profile');
-        const profiles: Record<string, any> = profilesRaw ? JSON.parse(profilesRaw) : {};
-        
-        const existingProfile = profiles[values.email] || {};
-        profiles[values.email] = { ...existingProfile, ...values };
-        
-        localStorage.setItem('sponsor_profile', JSON.stringify(profiles));
-
-        loadUsers();
-
-        toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
-        setIsDialogOpen(false);
-        setEditingUser(null);
+        try {
+            const userRef = doc(db, "users", values.email);
+            await setDoc(userRef, values, { merge: true });
+            
+            loadUsers();
+            toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
+            setIsDialogOpen(false);
+            setEditingUser(null);
+        } catch (error) {
+            console.error("Error updating user:", error);
+            toast({ variant: 'destructive', title: "Update Failed", description: "Could not update user in the database." });
+        }
     };
 
     const selectedDistrict = form.watch('district');
