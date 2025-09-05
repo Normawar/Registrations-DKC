@@ -1,4 +1,5 @@
-// src/lib/auth.ts - New authentication service
+// src/lib/auth.ts - Complete authentication service with React hooks
+import { useState, useEffect } from 'react';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -10,7 +11,6 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
-import { useState, useEffect } from 'react';
 
 export class AuthService {
   // Sign up with Firebase Auth and create Firestore profile
