@@ -59,8 +59,8 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
             if (existingUser && userProfile) {
                 const isCorrectTab = (
                     (userProfile.role === role) ||
-                    (userProfile.role === 'organizer' && (role === 'sponsor' || role === 'organizer')) ||
-                    (userProfile.role === 'district_coordinator' && (role === 'sponsor' || role === 'organizer'))
+                    (userProfile.role === 'organizer' && role === 'organizer') ||
+                    (userProfile.role === 'district_coordinator' && role === 'organizer')
                 );
 
                 if (!isCorrectTab) {
