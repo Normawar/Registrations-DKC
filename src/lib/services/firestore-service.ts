@@ -1,5 +1,9 @@
 
-// This file can now be removed as the db export is handled in firebase.ts
-// for simplicity in this application. The file is kept to avoid breaking
-// imports in a larger refactor, but it is effectively deprecated.
-export { db } from '@/lib/firebase';
+import { getFirestore } from 'firebase/firestore';
+import { app } from '@/lib/firebase';
+
+// This file is now the official source for the db instance.
+// It ensures we get the firestore instance from the initialized app.
+const db = app ? getFirestore(app) : null;
+
+export { db };

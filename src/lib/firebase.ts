@@ -13,40 +13,36 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let storage: FirebaseStorage | null = null;
-let db: Firestore | null = null;
+let app: FirebaseApp;
+let auth: Auth;
+let storage: FirebaseStorage;
+let db: Firestore;
 
 const isConfigValid = firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY';
 
 if (isConfigValid) {
     try {
-        app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+        app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
         auth = getAuth(app);
         storage = getStorage(app);
         db = getFirestore(app);
     } catch (e) {
         console.error("Failed to initialize Firebase", e);
         // Ensure services are null if initialization fails
-        app = null;
-        auth = null;
-        storage = null;
-        db = null;
+        app = null as any;
+        auth = null as any;
+        storage = null as any;
+        db = null as any;
     }
 } else {
     if (typeof window !== 'undefined') {
         console.warn("Firebase configuration is missing or incomplete. Please add your credentials to the .env file and restart the server. Firebase features will be disabled.");
     }
+    app = null as any;
+    auth = null as any;
+    storage = null as any;
+    db = null as any;
 }
-
-// Function to force re-authentication
-export const forceReauth = async () => {
-    if (auth) {
-        await auth.currentUser?.getIdToken(true);
-        console.log("Forced token refresh.");
-    }
-};
 
 
 export { app, auth, storage, db };
