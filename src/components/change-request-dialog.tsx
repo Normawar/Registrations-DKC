@@ -2,6 +2,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,7 +30,6 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
   const [confirmations, setConfirmations] = useState<any[]>([]);
   const [selectedConfirmationId, setSelectedConfirmationId] = useState<string>('');
   
-  // State for various request types
   const [playerToRemove, setPlayerToRemove] = useState<string>('');
   const [playerToAdd, setPlayerToAdd] = useState<string>('');
   const [playerForSectionChange, setPlayerForSectionChange] = useState<string>('');
@@ -42,29 +43,34 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      const allConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      let sponsorConfirmations = [];
-      if (profile.isDistrictCoordinator) {
-          sponsorConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
-      } else {
-          sponsorConfirmations = allConfirmations.filter((c: any) => c.schoolName === profile.school && c.district === profile.district);
-      }
-      setConfirmations(sponsorConfirmations);
-    } else {
-      // Reset form on close
-      setSelectedConfirmationId('');
-      setRequestType('');
-      setPlayerToRemove('');
-      setPlayerToAdd('');
-      setPlayerForSectionChange('');
-      setNewSection('');
-      setPlayerForBye('');
-      setByeRound('');
-      setPlayerToWithdraw('');
-      setAdditionalNotes('');
-    }
-  }, [isOpen, profile.school, profile.district, profile.isDistrictCoordinator]);
+    const loadConfirmations = async () => {
+        if (isOpen && db) {
+          const invoicesCol = collection(db, 'invoices');
+          const invoiceSnapshot = await getDocs(invoicesCol);
+          const allConfirmations = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+          let sponsorConfirmations = [];
+          if (profile.isDistrictCoordinator) {
+              sponsorConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
+          } else {
+              sponsorConfirmations = allConfirmations.filter((c: any) => c.schoolName === profile.school && c.district === profile.district);
+          }
+          setConfirmations(sponsorConfirmations);
+        } else if (!isOpen) {
+          setSelectedConfirmationId('');
+          setRequestType('');
+          setPlayerToRemove('');
+          setPlayerToAdd('');
+          setPlayerForSectionChange('');
+          setNewSection('');
+          setPlayerForBye('');
+          setByeRound('');
+          setPlayerToWithdraw('');
+          setAdditionalNotes('');
+        }
+    };
+    loadConfirmations();
+  }, [isOpen, profile]);
 
   const selectedConfirmation = useMemo(() => {
     return confirmations.find(c => c.id === selectedConfirmationId);
@@ -96,8 +102,8 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
     return masterDb.find(p => p.id === playerToAdd);
   }, [playerToAdd, masterDb]);
 
-  const handleSubmit = () => {
-    if (!selectedConfirmationId || !requestType) {
+  const handleSubmit = async () => {
+    if (!selectedConfirmationId || !requestType || !db) {
       toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select an event and a request type.' });
       return;
     }
@@ -143,8 +149,9 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
             return;
     }
     
+    const id = `req-${Date.now()}`;
     const newRequest: ChangeRequest = {
-        id: `req-${Date.now()}`,
+        id,
         confirmationId: selectedConfirmation.id,
         player,
         event: selectedConfirmation.eventName,
@@ -155,10 +162,9 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
         submittedBy: `${profile.firstName} ${profile.lastName}`,
         status: 'Pending',
     };
-
-    const allRequests = JSON.parse(localStorage.getItem('change_requests') || '[]');
-    allRequests.push(newRequest);
-    localStorage.setItem('change_requests', JSON.stringify(allRequests));
+    
+    const requestRef = doc(db, 'requests', id);
+    await setDoc(requestRef, newRequest);
 
     toast({ title: 'Request Submitted', description: 'Your change request has been sent for review.' });
     
@@ -210,7 +216,6 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
             </Select>
           </div>
           
-          {/* Dynamic Fields */}
           {requestType === 'Substitution' && (
             <div className="space-y-4 p-4 border rounded-md bg-muted/50">
               <h4 className="font-semibold text-sm">Substitution Details</h4>

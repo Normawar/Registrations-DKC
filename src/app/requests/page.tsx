@@ -1,8 +1,9 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { AppLayout } from "@/components/app-layout";
 import {
   Card,
@@ -21,7 +22,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import type { ChangeRequest } from "@/lib/data/requests-data";
-import { requestsData as initialRequestsData } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import Link from 'next/link';
@@ -38,44 +38,40 @@ export default function RequestsPage() {
   const [confirmationsMap, setConfirmationsMap] = useState<Map<string, any>>(new Map());
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
 
-
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
+    if (!db || !profile) return;
     try {
-      const storedRequestsRaw = localStorage.getItem('change_requests');
-      const allParsedRequests: ChangeRequest[] = storedRequestsRaw ? JSON.parse(storedRequestsRaw) : initialRequestsData;
-      
-      const allRequests = (Array.isArray(allParsedRequests) ? allParsedRequests : initialRequestsData).map((req, index) => ({
-        ...req,
-        id: req.id || `${req.confirmationId}-${req.player.replace(/\s/g, '')}-${index}` 
-      }));
+      const requestsCol = collection(db, 'requests');
+      const requestSnapshot = await getDocs(requestsCol);
+      const allRequests = requestSnapshot.docs.map(doc => doc.data() as ChangeRequest);
 
-      const storedConfirmationsRaw = localStorage.getItem('confirmations');
-      const allConfirmations = storedConfirmationsRaw ? JSON.parse(storedConfirmationsRaw) : [];
+      const invoicesCol = collection(db, 'invoices');
+      const invoiceSnapshot = await getDocs(invoicesCol);
       const confirmationMap = new Map();
-      allConfirmations.forEach((conf: any) => confirmationMap.set(conf.id, conf));
+      invoiceSnapshot.docs.forEach(doc => confirmationMap.set(doc.id, doc.data()));
       setConfirmationsMap(confirmationMap);
 
-      if (profile?.role === 'district_coordinator') {
+      if (profile.role === 'district_coordinator') {
           const districtConfirmationIds = new Set(
-              allConfirmations
+              Array.from(confirmationMap.values())
                   .filter((c: any) => c.district === profile.district)
                   .map((c: any) => c.id)
           );
           setRequests(allRequests.filter(req => districtConfirmationIds.has(req.confirmationId)));
-      } else if (profile?.role === 'sponsor') {
+      } else if (profile.role === 'sponsor') {
           const sponsorConfirmationIds = new Set(
-              allConfirmations
+              Array.from(confirmationMap.values())
                   .filter((c: any) => c.schoolName === profile.school && c.district === profile.district)
                   .map((c: any) => c.id)
           );
           setRequests(allRequests.filter(req => sponsorConfirmationIds.has(req.confirmationId)));
-      } else {
+      } else { // Organizer
           setRequests(allRequests);
       }
 
     } catch (e) {
-      console.error("Failed to parse data from localStorage", e);
-      setRequests(initialRequestsData);
+      console.error("Failed to load data from Firestore", e);
+      setRequests([]);
     }
   }, [profile]);
 
@@ -83,13 +79,6 @@ export default function RequestsPage() {
     if (profile) {
         loadData();
     }
-    const handleStorageChange = () => {
-        if (profile) loadData();
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
   }, [loadData, profile]);
 
   const sortedRequests = useMemo(() => {
@@ -144,7 +133,7 @@ export default function RequestsPage() {
   };
 
   const handleRequestCreated = () => {
-    loadData(); // Refresh the list after a new request is made
+    loadData();
   };
 
 
@@ -221,7 +210,7 @@ export default function RequestsPage() {
                                 <TableCell>
                                     {request.status === 'Pending' && profile?.role === 'organizer' ? (
                                         <Button asChild variant="outline" size="sm">
-                                          <Link href={`/confirmations#${request.confirmationId}`}>Review Request</Link>
+                                          <Link href={`/invoices#${request.confirmationId}`}>Review Request</Link>
                                         </Button>
                                     ) : (
                                         <div className="text-xs text-muted-foreground">

@@ -2,6 +2,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
+import { collection, getDocs, doc, writeBatch, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
@@ -13,8 +15,8 @@ interface MasterDbContextType {
   addPlayer: (player: MasterPlayer) => void;
   updatePlayer: (player: MasterPlayer) => void;
   deletePlayer: (playerId: string) => void;
-  addBulkPlayers: (players: MasterPlayer[]) => void;
-  clearDatabase: () => void;
+  addBulkPlayers: (players: MasterPlayer[]) => Promise<void>;
+  clearDatabase: () => Promise<void>;
   updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
   isDbError: boolean;
@@ -45,13 +47,6 @@ export type SearchCriteria = {
   portalType?: 'sponsor' | 'organizer' | 'individual';
 }
 
-// --- Constants ---
-
-const DB_STORAGE_KEY = 'master_player_database';
-const TIMESTAMP_KEY = 'master_player_database_timestamp';
-const SCHOOL_DATA_KEY = 'school_data';
-
-
 // --- Context Definition ---
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
@@ -63,34 +58,37 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [isDbLoaded, setIsDbLoaded] = useState(false);
   const [isDbError, setIsDbError] = useState(false);
 
-  const loadDatabase = useCallback(() => {
+  const loadDatabase = useCallback(async () => {
+    if (!db) {
+        console.error("Firestore not initialized.");
+        setIsDbError(true);
+        setIsDbLoaded(true);
+        return;
+    }
     setIsDbLoaded(false);
     setIsDbError(false);
     try {
-      const storedDb = localStorage.getItem(DB_STORAGE_KEY);
-      
-      if (storedDb) {
-        // Always use stored data if it exists, regardless of timestamp
-        const parsedDb = JSON.parse(storedDb);
-        if (parsedDb.length > 0) {
-          setDatabase(parsedDb);
+        const playersCol = collection(db, 'players');
+        const playerSnapshot = await getDocs(playersCol);
+        
+        if (playerSnapshot.empty) {
+            // If the collection is empty, seed it with the initial data.
+            console.log("Player database is empty. Seeding with initial data...");
+            const batch = writeBatch(db);
+            fullMasterPlayerData.forEach(player => {
+                const docRef = doc(db, 'players', player.id);
+                batch.set(docRef, player);
+            });
+            await batch.commit();
+            setDatabase(fullMasterPlayerData);
+            console.log("Seeding complete.");
         } else {
-          // Only fall back to sample data if stored data is empty
-          setDatabase(fullMasterPlayerData);
-          localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(fullMasterPlayerData));
-          localStorage.setItem(TIMESTAMP_KEY, new Date().getTime().toString());
+            const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+            setDatabase(playerList);
         }
-      } else {
-        // No stored data, use initial sample data
-        setDatabase(fullMasterPlayerData);
-        localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(fullMasterPlayerData));
-        localStorage.setItem(TIMESTAMP_KEY, new Date().getTime().toString());
-      }
     } catch (error) {
-      console.error("Failed to load or parse master player database:", error);
+      console.error("Failed to load player database from Firestore:", error);
       setIsDbError(true);
-      // Fallback to initial data if localStorage fails
-      setDatabase(fullMasterPlayerData);
     } finally {
       setIsDbLoaded(true);
     }
@@ -100,93 +98,68 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     loadDatabase();
   }, [loadDatabase]);
 
-  const persistDatabase = (newDb: MasterPlayer[]) => {
-    try {
-      setDatabase(newDb);
-      localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(newDb));
-      localStorage.setItem(TIMESTAMP_KEY, new Date().getTime().toString());
-    } catch (error) {
-      console.error("Failed to persist database to localStorage:", error);
-    }
-  };
-  
   const refreshDatabase = () => {
     loadDatabase();
   };
 
-  const addPlayer = (player: MasterPlayer) => {
-    const newDb = [...database];
-    const existingPlayerIndex = newDb.findIndex(p => p.uscfId && p.uscfId.toUpperCase() !== 'NEW' && p.uscfId === player.uscfId);
-    
-    if (existingPlayerIndex > -1) {
-        const existingPlayer = newDb[existingPlayerIndex];
-        // Merge new player data into existing record, preserving the original ID
-        newDb[existingPlayerIndex] = { ...existingPlayer, ...player, id: existingPlayer.id };
-    } else {
-        const newPlayerWithId = { ...player, id: player.id || `p-${Date.now()}` };
-        newDb.push(newPlayerWithId);
+  const addPlayer = async (player: MasterPlayer) => {
+    if (!db) return;
+    try {
+        const playerRef = doc(db, 'players', player.id);
+        await setDoc(playerRef, player, { merge: true });
+        // Optimistically update UI, then refresh from source
+        setDatabase(prev => {
+            const existingIndex = prev.findIndex(p => p.id === player.id);
+            if (existingIndex > -1) {
+                const newDb = [...prev];
+                newDb[existingIndex] = player;
+                return newDb;
+            }
+            return [...prev, player];
+        });
+        await loadDatabase(); // ensure consistency
+    } catch (error) {
+        console.error("Error adding/updating player:", error);
     }
-    persistDatabase(newDb);
   };
 
-  const addBulkPlayers = (players: MasterPlayer[]) => {
-    const playerMap = new Map(database.map(p => [p.uscfId, p]));
-
-    players.forEach(newPlayer => {
-        const playerWithId = {
-            ...newPlayer,
-            id: newPlayer.id || newPlayer.uscfId || `p-${Date.now()}-${Math.random()}`,
-        };
-        const existingPlayer = playerMap.get(playerWithId.uscfId);
-        // Merge new data into existing record, keeping the original ID if it exists
-        playerMap.set(playerWithId.uscfId, { ...existingPlayer, ...playerWithId });
+  const addBulkPlayers = async (players: MasterPlayer[]) => {
+    if (!db) return;
+    const batch = writeBatch(db);
+    players.forEach(player => {
+        const docRef = doc(db, 'players', player.id || player.uscfId);
+        batch.set(docRef, player, { merge: true });
     });
-    
-    const updatedDb = Array.from(playerMap.values());
-    persistDatabase(updatedDb);
-};
-
-
-  const clearDatabase = () => {
-    persistDatabase([]);
+    await batch.commit();
+    await loadDatabase();
   };
 
-  const updatePlayer = (updatedPlayer: MasterPlayer) => {
-    const newDb = database.map(p => p.id === updatedPlayer.id ? updatedPlayer : p);
-    persistDatabase(newDb);
+  const clearDatabase = async () => {
+    if (!db) return;
+    const playersCol = collection(db, 'players');
+    const playerSnapshot = await getDocs(playersCol);
+    const batch = writeBatch(db);
+    playerSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+    setDatabase([]);
   };
 
-  const deletePlayer = (playerId: string) => {
-    const newDb = database.filter(p => p.id !== playerId);
-    persistDatabase(newDb);
+  const updatePlayer = async (updatedPlayer: MasterPlayer) => {
+    if (!db) return;
+    const playerRef = doc(db, 'players', updatedPlayer.id);
+    await setDoc(playerRef, updatedPlayer, { merge: true });
+    await loadDatabase();
+  };
+
+  const deletePlayer = async (playerId: string) => {
+    if (!db) return;
+    await deleteDoc(doc(db, 'players', playerId));
+    await loadDatabase();
   };
 
   const updateSchoolDistrict = (oldDistrict: string, newDistrict: string) => {
-    // Update player database
-    const newPlayerDb = database.map(p => {
-      if (p.district === oldDistrict) {
-        return { ...p, district: newDistrict };
-      }
-      return p;
-    });
-    persistDatabase(newPlayerDb);
-
-    // Update school database in localStorage
-    try {
-        const storedSchoolsRaw = localStorage.getItem(SCHOOL_DATA_KEY);
-        const storedSchools = storedSchoolsRaw ? JSON.parse(storedSchoolsRaw) : initialSchoolData;
-        const updatedSchools = storedSchools.map((school: School) => {
-            if (school.district === oldDistrict) {
-                return { ...school, district: newDistrict };
-            }
-            return school;
-        });
-        localStorage.setItem(SCHOOL_DATA_KEY, JSON.stringify(updatedSchools));
-        // Dispatch an event to notify other components of the change
-        window.dispatchEvent(new Event('storage'));
-    } catch(e) {
-        console.error("Failed to update school data during district rename:", e);
-    }
+    // This function will need to be updated to work with Firestore for schools.
+    console.warn("updateSchoolDistrict needs to be reimplemented for Firestore.");
   };
   
   const searchPlayers = useCallback((criteria: Partial<SearchCriteria>): MasterPlayer[] => {
@@ -207,21 +180,15 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const results = database.filter(p => {
         if (excludeSet.has(p.id)) return false;
 
-        // Handle sponsor context search
         if (searchUnassigned && sponsorProfile) {
-            // For sponsors, search players who are unassigned OR already belong to them.
-            // This is primarily for the roster page search.
             const isUnassigned = !p.school || p.school.trim() === '';
             const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
             if (!isUnassigned && !belongsToSponsor) return false;
         } else if (portalType === 'organizer') {
-            // For organizers, search the whole database based on school/district filters
             if (school && school.trim() && p.school !== school) return false;
             if (district && district.trim() && p.district !== district) return false;
         }
 
-
-        // State filtering
         if (state && state !== 'ALL') {
             if (state === 'NO_STATE') {
                 if (p.state && p.state.trim() !== '') return false;
@@ -230,19 +197,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // Name filtering
         if (lowerFirstName && !p.firstName?.toLowerCase().includes(lowerFirstName)) return false;
         if (lowerMiddleName && !p.middleName?.toLowerCase().includes(lowerMiddleName)) return false;
         if (lowerLastName && !p.lastName?.toLowerCase().includes(lowerLastName)) return false;
-        
-        // USCF ID filtering
         if (lowerUscfId && p.uscfId && !p.uscfId.toString().includes(lowerUscfId)) return false;
-        
-        // Grade and section filtering
         if (grade && grade.trim() && p.grade !== grade) return false;
         if (section && section.trim() && p.section !== section) return false;
 
-        // Rating filtering
         const rating = p.regularRating;
         if (minRating !== undefined && (!rating || rating < minRating)) return false;
         if (maxRating !== undefined && (!rating || rating > maxRating)) return false;
@@ -253,7 +214,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     return results.slice(0, maxResults);
   }, [database, isDbLoaded]);
 
-  // Memoized derived data
   const dbStates = useMemo(() => {
     if (!isDbLoaded) return ['ALL', 'TX'];
     const states = [...new Set(database.map(p => p.state).filter(Boolean))].sort();

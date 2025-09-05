@@ -1,8 +1,9 @@
 
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -47,21 +48,22 @@ export default function UnifiedInvoiceRegistrations() {
   const [isDeleting, setIsDeleting] = useState(false);
 
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
+    if (!db || !profile) return;
     try {
-      const allInvoicesRaw = localStorage.getItem('all_invoices');
-      let invoicesArray = allInvoicesRaw ? JSON.parse(allInvoicesRaw) : [];
+      const invoicesCol = collection(db, 'invoices');
+      const invoiceSnapshot = await getDocs(invoicesCol);
+      let invoicesArray = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Filter by role
-      if (profile?.role === 'district_coordinator') {
+      if (profile.role === 'district_coordinator') {
           invoicesArray = invoicesArray.filter((inv: any) => inv.district === profile.district);
-          // Special filter for PSJA
           if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
             invoicesArray = invoicesArray.filter((inv: any) => inv.gtCoordinatorEmail && inv.gtCoordinatorEmail.trim() !== '');
           }
-      } else if (profile?.role === 'sponsor') {
+      } else if (profile.role === 'sponsor') {
           invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
-      } else if (profile?.role === 'individual') {
+      } else if (profile.role === 'individual') {
           invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
       }
       
@@ -103,7 +105,7 @@ export default function UnifiedInvoiceRegistrations() {
       
       setData(mapped);
     } catch (error) {
-      console.error('❌ Error loading unified data from localStorage:', error);
+      console.error('❌ Error loading unified data from Firestore:', error);
       setData([]);
     }
   }, [profile]);
@@ -113,18 +115,6 @@ export default function UnifiedInvoiceRegistrations() {
       loadData();
     }
     setClientReady(true);
-    
-    const handleStorageChange = () => {
-      if (profile) loadData();
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('all_invoices_updated', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('all_invoices_updated', handleStorageChange);
-    };
   }, [profile, loadData]);
 
   const handleSort = (field: string) => {
@@ -199,7 +189,7 @@ export default function UnifiedInvoiceRegistrations() {
   };
 
   const confirmDelete = async () => {
-    if (!invoiceToDelete) return;
+    if (!invoiceToDelete || !db) return;
 
     setIsDeleting(true);
     try {
@@ -207,18 +197,12 @@ export default function UnifiedInvoiceRegistrations() {
         await cancelInvoice({ invoiceId: invoiceToDelete.invoiceId });
       }
 
-      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const updatedInvoices = allInvoices.filter((inv: any) => inv.id !== invoiceToDelete.id);
-      localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
-
-      const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-      const updatedConfirmations = confirmations.filter((conf: any) => conf.id !== invoiceToDelete.id);
-      localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
+      const invoiceRef = doc(db, 'invoices', invoiceToDelete.id);
+      await setDoc(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED' }, { merge: true });
       
-      setData(updatedInvoices);
-      window.dispatchEvent(new Event('storage'));
+      await loadData();
       
-      toast({ title: 'Invoice Deleted', description: `Invoice ${invoiceToDelete.invoiceNumber || invoiceToDelete.id} has been removed.` });
+      toast({ title: 'Invoice Canceled', description: `Invoice ${invoiceToDelete.invoiceNumber || invoiceToDelete.id} has been marked as canceled.` });
     } catch (error) {
         console.error("Failed to delete invoice:", error);
         toast({ variant: 'destructive', title: 'Deletion Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
@@ -233,7 +217,6 @@ export default function UnifiedInvoiceRegistrations() {
   const getStatusBadge = (status: string, totalPaid?: number, totalInvoiced?: number) => {
     const s = (status || '').toUpperCase();
     
-    // Override status if we have payment data that indicates partial payment
     let displayStatus = s;
     if (totalPaid && totalInvoiced && totalPaid > 0 && totalPaid < totalInvoiced) {
       displayStatus = 'PARTIALLY_PAID';
@@ -279,7 +262,6 @@ export default function UnifiedInvoiceRegistrations() {
         const totalPaid = item.totalPaid || 0;
         const totalAmount = item.totalAmount || 0;
         
-        // Include if unpaid, overdue, or has a balance due
         return status === 'UNPAID' || 
                status === 'OVERDUE' || 
                status === 'PARTIALLY_PAID' ||

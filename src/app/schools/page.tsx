@@ -1,10 +1,12 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, useRef, type ChangeEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { collection, getDocs, doc, writeBatch, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -88,40 +90,39 @@ export default function SchoolsPage() {
   const [selectedDistrictToEdit, setSelectedDistrictToEdit] = useState<string | null>(null);
   const [newDistrictName, setNewDistrictName] = useState('');
 
-  const uniqueDistricts = useMemo(() => {
-    const districts = new Set(schools.map(s => s.district));
-    return Array.from(districts).sort();
-  }, [schools]);
+  const loadSchools = useCallback(async () => {
+    if (!db) return;
+    setIsDataLoaded(false);
+    const schoolsCol = collection(db, 'schools');
+    const schoolSnapshot = await getDocs(schoolsCol);
 
-  useEffect(() => {
-    try {
-        const storedSchools = localStorage.getItem('school_data');
-        if (storedSchools) {
-            setSchools(JSON.parse(storedSchools));
-        } else {
-            const initialSchoolsWithIds = initialSchoolData.map((school, index) => ({
-                ...school,
-                id: `school-${index}-${Date.now()}`,
-                teamCode: generateTeamCode(school)
-            }));
-            setSchools(initialSchoolsWithIds);
-        }
-    } catch (error) {
-        console.error("Failed to load schools from localStorage", error);
-        setSchools([]);
+    if (schoolSnapshot.empty) {
+        console.log("No schools in Firestore, seeding from initial data.");
+        const batch = writeBatch(db);
+        initialSchoolData.forEach((school, index) => {
+            const id = `school-${index}-${Date.now()}`;
+            const schoolWithId = { ...school, id, teamCode: generateTeamCode(school) };
+            const docRef = doc(db, 'schools', id);
+            batch.set(docRef, schoolWithId);
+        });
+        await batch.commit();
+        setSchools(initialSchoolData.map((s, i) => ({ ...s, id: `school-${i}-${Date.now()}`, teamCode: generateTeamCode(s) })));
+    } else {
+        const schoolList = schoolSnapshot.docs.map(doc => doc.data() as SchoolWithTeamCode);
+        setSchools(schoolList);
     }
     setIsDataLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (isDataLoaded) {
-        try {
-            localStorage.setItem('school_data', JSON.stringify(schools));
-        } catch (error) {
-            console.error("Failed to save schools to localStorage", error);
-        }
-    }
-  }, [schools, isDataLoaded]);
+    loadSchools();
+  }, [loadSchools]);
+
+
+  const uniqueDistricts = useMemo(() => {
+    const districts = new Set(schools.map(s => s.district));
+    return Array.from(districts).sort();
+  }, [schools]);
 
   const form = useForm<SchoolFormValues>({
     resolver: zodResolver(schoolFormSchema),
@@ -139,18 +140,19 @@ export default function SchoolsPage() {
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !db) return;
 
     Papa.parse(file, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => {
+        complete: async (results) => {
             const newSchools: SchoolWithTeamCode[] = [];
             let errors = 0;
             results.data.forEach((row: any) => {
                 try {
+                    const id = `sch-${Date.now()}-${Math.random()}`;
                     const school: SchoolWithTeamCode = {
-                        id: `sch-${Date.now()}-${Math.random()}`,
+                        id,
                         schoolName: row['School Name'] || row['schoolName'],
                         district: row['District'] || row['district'],
                         streetAddress: row['Street Address'] || row['streetAddress'],
@@ -164,61 +166,38 @@ export default function SchoolsPage() {
                         zip4: row['ZIP 4-digit'] || row['zip4'] || '',
                         teamCode: ''
                     };
-                    
-                    if (!school.schoolName || !school.district) {
-                        throw new Error('Missing required school name or district.');
-                    }
-
+                    if (!school.schoolName || !school.district) throw new Error('Missing required school name or district.');
                     school.teamCode = generateTeamCode({ schoolName: school.schoolName, district: school.district });
-                    
                     newSchools.push(school);
                 } catch (e) {
                     errors++;
-                    console.error("Error parsing school row:", row, e);
                 }
             });
             
-            if (newSchools.length === 0 && results.data.length > 0) {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Import Failed',
-                    description: 'Could not find any valid schools. Please check if your CSV headers match the expected format (e.g., "School Name", "District").'
+            if (newSchools.length > 0) {
+                const batch = writeBatch(db);
+                newSchools.forEach(school => {
+                    const docRef = doc(db, 'schools', school.id);
+                    batch.set(docRef, school);
                 });
-                return;
+                await batch.commit();
+                await loadSchools(); // Refresh from Firestore
             }
 
-            setSchools(prev => [...prev, ...newSchools]);
-            
             toast({
                 title: "Import Complete",
                 description: `Successfully imported ${newSchools.length} schools. ${errors > 0 ? `Skipped ${errors} invalid rows.` : ''}`
             });
         },
-        error: (error) => {
-            toast({
-                variant: 'destructive',
-                title: 'Import Failed',
-                description: `An error occurred while parsing the CSV file: ${error.message}`
-            });
-        }
     });
-
-    if (e.target) {
-        e.target.value = '';
-    }
+    if (e.target) e.target.value = '';
   };
 
   const handleAddSchool = () => {
     setEditingSchool(null);
     form.reset({
-      schoolName: '',
-      district: '',
-      streetAddress: '',
-      city: '',
-      zip: '',
-      phone: '',
-      county: '',
-      state: 'TX',
+      schoolName: '', district: '', streetAddress: '', city: '',
+      zip: '', phone: '', county: '', state: 'TX',
     });
     setIsDialogOpen(true);
   };
@@ -234,63 +213,57 @@ export default function SchoolsPage() {
     setIsAlertOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (schoolToDelete) {
-      setSchools(schools.filter(s => s.id !== schoolToDelete.id));
+  const confirmDelete = async () => {
+    if (schoolToDelete && db) {
+      await deleteDoc(doc(db, "schools", schoolToDelete.id));
+      await loadSchools();
       toast({ title: "School Deleted", description: `${schoolToDelete.schoolName} has been removed.` });
     }
     setIsAlertOpen(false);
     setSchoolToDelete(null);
   };
 
-  function onSubmit(values: SchoolFormValues) {
+  async function onSubmit(values: SchoolFormValues) {
+    if (!db) return;
     const teamCode = generateTeamCode(values);
+    let schoolToSave: SchoolWithTeamCode;
+
     if (editingSchool) {
-      setSchools(schools.map(s => s.id === editingSchool.id ? { ...s, ...values, teamCode } : s));
-      toast({ title: "School Updated", description: `${values.schoolName} has been updated.` });
+        schoolToSave = { ...editingSchool, ...values, teamCode };
     } else {
-      const newSchool: SchoolWithTeamCode = {
-        ...(values as Omit<School, 'charter'|'students'|'zip4'>), // This is a safe cast because zod schema matches
-        id: `school-${Date.now()}`,
-        teamCode,
-        charter: '',
-        students: '',
-        zip4: '',
-      };
-      setSchools([...schools, newSchool]);
-      toast({ title: "School Added", description: `${values.schoolName} has been added.` });
+        schoolToSave = {
+            ...(values as Omit<School, 'charter'|'students'|'zip4'>),
+            id: `school-${Date.now()}`,
+            teamCode,
+            charter: '', students: '', zip4: '',
+        };
     }
+    
+    await setDoc(doc(db, "schools", schoolToSave.id), schoolToSave, { merge: true });
+    await loadSchools();
+    toast({ title: editingSchool ? "School Updated" : "School Added" });
     setIsDialogOpen(false);
     setEditingSchool(null);
   }
 
-  const handleRenameDistrict = () => {
-    if (!selectedDistrictToEdit || !newDistrictName.trim()) {
-      toast({
-        variant: 'destructive',
-        title: 'Invalid Input',
-        description: 'Please select a district and provide a new name.',
-      });
-      return;
-    }
-
-    const updatedSchools = schools.map(school => {
+  const handleRenameDistrict = async () => {
+    if (!selectedDistrictToEdit || !newDistrictName.trim() || !db) return;
+    
+    const batch = writeBatch(db);
+    schools.forEach(school => {
       if (school.district === selectedDistrictToEdit) {
-        const updatedSchool = { ...school, district: newDistrictName.trim() };
-        // Also update team code since district name changed
-        updatedSchool.teamCode = generateTeamCode({ schoolName: updatedSchool.schoolName, district: updatedSchool.district });
-        return updatedSchool;
+        const schoolRef = doc(db, "schools", school.id);
+        const newTeamCode = generateTeamCode({ schoolName: school.schoolName, district: newDistrictName.trim() });
+        batch.update(schoolRef, { district: newDistrictName.trim(), teamCode: newTeamCode });
       }
-      return school;
     });
 
-    setSchools(updatedSchools);
+    await batch.commit();
+    await loadSchools();
     toast({
       title: 'District Renamed',
       description: `All schools under "${selectedDistrictToEdit}" have been moved to "${newDistrictName.trim()}".`,
     });
-    
-    // Reset fields
     setSelectedDistrictToEdit(null);
     setNewDistrictName('');
   };
@@ -301,69 +274,40 @@ export default function SchoolsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold font-headline">Schools &amp; Districts</h1>
-            <p className="text-muted-foreground">
-              Add, edit, or delete school and district information.
-            </p>
+            <p className="text-muted-foreground">Add, edit, or delete school and district information.</p>
           </div>
           <div className="flex items-center gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".csv"
-              onChange={handleFileImport}
-            />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="mr-2 h-4 w-4" /> Import CSV
-            </Button>
-            <Button onClick={handleAddSchool}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New School
-            </Button>
+            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Import CSV</Button>
+            <Button onClick={handleAddSchool}><PlusCircle className="mr-2 h-4 w-4" /> Add New School</Button>
           </div>
         </div>
         
         <Card>
           <CardHeader>
             <CardTitle>Edit District Name</CardTitle>
-            <CardDescription>
-              Select a district to rename. This will update all schools associated with it.
-            </CardDescription>
+            <CardDescription>Select a district to rename. This will update all schools associated with it.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="grid gap-1.5 flex-1">
               <Label htmlFor="district-to-edit">District to Rename</Label>
               <Select onValueChange={setSelectedDistrictToEdit} value={selectedDistrictToEdit || ''}>
-                <SelectTrigger id="district-to-edit">
-                  <SelectValue placeholder="Select a district..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
+                <SelectTrigger id="district-to-edit"><SelectValue placeholder="Select a district..." /></SelectTrigger>
+                <SelectContent>{uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="grid gap-1.5 flex-1">
               <Label htmlFor="new-district-name">New District Name</Label>
-              <Input
-                id="new-district-name"
-                value={newDistrictName}
-                onChange={(e) => setNewDistrictName(e.target.value)}
-                disabled={!selectedDistrictToEdit}
-                placeholder='Enter new name...'
-              />
+              <Input id="new-district-name" value={newDistrictName} onChange={(e) => setNewDistrictName(e.target.value)} disabled={!selectedDistrictToEdit} placeholder='Enter new name...' />
             </div>
-            <Button onClick={handleRenameDistrict} disabled={!selectedDistrictToEdit || !newDistrictName.trim()}>
-              <Edit className="mr-2 h-4 w-4" />
-              Rename District
-            </Button>
+            <Button onClick={handleRenameDistrict} disabled={!selectedDistrictToEdit || !newDistrictName.trim()}><Edit className="mr-2 h-4 w-4" /> Rename District</Button>
           </CardContent>
         </Card>
 
         <Card>
            <CardHeader>
             <CardTitle>School List</CardTitle>
-            <CardDescription>
-              A complete list of all schools in the system.
-            </CardDescription>
+            <CardDescription>A complete list of all schools in the system.</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
@@ -374,9 +318,7 @@ export default function SchoolsPage() {
                   <TableHead>District</TableHead>
                   <TableHead>City</TableHead>
                   <TableHead>County</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Actions</span>
-                  </TableHead>
+                  <TableHead><span className="sr-only">Actions</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -389,12 +331,7 @@ export default function SchoolsPage() {
                     <TableCell>{school.county}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Toggle menu</span></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => handleEditSchool(school)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
@@ -414,78 +351,26 @@ export default function SchoolsPage() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingSchool ? "Edit School" : "Add New School"}</DialogTitle>
-            <DialogDescription>
-              Fill out the details for the school below. The Team Code will be generated automatically.
-            </DialogDescription>
+            <DialogDescription>Fill out the details for the school below. The Team Code will be generated automatically.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="schoolName" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>School Name</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="district" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>District</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField control={form.control} name="schoolName" render={({ field }) => ( <FormItem><FormLabel>School Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
               </div>
-              <FormField control={form.control} name="streetAddress" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Street Address</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <FormField control={form.control} name="streetAddress" render={({ field }) => ( <FormItem><FormLabel>Street Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField control={form.control} name="city" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="state" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>State</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="zip" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>ZIP Code</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField control={form.control} name="city" render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="zip" render={({ field }) => ( <FormItem><FormLabel>ZIP Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="phone" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl><Input type="tel" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="county" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>County</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="county" render={({ field }) => ( <FormItem><FormLabel>County</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
               </div>
               <DialogFooter className="pt-4">
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost">Cancel</Button>
-                </DialogClose>
+                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
                 <Button type="submit">{editingSchool ? "Save Changes" : "Add School"}</Button>
               </DialogFooter>
             </form>
@@ -497,19 +382,14 @@ export default function SchoolsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the school record for {schoolToDelete?.schoolName}.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This action cannot be undone. This will permanently delete the school record for {schoolToDelete?.schoolName}.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </AppLayout>
   );
 }

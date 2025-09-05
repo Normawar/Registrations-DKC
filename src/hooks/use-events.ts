@@ -2,6 +2,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { collection, getDocs, doc, writeBatch, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export type Event = {
   id: string;
@@ -21,141 +23,67 @@ export type Event = {
   isPsjaOnly?: boolean;
 };
 
-const initialEvents: Event[] = [
-    {
-        id: '1',
-        name: "Spring Open 2024",
-        date: new Date(new Date().setDate(new Date().getDate() + 10)).toISOString(),
-        location: "City Convention Center",
-        rounds: 5,
-        regularFee: 20,
-        lateFee: 25,
-        veryLateFee: 30,
-        dayOfFee: 35,
-        imageUrl: "https://placehold.co/100x100.png",
-        imageName: "Event Banner",
-        pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
-        pdfName: "Spring Flyer",
-        isClosed: false,
-        isPsjaOnly: false,
-    },
-    {
-        id: '2',
-        name: "Summer Championship",
-        date: new Date(new Date().setDate(new Date().getDate() + 40)).toISOString(),
-        location: "Grand Hotel Ballroom",
-        rounds: 7,
-        regularFee: 25,
-        lateFee: 30,
-        veryLateFee: 35,
-        dayOfFee: 40,
-        isClosed: false,
-        isPsjaOnly: false,
-    },
-    {
-        id: '3',
-        name: "Autumn Classic",
-        date: new Date("2024-03-10").toISOString(),
-        location: "Community Chess Club",
-        rounds: 5,
-        regularFee: 20,
-        lateFee: 25,
-        veryLateFee: 30,
-        dayOfFee: 35,
-        pdfUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
-        pdfName: "Autumn Classic PDF",
-        isClosed: true,
-        isPsjaOnly: false,
-    },
-    {
-        id: '4',
-        name: "Winter Scholastic",
-        date: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
-        location: "North High School",
-        rounds: 4,
-        regularFee: 20,
-        lateFee: 25,
-        veryLateFee: 30,
-        dayOfFee: 35,
-        isClosed: false,
-        isPsjaOnly: false,
-    },
-    {
-        id: '5',
-        name: "New Year Blitz",
-        date: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString(),
-        location: "Online",
-        rounds: 9,
-        regularFee: 15,
-        lateFee: 20,
-        veryLateFee: 25,
-        dayOfFee: 30,
-        imageUrl: "https://placehold.co/100x100.png",
-        imageName: "Blitz Image",
-        isClosed: false,
-        isPsjaOnly: true,
-    },
-];
-
 export function useEvents() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  useEffect(() => {
-    try {
-      const storedEvents = localStorage.getItem('chess_events');
-      if (storedEvents) {
-        setEvents(JSON.parse(storedEvents));
-      } else {
-        setEvents(initialEvents);
-      }
-    } catch (error) {
-      console.error("Failed to load events from localStorage", error);
-      setEvents(initialEvents);
+  const loadEvents = useCallback(async () => {
+    if (!db) {
+        console.error("Firestore not initialized.");
+        return;
     }
+    setIsLoaded(false);
+    const eventsCol = collection(db, 'events');
+    const eventSnapshot = await getDocs(eventsCol);
+    const eventList = eventSnapshot.docs.map(doc => doc.data() as Event);
+    setEvents(eventList);
     setIsLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (isLoaded) {
-      try {
-        localStorage.setItem('chess_events', JSON.stringify(events));
-      } catch (error) {
-        console.error("Failed to save events to localStorage", error);
-      }
-    }
-  }, [events, isLoaded]);
+    loadEvents();
+  }, [loadEvents]);
 
-  const addEvent = useCallback((event: Event) => {
-    setEvents(prev => [...prev, event]);
-  }, []);
+  const addEvent = useCallback(async (event: Event) => {
+    if (!db) return;
+    const eventRef = doc(db, 'events', event.id);
+    await setDoc(eventRef, event);
+    await loadEvents();
+  }, [loadEvents]);
 
-  const addBulkEvents = useCallback((eventsToAdd: Event[]) => {
-    setEvents(prev => [...prev, ...eventsToAdd]);
-  }, []);
-
-  const updateEvent = useCallback((updatedEvent: Event) => {
-    setEvents(prevEvents => {
-      const newEvents = prevEvents.map(event =>
-        event.id === updatedEvent.id ? updatedEvent : event
-      );
-      // Persist the new state to localStorage immediately after setting it
-      try {
-        localStorage.setItem('chess_events', JSON.stringify(newEvents));
-      } catch (error) {
-        console.error("Failed to save updated events to localStorage", error);
-      }
-      return newEvents;
+  const addBulkEvents = useCallback(async (eventsToAdd: Event[]) => {
+    if (!db) return;
+    const batch = writeBatch(db);
+    eventsToAdd.forEach(event => {
+        const docRef = doc(db, 'events', event.id);
+        batch.set(docRef, event);
     });
-  }, []);
+    await batch.commit();
+    await loadEvents();
+  }, [loadEvents]);
 
-  const deleteEvent = useCallback((eventId: string) => {
-    setEvents(prev => prev.filter(e => e.id !== eventId));
-  }, []);
+  const updateEvent = useCallback(async (updatedEvent: Event) => {
+    if (!db) return;
+    const eventRef = doc(db, 'events', updatedEvent.id);
+    await setDoc(eventRef, updatedEvent, { merge: true });
+    await loadEvents();
+  }, [loadEvents]);
+
+  const deleteEvent = useCallback(async (eventId: string) => {
+    if (!db) return;
+    await deleteDoc(doc(db, 'events', eventId));
+    await loadEvents();
+  }, [loadEvents]);
   
-  const clearAllEvents = useCallback(() => {
+  const clearAllEvents = useCallback(async () => {
+    if (!db) return;
+    const eventsCol = collection(db, 'events');
+    const eventSnapshot = await getDocs(eventsCol);
+    const batch = writeBatch(db);
+    eventSnapshot.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
     setEvents([]);
   }, []);
 
-  return { events, addEvent, addBulkEvents, updateEvent, deleteEvent, clearAllEvents };
+  return { events, addEvent, addBulkEvents, updateEvent, deleteEvent, clearAllEvents, isLoaded };
 }
