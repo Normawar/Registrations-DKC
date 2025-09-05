@@ -1,3 +1,4 @@
+
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 import { auth, db } from '@/lib/firebase';
 
@@ -98,8 +99,8 @@ export async function simpleSignIn(email: string, password: string) {
     console.log('📧 Signing in with email:', email);
 
     // Import Firebase functions dynamically
-    const { signInWithEmailAndPassword } = await import('firebase/auth');
-    const { doc, getDoc } = await import('firebase/firestore');
+    const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+    const { doc, getDoc, setDoc } = await import('firebase/firestore');
 
     // Sign in the user
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -110,12 +111,10 @@ export async function simpleSignIn(email: string, password: string) {
     const profileDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
 
     if (!profileDoc.exists()) {
-      console.warn('⚠️ User profile not found in Firestore');
-      // Try to find by email (for legacy users)
+      console.warn('⚠️ User profile not found in Firestore for UID, checking for legacy doc...');
       const legacyDoc = await getDoc(doc(db, 'users', email.toLowerCase()));
       if (legacyDoc.exists()) {
         console.log('📦 Found legacy profile, migrating...');
-        // Migrate legacy profile to new UID-based key
         const legacyData = legacyDoc.data();
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           ...legacyData,
@@ -144,30 +143,67 @@ export async function simpleSignIn(email: string, password: string) {
   } catch (error: any) {
     console.error('❌ Signin failed:', error);
     
-    // Handle specific Firebase Auth errors
     let userFriendlyMessage = 'An error occurred during login.';
     
-    switch (error.code) {
-      case 'auth/user-not-found':
-      case 'auth/wrong-password':
-        userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
-        break;
-      case 'auth/invalid-email':
-        userFriendlyMessage = 'Please enter a valid email address.';
-        break;
-      case 'auth/user-disabled':
-        userFriendlyMessage = 'This account has been disabled. Please contact support.';
-        break;
-      case 'auth/too-many-requests':
-        userFriendlyMessage = 'Too many failed login attempts. Please try again later.';
-        break;
-      case 'auth/network-request-failed':
-        userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
-        break;
-      default:
-        if (error.message) {
-          userFriendlyMessage = error.message;
+    // --- THIS IS THE CRITICAL FIX ---
+    // If credential is invalid, check if a profile exists and create an Auth user for them.
+    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+        console.log('Login failed. Checking for existing profile to migrate...');
+        const { doc, getDoc, setDoc } = await import('firebase/firestore');
+        const { createUserWithEmailAndPassword } = await import('firebase/auth');
+        
+        const legacyDocRef = doc(db, 'users', email.toLowerCase());
+        const legacyDoc = await getDoc(legacyDocRef);
+        
+        if (legacyDoc.exists()) {
+            console.log('Legacy profile found. Creating Auth account...');
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                const profileData = legacyDoc.data();
+
+                // Update the document to be keyed by UID instead of email
+                await setDoc(doc(db, 'users', user.uid), {
+                    ...profileData,
+                    uid: user.uid,
+                    migratedAt: new Date().toISOString()
+                });
+                // We could delete the old email-keyed doc, but let's leave it for now.
+                
+                console.log(`✅ Successfully created Auth account for ${email} and migrated profile.`);
+                
+                return {
+                    success: true,
+                    user: user,
+                    profile: profileData
+                };
+
+            } catch (creationError: any) {
+                console.error('Failed to create auth account during migration:', creationError);
+                userFriendlyMessage = 'Your account needs to be setup. Please try signing up first.';
+            }
+        } else {
+            userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
         }
+    } else {
+      switch (error.code) {
+        case 'auth/invalid-email':
+          userFriendlyMessage = 'Please enter a valid email address.';
+          break;
+        case 'auth/user-disabled':
+          userFriendlyMessage = 'This account has been disabled. Please contact support.';
+          break;
+        case 'auth/too-many-requests':
+          userFriendlyMessage = 'Too many failed login attempts. Please try again later.';
+          break;
+        case 'auth/network-request-failed':
+          userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
+          break;
+        default:
+          if (error.message) {
+            userFriendlyMessage = error.message;
+          }
+      }
     }
 
     throw new Error(userFriendlyMessage);
