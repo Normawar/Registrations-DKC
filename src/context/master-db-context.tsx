@@ -7,6 +7,8 @@ import { db } from '@/lib/firebase';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
+import Papa from 'papaparse';
+import { isValid } from 'date-fns';
 
 // --- Types ---
 
@@ -51,6 +53,80 @@ export type SearchCriteria = {
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
+// Add this helper function for parsing CSV data (add it after your imports, before the MasterDbProvider)
+const parseCSVData = (data: any[]): MasterPlayer[] => {
+  const newPlayers: MasterPlayer[] = [];
+  let errors = 0;
+  let skippedIncomplete = 0;
+
+  const findColumn = (row: any, searchTerms: string[]) => {
+    const keys = Object.keys(row);
+    for (const term of searchTerms) {
+      const found = keys.find(key => 
+        key.toLowerCase().trim().includes(term.toLowerCase()) && 
+        row[key] !== null && 
+        row[key] !== undefined && 
+        String(row[key]).trim() !== ''
+      );
+      if (found) return row[found];
+    }
+    return null;
+  };
+
+  data.forEach((row: any) => {
+    try {
+      if (!row || Object.keys(row).length === 0) {
+        skippedIncomplete++;
+        return;
+      }
+
+      const uscfId = findColumn(row, ['uscfId', 'uscf id', 'id']);
+      const lastName = findColumn(row, ['lastName', 'last name']);
+
+      if (!uscfId || !lastName) {
+        skippedIncomplete++;
+        return;
+      }
+      
+      const firstName = findColumn(row, ['firstName', 'first name']) || 'Unknown';
+      const middleName = findColumn(row, ['middleName', 'middle name']) || '';
+      const ratingStr = findColumn(row, ['regularRating', 'rating']);
+      const expiresStr = findColumn(row, ['uscfExpiration', 'expires', 'expiration']);
+      const dobStr = findColumn(row, ['dob', 'dateOfBirth', 'birth']);
+
+      const playerData: MasterPlayer = {
+        id: String(uscfId),
+        uscfId: String(uscfId),
+        firstName: firstName,
+        lastName: lastName,
+        middleName: middleName,
+        state: findColumn(row, ['state', 'st']) || 'TX',
+        regularRating: ratingStr && !isNaN(parseInt(ratingStr)) ? parseInt(ratingStr) : undefined,
+        uscfExpiration: expiresStr && isValid(new Date(expiresStr)) ? new Date(expiresStr).toISOString() : undefined,
+        grade: findColumn(row, ['grade']) || '',
+        section: findColumn(row, ['section']) || '',
+        email: findColumn(row, ['email']) || '',
+        phone: findColumn(row, ['phone']) || '',
+        dob: dobStr && isValid(new Date(dobStr)) ? new Date(dobStr).toISOString() : undefined,
+        zipCode: findColumn(row, ['zipCode', 'zip']) || '',
+        studentType: findColumn(row, ['studentType', 'type']) === 'gt' ? 'gt' : 
+                     findColumn(row, ['studentType', 'type']) === 'independent' ? 'independent' : undefined,
+        school: findColumn(row, ['school']) || '',
+        district: findColumn(row, ['district']) || '',
+        events: Number(findColumn(row, ['events']) || 0),
+        eventIds: findColumn(row, ['eventIds'])?.split(',').filter(Boolean) || [],
+      };
+      newPlayers.push(playerData);
+    } catch(e) {
+      errors++;
+      console.error("Error processing player row:", row, e);
+    }
+  });
+
+  console.log(`CSV Processing complete: ${newPlayers.length} players processed, ${skippedIncomplete} skipped, ${errors} errors`);
+  return newPlayers;
+};
+
 // --- Provider Component ---
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
@@ -59,40 +135,99 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [isDbError, setIsDbError] = useState(false);
 
   const loadDatabase = useCallback(async () => {
-    if (!db) {
-        console.error("Firestore not initialized.");
-        setIsDbError(true);
-        setIsDbLoaded(true);
-        return;
-    }
-    setIsDbLoaded(false);
-    setIsDbError(false);
-    try {
-        const playersCol = collection(db, 'players');
-        const playerSnapshot = await getDocs(playersCol);
-        
-        if (playerSnapshot.empty) {
-            // If the collection is empty, seed it with the initial data.
-            console.log("Player database is empty. Seeding with initial data...");
-            const batch = writeBatch(db);
-            fullMasterPlayerData.forEach(player => {
-                const docRef = doc(db, 'players', player.id);
-                batch.set(docRef, player);
-            });
-            await batch.commit();
-            setDatabase(fullMasterPlayerData);
-            console.log("Seeding complete.");
-        } else {
-            const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-            setDatabase(playerList);
-        }
-    } catch (error) {
-      console.error("Failed to load player database from Firestore:", error);
+  if (!db) {
+      console.error("Firestore not initialized.");
       setIsDbError(true);
-    } finally {
       setIsDbLoaded(true);
-    }
-  }, []);
+      return;
+  }
+  setIsDbLoaded(false);
+  setIsDbError(false);
+  try {
+      const playersCol = collection(db, 'players');
+      const playerSnapshot = await getDocs(playersCol);
+      
+      if (playerSnapshot.empty) {
+          console.log("Player database is empty. Seeding with master CSV data...");
+          
+          try {
+              // Load master CSV from public folder
+              const response = await fetch('/data/master-players.csv');
+              if (!response.ok) {
+                  throw new Error(`Failed to fetch CSV: ${response.statusText}`);
+              }
+              
+              const csvText = await response.text();
+              
+              const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
+                  Papa.parse(csvText, {
+                      header: true,
+                      skipEmptyLines: true,
+                      complete: resolve,
+                      error: reject
+                  });
+              });
+              
+              const seedPlayers = parseCSVData(parseResult.data);
+              
+              if (seedPlayers.length > 0) {
+                  // Batch write to Firestore (handles large datasets)
+                  const batchSize = 500; // Firestore batch limit
+                  const batches = [];
+                  
+                  for (let i = 0; i < seedPlayers.length; i += batchSize) {
+                      const batch = writeBatch(db);
+                      const batchPlayers = seedPlayers.slice(i, i + batchSize);
+                      
+                      batchPlayers.forEach(player => {
+                          const docRef = doc(db, 'players', player.id);
+                          batch.set(docRef, player);
+                      });
+                      
+                      batches.push(batch.commit());
+                  }
+                  
+                  // Execute all batches
+                  await Promise.all(batches);
+                  
+                  setDatabase(seedPlayers);
+                  console.log(`Seeding complete. Imported ${seedPlayers.length} players from master CSV.`);
+              } else {
+                  console.warn("No valid players found in master CSV data");
+                  // Fallback to placeholder data
+                  const batch = writeBatch(db);
+                  fullMasterPlayerData.forEach(player => {
+                      const docRef = doc(db, 'players', player.id);
+                      batch.set(docRef, player);
+                  });
+                  await batch.commit();
+                  setDatabase(fullMasterPlayerData);
+                  console.log("Used fallback placeholder data.");
+              }
+          } catch (csvError) {
+              console.error("Error loading master CSV, falling back to placeholder data:", csvError);
+              // Fallback to placeholder data if CSV loading fails
+              const batch = writeBatch(db);
+              fullMasterPlayerData.forEach(player => {
+                  const docRef = doc(db, 'players', player.id);
+                  batch.set(docRef, player);
+              });
+              await batch.commit();
+              setDatabase(fullMasterPlayerData);
+              console.log("Used fallback placeholder data due to CSV error.");
+          }
+      } else {
+          const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+          setDatabase(playerList);
+          console.log(`Loaded ${playerList.length} players from Firestore.`);
+      }
+  } catch (error) {
+    console.error("Failed to load player database from Firestore:", error);
+    setIsDbError(true);
+  } finally {
+    setIsDbLoaded(true);
+  }
+}, []);
   
   useEffect(() => {
     loadDatabase();
