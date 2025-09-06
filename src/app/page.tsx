@@ -25,6 +25,7 @@ import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-prof
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { db } from '@/lib/services/firestore-service';
+import { simpleSignIn, checkFirebaseConfig } from '@/lib/simple-auth';
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -46,9 +47,6 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
         setIsLoading(true);
         
         try {
-            // Import the simple auth functions
-            const { simpleSignIn, checkFirebaseConfig } = await import('@/lib/simple-auth');
-            
             // Check Firebase configuration first
             if (!checkFirebaseConfig()) {
                 toast({
