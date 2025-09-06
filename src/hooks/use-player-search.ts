@@ -51,9 +51,9 @@ export function usePlayerSearch({
         setSearchResults([]);
         return;
     }
-
+    
     setIsLoading(true);
-
+    
     const searchCriteria: SearchCriteria = {
       ...filters,
       excludeIds,
@@ -62,18 +62,27 @@ export function usePlayerSearch({
       sponsorProfile,
       portalType,
     };
-
+    
     const handler = setTimeout(() => {
         const results = searchPlayers(searchCriteria);
         setSearchResults(results);
         setIsLoading(false);
     }, 300);
-
+    
     return () => {
         clearTimeout(handler);
     };
-
-  }, [filters, searchPlayers, isDbLoaded, maxResults, hasActiveFilters, excludeIds, searchUnassigned, sponsorProfile, portalType]);
+  }, [
+    filters, 
+    isDbLoaded, 
+    maxResults, 
+    hasActiveFilters, 
+    excludeIds, 
+    searchUnassigned, 
+    sponsorProfile, 
+    portalType
+    // Remove 'searchPlayers' from dependencies
+  ]);
   
   const hasResults = searchResults.length > 0;
 
