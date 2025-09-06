@@ -73,6 +73,17 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
     return null;
   };
 
+  // Helper function to remove undefined values from an object
+  const removeUndefined = (obj: any) => {
+    const cleaned: any = {};
+    Object.keys(obj).forEach(key => {
+      if (obj[key] !== undefined) {
+        cleaned[key] = obj[key];
+      }
+    });
+    return cleaned;
+  };
+
   data.forEach((row: any) => {
     try {
       if (!row || Object.keys(row).length === 0) {
@@ -89,34 +100,65 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
       }
       
       const firstName = findColumn(row, ['firstName', 'first name']) || 'Unknown';
-      const middleName = findColumn(row, ['middleName', 'middle name']) || '';
+      const middleName = findColumn(row, ['middleName', 'middle name']);
       const ratingStr = findColumn(row, ['regularRating', 'rating']);
       const expiresStr = findColumn(row, ['uscfExpiration', 'expires', 'expiration']);
       const dobStr = findColumn(row, ['dob', 'dateOfBirth', 'birth']);
+      const grade = findColumn(row, ['grade']);
+      const section = findColumn(row, ['section']);
+      const email = findColumn(row, ['email']);
+      const phone = findColumn(row, ['phone']);
+      const zipCode = findColumn(row, ['zipCode', 'zip']);
+      const school = findColumn(row, ['school']);
+      const district = findColumn(row, ['district']);
+      const state = findColumn(row, ['state', 'st']);
+      const studentTypeStr = findColumn(row, ['studentType', 'type']);
+      const eventsStr = findColumn(row, ['events']);
+      const eventIdsStr = findColumn(row, ['eventIds']);
 
-      const playerData: MasterPlayer = {
+      // Build player data object, only including defined values
+      const playerData: any = {
         id: String(uscfId),
         uscfId: String(uscfId),
         firstName: firstName,
         lastName: lastName,
-        middleName: middleName,
-        state: findColumn(row, ['state', 'st']) || 'TX',
-        regularRating: ratingStr && !isNaN(parseInt(ratingStr)) ? parseInt(ratingStr) : undefined,
-        uscfExpiration: expiresStr && isValid(new Date(expiresStr)) ? new Date(expiresStr).toISOString() : undefined,
-        grade: findColumn(row, ['grade']) || '',
-        section: findColumn(row, ['section']) || '',
-        email: findColumn(row, ['email']) || '',
-        phone: findColumn(row, ['phone']) || '',
-        dob: dobStr && isValid(new Date(dobStr)) ? new Date(dobStr).toISOString() : undefined,
-        zipCode: findColumn(row, ['zipCode', 'zip']) || '',
-        studentType: findColumn(row, ['studentType', 'type']) === 'gt' ? 'gt' : 
-                     findColumn(row, ['studentType', 'type']) === 'independent' ? 'independent' : undefined,
-        school: findColumn(row, ['school']) || '',
-        district: findColumn(row, ['district']) || '',
-        events: Number(findColumn(row, ['events']) || 0),
-        eventIds: findColumn(row, ['eventIds'])?.split(',').filter(Boolean) || [],
+        events: Number(eventsStr || 0),
+        eventIds: eventIdsStr ? eventIdsStr.split(',').filter(Boolean) : [],
       };
-      newPlayers.push(playerData);
+
+      // Only add optional fields if they have values
+      if (middleName) playerData.middleName = middleName;
+      if (state) playerData.state = state;
+      else playerData.state = 'TX'; // Default state
+      
+      if (ratingStr && !isNaN(parseInt(ratingStr))) {
+        playerData.regularRating = parseInt(ratingStr);
+      }
+      
+      if (expiresStr && isValid(new Date(expiresStr))) {
+        playerData.uscfExpiration = new Date(expiresStr).toISOString();
+      }
+      
+      if (dobStr && isValid(new Date(dobStr))) {
+        playerData.dob = new Date(dobStr).toISOString();
+      }
+      
+      if (grade) playerData.grade = grade;
+      if (section) playerData.section = section;
+      if (email) playerData.email = email;
+      if (phone) playerData.phone = phone;
+      if (zipCode) playerData.zipCode = zipCode;
+      if (school) playerData.school = school;
+      if (district) playerData.district = district;
+      
+      if (studentTypeStr === 'gt' || studentTypeStr === 'independent') {
+        playerData.studentType = studentTypeStr;
+      }
+
+      // Ensure no undefined values made it through
+      const cleanedPlayerData = removeUndefined(playerData);
+      
+      newPlayers.push(cleanedPlayerData as MasterPlayer);
     } catch(e) {
       errors++;
       console.error("Error processing player row:", row, e);
