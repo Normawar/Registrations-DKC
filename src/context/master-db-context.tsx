@@ -53,7 +53,7 @@ export type SearchCriteria = {
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
-// Add this helper function for parsing CSV data (add it after your imports, before the MasterDbProvider)
+// Add this helper function for parsing CSV data
 const parseCSVData = (data: any[]): MasterPlayer[] => {
   const newPlayers: MasterPlayer[] = [];
   let errors = 0;
