@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useMasterDb, type SearchCriteria, type MasterPlayer } from '@/context/master-db-context';
 import { useSponsorProfile, type SponsorProfile } from './use-sponsor-profile';
 
@@ -29,6 +28,29 @@ export function usePlayerSearch({
   const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
   const [maxResults, setMaxResults] = useState<number>(initialMaxResults);
 
+  // Use refs to track the latest values without causing re-renders
+  const excludeIdsRef = useRef(excludeIds);
+  const searchUnassignedRef = useRef(searchUnassigned);
+  const sponsorProfileRef = useRef(sponsorProfile);
+  const portalTypeRef = useRef(portalType);
+
+  // Update refs when props change
+  useEffect(() => {
+    excludeIdsRef.current = excludeIds;
+  }, [excludeIds]);
+
+  useEffect(() => {
+    searchUnassignedRef.current = searchUnassigned;
+  }, [searchUnassigned]);
+
+  useEffect(() => {
+    sponsorProfileRef.current = sponsorProfile;
+  }, [sponsorProfile]);
+
+  useEffect(() => {
+    portalTypeRef.current = portalType;
+  }, [portalType]);
+
   const updateFilter = useCallback((key: keyof SearchCriteria, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
@@ -46,6 +68,7 @@ export function usePlayerSearch({
     });
   }, [filters]);
 
+  // Stabilize the search with minimal dependencies
   useEffect(() => {
     if (!isDbLoaded || !hasActiveFilters) {
         setSearchResults([]);
@@ -54,16 +77,16 @@ export function usePlayerSearch({
     
     setIsLoading(true);
     
-    const searchCriteria: SearchCriteria = {
-      ...filters,
-      excludeIds,
-      maxResults,
-      searchUnassigned,
-      sponsorProfile,
-      portalType,
-    };
-    
     const handler = setTimeout(() => {
+        const searchCriteria: SearchCriteria = {
+          ...filters,
+          excludeIds: excludeIdsRef.current,
+          maxResults,
+          searchUnassigned: searchUnassignedRef.current,
+          sponsorProfile: sponsorProfileRef.current,
+          portalType: portalTypeRef.current,
+        };
+        
         const results = searchPlayers(searchCriteria);
         setSearchResults(results);
         setIsLoading(false);
@@ -72,17 +95,7 @@ export function usePlayerSearch({
     return () => {
         clearTimeout(handler);
     };
-  }, [
-    filters, 
-    isDbLoaded, 
-    maxResults, 
-    hasActiveFilters, 
-    excludeIds, 
-    searchUnassigned, 
-    sponsorProfile, 
-    portalType
-    // Remove 'searchPlayers' from dependencies
-  ]);
+  }, [filters, isDbLoaded, maxResults, hasActiveFilters, searchPlayers]); // searchPlayers is now stable
   
   const hasResults = searchResults.length > 0;
 
