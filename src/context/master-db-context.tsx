@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -286,6 +287,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const addPlayer = async (player: MasterPlayer) => {
     if (!db) return;
     try {
+      console.log("Current user:", auth.currentUser);
+      console.log("User authenticated:", !!auth.currentUser);
       const cleanedPlayer = removeUndefined(player);
       const playerRef = doc(db, 'players', cleanedPlayer.id);
       await setDoc(playerRef, cleanedPlayer, { merge: true });
@@ -416,7 +419,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const results = database.filter(p => {
         if (excludeSet.has(p.id)) return false;
 
-        if (searchUnassigned && sponsorProfile) {
+        if (searchUnassigned && sponsorProfile && portalType === 'sponsor') {
             const isUnassigned = !p.school || p.school.trim() === '';
             const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
             if (!isUnassigned && !belongsToSponsor) return false;
@@ -501,3 +504,5 @@ export const useMasterDb = () => {
   }
   return context;
 };
+
+    
