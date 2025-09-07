@@ -562,7 +562,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
   
     const {
-      firstName, lastName, uscfId, state, grade, section, school, district,
+      firstName, middleName, lastName, uscfId, state, grade, section, school, district,
       minRating, maxRating, pageSize = 100, lastDoc, sponsorProfile, portalType
     } = criteria;
   
@@ -615,7 +615,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       
       // For name searches, we'll need to do client-side filtering
       // since Firestore doesn't support efficient text search
-      const needsClientFiltering = firstName || lastName;
+      const needsClientFiltering = firstName || middleName || lastName;
       
       // If no server-side filters and need client filtering, limit initial fetch
       if (conditions.length === 0 && needsClientFiltering) {
@@ -650,6 +650,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
           
           // Name filtering (case-insensitive partial match)
           if (firstName && !player.firstName?.toLowerCase().includes(firstName.toLowerCase())) {
+            return false;
+          }
+          if (middleName && !player.middleName?.toLowerCase().includes(middleName.toLowerCase())) {
             return false;
           }
           if (lastName && !player.lastName?.toLowerCase().includes(lastName.toLowerCase())) {
