@@ -53,6 +53,29 @@ export type SearchCriteria = {
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
+// Helper function to remove undefined values from an object
+const removeUndefined = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined);
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    Object.keys(obj).forEach(key => {
+      if (obj[key] !== undefined) {
+        cleaned[key] = removeUndefined(obj[key]);
+      }
+    });
+    return cleaned;
+  }
+  
+  return obj;
+};
+
 // Add this helper function for parsing CSV data
 const parseCSVData = (data: any[]): MasterPlayer[] => {
   const newPlayers: MasterPlayer[] = [];
@@ -71,17 +94,6 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
       if (found) return row[found];
     }
     return null;
-  };
-
-  // Helper function to remove undefined values from an object
-  const removeUndefined = (obj: any) => {
-    const cleaned: any = {};
-    Object.keys(obj).forEach(key => {
-      if (obj[key] !== undefined) {
-        cleaned[key] = obj[key];
-      }
-    });
-    return cleaned;
   };
 
   data.forEach((row: any) => {
@@ -169,30 +181,6 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
   return newPlayers;
 };
 
-
-const cleanDataForFirebase = (data: any): any => {
-  if (data === null || data === undefined) {
-    return null;
-  }
-  
-  if (Array.isArray(data)) {
-    return data.map(cleanDataForFirebase);
-  }
-  
-  if (typeof data === 'object') {
-    const cleanedData: any = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (value !== undefined) {
-        cleanedData[key] = cleanDataForFirebase(value);
-      }
-      // Skip undefined values completely - don't add them to the object
-    }
-    return cleanedData;
-  }
-  
-  return data;
-};
-
 // --- Provider Component ---
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
@@ -201,99 +189,83 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [isDbError, setIsDbError] = useState(false);
 
   const loadDatabase = useCallback(async () => {
-  if (!db) {
-      console.error("Firestore not initialized.");
+    if (!db) {
+        console.error("Firestore not initialized.");
+        setIsDbError(true);
+        setIsDbLoaded(true);
+        return;
+    }
+    setIsDbLoaded(false);
+    setIsDbError(false);
+    try {
+        const playersCol = collection(db, 'players');
+        const playerSnapshot = await getDocs(playersCol);
+        
+        if (playerSnapshot.empty) {
+            console.log("Player database is empty. Seeding with master CSV data...");
+            
+            try {
+                const response = await fetch('/data/master-players.csv');
+                if (!response.ok) throw new Error(`Failed to fetch CSV: ${response.statusText}`);
+                
+                const csvText = await response.text();
+                
+                const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
+                    Papa.parse(csvText, { header: true, skipEmptyLines: true, complete: resolve, error: reject });
+                });
+                
+                const seedPlayers = parseCSVData(parseResult.data);
+                
+                if (seedPlayers.length > 0) {
+                    const batchSize = 500;
+                    for (let i = 0; i < seedPlayers.length; i += batchSize) {
+                        const batch = writeBatch(db);
+                        const batchPlayers = seedPlayers.slice(i, i + batchSize);
+                        
+                        batchPlayers.forEach(player => {
+                            const cleanedPlayer = removeUndefined(player);
+                            const docRef = doc(db, 'players', player.id);
+                            batch.set(docRef, cleanedPlayer);
+                        });
+                        await batch.commit();
+                    }
+                    
+                    setDatabase(seedPlayers);
+                    console.log(`Seeding complete. Imported ${seedPlayers.length} players from master CSV.`);
+                } else {
+                    console.warn("No valid players found in master CSV data. Falling back to placeholder data.");
+                    const batch = writeBatch(db);
+                    fullMasterPlayerData.forEach(player => {
+                        const cleanedPlayer = removeUndefined(player);
+                        const docRef = doc(db, 'players', player.id);
+                        batch.set(docRef, cleanedPlayer);
+                    });
+                    await batch.commit();
+                    setDatabase(fullMasterPlayerData);
+                }
+            } catch (csvError) {
+                console.error("Error loading master CSV, falling back to placeholder data:", csvError);
+                const batch = writeBatch(db);
+                fullMasterPlayerData.forEach(player => {
+                    const cleanedPlayer = removeUndefined(player);
+                    const docRef = doc(db, 'players', player.id);
+                    batch.set(docRef, cleanedPlayer);
+                });
+                await batch.commit();
+                setDatabase(fullMasterPlayerData);
+            }
+        } else {
+            const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+            setDatabase(playerList);
+            console.log(`Loaded ${playerList.length} players from Firestore.`);
+        }
+    } catch (error) {
+      console.error("Failed to load player database from Firestore:", error);
       setIsDbError(true);
+    } finally {
       setIsDbLoaded(true);
-      return;
-  }
-  setIsDbLoaded(false);
-  setIsDbError(false);
-  try {
-      const playersCol = collection(db, 'players');
-      const playerSnapshot = await getDocs(playersCol);
-      
-      if (playerSnapshot.empty) {
-          console.log("Player database is empty. Seeding with master CSV data...");
-          
-          try {
-              // Load master CSV from public folder
-              const response = await fetch('/data/master-players.csv');
-              if (!response.ok) {
-                  throw new Error(`Failed to fetch CSV: ${response.statusText}`);
-              }
-              
-              const csvText = await response.text();
-              
-              const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
-                  Papa.parse(csvText, {
-                      header: true,
-                      skipEmptyLines: true,
-                      complete: resolve,
-                      error: reject
-                  });
-              });
-              
-              const seedPlayers = parseCSVData(parseResult.data);
-              
-              if (seedPlayers.length > 0) {
-                  // Batch write to Firestore (handles large datasets)
-                  const batchSize = 500; // Firestore batch limit
-                  const batches = [];
-                  
-                  for (let i = 0; i < seedPlayers.length; i += batchSize) {
-                      const batch = writeBatch(db);
-                      const batchPlayers = seedPlayers.slice(i, i + batchSize);
-                      
-                      batchPlayers.forEach(player => {
-                          const docRef = doc(db, 'players', player.id);
-                          batch.set(docRef, player);
-                      });
-                      
-                      batches.push(batch.commit());
-                  }
-                  
-                  // Execute all batches
-                  await Promise.all(batches);
-                  
-                  setDatabase(seedPlayers);
-                  console.log(`Seeding complete. Imported ${seedPlayers.length} players from master CSV.`);
-              } else {
-                  console.warn("No valid players found in master CSV data");
-                  // Fallback to placeholder data
-                  const batch = writeBatch(db);
-                  fullMasterPlayerData.forEach(player => {
-                      const docRef = doc(db, 'players', player.id);
-                      batch.set(docRef, player);
-                  });
-                  await batch.commit();
-                  setDatabase(fullMasterPlayerData);
-                  console.log("Used fallback placeholder data.");
-              }
-          } catch (csvError) {
-              console.error("Error loading master CSV, falling back to placeholder data:", csvError);
-              // Fallback to placeholder data if CSV loading fails
-              const batch = writeBatch(db);
-              fullMasterPlayerData.forEach(player => {
-                  const docRef = doc(db, 'players', player.id);
-                  batch.set(docRef, player);
-              });
-              await batch.commit();
-              setDatabase(fullMasterPlayerData);
-              console.log("Used fallback placeholder data due to CSV error.");
-          }
-      } else {
-          const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-          setDatabase(playerList);
-          console.log(`Loaded ${playerList.length} players from Firestore.`);
-      }
-  } catch (error) {
-    console.error("Failed to load player database from Firestore:", error);
-    setIsDbError(true);
-  } finally {
-    setIsDbLoaded(true);
-  }
-}, []);
+    }
+  }, []);
   
   useEffect(() => {
     loadDatabase();
@@ -306,7 +278,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const addPlayer = async (player: MasterPlayer) => {
     if (!db) return;
     try {
-        const cleanedPlayer = cleanDataForFirebase(player);
+        const cleanedPlayer = removeUndefined(player);
         const playerRef = doc(db, 'players', cleanedPlayer.id);
         await setDoc(playerRef, cleanedPlayer, { merge: true });
         // Optimistically update UI, then refresh from source
@@ -322,18 +294,25 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         await loadDatabase(); // ensure consistency
     } catch (error) {
         console.error("Error adding/updating player:", error);
+        throw error;
     }
   };
 
   const addBulkPlayers = async (players: MasterPlayer[]) => {
     if (!db) return;
-    const batch = writeBatch(db);
-    players.forEach(player => {
-        const docRef = doc(db, 'players', player.id || player.uscfId);
-        batch.set(docRef, player, { merge: true });
-    });
-    await batch.commit();
-    await loadDatabase();
+    try {
+        const batch = writeBatch(db);
+        players.forEach(player => {
+            const cleanedPlayer = removeUndefined(player);
+            const docRef = doc(db, 'players', player.id || player.uscfId);
+            batch.set(docRef, cleanedPlayer, { merge: true });
+        });
+        await batch.commit();
+        await loadDatabase();
+    } catch (error) {
+        console.error("Error adding bulk players:", error);
+        throw error;
+    }
   };
 
   const clearDatabase = async () => {
@@ -346,19 +325,16 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     setDatabase([]);
   };
 
-  const updatePlayer = async (player: MasterPlayer) => {
+  const updatePlayer = async (updatedPlayer: MasterPlayer) => {
     if (!db) return;
     try {
-      const cleanedPlayer = cleanDataForFirebase(player);
-      const playerRef = doc(db, 'players', cleanedPlayer.id);
-      await setDoc(playerRef, cleanedPlayer, { merge: true });
-      
-      setDatabase(prevDb => 
-        prevDb.map(p => p.id === player.id ? player : p)
-      );
+        const cleanedPlayer = removeUndefined(updatedPlayer);
+        const playerRef = doc(db, 'players', updatedPlayer.id);
+        await setDoc(playerRef, cleanedPlayer, { merge: true });
+        await loadDatabase();
     } catch (error) {
-      console.error('Error updating player:', error);
-      throw error;
+        console.error('Error updating player:', error);
+        throw error;
     }
   };
 
