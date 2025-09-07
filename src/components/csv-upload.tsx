@@ -2,13 +2,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useMasterDb } from '@/context/master-db-context';
+import { useMasterDb, type UploadProgress } from '@/context/master-db-context';
 import { Progress } from '@/components/ui/progress';
 
 export const CSVUploadComponent: React.FC = () => {
   const { bulkUploadCSV } = useMasterDb();
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [results, setResults] = useState<{ uploaded: number; errors: string[] } | null>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,6 +55,26 @@ export const CSVUploadComponent: React.FC = () => {
     }
   };
 
+  const getStageIcon = (stage: string) => {
+    switch (stage) {
+      case 'parsing': return '📄';
+      case 'uploading': return '⬆️';
+      case 'refreshing': return '🔄';
+      case 'complete': return '✅';
+      default: return '🚀';
+    }
+  };
+
+  const getStageColor = (stage: string) => {
+    switch (stage) {
+      case 'parsing': return 'text-blue-600';
+      case 'uploading': return 'text-orange-600';
+      case 'refreshing': return 'text-purple-600';
+      case 'complete': return 'text-green-600';
+      default: return 'text-gray-600';
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -70,31 +90,64 @@ export const CSVUploadComponent: React.FC = () => {
         />
       </div>
 
-      {uploading && (
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <div className="flex items-center mb-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
-            <span className="text-blue-700 font-medium">Uploading CSV... Please wait</span>
+      {uploading && progress && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-xl">{getStageIcon(progress.stage)}</span>
+              <span className={`font-medium capitalize ${getStageColor(progress.stage)}`}>
+                {progress.stage}
+              </span>
+            </div>
+            <span className="text-sm text-gray-500">
+              {progress.percentage}%
+            </span>
           </div>
-          {progress && (
-            <div>
-              <Progress value={(progress.current / progress.total) * 100} className="w-full h-2" />
-              <p className="text-xs text-blue-600 mt-1 text-center">
-                {progress.current.toLocaleString()} / {progress.total.toLocaleString()} players uploaded
-              </p>
+
+          <Progress value={progress.percentage} className="w-full h-3" />
+
+          <div className="space-y-2">
+            <p className="text-sm text-blue-700 font-medium">
+              {progress.message}
+            </p>
+            
+            {progress.stage === 'uploading' && (
+              <div className="grid grid-cols-2 gap-4 text-xs text-gray-600">
+                <div>
+                  <span className="font-medium">Batch Progress:</span>
+                  <br />
+                  {progress.currentBatch} of {progress.totalBatches} batches
+                </div>
+                <div>
+                  <span className="font-medium">Records Uploaded:</span>
+                  <br />
+                  {progress.uploadedRecords.toLocaleString()} of {progress.totalRecords.toLocaleString()}
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {progress.stage === 'uploading' && progress.currentBatch > 1 && (
+            <div className="text-xs text-gray-500">
+              Estimated time remaining: ~{Math.ceil((progress.totalBatches - progress.currentBatch) * 1)} seconds
             </div>
           )}
         </div>
       )}
 
-      {results && (
+      {results && !uploading && (
         <div className={`border rounded-md p-4 ${results.errors.length > 0 ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'}`}>
-          <h3 className="font-medium mb-2">Upload Results</h3>
-          <p className="text-sm">Successfully uploaded: {results.uploaded} players</p>
+          <h3 className="font-medium mb-2 flex items-center">
+            <span className="mr-2">🎉</span>
+            Upload Results
+          </h3>
+          <p className="text-sm">
+            <span className="font-medium">Successfully uploaded:</span> {results.uploaded.toLocaleString()} players
+          </p>
           {results.errors.length > 0 && (
             <div className="mt-2">
               <p className="text-sm text-yellow-700 font-medium">Errors encountered:</p>
-              <ul className="text-xs text-yellow-600 mt-1 space-y-1">
+              <ul className="text-xs text-yellow-600 mt-1 space-y-1 max-h-32 overflow-y-auto">
                 {results.errors.map((error, index) => (
                   <li key={index}>• {error}</li>
                 ))}
@@ -109,9 +162,11 @@ export const CSVUploadComponent: React.FC = () => {
         <ul className="mt-1 space-y-1">
           <li>• Required columns: uscfId, firstName, lastName</li>
           <li>• Optional columns: state, grade, section, school, district, email, phone, regularRating</li>
-          <li>• Files are uploaded in batches of 500 with 1-second delays to prevent rate limiting</li>
+          <li>• Large files are processed in batches with progress tracking</li>
         </ul>
       </div>
     </div>
   );
 };
+
+    
