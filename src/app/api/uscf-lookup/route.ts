@@ -1,4 +1,7 @@
+// app/api/uscf-lookup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+
+const USCF_SERVICE_URL = process.env.USCF_SERVICE_URL || 'https://your-cloud-run-service-url';
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,30 +11,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'USCF ID is required' }, { status: 400 });
     }
 
-    if (!/^\d{7,8}$/.test(body.uscfId.trim())) {
-      return NextResponse.json({ error: 'Invalid USCF ID format' }, { status: 400 });
+    const response = await fetch(`${USCF_SERVICE_URL}/uscf-lookup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uscf_id: body.uscfId }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errorData.error || 'Player not found' }, 
+        { status: response.status }
+      );
     }
 
-    // Mock data for testing
-    const mockPlayer = {
-      uscf_id: body.uscfId.trim(),
-      name: "MORENO, RYAN",
-      rating_regular: 602,
-      rating_quick: 605,
-      state: "TX",
-      expiration_date: "2025-09-30"
-    };
-
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    return NextResponse.json(mockPlayer);
+    const player = await response.json();
+    return NextResponse.json(player);
 
   } catch (error) {
-    console.error('API error:', error);
+    console.error('USCF lookup error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' }, 
-      { status: 500 }
+      { error: 'Service unavailable' }, 
+      { status: 503 }
     );
   }
 }
