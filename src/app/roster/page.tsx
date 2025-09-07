@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -56,10 +55,10 @@ const playerFormSchema = z.object({
   ),
   grade: z.string().optional(),
   section: z.string().optional(),
-  email: z.string().email({ message: "Please enter a valid email." }).optional().or(z.literal('')),
+  email: z.string().email({ message: "Please enter a valid email." }),
   phone: z.string().optional(),
   dob: z.date().optional(),
-  zipCode: z.string().optional(),
+  zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
   studentType: z.string().optional(),
   state: z.string().optional(),
   school: z.string().min(1, { message: "School name is required."}),
@@ -100,18 +99,11 @@ function SponsorRosterView() {
 
   const createPlayerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
-  });
-
-  // Update form defaults when profile loads
-  useEffect(() => {
-    if (profile) {
-      createPlayerForm.reset({
-        school: profile.school,
-        district: profile.district,
-        studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
-      });
+    defaultValues: {
+      school: profile?.school || '',
+      district: profile?.district || '',
     }
-  }, [profile, createPlayerForm]);
+  });
 
   const rosterPlayers = useMemo(() => {
     if (!isProfileLoaded || !isDbLoaded || !profile) return [];
@@ -250,7 +242,6 @@ function SponsorRosterView() {
 
     const { uscfExpiration, dob, ...restOfValues } = values;
     
-    // Generate a temporary ID for the new player
     const newPlayerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const newPlayerRecord: MasterPlayer = {
@@ -409,17 +400,17 @@ function SponsorRosterView() {
                   <Form {...playerForm}>
                       <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={playerForm.control} name="dob" render={({ field }) => ( 
@@ -471,8 +462,8 @@ function SponsorRosterView() {
                               <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter zip code" /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                       </form>
                   </Form>
@@ -495,17 +486,17 @@ function SponsorRosterView() {
                   <Form {...createPlayerForm}>
                       <form id="create-player-form" onSubmit={createPlayerForm.handleSubmit(handleCreatePlayerSubmit)} className="space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              <FormField control={createPlayerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={createPlayerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={createPlayerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={createPlayerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={createPlayerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={createPlayerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={createPlayerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={createPlayerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} disabled value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} disabled value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} placeholder="Enter USCF ID or 'NEW'" /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} placeholder="Enter USCF ID or 'NEW'" value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={createPlayerForm.control} name="dob" render={({ field }) => ( 
@@ -573,8 +564,8 @@ function SponsorRosterView() {
                               </div>
                           )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter zip code" /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                       </form>
                   </Form>
