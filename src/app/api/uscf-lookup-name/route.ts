@@ -4,9 +4,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Allow searching by just first name, last name, or both
-    const firstName = body.firstName?.trim() || '';
-    const lastName = body.lastName?.trim() || '';
+    const firstName = body.firstName?.trim().toLowerCase() || '';
+    const lastName = body.lastName?.trim().toLowerCase() || '';
     
     if (!firstName && !lastName) {
       return NextResponse.json(
@@ -15,8 +14,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mock data with various name formats - always return these for testing
-    const mockPlayers = [
+    // All possible mock players
+    const allMockPlayers = [
       {
         uscf_id: "32052572",
         name: "MORENO, RYAN",
@@ -27,7 +26,7 @@ export async function POST(request: NextRequest) {
       },
       {
         uscf_id: "12345678",
-        name: "SMITH, JOHN, DAVID",  // This should show as "JOHN DAVID SMITH"
+        name: "SMITH, JOHN, DAVID",
         rating_regular: 1200,
         rating_quick: 1180,
         state: "CA",
@@ -35,7 +34,7 @@ export async function POST(request: NextRequest) {
       },
       {
         uscf_id: "87654321",
-        name: "JOHNSON, MARY, ELIZABETH",  // This should show as "MARY ELIZABETH JOHNSON"
+        name: "JOHNSON, MARY, ELIZABETH",
         rating_regular: 1350,
         rating_quick: 1320,
         state: "FL",
@@ -43,18 +42,58 @@ export async function POST(request: NextRequest) {
       },
       {
         uscf_id: "11223344",
-        name: `${lastName.toUpperCase() || 'GARCIA'}, ${firstName.toUpperCase() || 'CARLOS'}, ANTONIO`,
+        name: "GARCIA, CARLOS, ANTONIO",
         rating_regular: 1450,
         rating_quick: 1425,
         state: "NY",
         expiration_date: "2025-10-20"
+      },
+      {
+        uscf_id: "55667788",
+        name: "BROWN, JOHN",
+        rating_regular: 1100,
+        rating_quick: 1080,
+        state: "OH",
+        expiration_date: "2025-08-15"
+      },
+      {
+        uscf_id: "99887766",
+        name: "WILSON, JOHN, MICHAEL",
+        rating_regular: 1600,
+        rating_quick: 1580,
+        state: "IL",
+        expiration_date: "2025-07-30"
       }
     ];
+
+    // Filter players based on search criteria
+    const filteredPlayers = allMockPlayers.filter(player => {
+      const nameParts = player.name.split(', ');
+      const playerLastName = nameParts[0].toLowerCase();
+      const playerFirstName = nameParts[1].toLowerCase();
+      
+      // If both first and last name provided, both must match
+      if (firstName && lastName) {
+        return playerFirstName.includes(firstName) && playerLastName.includes(lastName);
+      }
+      
+      // If only first name provided
+      if (firstName && !lastName) {
+        return playerFirstName.includes(firstName);
+      }
+      
+      // If only last name provided
+      if (!firstName && lastName) {
+        return playerLastName.includes(lastName);
+      }
+      
+      return false;
+    });
 
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    return NextResponse.json(mockPlayers);
+    return NextResponse.json(filteredPlayers);
 
   } catch (error) {
     console.error('API error:', error);
