@@ -18,6 +18,7 @@ interface MasterDbContextType {
   updatePlayer: (player: MasterPlayer) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
   addBulkPlayers: (players: MasterPlayer[]) => Promise<void>;
+  bulkUploadCSV: (csvFile: File) => Promise<{ uploaded: number; errors: string[] }>;
   clearDatabase: () => Promise<void>;
   updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
@@ -542,6 +543,84 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     return [...new Set(database.map(p => p.district).filter(Boolean))].sort() as string[];
   }, [database, isDbLoaded]);
 
+  const bulkUploadCSV = async (csvFile: File): Promise<{ uploaded: number; errors: string[] }> => {
+    if (!db) throw new Error("Database not initialized");
+  
+    try {
+      // Read and parse CSV
+      const csvText = await csvFile.text();
+      const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
+        Papa.parse(csvText, { 
+          header: true, 
+          skipEmptyLines: true, 
+          dynamicTyping: true,
+          complete: resolve, 
+          error: reject 
+        });
+      });
+  
+      const players = parseCSVData(parseResult.data);
+      console.log(`Parsed ${players.length} players from CSV`);
+  
+      if (players.length === 0) {
+        return { uploaded: 0, errors: ['No valid players found in CSV'] };
+      }
+  
+      // Batch upload with rate limiting
+      const batchSize = 500;
+      const delayMs = 1000;
+      let totalUploaded = 0;
+      const errors: string[] = [];
+  
+      for (let i = 0; i < players.length; i += batchSize) {
+        const batchPlayers = players.slice(i, i + batchSize);
+        
+        try {
+          const batch = writeBatch(db);
+          
+          batchPlayers.forEach(player => {
+            const cleanedPlayer = removeUndefined(player);
+            const docRef = doc(db, 'players', player.id);
+            batch.set(docRef, cleanedPlayer, { merge: true });
+          });
+  
+          await batch.commit();
+          totalUploaded += batchPlayers.length;
+          
+          console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} completed (${totalUploaded}/${players.length} total)`);
+  
+          // Rate limiting delay (skip on last batch)
+          if (i + batchSize < players.length) {
+            console.log(`Waiting ${delayMs}ms before next batch...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+  
+        } catch (error) {
+          console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} failed:`, error);
+          
+          // Handle rate limiting
+          if (error instanceof Error && error.message.includes('resource-exhausted')) {
+            console.log('Rate limit hit, waiting longer...');
+            await new Promise(resolve => setTimeout(resolve, delayMs * 3));
+            i -= batchSize; // Retry this batch
+            continue;
+          }
+          
+          errors.push(`Batch ${Math.floor(i/batchSize) + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      }
+  
+      // Refresh the database after upload
+      await loadDatabase();
+      
+      return { uploaded: totalUploaded, errors };
+  
+    } catch (error) {
+      console.error('CSV upload failed:', error);
+      throw error;
+    }
+  };
+
 
   const value = {
     database,
@@ -549,6 +628,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     updatePlayer,
     deletePlayer,
     addBulkPlayers,
+    bulkUploadCSV,
     clearDatabase,
     updateSchoolDistrict,
     isDbLoaded,

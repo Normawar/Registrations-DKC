@@ -35,6 +35,7 @@ import { schoolData } from '@/lib/data/school-data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { CSVUploadComponent } from '@/components/csv-upload';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 type DistrictSortableColumnKey = SortableColumnKey | 'gt';
@@ -460,6 +461,10 @@ function SponsorRosterView() {
             Create New Player
           </Button>
         </div>
+      </div>
+
+      <div className='my-6'>
+        <CSVUploadComponent />
       </div>
 
       {profile && teamCode && (
