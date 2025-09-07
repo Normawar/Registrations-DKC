@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -14,9 +13,9 @@ import { isValid } from 'date-fns';
 
 interface MasterDbContextType {
   database: MasterPlayer[];
-  addPlayer: (player: MasterPlayer) => void;
-  updatePlayer: (player: MasterPlayer) => void;
-  deletePlayer: (playerId: string) => void;
+  addPlayer: (player: MasterPlayer) => Promise<void>;
+  updatePlayer: (player: MasterPlayer) => Promise<void>;
+  deletePlayer: (playerId: string) => Promise<void>;
   addBulkPlayers: (players: MasterPlayer[]) => Promise<void>;
   clearDatabase: () => Promise<void>;
   updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
@@ -28,6 +27,8 @@ interface MasterDbContextType {
   dbDistricts: string[];
   searchPlayers: (criteria: Partial<SearchCriteria>) => MasterPlayer[];
   refreshDatabase: () => void;
+  generatePlayerId: (uscfId: string) => string;
+  updatePlayerFromUscfData: (uscfData: Partial<MasterPlayer>[]) => Promise<{ updated: number; created: number }>;
 }
 
 export type SearchCriteria = {
@@ -274,45 +275,24 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const refreshDatabase = () => {
     loadDatabase();
   };
+  
+  const generatePlayerId = (uscfId: string): string => {
+    if (uscfId && uscfId.toUpperCase() !== 'NEW' && uscfId.trim() !== '') {
+      return uscfId.trim();
+    }
+    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
 
   const addPlayer = async (player: MasterPlayer) => {
-    if (!db) {
-        console.error("Database not initialized");
-        return;
-    }
-
-    console.log("Current user:", auth.currentUser);
-    console.log("User authenticated:", !!auth.currentUser);
-
-    if (!auth.currentUser) {
-        console.error("User not authenticated! Cannot add player.");
-        return;
-    }
-
+    if (!db) return;
     try {
-        console.log("Attempting to add player:", player);
-        const cleanedPlayer = removeUndefined(player);
-        console.log("Cleaned player data:", cleanedPlayer);
-
-        const playerRef = doc(db, 'players', cleanedPlayer.id);
-        await setDoc(playerRef, cleanedPlayer, { merge: true });
-
-        console.log("Player successfully written to Firebase");
-        
-        // Optimistically update UI, then refresh from source
-        setDatabase(prev => {
-            const existingIndex = prev.findIndex(p => p.id === player.id);
-            if (existingIndex > -1) {
-                const newDb = [...prev];
-                newDb[existingIndex] = player;
-                return newDb;
-            }
-            return [...prev, player];
-        });
-        await loadDatabase(); // ensure consistency
+      const cleanedPlayer = removeUndefined(player);
+      const playerRef = doc(db, 'players', cleanedPlayer.id);
+      await setDoc(playerRef, cleanedPlayer, { merge: true });
+      await loadDatabase(); // Ensure UI consistency by reloading from source
     } catch (error) {
-        console.error("Error adding/updating player:", error);
-        throw error;
+      console.error("Error adding/updating player:", error);
+      throw error;
     }
   };
 
@@ -338,7 +318,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const playersCol = collection(db, 'players');
     const playerSnapshot = await getDocs(playersCol);
     const batch = writeBatch(db);
-    playerSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+    playerSnapshot.docs.forEach(d => batch.delete(d.ref));
     await batch.commit();
     setDatabase([]);
   };
@@ -363,8 +343,59 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateSchoolDistrict = (oldDistrict: string, newDistrict: string) => {
-    // This function will need to be updated to work with Firestore for schools.
     console.warn("updateSchoolDistrict needs to be reimplemented for Firestore.");
+  };
+
+  const updatePlayerFromUscfData = async (uscfData: Partial<MasterPlayer>[]) => {
+    if (!db) {
+        throw new Error("Database not initialized");
+    }
+    const stats = { updated: 0, created: 0 };
+    const batch = writeBatch(db);
+
+    for (const uscfPlayer of uscfData) {
+        if (!uscfPlayer.uscfId) continue;
+        
+        const playerId = generatePlayerId(uscfPlayer.uscfId);
+        const playerRef = doc(db, 'players', playerId);
+        const playerDoc = await getDoc(playerRef);
+
+        if (playerDoc.exists()) {
+            const existingData = playerDoc.data() as MasterPlayer;
+            const updatedData = {
+                regularRating: uscfPlayer.regularRating !== undefined ? uscfPlayer.regularRating : existingData.regularRating,
+                uscfExpiration: uscfPlayer.uscfExpiration || existingData.uscfExpiration,
+                // Add any other fields from USCF that should be updated
+            };
+            batch.update(playerRef, updatedData);
+            stats.updated++;
+        } else {
+            // Player doesn't exist, create a new record
+            const newPlayerData: MasterPlayer = {
+                id: playerId,
+                uscfId: uscfPlayer.uscfId,
+                firstName: uscfPlayer.firstName || 'Unknown',
+                lastName: uscfPlayer.lastName || 'Unknown',
+                regularRating: uscfPlayer.regularRating,
+                uscfExpiration: uscfPlayer.uscfExpiration,
+                state: uscfPlayer.state || 'TX',
+                grade: '',
+                section: '',
+                email: '',
+                school: '',
+                district: '',
+                events: 0,
+                eventIds: [],
+            };
+            const cleanedPlayer = removeUndefined(newPlayerData);
+            batch.set(playerRef, cleanedPlayer);
+            stats.created++;
+        }
+    }
+
+    await batch.commit();
+    await loadDatabase();
+    return stats;
   };
   
   const searchPlayers = useCallback((criteria: Partial<SearchCriteria>): MasterPlayer[] => {
@@ -451,7 +482,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     dbSchools,
     dbDistricts,
     searchPlayers,
-    refreshDatabase
+    refreshDatabase,
+    generatePlayerId,
+    updatePlayerFromUscfData,
   };
 
   return (

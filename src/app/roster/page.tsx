@@ -46,7 +46,7 @@ const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K
 const playerFormSchema = z.object({
   id: z.string().optional(),
   firstName: z.string().min(1, { message: "First Name is required." }),
-  middleName: z.string().transform(val => val || ''), // Always return string
+  middleName: z.string().transform(val => val || ''),
   lastName: z.string().min(1, { message: "Last Name is required." }),
   uscfId: z.string().min(1, { message: "USCF ID is required." }),
   uscfExpiration: z.date().optional(),
@@ -61,14 +61,14 @@ const playerFormSchema = z.object({
       invalid_type_error: "Rating must be a number or UNR."
     }).optional()
   ),
-  grade: z.string().transform(val => val || ''), // Always return string
-  section: z.string().transform(val => val || ''), // Always return string
+  grade: z.string().transform(val => val || ''),
+  section: z.string().transform(val => val || ''),
   email: z.string().min(1, { message: "Email is required for roster players." }).email({ message: "Please enter a valid email." }),
   zipCode: z.string().min(1, { message: "Zip Code is required for roster players." }),
-  phone: z.string().transform(val => val || ''), // Always return string
+  phone: z.string().transform(val => val || ''),
   dob: z.date().optional(),
-  studentType: z.string().transform(val => val || ''), // Always return string
-  state: z.string().transform(val => val || ''), // Always return string
+  studentType: z.string().transform(val => val || ''),
+  state: z.string().transform(val => val || ''),
   school: z.string().min(1, { message: "School name is required."}),
   district: z.string().min(1, { message: "District name is required."}),
 }).refine(data => {
@@ -104,7 +104,7 @@ function SponsorRosterView() {
   const [pendingPlayer, setPendingPlayer] = useState<MasterPlayer | null>(null);
 
   const { profile, isProfileLoaded } = useSponsorProfile();
-  const { database, addPlayer, updatePlayer, isDbLoaded } = useMasterDb();
+  const { database, addPlayer, updatePlayer, isDbLoaded, generatePlayerId } = useMasterDb();
   
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
@@ -127,8 +127,8 @@ function SponsorRosterView() {
         phone: '',
         zipCode: '',
         uscfId: '',
-        school: profile.school,
-        district: profile.district,
+        school: profile.school || '',
+        district: profile.district || '',
         grade: '',
         section: '',
         state: '',
@@ -232,7 +232,7 @@ function SponsorRosterView() {
       };
       
       if (pendingPlayer) {
-          addPlayer(updatedPlayerRecord);
+          await addPlayer(updatedPlayerRecord);
           toast({ 
               title: "Player Added to Roster", 
               description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
@@ -284,17 +284,19 @@ function SponsorRosterView() {
 
     const { uscfExpiration, dob, ...restOfValues } = values;
     
-    const newPlayerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newPlayerId = generatePlayerId(values.uscfId);
     
     const newPlayerRecord: MasterPlayer = {
-        id: newPlayerId,
         ...restOfValues,
+        id: newPlayerId,
         school: profile.school,
         district: profile.district,
         dob: dob ? dob.toISOString() : undefined,
         uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        events: 0,
+        eventIds: [],
     };
     
     await addPlayer(newPlayerRecord);
