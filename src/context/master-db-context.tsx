@@ -372,18 +372,61 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const addBulkPlayers = async (players: MasterPlayer[]) => {
     if (!db) return;
+    
     try {
-        const batch = writeBatch(db);
-        players.forEach(player => {
+      console.log(`Starting bulk upload of ${players.length} players...`);
+      
+      // For large uploads (>1000 records), use batching with delays
+      if (players.length > 1000) {
+        const batchSize = 500;
+        const delayMs = 1000;
+        const totalBatches = Math.ceil(players.length / batchSize);
+        let totalUploaded = 0;
+        
+        console.log(`Large upload detected. Processing ${totalBatches} batches with rate limiting...`);
+        
+        for (let i = 0; i < players.length; i += batchSize) {
+          const batch = writeBatch(db);
+          const batchPlayers = players.slice(i, i + batchSize);
+          const batchNum = Math.floor(i/batchSize) + 1;
+          
+          console.log(`Processing batch ${batchNum}/${totalBatches} (${batchPlayers.length} players)...`);
+          
+          batchPlayers.forEach(player => {
             const cleanedPlayer = removeUndefined(player);
             const docRef = doc(db, 'players', player.id || player.uscfId);
             batch.set(docRef, cleanedPlayer, { merge: true });
+          });
+          
+          await batch.commit();
+          totalUploaded += batchPlayers.length;
+          
+          console.log(`Batch ${batchNum}/${totalBatches} completed (${totalUploaded}/${players.length} total)`);
+          
+          // Rate limiting delay (skip on last batch)
+          if (i + batchSize < players.length) {
+            console.log(`Waiting ${delayMs}ms before next batch...`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
+        
+        console.log(`Large upload complete! ${totalUploaded} players uploaded`);
+      } else {
+        // For smaller uploads, use the original method
+        const batch = writeBatch(db);
+        players.forEach(player => {
+          const cleanedPlayer = removeUndefined(player);
+          const docRef = doc(db, 'players', player.id || player.uscfId);
+          batch.set(docRef, cleanedPlayer, { merge: true });
         });
         await batch.commit();
-        await loadDatabase();
+        console.log(`Small upload complete! ${players.length} players uploaded`);
+      }
+      
+      await loadDatabase();
     } catch (error) {
-        console.error("Error adding bulk players:", error);
-        throw error;
+      console.error("Error adding bulk players:", error);
+      throw error;
     }
   };
 
@@ -686,7 +729,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             percentage: Math.round((totalUploaded / players.length) * 90),
             message: `Waiting ${delayMs}ms before next batch...`
           });
-          console.log(`⏳ Waiting ${delayMs}ms before next batch...`);
+          console.log(`Waiting ${delayMs}ms before next batch...`);
           await new Promise(resolve => setTimeout(resolve, delayMs));
         }
 
