@@ -20,6 +20,18 @@ export type MasterPlayer = {
   district: string;
   events: number;
   eventIds: string[];
+  createdAt?: string; // ISO date string
+  updatedAt?: string; // ISO date string
+
+  // Add these new fields for potential matches
+  potentialUscfMatch?: {
+    uscfId: string;
+    confidence: 'high' | 'medium' | 'low';
+    matchedOn: string[];
+    flaggedDate: string;
+    reviewedBy?: string;
+    reviewStatus?: 'pending' | 'confirmed' | 'rejected';
+  };
 };
 
 // This is a placeholder for a much larger dataset.

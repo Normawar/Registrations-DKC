@@ -10,7 +10,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus, BadgeInfo } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -34,6 +34,7 @@ import { Label } from '@/components/ui/label';
 import { schoolData } from '@/lib/data/school-data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 type DistrictSortableColumnKey = SortableColumnKey | 'gt';
@@ -41,12 +42,12 @@ type DistrictSortableColumnKey = SortableColumnKey | 'gt';
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
 const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3, '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7, '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11, '12th Grade': 12, };
-const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12 };
+const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12, Championship: 12 };
 
 const playerFormSchema = z.object({
   id: z.string().optional(),
   firstName: z.string().min(1, { message: "First Name is required." }),
-  middleName: z.string().transform(val => val || ''),
+  middleName: z.string().optional().transform(val => val === '' ? undefined : val),
   lastName: z.string().min(1, { message: "Last Name is required." }),
   uscfId: z.string().min(1, { message: "USCF ID is required." }),
   uscfExpiration: z.date().optional(),
@@ -61,14 +62,14 @@ const playerFormSchema = z.object({
       invalid_type_error: "Rating must be a number or UNR."
     }).optional()
   ),
-  grade: z.string().transform(val => val || ''),
-  section: z.string().transform(val => val || ''),
+  grade: z.string().optional().transform(val => val === '' ? undefined : val),
+  section: z.string().optional().transform(val => val === '' ? undefined : val),
   email: z.string().min(1, { message: "Email is required for roster players." }).email({ message: "Please enter a valid email." }),
   zipCode: z.string().min(1, { message: "Zip Code is required for roster players." }),
-  phone: z.string().transform(val => val || ''),
+  phone: z.string().optional().transform(val => val === '' ? undefined : val),
   dob: z.date().optional(),
-  studentType: z.string().transform(val => val || ''),
-  state: z.string().transform(val => val || ''),
+  studentType: z.string().optional().transform(val => val === '' ? undefined : val),
+  state: z.string().optional().transform(val => val === '' ? undefined : val),
   school: z.string().min(1, { message: "School name is required."}),
   district: z.string().min(1, { message: "District name is required."}),
 }).refine(data => {
@@ -220,34 +221,34 @@ function SponsorRosterView() {
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-      if (!editingPlayer) return;
-
-      const { uscfExpiration, dob, ...restOfValues } = values;
-      
-      const updatedPlayerRecord: MasterPlayer = {
-          ...editingPlayer,
-          ...restOfValues,
-          dob: dob ? dob.toISOString() : undefined,
-          uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-      };
-      
-      if (pendingPlayer) {
-          await addPlayer(updatedPlayerRecord);
-          toast({ 
-              title: "Player Added to Roster", 
-              description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
-          });
-          setPendingPlayer(null);
-      } else {
-          await updatePlayer(updatedPlayerRecord);
-          toast({ 
-              title: "Player Updated", 
-              description: `${values.firstName} ${values.lastName}'s information has been updated.`
-          });
-      }
-      
-      setIsEditPlayerDialogOpen(false);
-      setEditingPlayer(null);
+    if (!editingPlayer) return;
+  
+    const { uscfExpiration, dob, ...restOfValues } = values;
+    
+    const updatedPlayerRecord: MasterPlayer = {
+      ...editingPlayer,
+      ...restOfValues,
+      dob: dob ? dob.toISOString() : undefined,
+      uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+    };
+    
+    if (pendingPlayer) {
+      await addPlayer(updatedPlayerRecord);
+      toast({ 
+        title: "Player Added to Roster", 
+        description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
+      });
+      setPendingPlayer(null);
+    } else {
+      await updatePlayer(updatedPlayerRecord);
+      toast({ 
+        title: "Player Updated", 
+        description: `${values.firstName} ${values.lastName}'s information has been updated.`
+      });
+    }
+    
+    setIsEditPlayerDialogOpen(false);
+    setEditingPlayer(null);
   };
 
   const handleCancelEdit = () => {
@@ -262,19 +263,19 @@ function SponsorRosterView() {
     if (!profile) return;
     
     createPlayerForm.reset({
-      firstName: '',
-      lastName: '',
-      middleName: '',
-      email: '',
-      phone: '',
-      zipCode: '',
-      uscfId: '',
-      school: profile.school || '',
-      district: profile.district || '',
-      grade: '',
-      section: '',
-      state: '',
-      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
+        firstName: '',
+        lastName: '',
+        middleName: '',
+        email: '',
+        phone: '',
+        zipCode: '',
+        uscfId: '',
+        school: profile.school || '',
+        district: profile.district || '',
+        grade: '',
+        section: '',
+        state: '',
+        studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
     });
     setIsCreatePlayerDialogOpen(true);
   };
@@ -344,6 +345,102 @@ function SponsorRosterView() {
     });
   };
 
+  const PotentialMatchesReview = () => {
+    const flaggedPlayers = rosterPlayers.filter(p => 
+      p.potentialUscfMatch?.reviewStatus === 'pending'
+    );
+  
+    const confirmMatch = async (player: MasterPlayer) => {
+      if (!player.potentialUscfMatch) return;
+  
+      const updatedPlayer = {
+        ...player,
+        uscfId: player.potentialUscfMatch.uscfId,
+        potentialUscfMatch: {
+          ...player.potentialUscfMatch,
+          reviewStatus: 'confirmed' as const,
+          reviewedBy: profile?.email
+        }
+      };
+  
+      await updatePlayer(updatedPlayer);
+      toast({ 
+        title: "Match Confirmed", 
+        description: `${player.firstName} ${player.lastName} updated with USCF ID ${player.potentialUscfMatch.uscfId}`
+      });
+    };
+  
+    const rejectMatch = async (player: MasterPlayer) => {
+      if (!player.potentialUscfMatch) return;
+  
+      const updatedPlayer = {
+        ...player,
+        potentialUscfMatch: {
+          ...player.potentialUscfMatch,
+          reviewStatus: 'rejected' as const,
+          reviewedBy: profile?.email
+        }
+      };
+  
+      await updatePlayer(updatedPlayer);
+      toast({ 
+        title: "Match Rejected", 
+        description: `Potential match for ${player.firstName} ${player.lastName} has been rejected`
+      });
+    };
+  
+    if (flaggedPlayers.length === 0) return null;
+  
+    return (
+      <Card className="mb-8 border-amber-500">
+        <CardHeader>
+            <div className="flex items-center gap-2">
+                <BadgeInfo className="h-6 w-6 text-amber-600" />
+                <div>
+                    <CardTitle className="text-amber-700">Potential USCF Matches Found</CardTitle>
+                    <CardDescription>
+                    Review these potential matches from the latest USCF upload to assign official USCF IDs to your manually created players.
+                    </CardDescription>
+                </div>
+            </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {flaggedPlayers.map(player => (
+              <div key={player.id} className="border rounded p-4 bg-amber-50">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-semibold">
+                      {player.firstName} {player.lastName}
+                    </h4>
+                    <p className="text-sm text-muted-foreground">
+                      Current: Temp ID | Potential USCF ID: {player.potentialUscfMatch?.uscfId}
+                    </p>
+                    <div className="mt-2">
+                      <Badge variant={
+                        player.potentialUscfMatch?.confidence === 'high' ? 'default' : 'secondary'
+                      } className={player.potentialUscfMatch?.confidence === 'high' ? 'bg-green-600' : ''}>
+                        {player.potentialUscfMatch?.confidence} confidence
+                      </Badge>
+                    </div>
+                  </div>
+                  <div className="space-x-2">
+                    <Button size="sm" onClick={() => confirmMatch(player)}>
+                      Confirm Match
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => rejectMatch(player)}>
+                      Not a Match
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -375,6 +472,8 @@ function SponsorRosterView() {
           </AlertDescription>
         </Alert>
       )}
+
+      <PotentialMatchesReview />
 
       <Card>
         <CardHeader><CardTitle>Current Roster</CardTitle><CardDescription>Players registered under your school and district</CardDescription></CardHeader>

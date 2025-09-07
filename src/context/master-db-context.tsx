@@ -55,28 +55,28 @@ export type SearchCriteria = {
 
 const MasterDbContext = createContext<MasterDbContextType | undefined>(undefined);
 
-// Helper function to remove undefined values from an object
+// Helper function to clean undefined values for Firebase
 const removeUndefined = (obj: any): any => {
-  if (obj === null || obj === undefined) {
-    return null;
-  }
-  
-  if (Array.isArray(obj)) {
-    return obj.map(removeUndefined);
-  }
-  
-  if (typeof obj === 'object') {
-    const cleaned: any = {};
-    Object.keys(obj).forEach(key => {
-      if (obj[key] !== undefined) {
-        cleaned[key] = removeUndefined(obj[key]);
-      }
-    });
-    return cleaned;
-  }
-  
-  return obj;
-};
+    if (obj === null || obj === undefined) {
+      return null;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(removeUndefined);
+    }
+    
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      Object.keys(obj).forEach(key => {
+        if (obj[key] !== undefined) {
+          cleaned[key] = removeUndefined(obj[key]);
+        }
+      });
+      return cleaned;
+    }
+    
+    return obj;
+  };
 
 // Add this helper function for parsing CSV data
 const parseCSVData = (data: any[]): MasterPlayer[] => {
@@ -183,6 +183,56 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
   return newPlayers;
 };
 
+const generatePlayerId = (uscfId: string): string => {
+    if (uscfId && uscfId.toUpperCase() !== 'NEW' && uscfId.trim() !== '') {
+      return uscfId;
+    }
+    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+  
+const flagPotentialMatches = (uscfPlayers: any[], tempPlayers: MasterPlayer[]) => {
+    const potentialMatches: Array<{
+      tempPlayer: MasterPlayer;
+      uscfPlayer: any;
+      confidence: 'high' | 'medium' | 'low';
+      matchedFields: string[];
+    }> = [];
+  
+    uscfPlayers.forEach(uscfPlayer => {
+      tempPlayers.forEach(tempPlayer => {
+        const matches = [];
+        let confidence: 'high' | 'medium' | 'low' = 'low';
+  
+        if (tempPlayer.firstName?.toLowerCase().trim() === uscfPlayer.firstName?.toLowerCase().trim()) {
+          matches.push('firstName');
+        }
+        if (tempPlayer.lastName?.toLowerCase().trim() === uscfPlayer.lastName?.toLowerCase().trim()) {
+          matches.push('lastName');
+        }
+        if (tempPlayer.state === uscfPlayer.state) {
+          matches.push('state');
+        }
+  
+        if (matches.includes('firstName') && matches.includes('lastName') && matches.includes('state')) {
+          confidence = 'high';
+        } else if (matches.includes('firstName') && matches.includes('lastName')) {
+          confidence = 'medium';
+        }
+  
+        if (confidence === 'high' || confidence === 'medium') {
+          potentialMatches.push({
+            tempPlayer,
+            uscfPlayer,
+            confidence,
+            matchedFields: matches
+          });
+        }
+      });
+    });
+  
+    return potentialMatches;
+  };
+
 // --- Provider Component ---
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
@@ -276,19 +326,11 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const refreshDatabase = () => {
     loadDatabase();
   };
-  
-  const generatePlayerId = (uscfId: string): string => {
-    if (uscfId && uscfId.toUpperCase() !== 'NEW' && uscfId.trim() !== '') {
-      return uscfId.trim();
-    }
-    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  };
 
   const addPlayer = async (player: MasterPlayer) => {
     if (!db) return;
     try {
       console.log("Current user:", auth.currentUser);
-      console.log("User authenticated:", !!auth.currentUser);
       const cleanedPlayer = removeUndefined(player);
       const playerRef = doc(db, 'players', cleanedPlayer.id);
       await setDoc(playerRef, cleanedPlayer, { merge: true });
@@ -328,14 +370,39 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const updatePlayer = async (updatedPlayer: MasterPlayer) => {
     if (!db) return;
-    try {
-        const cleanedPlayer = removeUndefined(updatedPlayer);
-        const playerRef = doc(db, 'players', updatedPlayer.id);
-        await setDoc(playerRef, cleanedPlayer, { merge: true });
-        await loadDatabase();
-    } catch (error) {
-        console.error('Error updating player:', error);
-        throw error;
+    
+    const oldId = updatedPlayer.id;
+    const newUscfId = updatedPlayer.uscfId;
+    
+    // Check if USCF ID changed from temp ID to real USCF ID
+    const isIdMigration = oldId.startsWith('temp_') && 
+                         newUscfId && 
+                         newUscfId.toUpperCase() !== 'NEW' && 
+                         newUscfId !== oldId;
+    
+    if (isIdMigration) {
+      const newId = newUscfId;
+      const playerWithNewId = {
+        ...updatedPlayer,
+        id: newId,
+        updatedAt: new Date().toISOString()
+      };
+      
+      const cleanedPlayer = removeUndefined(playerWithNewId);
+      
+      await setDoc(doc(db, 'players', newId), cleanedPlayer);
+      await deleteDoc(doc(db, 'players', oldId));
+      
+      setDatabase(prevDb => 
+        prevDb.map(p => p.id === oldId ? playerWithNewId : p)
+      );
+    } else {
+      const cleanedPlayer = removeUndefined(updatedPlayer);
+      await setDoc(doc(db, 'players', updatedPlayer.id), cleanedPlayer, { merge: true });
+      
+      setDatabase(prevDb => 
+        prevDb.map(p => p.id === updatedPlayer.id ? updatedPlayer : p)
+      );
     }
   };
 
