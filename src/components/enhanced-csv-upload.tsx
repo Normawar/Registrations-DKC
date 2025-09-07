@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useMasterDb, type UploadProgress } from '@/context/master-db-context';
+import { Progress } from '@/components/ui/progress';
 
 export const EnhancedCSVUpload: React.FC = () => {
   const { bulkUploadCSVWithProgress } = useMasterDb();
@@ -31,8 +32,6 @@ export const EnhancedCSVUpload: React.FC = () => {
   };
 
   const handleUpload = async () => {
-    console.log('🎯 handleUpload called');
-    
     if (!selectedFile) {
       alert('Please select a CSV file first');
       return;
@@ -44,8 +43,6 @@ export const EnhancedCSVUpload: React.FC = () => {
       alert('Upload function not available. Please refresh the page and try again.');
       return;
     }
-  
-    console.log('✅ bulkUploadCSVWithProgress function found');
   
     setUploading(true);
     setProgress(null);
@@ -161,10 +158,7 @@ export const EnhancedCSVUpload: React.FC = () => {
           {/* Upload Button */}
           {selectedFile && !uploading && (
             <button
-              onClick={() => {
-                console.log('🔴 Button clicked!');
-                handleUpload();
-              }}
+              onClick={handleUpload}
               disabled={uploading}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50"
             >
