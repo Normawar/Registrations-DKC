@@ -29,7 +29,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo } from 'react';
@@ -72,6 +72,7 @@ const organizerMenuItems = [
   { href: "/organizer-registration", icon: RookIcon, label: "Register for Event" },
   { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
+  { href: "/organizers/vouchers", icon: FileText, label: "Voucher Management" },
   { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
