@@ -184,10 +184,16 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
 };
 
 const generatePlayerId = (uscfId: string): string => {
+    console.log('generatePlayerId called with:', uscfId, 'type:', typeof uscfId);
+    
     if (uscfId && uscfId.toUpperCase() !== 'NEW' && uscfId.trim() !== '') {
-      return uscfId;
+        console.log('Returning USCF ID:', uscfId);
+        return uscfId;
     }
-    return `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    console.log('Returning temp ID:', tempId);
+    return tempId;
 };
   
 const flagPotentialMatches = (uscfPlayers: any[], tempPlayers: MasterPlayer[]) => {
