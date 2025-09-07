@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -11,7 +10,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, Plus, UserPlus } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -83,6 +82,7 @@ function SponsorRosterView() {
   const { toast } = useToast();
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
   const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
+  const [isCreatePlayerDialogOpen, setIsCreatePlayerDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
@@ -96,6 +96,14 @@ function SponsorRosterView() {
 
   const playerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
+  });
+
+  const createPlayerForm = useForm<PlayerFormValues>({
+    resolver: zodResolver(playerFormSchema),
+    defaultValues: {
+      school: profile?.school || '',
+      district: profile?.district || '',
+    }
   });
 
   const rosterPlayers = useMemo(() => {
@@ -219,6 +227,51 @@ function SponsorRosterView() {
       setEditingPlayer(null);
   };
 
+  const handleCreateNewPlayer = () => {
+    if (!profile) return;
+    
+    createPlayerForm.reset({
+      school: profile.school,
+      district: profile.district,
+      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+    });
+    setIsCreatePlayerDialogOpen(true);
+  };
+
+  const handleCreatePlayerSubmit = async (values: PlayerFormValues) => {
+    if (!profile) return;
+
+    const { uscfExpiration, dob, ...restOfValues } = values;
+    
+    // Generate a temporary ID for the new player
+    const newPlayerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const newPlayerRecord: MasterPlayer = {
+        id: newPlayerId,
+        ...restOfValues,
+        school: profile.school,
+        district: profile.district,
+        dob: dob ? dob.toISOString() : undefined,
+        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+    
+    await addPlayer(newPlayerRecord);
+    toast({ 
+        title: "Player Created", 
+        description: `${values.firstName} ${values.lastName} has been created and added to your roster.`
+    });
+    
+    setIsCreatePlayerDialogOpen(false);
+    createPlayerForm.reset();
+  };
+
+  const handleCancelCreate = () => {
+    setIsCreatePlayerDialogOpen(false);
+    createPlayerForm.reset();
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -228,10 +281,16 @@ function SponsorRosterView() {
             Manage your team players and their information. ({rosterPlayers.length} players)
           </p>
         </div>
-        <Button onClick={() => setIsSearchDialogOpen(true)} className="flex items-center gap-2">
-          <Search className="h-4 w-4" />
-          Add Player from Database
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsSearchDialogOpen(true)} variant="outline" className="flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Add from Database
+          </Button>
+          <Button onClick={handleCreateNewPlayer} className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4" />
+            Create New Player
+          </Button>
+        </div>
       </div>
 
       {profile && teamCode && (
@@ -322,6 +381,7 @@ function SponsorRosterView() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Edit Player Dialog */}
       <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
           <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
               <DialogHeader className="p-6 pb-4 border-b shrink-0">
@@ -403,6 +463,108 @@ function SponsorRosterView() {
               <DialogFooter className="p-6 pt-4 border-t shrink-0">
                   <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
                   <Button type="submit" form="edit-player-form">Save Changes</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+      {/* Create New Player Dialog */}
+      <Dialog open={isCreatePlayerDialogOpen} onOpenChange={setIsCreatePlayerDialogOpen}>
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
+              <DialogHeader className="p-6 pb-4 border-b shrink-0">
+                  <DialogTitle>Create New Player</DialogTitle>
+                  <DialogDescription>Add a new player to the database and your roster. This player will be added to the master database and assigned to your school.</DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto p-6">
+                  <Form {...createPlayerForm}>
+                      <form id="create-player-form" onSubmit={createPlayerForm.handleSubmit(handleCreatePlayerSubmit)} className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                              <FormField control={createPlayerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Opt)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <FormField control={createPlayerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} disabled /></FormControl><FormMessage /></FormItem> )} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} placeholder="Enter USCF ID or 'NEW'" /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem> )} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <FormField control={createPlayerForm.control} name="dob" render={({ field }) => ( 
+                                  <FormItem><FormLabel>Date of Birth</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                      onChange={(e) => {
+                                        const dateValue = e.target.value;
+                                        if (dateValue) {
+                                          const parsedDate = new Date(dateValue + 'T00:00:00');
+                                          if (!isNaN(parsedDate.getTime())) {
+                                            field.onChange(parsedDate);
+                                          }
+                                        } else {
+                                          field.onChange(undefined);
+                                        }
+                                      }}
+                                      placeholder="Select date of birth"
+                                      max={format(new Date(), 'yyyy-MM-dd')}
+                                      min="1900-01-01"
+                                    />
+                                  </FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="uscfExpiration" render={({ field }) => ( 
+                                  <FormItem><FormLabel>USCF Expiration</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      type="date"
+                                      value={field.value ? format(field.value, 'yyyy-MM-dd') : ''}
+                                      onChange={(e) => {
+                                        const dateValue = e.target.value;
+                                        if (dateValue) {
+                                          const parsedDate = new Date(dateValue + 'T00:00:00');
+                                          if (!isNaN(parsedDate.getTime())) {
+                                            field.onChange(parsedDate);
+                                          }
+                                        } else {
+                                          field.onChange(undefined);
+                                        }
+                                      }}
+                                      placeholder="Select expiration date"
+                                      min={format(new Date(), 'yyyy-MM-dd')}
+                                    />
+                                  </FormControl><FormMessage /></FormItem>)} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <FormField control={createPlayerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                          </div>
+                          {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  <FormField control={createPlayerForm.control} name="studentType" render={({ field }) => ( 
+                                      <FormItem><FormLabel>Student Type</FormLabel>
+                                      <FormControl>
+                                          <Select onValueChange={field.onChange} value={field.value}>
+                                              <SelectTrigger><SelectValue placeholder="Select student type" /></SelectTrigger>
+                                              <SelectContent>
+                                                  <SelectItem value="independent">Independent</SelectItem>
+                                                  <SelectItem value="gt">GT (Gifted & Talented)</SelectItem>
+                                              </SelectContent>
+                                          </Select>
+                                      </FormControl><FormMessage /></FormItem>
+                                  )} />
+                              </div>
+                          )}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                          </div>
+                      </form>
+                  </Form>
+              </div>
+              <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                  <Button type="button" variant="ghost" onClick={handleCancelCreate}>Cancel</Button>
+                  <Button type="submit" form="create-player-form">Create Player</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>
@@ -638,5 +800,3 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
-
-    
