@@ -46,7 +46,7 @@ const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K
 const playerFormSchema = z.object({
   id: z.string().optional(),
   firstName: z.string().min(1, { message: "First Name is required." }),
-  middleName: z.string().optional().transform(val => val === '' ? undefined : val),
+  middleName: z.string().transform(val => val || ''), // Always return string
   lastName: z.string().min(1, { message: "Last Name is required." }),
   uscfId: z.string().min(1, { message: "USCF ID is required." }),
   uscfExpiration: z.date().optional(),
@@ -61,21 +61,21 @@ const playerFormSchema = z.object({
       invalid_type_error: "Rating must be a number or UNR."
     }).optional()
   ),
-  grade: z.string().optional().transform(val => val === '' ? undefined : val),
-  section: z.string().optional().transform(val => val === '' ? undefined : val),
+  grade: z.string().transform(val => val || ''), // Always return string
+  section: z.string().transform(val => val || ''), // Always return string
   email: z.string().min(1, { message: "Email is required for roster players." }).email({ message: "Please enter a valid email." }),
   zipCode: z.string().min(1, { message: "Zip Code is required for roster players." }),
-  phone: z.string().optional().transform(val => val === '' ? undefined : val),
+  phone: z.string().transform(val => val || ''), // Always return string
   dob: z.date().optional(),
-  studentType: z.string().optional().transform(val => val === '' ? undefined : val),
-  state: z.string().optional().transform(val => val === '' ? undefined : val),
+  studentType: z.string().transform(val => val || ''), // Always return string
+  state: z.string().transform(val => val || ''), // Always return string
   school: z.string().min(1, { message: "School name is required."}),
   district: z.string().min(1, { message: "District name is required."}),
 }).refine(data => {
-    if (data.uscfId.toUpperCase() !== 'NEW') { 
-      return data.uscfExpiration !== undefined; 
-    }
-    return true;
+  if (data.uscfId.toUpperCase() !== 'NEW') { 
+    return data.uscfExpiration !== undefined; 
+  }
+  return true;
 }, { 
   message: "USCF Expiration is required unless ID is NEW.", 
   path: ["uscfExpiration"] 
@@ -127,8 +127,8 @@ function SponsorRosterView() {
         phone: '',
         zipCode: '',
         uscfId: '',
-        school: profile.school || '',
-        district: profile.district || '',
+        school: profile.school,
+        district: profile.district,
         grade: '',
         section: '',
         state: '',
@@ -220,34 +220,34 @@ function SponsorRosterView() {
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-    if (!editingPlayer) return;
+      if (!editingPlayer) return;
 
-    const { uscfExpiration, dob, ...restOfValues } = values;
-    
-    const updatedPlayerRecord: MasterPlayer = {
-        ...editingPlayer,
-        ...restOfValues,
-        dob: dob ? dob.toISOString() : undefined,
-        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-    };
-    
-    if (pendingPlayer) {
-        await addPlayer(updatedPlayerRecord);
-        toast({ 
-            title: "Player Added to Roster", 
-            description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
-        });
-        setPendingPlayer(null);
-    } else {
-        await updatePlayer(updatedPlayerRecord);
-        toast({ 
-            title: "Player Updated", 
-            description: `${values.firstName} ${values.lastName}'s information has been updated.`
-        });
-    }
-    
-    setIsEditPlayerDialogOpen(false);
-    setEditingPlayer(null);
+      const { uscfExpiration, dob, ...restOfValues } = values;
+      
+      const updatedPlayerRecord: MasterPlayer = {
+          ...editingPlayer,
+          ...restOfValues,
+          dob: dob ? dob.toISOString() : undefined,
+          uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+      };
+      
+      if (pendingPlayer) {
+          addPlayer(updatedPlayerRecord);
+          toast({ 
+              title: "Player Added to Roster", 
+              description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
+          });
+          setPendingPlayer(null);
+      } else {
+          await updatePlayer(updatedPlayerRecord);
+          toast({ 
+              title: "Player Updated", 
+              description: `${values.firstName} ${values.lastName}'s information has been updated.`
+          });
+      }
+      
+      setIsEditPlayerDialogOpen(false);
+      setEditingPlayer(null);
   };
 
   const handleCancelEdit = () => {

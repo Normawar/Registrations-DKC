@@ -169,6 +169,30 @@ const parseCSVData = (data: any[]): MasterPlayer[] => {
   return newPlayers;
 };
 
+
+const cleanDataForFirebase = (data: any): any => {
+  if (data === null || data === undefined) {
+    return null;
+  }
+  
+  if (Array.isArray(data)) {
+    return data.map(cleanDataForFirebase);
+  }
+  
+  if (typeof data === 'object') {
+    const cleanedData: any = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanedData[key] = cleanDataForFirebase(value);
+      }
+      // Skip undefined values completely - don't add them to the object
+    }
+    return cleanedData;
+  }
+  
+  return data;
+};
+
 // --- Provider Component ---
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
@@ -282,8 +306,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const addPlayer = async (player: MasterPlayer) => {
     if (!db) return;
     try {
-        const playerRef = doc(db, 'players', player.id);
-        await setDoc(playerRef, player, { merge: true });
+        const cleanedPlayer = cleanDataForFirebase(player);
+        const playerRef = doc(db, 'players', cleanedPlayer.id);
+        await setDoc(playerRef, cleanedPlayer, { merge: true });
         // Optimistically update UI, then refresh from source
         setDatabase(prev => {
             const existingIndex = prev.findIndex(p => p.id === player.id);
@@ -321,11 +346,20 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     setDatabase([]);
   };
 
-  const updatePlayer = async (updatedPlayer: MasterPlayer) => {
+  const updatePlayer = async (player: MasterPlayer) => {
     if (!db) return;
-    const playerRef = doc(db, 'players', updatedPlayer.id);
-    await setDoc(playerRef, updatedPlayer, { merge: true });
-    await loadDatabase();
+    try {
+      const cleanedPlayer = cleanDataForFirebase(player);
+      const playerRef = doc(db, 'players', cleanedPlayer.id);
+      await setDoc(playerRef, cleanedPlayer, { merge: true });
+      
+      setDatabase(prevDb => 
+        prevDb.map(p => p.id === player.id ? player : p)
+      );
+    } catch (error) {
+      console.error('Error updating player:', error);
+      throw error;
+    }
   };
 
   const deletePlayer = async (playerId: string) => {
