@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -45,35 +46,49 @@ const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K
 const playerFormSchema = z.object({
   id: z.string().optional(),
   firstName: z.string().min(1, { message: "First Name is required." }),
-  middleName: z.string().optional(),
+  middleName: z.string().optional().transform(val => val === '' ? undefined : val),
   lastName: z.string().min(1, { message: "Last Name is required." }),
   uscfId: z.string().min(1, { message: "USCF ID is required." }),
   uscfExpiration: z.date().optional(),
   regularRating: z.preprocess(
-    (val) => (String(val).toUpperCase() === 'UNR' || val === '' ? undefined : val),
-    z.coerce.number({invalid_type_error: "Rating must be a number or UNR."}).optional()
+    (val) => {
+      if (!val || String(val).toUpperCase() === 'UNR' || val === '') {
+        return undefined;
+      }
+      return val;
+    },
+    z.coerce.number({
+      invalid_type_error: "Rating must be a number or UNR."
+    }).optional()
   ),
-  grade: z.string().optional(),
-  section: z.string().optional(),
-  email: z.string().email({ message: "A valid email is required." }),
-  phone: z.string().optional(),
+  grade: z.string().optional().transform(val => val === '' ? undefined : val),
+  section: z.string().optional().transform(val => val === '' ? undefined : val),
+  email: z.string().min(1, { message: "Email is required for roster players." }).email({ message: "Please enter a valid email." }),
+  zipCode: z.string().min(1, { message: "Zip Code is required for roster players." }),
+  phone: z.string().optional().transform(val => val === '' ? undefined : val),
   dob: z.date().optional(),
-  zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
-  studentType: z.string().optional(),
-  state: z.string().optional(),
+  studentType: z.string().optional().transform(val => val === '' ? undefined : val),
+  state: z.string().optional().transform(val => val === '' ? undefined : val),
   school: z.string().min(1, { message: "School name is required."}),
   district: z.string().min(1, { message: "District name is required."}),
 }).refine(data => {
-    if (data.uscfId.toUpperCase() !== 'NEW') { return data.uscfExpiration !== undefined; }
+    if (data.uscfId.toUpperCase() !== 'NEW') { 
+      return data.uscfExpiration !== undefined; 
+    }
     return true;
-}, { message: "USCF Expiration is required unless ID is NEW.", path: ["uscfExpiration"] })
-.refine((data) => {
-    if (!data.grade || !data.section || data.section === 'Championship') return true;
-    const playerGradeLevel = gradeToNumber[data.grade];
-    const sectionMaxLevel = sectionMaxGrade[data.section];
-    if (playerGradeLevel === undefined || sectionMaxLevel === undefined) return true;
-    return playerGradeLevel <= sectionMaxLevel;
-  }, { message: "Player's grade is too high for this section.", path: ["section"] });
+}, { 
+  message: "USCF Expiration is required unless ID is NEW.", 
+  path: ["uscfExpiration"] 
+}).refine((data) => {
+  if (!data.grade || !data.section || data.section === 'Championship') return true;
+  const playerGradeLevel = gradeToNumber[data.grade];
+  const sectionMaxLevel = sectionMaxGrade[data.section];
+  if (playerGradeLevel === undefined || sectionMaxLevel === undefined) return true;
+  return playerGradeLevel <= sectionMaxLevel;
+}, { 
+  message: "Player's grade is too high for this section.", 
+  path: ["section"] 
+});
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
@@ -105,9 +120,19 @@ function SponsorRosterView() {
   useEffect(() => {
     if (profile) {
       createPlayerForm.reset({
-        school: profile.school,
-        district: profile.district,
-        studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+        firstName: '',
+        lastName: '',
+        middleName: '',
+        email: '',
+        phone: '',
+        zipCode: '',
+        uscfId: '',
+        school: profile.school || '',
+        district: profile.district || '',
+        grade: '',
+        section: '',
+        state: '',
+        studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
       });
     }
   }, [profile, createPlayerForm]);
@@ -195,34 +220,34 @@ function SponsorRosterView() {
   };
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
-      if (!editingPlayer) return;
+    if (!editingPlayer) return;
 
-      const { uscfExpiration, dob, ...restOfValues } = values;
-      
-      const updatedPlayerRecord: MasterPlayer = {
-          ...editingPlayer,
-          ...restOfValues,
-          dob: dob ? dob.toISOString() : undefined,
-          uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
-      };
-      
-      if (pendingPlayer) {
-          addPlayer(updatedPlayerRecord);
-          toast({ 
-              title: "Player Added to Roster", 
-              description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
-          });
-          setPendingPlayer(null);
-      } else {
-          await updatePlayer(updatedPlayerRecord);
-          toast({ 
-              title: "Player Updated", 
-              description: `${values.firstName} ${values.lastName}'s information has been updated.`
-          });
-      }
-      
-      setIsEditPlayerDialogOpen(false);
-      setEditingPlayer(null);
+    const { uscfExpiration, dob, ...restOfValues } = values;
+    
+    const updatedPlayerRecord: MasterPlayer = {
+        ...editingPlayer,
+        ...restOfValues,
+        dob: dob ? dob.toISOString() : undefined,
+        uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+    };
+    
+    if (pendingPlayer) {
+        await addPlayer(updatedPlayerRecord);
+        toast({ 
+            title: "Player Added to Roster", 
+            description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
+        });
+        setPendingPlayer(null);
+    } else {
+        await updatePlayer(updatedPlayerRecord);
+        toast({ 
+            title: "Player Updated", 
+            description: `${values.firstName} ${values.lastName}'s information has been updated.`
+        });
+    }
+    
+    setIsEditPlayerDialogOpen(false);
+    setEditingPlayer(null);
   };
 
   const handleCancelEdit = () => {
@@ -237,9 +262,19 @@ function SponsorRosterView() {
     if (!profile) return;
     
     createPlayerForm.reset({
-      school: profile.school,
-      district: profile.district,
-      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+      firstName: '',
+      lastName: '',
+      middleName: '',
+      email: '',
+      phone: '',
+      zipCode: '',
+      uscfId: '',
+      school: profile.school || '',
+      district: profile.district || '',
+      grade: '',
+      section: '',
+      state: '',
+      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
     });
     setIsCreatePlayerDialogOpen(true);
   };
@@ -249,7 +284,6 @@ function SponsorRosterView() {
 
     const { uscfExpiration, dob, ...restOfValues } = values;
     
-    // Generate a temporary ID for the new player
     const newPlayerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const newPlayerRecord: MasterPlayer = {
@@ -271,9 +305,19 @@ function SponsorRosterView() {
     
     setIsCreatePlayerDialogOpen(false);
     createPlayerForm.reset({
-      school: profile.school,
-      district: profile.district,
-      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+      firstName: '',
+      lastName: '',
+      middleName: '',
+      email: '',
+      phone: '',
+      zipCode: '',
+      uscfId: '',
+      school: profile.school || '',
+      district: profile.district || '',
+      grade: '',
+      section: '',
+      state: '',
+      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
     });
   };
 
@@ -282,9 +326,19 @@ function SponsorRosterView() {
     
     setIsCreatePlayerDialogOpen(false);
     createPlayerForm.reset({
-      school: profile.school,
-      district: profile.district,
-      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+      firstName: '',
+      lastName: '',
+      middleName: '',
+      email: '',
+      phone: '',
+      zipCode: '',
+      uscfId: '',
+      school: profile.school || '',
+      district: profile.district || '',
+      grade: '',
+      section: '',
+      state: '',
+      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
     });
   };
 
@@ -469,8 +523,11 @@ function SponsorRosterView() {
                               <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter zip code" /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter zip code" /></FormControl><FormMessage /></FormItem> )} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={playerForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" {...field} value={field.value || ''} placeholder="Enter phone number" /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                       </form>
                   </Form>
@@ -570,8 +627,11 @@ function SponsorRosterView() {
                               </div>
                           )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter zip code" /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter zip code" /></FormControl><FormMessage /></FormItem> )} />
+                          </div>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <FormField control={createPlayerForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" {...field} value={field.value || ''} placeholder="Enter phone number" /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                       </form>
                   </Form>
