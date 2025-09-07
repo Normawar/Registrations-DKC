@@ -43,8 +43,8 @@ def lookup_players_by_name():
         first_name = data.get('first_name')
         last_name = data.get('last_name')
         
-        if not first_name or not last_name:
-            return jsonify({'error': 'Both first and last name are required'}), 400
+        if not first_name and not last_name:
+            return jsonify({'error': 'At least a first or last name is required'}), 400
         
         players = uscf_lookup.lookup_by_name(first_name, last_name)
         
