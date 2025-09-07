@@ -4,12 +4,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    if (!body.firstName || !body.lastName) {
-      return NextResponse.json(
-        { error: 'Both first name and last name are required' }, 
-        { status: 400 }
-      );
-    }
+    // This check is now removed to allow searching by a single name
+    // if (!body.firstName || !body.lastName) {
+    //   return NextResponse.json(
+    //     { error: 'Both first name and last name are required' }, 
+    //     { status: 400 }
+    //   );
+    // }
 
     // Mock data with various name formats
     const mockPlayers = [
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
       },
       {
         uscf_id: "87654321",
-        name: `${body.lastName.toUpperCase()}, ${body.firstName.toUpperCase()}, MICHAEL`,  // User's search + middle name
+        name: `${body.lastName?.toUpperCase() || 'DOE'}, ${body.firstName?.toUpperCase() || 'JANE'}, MICHAEL`,  // User's search + middle name
         rating_regular: 1350,
         rating_quick: 1320,
         state: "FL",
