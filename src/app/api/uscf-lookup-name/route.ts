@@ -71,15 +71,18 @@ export async function POST(request: NextRequest) {
       const nameParts = player.name.split(', ');
       const playerLastName = nameParts[0].toLowerCase();
       const playerFirstName = nameParts[1].toLowerCase();
+      const playerMiddleName = nameParts[2]?.toLowerCase() || '';
       
       // If both first and last name provided, both must match
       if (firstName && lastName) {
-        return playerFirstName.includes(firstName) && playerLastName.includes(lastName);
+        const firstNameMatch = playerFirstName.includes(firstName) || playerMiddleName.includes(firstName);
+        const lastNameMatch = playerLastName.includes(lastName);
+        return firstNameMatch && lastNameMatch;
       }
       
-      // If only first name provided
+      // If only first name provided, search in both first name AND middle name
       if (firstName && !lastName) {
-        return playerFirstName.includes(firstName);
+        return playerFirstName.includes(firstName) || playerMiddleName.includes(firstName);
       }
       
       // If only last name provided
