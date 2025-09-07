@@ -5,28 +5,42 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     if (!body.firstName || !body.lastName) {
-      return NextResponse.json({ error: 'Both first name and last name are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Both first name and last name are required' }, 
+        { status: 400 }
+      );
     }
 
-    const response = await fetch('http://localhost:8000/uscf-lookup-name', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        first_name: body.firstName, 
-        last_name: body.lastName 
-      }),
-    });
+    // Mock data for testing
+    const mockPlayers = [
+      {
+        uscf_id: "32052572",
+        name: "MORENO, RYAN",
+        rating_regular: 602,
+        rating_quick: 605,
+        state: "TX",
+        expiration_date: "2025-09-30"
+      },
+      {
+        uscf_id: "12345678",
+        name: `${body.lastName.toUpperCase()}, ${body.firstName.toUpperCase()}`,
+        rating_regular: 1200,
+        rating_quick: 1180,
+        state: "CA",
+        expiration_date: "2025-12-31"
+      }
+    ];
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      return NextResponse.json({ error: errorData.error || 'Failed to lookup players' }, { status: response.status });
-    }
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
-    const players = await response.json();
-    return NextResponse.json(players);
+    return NextResponse.json(mockPlayers);
 
   } catch (error) {
     console.error('API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' }, 
+      { status: 500 }
+    );
   }
 }

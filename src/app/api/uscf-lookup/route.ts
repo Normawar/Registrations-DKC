@@ -12,22 +12,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid USCF ID format' }, { status: 400 });
     }
 
-    const response = await fetch('http://localhost:8000/uscf-lookup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uscf_id: body.uscfId }),
-    });
+    // Mock data for testing
+    const mockPlayer = {
+      uscf_id: body.uscfId.trim(),
+      name: "MORENO, RYAN",
+      rating_regular: 602,
+      rating_quick: 605,
+      state: "TX",
+      expiration_date: "2025-09-30"
+    };
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      return NextResponse.json({ error: errorData.error || 'Player not found' }, { status: response.status });
-    }
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const player = await response.json();
-    return NextResponse.json(player);
+    return NextResponse.json(mockPlayer);
 
   } catch (error) {
     console.error('API error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' }, 
+      { status: 500 }
+    );
   }
 }
