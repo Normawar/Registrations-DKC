@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         expiration_date: "2025-09-30"
       },
       {
-        uscf_id: "12345678",
+        uscf_id: "12345679",
         name: "SMITH, JOHN, DAVID",  // Example with middle name
         rating_regular: 1200,
         rating_quick: 1180,
