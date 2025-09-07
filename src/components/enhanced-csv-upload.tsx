@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useMasterDb, type UploadProgress } from '@/context/master-db-context';
-import { Progress } from '@/components/ui/progress';
 
 export const EnhancedCSVUpload: React.FC = () => {
   const { bulkUploadCSVWithProgress } = useMasterDb();
@@ -162,10 +161,14 @@ export const EnhancedCSVUpload: React.FC = () => {
           {/* Upload Button */}
           {selectedFile && !uploading && (
             <button
-              onClick={handleUpload}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
+              onClick={() => {
+                console.log('🔴 Button clicked!');
+                handleUpload();
+              }}
+              disabled={uploading}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50"
             >
-              Start Enhanced Upload
+              {uploading ? 'Uploading...' : 'Start Enhanced Upload'}
             </button>
           )}
         </div>
