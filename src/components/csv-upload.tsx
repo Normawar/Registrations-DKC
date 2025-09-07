@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useMasterDb } from '@/context/master-db-context';
+import { Progress } from '@/components/ui/progress';
 
 export const CSVUploadComponent: React.FC = () => {
   const { bulkUploadCSV } = useMasterDb();
@@ -30,7 +31,10 @@ export const CSVUploadComponent: React.FC = () => {
         return;
       }
 
-      const result = await bulkUploadCSV(file);
+      const result = await bulkUploadCSV(file, (progressUpdate) => {
+        setProgress(progressUpdate);
+      });
+
       setResults(result);
       
       if (result.uploaded > 0) {
@@ -68,10 +72,18 @@ export const CSVUploadComponent: React.FC = () => {
 
       {uploading && (
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-          <div className="flex items-center">
+          <div className="flex items-center mb-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
-            <span className="text-blue-700">Uploading CSV... Please wait</span>
+            <span className="text-blue-700 font-medium">Uploading CSV... Please wait</span>
           </div>
+          {progress && (
+            <div>
+              <Progress value={(progress.current / progress.total) * 100} className="w-full h-2" />
+              <p className="text-xs text-blue-600 mt-1 text-center">
+                {progress.current.toLocaleString()} / {progress.total.toLocaleString()} players uploaded
+              </p>
+            </div>
+          )}
         </div>
       )}
 

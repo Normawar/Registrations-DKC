@@ -18,7 +18,7 @@ interface MasterDbContextType {
   updatePlayer: (player: MasterPlayer) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
   addBulkPlayers: (players: MasterPlayer[]) => Promise<void>;
-  bulkUploadCSV: (csvFile: File) => Promise<{ uploaded: number; errors: string[] }>;
+  bulkUploadCSV: (csvFile: File, onProgress: (progress: { current: number; total: number }) => void) => Promise<{ uploaded: number; errors: string[] }>;
   clearDatabase: () => Promise<void>;
   updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
@@ -338,6 +338,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     if (!db) return;
     try {
       console.log("Current user:", auth.currentUser);
+      console.log("User authenticated:", !!auth.currentUser);
+  
+      if (!auth.currentUser) {
+        console.error("User not authenticated!");
+        return;
+      }
       const cleanedPlayer = removeUndefined(player);
       const playerRef = doc(db, 'players', cleanedPlayer.id);
       await setDoc(playerRef, cleanedPlayer, { merge: true });
@@ -493,7 +499,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const results = database.filter(p => {
         if (excludeSet.has(p.id)) return false;
 
-        if (searchUnassigned && sponsorProfile && portalType === 'sponsor') {
+        if (portalType === 'sponsor' && searchUnassigned && sponsorProfile) {
             const isUnassigned = !p.school || p.school.trim() === '';
             const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
             if (!isUnassigned && !belongsToSponsor) return false;
@@ -543,7 +549,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     return [...new Set(database.map(p => p.district).filter(Boolean))].sort() as string[];
   }, [database, isDbLoaded]);
 
-  const bulkUploadCSV = async (csvFile: File): Promise<{ uploaded: number; errors: string[] }> => {
+  const bulkUploadCSV = async (csvFile: File, onProgress: (progress: { current: number; total: number }) => void): Promise<{ uploaded: number; errors: string[] }> => {
     if (!db) throw new Error("Database not initialized");
   
     try {
@@ -586,6 +592,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   
           await batch.commit();
           totalUploaded += batchPlayers.length;
+          onProgress({ current: totalUploaded, total: players.length });
           
           console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} completed (${totalUploaded}/${players.length} total)`);
   
