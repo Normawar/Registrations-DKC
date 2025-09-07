@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import { collection, getDocs, doc, writeBatch, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, auth } from '@/lib/firebase';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
@@ -276,11 +276,29 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addPlayer = async (player: MasterPlayer) => {
-    if (!db) return;
+    if (!db) {
+        console.error("Database not initialized");
+        return;
+    }
+
+    console.log("Current user:", auth.currentUser);
+    console.log("User authenticated:", !!auth.currentUser);
+
+    if (!auth.currentUser) {
+        console.error("User not authenticated! Cannot add player.");
+        return;
+    }
+
     try {
+        console.log("Attempting to add player:", player);
         const cleanedPlayer = removeUndefined(player);
+        console.log("Cleaned player data:", cleanedPlayer);
+
         const playerRef = doc(db, 'players', cleanedPlayer.id);
         await setDoc(playerRef, cleanedPlayer, { merge: true });
+
+        console.log("Player successfully written to Firebase");
+        
         // Optimistically update UI, then refresh from source
         setDatabase(prev => {
             const existingIndex = prev.findIndex(p => p.id === player.id);
