@@ -55,7 +55,7 @@ const playerFormSchema = z.object({
   ),
   grade: z.string().optional(),
   section: z.string().optional(),
-  email: z.string().email({ message: "Please enter a valid email." }),
+  email: z.string().email({ message: "A valid email is required." }),
   phone: z.string().optional(),
   dob: z.date().optional(),
   zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
@@ -99,11 +99,18 @@ function SponsorRosterView() {
 
   const createPlayerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
-    defaultValues: {
-      school: profile?.school || '',
-      district: profile?.district || '',
-    }
   });
+
+  // Update form defaults when profile loads
+  useEffect(() => {
+    if (profile) {
+      createPlayerForm.reset({
+        school: profile.school,
+        district: profile.district,
+        studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+      });
+    }
+  }, [profile, createPlayerForm]);
 
   const rosterPlayers = useMemo(() => {
     if (!isProfileLoaded || !isDbLoaded || !profile) return [];
@@ -242,6 +249,7 @@ function SponsorRosterView() {
 
     const { uscfExpiration, dob, ...restOfValues } = values;
     
+    // Generate a temporary ID for the new player
     const newPlayerId = `player_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     const newPlayerRecord: MasterPlayer = {
@@ -400,9 +408,9 @@ function SponsorRosterView() {
                   <Form {...playerForm}>
                       <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
@@ -453,7 +461,6 @@ function SponsorRosterView() {
                                         }
                                       }}
                                       placeholder="Select expiration date"
-                                      min={format(new Date(), 'yyyy-MM-dd')}
                                     />
                                   </FormControl><FormMessage /></FormItem>)} />
                           </div>
@@ -486,16 +493,16 @@ function SponsorRosterView() {
                   <Form {...createPlayerForm}>
                       <form id="create-player-form" onSubmit={createPlayerForm.handleSubmit(handleCreatePlayerSubmit)} className="space-y-6">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <FormField control={createPlayerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={createPlayerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={createPlayerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={createPlayerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} disabled value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                               <FormField control={createPlayerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} disabled value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} placeholder="Enter USCF ID or 'NEW'" value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter USCF ID or 'NEW'" /></FormControl><FormMessage /></FormItem> )} />
                               <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -539,7 +546,6 @@ function SponsorRosterView() {
                                         }
                                       }}
                                       placeholder="Select expiration date"
-                                      min={format(new Date(), 'yyyy-MM-dd')}
                                     />
                                   </FormControl><FormMessage /></FormItem>)} />
                           </div>
@@ -564,8 +570,8 @@ function SponsorRosterView() {
                               </div>
                           )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter zip code" /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter zip code" /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                       </form>
                   </Form>
