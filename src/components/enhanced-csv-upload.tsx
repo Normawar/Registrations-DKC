@@ -1,32 +1,47 @@
-
 'use client';
 
 import React, { useState } from 'react';
 import { useMasterDb, type UploadProgress } from '@/context/master-db-context';
-import { Progress } from '@/components/ui/progress';
 
 export const EnhancedCSVUpload: React.FC = () => {
   const { bulkUploadCSVWithProgress } = useMasterDb();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [results, setResults] = useState<{ uploaded: number; errors: string[] } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelection = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    console.log('File selected:', file?.name);
+    
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
 
     if (!file.name.toLowerCase().endsWith('.csv')) {
       alert('Please select a CSV file');
+      event.target.value = ''; // Clear the input
+      setSelectedFile(null);
+      return;
+    }
+
+    setSelectedFile(file);
+    setResults(null); // Clear previous results
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      alert('Please select a CSV file first');
       return;
     }
 
     setUploading(true);
-    setResults(null);
     setProgress(null);
 
     try {
       const confirmed = confirm(
-        `Upload CSV file "${file.name}"?\n\n` +
+        `Upload CSV file "${selectedFile.name}"?\n\n` +
         `This enhanced upload includes:\n` +
         `• Real-time progress tracking\n` +
         `• Rate limiting protection\n` +
@@ -39,27 +54,33 @@ export const EnhancedCSVUpload: React.FC = () => {
         return;
       }
 
-      const result = await bulkUploadCSVWithProgress(file, (progressUpdate) => {
+      console.log('Starting enhanced CSV upload...');
+      
+      const result = await bulkUploadCSVWithProgress(selectedFile, (progressUpdate) => {
+        console.log('Progress update:', progressUpdate);
         setProgress(progressUpdate);
       });
       
       setResults(result);
       
       if (result.uploaded > 0) {
-        alert(`✅ Successfully uploaded ${result.uploaded.toLocaleString()} players!`);
+        alert(`Successfully uploaded ${result.uploaded.toLocaleString()} players!`);
       }
       
       if (result.errors.length > 0) {
         console.warn('Upload errors:', result.errors);
       }
 
+      // Clear the file selection after successful upload
+      setSelectedFile(null);
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+
     } catch (error) {
       console.error('Upload failed:', error);
-      alert(`❌ Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
-      // Clear the file input
-      event.target.value = '';
     }
   };
 
@@ -103,13 +124,36 @@ export const EnhancedCSVUpload: React.FC = () => {
           Advanced upload with progress tracking, rate limiting, and batch processing
         </p>
         
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleFileUpload}
-          disabled={uploading}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 disabled:opacity-50"
-        />
+        <div className="space-y-4">
+          {/* File Selection */}
+          <div>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileSelection}
+              disabled={uploading}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 disabled:opacity-50"
+            />
+            
+            {selectedFile && (
+              <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                <p className="text-sm text-green-700">
+                  <strong>Selected:</strong> {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Upload Button */}
+          {selectedFile && !uploading && (
+            <button
+              onClick={handleUpload}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
+            >
+              Start Enhanced Upload
+            </button>
+          )}
+        </div>
       </div>
 
       {uploading && progress && (
