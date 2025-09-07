@@ -1,244 +1,288 @@
 
+
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Label } from '@/components/ui/label';
-import { usePlayerSearch } from '@/hooks/use-player-search';
-import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { Loader2, Search, X, School } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
+import React, { useState } from 'react';
+import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
 
-
-interface PlayerSearchDialogProps {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  onSelectPlayer: (player: MasterPlayer) => void;
-  onPlayerSelected?: (player: MasterPlayer) => void; 
-  excludeIds?: string[];
-  portalType: 'sponsor' | 'organizer' | 'individual';
-}
-
-export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPlayerSelected, excludeIds, portalType }: PlayerSearchDialogProps) {
-  const { profile } = useSponsorProfile();
-  const { dbStates, dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
-  const { toast } = useToast();
-
-  const {
-    filters,
-    updateFilter,
-    clearFilters,
-    searchResults,
-    isLoading,
-    hasResults,
-    hasActiveFilters,
-  } = usePlayerSearch({
-    initialFilters: { state: 'TX' },
-    excludeIds: portalType === 'sponsor' ? excludeIds : [], // Only exclude for sponsors
-    searchUnassigned: portalType === 'sponsor',
-    sponsorProfile: portalType === 'sponsor' ? profile : null,
-    portalType: portalType,
-  });
+export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPlayerSelected, excludeIds, portalType }: {
+    isOpen: boolean;
+    onOpenChange: (isOpen: boolean) => void;
+    onSelectPlayer: (player: MasterPlayer) => void;
+    onPlayerSelected?: (player: MasterPlayer) => void;
+    excludeIds?: string[];
+    portalType: 'sponsor' | 'organizer' | 'individual';
+}) {
+  const { searchPlayers } = useMasterDb();
+  const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   
-const handleSelect = (player: MasterPlayer) => {
-    let playerWithSponsorInfo = { ...player };
-    
-    // For individual portal, the logic from onPlayerSelected is now used directly
-    if (portalType === 'individual' && onPlayerSelected) {
-      onOpenChange(false);
-      onPlayerSelected(player);
-      return;
+  const handleSearch = async () => {
+    setIsSearching(true);
+    try {
+      console.log('Starting search with criteria:', searchCriteria);
+      const result = await searchPlayers({
+        ...searchCriteria,
+        pageSize: 100 // Load 100 results at a time
+      });
+      console.log('Search completed:', result);
+      setSearchResult(result);
+    } catch (error) {
+      console.error('Search failed:', error);
+      alert('Search failed. Please try again.');
+    } finally {
+      setIsSearching(false);
     }
-    
-    if (portalType === 'individual') {
-        onOpenChange(false);
-        onSelectPlayer(player);
-        return;
-    }
+  };
 
-    // Existing logic for sponsor/organizer
-    if (portalType === 'sponsor' && profile) {
-        playerWithSponsorInfo = {
-            ...player,
-            district: profile.district,
-            school: profile.school,
-        };
-    }
+  const handleLoadMore = async () => {
+    if (!searchResult?.hasMore || !searchResult?.lastDoc) return;
     
+    setIsSearching(true);
+    try {
+      const moreResults = await searchPlayers({
+        ...searchCriteria,
+        lastDoc: searchResult.lastDoc,
+        pageSize: 100
+      });
+      
+      setSearchResult({
+        players: [...searchResult.players, ...moreResults.players],
+        hasMore: moreResults.hasMore,
+        lastDoc: moreResults.lastDoc,
+        totalFound: searchResult.totalFound + moreResults.totalFound
+      });
+    } catch (error) {
+      console.error('Load more failed:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchCriteria({});
+    setSearchResult(null);
+  };
+  
+  const handleSelect = (player: MasterPlayer) => {
     if (onPlayerSelected) {
-        onPlayerSelected(playerWithSponsorInfo);
+        onPlayerSelected(player);
     } else {
-        onSelectPlayer(playerWithSponsorInfo);
+        onSelectPlayer(player);
     }
     onOpenChange(false);
-};
-  
+  }
+
+  if (!isOpen) return null;
+
   return (
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl h-[95vh] flex flex-col">
-            <DialogHeader className="shrink-0 flex-row items-start justify-between">
-                <div>
-                    <DialogTitle>Search Master Player Database</DialogTitle>
-                    <DialogDescription>
-                        Find existing players to add. For sponsors, players already on your roster are automatically excluded.
-                    </DialogDescription>
-                </div>
-                 {hasActiveFilters && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-destructive hover:text-destructive">
-                        <X className="mr-2 h-4 w-4" />Clear Filters
-                    </Button>
-                )}
-            </DialogHeader>
-
-            <div className="border rounded-md p-4 space-y-4 shrink-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                        <Label htmlFor="search-first-name">First Name</Label>
-                        <Input id="search-first-name" placeholder="John" value={filters.firstName || ''} onChange={(e) => updateFilter('firstName', e.target.value)} />
-                    </div>
-                    <div>
-                        <Label htmlFor="search-middle-name">Middle Name</Label>
-                        <Input id="search-middle-name" placeholder="M" value={filters.middleName || ''} onChange={(e) => updateFilter('middleName', e.target.value)} />
-                    </div>
-                    <div>
-                        <Label htmlFor="search-last-name">Last Name</Label>
-                        <Input id="search-last-name" placeholder="Doe" value={filters.lastName || ''} onChange={(e) => updateFilter('lastName', e.target.value)} />
-                    </div>
-                    <div>
-                        <Label htmlFor="search-uscf-id">USCF ID</Label>
-                        <Input id="search-uscf-id" placeholder="12345678" value={filters.uscfId || ''} onChange={(e) => updateFilter('uscfId', e.target.value)} />
-                    </div>
-                    <div>
-                        <Label htmlFor="search-state">State</Label>
-                        <Select value={filters.state || 'ALL'} onValueChange={(value) => updateFilter('state', value)} disabled={!isDbLoaded}>
-                            <SelectTrigger id="search-state">
-                                <SelectValue placeholder={isDbLoaded ? "All States" : "Loading..."} />
-                            </SelectTrigger>
-                            <SelectContent>{dbStates.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                {portalType === 'organizer' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="search-school">School</Label>
-                            <Select value={filters.school || ''} onValueChange={(value) => updateFilter('school', value)} disabled={!isDbLoaded}>
-                                <SelectTrigger id="search-school">
-                                    <SelectValue placeholder={isDbLoaded ? "All Schools" : "Loading..."} />
-                                </SelectTrigger>
-                                <SelectContent>{dbSchools.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="search-district">District</Label>
-                            <Select value={filters.district || ''} onValueChange={(value) => updateFilter('district', value)} disabled={!isDbLoaded}>
-                                <SelectTrigger id="search-district">
-                                    <SelectValue placeholder={isDbLoaded ? "All Districts" : "Loading..."} />
-                                </SelectTrigger>
-                                <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                )}
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        
+        {/* Search Form */}
+        <div className="mb-6">
+          <h2 className="text-xl font-bold mb-4">Search Master Player Database</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Use specific filters for faster results. Avoid broad searches with large datasets.
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* USCF ID - Most efficient search */}
+            <div>
+              <label className="block text-sm font-medium mb-1">USCF ID (Exact)</label>
+              <input
+                type="text"
+                value={searchCriteria.uscfId || ''}
+                onChange={(e) => setSearchCriteria(prev => ({ ...prev, uscfId: e.target.value }))}
+                placeholder="12345678"
+                className="w-full border rounded px-3 py-2"
+              />
             </div>
-
-            {hasResults && (
-                <div className="py-2 text-sm text-muted-foreground shrink-0">
-                    Found {searchResults.length} player{searchResults.length !== 1 ? 's' : ''}
-                </div>
-            )}
             
-            <ScrollArea className="flex-1 border rounded-md">
-                <div className="p-4">
-                    {isLoading && (
-                        <div className="flex items-center justify-center p-8 text-muted-foreground">
-                            <Loader2 className="mr-2 h-5 w-5 animate-spin"/>Searching...
-                        </div>
-                    )}
-                    {!isLoading && !hasResults && hasActiveFilters && (
-                        <div className="text-center p-8 text-muted-foreground">
-                            No players found matching your criteria.
-                        </div>
-                    )}
-                    {!isLoading && !hasActiveFilters && (
-                        <div className="text-center p-8 text-muted-foreground">
-                            Enter search criteria above to find players.
-                        </div>
-                    )}
-                    {hasResults && (
-                        <div className="space-y-2">
-                            {searchResults.map((player, index) => {
-                                const missingFields = (portalType === 'sponsor' || portalType === 'individual') ? [
-                                    !player.dob && 'DOB',
-                                    !player.grade && 'Grade', 
-                                    !player.section && 'Section',
-                                    !player.email && 'Email',
-                                    !player.zipCode && 'Zip'
-                                ].filter(Boolean) : [];
-                                
-                                const isIncomplete = missingFields.length > 0;
-                                const fullName = [player.firstName, player.middleName, player.lastName].filter(Boolean).join(' ');
-
-                                
-                                return (
-                                    <div key={player.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50">
-                                        <div className="flex-1">
-                                            <p className="font-semibold">{fullName}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                ID: {player.uscfId} | Rating: {player.regularRating || 'UNR'} | School: {player.school || 'N/A'}
-                                            </p>
-                                            {isIncomplete && (portalType === 'sponsor' || portalType === 'individual') && (
-                                                <p className="text-xs text-blue-600 mt-1">
-                                                    📝 Needs completion: {missingFields.join(', ')}
-                                                </p>
-                                            )}
-                                            {!isIncomplete && (portalType === 'sponsor' || portalType === 'individual') && (
-                                                <p className="text-xs text-green-600 mt-1">
-                                                    ✅ Complete profile
-                                                </p>
-                                            )}
-                                        </div>
-                                        <Button 
-                                            variant="secondary"
-                                            size="sm" 
-                                            onClick={() => handleSelect(player)}
-                                        >
-                                            {(isIncomplete && (portalType === 'sponsor' || portalType === 'individual')) ? 'Add & Complete' : 'Select'}
-                                        </Button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            </ScrollArea>
+            {/* First Name */}
+            <div>
+              <label className="block text-sm font-medium mb-1">First Name</label>
+              <input
+                type="text"
+                value={searchCriteria.firstName || ''}
+                onChange={(e) => setSearchCriteria(prev => ({ ...prev, firstName: e.target.value }))}
+                placeholder="John"
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
             
-            <DialogFooter className="shrink-0">
-                <DialogClose asChild>
-                    <Button variant="outline">Close</Button>
-                </DialogClose>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            {/* Last Name */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Last Name</label>
+              <input
+                type="text"
+                value={searchCriteria.lastName || ''}
+                onChange={(e) => setSearchCriteria(prev => ({ ...prev, lastName: e.target.value }))}
+                placeholder="Doe"
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+            
+            {/* State */}
+            <div>
+              <label className="block text-sm font-medium mb-1">State</label>
+              <select
+                value={searchCriteria.state || ''}
+                onChange={(e) => setSearchCriteria(prev => ({ ...prev, state: e.target.value }))}
+                className="w-full border rounded px-3 py-2"
+              >
+                <option value="">All States</option>
+                <option value="TX">Texas</option>
+                <option value="CA">California</option>
+                <option value="NY">New York</option>
+                <option value="FL">Florida</option>
+                {/* Add more states as needed */}
+              </select>
+            </div>
+            
+            {/* School */}
+            <div>
+              <label className="block text-sm font-medium mb-1">School (Exact)</label>
+              <input
+                type="text"
+                value={searchCriteria.school || ''}
+                onChange={(e) => setSearchCriteria(prev => ({ ...prev, school: e.target.value }))}
+                placeholder="Lincoln Elementary"
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+            
+            {/* District */}
+            <div>
+              <label className="block text-sm font-medium mb-1">District (Exact)</label>
+              <input
+                type="text"
+                value={searchCriteria.district || ''}
+                onChange={(e) => setSearchCriteria(prev => ({ ...prev, district: e.target.value }))}
+                placeholder="Austin ISD"
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+          </div>
+          
+          {/* Rating Range */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Min Rating</label>
+              <input
+                type="number"
+                value={searchCriteria.minRating || ''}
+                onChange={(e) => setSearchCriteria(prev => ({ 
+                  ...prev, 
+                  minRating: e.target.value ? parseInt(e.target.value) : undefined 
+                }))}
+                placeholder="1000"
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Max Rating</label>
+              <input
+                type="number"
+                value={searchCriteria.maxRating || ''}
+                onChange={(e) => setSearchCriteria(prev => ({ 
+                  ...prev, 
+                  maxRating: e.target.value ? parseInt(e.target.value) : undefined 
+                }))}
+                placeholder="2000"
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+          </div>
+          
+          {/* Action Buttons */}
+          <div className="flex space-x-4">
+            <button
+              onClick={handleSearch}
+              disabled={isSearching}
+              className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isSearching ? 'Searching...' : 'Search Players'}
+            </button>
+            
+            <button
+              onClick={handleClearSearch}
+              className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700"
+            >
+              Clear
+            </button>
+            
+            <button
+              onClick={() => onOpenChange(false)}
+              className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+        
+        {/* Search Results */}
+        {searchResult && (
+          <div>
+            <div className="border-t pt-4">
+              <h3 className="text-lg font-semibold mb-2">
+                Search Results ({searchResult.players.length} shown)
+              </h3>
+              
+              {searchResult.players.length === 0 ? (
+                <p className="text-gray-500">No players found matching your criteria.</p>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border-collapse border border-gray-300">
+                      <thead>
+                        <tr className="bg-gray-50">
+                          <th className="border border-gray-300 px-4 py-2 text-left">Name</th>
+                          <th className="border border-gray-300 px-4 py-2 text-left">USCF ID</th>
+                          <th className="border border-gray-300 px-4 py-2 text-left">State</th>
+                          <th className="border border-gray-300 px-4 py-2 text-left">School</th>
+                          <th className="border border-gray-300 px-4 py-2 text-left">Rating</th>
+                          <th className="border border-gray-300 px-4 py-2 text-left">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {searchResult.players.map((player) => (
+                          <tr key={player.id} className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-4 py-2">
+                              {player.firstName} {player.lastName}
+                            </td>
+                            <td className="border border-gray-300 px-4 py-2">{player.uscfId}</td>
+                            <td className="border border-gray-300 px-4 py-2">{player.state}</td>
+                            <td className="border border-gray-300 px-4 py-2">{player.school}</td>
+                            <td className="border border-gray-300 px-4 py-2">{player.regularRating}</td>
+                            <td className="border border-gray-300 px-4 py-2">
+                                <button onClick={() => handleSelect(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {/* Load More Button */}
+                  {searchResult.hasMore && (
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={handleLoadMore}
+                        disabled={isSearching}
+                        className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {isSearching ? 'Loading...' : 'Load More Results'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
-}
+};

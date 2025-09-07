@@ -3,7 +3,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
-import { collection, getDocs, doc, writeBatch, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, startAfter, Query, DocumentSnapshot, getDoc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
@@ -22,6 +22,37 @@ export type UploadProgress = {
   percentage: number;
   message: string;
 };
+
+// Add pagination support to SearchCriteria
+export type SearchCriteria = {
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  uscfId?: string;
+  state?: string;
+  grade?: string;
+  section?: string;
+  school?: string;
+  district?: string;
+  minRating?: number;
+  maxRating?: number;
+  excludeIds?: string[];
+  maxResults?: number;
+  searchUnassigned?: boolean;
+  sponsorProfile?: SponsorProfile | null;
+  portalType?: 'sponsor' | 'organizer' | 'individual';
+  // New pagination fields
+  lastDoc?: DocumentSnapshot;
+  pageSize?: number;
+}
+
+// New return type with pagination
+export type SearchResult = {
+  players: MasterPlayer[];
+  hasMore: boolean;
+  lastDoc?: DocumentSnapshot;
+  totalFound: number;
+}
 
 interface MasterDbContextType {
   database: MasterPlayer[];
@@ -44,30 +75,12 @@ interface MasterDbContextType {
   dbStates: string[];
   dbSchools: string[];
   dbDistricts: string[];
-  searchPlayers: (criteria: Partial<SearchCriteria>) => MasterPlayer[];
+  searchPlayers: (criteria: Partial<SearchCriteria>) => Promise<SearchResult>;
   refreshDatabase: () => void;
   generatePlayerId: (uscfId: string) => string;
   updatePlayerFromUscfData: (uscfData: Partial<MasterPlayer>[]) => Promise<{ updated: number; created: number }>;
 }
 
-export type SearchCriteria = {
-  firstName?: string;
-  middleName?: string;
-  lastName?: string;
-  uscfId?: string;
-  state?: string;
-  grade?: string;
-  section?: string;
-  school?: string;
-  district?: string;
-  minRating?: number;
-  maxRating?: number;
-  excludeIds?: string[];
-  maxResults?: number;
-  searchUnassigned?: boolean;
-  sponsorProfile?: SponsorProfile | null;
-  portalType?: 'sponsor' | 'organizer' | 'individual';
-}
 
 // --- Context Definition ---
 
@@ -543,57 +556,149 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     return stats;
   };
   
-  const searchPlayers = useCallback((criteria: Partial<SearchCriteria>): MasterPlayer[] => {
-    if (!isDbLoaded) return [];
-
+  const searchPlayers = async (criteria: Partial<SearchCriteria>): Promise<SearchResult> => {
+    if (!db) {
+      return { players: [], hasMore: false, totalFound: 0 };
+    }
+  
     const {
-        firstName, middleName, lastName, uscfId, state, grade, section, school, district,
-        minRating, maxRating, excludeIds = [], maxResults = 1000,
-        searchUnassigned, sponsorProfile, portalType
+      firstName, lastName, uscfId, state, grade, section, school, district,
+      minRating, maxRating, pageSize = 100, lastDoc, sponsorProfile, portalType
     } = criteria;
-    
-    const lowerFirstName = firstName?.trim().toLowerCase();
-    const lowerMiddleName = middleName?.trim().toLowerCase();
-    const lowerLastName = lastName?.trim().toLowerCase();
-    const lowerUscfId = uscfId?.trim();
-    const excludeSet = new Set(excludeIds);
-
-    const results = database.filter(p => {
-        if (excludeSet.has(p.id)) return false;
-
-        if (searchUnassigned && sponsorProfile && portalType === 'sponsor') {
-            const isUnassigned = !p.school || p.school.trim() === '';
-            const belongsToSponsor = p.school === sponsorProfile.school && p.district === sponsorProfile.district;
-            if (!isUnassigned && !belongsToSponsor) return false;
-        } else if (portalType === 'organizer') {
-            if (school && school.trim() && p.school !== school) return false;
-            if (district && district.trim() && p.district !== district) return false;
+  
+    try {
+      console.log('Starting server-side search with criteria:', criteria);
+      
+      let q: Query = collection(db, 'players');
+      
+      // Build efficient Firestore queries
+      const conditions: any[] = [];
+      
+      // Exact match filters (most efficient)
+      if (state && state !== 'ALL' && state !== 'NO_STATE') {
+        conditions.push(where('state', '==', state));
+      }
+      
+      if (grade && grade.trim()) {
+        conditions.push(where('grade', '==', grade));
+      }
+      
+      if (section && section.trim()) {
+        conditions.push(where('section', '==', section));
+      }
+      
+      if (school && school.trim()) {
+        conditions.push(where('school', '==', school));
+      }
+      
+      if (district && district.trim()) {
+        conditions.push(where('district', '==', district));
+      }
+  
+      // USCF ID exact match (most common search)
+      if (uscfId && uscfId.trim()) {
+        conditions.push(where('uscfId', '==', uscfId.trim()));
+      }
+      
+      // Rating range queries
+      if (minRating !== undefined) {
+        conditions.push(where('regularRating', '>=', minRating));
+      }
+      if (maxRating !== undefined) {
+        conditions.push(where('regularRating', '<=', maxRating));
+      }
+      
+      // Apply all conditions
+      conditions.forEach(condition => {
+        q = query(q, condition);
+      });
+      
+      // For name searches, we'll need to do client-side filtering
+      // since Firestore doesn't support efficient text search
+      const needsClientFiltering = firstName || lastName;
+      
+      // If no server-side filters and need client filtering, limit initial fetch
+      if (conditions.length === 0 && needsClientFiltering) {
+        q = query(q, limit(1000)); // Fetch first 1000 for name filtering
+      } else {
+        // Add pagination
+        if (lastDoc) {
+          q = query(q, startAfter(lastDoc));
         }
-
-        if (state && state !== 'ALL') {
-            if (state === 'NO_STATE') {
-                if (p.state && p.state.trim() !== '') return false;
-            } else {
-                if (p.state !== state) return false;
-            }
-        }
-
-        if (lowerFirstName && !p.firstName?.toLowerCase().includes(lowerFirstName)) return false;
-        if (lowerMiddleName && !p.middleName?.toLowerCase().includes(lowerMiddleName)) return false;
-        if (lowerLastName && !p.lastName?.toLowerCase().includes(lowerLastName)) return false;
-        if (lowerUscfId && p.uscfId && !p.uscfId.toString().includes(lowerUscfId)) return false;
-        if (grade && grade.trim() && p.grade !== grade) return false;
-        if (section && section.trim() && p.section !== section) return false;
-
-        const rating = p.regularRating;
-        if (minRating !== undefined && (!rating || rating < minRating)) return false;
-        if (maxRating !== undefined && (!rating || rating > maxRating)) return false;
-
-        return true;
-    });
-
-    return results.slice(0, maxResults);
-  }, [database, isDbLoaded]);
+        q = query(q, limit(pageSize));
+      }
+      
+      // Add ordering for consistent pagination
+      q = query(q, orderBy('uscfId'));
+      
+      console.log('Executing Firestore query...');
+      const querySnapshot = await getDocs(q);
+      let results = querySnapshot.docs.map(doc => ({
+        ...doc.data(),
+        _docRef: doc // Store doc reference for pagination
+      } as MasterPlayer & { _docRef: DocumentSnapshot }));
+      
+      console.log(`Firestore returned ${results.length} results`);
+      
+      // Client-side filtering for name searches and complex criteria
+      if (needsClientFiltering || criteria.excludeIds?.length) {
+        const excludeSet = new Set(criteria.excludeIds || []);
+        
+        results = results.filter(player => {
+          // Exclude IDs
+          if (excludeSet.has(player.id)) return false;
+          
+          // Name filtering (case-insensitive partial match)
+          if (firstName && !player.firstName?.toLowerCase().includes(firstName.toLowerCase())) {
+            return false;
+          }
+          if (lastName && !player.lastName?.toLowerCase().includes(lastName.toLowerCase())) {
+            return false;
+          }
+          
+          return true;
+        });
+      }
+      
+      // Handle sponsor/organizer specific filtering
+      if (sponsorProfile && portalType === 'sponsor') {
+        results = results.filter(player => {
+          const isUnassigned = !player.school || player.school.trim() === '';
+          const belongsToSponsor = player.school === sponsorProfile.school && 
+                                  player.district === sponsorProfile.district;
+          return isUnassigned || belongsToSponsor;
+        });
+      }
+      
+      // Limit final results
+      const maxResults = criteria.maxResults || pageSize;
+      const hasMore = results.length === pageSize && !needsClientFiltering;
+      const finalResults = results.slice(0, maxResults);
+      
+      // Get last document for pagination
+      const newLastDoc = finalResults.length > 0 ? 
+        (finalResults[finalResults.length - 1] as any)._docRef : undefined;
+      
+      // Clean up _docRef before returning
+      const cleanResults = finalResults.map(player => {
+        const { _docRef, ...cleanPlayer } = player as any;
+        return cleanPlayer;
+      });
+      
+      console.log(`Returning ${cleanResults.length} filtered results`);
+      
+      return {
+        players: cleanResults,
+        hasMore,
+        lastDoc: newLastDoc,
+        totalFound: cleanResults.length
+      };
+      
+    } catch (error) {
+      console.error('Search failed:', error);
+      return { players: [], hasMore: false, totalFound: 0 };
+    }
+  };
 
   const dbStates = useMemo(() => {
     if (!isDbLoaded) return ['ALL', 'TX'];
