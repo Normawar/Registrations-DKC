@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -55,7 +54,7 @@ export default function VoucherManagementPage() {
     const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
     const pending = [];
     
-    confirmations.forEach((confirmation: any) => {
+    confirmations.forEach(confirmation => {
       Object.entries(confirmation.selections || {}).forEach(([playerId, selection]: [string, any]) => {
         if (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing') {
           const player = database.find(p => p.id === playerId);
@@ -321,7 +320,10 @@ export default function VoucherManagementPage() {
                 <CardContent>
                   <div className="text-2xl font-bold">{pendingMemberships.length}</div>
                   <div className="text-xs text-muted-foreground">
-                    From all tournaments
+                    {selectedTournaments.length > 0 
+                      ? `From ${selectedTournaments.length} selected tournaments`
+                      : 'From all tournaments'
+                    }
                   </div>
                 </CardContent>
               </Card>
@@ -376,7 +378,7 @@ export default function VoucherManagementPage() {
                         </TableCell>
                         <TableCell>{format(new Date(assignment.assignedDate), 'MMM dd, yyyy')}</TableCell>
                         <TableCell>
-                          <Badge variant={assignment.uscfIdAssigned ? 'default' : 'destructive'} className={assignment.uscfIdAssigned ? 'bg-green-600' : ''}>
+                          <Badge variant={assignment.uscfIdAssigned ? 'success' : 'warning'}>
                             {assignment.uscfIdAssigned ? 'Processed' : 'Pending'}
                           </Badge>
                         </TableCell>
@@ -394,7 +396,7 @@ export default function VoucherManagementPage() {
                 <CardTitle>Upload Voucher File</CardTitle>
                 <CardDescription>
                   Upload a PDF, CSV, or text file containing USCF voucher numbers. 
-                  The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.
+                  The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -486,7 +488,7 @@ export default function VoucherManagementPage() {
                             </TableCell>
                             <TableCell>{membership.confirmation.eventName}</TableCell>
                             <TableCell>
-                              <Badge variant="destructive">Pending Assignment</Badge>
+                              <Badge variant="warning">Pending Assignment</Badge>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -560,7 +562,7 @@ export default function VoucherManagementPage() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Badge variant="destructive">Pending</Badge>
+                            <Badge variant="warning">Pending</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
