@@ -10,7 +10,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, Plus, UserPlus } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -100,11 +100,18 @@ function SponsorRosterView() {
 
   const createPlayerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
-    defaultValues: {
-      school: profile?.school || '',
-      district: profile?.district || '',
-    }
   });
+
+  // Update form defaults when profile loads
+  useEffect(() => {
+    if (profile) {
+      createPlayerForm.reset({
+        school: profile.school,
+        district: profile.district,
+        studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+      });
+    }
+  }, [profile, createPlayerForm]);
 
   const rosterPlayers = useMemo(() => {
     if (!isProfileLoaded || !isDbLoaded || !profile) return [];
@@ -264,12 +271,22 @@ function SponsorRosterView() {
     });
     
     setIsCreatePlayerDialogOpen(false);
-    createPlayerForm.reset();
+    createPlayerForm.reset({
+      school: profile.school,
+      district: profile.district,
+      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+    });
   };
 
   const handleCancelCreate = () => {
+    if (!profile) return;
+    
     setIsCreatePlayerDialogOpen(false);
-    createPlayerForm.reset();
+    createPlayerForm.reset({
+      school: profile.school,
+      district: profile.district,
+      studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : undefined,
+    });
   };
 
   return (
