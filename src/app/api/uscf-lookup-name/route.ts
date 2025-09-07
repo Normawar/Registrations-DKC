@@ -4,15 +4,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // This check is now removed to allow searching by a single name
-    // if (!body.firstName || !body.lastName) {
-    //   return NextResponse.json(
-    //     { error: 'Both first name and last name are required' }, 
-    //     { status: 400 }
-    //   );
-    // }
+    // Allow searching by just first name, last name, or both
+    const firstName = body.firstName?.trim() || '';
+    const lastName = body.lastName?.trim() || '';
+    
+    if (!firstName && !lastName) {
+      return NextResponse.json(
+        { error: 'Please enter at least a first name or last name' }, 
+        { status: 400 }
+      );
+    }
 
-    // Mock data with various name formats
+    // Mock data with various name formats - always return these for testing
     const mockPlayers = [
       {
         uscf_id: "32052572",
@@ -24,7 +27,7 @@ export async function POST(request: NextRequest) {
       },
       {
         uscf_id: "12345678",
-        name: "SMITH, JOHN, DAVID",  // Example with middle name
+        name: "SMITH, JOHN, DAVID",  // This should show as "JOHN DAVID SMITH"
         rating_regular: 1200,
         rating_quick: 1180,
         state: "CA",
@@ -32,11 +35,19 @@ export async function POST(request: NextRequest) {
       },
       {
         uscf_id: "87654321",
-        name: `${body.lastName?.toUpperCase() || 'DOE'}, ${body.firstName?.toUpperCase() || 'JANE'}, MICHAEL`,  // User's search + middle name
+        name: "JOHNSON, MARY, ELIZABETH",  // This should show as "MARY ELIZABETH JOHNSON"
         rating_regular: 1350,
         rating_quick: 1320,
         state: "FL",
         expiration_date: "2025-11-15"
+      },
+      {
+        uscf_id: "11223344",
+        name: `${lastName.toUpperCase() || 'GARCIA'}, ${firstName.toUpperCase() || 'CARLOS'}, ANTONIO`,
+        rating_regular: 1450,
+        rating_quick: 1425,
+        state: "NY",
+        expiration_date: "2025-10-20"
       }
     ];
 

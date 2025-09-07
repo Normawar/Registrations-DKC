@@ -98,8 +98,11 @@ export function EnhancedPlayerSearchDialog({
   };
 
   const handleUSCFLookupByName = async () => {
-    if (!uscfLookup.firstName.trim() || !uscfLookup.lastName.trim()) {
-      setUSCFError('Please enter both first and last name');
+    const firstName = uscfLookup.firstName.trim();
+    const lastName = uscfLookup.lastName.trim();
+
+    if (!firstName && !lastName) {
+      setUSCFError('Please enter at least a first or last name');
       return;
     }
 
@@ -112,8 +115,8 @@ export function EnhancedPlayerSearchDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          firstName: uscfLookup.firstName.trim(), 
-          lastName: uscfLookup.lastName.trim() 
+          firstName, 
+          lastName
         }),
       });
 
@@ -122,7 +125,7 @@ export function EnhancedPlayerSearchDialog({
         if (players.length > 0) {
           setUSCFResults(players);
         } else {
-          setUSCFError(`No players found with name: ${uscfLookup.firstName} ${uscfLookup.lastName}`);
+          setUSCFError(`No players found matching your search.`);
         }
       } else {
         const errorData = await response.json();
@@ -147,15 +150,23 @@ export function EnhancedPlayerSearchDialog({
   };
 
   const formatUSCFPlayerName = (name: string) => {
+    // Parse the formatted name "lastName, firstName, middleName" and display all parts
     const parts = name.split(', ');
     if (parts.length >= 2) {
       const lastName = parts[0];
       const firstName = parts[1];
       const middleName = parts.length > 2 ? parts[2] : '';
-      return `${firstName} ${middleName} ${lastName}`.trim();
+      
+      // Show all parts: "firstName middleName lastName"
+      if (middleName) {
+        return `${firstName} ${middleName} ${lastName}`;
+      } else {
+        return `${firstName} ${lastName}`;
+      }
     }
     return name;
   };
+
 
   if (!isOpen) return null;
 
