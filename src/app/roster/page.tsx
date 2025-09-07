@@ -20,7 +20,7 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { PlayerSearchDialog } from '@/components/PlayerSearchDialog';
+import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
@@ -190,18 +190,50 @@ function SponsorRosterView() {
     setIsEditPlayerDialogOpen(true);
   };
   
-  const handleSelectPlayer = (player: MasterPlayer) => {
-    addPlayer(player);
-    toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been added to your roster.` });
+  const handleSelectPlayer = (player: any) => {
+    const isMasterPlayer = 'uscfId' in player;
+    const playerToAdd: Partial<MasterPlayer> = isMasterPlayer ? 
+      player : 
+      {
+        id: player.uscf_id,
+        uscfId: player.uscf_id,
+        firstName: player.name.split(' ')[0],
+        lastName: player.name.split(' ').slice(1).join(' '),
+        regularRating: player.rating_regular,
+        state: player.state,
+        uscfExpiration: player.expiration_date,
+      };
+
+    addPlayer(playerToAdd as MasterPlayer);
+    toast({ title: "Player Added", description: `${playerToAdd.firstName} ${playerToAdd.lastName} has been added to your roster.` });
   };
 
-  const handlePlayerSelectedForEdit = (player: MasterPlayer) => {
-    setPendingPlayer(player);
-    setEditingPlayer(player);
+  const handlePlayerSelectedForEdit = (player: any) => {
+    const isMasterPlayer = 'uscfId' in player;
+    const playerToEdit: MasterPlayer = isMasterPlayer ? player : {
+      id: player.uscf_id,
+      uscfId: player.uscf_id,
+      firstName: player.name.split(', ')[1] || '',
+      lastName: player.name.split(', ')[0] || '',
+      middleName: player.name.split(', ').length > 2 ? player.name.split(', ')[2] : '',
+      regularRating: player.rating_regular || undefined,
+      uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
+      state: player.state || 'TX',
+      school: profile?.school || '',
+      district: profile?.district || '',
+      grade: '',
+      section: '',
+      email: '',
+      zipCode: '',
+      events: 0,
+      eventIds: [],
+    };
+    setPendingPlayer(playerToEdit);
+    setEditingPlayer(playerToEdit);
     playerForm.reset({
-        ...player,
-        dob: player.dob ? new Date(player.dob) : undefined,
-        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+      ...playerToEdit,
+      dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
+      uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
     });
     setIsEditPlayerDialogOpen(true);
   };
@@ -528,13 +560,12 @@ function SponsorRosterView() {
         </CardContent>
       </Card>
 
-      <PlayerSearchDialog 
+      <EnhancedPlayerSearchDialog 
           isOpen={isSearchDialogOpen}
           onOpenChange={setIsSearchDialogOpen}
-          onSelectPlayer={handleSelectPlayer}
-          onPlayerSelected={handlePlayerSelectedForEdit}
+          onSelectPlayer={handlePlayerSelectedForEdit}
           excludeIds={rosterPlayerIds}
-          portalType="sponsor"
+          title="Add Player to Roster"
       />
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
