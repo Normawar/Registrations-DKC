@@ -320,10 +320,7 @@ export default function VoucherManagementPage() {
                 <CardContent>
                   <div className="text-2xl font-bold">{pendingMemberships.length}</div>
                   <div className="text-xs text-muted-foreground">
-                    {selectedTournaments.length > 0 
-                      ? `From ${selectedTournaments.length} selected tournaments`
-                      : 'From all tournaments'
-                    }
+                    From all tournaments
                   </div>
                 </CardContent>
               </Card>
@@ -378,7 +375,7 @@ export default function VoucherManagementPage() {
                         </TableCell>
                         <TableCell>{format(new Date(assignment.assignedDate), 'MMM dd, yyyy')}</TableCell>
                         <TableCell>
-                          <Badge variant={assignment.uscfIdAssigned ? 'success' : 'warning'}>
+                          <Badge variant={assignment.uscfIdAssigned ? 'default' : 'secondary'} className={assignment.uscfIdAssigned ? 'bg-green-600' : ''}>
                             {assignment.uscfIdAssigned ? 'Processed' : 'Pending'}
                           </Badge>
                         </TableCell>
@@ -488,7 +485,7 @@ export default function VoucherManagementPage() {
                             </TableCell>
                             <TableCell>{membership.confirmation.eventName}</TableCell>
                             <TableCell>
-                              <Badge variant="warning">Pending Assignment</Badge>
+                              <Badge variant="destructive">Pending Assignment</Badge>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -562,7 +559,7 @@ export default function VoucherManagementPage() {
                             />
                           </TableCell>
                           <TableCell>
-                            <Badge variant="warning">Pending</Badge>
+                            <Badge variant="destructive">Pending</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
