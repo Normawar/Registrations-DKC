@@ -1,10 +1,12 @@
+
 'use client';
 
 import React, { useState } from 'react';
 import { useMasterDb, type UploadProgress } from '@/context/master-db-context';
+import { Progress } from '@/components/ui/progress';
 
 export const EnhancedCSVUpload: React.FC = () => {
-  const { bulkUploadCSV } = useMasterDb();
+  const { bulkUploadCSVWithProgress } = useMasterDb();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [results, setResults] = useState<{ uploaded: number; errors: string[] } | null>(null);
@@ -37,7 +39,7 @@ export const EnhancedCSVUpload: React.FC = () => {
         return;
       }
 
-      const result = await bulkUploadCSV(file, (progressUpdate) => {
+      const result = await bulkUploadCSVWithProgress(file, (progressUpdate) => {
         setProgress(progressUpdate);
       });
       
@@ -222,4 +224,9 @@ export const EnhancedCSVUpload: React.FC = () => {
           <li>• Automatic rate limiting (500 records/batch, 1s delays)</li>
           <li>• Error recovery and retry logic</li>
           <li>• Detailed batch processing information</li>
-          <li>• Optimized for large
+          <li>• Optimized for large files (100K+ records)</li>
+        </ul>
+      </div>
+    </div>
+  );
+};
