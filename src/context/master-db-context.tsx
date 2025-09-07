@@ -28,11 +28,14 @@ interface MasterDbContextType {
   addPlayer: (player: MasterPlayer) => Promise<void>;
   updatePlayer: (player: MasterPlayer) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
-  addBulkPlayers: (players: MasterPlayer[]) => Promise<void>;
+   addBulkPlayers: (
+    players: MasterPlayer[], 
+    onProgress?: (progress: { current: number; total: number; message: string }) => void
+  ) => Promise<void>;
   bulkUploadCSVWithProgress: (
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
-  ) => Promise<{ uploaded: number; errors: string[] }>;
+  ) => Promise<{ uploaded: number; errors: string[] }>; // New function
   clearDatabase: () => Promise<void>;
   updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
