@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { EnhancedCSVUpload } from '@/components/enhanced-csv-upload';
 
 
 type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state' | 'uscfExpiration' | 'events';
@@ -312,6 +313,10 @@ function PlayersPageContent() {
         </div>
       </div>
       
+      <div className="mb-8">
+          <EnhancedCSVUpload />
+      </div>
+
       <Card>
           <CardHeader>
               <div className="flex justify-between items-center">
@@ -456,3 +461,4 @@ export default function PlayersPage() {
         </AppLayout>
     );
 }
+
