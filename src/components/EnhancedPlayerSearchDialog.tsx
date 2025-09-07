@@ -526,7 +526,7 @@ export function EnhancedPlayerSearchDialog({
                                   : 'bg-green-500 text-white hover:bg-green-600'
                               }`}
                             >
-                              {excludeIds.includes(player.uscf_id) ? 'Already Added' : 'Select'}
+                              {excludeIds.includes(player.uscf_id) ? 'Already Added' : 'Add & Complete'}
                             </button>
                           </td>
                         </tr>
