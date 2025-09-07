@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useMasterDb, type UploadProgress } from '@/context/master-db-context';
+import { Progress } from '@/components/ui/progress';
 
 export const EnhancedCSVUpload: React.FC = () => {
   const { bulkUploadCSVWithProgress } = useMasterDb();
@@ -31,14 +32,25 @@ export const EnhancedCSVUpload: React.FC = () => {
   };
 
   const handleUpload = async () => {
+    console.log('🎯 handleUpload called');
+    
     if (!selectedFile) {
       alert('Please select a CSV file first');
       return;
     }
-
+  
+    // Check if the function exists
+    if (!bulkUploadCSVWithProgress) {
+      console.error('❌ bulkUploadCSVWithProgress function not found in context');
+      alert('Upload function not available. Please refresh the page and try again.');
+      return;
+    }
+  
+    console.log('✅ bulkUploadCSVWithProgress function found');
+  
     setUploading(true);
     setProgress(null);
-
+  
     try {
       const confirmed = confirm(
         `Upload CSV file "${selectedFile.name}"?\n\n` +
@@ -50,17 +62,19 @@ export const EnhancedCSVUpload: React.FC = () => {
       );
       
       if (!confirmed) {
+        console.log('User cancelled upload');
         setUploading(false);
         return;
       }
-
-      console.log('Starting enhanced CSV upload...');
+  
+      console.log('🚀 Starting enhanced CSV upload with file:', selectedFile.name);
       
       const result = await bulkUploadCSVWithProgress(selectedFile, (progressUpdate) => {
-        console.log('Progress update:', progressUpdate);
+        console.log('📊 Progress update received:', progressUpdate);
         setProgress(progressUpdate);
       });
       
+      console.log('✅ Upload completed:', result);
       setResults(result);
       
       if (result.uploaded > 0) {
@@ -70,16 +84,17 @@ export const EnhancedCSVUpload: React.FC = () => {
       if (result.errors.length > 0) {
         console.warn('Upload errors:', result.errors);
       }
-
+  
       // Clear the file selection after successful upload
       setSelectedFile(null);
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
-
+  
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error('💥 Upload failed with error:', error);
       alert(`Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
+      console.log('🏁 Upload process finished');
       setUploading(false);
     }
   };
