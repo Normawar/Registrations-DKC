@@ -18,7 +18,7 @@ interface MasterDbContextType {
   updatePlayer: (player: MasterPlayer) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
   addBulkPlayers: (players: MasterPlayer[]) => Promise<void>;
-  bulkUploadCSV: (csvFile: File, onProgress: (progress: { current: number; total: number }) => void) => Promise<{ uploaded: number; errors: string[] }>;
+  bulkUploadCSV: (csvFile: File) => Promise<{ uploaded: number; errors: string[] }>;
   clearDatabase: () => Promise<void>;
   updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
@@ -335,22 +335,24 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addPlayer = async (player: MasterPlayer) => {
-    if (!db) return;
-    try {
-      console.log("Current user:", auth.currentUser);
-      console.log("User authenticated:", !!auth.currentUser);
-  
-      if (!auth.currentUser) {
-        console.error("User not authenticated!");
+    if (!db) {
+        console.error("Database not initialized");
         return;
-      }
-      const cleanedPlayer = removeUndefined(player);
-      const playerRef = doc(db, 'players', cleanedPlayer.id);
-      await setDoc(playerRef, cleanedPlayer, { merge: true });
-      await loadDatabase(); // Ensure UI consistency by reloading from source
+    }
+    
+    try {
+        console.log("Attempting to add player:", player);
+        const cleanedPlayer = removeUndefined(player);
+        console.log("Cleaned player data:", cleanedPlayer);
+
+        const playerRef = doc(db, 'players', cleanedPlayer.id);
+        await setDoc(playerRef, cleanedPlayer, { merge: true });
+        
+        console.log("Player successfully written to Firebase");
+        await loadDatabase(); // Ensure UI consistency by reloading from source
     } catch (error) {
-      console.error("Error adding/updating player:", error);
-      throw error;
+        console.error("Error adding player:", error);
+        throw error;
     }
   };
 
@@ -549,12 +551,16 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     return [...new Set(database.map(p => p.district).filter(Boolean))].sort() as string[];
   }, [database, isDbLoaded]);
 
-  const bulkUploadCSV = async (csvFile: File, onProgress: (progress: { current: number; total: number }) => void): Promise<{ uploaded: number; errors: string[] }> => {
+  const bulkUploadCSV = async (csvFile: File): Promise<{ uploaded: number; errors: string[] }> => {
     if (!db) throw new Error("Database not initialized");
   
     try {
+      console.log('🚀 Starting CSV bulk upload...');
+      
       // Read and parse CSV
       const csvText = await csvFile.text();
+      console.log('📄 CSV file read successfully');
+      
       const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
         Papa.parse(csvText, { 
           header: true, 
@@ -566,7 +572,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       });
   
       const players = parseCSVData(parseResult.data);
-      console.log(`Parsed ${players.length} players from CSV`);
+      console.log(`✅ Parsed ${players.length} players from CSV`);
   
       if (players.length === 0) {
         return { uploaded: 0, errors: ['No valid players found in CSV'] };
@@ -578,8 +584,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       let totalUploaded = 0;
       const errors: string[] = [];
   
+      console.log(`📦 Processing ${Math.ceil(players.length / batchSize)} batches...`);
+  
       for (let i = 0; i < players.length; i += batchSize) {
         const batchPlayers = players.slice(i, i + batchSize);
+        const batchNum = Math.floor(i/batchSize) + 1;
+        const totalBatches = Math.ceil(players.length / batchSize);
         
         try {
           const batch = writeBatch(db);
@@ -592,38 +602,39 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   
           await batch.commit();
           totalUploaded += batchPlayers.length;
-          onProgress({ current: totalUploaded, total: players.length });
           
-          console.log(`✅ Batch ${Math.floor(i/batchSize) + 1} completed (${totalUploaded}/${players.length} total)`);
+          console.log(`✅ Batch ${batchNum}/${totalBatches} completed (${totalUploaded}/${players.length} total)`);
   
           // Rate limiting delay (skip on last batch)
           if (i + batchSize < players.length) {
-            console.log(`Waiting ${delayMs}ms before next batch...`);
+            console.log(`⏳ Waiting ${delayMs}ms before next batch...`);
             await new Promise(resolve => setTimeout(resolve, delayMs));
           }
   
         } catch (error) {
-          console.error(`❌ Batch ${Math.floor(i/batchSize) + 1} failed:`, error);
+          console.error(`❌ Batch ${batchNum} failed:`, error);
           
           // Handle rate limiting
           if (error instanceof Error && error.message.includes('resource-exhausted')) {
-            console.log('Rate limit hit, waiting longer...');
+            console.log('🚫 Rate limit hit, waiting longer...');
             await new Promise(resolve => setTimeout(resolve, delayMs * 3));
             i -= batchSize; // Retry this batch
             continue;
           }
           
-          errors.push(`Batch ${Math.floor(i/batchSize) + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          errors.push(`Batch ${batchNum}: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
   
       // Refresh the database after upload
+      console.log('🔄 Refreshing database...');
       await loadDatabase();
       
+      console.log(`🎉 Upload complete! ${totalUploaded} players uploaded`);
       return { uploaded: totalUploaded, errors };
   
     } catch (error) {
-      console.error('CSV upload failed:', error);
+      console.error('💥 CSV upload failed:', error);
       throw error;
     }
   };
@@ -666,3 +677,4 @@ export const useMasterDb = () => {
 };
 
     
+
