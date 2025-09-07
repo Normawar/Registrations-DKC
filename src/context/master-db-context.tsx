@@ -29,7 +29,7 @@ interface MasterDbContextType {
   updatePlayer: (player: MasterPlayer) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
   addBulkPlayers: (players: MasterPlayer[]) => Promise<void>;
-  bulkUploadCSV: (
+  bulkUploadCSVWithProgress: (
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
   ) => Promise<{ uploaded: number; errors: string[] }>;
@@ -565,184 +565,191 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     return [...new Set(database.map(p => p.district).filter(Boolean))].sort() as string[];
   }, [database, isDbLoaded]);
 
-  const bulkUploadCSV = async (
-    csvFile: File,
-    onProgress?: (progress: UploadProgress) => void
-  ): Promise<{ uploaded: number; errors: string[] }> => {
-    if (!db) throw new Error("Database not initialized");
+  const bulkUploadCSVWithProgress = async (
+  csvFile: File, 
+  onProgress?: (progress: UploadProgress) => void
+): Promise<{ uploaded: number; errors: string[] }> => {
+  console.log('🚀 bulkUploadCSVWithProgress called with file:', csvFile.name);
   
-    const updateProgress = (progress: Partial<UploadProgress>) => {
-      if (onProgress) {
-        const fullProgress: UploadProgress = {
-          stage: 'parsing',
-          currentBatch: 0,
-          totalBatches: 0,
-          uploadedRecords: 0,
-          totalRecords: 0,
-          percentage: 0,
-          message: 'Starting...',
-          ...progress
-        };
-        onProgress(fullProgress);
-      }
-    };
-  
-    try {
-      console.log('🚀 Starting CSV bulk upload...');
-      updateProgress({ stage: 'parsing', message: 'Reading CSV file...' });
-      
-      const csvText = await csvFile.text();
-      console.log('📄 CSV file read successfully');
-      updateProgress({ stage: 'parsing', message: 'Parsing CSV data...' });
-      
-      const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
-        Papa.parse(csvText, { 
-          header: true, 
-          skipEmptyLines: true, 
-          dynamicTyping: true,
-          complete: resolve, 
-          error: reject 
-        });
+  if (!db) throw new Error("Database not initialized");
+
+  const updateProgress = (progress: Partial<UploadProgress>) => {
+    console.log('Progress update:', progress);
+    if (onProgress) {
+      const fullProgress: UploadProgress = {
+        stage: 'parsing',
+        currentBatch: 0,
+        totalBatches: 0,
+        uploadedRecords: 0,
+        totalRecords: 0,
+        percentage: 0,
+        message: 'Starting...',
+        ...progress
+      };
+      onProgress(fullProgress);
+    }
+  };
+
+  try {
+    console.log('Starting enhanced CSV bulk upload...');
+    updateProgress({ stage: 'parsing', message: 'Reading CSV file...' });
+    
+    // Read and parse CSV
+    const csvText = await csvFile.text();
+    console.log('CSV file read successfully, length:', csvText.length);
+    updateProgress({ stage: 'parsing', message: 'Parsing CSV data...' });
+    
+    const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
+      Papa.parse(csvText, { 
+        header: true, 
+        skipEmptyLines: true, 
+        dynamicTyping: true,
+        complete: resolve, 
+        error: reject 
       });
-  
-      const players = parseCSVData(parseResult.data);
-      console.log(`✅ Parsed ${players.length} players from CSV`);
-  
-      if (players.length === 0) {
-        updateProgress({ 
-          stage: 'complete', 
-          message: 'No valid players found in CSV',
-          percentage: 100 
-        });
-        return { uploaded: 0, errors: ['No valid players found in CSV'] };
-      }
-  
-      const batchSize = 500;
-      const delayMs = 1000;
-      const totalBatches = Math.ceil(players.length / batchSize);
-      let totalUploaded = 0;
-      const errors: string[] = [];
-  
-      console.log(`📦 Processing ${totalBatches} batches...`);
+    });
+
+    const players = parseCSVData(parseResult.data);
+    console.log(`Parsed ${players.length} players from CSV`);
+
+    if (players.length === 0) {
       updateProgress({ 
-        stage: 'uploading', 
-        totalBatches,
-        totalRecords: players.length,
-        message: `Starting upload of ${players.length} players in ${totalBatches} batches...` 
+        stage: 'complete', 
+        message: 'No valid players found in CSV',
+        percentage: 100 
       });
-  
-      for (let i = 0; i < players.length; i += batchSize) {
-        const batchPlayers = players.slice(i, i + batchSize);
-        const batchNum = Math.floor(i/batchSize) + 1;
+      return { uploaded: 0, errors: ['No valid players found in CSV'] };
+    }
+
+    // Setup batching
+    const batchSize = 500;
+    const delayMs = 1000;
+    const totalBatches = Math.ceil(players.length / batchSize);
+    let totalUploaded = 0;
+    const errors: string[] = [];
+
+    console.log(`Processing ${totalBatches} batches with progress tracking...`);
+    updateProgress({ 
+      stage: 'uploading', 
+      totalBatches,
+      totalRecords: players.length,
+      message: `Starting upload of ${players.length} players in ${totalBatches} batches...` 
+    });
+
+    // Process batches
+    for (let i = 0; i < players.length; i += batchSize) {
+      const batchPlayers = players.slice(i, i + batchSize);
+      const batchNum = Math.floor(i/batchSize) + 1;
+      
+      updateProgress({
+        stage: 'uploading',
+        currentBatch: batchNum,
+        totalBatches,
+        uploadedRecords: totalUploaded,
+        totalRecords: players.length,
+        percentage: Math.round((totalUploaded / players.length) * 90),
+        message: `Uploading batch ${batchNum}/${totalBatches} (${batchPlayers.length} players)...`
+      });
+      
+      try {
+        const batch = writeBatch(db);
         
+        batchPlayers.forEach(player => {
+          const cleanedPlayer = removeUndefined(player);
+          const docRef = doc(db, 'players', player.id);
+          batch.set(docRef, cleanedPlayer, { merge: true });
+        });
+
+        await batch.commit();
+        totalUploaded += batchPlayers.length;
+        
+        console.log(`Batch ${batchNum}/${totalBatches} completed (${totalUploaded}/${players.length} total)`);
+
         updateProgress({
           stage: 'uploading',
           currentBatch: batchNum,
           totalBatches,
           uploadedRecords: totalUploaded,
           totalRecords: players.length,
-          percentage: Math.round((totalUploaded / players.length) * 100),
-          message: `Uploading batch ${batchNum}/${totalBatches} (${batchPlayers.length} players)...`
+          percentage: Math.round((totalUploaded / players.length) * 90),
+          message: `Completed batch ${batchNum}/${totalBatches} - ${totalUploaded} players uploaded`
         });
-        
-        try {
-          const batch = writeBatch(db);
-          
-          batchPlayers.forEach(player => {
-            const cleanedPlayer = removeUndefined(player);
-            const docRef = doc(db, 'players', player.id);
-            batch.set(docRef, cleanedPlayer, { merge: true });
-          });
-  
-          await batch.commit();
-          totalUploaded += batchPlayers.length;
-          
-          console.log(`✅ Batch ${batchNum}/${totalBatches} completed (${totalUploaded}/${players.length} total)`);
-  
+
+        // Rate limiting delay (skip on last batch)
+        if (i + batchSize < players.length) {
           updateProgress({
             stage: 'uploading',
             currentBatch: batchNum,
             totalBatches,
             uploadedRecords: totalUploaded,
             totalRecords: players.length,
-            percentage: Math.round((totalUploaded / players.length) * 100),
-            message: `Completed batch ${batchNum}/${totalBatches} - ${totalUploaded} players uploaded`
+            percentage: Math.round((totalUploaded / players.length) * 90),
+            message: `Waiting ${delayMs}ms before next batch...`
           });
-  
-          if (i + batchSize < players.length) {
-            updateProgress({
-              stage: 'uploading',
-              currentBatch: batchNum,
-              totalBatches,
-              uploadedRecords: totalUploaded,
-              totalRecords: players.length,
-              percentage: Math.round((totalUploaded / players.length) * 100),
-              message: `Waiting ${delayMs}ms before next batch...`
-            });
-            console.log(`⏳ Waiting ${delayMs}ms before next batch...`);
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-          }
-  
-        } catch (error) {
-          console.error(`❌ Batch ${batchNum} failed:`, error);
-          
-          if (error instanceof Error && error.message.includes('resource-exhausted')) {
-            console.log('🚫 Rate limit hit, waiting longer...');
-            updateProgress({
-              stage: 'uploading',
-              currentBatch: batchNum,
-              totalBatches,
-              uploadedRecords: totalUploaded,
-              totalRecords: players.length,
-              percentage: Math.round((totalUploaded / players.length) * 100),
-              message: `Rate limit reached - waiting longer before retry...`
-            });
-            await new Promise(resolve => setTimeout(resolve, delayMs * 3));
-            i -= batchSize;
-            continue;
-          }
-          
-          errors.push(`Batch ${batchNum}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.log(`⏳ Waiting ${delayMs}ms before next batch...`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
         }
-      }
-  
-      console.log('🔄 Refreshing database...');
-      updateProgress({
-        stage: 'refreshing',
-        currentBatch: totalBatches,
-        totalBatches,
-        uploadedRecords: totalUploaded,
-        totalRecords: players.length,
-        percentage: 95,
-        message: 'Refreshing database...'
-      });
-      
-      await loadDatabase();
-      
-      console.log(`🎉 Upload complete! ${totalUploaded} players uploaded`);
-      updateProgress({
-        stage: 'complete',
-        currentBatch: totalBatches,
-        totalBatches,
-        uploadedRecords: totalUploaded,
-        totalRecords: players.length,
-        percentage: 100,
-        message: `Upload complete! ${totalUploaded} players processed.`
-      });
-      
-      return { uploaded: totalUploaded, errors };
-  
-    } catch (error) {
-      console.error('💥 CSV upload failed:', error);
-      updateProgress({ 
-        stage: 'complete', 
-        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        percentage: 100 
-      });
-      throw error;
-    }
-  };
 
+      } catch (error) {
+        console.error(`Batch ${batchNum} failed:`, error);
+        
+        if (error instanceof Error && error.message.includes('resource-exhausted')) {
+          console.log('Rate limit hit, waiting longer...');
+          updateProgress({
+            stage: 'uploading',
+            currentBatch: batchNum,
+            totalBatches,
+            uploadedRecords: totalUploaded,
+            totalRecords: players.length,
+            percentage: Math.round((totalUploaded / players.length) * 90),
+            message: `Rate limit reached - waiting longer before retry...`
+          });
+          await new Promise(resolve => setTimeout(resolve, delayMs * 3));
+          i -= batchSize; // Retry this batch
+          continue;
+        }
+        
+        errors.push(`Batch ${batchNum}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    // Refresh the database after upload
+    console.log('Refreshing database...');
+    updateProgress({
+      stage: 'refreshing',
+      currentBatch: totalBatches,
+      totalBatches,
+      uploadedRecords: totalUploaded,
+      totalRecords: players.length,
+      percentage: 95,
+      message: 'Refreshing database...'
+    });
+    
+    await loadDatabase();
+    
+    console.log(`Enhanced upload complete! ${totalUploaded} players uploaded`);
+    updateProgress({
+      stage: 'complete',
+      currentBatch: totalBatches,
+      totalBatches,
+      uploadedRecords: totalUploaded,
+      totalRecords: players.length,
+      percentage: 100,
+      message: `Upload complete! ${totalUploaded} players uploaded successfully`
+    });
+    
+    return { uploaded: totalUploaded, errors };
+
+  } catch (error) {
+    console.error('Enhanced CSV upload failed:', error);
+    updateProgress({
+      stage: 'complete',
+      percentage: 0,
+      message: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    });
+    throw error;
+  }
+};
 
   const value = {
     database,
@@ -750,7 +757,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     updatePlayer,
     deletePlayer,
     addBulkPlayers,
-    bulkUploadCSV,
+    bulkUploadCSVWithProgress,
     clearDatabase,
     updateSchoolDistrict,
     isDbLoaded,
