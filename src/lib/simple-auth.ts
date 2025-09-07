@@ -2,6 +2,7 @@
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 
 // Simple signup function with detailed error logging
@@ -206,3 +207,15 @@ export function checkFirebaseConfig() {
   console.log('✅ Firebase configuration complete');
   return true;
 }
+
+export const resetPassword = async (email: string): Promise<void> => {
+  try {
+    if (!auth) {
+        throw new Error('Authentication service not initialized');
+    }
+    await sendPasswordResetEmail(auth, email);
+  } catch (error: any) {
+    console.error('Error sending password reset email:', error);
+    throw error;
+  }
+};

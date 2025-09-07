@@ -6,9 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
 import { Eye, EyeOff } from 'lucide-react';
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,11 +20,11 @@ import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Image from "next/image";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { db } from '@/lib/services/firestore-service';
 import { simpleSignIn, checkFirebaseConfig } from '@/lib/simple-auth';
+import { resetPassword } from '@/lib/simple-auth'; // Added import
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -39,17 +37,46 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
     const { updateProfile } = useSponsorProfile();
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [isResetting, setIsResetting] = useState(false);
+    const [resetMessage, setResetMessage] = useState('');
 
     const form = useForm<z.infer<typeof loginFormSchema>>({
         resolver: zodResolver(loginFormSchema),
         defaultValues: { email: "", password: "" },
     });
+    
+    const emailForReset = form.watch('email');
+
+    const handlePasswordReset = async () => {
+        if (!emailForReset || !emailForReset.trim()) {
+            form.setError("email", { type: "manual", message: "Please enter an email to reset." });
+            return;
+        }
+
+        setIsResetting(true);
+        setResetMessage('');
+
+        try {
+            await resetPassword(emailForReset);
+            setResetMessage('Password reset email sent! Check your inbox and spam folder.');
+        } catch (error: any) {
+            let errorMessage = 'Failed to send reset email. Please try again.';
+            switch (error.code) {
+                case 'auth/user-not-found': errorMessage = 'No account found with this email address'; break;
+                case 'auth/invalid-email': errorMessage = 'Please enter a valid email address'; break;
+                case 'auth/too-many-requests': errorMessage = 'Too many reset attempts. Please try again later'; break;
+            }
+            form.setError("email", { type: "manual", message: errorMessage });
+        } finally {
+            setIsResetting(false);
+        }
+    };
 
     async function onSubmit(values: z.infer<typeof loginFormSchema>) {
         setIsLoading(true);
+        setResetMessage(''); // Clear reset message on new login attempt
         
         try {
-            // Check Firebase configuration first
             if (!checkFirebaseConfig()) {
                 toast({
                     variant: 'destructive',
@@ -60,7 +87,6 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                 return;
             }
     
-            // Use the simple signin function
             const result = await simpleSignIn(values.email, values.password);
             
             if (result.success) {
@@ -71,30 +97,19 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                 
                 setTimeout(() => {
                     switch (result.profile.role) {
-                        case 'organizer':
-                            router.push('/manage-events');
-                            break;
-                        case 'district_coordinator':
-                            router.push('/district-dashboard');
-                            break;
+                        case 'organizer': router.push('/manage-events'); break;
+                        case 'district_coordinator': router.push('/district-dashboard'); break;
                         case 'sponsor':
-                             if (result.profile.isDistrictCoordinator) {
-                                router.push('/auth/role-selection');
-                            } else {
-                                router.push('/dashboard');
-                            }
+                             if (result.profile.isDistrictCoordinator) { router.push('/auth/role-selection'); } 
+                             else { router.push('/dashboard'); }
                             break;
-                        case 'individual':
-                            router.push('/individual-dashboard');
-                            break;
-                        default:
-                            router.push('/dashboard');
+                        case 'individual': router.push('/individual-dashboard'); break;
+                        default: router.push('/dashboard');
                     }
                 }, 100);
             }
         } catch (error) {
             console.error('Login error:', error);
-            
             form.setError("email", {
                 type: "manual",
                 message: error instanceof Error ? error.message : "An error occurred during login. Please try again.",
@@ -126,7 +141,7 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                         size="sm"
                         className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                         onClick={() => setShowPassword(!showPassword)}
-                        tabIndex={-1} // Makes the button unfocusable
+                        tabIndex={-1}
                       >
                         {showPassword ? (
                           <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -142,9 +157,24 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
               )}/>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
+              {resetMessage && (
+                <div className="text-center p-3 bg-green-50 border border-green-200 rounded-md w-full">
+                  <p className="text-sm text-green-700">{resetMessage}</p>
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Signing In..." : "Sign In"}
               </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={handlePasswordReset}
+                  disabled={isResetting}
+                  className="text-sm text-primary hover:underline disabled:opacity-50"
+                >
+                  {isResetting ? 'Sending reset email...' : 'Forgot your password?'}
+                </button>
+              </div>
               <div className="text-sm text-center text-muted-foreground">
                 Don't have an account?{" "}
                 <Link href="/signup" className="font-medium text-primary underline-offset-4 hover:underline" prefetch={false}>
