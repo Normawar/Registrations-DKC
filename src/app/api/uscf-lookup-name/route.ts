@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Mock data for testing
+    // Mock data with various name formats
     const mockPlayers = [
       {
         uscf_id: "32052572",
@@ -23,11 +23,19 @@ export async function POST(request: NextRequest) {
       },
       {
         uscf_id: "12345678",
-        name: `${body.lastName.toUpperCase()}, ${body.firstName.toUpperCase()}`,
+        name: "SMITH, JOHN, DAVID",  // Example with middle name
         rating_regular: 1200,
         rating_quick: 1180,
         state: "CA",
         expiration_date: "2025-12-31"
+      },
+      {
+        uscf_id: "87654321",
+        name: `${body.lastName.toUpperCase()}, ${body.firstName.toUpperCase()}, MICHAEL`,  // User's search + middle name
+        rating_regular: 1350,
+        rating_quick: 1320,
+        state: "FL",
+        expiration_date: "2025-11-15"
       }
     ];
 
