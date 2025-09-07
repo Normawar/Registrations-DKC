@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { EnhancedCSVUpload } from '@/components/enhanced-csv-upload';
+import { MasterDbProvider } from '@/context/master-db-context';
 
 
 type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state' | 'uscfExpiration' | 'events';
@@ -455,9 +456,11 @@ function PlayersPageContent() {
 export default function PlayersPage() {
     return (
         <AppLayout>
-            <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-                <PlayersPageContent />
-            </Suspense>
+            <MasterDbProvider>
+                <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+                    <PlayersPageContent />
+                </Suspense>
+            </MasterDbProvider>
         </AppLayout>
     );
 }
