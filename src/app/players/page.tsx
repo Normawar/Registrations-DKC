@@ -24,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { EnhancedCSVUpload } from '@/components/enhanced-csv-upload';
 import { MasterDbProvider } from '@/context/master-db-context';
+import { SimpleTestUpload } from '@/components/simple-test-upload';
 
 
 type SortableColumnKey = 'lastName' | 'school' | 'uscfId' | 'regularRating' | 'grade' | 'state' | 'uscfExpiration' | 'events';
@@ -315,6 +316,7 @@ function PlayersPageContent() {
       </div>
       
       <div className="mb-8">
+          <SimpleTestUpload />
           <EnhancedCSVUpload />
       </div>
 
@@ -464,4 +466,5 @@ export default function PlayersPage() {
         </AppLayout>
     );
 }
+
 
