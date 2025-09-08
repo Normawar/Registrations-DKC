@@ -51,23 +51,44 @@ export default function UnifiedInvoiceRegistrations() {
   const loadData = useCallback(async () => {
     if (!db || !profile) return;
     try {
-      const invoicesCol = collection(db, 'invoices');
-      const invoiceSnapshot = await getDocs(invoicesCol);
-      let invoicesArray = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const invoicesCol = collection(db, 'invoices');
+        const invoiceSnapshot = await getDocs(invoicesCol);
+        let firestoreInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      // Filter by role
-      if (profile.role === 'organizer') {
-        // Organizer sees all invoices
-      } else if (profile.role === 'district_coordinator') {
-          invoicesArray = invoicesArray.filter((inv: any) => inv.district === profile.district);
-          if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
-            invoicesArray = invoicesArray.filter((inv: any) => inv.gtCoordinatorEmail && inv.gtCoordinatorEmail.trim() !== '');
-          }
-      } else if (profile.role === 'sponsor') {
-          invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
-      } else if (profile.role === 'individual') {
-          invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
-      }
+        // Also load from local storage confirmations for good measure
+        let localConfirmations: any[] = [];
+        try {
+            const stored = localStorage.getItem('confirmations');
+            if (stored) {
+                localConfirmations = JSON.parse(stored);
+            }
+        } catch(e) {
+            console.error("Failed to parse confirmations from local storage", e);
+        }
+
+        // Combine and deduplicate
+        const combinedData = [...firestoreInvoices, ...localConfirmations];
+        const uniqueDataMap = new Map();
+        combinedData.forEach(item => {
+            if (item.id) {
+                uniqueDataMap.set(item.id, { ...uniqueDataMap.get(item.id), ...item });
+            }
+        });
+        let invoicesArray = Array.from(uniqueDataMap.values());
+        
+        // Filter by role
+        if (profile.role === 'organizer') {
+            // Organizer sees all invoices, no filtering needed
+        } else if (profile.role === 'district_coordinator') {
+            invoicesArray = invoicesArray.filter((inv: any) => inv.district === profile.district);
+            if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+                invoicesArray = invoicesArray.filter((inv: any) => inv.gtCoordinatorEmail && inv.gtCoordinatorEmail.trim() !== '');
+            }
+        } else if (profile.role === 'sponsor') {
+            invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
+        } else if (profile.role === 'individual') {
+            invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
+        }
       
       const mapped = invoicesArray.map((invoice: any) => {
         let registrations: any[] = [];
