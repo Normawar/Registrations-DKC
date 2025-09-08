@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building, AlertCircle, Edit, Trash2, Loader2 } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building, AlertCircle, Edit, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -29,7 +28,6 @@ import {
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { useRouter } from 'next/navigation';
 
-
 export default function UnifiedInvoiceRegistrations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -39,6 +37,7 @@ export default function UnifiedInvoiceRegistrations() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [clientReady, setClientReady] = useState(false);
   const [data, setData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const { profile } = useSponsorProfile();
   const { toast } = useToast();
   const router = useRouter();
@@ -47,48 +46,117 @@ export default function UnifiedInvoiceRegistrations() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-
+  // Enhanced loadData with comprehensive debugging
   const loadData = useCallback(async () => {
-    if (!db || !profile) return;
+    if (!db || !profile) {
+      console.log('❌ Missing db or profile:', { db: !!db, profile: !!profile });
+      return;
+    }
+    
+    setIsLoading(true);
+    console.log('🔍 Loading data for profile:', {
+      role: profile.role,
+      district: profile.district,
+      school: profile.school,
+      email: profile.email
+    });
+    
     try {
-        const invoicesCol = collection(db, 'invoices');
-        const invoiceSnapshot = await getDocs(invoicesCol);
-        let firestoreInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const invoicesCol = collection(db, 'invoices');
+      const invoiceSnapshot = await getDocs(invoicesCol);
+      let firestoreInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        // Also load from local storage confirmations for good measure
-        let localConfirmations: any[] = [];
-        try {
-            const stored = localStorage.getItem('confirmations');
-            if (stored) {
-                localConfirmations = JSON.parse(stored);
-            }
-        } catch(e) {
-            console.error("Failed to parse confirmations from local storage", e);
+      console.log('📊 Raw Firestore invoices:', firestoreInvoices.length);
+      
+      // Debug: Log today's invoices specifically
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayInvoices = firestoreInvoices.filter(inv => {
+        const submissionDate = inv.submissionTimestamp ? new Date(inv.submissionTimestamp) : null;
+        if (submissionDate) {
+          submissionDate.setHours(0, 0, 0, 0);
+          return submissionDate.getTime() === today.getTime();
         }
+        return false;
+      });
+      
+      console.log('📅 Today\'s invoices found:', todayInvoices.length, todayInvoices);
 
-        // Combine and deduplicate
-        const combinedData = [...firestoreInvoices, ...localConfirmations];
-        const uniqueDataMap = new Map();
-        combinedData.forEach(item => {
-            if (item.id) {
-                uniqueDataMap.set(item.id, { ...uniqueDataMap.get(item.id), ...item });
-            }
+      // Load from local storage
+      let localConfirmations: any[] = [];
+      try {
+        const stored = localStorage.getItem('confirmations');
+        if (stored) {
+          localConfirmations = JSON.parse(stored);
+        }
+      } catch(e) {
+        console.error("Failed to parse confirmations from local storage", e);
+      }
+
+      console.log('💾 Local confirmations:', localConfirmations.length);
+
+      // Combine and deduplicate
+      const combinedData = [...firestoreInvoices, ...localConfirmations];
+      console.log('🔄 Combined data before dedup:', combinedData.length);
+      
+      const uniqueDataMap = new Map();
+      combinedData.forEach(item => {
+        if (item.id) {
+          uniqueDataMap.set(item.id, { ...uniqueDataMap.get(item.id), ...item });
+        }
+      });
+      let invoicesArray = Array.from(uniqueDataMap.values());
+      console.log('✨ After deduplication:', invoicesArray.length);
+      
+      // Role-based filtering with enhanced logging
+      const beforeRoleFilter = invoicesArray.length;
+      console.log('👤 Applying role filter for:', profile.role);
+      
+      if (profile.role === 'organizer') {
+        console.log('🏢 Organizer role - showing all invoices (no filtering)');
+        // Organizer sees all invoices, no filtering needed
+      } else if (profile.role === 'district_coordinator') {
+        invoicesArray = invoicesArray.filter((inv: any) => {
+          const matches = inv.district === profile.district;
+          if (!matches) {
+            console.log('❌ Invoice filtered out by district:', inv.id, inv.district, 'vs', profile.district);
+          }
+          return matches;
         });
-        let invoicesArray = Array.from(uniqueDataMap.values());
+        console.log(`🏫 District coordinator filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
         
-        // Filter by role
-        if (profile.role === 'organizer') {
-            // Organizer sees all invoices, no filtering needed
-        } else if (profile.role === 'district_coordinator') {
-            invoicesArray = invoicesArray.filter((inv: any) => inv.district === profile.district);
-            if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
-                invoicesArray = invoicesArray.filter((inv: any) => inv.gtCoordinatorEmail && inv.gtCoordinatorEmail.trim() !== '');
-            }
-        } else if (profile.role === 'sponsor') {
-            invoicesArray = invoicesArray.filter((inv: any) => inv.schoolName === profile.school && inv.district === profile.district);
-        } else if (profile.role === 'individual') {
-            invoicesArray = invoicesArray.filter((inv: any) => inv.parentEmail === profile.email);
+        if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+          const beforeGTFilter = invoicesArray.length;
+          invoicesArray = invoicesArray.filter((inv: any) => inv.gtCoordinatorEmail && inv.gtCoordinatorEmail.trim() !== '');
+          console.log(`📧 GT Coordinator email filter: ${beforeGTFilter} -> ${invoicesArray.length}`);
         }
+      } else if (profile.role === 'sponsor') {
+        invoicesArray = invoicesArray.filter((inv: any) => {
+          const matchesSchool = inv.schoolName === profile.school;
+          const matchesDistrict = inv.district === profile.district;
+          if (!matchesSchool || !matchesDistrict) {
+            console.log('❌ Invoice filtered out by school/district:', inv.id, {
+              invoiceSchool: inv.schoolName,
+              profileSchool: profile.school,
+              invoiceDistrict: inv.district,
+              profileDistrict: profile.district
+            });
+          }
+          return matchesSchool && matchesDistrict;
+        });
+        console.log(`🎓 Sponsor filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
+      } else if (profile.role === 'individual') {
+        invoicesArray = invoicesArray.filter((inv: any) => {
+          const matches = inv.parentEmail === profile.email;
+          if (!matches) {
+            console.log('❌ Invoice filtered out by email:', inv.id, inv.parentEmail, 'vs', profile.email);
+          }
+          return matches;
+        });
+        console.log(`👨‍👩‍👧‍👦 Individual filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
+      }
+
+      console.log('🎯 Final filtered invoices:', invoicesArray.length);
       
       const mapped = invoicesArray.map((invoice: any) => {
         let registrations: any[] = [];
@@ -126,14 +194,34 @@ export default function UnifiedInvoiceRegistrations() {
         };
       });
       
+      console.log('📋 Final mapped data:', mapped.length);
       setData(mapped);
+      
     } catch (error) {
       console.error('❌ Error loading unified data from Firestore:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error Loading Data',
+        description: 'Failed to load invoices. Please try refreshing the page.'
+      });
       setData([]);
+    } finally {
+      setIsLoading(false);
     }
-  }, [profile]);
+  }, [profile, toast]);
+  
+  // Manual refresh function
+  const handleManualRefresh = useCallback(async () => {
+    console.log('🔄 Manual refresh triggered');
+    await loadData();
+    toast({
+      title: 'Data Refreshed',
+      description: 'Invoice data has been reloaded from the database.'
+    });
+  }, [loadData, toast]);
   
   useEffect(() => {
+    console.log('🔄 Profile changed, loading data:', profile);
     if (profile) {
       loadData();
     }
@@ -157,6 +245,14 @@ export default function UnifiedInvoiceRegistrations() {
   };
 
   const filteredAndSortedData = useMemo(() => {
+    console.log('🔍 Filtering data:', { 
+      totalData: data.length, 
+      searchTerm, 
+      statusFilter,
+      sortField,
+      sortDirection 
+    });
+    
     const filtered = data.filter((item: any) => {
       const lowerSearchTerm = searchTerm.toLowerCase();
       const matchesSearch = 
@@ -172,6 +268,8 @@ export default function UnifiedInvoiceRegistrations() {
       const matchesStatus = statusFilter === 'all' || (item.status && item.status.toUpperCase() === statusFilter.toUpperCase());
       return matchesSearch && matchesStatus;
     });
+
+    console.log('📊 After filtering:', filtered.length);
 
     return filtered.sort((a: any, b: any) => {
       let aValue, bValue;
@@ -225,17 +323,23 @@ export default function UnifiedInvoiceRegistrations() {
       
       await loadData();
       
-      toast({ title: 'Invoice Canceled', description: `Invoice ${invoiceToDelete.invoiceNumber || invoiceToDelete.id} has been marked as canceled.` });
+      toast({ 
+        title: 'Invoice Canceled', 
+        description: `Invoice ${invoiceToDelete.invoiceNumber || invoiceToDelete.id} has been marked as canceled.` 
+      });
     } catch (error) {
-        console.error("Failed to delete invoice:", error);
-        toast({ variant: 'destructive', title: 'Deletion Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
+      console.error("Failed to delete invoice:", error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Deletion Failed', 
+        description: error instanceof Error ? error.message : 'An unknown error occurred.' 
+      });
     } finally {
-        setIsDeleting(false);
-        setIsAlertOpen(false);
-        setInvoiceToDelete(null);
+      setIsDeleting(false);
+      setIsAlertOpen(false);
+      setInvoiceToDelete(null);
     }
   };
-
 
   const getStatusBadge = (status: string, totalPaid?: number, totalInvoiced?: number) => {
     const s = (status || '').toUpperCase();
@@ -297,16 +401,45 @@ export default function UnifiedInvoiceRegistrations() {
       }, 0);
   }, [filteredAndSortedData]);
 
-
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Invoice & Registration Management</h1>
-          <p className="text-muted-foreground">
-            Complete overview of all sponsorship invoices and student registrations
-          </p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Invoice & Registration Management</h1>
+            <p className="text-muted-foreground">
+              Complete overview of all sponsorship invoices and student registrations
+            </p>
+          </div>
+          <Button 
+            onClick={handleManualRefresh} 
+            disabled={isLoading}
+            variant="outline"
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Loading...' : 'Refresh'}
+          </Button>
         </div>
+
+        {/* Debug info for development */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardHeader>
+              <CardTitle className="text-orange-800">Debug Info</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <strong>Profile:</strong> {profile?.role} | {profile?.school} | {profile?.district}
+                </div>
+                <div>
+                  <strong>Data:</strong> {data.length} raw | {filteredAndSortedData.length} filtered
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -317,7 +450,11 @@ export default function UnifiedInvoiceRegistrations() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {clientReady ? (<div className="text-2xl font-bold">${(totalAmount).toFixed(2)}</div>) : (<Skeleton className="h-8 w-3/4" />)}
+              {clientReady ? (
+                <div className="text-2xl font-bold">${totalAmount.toFixed(2)}</div>
+              ) : (
+                <Skeleton className="h-8 w-3/4" />
+              )}
               <p className="text-xs text-muted-foreground">Across all invoices</p>
             </CardContent>
           </Card>
@@ -328,7 +465,11 @@ export default function UnifiedInvoiceRegistrations() {
               <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-               {clientReady ? (<div className="text-2xl font-bold">${(outstandingAmount).toFixed(2)}</div>) : (<Skeleton className="h-8 w-3/4" />)}
+               {clientReady ? (
+                 <div className="text-2xl font-bold">${outstandingAmount.toFixed(2)}</div>
+               ) : (
+                 <Skeleton className="h-8 w-3/4" />
+               )}
               <p className="text-xs text-muted-foreground">{outstandingInvoices} invoice(s) require payment</p>
             </CardContent>
           </Card>
@@ -339,11 +480,29 @@ export default function UnifiedInvoiceRegistrations() {
               <Building className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-               {clientReady ? (<div className="text-2xl font-bold">{paidInvoices}</div>) : (<Skeleton className="h-8 w-1/2" />)}
+               {clientReady ? (
+                 <div className="text-2xl font-bold">{paidInvoices}</div>
+               ) : (
+                 <Skeleton className="h-8 w-1/2" />
+               )}
               <p className="text-xs text-muted-foreground">of {clientReady ? filteredAndSortedData.length : '...'} total</p>
             </CardContent>
           </Card>
 
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+               {clientReady ? (
+                 <div className="text-2xl font-bold">{data.length}</div>
+               ) : (
+                 <Skeleton className="h-8 w-1/2" />
+               )}
+              <p className="text-xs text-muted-foreground">in the system</p>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
@@ -383,6 +542,7 @@ export default function UnifiedInvoiceRegistrations() {
             <CardTitle>All Invoices & Registrations</CardTitle>
             <CardDescription>
               Showing {filteredAndSortedData.length} invoice(s) with complete registration details
+              {isLoading && " (Loading...)"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -421,17 +581,21 @@ export default function UnifiedInvoiceRegistrations() {
                       </Button>
                     </th>
                     <th className="text-left p-2">
-                      <Button variant="ghost" className="h-auto p-0 font-semibold" onClick={() => handleSort('eventDate')}>
-                        Event Date {getSortIcon('eventDate')}
+                      <Button variant="ghost" className="h-auto p-0 font-semibold" onClick={() => handleSort('submissionTimestamp')}>
+                        Created {getSortIcon('submissionTimestamp')}
                       </Button>
                     </th>
                     <th className="text-left p-2">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {!clientReady ? (
+                  {!clientReady || isLoading ? (
                       Array.from({length: 5}).map((_, i) => (
-                          <tr key={i} className="border-b"><td colSpan={8} className="p-2"><Skeleton className="h-8 w-full"/></td></tr>
+                          <tr key={i} className="border-b">
+                            <td colSpan={8} className="p-2">
+                              <Skeleton className="h-8 w-full"/>
+                            </td>
+                          </tr>
                       ))
                   ) : filteredAndSortedData.map((invoice) => (
                     <tr key={invoice.id} className="border-b hover:bg-muted/50">
@@ -470,17 +634,36 @@ export default function UnifiedInvoiceRegistrations() {
                       <td className="p-2">
                         {getStatusBadge(invoice.status, invoice.totalPaid, invoice.totalAmount)}
                       </td>
-                      <td className="p-2">{invoice.eventDate ? format(new Date(invoice.eventDate), 'PPP') : 'N/A'}</td>
+                      <td className="p-2">
+                        {invoice.submissionTimestamp ? format(new Date(invoice.submissionTimestamp), 'PPp') : 'N/A'}
+                      </td>
                       <td className="p-2">
                         <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleViewInvoice(invoice)} className="gap-1">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleViewInvoice(invoice)} 
+                            className="gap-1"
+                          >
                             <Eye className="h-4 w-4" />
                             Details
                           </Button>
                           {profile?.role === 'organizer' && (
                             <>
-                              <Button variant="outline" size="icon" onClick={() => handleEditInvoice(invoice.id)}><Edit className="h-4 w-4" /></Button>
-                              <Button variant="destructive" size="icon" onClick={() => handleDeleteInvoice(invoice)}><Trash2 className="h-4 w-4" /></Button>
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                onClick={() => handleEditInvoice(invoice.id)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="destructive" 
+                                size="icon" 
+                                onClick={() => handleDeleteInvoice(invoice)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </>
                           )}
                         </div>
@@ -491,9 +674,17 @@ export default function UnifiedInvoiceRegistrations() {
               </table>
             </div>
 
-            {clientReady && filteredAndSortedData.length === 0 && (
+            {clientReady && !isLoading && filteredAndSortedData.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-muted-foreground">No invoices found matching your criteria.</p>
+                {data.length === 0 && (
+                  <div className="mt-4">
+                    <Button onClick={handleManualRefresh} variant="outline">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Try Refreshing
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>
@@ -510,6 +701,7 @@ export default function UnifiedInvoiceRegistrations() {
           />
         )}
       </div>
+      
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -520,7 +712,11 @@ export default function UnifiedInvoiceRegistrations() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}>
+            <AlertDialogAction 
+              onClick={confirmDelete} 
+              className="bg-destructive hover:bg-destructive/90" 
+              disabled={isDeleting}
+            >
               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete Invoice
             </AlertDialogAction>
