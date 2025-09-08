@@ -179,16 +179,19 @@ export default function UnifiedInvoiceRegistrations() {
           if (invoice.membershipType) {
             return `USCF ${invoice.membershipType}`;
           }
+          if (invoice.title) {
+            return invoice.title;
+          }
           return 'Unknown Event';
         };
 
         return {
           ...invoice,
-          id: invoice.id || invoice.invoiceId,
+          id: invoice.id || invoice.invoiceId || invoice.eventId,
           invoiceTitle: getInvoiceTitle(),
-          companyName: invoice.schoolName || invoice.purchaserName || 'Unknown',
-          contactEmail: invoice.sponsorEmail || invoice.purchaserEmail || 'Unknown',
-          totalAmount: invoice.totalInvoiced || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
+          companyName: invoice.schoolName || invoice.purchaserName || invoice.school || 'Unknown',
+          contactEmail: invoice.sponsorEmail || invoice.purchaserEmail || invoice.email || 'Unknown',
+          totalAmount: invoice.totalInvoiced || invoice.totalAmount || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
           status: invoice.invoiceStatus || invoice.status || 'UNKNOWN',
           registrations: registrations,
         };
