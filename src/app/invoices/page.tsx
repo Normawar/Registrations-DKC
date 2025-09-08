@@ -56,7 +56,9 @@ export default function UnifiedInvoiceRegistrations() {
       let invoicesArray = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Filter by role
-      if (profile.role === 'district_coordinator') {
+      if (profile.role === 'organizer') {
+        // Organizer sees all invoices
+      } else if (profile.role === 'district_coordinator') {
           invoicesArray = invoicesArray.filter((inv: any) => inv.district === profile.district);
           if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
             invoicesArray = invoicesArray.filter((inv: any) => inv.gtCoordinatorEmail && inv.gtCoordinatorEmail.trim() !== '');
