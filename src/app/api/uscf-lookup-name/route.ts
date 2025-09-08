@@ -1,9 +1,14 @@
 // app/api/uscf-lookup-name/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const USCF_SERVICE_URL = process.env.USCF_SERVICE_URL || 'https://your-cloud-run-service-url';
+const USCF_SERVICE_URL = process.env.USCF_SERVICE_URL;
 
 export async function POST(request: NextRequest) {
+  if (!USCF_SERVICE_URL) {
+    console.error('USCF_SERVICE_URL is not defined in environment variables.');
+    return NextResponse.json({ error: 'Service is not configured' }, { status: 500 });
+  }
+
   try {
     const body = await request.json();
     
@@ -27,7 +32,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      return NextResponse.json([], { status: 200 });
+      // It's better to return the error from the service if possible
+      const errorData = await response.json().catch(() => ({ error: 'An unknown error occurred' }));
+      return NextResponse.json({ error: errorData.error }, { status: response.status });
     }
 
     const players = await response.json();
