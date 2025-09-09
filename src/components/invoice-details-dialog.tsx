@@ -13,7 +13,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useSponsorProfile, type SponsorProfile } from "@/hooks/use-sponsor-profile";
 import { useMasterDb } from "@/context/master-db-context";
-import { Upload, ExternalLink, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle, UploadCloud } from 'lucide-react';
+import { Upload, ExternalLink, CreditCard, Check, DollarSign, RefreshCw, Loader2, Download, File as FileIcon, X, Trash2, History, MessageSquare, Shield, CheckCircle, UploadCloud, Award } from 'lucide-react';
 import { format } from "date-fns";
 import { updateInvoiceTitle } from '@/ai/flows/update-invoice-title-flow';
 import { recordPayment } from '@/ai/flows/record-payment-flow';
@@ -151,7 +151,7 @@ const SponsorPaymentComponent = () => {
     setPayByCheckAtTournament(false);
     setUploadedFiles([]);
     setFileUrls(prev => {
-      prev.forEach(url => URL.revokeObjectURL(url));
+      prev.forEach(url => URL.createObjectURL(url));
       return [];
     });
   };

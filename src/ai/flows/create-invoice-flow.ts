@@ -141,7 +141,11 @@ const createInvoiceFlow = ai.defineFlow(
       // 1. Registration Line Item
       if (input.players.length > 0) {
           const registrationFee = input.players[0].baseRegistrationFee;
-          const playerNotes = input.players.map((p, index) => `${index + 1}. ${p.playerName} (${p.uscfId})`).join('\n');
+          const playerNotes = input.players.map((p, index) => {
+            const studentType = p.isGtPlayer ? ' (GT)' : '';
+            return `${index + 1}. ${p.playerName} (${p.uscfId})${studentType}`;
+          }).join('\n');
+
           lineItems.push({
               name: `Tournament Registration`,
               quantity: String(input.players.length),

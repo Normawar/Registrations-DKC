@@ -22,24 +22,24 @@ async function updateInvoice() {
   // --- Data extracted from the invoice image ---
   const selectionsData = {
     // Assuming 'NEW' for USCF ID if not available, will need to be updated later.
-    "NEW_Aaliyah_Rodriguez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Alyssa_Cavazos": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Alyssa_Puga": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Devin_Valdez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Diego_Hernandez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Elias_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Elijah_Martinez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Emely_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Hector_Lopez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Jacob_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Joel_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Jorge_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Juan_Marines": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Julian_Cantu": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Matthew_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Sebastian_Salinas": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Victoria_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
-    "NEW_Yolotzin_Martinez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" }
+    "NEW_Aaliyah_Rodriguez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Alyssa_Cavazos": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Alyssa_Puga": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Devin_Valdez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Diego_Hernandez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Elias_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Elijah_Martinez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Emely_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Hector_Lopez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Jacob_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Joel_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Jorge_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Juan_Marines": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Julian_Cantu": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Matthew_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Sebastian_Salinas": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Victoria_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "NEW_Yolotzin_Martinez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" }
   };
   
   const updatedInvoiceData = {
