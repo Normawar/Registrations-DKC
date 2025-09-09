@@ -207,7 +207,7 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
               <SelectContent>
                 {confirmations.map(c => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.eventName} - Invoice #{c.invoiceNumber || c.id.slice(-6)}
+                    {c.invoiceTitle || c.eventName} - #{c.invoiceNumber || c.id.slice(-6)}
                   </SelectItem>
                 ))}
               </SelectContent>
