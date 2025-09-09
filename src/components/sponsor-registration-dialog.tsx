@@ -241,9 +241,29 @@ export function SponsorRegistrationDialog({
         purchaserEmail: profile.email,
       };
       
-      // *** FIX: SAVE TO FIRESTORE 'invoices' COLLECTION ***
-      const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
-      await setDoc(invoiceDocRef, newConfirmation);
+      // Enhanced Firestore save with debugging
+      try {
+        console.log('💾 Attempting to save invoice to Firestore...', result.invoiceId);
+        console.log('🔧 DB object:', !!db);
+        console.log('🔧 newConfirmation data:', newConfirmation);
+        
+        if (!db) {
+          throw new Error('Database connection not available');
+        }
+        
+        const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
+        await setDoc(invoiceDocRef, newConfirmation);
+        
+        console.log('✅ Successfully saved invoice to Firestore!');
+        
+      } catch (firestoreError) {
+        console.error('❌ FIRESTORE SAVE FAILED:', firestoreError);
+        toast({
+          variant: 'destructive',
+          title: 'Warning: Invoice created but not saved to database',
+          description: 'The invoice was sent successfully, but there was an issue saving to the system.'
+        });
+      }
       
       // Also save to localStorage for immediate UI update on sponsor's side
       const existingConfirmations = localStorage.getItem('confirmations');
