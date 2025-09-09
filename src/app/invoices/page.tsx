@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -38,7 +37,7 @@ export default function UnifiedInvoiceRegistrations() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [clientReady, setClientReady] = useState(false);
   const [data, setData] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // Start with loading true
+  const [isLoading, setIsLoading] = useState(false);
   const { profile, isProfileLoaded } = useSponsorProfile();
   const { toast } = useToast();
   const router = useRouter();
@@ -48,14 +47,13 @@ export default function UnifiedInvoiceRegistrations() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadData = useCallback(async () => {
-    // Guard clause moved to useEffect to prevent unnecessary calls
     if (!db || !profile) {
       console.log('❌ Aborting loadData: db or profile not ready.');
       return;
     }
     
     setIsLoading(true);
-    console.log('🎯 === EVENT-BASED INVOICE SEARCH v3.0 ===');
+    console.log('🎯 === UNIFIED INVOICE SEARCH v4.0 ===');
     console.log('Profile:', {
       role: profile.role,
       district: profile.district,
@@ -66,45 +64,41 @@ export default function UnifiedInvoiceRegistrations() {
     try {
       let allInvoiceData: any[] = [];
       
-      const eventsCol = collection(db, 'events');
-      const eventsSnapshot = await getDocs(eventsCol);
-      
-      for (const eventDoc of eventsSnapshot.docs) {
-        const eventData = eventDoc.data();
-        const subCollectionNames = ['confirmations', 'registrations', 'invoices', 'sponsors', 'players'];
-        
-        for (const subName of subCollectionNames) {
-          try {
-            const subCol = collection(eventDoc.ref, subName);
-            const subSnapshot = await getDocs(subCol);
-            
-            if (!subSnapshot.empty) {
-              subSnapshot.docs.forEach((subDoc) => {
-                allInvoiceData.push({
-                  ...subDoc.data(),
-                  id: `${eventDoc.id}-${subDoc.id}`,
-                  originalDocId: subDoc.id,
-                  parentEventId: eventDoc.id,
-                  parentEventName: eventData.name,
-                  parentEventDate: eventData.date,
-                  sourceType: `event-${subName}`,
-                });
-              });
-            }
-          } catch (e) {
-            // Subcollection does not exist, which is normal
-          }
+      // Strategy 1: Fetch from the top-level 'invoices' collection
+      try {
+        const invoicesCol = collection(db, 'invoices');
+        const invoiceSnapshot = await getDocs(invoicesCol);
+        if (!invoiceSnapshot.empty) {
+          const firestoreInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), sourceType: 'firestore-invoices' }));
+          allInvoiceData.push(...firestoreInvoices);
+          console.log(`✅ Found ${firestoreInvoices.length} documents in top-level 'invoices' collection.`);
+        } else {
+          console.log("🟡 No documents found in top-level 'invoices' collection.");
         }
+      } catch (e) {
+        console.error("Error fetching from 'invoices' collection:", e);
       }
-      
-      console.log(`📊 Found ${allInvoiceData.length} potential records in event subcollections.`);
+
+      // Strategy 2: Also check localStorage for confirmations as a fallback/supplement
+      try {
+        const stored = localStorage.getItem('confirmations');
+        if (stored) {
+          const localConfirmations = JSON.parse(stored);
+          console.log(`💾 Found ${localConfirmations.length} items in localStorage 'confirmations'.`);
+          localConfirmations.forEach((item: any) => {
+            allInvoiceData.push({ ...item, id: item.id || `localStorage-${item.invoiceId}`, sourceType: 'localStorage' });
+          });
+        }
+      } catch (e) {
+        console.error("Error reading 'confirmations' from localStorage:", e);
+      }
+
+      console.log(`🔄 Total combined data before deduplication: ${allInvoiceData.length}`);
       
       const uniqueDataMap = new Map();
       allInvoiceData.forEach(item => {
-        const key = item.id || item.confirmationId || item.invoiceId || `${item.sourceType}-${Math.random()}`;
-        if (!uniqueDataMap.has(key)) {
-          uniqueDataMap.set(key, { ...item, id: key });
-        } else {
+        const key = item.id || item.invoiceId;
+        if (key) {
           uniqueDataMap.set(key, { ...uniqueDataMap.get(key), ...item });
         }
       });
@@ -167,7 +161,7 @@ export default function UnifiedInvoiceRegistrations() {
       setData(mapped);
       
     } catch (error) {
-      console.error('❌ Error in event-based search:', error);
+      console.error('❌ Error in unified search:', error);
       toast({ variant: 'destructive', title: 'Error Loading Data', description: 'Failed to load registration data. Please try again.' });
       setData([]);
     } finally {
@@ -177,18 +171,14 @@ export default function UnifiedInvoiceRegistrations() {
 
   const handleManualRefresh = useCallback(async () => {
     await loadData();
-    toast({ title: 'Data Refreshed', description: 'Registration data has been reloaded from all events.' });
+    toast({ title: 'Data Refreshed', description: 'Registration data has been reloaded.' });
   }, [loadData, toast]);
   
-  // FIXED: This now waits for the profile to be loaded before calling loadData
   useEffect(() => {
     if (isProfileLoaded && profile) {
       loadData();
     }
-    // Set clientReady once profile loading is complete, regardless of outcome
-    if (!isProfileLoaded) {
-        setClientReady(true);
-    }
+    setClientReady(true);
   }, [isProfileLoaded, profile, loadData]);
 
   const handleSort = (field: string) => {
@@ -370,11 +360,10 @@ export default function UnifiedInvoiceRegistrations() {
           </Button>
         </div>
 
-        {/* Debug info for development */}
         {process.env.NODE_ENV === 'development' && (
           <Card className="border-blue-200 bg-blue-50">
             <CardHeader>
-              <CardTitle className="text-blue-800">Event-Based Search Active</CardTitle>
+              <CardTitle className="text-blue-800">Unified Search Active</CardTitle>
             </CardHeader>
             <CardContent className="text-sm">
               <div className="grid grid-cols-2 gap-4">
@@ -382,13 +371,10 @@ export default function UnifiedInvoiceRegistrations() {
                   <strong>Profile:</strong> {profile?.role} | {profile?.school} | {profile?.district}
                 </div>
                 <div>
-                  <strong>Data Sources:</strong> Event subcollections + localStorage
+                  <strong>Data Sources:</strong> Firestore 'invoices' collection + localStorage 'confirmations'
                 </div>
                 <div>
                   <strong>Data Found:</strong> {data.length} items | {filteredAndSortedData.length} filtered
-                </div>
-                <div>
-                  <strong>Search Method:</strong> Events → Subcollections → Registration Data
                 </div>
               </div>
             </CardContent>
@@ -495,7 +481,7 @@ export default function UnifiedInvoiceRegistrations() {
           <CardHeader>
             <CardTitle>All Invoices & Registrations</CardTitle>
             <CardDescription>
-              Showing {filteredAndSortedData.length} registration record(s) from event subcollections
+              Showing {filteredAndSortedData.length} registration record(s)
               {isLoading && " (Loading...)"}
             </CardDescription>
           </CardHeader>
