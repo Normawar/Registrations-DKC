@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -186,49 +187,40 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
     onRequestCreated();
   };
 
-  // Replace your existing getInvoiceDisplayTitle function with this corrected version
-const getInvoiceDisplayTitle = (invoice: any): string => {
-  let title = '';
+  const getInvoiceDisplayTitle = (invoice: any): string => {
+    let title = '';
+    
+    const hasContent = (str: any) => str && typeof str === 'string' && str.trim().length > 0;
+    
+    if (hasContent(invoice.invoiceTitle)) {
+      title = invoice.invoiceTitle.trim();
+    }
+    else if (hasContent(invoice.title)) {
+        title = invoice.title.trim();
+    }
+    else if (hasContent(invoice.description)) {
+      title = invoice.description.trim();
+    }
+    else if (hasContent(invoice.purchaserName)) {
+      title = `Registration for ${invoice.purchaserName.trim()}`;
+    }
+    else {
+      title = hasContent(invoice.eventName) ? invoice.eventName.trim() : 'Registration';
+    }
   
-  // Helper function to check if a string has meaningful content
-  const hasContent = (str: any) => str && typeof str === 'string' && str.trim().length > 0;
+    const school = invoice.schoolName;
+    if (hasContent(school) && 
+        school !== 'Individual Registration' && 
+        !title.toLowerCase().includes(school.toLowerCase().trim())) {
+      title = `${title} - ${school.trim()}`;
+    }
   
-  // Priority 1: Square API 'title' field (this is where Square stores the main title)
-  if (hasContent(invoice.title)) {
-    title = invoice.title.trim();
-  }
-  // Priority 2: Custom invoiceTitle field (for backward compatibility)
-  else if (hasContent(invoice.invoiceTitle)) {
-    title = invoice.invoiceTitle.trim();
-  }
-  // Priority 3: description field
-  else if (hasContent(invoice.description)) {
-    title = invoice.description.trim();
-  }
-  // Priority 4: purchaser name
-  else if (hasContent(invoice.purchaserName)) {
-    title = `Registration for ${invoice.purchaserName.trim()}`;
-  }
-  // Fallback: event name
-  else {
-    title = hasContent(invoice.eventName) ? invoice.eventName.trim() : 'Registration';
-  }
-
-  // Add school if it exists and adds meaningful information
-  const school = invoice.schoolName;
-  if (hasContent(school) && 
-      school !== 'Individual Registration' && 
-      !title.toLowerCase().includes(school.toLowerCase().trim())) {
-    title = `${title} - ${school.trim()}`;
-  }
-
-  // Add invoice number for uniqueness
-  const invoiceNum = hasContent(invoice.invoiceNumber) 
-    ? invoice.invoiceNumber.trim()
-    : (invoice.id ? invoice.id.slice(-6) : 'N/A');
-  
-  return `${title} - #${invoiceNum}`;
-};
+    const invoiceNum = hasContent(invoice.invoiceNumber) 
+      ? invoice.invoiceNumber.trim()
+      : (invoice.id ? invoice.id.slice(-6) : 'N/A');
+    
+    return `${title} - #${invoiceNum}`;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
