@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -508,3 +509,5 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         </div>
     );
 }
+
+    
