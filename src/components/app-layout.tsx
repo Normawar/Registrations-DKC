@@ -74,6 +74,7 @@ const organizerMenuItems = [
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/organizers/vouchers", icon: FileText, label: "Voucher Management" },
   { href: "/previous-events", icon: History, label: "Previous Events" },
+  { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
 ];
 
 const individualMenuItems = [
