@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,9 +13,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useMasterDb } from '@/context/master-db-context';
 import Papa from 'papaparse';
 import { format } from 'date-fns';
-import { Upload, Download, UserPlus, FileText, CheckCircle } from 'lucide-react';
-import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { Upload, Download, UserPlus, FileText, CheckCircle, Loader2 } from 'lucide-react';
+import { collection, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
 
 interface VoucherAssignment {
   id: string;
@@ -32,16 +34,20 @@ interface VoucherAssignment {
   playerAddress?: string;
   playerBirthDate?: string;
   playerGender?: string;
+  proofFileName?: string;
+  proofFileUrl?: string;
 }
 
 export default function VoucherManagementPage() {
   const { toast } = useToast();
   const { database, updatePlayer } = useMasterDb();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const proofFileInputRef = useRef<HTMLInputElement>(null);
   
   const [availableVouchers, setAvailableVouchers] = useState<string[]>([]);
   const [pendingMemberships, setPendingMemberships] = useState<any[]>([]);
   const [assignedVouchers, setAssignedVouchers] = useState<VoucherAssignment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Load data from Firestore on component mount
   const loadData = async () => {
@@ -194,6 +200,34 @@ export default function VoucherManagementPage() {
     
     toast({ title: "Vouchers Assigned Successfully" });
   };
+  
+  const handleProofUpload = async (file: File, assignmentId: string) => {
+    if (!db || !storage) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Firebase not configured for uploads.' });
+        return;
+    }
+
+    setIsUploading(true);
+    try {
+        const storageRef = ref(storage, `voucher-proofs/${assignmentId}/${file.name}`);
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+
+        const assignmentRef = doc(db, 'assignedVouchers', assignmentId);
+        await updateDoc(assignmentRef, {
+            proofFileUrl: downloadURL,
+            proofFileName: file.name
+        });
+        
+        await loadData(); // Refresh data to show new file link
+        toast({ title: 'Upload Successful', description: `Proof for voucher ${assignmentId.slice(0, 8)} uploaded.` });
+    } catch (error) {
+        console.error("Failed to upload proof:", error);
+        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload the file.' });
+    } finally {
+        setIsUploading(false);
+    }
+  };
 
   const updatePlayerUscfId = async (assignmentId: string, newUscfId: string) => {
     if (!db) return;
@@ -227,6 +261,7 @@ export default function VoucherManagementPage() {
       'Birth Date': assignment.playerBirthDate || '',
       'Gender': assignment.playerGender || '',
       'Assigned Date': format(new Date(assignment.assignedDate), 'yyyy-MM-dd'),
+      'Proof URL': assignment.proofFileUrl || 'N/A',
       'USCF ID': ''
     }));
 
@@ -345,7 +380,7 @@ export default function VoucherManagementPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Upload Voucher File</CardTitle>
-                <CardDescription>Upload a PDF, CSV, or text file containing USCF voucher numbers. The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX.</CardDescription>
+                <CardDescription>Upload a PDF, CSV, or text file containing USCF voucher numbers. The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-center w-full">
@@ -420,13 +455,38 @@ export default function VoucherManagementPage() {
                 </div>
                 {assignedVouchers.filter(v => !v.uscfIdAssigned).length > 0 ? (
                   <Table>
-                    <TableHeader><TableRow><TableHead>Player Name</TableHead><TableHead>Voucher Number</TableHead><TableHead>Type</TableHead><TableHead>USCF ID</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Voucher</TableHead><TableHead>Type</TableHead><TableHead>Proof</TableHead><TableHead>USCF ID</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {assignedVouchers.filter(v => !v.uscfIdAssigned).map(assignment => (
                         <TableRow key={assignment.id}>
                           <TableCell>{assignment.playerName}</TableCell>
                           <TableCell className="font-mono text-sm">{assignment.voucherNumber}</TableCell>
                           <TableCell><Badge variant={assignment.membershipType === 'new' ? 'default' : 'secondary'}>{assignment.membershipType}</Badge></TableCell>
+                           <TableCell>
+                                {assignment.proofFileUrl ? (
+                                    <Button asChild variant="link" size="sm">
+                                        <a href={assignment.proofFileUrl} target="_blank" rel="noopener noreferrer">View Proof</a>
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <input 
+                                            type="file" 
+                                            className="hidden" 
+                                            ref={proofFileInputRef}
+                                            onChange={(e) => e.target.files && handleProofUpload(e.target.files[0], assignment.id)} 
+                                            accept="image/*,application/pdf"
+                                        />
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => proofFileInputRef.current?.click()}
+                                            disabled={isUploading}
+                                        >
+                                            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                        </Button>
+                                    </>
+                                )}
+                            </TableCell>
                           <TableCell>
                             <Input placeholder="Enter USCF ID" className="w-32" onBlur={(e) => { if (e.target.value.trim()) { updatePlayerUscfId(assignment.id, e.target.value.trim()); e.target.value = ''; } }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
                           </TableCell>
