@@ -15,9 +15,7 @@ import Papa from 'papaparse';
 import { format } from 'date-fns';
 import { Upload, Download, UserPlus, FileText, CheckCircle, Loader2 } from 'lucide-react';
 import { collection, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-
+import { db } from '@/lib/firebase';
 
 interface VoucherAssignment {
   id: string;
@@ -42,12 +40,12 @@ export default function VoucherManagementPage() {
   const { toast } = useToast();
   const { database, updatePlayer } = useMasterDb();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const proofFileInputRef = useRef<HTMLInputElement>(null);
   
   const [availableVouchers, setAvailableVouchers] = useState<string[]>([]);
   const [pendingMemberships, setPendingMemberships] = useState<any[]>([]);
   const [assignedVouchers, setAssignedVouchers] = useState<VoucherAssignment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Load data from Firestore on component mount
   const loadData = async () => {
@@ -79,26 +77,24 @@ export default function VoucherManagementPage() {
     const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
 
     const pending = [];
+    const assignedPlayerIds = new Set(assignedVouchers.map(v => v.playerId));
     
-    allConfirmations.forEach(confirmation => {
-      Object.entries(confirmation.selections || {}).forEach(([playerId, selection]: [string, any]) => {
-        if (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing') {
+    for (const confirmation of allConfirmations) {
+      for (const [playerId, selection] of Object.entries(confirmation.selections || {})) {
+        if ((selection as any).uscfStatus === 'new' || (selection as any).uscfStatus === 'renewing') {
           const player = database.find(p => p.id === playerId);
-          if (player) {
-            const existingAssignment = assignedVouchers.find(v => v.playerId === playerId);
-            if (!existingAssignment) {
-              pending.push({
-                playerId,
-                player,
-                confirmation,
-                selection,
-                membershipType: selection.uscfStatus
-              });
-            }
+          if (player && !assignedPlayerIds.has(playerId)) {
+            pending.push({
+              playerId,
+              player,
+              confirmation,
+              selection,
+              membershipType: (selection as any).uscfStatus
+            });
           }
         }
-      });
-    });
+      }
+    }
     setPendingMemberships(pending);
   }, [database, assignedVouchers]);
 
@@ -123,13 +119,16 @@ export default function VoucherManagementPage() {
     const file = event.target.files?.[0];
     if (!file || !db) return;
 
+    setIsUploading(true);
     try {
         let extractedVouchers: string[] = [];
         const text = await file.text();
         extractedVouchers = extractVoucherNumbers(text);
 
         if (extractedVouchers.length === 0) {
-            toast({ title: "No Vouchers Found", variant: "destructive" }); return;
+            toast({ title: "No Vouchers Found", description: "The uploaded file did not contain any valid voucher numbers.", variant: "destructive" });
+            setIsUploading(false);
+            return;
         }
 
         const newVouchers = [...new Set([...availableVouchers, ...extractedVouchers])];
@@ -142,13 +141,14 @@ export default function VoucherManagementPage() {
         await batch.commit();
 
         setAvailableVouchers(newVouchers);
-        toast({ title: "Vouchers Uploaded Successfully" });
+        toast({ title: "Vouchers Uploaded Successfully", description: `${extractedVouchers.length} new voucher numbers were added.` });
 
     } catch (error) {
-        toast({ title: "Upload Error", variant: "destructive" });
+        toast({ title: "Upload Error", variant: "destructive", description: "Could not read or process the file." });
     }
 
     if (fileInputRef.current) fileInputRef.current.value = '';
+    setIsUploading(false);
   };
 
   const autoAssignVouchers = async () => {
@@ -159,7 +159,7 @@ export default function VoucherManagementPage() {
 
     const unassigned = pendingMemberships.filter(p => !assignedVouchers.find(av => av.playerId === p.playerId));
     if (unassigned.length === 0) {
-      toast({ title: "No Pending Memberships" }); return;
+      toast({ title: "No Pending Memberships to Assign" }); return;
     }
 
     const assignmentsToMake = Math.min(unassigned.length, availableVouchers.length);
@@ -177,9 +177,8 @@ export default function VoucherManagementPage() {
         eventName: membership.confirmation.eventName,
         playerEmail: membership.player.email,
         playerPhone: membership.player.phone,
-        playerAddress: `${membership.player.address || ''} ${membership.player.city || ''} ${membership.player.state || ''} ${membership.player.zip || ''}`.trim(),
-        playerBirthDate: membership.player.birthDate,
-        playerGender: membership.player.gender
+        playerAddress: `${membership.player.address || ''} ${membership.player.city || ''} ${membership.player.state || ''} ${membership.player.zipCode || ''}`.trim(),
+        playerBirthDate: membership.player.dob,
       });
     });
 
@@ -198,41 +197,18 @@ export default function VoucherManagementPage() {
     await batch.commit();
     await loadData();
     
-    toast({ title: "Vouchers Assigned Successfully" });
+    toast({ title: "Vouchers Assigned Successfully", description: `${newAssignments.length} vouchers have been assigned.` });
   };
   
-  const handleProofUpload = async (file: File, assignmentId: string) => {
-    if (!db || !storage) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Firebase not configured for uploads.' });
+  const updatePlayerUscfId = async (assignmentId: string, newUscfId: string) => {
+    if (!db || !newUscfId.trim()) return;
+    
+    setIsProcessing(true);
+    const assignment = assignedVouchers.find(v => v.id === assignmentId);
+    if (!assignment) {
+        setIsProcessing(false);
         return;
     }
-
-    setIsUploading(true);
-    try {
-        const storageRef = ref(storage, `voucher-proofs/${assignmentId}/${file.name}`);
-        await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(storageRef);
-
-        const assignmentRef = doc(db, 'assignedVouchers', assignmentId);
-        await updateDoc(assignmentRef, {
-            proofFileUrl: downloadURL,
-            proofFileName: file.name
-        });
-        
-        await loadData(); // Refresh data to show new file link
-        toast({ title: 'Upload Successful', description: `Proof for voucher ${assignmentId.slice(0, 8)} uploaded.` });
-    } catch (error) {
-        console.error("Failed to upload proof:", error);
-        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload the file.' });
-    } finally {
-        setIsUploading(false);
-    }
-  };
-
-  const updatePlayerUscfId = async (assignmentId: string, newUscfId: string) => {
-    if (!db) return;
-    const assignment = assignedVouchers.find(v => v.id === assignmentId);
-    if (!assignment || !newUscfId.trim()) return;
 
     const player = database.find(p => p.id === assignment.playerId);
     if (player) {
@@ -240,16 +216,22 @@ export default function VoucherManagementPage() {
       
       const updatedAssignment = { ...assignment, uscfIdAssigned: newUscfId.trim(), processedDate: new Date().toISOString() };
       const docRef = doc(db, 'assignedVouchers', assignmentId);
-      await writeBatch(db).update(docRef, updatedAssignment).commit();
+      await updateDoc(docRef, updatedAssignment);
       
       setAssignedVouchers(prev => prev.map(v => v.id === assignmentId ? updatedAssignment : v));
       toast({ title: "USCF ID Updated" });
     }
+    setIsProcessing(false);
   };
 
   const exportProcessingReport = () => {
     const unprocessed = assignedVouchers.filter(v => !v.uscfIdAssigned);
     
+    if (unprocessed.length === 0) {
+        toast({ title: 'Nothing to Export', description: 'There are no vouchers pending processing.' });
+        return;
+    }
+
     const csvData = unprocessed.map(assignment => ({
       'Player Name': assignment.playerName,
       'Voucher Number': assignment.voucherNumber,
@@ -258,10 +240,9 @@ export default function VoucherManagementPage() {
       'Email': assignment.playerEmail || '',
       'Phone': assignment.playerPhone || '',
       'Address': assignment.playerAddress || '',
-      'Birth Date': assignment.playerBirthDate || '',
+      'Birth Date': assignment.playerBirthDate ? format(new Date(assignment.playerBirthDate), 'yyyy-MM-dd') : '',
       'Gender': assignment.playerGender || '',
       'Assigned Date': format(new Date(assignment.assignedDate), 'yyyy-MM-dd'),
-      'Proof URL': assignment.proofFileUrl || 'N/A',
       'USCF ID': ''
     }));
 
@@ -380,7 +361,7 @@ export default function VoucherManagementPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Upload Voucher File</CardTitle>
-                <CardDescription>Upload a PDF, CSV, or text file containing USCF voucher numbers. The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.</CardDescription>
+                <CardDescription>Upload a text-based file (TXT, CSV) containing USCF voucher numbers. The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-center w-full">
@@ -388,9 +369,9 @@ export default function VoucherManagementPage() {
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                       <Upload className="w-8 h-8 mb-4 text-gray-500" />
                       <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                      <p className="text-xs text-gray-500">PDF, CSV, or TXT files</p>
+                      <p className="text-xs text-gray-500">TXT or CSV files only</p>
                     </div>
-                    <input ref={fileInputRef} id="voucher-upload" type="file" className="hidden" accept=".pdf,.csv,.txt" onChange={handleFileUpload} />
+                    <input ref={fileInputRef} id="voucher-upload" type="file" className="hidden" accept=".csv,.txt" onChange={handleFileUpload} disabled={isUploading} />
                   </label>
                 </div>
                 {availableVouchers.length > 0 && (
@@ -455,40 +436,15 @@ export default function VoucherManagementPage() {
                 </div>
                 {assignedVouchers.filter(v => !v.uscfIdAssigned).length > 0 ? (
                   <Table>
-                    <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Voucher</TableHead><TableHead>Type</TableHead><TableHead>Proof</TableHead><TableHead>USCF ID</TableHead></TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Voucher</TableHead><TableHead>Type</TableHead><TableHead>USCF ID</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {assignedVouchers.filter(v => !v.uscfIdAssigned).map(assignment => (
                         <TableRow key={assignment.id}>
                           <TableCell>{assignment.playerName}</TableCell>
                           <TableCell className="font-mono text-sm">{assignment.voucherNumber}</TableCell>
                           <TableCell><Badge variant={assignment.membershipType === 'new' ? 'default' : 'secondary'}>{assignment.membershipType}</Badge></TableCell>
-                           <TableCell>
-                                {assignment.proofFileUrl ? (
-                                    <Button asChild variant="link" size="sm">
-                                        <a href={assignment.proofFileUrl} target="_blank" rel="noopener noreferrer">View Proof</a>
-                                    </Button>
-                                ) : (
-                                    <>
-                                        <input 
-                                            type="file" 
-                                            className="hidden" 
-                                            ref={proofFileInputRef}
-                                            onChange={(e) => e.target.files && handleProofUpload(e.target.files[0], assignment.id)} 
-                                            accept="image/*,application/pdf"
-                                        />
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            onClick={() => proofFileInputRef.current?.click()}
-                                            disabled={isUploading}
-                                        >
-                                            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                                        </Button>
-                                    </>
-                                )}
-                            </TableCell>
                           <TableCell>
-                            <Input placeholder="Enter USCF ID" className="w-32" onBlur={(e) => { if (e.target.value.trim()) { updatePlayerUscfId(assignment.id, e.target.value.trim()); e.target.value = ''; } }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+                            <Input placeholder="Enter USCF ID" className="w-32" disabled={isProcessing} onBlur={(e) => { if (e.target.value.trim()) { updatePlayerUscfId(assignment.id, e.target.value.trim()); e.target.value = ''; } }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
                           </TableCell>
                         </TableRow>
                       ))}
