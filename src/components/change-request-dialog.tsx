@@ -51,16 +51,12 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
 
           let userConfirmations: any[] = [];
           
-          if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
-            if (profile.isDistrictCoordinator) {
-              // District coordinator sees all invoices in their district
-              userConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
-            } else {
-              // Standard sponsor sees only their school's invoices
-              userConfirmations = allConfirmations.filter((c: any) => c.schoolName === profile.school && c.district === profile.district);
-            }
+          if (profile.role === 'district_coordinator') {
+            userConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
+          } else if (profile.role === 'sponsor') {
+            // A sponsor should only see invoices they have created.
+            userConfirmations = allConfirmations.filter((c: any) => c.sponsorEmail === profile.email);
           } else if (profile.role === 'individual') {
-            // Individual user sees invoices matching their email
             userConfirmations = allConfirmations.filter((c: any) => c.parentEmail === profile.email);
           }
           
