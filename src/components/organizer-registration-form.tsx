@@ -72,7 +72,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 // --- Types and Schemas ---
 
@@ -167,10 +167,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
 
         return () => clearTimeout(handler);
     }, [searchQuery, masterDatabase]);
-
-    if (!event) {
-        return <Card><CardContent className='pt-6'>Event not found. Please go back to Manage Events and select an event.</CardContent></Card>;
-    }
     
     const handleSelectSearchedPlayer = (player: MasterPlayer) => {
         setSearchQuery('');
@@ -192,6 +188,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     };
 
     const handlePlayerFormSubmit = (values: PlayerFormValues) => {
+        if (!event) return;
         const eventDate = new Date(event.date);
         const isExpired = !values.uscfExpiration || values.uscfExpiration < eventDate;
         const uscfStatus = values.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
@@ -228,6 +225,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     };
 
     const handleGenerateInvoice = async (recipient: InvoiceRecipientValues) => {
+        if (!event || !db) return;
         setIsSubmitting(true);
         let registrationFeePerPlayer = event.regularFee;
         const eventDate = new Date(event.date);
@@ -277,7 +275,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             
             toast({ title: "Invoice Generated Successfully!", description: `Invoice ${result.invoiceNumber || result.invoiceId} for ${stagedPlayers.length} players has been created.` });
             
-            // Reset state
             setStagedPlayers([]);
             setIsInvoiceDialogOpen(false);
             
@@ -291,6 +288,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     };
     
     const handleCompRegistration = async (recipient: InvoiceRecipientValues) => {
+        if (!event || !db) return;
         setIsSubmitting(true);
         try {
             const confirmationId = `COMP_${Date.now()}`;
@@ -328,6 +326,10 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             setIsSubmitting(false);
         }
     };
+
+    if (!event) {
+        return <Card><CardContent className='pt-6'>Event not found. Please go back to Manage Events and select an event.</CardContent></Card>;
+    }
 
     return (
         <div className="space-y-8">
@@ -509,5 +511,3 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         </div>
     );
 }
-
-    
