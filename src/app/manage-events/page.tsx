@@ -486,31 +486,27 @@ export default function ManageEventsPage() {
       toast({ variant: 'destructive', title: 'Loading...', description: 'Player database is still loading, please try again in a moment.'});
       return;
     }
-
+  
+    // Fetch all invoices from Firestore
     const invoicesCol = collection(db, 'invoices');
     const invoiceSnapshot = await getDocs(invoicesCol);
-    const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
-  
-    const latestConfirmationsMap = new Map<string, StoredConfirmation>();
-    for (const conf of allConfirmations) {
-        const key = conf.invoiceId || conf.id;
-        const existing = latestConfirmationsMap.get(key);
-        if (!existing || new Date(conf.submissionTimestamp) > new Date(existing.submissionTimestamp)) {
-            latestConfirmationsMap.set(key, conf as StoredConfirmation);
-        }
-    }
-    const latestConfirmations = Array.from(latestConfirmationsMap.values());
+    const allConfirmations: StoredConfirmation[] = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as StoredConfirmation[];
   
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
   
-    for (const conf of latestConfirmations) {
+    for (const conf of allConfirmations) {
       if (conf.eventId === event.id) {
         for (const playerId in conf.selections) {
             const registrationDetails = conf.selections[playerId];
             const player = playerMap.get(playerId);
             if (player) {
-                uniquePlayerRegistrations.set(playerId, { player, details: registrationDetails, invoiceId: conf.invoiceId, invoiceNumber: conf.invoiceNumber });
+                uniquePlayerRegistrations.set(playerId, { 
+                    player, 
+                    details: registrationDetails, 
+                    invoiceId: conf.invoiceId, 
+                    invoiceNumber: conf.invoiceNumber 
+                });
             }
         }
       }
