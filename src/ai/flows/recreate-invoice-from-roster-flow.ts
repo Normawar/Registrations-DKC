@@ -21,6 +21,7 @@ const PlayerToInvoiceSchema = z.object({
   baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
   lateFee: z.number().describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
+  isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
 });
 
 const RecreateInvoiceInputSchema = z.object({
@@ -140,3 +141,5 @@ const recreateInvoiceFlow = ai.defineFlow(
     }
   }
 );
+
+    

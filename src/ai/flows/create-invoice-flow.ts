@@ -169,19 +169,24 @@ const createInvoiceFlow = ai.defineFlow(
           });
       }
 
-      // 3. USCF Membership Line Item
+      // 3. USCF Membership Line Item (with PSJA GT exception)
       const uscfActionPlayers = input.players.filter(p => {
           if (!p.uscfAction) return false;
-          // For PSJA district, only charge for USCF if the player is NOT a GT player
-          if (input.district === 'PHARR-SAN JUAN-ALAMO ISD') {
-              return !p.isGtPlayer;
+          // For PSJA district, ONLY charge for USCF if the player is NOT a GT player
+          if (input.district === 'PHARR-SAN JUAN-ALAMO ISD' && p.isGtPlayer) {
+              return false; // Do not charge GT players from PSJA
           }
-          // For all other districts, charge if uscfAction is true
+          // For all other districts or non-GT PSJA players, charge if uscfAction is true
           return true;
       });
 
       if (uscfActionPlayers.length > 0) {
           const uscfPlayerNotes = uscfActionPlayers.map((p, index) => `${index + 1}. ${p.playerName}`).join('\n');
+          let note = `Applies to players needing USCF membership.\n${uscfPlayerNotes}`;
+          if(input.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+            note = `Applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`;
+          }
+
           lineItems.push({
               name: 'USCF Membership (New/Renew)',
               quantity: String(uscfActionPlayers.length),
@@ -189,7 +194,7 @@ const createInvoiceFlow = ai.defineFlow(
                   amount: BigInt(Math.round(input.uscfFee * 100)),
                   currency: 'USD',
               },
-              note: `This fee applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`,
+              note: note,
           });
       }
 
@@ -294,3 +299,5 @@ const createInvoiceFlow = ai.defineFlow(
     }
   }
 );
+
+    
