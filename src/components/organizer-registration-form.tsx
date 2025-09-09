@@ -517,3 +517,5 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         </div>
     );
 }
+
+    
