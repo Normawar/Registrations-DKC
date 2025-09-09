@@ -32,6 +32,9 @@ type User = {
     school?: string;
     district?: string;
     isDistrictCoordinator?: boolean;
+    phone?: string;
+    bookkeeperEmail?: string;
+    gtCoordinatorEmail?: string;
 };
 
 const userFormSchema = z.object({
@@ -42,6 +45,9 @@ const userFormSchema = z.object({
   school: z.string().optional(),
   district: z.string().optional(),
   isDistrictCoordinator: z.boolean().optional(),
+  phone: z.string().optional(),
+  bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+  gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -116,6 +122,9 @@ export default function UsersPage() {
             school: editingUser.school || '',
             district: initialDistrict,
             isDistrictCoordinator: editingUser.isDistrictCoordinator || false,
+            phone: editingUser.phone || '',
+            bookkeeperEmail: editingUser.bookkeeperEmail || '',
+            gtCoordinatorEmail: editingUser.gtCoordinatorEmail || '',
         });
         handleDistrictChange(initialDistrict, false);
       }
@@ -230,6 +239,7 @@ export default function UsersPage() {
                                     <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="role" render={({ field }) => (
                                         <FormItem><FormLabel>Role</FormLabel>
                                         <Select onValueChange={(value) => form.setValue('role', value as User['role'])} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
@@ -290,6 +300,8 @@ export default function UsersPage() {
                                             <FormMessage />
                                         </FormItem>
                                     )} />
+                                    <FormField control={form.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper Email</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                 </form>
                             </Form>
                         </div>
