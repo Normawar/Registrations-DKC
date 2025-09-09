@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -187,30 +186,49 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
     onRequestCreated();
   };
 
-  const getInvoiceDisplayTitle = (invoice: any): string => {
-    // 1. Start with the most specific title if available.
-    let title = invoice.invoiceTitle || invoice.description;
+  // Replace your existing getInvoiceDisplayTitle function with this corrected version
+const getInvoiceDisplayTitle = (invoice: any): string => {
+  let title = '';
+  
+  // Helper function to check if a string has meaningful content
+  const hasContent = (str: any) => str && typeof str === 'string' && str.trim().length > 0;
+  
+  // Priority 1: Square API 'title' field (this is where Square stores the main title)
+  if (hasContent(invoice.title)) {
+    title = invoice.title.trim();
+  }
+  // Priority 2: Custom invoiceTitle field (for backward compatibility)
+  else if (hasContent(invoice.invoiceTitle)) {
+    title = invoice.invoiceTitle.trim();
+  }
+  // Priority 3: description field
+  else if (hasContent(invoice.description)) {
+    title = invoice.description.trim();
+  }
+  // Priority 4: purchaser name
+  else if (hasContent(invoice.purchaserName)) {
+    title = `Registration for ${invoice.purchaserName.trim()}`;
+  }
+  // Fallback: event name
+  else {
+    title = hasContent(invoice.eventName) ? invoice.eventName.trim() : 'Registration';
+  }
 
-    // 2. If no specific title, use the purchaser's name.
-    if (!title && invoice.purchaserName) {
-        title = `Registration for ${invoice.purchaserName}`;
-    }
+  // Add school if it exists and adds meaningful information
+  const school = invoice.schoolName;
+  if (hasContent(school) && 
+      school !== 'Individual Registration' && 
+      !title.toLowerCase().includes(school.toLowerCase().trim())) {
+    title = `${title} - ${school.trim()}`;
+  }
 
-    // 3. As a last resort for title, use the event name.
-    if (!title) {
-        title = invoice.eventName || 'Registration';
-    }
-
-    // 4. Append school name if it exists and is different from the title.
-    const school = invoice.schoolName;
-    if (school && school !== 'Individual Registration' && !title.includes(school)) {
-        title = `${title} - ${school}`;
-    }
-
-    // 5. Always append the unique invoice number for clarity.
-    const invoiceNum = invoice.invoiceNumber || invoice.id?.slice(-6);
-    return `${title} - #${invoiceNum}`;
-  };
+  // Add invoice number for uniqueness
+  const invoiceNum = hasContent(invoice.invoiceNumber) 
+    ? invoice.invoiceNumber.trim()
+    : (invoice.id ? invoice.id.slice(-6) : 'N/A');
+  
+  return `${title} - #${invoiceNum}`;
+};
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
