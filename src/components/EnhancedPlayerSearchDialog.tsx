@@ -15,13 +15,13 @@ interface USCFPlayer {
 export function EnhancedPlayerSearchDialog({ 
   isOpen, 
   onOpenChange, 
-  onSelectPlayer,
+  onPlayerSelected,
   excludeIds = [],
   title = "Search Master Player Database"
 }: {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onSelectPlayer: (player: MasterPlayer | USCFPlayer) => void;
+  onPlayerSelected: (player: MasterPlayer | USCFPlayer) => void;
   excludeIds?: string[];
   title?: string;
 }) {
@@ -145,7 +145,7 @@ export function EnhancedPlayerSearchDialog({
   };
 
   const handleSelectPlayer = (player: MasterPlayer | USCFPlayer) => {
-    onSelectPlayer(player);
+    onPlayerSelected(player);
     onOpenChange(false);
   };
 

@@ -190,24 +190,6 @@ function SponsorRosterView() {
     setIsEditPlayerDialogOpen(true);
   };
   
-  const handleSelectPlayer = (player: any) => {
-    const isMasterPlayer = 'uscfId' in player;
-    const playerToAdd: Partial<MasterPlayer> = isMasterPlayer ? 
-      player : 
-      {
-        id: player.uscf_id,
-        uscfId: player.uscf_id,
-        firstName: player.name.split(' ')[0],
-        lastName: player.name.split(' ').slice(1).join(' '),
-        regularRating: player.rating_regular,
-        state: player.state,
-        uscfExpiration: player.expiration_date,
-      };
-
-    addPlayer(playerToAdd as MasterPlayer);
-    toast({ title: "Player Added", description: `${playerToAdd.firstName} ${playerToAdd.lastName} has been added to your roster.` });
-  };
-
   const handlePlayerSelectedForEdit = (player: any) => {
     const isMasterPlayer = 'uscfId' in player;
     const playerToEdit: MasterPlayer = isMasterPlayer ? player : {
@@ -563,7 +545,7 @@ function SponsorRosterView() {
       <EnhancedPlayerSearchDialog 
           isOpen={isSearchDialogOpen}
           onOpenChange={setIsSearchDialogOpen}
-          onSelectPlayer={handlePlayerSelectedForEdit}
+          onPlayerSelected={handlePlayerSelectedForEdit}
           excludeIds={rosterPlayerIds}
           title="Add Player to Roster"
       />
