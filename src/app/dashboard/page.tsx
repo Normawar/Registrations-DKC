@@ -23,34 +23,76 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { format, isSameDay } from "date-fns";
 import { Info, FileText, ImageIcon, Lock } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { useMasterDb } from "@/context/master-db-context";
-import { useSponsorProfile, type SponsorProfile } from "@/hooks/use-sponsor-profile";
+import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dialog";
 import { SponsorGuard } from "@/components/auth-guard";
-
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/services/firestore-service";
 
 function DashboardContent() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
-  const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
+  const { profile } = useSponsorProfile();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [clientReady, setClientReady] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   useEffect(() => {
-    // This ensures client-specific code runs only after mounting
     setClientReady(true);
     setSelectedDate(new Date());
   }, []);
+
+  const loadRecentActivity = useCallback(async () => {
+    if (!db || !profile) return;
+
+    const invoicesCol = collection(db, 'invoices');
+    const invoiceSnapshot = await getDocs(invoicesCol);
+    const allInvoices = invoiceSnapshot.docs.map(doc => doc.data());
+
+    let userInvoices;
+    if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+      userInvoices = allInvoices.filter(inv => inv.district === profile.district && inv.schoolName === profile.school);
+    } else {
+      userInvoices = allInvoices;
+    }
+    
+    const activity = userInvoices
+      .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime())
+      .slice(0, 5)
+      .map(inv => {
+        const firstPlayerName = Object.keys(inv.selections || {}).length > 0
+          ? allPlayers.find(p => p.id === Object.keys(inv.selections)[0])?.firstName || 'Unknown Player'
+          : 'N/A';
+        
+        return {
+          id: inv.id,
+          player: firstPlayerName,
+          email: inv.purchaserEmail,
+          event: inv.eventName,
+          status: inv.invoiceStatus,
+          date: inv.submissionTimestamp,
+        };
+      });
+
+    setRecentActivity(activity);
+  }, [profile, allPlayers]);
+  
+  useEffect(() => {
+    if(profile && allPlayers.length > 0) {
+      loadRecentActivity();
+    }
+  }, [profile, allPlayers, loadRecentActivity]);
 
   const rosterPlayers = useMemo(() => {
     if (!profile || profile.role !== 'sponsor') return [];
@@ -75,6 +117,20 @@ function DashboardContent() {
   const handleRegisterClick = (event: any) => {
     setSelectedEvent(event);
     setIsRegistrationDialogOpen(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch(status?.toUpperCase()) {
+        case 'PAID':
+        case 'COMPED':
+            return <Badge variant="default" className="bg-green-600">Paid</Badge>
+        case 'UNPAID':
+            return <Badge variant="destructive">Unpaid</Badge>
+        case 'CANCELED':
+            return <Badge variant="secondary">Canceled</Badge>
+        default:
+            return <Badge variant="outline">{status || 'Draft'}</Badge>
+    }
   };
 
   return (
@@ -233,52 +289,32 @@ function DashboardContent() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Player</TableHead>
+                    <TableHead>Player(s)</TableHead>
                     <TableHead>Event</TableHead>
-                    <TableHead>Activity</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead className="text-right">Date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell>
-                      <div className="font-medium">Liam Johnson</div>
-                      <div className="text-sm text-muted-foreground">
-                        liam@example.com
-                      </div>
-                    </TableCell>
-                    <TableCell>Spring Open 2024</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">Registered</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">2024-05-23</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="font-medium">Olivia Smith</div>
-                      <div className="text-sm text-muted-foreground">
-                        olivia@example.com
-                      </div>
-                    </TableCell>
-                    <TableCell>Summer Championship</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">Invoiced</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">2024-05-22</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>
-                      <div className="font-medium">Noah Williams</div>
-                      <div className="text-sm text-muted-foreground">
-                        noah@example.com
-                      </div>
-                    </TableCell>
-                    <TableCell>Spring Open 2024</TableCell>
-                    <TableCell>
-                      <Badge variant="destructive">Withdrew</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">2024-05-21</TableCell>
-                  </TableRow>
+                 {recentActivity.length === 0 ? (
+                    <TableRow>
+                        <TableCell colSpan={4} className="text-center h-24">No recent activity.</TableCell>
+                    </TableRow>
+                 ) : (
+                    recentActivity.map(activity => (
+                        <TableRow key={activity.id}>
+                            <TableCell>
+                                <div className="font-medium">{activity.player}</div>
+                                <div className="text-sm text-muted-foreground">
+                                    {activity.email}
+                                </div>
+                            </TableCell>
+                            <TableCell>{activity.event}</TableCell>
+                            <TableCell>{getStatusBadge(activity.status)}</TableCell>
+                            <TableCell className="text-right">{format(new Date(activity.date), 'PP')}</TableCell>
+                        </TableRow>
+                    ))
+                 )}
                 </TableBody>
               </Table>
             </Card>

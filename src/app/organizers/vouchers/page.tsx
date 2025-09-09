@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -13,6 +14,8 @@ import { useMasterDb } from '@/context/master-db-context';
 import Papa from 'papaparse';
 import { format } from 'date-fns';
 import { Upload, Download, UserPlus, FileText, CheckCircle } from 'lucide-react';
+import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 interface VoucherAssignment {
   id: string;
@@ -39,22 +42,39 @@ export default function VoucherManagementPage() {
   const [availableVouchers, setAvailableVouchers] = useState<string[]>([]);
   const [pendingMemberships, setPendingMemberships] = useState<any[]>([]);
   const [assignedVouchers, setAssignedVouchers] = useState<VoucherAssignment[]>([]);
-  const [processingVouchers, setProcessingVouchers] = useState<VoucherAssignment[]>([]);
 
-  // Load data from localStorage on component mount
-  useEffect(() => {
-    const vouchers = JSON.parse(localStorage.getItem('available_vouchers') || '[]');
-    const assigned = JSON.parse(localStorage.getItem('assigned_vouchers') || '[]');
-    setAvailableVouchers(vouchers);
-    setAssignedVouchers(assigned);
-    loadPendingMemberships();
-  }, [database]);
+  // Load data from Firestore on component mount
+  const loadData = async () => {
+    if (!db) return;
+    try {
+        const vouchersCol = collection(db, 'vouchers');
+        const assignedCol = collection(db, 'assignedVouchers');
 
-  const loadPendingMemberships = () => {
-    const confirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
+        const [vouchersSnapshot, assignedSnapshot] = await Promise.all([
+            getDocs(vouchersCol),
+            getDocs(assignedCol)
+        ]);
+
+        const vouchers = vouchersSnapshot.docs.map(doc => doc.data().voucherNumber);
+        const assigned = assignedSnapshot.docs.map(doc => doc.data() as VoucherAssignment);
+        
+        setAvailableVouchers(vouchers);
+        setAssignedVouchers(assigned);
+    } catch (error) {
+        console.error("Failed to load voucher data from Firestore:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not load voucher data.' });
+    }
+  };
+
+  const loadPendingMemberships = useCallback(async () => {
+    if (!db) return;
+    const invoicesCol = collection(db, 'invoices');
+    const invoiceSnapshot = await getDocs(invoicesCol);
+    const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
+
     const pending = [];
     
-    confirmations.forEach(confirmation => {
+    allConfirmations.forEach(confirmation => {
       Object.entries(confirmation.selections || {}).forEach(([playerId, selection]: [string, any]) => {
         if (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing') {
           const player = database.find(p => p.id === playerId);
@@ -73,98 +93,67 @@ export default function VoucherManagementPage() {
         }
       });
     });
-    
     setPendingMemberships(pending);
-  };
+  }, [database, assignedVouchers]);
 
-  // Extract voucher numbers from various file formats
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (database.length > 0) {
+      loadPendingMemberships();
+    }
+  }, [database, assignedVouchers, loadPendingMemberships]);
+
+
   const extractVoucherNumbers = (text: string): string[] => {
-    // Pattern to match USCF voucher numbers (5 groups of 5 digits separated by hyphens)
     const voucherPattern = /\b\d{5}-\d{5}-\d{5}-\d{5}-\d{5}\b/g;
     const matches = text.match(voucherPattern) || [];
-    return [...new Set(matches)]; // Remove duplicates
+    return [...new Set(matches)];
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !db) return;
 
     try {
-      let extractedVouchers: string[] = [];
-
-      if (file.type === 'application/pdf') {
-        // For PDF files, we'll extract text content
-        const arrayBuffer = await file.arrayBuffer();
-        const text = new TextDecoder().decode(arrayBuffer);
-        extractedVouchers = extractVoucherNumbers(text);
-      } else if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
-        // For CSV files
-        const text = await file.text();
-        Papa.parse(text, {
-          complete: (results) => {
-            const allText = results.data.flat().join(' ');
-            extractedVouchers = extractVoucherNumbers(allText);
-          }
-        });
-      } else {
-        // For text files
+        let extractedVouchers: string[] = [];
         const text = await file.text();
         extractedVouchers = extractVoucherNumbers(text);
-      }
 
-      if (extractedVouchers.length === 0) {
-        toast({
-          title: "No Vouchers Found",
-          description: "No valid voucher numbers were found in the uploaded file.",
-          variant: "destructive"
+        if (extractedVouchers.length === 0) {
+            toast({ title: "No Vouchers Found", variant: "destructive" }); return;
+        }
+
+        const newVouchers = [...new Set([...availableVouchers, ...extractedVouchers])];
+        
+        const batch = writeBatch(db);
+        newVouchers.forEach(voucher => {
+            const docRef = doc(db, 'vouchers', voucher);
+            batch.set(docRef, { voucherNumber: voucher });
         });
-        return;
-      }
+        await batch.commit();
 
-      // Merge with existing vouchers, avoiding duplicates
-      const newVouchers = [...new Set([...availableVouchers, ...extractedVouchers])];
-      setAvailableVouchers(newVouchers);
-      localStorage.setItem('available_vouchers', JSON.stringify(newVouchers));
-      
-      toast({
-        title: "Vouchers Uploaded Successfully",
-        description: `${extractedVouchers.length} voucher numbers extracted. Total available: ${newVouchers.length}`
-      });
+        setAvailableVouchers(newVouchers);
+        toast({ title: "Vouchers Uploaded Successfully" });
 
     } catch (error) {
-      toast({
-        title: "Upload Error",
-        description: "There was an error processing the file. Please try again.",
-        variant: "destructive"
-      });
+        toast({ title: "Upload Error", variant: "destructive" });
     }
 
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const autoAssignVouchers = () => {
-    if (availableVouchers.length === 0) {
-      toast({
-        title: "No Available Vouchers",
-        description: "Please upload vouchers before attempting auto-assignment.",
-        variant: "destructive"
-      });
+  const autoAssignVouchers = async () => {
+    if (availableVouchers.length === 0 || !db) {
+      toast({ title: "No Available Vouchers", variant: "destructive" });
       return;
     }
 
-    const unassigned = pendingMemberships.filter(p => 
-      !assignedVouchers.find(av => av.playerId === p.playerId)
-    );
-
+    const unassigned = pendingMemberships.filter(p => !assignedVouchers.find(av => av.playerId === p.playerId));
     if (unassigned.length === 0) {
-      toast({
-        title: "No Pending Memberships",
-        description: "All eligible players already have vouchers assigned.",
-      });
-      return;
+      toast({ title: "No Pending Memberships" }); return;
     }
 
     const assignmentsToMake = Math.min(unassigned.length, availableVouchers.length);
@@ -187,54 +176,40 @@ export default function VoucherManagementPage() {
         playerGender: membership.player.gender
       });
     });
-    
-    const updatedAssigned = [...assignedVouchers, ...newAssignments];
-    setAssignedVouchers(updatedAssigned);
-    localStorage.setItem('assigned_vouchers', JSON.stringify(updatedAssigned));
-    
-    // Remove used vouchers from available pool
-    const remainingVouchers = availableVouchers.slice(assignmentsToMake);
-    setAvailableVouchers(remainingVouchers);
-    localStorage.setItem('available_vouchers', JSON.stringify(remainingVouchers));
-    
-    loadPendingMemberships(); // Refresh display
-    
-    toast({
-      title: "Vouchers Assigned Successfully",
-      description: `${newAssignments.length} vouchers automatically assigned to players needing memberships.`
+
+    const batch = writeBatch(db);
+    newAssignments.forEach(assignment => {
+        const docRef = doc(db, 'assignedVouchers', assignment.id);
+        batch.set(docRef, assignment);
     });
+    
+    const usedVouchers = availableVouchers.slice(0, assignmentsToMake);
+    usedVouchers.forEach(voucher => {
+        const docRef = doc(db, 'vouchers', voucher);
+        batch.delete(docRef);
+    });
+
+    await batch.commit();
+    await loadData();
+    
+    toast({ title: "Vouchers Assigned Successfully" });
   };
 
-  const generateProcessingReport = () => {
-    const unprocessedVouchers = assignedVouchers.filter(v => !v.uscfIdAssigned);
-    setProcessingVouchers(unprocessedVouchers);
-  };
-
-  const updatePlayerUscfId = (assignmentId: string, newUscfId: string) => {
+  const updatePlayerUscfId = async (assignmentId: string, newUscfId: string) => {
+    if (!db) return;
     const assignment = assignedVouchers.find(v => v.id === assignmentId);
     if (!assignment || !newUscfId.trim()) return;
 
     const player = database.find(p => p.id === assignment.playerId);
     if (player) {
-      // Update the player record in the database
-      updatePlayer({
-        ...player,
-        uscfId: newUscfId.trim()
-      });
+      await updatePlayer({ ...player, uscfId: newUscfId.trim() });
       
-      // Mark voucher as processed
-      const updatedAssigned = assignedVouchers.map(v => 
-        v.id === assignmentId 
-          ? { ...v, uscfIdAssigned: newUscfId.trim(), processedDate: new Date().toISOString() } 
-          : v
-      );
-      setAssignedVouchers(updatedAssigned);
-      localStorage.setItem('assigned_vouchers', JSON.stringify(updatedAssigned));
+      const updatedAssignment = { ...assignment, uscfIdAssigned: newUscfId.trim(), processedDate: new Date().toISOString() };
+      const docRef = doc(db, 'assignedVouchers', assignmentId);
+      await writeBatch(db).update(docRef, updatedAssignment).commit();
       
-      toast({
-        title: "USCF ID Updated",
-        description: `${assignment.playerName} has been assigned USCF ID: ${newUscfId}`
-      });
+      setAssignedVouchers(prev => prev.map(v => v.id === assignmentId ? updatedAssignment : v));
+      toast({ title: "USCF ID Updated" });
     }
   };
 
@@ -265,17 +240,19 @@ export default function VoucherManagementPage() {
     URL.revokeObjectURL(url);
   };
 
-  const clearAllVouchers = () => {
+  const clearAllVouchers = async () => {
     if (confirm('Are you sure you want to clear all voucher data? This cannot be undone.')) {
+      if (!db) return;
+      const batch = writeBatch(db);
+      const vouchersSnapshot = await getDocs(collection(db, 'vouchers'));
+      vouchersSnapshot.forEach(doc => batch.delete(doc.ref));
+      const assignedSnapshot = await getDocs(collection(db, 'assignedVouchers'));
+      assignedSnapshot.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      
       setAvailableVouchers([]);
       setAssignedVouchers([]);
-      setProcessingVouchers([]);
-      localStorage.removeItem('available_vouchers');
-      localStorage.removeItem('assigned_vouchers');
-      toast({
-        title: "Voucher Data Cleared",
-        description: "All voucher data has been cleared."
-      });
+      toast({ title: "Voucher Data Cleared" });
     }
   };
 
@@ -307,9 +284,7 @@ export default function VoucherManagementPage() {
                   <CardTitle className="text-sm font-medium">Available Vouchers</CardTitle>
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{availableVouchers.length}</div>
-                </CardContent>
+                <CardContent><div className="text-2xl font-bold">{availableVouchers.length}</div></CardContent>
               </Card>
 
               <Card>
@@ -317,12 +292,7 @@ export default function VoucherManagementPage() {
                   <CardTitle className="text-sm font-medium">Pending Memberships</CardTitle>
                   <UserPlus className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{pendingMemberships.length}</div>
-                  <div className="text-xs text-muted-foreground">
-                    From all tournaments
-                  </div>
-                </CardContent>
+                <CardContent><div className="text-2xl font-bold">{pendingMemberships.length}</div><p className="text-xs text-muted-foreground">From all tournaments</p></CardContent>
               </Card>
 
               <Card>
@@ -330,9 +300,7 @@ export default function VoucherManagementPage() {
                   <CardTitle className="text-sm font-medium">Assigned Vouchers</CardTitle>
                   <CheckCircle className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{assignedVouchers.length}</div>
-                </CardContent>
+                <CardContent><div className="text-2xl font-bold">{assignedVouchers.length}</div></CardContent>
               </Card>
 
               <Card>
@@ -340,18 +308,12 @@ export default function VoucherManagementPage() {
                   <CardTitle className="text-sm font-medium">Processed Vouchers</CardTitle>
                   <Download className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {assignedVouchers.filter(v => v.uscfIdAssigned).length}
-                  </div>
-                </CardContent>
+                <CardContent><div className="text-2xl font-bold">{assignedVouchers.filter(v => v.uscfIdAssigned).length}</div></CardContent>
               </Card>
             </div>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Recent Voucher Assignments</CardTitle>
-              </CardHeader>
+              <CardHeader><CardTitle>Recent Voucher Assignments</CardTitle></CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
@@ -368,17 +330,9 @@ export default function VoucherManagementPage() {
                       <TableRow key={assignment.id}>
                         <TableCell>{assignment.playerName}</TableCell>
                         <TableCell className="font-mono">{assignment.voucherNumber}</TableCell>
-                        <TableCell>
-                          <Badge variant={assignment.membershipType === 'new' ? 'default' : 'secondary'}>
-                            {assignment.membershipType}
-                          </Badge>
-                        </TableCell>
+                        <TableCell><Badge variant={assignment.membershipType === 'new' ? 'default' : 'secondary'}>{assignment.membershipType}</Badge></TableCell>
                         <TableCell>{format(new Date(assignment.assignedDate), 'MMM dd, yyyy')}</TableCell>
-                        <TableCell>
-                          <Badge variant={assignment.uscfIdAssigned ? 'default' : 'secondary'} className={assignment.uscfIdAssigned ? 'bg-green-600' : ''}>
-                            {assignment.uscfIdAssigned ? 'Processed' : 'Pending'}
-                          </Badge>
-                        </TableCell>
+                        <TableCell><Badge variant={assignment.uscfIdAssigned ? 'default' : 'secondary'} className={assignment.uscfIdAssigned ? 'bg-green-600' : ''}>{assignment.uscfIdAssigned ? 'Processed' : 'Pending'}</Badge></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -391,48 +345,26 @@ export default function VoucherManagementPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Upload Voucher File</CardTitle>
-                <CardDescription>
-                  Upload a PDF, CSV, or text file containing USCF voucher numbers. 
-                  The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX.
-                </CardDescription>
+                <CardDescription>Upload a PDF, CSV, or text file containing USCF voucher numbers. The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-center w-full">
                   <label htmlFor="voucher-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
                       <Upload className="w-8 h-8 mb-4 text-gray-500" />
-                      <p className="mb-2 text-sm text-gray-500">
-                        <span className="font-semibold">Click to upload</span> or drag and drop
-                      </p>
+                      <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
                       <p className="text-xs text-gray-500">PDF, CSV, or TXT files</p>
                     </div>
-                    <input
-                      ref={fileInputRef}
-                      id="voucher-upload"
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.csv,.txt"
-                      onChange={handleFileUpload}
-                    />
+                    <input ref={fileInputRef} id="voucher-upload" type="file" className="hidden" accept=".pdf,.csv,.txt" onChange={handleFileUpload} />
                   </label>
                 </div>
-
                 {availableVouchers.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Available Vouchers ({availableVouchers.length})</h3>
-                    <div className="max-h-48 overflow-y-auto bg-gray-50 p-3 rounded">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        {availableVouchers.slice(0, 20).map((voucher, index) => (
-                          <code key={index} className="text-xs bg-white p-1 rounded">
-                            {voucher}
-                          </code>
-                        ))}
+                    <div className="max-h-48 overflow-y-auto bg-gray-50 p-3 rounded"><div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {availableVouchers.slice(0, 20).map((voucher, index) => (<code key={index} className="text-xs bg-white p-1 rounded">{voucher}</code>))}
                       </div>
-                      {availableVouchers.length > 20 && (
-                        <p className="text-sm text-gray-500 mt-2">
-                          ...and {availableVouchers.length - 20} more
-                        </p>
-                      )}
+                      {availableVouchers.length > 20 && (<p className="text-sm text-gray-500 mt-2">...and {availableVouchers.length - 20} more</p>)}
                     </div>
                   </div>
                 )}
@@ -444,9 +376,7 @@ export default function VoucherManagementPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Auto-Assign Vouchers</CardTitle>
-                <CardDescription>
-                  Automatically assign available vouchers to players who need new or renewed memberships.
-                </CardDescription>
+                <CardDescription>Automatically assign available vouchers to players who need new or renewed memberships.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -454,39 +384,20 @@ export default function VoucherManagementPage() {
                     <p><strong>Available vouchers:</strong> {availableVouchers.length}</p>
                     <p><strong>Players needing memberships:</strong> {pendingMemberships.length}</p>
                   </div>
-                  <Button 
-                    onClick={autoAssignVouchers}
-                    disabled={availableVouchers.length === 0 || pendingMemberships.length === 0}
-                  >
-                    Auto-Assign Vouchers
-                  </Button>
+                  <Button onClick={autoAssignVouchers} disabled={availableVouchers.length === 0 || pendingMemberships.length === 0}>Auto-Assign Vouchers</Button>
                 </div>
-
                 {pendingMemberships.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Players Needing Memberships</h3>
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Player Name</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Event</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
+                      <TableHeader><TableRow><TableHead>Player Name</TableHead><TableHead>Type</TableHead><TableHead>Event</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                       <TableBody>
                         {pendingMemberships.map(membership => (
                           <TableRow key={membership.playerId}>
                             <TableCell>{membership.player.firstName} {membership.player.lastName}</TableCell>
-                            <TableCell>
-                              <Badge variant={membership.membershipType === 'new' ? 'default' : 'secondary'}>
-                                {membership.membershipType}
-                              </Badge>
-                            </TableCell>
+                            <TableCell><Badge variant={membership.membershipType === 'new' ? 'default' : 'secondary'}>{membership.membershipType}</Badge></TableCell>
                             <TableCell>{membership.confirmation.eventName}</TableCell>
-                            <TableCell>
-                              <Badge variant="destructive">Pending Assignment</Badge>
-                            </TableCell>
+                            <TableCell><Badge variant="destructive">Pending Assignment</Badge></TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -501,105 +412,45 @@ export default function VoucherManagementPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Process Assigned Vouchers</CardTitle>
-                <CardDescription>
-                  Enter USCF IDs for players who have been assigned vouchers and had their memberships processed.
-                </CardDescription>
+                <CardDescription>Enter USCF IDs for players who have been assigned vouchers and had their memberships processed.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <Button onClick={generateProcessingReport}>
-                    Refresh Processing List
-                  </Button>
-                  <Button onClick={exportProcessingReport} variant="outline">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export Processing Report
-                  </Button>
+                <div className="flex justify-end">
+                  <Button onClick={exportProcessingReport} variant="outline"><Download className="w-4 h-4 mr-2" />Export Processing Report</Button>
                 </div>
-
                 {assignedVouchers.filter(v => !v.uscfIdAssigned).length > 0 ? (
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Player Name</TableHead>
-                        <TableHead>Voucher Number</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Event</TableHead>
-                        <TableHead>Assigned Date</TableHead>
-                        <TableHead>USCF ID</TableHead>
-                        <TableHead>Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                    <TableHeader><TableRow><TableHead>Player Name</TableHead><TableHead>Voucher Number</TableHead><TableHead>Type</TableHead><TableHead>USCF ID</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {assignedVouchers.filter(v => !v.uscfIdAssigned).map(assignment => (
                         <TableRow key={assignment.id}>
                           <TableCell>{assignment.playerName}</TableCell>
                           <TableCell className="font-mono text-sm">{assignment.voucherNumber}</TableCell>
+                          <TableCell><Badge variant={assignment.membershipType === 'new' ? 'default' : 'secondary'}>{assignment.membershipType}</Badge></TableCell>
                           <TableCell>
-                            <Badge variant={assignment.membershipType === 'new' ? 'default' : 'secondary'}>
-                              {assignment.membershipType}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{assignment.eventName}</TableCell>
-                          <TableCell>{format(new Date(assignment.assignedDate), 'MMM dd, yyyy')}</TableCell>
-                          <TableCell>
-                            <Input
-                              placeholder="Enter USCF ID"
-                              className="w-32"
-                              onBlur={(e) => {
-                                if (e.target.value.trim()) {
-                                  updatePlayerUscfId(assignment.id, e.target.value.trim());
-                                  e.target.value = '';
-                                }
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.currentTarget.blur();
-                                }
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="destructive">Pending</Badge>
+                            <Input placeholder="Enter USCF ID" className="w-32" onBlur={(e) => { if (e.target.value.trim()) { updatePlayerUscfId(assignment.id, e.target.value.trim()); e.target.value = ''; } }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No vouchers pending processing. All assigned vouchers have been processed!
-                  </div>
-                )}
+                ) : ( <div className="text-center py-8 text-muted-foreground">No vouchers pending processing.</div> )}
               </CardContent>
             </Card>
 
             {assignedVouchers.filter(v => v.uscfIdAssigned).length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Processed Vouchers</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle>Processed Vouchers</CardTitle></CardHeader>
                 <CardContent>
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Player Name</TableHead>
-                        <TableHead>Voucher Number</TableHead>
-                        <TableHead>USCF ID</TableHead>
-                        <TableHead>Processed Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                    <TableHeader><TableRow><TableHead>Player Name</TableHead><TableHead>Voucher Number</TableHead><TableHead>USCF ID</TableHead><TableHead>Processed Date</TableHead></TableRow></TableHeader>
                     <TableBody>
-                      {assignedVouchers
-                        .filter(v => v.uscfIdAssigned)
-                        .sort((a, b) => new Date(b.processedDate || '').getTime() - new Date(a.processedDate || '').getTime())
-                        .map(assignment => (
+                      {assignedVouchers.filter(v => v.uscfIdAssigned).sort((a, b) => new Date(b.processedDate || '').getTime() - new Date(a.processedDate || '').getTime()).map(assignment => (
                         <TableRow key={assignment.id}>
                           <TableCell>{assignment.playerName}</TableCell>
                           <TableCell className="font-mono text-sm">{assignment.voucherNumber}</TableCell>
                           <TableCell className="font-mono">{assignment.uscfIdAssigned}</TableCell>
-                          <TableCell>
-                            {assignment.processedDate && format(new Date(assignment.processedDate), 'MMM dd, yyyy')}
-                          </TableCell>
+                          <TableCell>{assignment.processedDate && format(new Date(assignment.processedDate), 'MMM dd, yyyy')}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
