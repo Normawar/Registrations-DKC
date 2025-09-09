@@ -186,6 +186,12 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
     onRequestCreated();
   };
 
+  const getInvoiceDisplayTitle = (invoice: any): string => {
+    const title = invoice.invoiceTitle || invoice.eventName || 'Registration';
+    const school = invoice.schoolName || 'N/A';
+    const invoiceNum = invoice.invoiceNumber || invoice.id?.slice(-6);
+    return `${title} - ${school} - #${invoiceNum}`;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -207,7 +213,7 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
               <SelectContent>
                 {confirmations.map(c => (
                   <SelectItem key={c.id} value={c.id}>
-                    {c.invoiceTitle || c.eventName} - #{c.invoiceNumber || c.id.slice(-6)}
+                    {getInvoiceDisplayTitle(c)}
                   </SelectItem>
                 ))}
               </SelectContent>
