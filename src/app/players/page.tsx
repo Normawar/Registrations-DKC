@@ -3,7 +3,7 @@
 // Updated src/app/players/page.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,6 +23,9 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CSVUploadComponent } from '@/components/csv-upload';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { OrganizerGuard } from '@/components/auth-guard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -78,7 +81,7 @@ const playerFormSchema = z.object({
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
-export default function PlayersPage() {
+function PlayersPageContent() {
   const { addPlayer, updatePlayer } = useMasterDb();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -154,6 +157,31 @@ export default function PlayersPage() {
   };
   
   const { database } = useMasterDb();
+  
+  const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
+    if (!player?.changeHistory || player.changeHistory.length === 0) {
+        return <div className="p-6 text-center text-muted-foreground">No change history available for this player.</div>;
+    }
+
+    return (
+        <div className="p-6 space-y-4">
+            {player.changeHistory.slice().reverse().map(entry => (
+                <div key={entry.timestamp} className="text-sm border-l-2 pl-4">
+                    <p className="font-medium">
+                        {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
+                    </p>
+                    <ul className="list-disc pl-5 mt-1 text-muted-foreground text-xs">
+                        {entry.changes.map((change, index) => (
+                            <li key={index}>
+                                Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic">'{String(change.oldValue)}'</span> to <span className="italic">'{String(change.newValue)}'</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ))}
+        </div>
+    );
+  };
 
 
   return (
@@ -207,13 +235,19 @@ export default function PlayersPage() {
 
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
             <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
-                <DialogHeader className="p-6 pb-4 border-b shrink-0">
+               <Tabs defaultValue="details" className="w-full">
+                <DialogHeader className="p-6 pb-0 border-b shrink-0">
                     <DialogTitle>{editingPlayer && database.some(p => p.id === editingPlayer.id) ? 'Edit Player' : 'Add New Player'}</DialogTitle>
                     <DialogDescription>
                         Complete the player's information. This will add them to or update their record in the master database.
                     </DialogDescription>
+                    <TabsList className="grid w-full grid-cols-2 mt-4">
+                        <TabsTrigger value="details">Player Details</TabsTrigger>
+                        <TabsTrigger value="history">Change History</TabsTrigger>
+                    </TabsList>
                 </DialogHeader>
-                <div className='flex-1 overflow-y-auto p-6'>
+                <TabsContent value="details">
+                  <div className='flex-1 overflow-y-auto p-6'>
                     <Form {...playerForm}>
                         <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-4">
                             {/* Form fields here */}
@@ -275,7 +309,12 @@ export default function PlayersPage() {
                             </div>
                         </form>
                     </Form>
-                </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="history">
+                  <ChangeHistoryTab player={editingPlayer} />
+                </TabsContent>
+               </Tabs>
                 <DialogFooter className="p-6 pt-4 border-t shrink-0">
                     <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
                     <Button type="submit" form="edit-player-form">Save Player</Button>
@@ -285,4 +324,12 @@ export default function PlayersPage() {
       </div>
     </AppLayout>
   );
+}
+
+export default function PlayersPage() {
+    return (
+        <OrganizerGuard>
+            <PlayersPageContent />
+        </OrganizerGuard>
+    )
 }
