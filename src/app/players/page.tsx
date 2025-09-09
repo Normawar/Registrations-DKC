@@ -188,46 +188,15 @@ export default function PlayersPage() {
             </CardContent>
         </Card>
 
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">All Players</h2>
-            <p className="text-sm text-gray-600">The complete list of players. Use the search button for advanced filtering.</p>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Player
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    School / District
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    USCF ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Expiration
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rating
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Events
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <tr>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500" colSpan={7}>
-                    Player data will be displayed here when the database loads...
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 text-center text-gray-500">
+            <Search className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+            <h2 className="text-lg font-medium text-gray-800">Search to Begin</h2>
+            <p className="mt-1 text-sm">
+                Use the "Search Players" button to find, edit, or add players to the master database. 
+                Displaying all {database.length.toLocaleString()} players at once is not supported for performance reasons.
+            </p>
         </div>
+
 
         <EnhancedPlayerSearchDialog
           isOpen={isSearchOpen}
