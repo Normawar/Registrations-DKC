@@ -136,7 +136,6 @@ export default function RequestsPage() {
     loadData();
   };
 
-
   return (
     <AppLayout>
       <div className="space-y-8">
