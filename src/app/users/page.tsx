@@ -274,8 +274,8 @@ export default function UsersPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sortedUsers.map((user) => (
-                                    <TableRow key={user.email}>
+                                {sortedUsers.map((user, index) => (
+                                    <TableRow key={`${user.email}-${index}`}>
                                         <TableCell className="font-mono">{user.email}</TableCell>
                                         <TableCell>{user.firstName} {user.lastName}</TableCell>
                                         <TableCell className='capitalize'>
