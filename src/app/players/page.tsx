@@ -240,6 +240,22 @@ export default function PlayersPage() {
                                 <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
+                            {(editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD') && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField control={playerForm.control} name="studentType" render={({ field }) => ( 
+                                        <FormItem><FormLabel>Student Type</FormLabel>
+                                        <FormControl>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <SelectTrigger><SelectValue placeholder="Select student type" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="independent">Independent</SelectItem>
+                                                    <SelectItem value="gt">GT (Gifted & Talented)</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </FormControl><FormMessage /></FormItem>
+                                    )} />
+                                </div>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormMessage /></FormItem> )} />

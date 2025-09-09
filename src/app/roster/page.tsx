@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
@@ -588,7 +589,7 @@ function SponsorRosterView() {
                               <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                               <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
-                           {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                           {(profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD') && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={playerForm.control} name="studentType" render={({ field }) => ( 
                                     <FormItem><FormLabel>Student Type</FormLabel>
