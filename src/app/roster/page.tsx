@@ -913,6 +913,43 @@ function DistrictRosterView() {
             description: `${gtPlayers.length} GT players have been exported.`,
         });
     }, [allPlayers, toast]);
+    
+    const handleExportIndependentRoster = useCallback(() => {
+        const psjaPlayers = allPlayers.filter(p => p.district === 'PHARR-SAN JUAN-ALAMO ISD');
+        const independentPlayers = psjaPlayers.filter(p => p.studentType === 'independent');
+
+        if (independentPlayers.length === 0) {
+            toast({
+                title: "No Independent Players Found",
+                description: "There are no players marked as Independent in the PHARR-SAN JUAN-ALAMO ISD district.",
+            });
+            return;
+        }
+
+        const dataToExport = independentPlayers.map(player => ({
+            'First Name': player.firstName,
+            'Last Name': player.lastName,
+            'USCF ID': player.uscfId,
+            'School': player.school,
+            'Grade': player.grade,
+            'Rating': player.regularRating || 'UNR',
+            'Email': player.email,
+        }));
+
+        const csv = Papa.unparse(dataToExport);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `psja_independent_roster_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast({
+            title: "Export Successful",
+            description: `${independentPlayers.length} Independent players have been exported.`,
+        });
+    }, [allPlayers, toast]);
 
     return (
         <div className="space-y-8">
@@ -957,10 +994,16 @@ function DistrictRosterView() {
                                <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent" className="cursor-pointer">Independent</Label></div>
                             </RadioGroup>
                         </div>
-                        <Button onClick={handleExportGTRoster} variant="outline" size="sm">
-                            <Download className="mr-2 h-4 w-4" />
-                            Export GT Roster
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button onClick={handleExportGTRoster} variant="outline" size="sm">
+                                <Download className="mr-2 h-4 w-4" />
+                                Export GT Roster
+                            </Button>
+                            <Button onClick={handleExportIndependentRoster} variant="outline" size="sm">
+                                <Download className="mr-2 h-4 w-4" />
+                                Export Independent Roster
+                            </Button>
+                        </div>
                     </div>
                  )}
                  <div className="flex items-center space-x-2 pt-2">
