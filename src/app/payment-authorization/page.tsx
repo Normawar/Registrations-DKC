@@ -39,6 +39,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 
 type Confirmation = {
@@ -75,10 +77,12 @@ export default function PaymentAuthorizationPage() {
   const [paymentNote, setPaymentNote] = useState<string>('');
 
 
-  const loadPendingPayments = useCallback(() => {
+  const loadPendingPayments = useCallback(async () => {
+    if (!db) return;
     try {
-      const storedConfirmations = localStorage.getItem('confirmations');
-      const allConfirmations: Confirmation[] = storedConfirmations ? JSON.parse(storedConfirmations) : [];
+      const invoicesCol = collection(db, 'invoices');
+      const invoiceSnapshot = await getDocs(invoicesCol);
+      const allConfirmations: Confirmation[] = invoiceSnapshot.docs.map(doc => doc.data() as Confirmation);
       const pending = allConfirmations.filter(c => c.paymentStatus === 'pending-po');
       setPendingPayments(pending);
     } catch (error) {
@@ -93,10 +97,6 @@ export default function PaymentAuthorizationPage() {
 
   useEffect(() => {
     loadPendingPayments();
-    // Listen for storage changes to keep data fresh
-    const handleStorageChange = () => loadPendingPayments();
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
   }, [loadPendingPayments]);
   
   const openApprovalDialog = (confirmation: Confirmation) => {
@@ -134,15 +134,7 @@ export default function PaymentAuthorizationPage() {
       );
       localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
       
-      const storedConfirmations = localStorage.getItem('confirmations') || '[]';
-      const allConfirmations: Confirmation[] = JSON.parse(storedConfirmations);
-      const updatedConfirmations = allConfirmations.map(c => 
-          c.id === selectedConfirmation.id ? { ...c, paymentStatus: result.status === 'PAID' ? 'paid' : 'unpaid', invoiceStatus: result.status } : c
-      );
-      localStorage.setItem('confirmations', JSON.stringify(updatedConfirmations));
-      
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('all_invoices_updated'));
+      await loadPendingPayments();
       
       toast({
         title: 'Payment Recorded',

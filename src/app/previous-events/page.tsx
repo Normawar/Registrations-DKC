@@ -1,7 +1,8 @@
 
+
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ import { FileText, ImageIcon, History, Eye } from "lucide-react";
 import { useEvents } from '@/hooks/use-events';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 export default function PreviousEventsPage() {
     const { events } = useEvents();
@@ -32,12 +35,18 @@ export default function PreviousEventsPage() {
     const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
-    useEffect(() => {
-        const storedConfirmations = localStorage.getItem('confirmations');
-        if (storedConfirmations) {
-            setConfirmations(JSON.parse(storedConfirmations));
-        }
+    const loadData = useCallback(async () => {
+        if (!db) return;
+        const invoicesCol = collection(db, 'invoices');
+        const invoiceSnapshot = await getDocs(invoicesCol);
+        const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
+        setConfirmations(allConfirmations);
     }, []);
+    
+    useEffect(() => {
+      loadData();
+    }, [loadData]);
+
 
     const previousEvents = useMemo(() => {
         const now = new Date();

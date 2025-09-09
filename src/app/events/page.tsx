@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -9,10 +10,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useEvents } from '@/hooks/use-events';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Calendar, MapPin, DollarSign, Users, CheckCircle, Clock, Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 export default function EventsPage() {
   const { profile } = useSponsorProfile();
@@ -22,24 +25,22 @@ export default function EventsPage() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
 
-  // Load registrations
-  useEffect(() => {
-    const loadRegistrations = () => {
-      try {
-        const storedConfirmations = localStorage.getItem('confirmations');
-        setRegistrations(storedConfirmations ? JSON.parse(storedConfirmations) : []);
-      } catch (error) {
-        console.error('Failed to load registrations:', error);
-      }
-    };
-
-    loadRegistrations();
-    
-    // Listen for storage changes
-    const handleStorageChange = () => loadRegistrations();
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+  // Load registrations from Firestore
+  const loadRegistrations = useCallback(async () => {
+    if (!db) return;
+    try {
+      const invoicesCol = collection(db, 'invoices');
+      const invoiceSnapshot = await getDocs(invoicesCol);
+      const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
+      setRegistrations(allConfirmations);
+    } catch (error) {
+      console.error('Failed to load registrations from Firestore:', error);
+    }
   }, []);
+
+  useEffect(() => {
+    loadRegistrations();
+  }, [loadRegistrations]);
 
   // Get upcoming events
   const upcomingEvents = useMemo(() => {
@@ -57,7 +58,7 @@ export default function EventsPage() {
       
       if (profile.role === 'individual') {
         return reg.parentEmail === profile.email;
-      } else if (profile.role === 'sponsor') {
+      } else if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
         return reg.schoolName === profile.school && reg.district === profile.district;
       }
       

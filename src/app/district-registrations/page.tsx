@@ -18,6 +18,8 @@ import Papa from 'papaparse';
 import { DistrictCoordinatorGuard } from '@/components/auth-guard';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 type RegistrationInfo = {
   player: MasterPlayer;
@@ -39,15 +41,18 @@ function DistrictRegistrationsContent() {
   const [upcomingEventsWithRegistrations, setUpcomingEventsWithRegistrations] = useState<any[]>([]);
   const [showActiveOnly, setShowActiveOnly] = useState(false);
 
-  useEffect(() => {
-    const loadData = () => {
-      const stored = localStorage.getItem('confirmations');
-      setConfirmations(stored ? JSON.parse(stored) : []);
-    };
-    loadData();
-    window.addEventListener('storage', loadData);
-    return () => window.removeEventListener('storage', loadData);
+  const loadData = useCallback(async () => {
+    if (!db) return;
+    const invoicesCol = collection(db, 'invoices');
+    const invoiceSnapshot = await getDocs(invoicesCol);
+    const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
+    setConfirmations(allConfirmations);
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
 
   useEffect(() => {
     if (!profile || !isDbLoaded || events.length === 0) return;
@@ -62,7 +67,7 @@ function DistrictRegistrationsContent() {
       
       districtConfirmations.forEach(conf => {
         if (!conf.selections) return;
-        Object.entries(conf.selections).forEach(([playerId, details]) => {
+        Object.entries(conf.selections).forEach(([playerId, details]: [string, any]) => {
           const player = playerMap.get(playerId);
           if (player && details.status !== 'withdrawn') {
             registrationsMap.set(playerId, { player, details, invoiceId: conf.invoiceId, invoiceNumber: conf.invoiceNumber });

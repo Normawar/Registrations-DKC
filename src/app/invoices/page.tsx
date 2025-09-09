@@ -54,7 +54,7 @@ export default function UnifiedInvoiceRegistrations() {
     }
     
     setIsLoading(true);
-    console.log('🎯 === UNIFIED INVOICE SEARCH v4.0 ===');
+    console.log('🎯 === UNIFIED INVOICE SEARCH v5.0 (Firestore Only) ===');
     console.log('Profile:', {
       role: profile.role,
       district: profile.district,
@@ -65,48 +65,19 @@ export default function UnifiedInvoiceRegistrations() {
     try {
       let allInvoiceData: any[] = [];
       
-      // Strategy 1: Fetch from the top-level 'invoices' collection
-      try {
-        const invoicesCol = collection(db, 'invoices');
-        const invoiceSnapshot = await getDocs(invoicesCol);
-        if (!invoiceSnapshot.empty) {
-          const firestoreInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), sourceType: 'firestore-invoices' }));
-          allInvoiceData.push(...firestoreInvoices);
-          console.log(`✅ Found ${firestoreInvoices.length} documents in top-level 'invoices' collection.`);
-        } else {
-          console.log("🟡 No documents found in top-level 'invoices' collection.");
-        }
-      } catch (e) {
-        console.error("Error fetching from 'invoices' collection:", e);
+      const invoicesCol = collection(db, 'invoices');
+      const invoiceSnapshot = await getDocs(invoicesCol);
+      if (!invoiceSnapshot.empty) {
+        const firestoreInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        allInvoiceData.push(...firestoreInvoices);
+        console.log(`✅ Found ${firestoreInvoices.length} documents in top-level 'invoices' collection.`);
+      } else {
+        console.log("🟡 No documents found in top-level 'invoices' collection.");
       }
 
-      // Strategy 2: Also check localStorage for confirmations as a fallback/supplement
-      try {
-        const stored = localStorage.getItem('confirmations');
-        if (stored) {
-          const localConfirmations = JSON.parse(stored);
-          console.log(`💾 Found ${localConfirmations.length} items in localStorage 'confirmations'.`);
-          localConfirmations.forEach((item: any) => {
-            allInvoiceData.push({ ...item, id: item.id || `localStorage-${item.invoiceId}`, sourceType: 'localStorage' });
-          });
-        }
-      } catch (e) {
-        console.error("Error reading 'confirmations' from localStorage:", e);
-      }
-
-      console.log(`🔄 Total combined data before deduplication: ${allInvoiceData.length}`);
+      console.log(`🔄 Total data found: ${allInvoiceData.length}`);
       
-      const uniqueDataMap = new Map();
-      allInvoiceData.forEach(item => {
-        const key = item.id || item.invoiceId;
-        if (key) {
-          uniqueDataMap.set(key, { ...uniqueDataMap.get(key), ...item });
-        }
-      });
-      
-      let invoicesArray = Array.from(uniqueDataMap.values());
-      console.log(`✨ After deduplication: ${invoicesArray.length}`);
-      
+      let invoicesArray = allInvoiceData;
       const beforeRoleFilter = invoicesArray.length;
       console.log(`👤 Applying role filter for: ${profile.role}`);
       
@@ -162,56 +133,13 @@ export default function UnifiedInvoiceRegistrations() {
       setData(mapped);
       
     } catch (error) {
-      console.error('❌ Error in unified search:', error);
+      console.error('❌ Error loading data from Firestore:', error);
       toast({ variant: 'destructive', title: 'Error Loading Data', description: 'Failed to load registration data. Please try again.' });
       setData([]);
     } finally {
       setIsLoading(false);
     }
   }, [profile, toast]);
-
-  // Temporary debug function - add this after loadData
-  const debugFirestoreAccess = useCallback(async () => {
-    console.log('🔍 Debug: Testing Firestore access from component...');
-    
-    if (!db) {
-      console.log('❌ db not available');
-      return;
-    }
-    
-    try {
-      const invoicesCol = collection(db, 'invoices');
-      const snapshot = await getDocs(invoicesCol);
-      console.log(`✅ Component can read invoices: ${snapshot.size} documents`);
-      
-      if (snapshot.size > 0) {
-        console.log('🎯 Sample invoice:', snapshot.docs[0].data());
-        
-        // Check if any are from today
-        const today = new Date().toDateString();
-        let todayCount = 0;
-        snapshot.docs.forEach(doc => {
-          const data = doc.data();
-          if (data.submissionTimestamp) {
-            const docDate = new Date(data.submissionTimestamp).toDateString();
-            if (docDate === today) {
-              todayCount++;
-              console.log('📅 Today\'s invoice found:', data);
-            }
-          }
-        });
-        console.log(`📅 Total invoices from today: ${todayCount}`);
-      }
-    } catch (error: any) {
-      console.error('❌ Component cannot read invoices:', error);
-      if (error.code) {
-        console.log(`Error code: ${error.code}`);
-        if (error.code === 'permission-denied') {
-          console.log('🚫 This confirms it\'s a Firestore security rules issue');
-        }
-      }
-    }
-  }, []);
 
   const handleManualRefresh = useCallback(async () => {
     await loadData();
@@ -221,10 +149,9 @@ export default function UnifiedInvoiceRegistrations() {
   useEffect(() => {
     if (isProfileLoaded && profile) {
       loadData();
-      debugFirestoreAccess(); // Add this line
     }
     setClientReady(true);
-  }, [isProfileLoaded, profile, loadData, debugFirestoreAccess]); // Add debugFirestoreAccess to dependencies
+  }, [isProfileLoaded, profile, loadData]);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -311,11 +238,6 @@ export default function UnifiedInvoiceRegistrations() {
       
       const invoiceRef = doc(db, 'invoices', invoiceToDelete.id);
       await setDoc(invoiceRef, { status: finalStatus, invoiceStatus: finalStatus }, { merge: true });
-      
-      // Update local storage as well for immediate UI update
-      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const updatedInvoices = allInvoices.map((inv: any) => inv.id === invoiceToDelete.id ? { ...inv, status: finalStatus, invoiceStatus: finalStatus } : inv);
-      localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
       
       await loadData();
       
@@ -429,7 +351,7 @@ export default function UnifiedInvoiceRegistrations() {
                   <strong>Profile:</strong> {profile?.role} | {profile?.school} | {profile?.district}
                 </div>
                 <div>
-                  <strong>Data Sources:</strong> Firestore 'invoices' collection + localStorage 'confirmations'
+                  <strong>Data Source:</strong> Firestore 'invoices' collection
                 </div>
                 <div>
                   <strong>Data Found:</strong> {data.length} items | {filteredAndSortedData.length} filtered

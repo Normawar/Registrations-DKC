@@ -92,6 +92,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 
 const eventFormSchema = z.object({
@@ -479,21 +481,22 @@ export default function ManageEventsPage() {
     setIsClearAlertOpen(false);
   };
 
-  const handleViewRegistrations = (event: Event) => {
-    if (!isDbLoaded) {
+  const handleViewRegistrations = async (event: Event) => {
+    if (!isDbLoaded || !db) {
       toast({ variant: 'destructive', title: 'Loading...', description: 'Player database is still loading, please try again in a moment.'});
       return;
     }
 
-    const rawConfirmations = localStorage.getItem('confirmations');
-    const allConfirmations: StoredConfirmation[] = rawConfirmations ? JSON.parse(rawConfirmations) : [];
+    const invoicesCol = collection(db, 'invoices');
+    const invoiceSnapshot = await getDocs(invoicesCol);
+    const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
   
     const latestConfirmationsMap = new Map<string, StoredConfirmation>();
     for (const conf of allConfirmations) {
         const key = conf.invoiceId || conf.id;
         const existing = latestConfirmationsMap.get(key);
         if (!existing || new Date(conf.submissionTimestamp) > new Date(existing.submissionTimestamp)) {
-            latestConfirmationsMap.set(key, conf);
+            latestConfirmationsMap.set(key, conf as StoredConfirmation);
         }
     }
     const latestConfirmations = Array.from(latestConfirmationsMap.values());
