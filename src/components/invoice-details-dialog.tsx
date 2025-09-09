@@ -530,11 +530,26 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   const [creditCardAmount, setCreditCardAmount] = useState('');
   const [creditCardLast4, setCreditCardLast4] = useState('');
 
-  const getRegisteredPlayers = (conf: any) => {
-    if (!conf?.selections) return [];
-    const playerIds = Object.keys(conf.selections);
-    return masterDatabase.filter(player => playerIds.includes(player.id));
-  };
+  const getRegisteredPlayers = useCallback((conf: any) => {
+    if (!conf) return [];
+  
+    // Primary method: Use the 'selections' map
+    if (conf.selections && typeof conf.selections === 'object' && Object.keys(conf.selections).length > 0) {
+      const playerIds = Object.keys(conf.selections);
+      return masterDatabase.filter(player => playerIds.includes(player.id));
+    }
+  
+    // Fallback method: Use the 'students' array from migrated data
+    if (Array.isArray(conf.students) && conf.students.length > 0) {
+      // Assuming students array contains objects with a 'name' field
+      const studentNames = new Set(conf.students.map((s: any) => s.name.toLowerCase()));
+      return masterDatabase.filter(player => 
+        studentNames.has(`${player.firstName} ${player.lastName}`.toLowerCase())
+      );
+    }
+  
+    return [];
+  }, [masterDatabase]);
   
   const calculatedTotalPaid = useMemo(() => {
     if (!confirmation?.paymentHistory) return 0;
