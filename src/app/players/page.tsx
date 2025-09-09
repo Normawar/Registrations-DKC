@@ -1,4 +1,5 @@
 
+
 // Updated src/app/players/page.tsx
 'use client';
 
@@ -19,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -242,21 +244,37 @@ export default function PlayersPage() {
                                 <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
-                            {(editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD') && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={playerForm.control} name="studentType" render={({ field }) => ( 
-                                        <FormItem><FormLabel>Student Type</FormLabel>
-                                        <FormControl>
-                                            <Select onValueChange={field.onChange} value={field.value}>
-                                                <SelectTrigger><SelectValue placeholder="Select student type" /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="independent">Independent</SelectItem>
-                                                    <SelectItem value="gt">GT (Gifted & Talented)</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </FormControl><FormMessage /></FormItem>
-                                    )} />
-                                </div>
+                            {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                <FormField
+                                  control={playerForm.control}
+                                  name="studentType"
+                                  render={({ field }) => (
+                                    <FormItem className="space-y-3">
+                                      <FormLabel>Student Type</FormLabel>
+                                      <FormControl>
+                                        <RadioGroup
+                                          onValueChange={field.onChange}
+                                          value={field.value || 'independent'}
+                                          className="flex items-center space-x-4"
+                                        >
+                                          <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl>
+                                              <RadioGroupItem value="independent" />
+                                            </FormControl>
+                                            <FormLabel className="font-normal">Independent</FormLabel>
+                                          </FormItem>
+                                          <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl>
+                                              <RadioGroupItem value="gt" />
+                                            </FormControl>
+                                            <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
+                                          </FormItem>
+                                        </RadioGroup>
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
                             )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />

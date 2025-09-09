@@ -591,21 +591,37 @@ function SponsorRosterView() {
                               <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                               <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
-                           {(editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD') && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={playerForm.control} name="studentType" render={({ field }) => ( 
-                                    <FormItem><FormLabel>Student Type</FormLabel>
-                                    <FormControl>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <SelectTrigger><SelectValue placeholder="Select student type" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="independent">Independent</SelectItem>
-                                                <SelectItem value="gt">GT (Gifted & Talented)</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </FormControl><FormMessage /></FormItem>
-                                )} />
-                            </div>
+                           {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                            <FormField
+                              control={playerForm.control}
+                              name="studentType"
+                              render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                  <FormLabel>Student Type</FormLabel>
+                                  <FormControl>
+                                    <RadioGroup
+                                      onValueChange={field.onChange}
+                                      value={field.value || 'independent'}
+                                      className="flex items-center space-x-4"
+                                    >
+                                      <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                          <RadioGroupItem value="independent" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">Independent</FormLabel>
+                                      </FormItem>
+                                      <FormItem className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                          <RadioGroupItem value="gt" />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
+                                      </FormItem>
+                                    </RadioGroup>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                            )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={playerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
@@ -748,20 +764,36 @@ function SponsorRosterView() {
                               <FormField control={createPlayerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                           </div>
                           {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <FormField control={createPlayerForm.control} name="studentType" render={({ field }) => ( 
-                                      <FormItem><FormLabel>Student Type</FormLabel>
-                                      <FormControl>
-                                          <Select onValueChange={field.onChange} value={field.value}>
-                                              <SelectTrigger><SelectValue placeholder="Select student type" /></SelectTrigger>
-                                              <SelectContent>
-                                                  <SelectItem value="independent">Independent</SelectItem>
-                                                  <SelectItem value="gt">GT (Gifted & Talented)</SelectItem>
-                                              </SelectContent>
-                                          </Select>
-                                      </FormControl><FormMessage /></FormItem>
-                                  )} />
-                              </div>
+                              <FormField
+                                control={createPlayerForm.control}
+                                name="studentType"
+                                render={({ field }) => (
+                                  <FormItem className="space-y-3">
+                                    <FormLabel>Student Type</FormLabel>
+                                    <FormControl>
+                                      <RadioGroup
+                                        onValueChange={field.onChange}
+                                        value={field.value || 'independent'}
+                                        className="flex items-center space-x-4"
+                                      >
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                          <FormControl>
+                                            <RadioGroupItem value="independent" />
+                                          </FormControl>
+                                          <FormLabel className="font-normal">Independent</FormLabel>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                          <FormControl>
+                                            <RadioGroupItem value="gt" />
+                                          </FormControl>
+                                          <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
+                                        </FormItem>
+                                      </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
                           )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
