@@ -1,7 +1,8 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -172,7 +173,7 @@ export function SponsorRegistrationDialog({
   };
 
   const handleCreateInvoice = async () => {
-    if (!profile || !event) return;
+    if (!profile || !event || !db) return;
 
     setIsSubmitting(true);
 
@@ -180,10 +181,8 @@ export function SponsorRegistrationDialog({
       const { fee: currentFee } = getFeeForEvent();
       const lateFeeAmount = currentFee - event.regularFee;
 
-      // Prepare players for invoice
       const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
         const student = rosterPlayers.find(p => p.id === playerId);
-        
         return {
           playerName: `${student?.firstName} ${student?.lastName}`,
           uscfId: student?.uscfId || '',
@@ -194,11 +193,8 @@ export function SponsorRegistrationDialog({
       });
 
       const uscfFee = 24;
-      
-      // Generate team code from profile
       const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
 
-      // Create the Square invoice
       const result = await createInvoice({
         sponsorName: `${profile.firstName} ${profile.lastName}`,
         sponsorEmail: profile.email || '',
@@ -227,34 +223,29 @@ export function SponsorRegistrationDialog({
         schoolName: profile.school,
         district: profile.district,
         teamCode: teamCode,
-        
-        // Ensure proper title
         invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
-        
         selections: Object.fromEntries(
           Object.entries(selectedStudents).map(([playerId, details]) => [
-            playerId,
-            {
-              ...details,
-              status: 'active'
-            }
+            playerId, { ...details, status: 'active' }
           ])
         ),
         totalInvoiced: feeBreakdown.total,
-        totalAmount: feeBreakdown.total, // Add for consistency
+        totalAmount: feeBreakdown.total,
         invoiceStatus: result.status,
-        status: result.status, // Add for consistency
+        status: result.status,
         invoiceUrl: result.invoiceUrl,
         purchaserName: `${profile.firstName} ${profile.lastName}`,
-        
-        // Standardized contact fields
         sponsorEmail: profile.email,
         sponsorPhone: profile.phone,
         contactEmail: profile.email,
         purchaserEmail: profile.email,
       };
       
-      // Save to localStorage
+      // *** FIX: SAVE TO FIRESTORE 'invoices' COLLECTION ***
+      const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
+      await setDoc(invoiceDocRef, newConfirmation);
+      
+      // Also save to localStorage for immediate UI update on sponsor's side
       const existingConfirmations = localStorage.getItem('confirmations');
       const allConfirmations = existingConfirmations ? JSON.parse(existingConfirmations) : [];
       allConfirmations.push(newConfirmation);
@@ -263,24 +254,18 @@ export function SponsorRegistrationDialog({
       const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
       localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
 
-      console.log('Invoice creation result details:', result);
-
-      // Set state to show the invoice details modal
       setCreatedInvoiceId(result.invoiceId);
       setShowInvoiceModal(true);
       toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
       
-      // Reset and close the registration dialog
       setSelectedStudents({});
       setShowConfirmation(false);
       onOpenChange(false);
       
-      // Trigger storage event to update other components
       window.dispatchEvent(new Event('storage'));
       
     } catch (error) {
-      console.error('Registration failed with full error:', error);
-      console.error('Error stack:', (error as Error).stack);
+      console.error('Registration failed:', error);
       const description = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({
         variant: 'destructive',
