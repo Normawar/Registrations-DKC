@@ -5,7 +5,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,9 +12,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useMasterDb } from '@/context/master-db-context';
 import Papa from 'papaparse';
 import { format } from 'date-fns';
-import { Upload, Download, UserPlus, FileText, CheckCircle, Loader2 } from 'lucide-react';
+import { Upload, Download, UserPlus, FileText, CheckCircle, Loader2, ClipboardPaste } from 'lucide-react';
 import { collection, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { Textarea } from '@/components/ui/textarea';
 
 interface VoucherAssignment {
   id: string;
@@ -39,13 +39,12 @@ interface VoucherAssignment {
 export default function VoucherManagementPage() {
   const { toast } = useToast();
   const { database, updatePlayer } = useMasterDb();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [availableVouchers, setAvailableVouchers] = useState<string[]>([]);
   const [pendingMemberships, setPendingMemberships] = useState<any[]>([]);
   const [assignedVouchers, setAssignedVouchers] = useState<VoucherAssignment[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [pastedVouchers, setPastedVouchers] = useState('');
 
   // Load data from Firestore on component mount
   const loadData = async () => {
@@ -115,19 +114,14 @@ export default function VoucherManagementPage() {
     return [...new Set(matches)];
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !db) return;
+  const handleImportVouchers = async () => {
+    if (!pastedVouchers.trim() || !db) return;
 
-    setIsUploading(true);
     try {
-        let extractedVouchers: string[] = [];
-        const text = await file.text();
-        extractedVouchers = extractVoucherNumbers(text);
+        const extractedVouchers = extractVoucherNumbers(pastedVouchers);
 
         if (extractedVouchers.length === 0) {
-            toast({ title: "No Vouchers Found", description: "The uploaded file did not contain any valid voucher numbers.", variant: "destructive" });
-            setIsUploading(false);
+            toast({ title: "No Vouchers Found", description: "No valid voucher numbers were found in the pasted text.", variant: "destructive" });
             return;
         }
 
@@ -141,14 +135,12 @@ export default function VoucherManagementPage() {
         await batch.commit();
 
         setAvailableVouchers(newVouchers);
-        toast({ title: "Vouchers Uploaded Successfully", description: `${extractedVouchers.length} new voucher numbers were added.` });
+        setPastedVouchers('');
+        toast({ title: "Vouchers Added Successfully", description: `${extractedVouchers.length} new voucher numbers were added.` });
 
     } catch (error) {
-        toast({ title: "Upload Error", variant: "destructive", description: "Could not read or process the file." });
+        toast({ title: "Import Error", variant: "destructive", description: "Could not process the pasted text." });
     }
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    setIsUploading(false);
   };
 
   const autoAssignVouchers = async () => {
@@ -288,7 +280,7 @@ export default function VoucherManagementPage() {
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="upload">Upload Vouchers</TabsTrigger>
+            <TabsTrigger value="upload">Import Vouchers</TabsTrigger>
             <TabsTrigger value="assign">Assign Vouchers</TabsTrigger>
             <TabsTrigger value="process">Process Vouchers</TabsTrigger>
           </TabsList>
@@ -360,20 +352,20 @@ export default function VoucherManagementPage() {
           <TabsContent value="upload" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Upload Voucher File</CardTitle>
-                <CardDescription>Upload a text-based file (TXT, CSV) containing USCF voucher numbers. The system will automatically extract voucher numbers in the format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX.</CardDescription>
+                <CardTitle>Paste Voucher Numbers</CardTitle>
+                <CardDescription>Copy voucher numbers from your PDF or other document and paste them into the text area below. The system will automatically find and extract valid voucher numbers.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-center w-full">
-                  <label htmlFor="voucher-upload" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-4 text-gray-500" />
-                      <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                      <p className="text-xs text-gray-500">TXT or CSV files only</p>
-                    </div>
-                    <input ref={fileInputRef} id="voucher-upload" type="file" className="hidden" accept=".csv,.txt" onChange={handleFileUpload} disabled={isUploading} />
-                  </label>
-                </div>
+                <Textarea
+                    placeholder="Paste voucher numbers here. The app will find any numbers in the format XXXXX-XXXXX-XXXXX-XXXXX-XXXXX."
+                    className="h-48"
+                    value={pastedVouchers}
+                    onChange={(e) => setPastedVouchers(e.target.value)}
+                />
+                <Button onClick={handleImportVouchers}>
+                    <ClipboardPaste className="h-4 w-4 mr-2"/>
+                    Import Vouchers from Text
+                </Button>
                 {availableVouchers.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Available Vouchers ({availableVouchers.length})</h3>
