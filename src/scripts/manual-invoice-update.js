@@ -19,29 +19,19 @@ async function updateInvoice() {
   const invoiceId = 'inv:0-ChBL5kS7M_QOXReaRrBzEhDkEJ8I';
   const invoiceRef = doc(db, 'invoices', invoiceId);
 
-  // --- 🚨 FILL IN THIS DATA 🚨 ---
-  // You need to get the list of players from your invoice screenshot.
-  // For each player, find their USCF ID and the section they were registered in.
+  // --- Data extracted from the invoice image ---
   const selectionsData = {
-    // Example for one player:
-    "16800831": { // This is the Player's USCF ID.
-      "section": "Middle School K-8", // The section they played in.
-      "status": "active",
-      "uscfStatus": "renewing" // Can be "current", "new", or "renewing".
-    },
-    // Add another player like this:
-    "PLAYER_ID_2": {
-      "section": "Championship",
-      "status": "active",
-      "uscfStatus": "current"
-    },
-    // ... add an entry for every player on the invoice.
+    "16800831": { "section": "Middle School K-8", "status": "active", "uscfStatus": "renewing" },
+    "30298794": { "section": "Middle School K-8", "status": "active", "uscfStatus": "renewing" },
+    "30347260": { "section": "Middle School K-8", "status": "active", "uscfStatus": "renewing" },
+    "30347282": { "section": "Middle School K-8", "status": "active", "uscfStatus": "renewing" },
+    "31487695": { "section": "Middle School K-8", "status": "active", "uscfStatus": "current" },
+    "31487845": { "section": "Middle School K-8", "status": "active", "uscfStatus": "current" },
+    "32114974": { "section": "Middle School K-8", "status": "active", "uscfStatus": "current" },
+    "NEW_Matthew_Gonzalez": { "section": "Middle School K-8", "status": "active", "uscfStatus": "new" },
+    "NEW_Dallas_Evans": { "section": "Middle School K-8", "status": "active", "uscfStatus": "new" },
+    "NEW_Ezra_Rivera": { "section": "Middle School K-8", "status": "active", "uscfStatus": "new" }
   };
-
-  if (Object.keys(selectionsData).length <= 1 && selectionsData.PLAYER_ID_2) {
-      console.error("❌ Please fill in the selectionsData object with real player information before running the script.");
-      return;
-  }
 
   console.log(`Updating invoice ${invoiceId} with ${Object.keys(selectionsData).length} player selections...`);
 
@@ -56,3 +46,4 @@ async function updateInvoice() {
 }
 
 updateInvoice().catch(console.error);
+
