@@ -44,19 +44,29 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
 
   useEffect(() => {
     const loadConfirmations = async () => {
-        if (isOpen && db) {
+        if (isOpen && db && profile) {
           const invoicesCol = collection(db, 'invoices');
           const invoiceSnapshot = await getDocs(invoicesCol);
           const allConfirmations = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-          let sponsorConfirmations = [];
-          if (profile.isDistrictCoordinator) {
-              sponsorConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
-          } else {
-              sponsorConfirmations = allConfirmations.filter((c: any) => c.schoolName === profile.school && c.district === profile.district);
+          let userConfirmations: any[] = [];
+          
+          if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+            if (profile.isDistrictCoordinator) {
+              // District coordinator sees all invoices in their district
+              userConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
+            } else {
+              // Standard sponsor sees only their school's invoices
+              userConfirmations = allConfirmations.filter((c: any) => c.schoolName === profile.school && c.district === profile.district);
+            }
+          } else if (profile.role === 'individual') {
+            // Individual user sees invoices matching their email
+            userConfirmations = allConfirmations.filter((c: any) => c.parentEmail === profile.email);
           }
-          setConfirmations(sponsorConfirmations);
+          
+          setConfirmations(userConfirmations);
         } else if (!isOpen) {
+          // Reset state when dialog closes
           setSelectedConfirmationId('');
           setRequestType('');
           setPlayerToRemove('');
@@ -179,9 +189,10 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Make a Change Request</DialogTitle>
-          <DialogDescription>
-            Select a registration and describe the change you need. This will be sent to an organizer for approval.
+          <DialogDescription className="sr-only">
+            Dialog for submitting a change request for a registered event.
           </DialogDescription>
+          <p className="text-sm text-muted-foreground">Select a registration and describe the change you need. This will be sent to an organizer for approval.</p>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
