@@ -21,6 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Search } from 'lucide-react';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { CSVUploadComponent } from '@/components/csv-upload';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
@@ -140,7 +142,7 @@ export default function PlayersPage() {
         description: `${values.firstName} ${values.lastName} has been added to the master database.`
       });
     } else {
-      await updatePlayer(updatedPlayerRecord);
+      await updatePlayer(updatedPlayerRecord, profile);
       toast({ 
         title: "Player Updated", 
         description: `${values.firstName} ${values.lastName}'s information has been updated.`
@@ -175,6 +177,16 @@ export default function PlayersPage() {
             </Button>
           </div>
         </div>
+
+        <Card>
+            <CardHeader>
+                <CardTitle>Bulk Upload</CardTitle>
+                <CardDescription>Upload a CSV file to add or update multiple players in the master database at once.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <CSVUploadComponent />
+            </CardContent>
+        </Card>
 
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="px-6 py-4 border-b border-gray-200">
