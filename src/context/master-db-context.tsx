@@ -821,7 +821,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             // USCF ID not found, try to match with a temp player
             const potentialMatches = allTempPlayers.filter(tempPlayer =>
               tempPlayer.firstName?.toLowerCase() === uscfPlayer.firstName?.toLowerCase() &&
-              tempPlayer.lastName?.toLowerCase() === uscfPlayer.lastName?.toLowerCase()
+              tempPlayer.lastName?.toLowerCase() === uscfPlayer.lastName?.toLowerCase() &&
+              tempPlayer.school?.toLowerCase() === uscfPlayer.school?.toLowerCase()
             );
   
             if (potentialMatches.length === 1) {
@@ -847,6 +848,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
                 ) {
                   const matchData = {
                     uscfId: uscfPlayer.uscfId,
+                    uscfHistoryUrl: `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${uscfPlayer.uscfId}`,
                     confidence: 'high' as const,
                     matchedOn: ['firstName', 'lastName'],
                     flaggedDate: new Date().toISOString(),

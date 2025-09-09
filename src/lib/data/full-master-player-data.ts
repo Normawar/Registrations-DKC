@@ -41,6 +41,7 @@ export type MasterPlayer = {
     flaggedDate: string;
     reviewedBy?: string;
     reviewStatus?: 'pending' | 'confirmed' | 'rejected';
+    uscfHistoryUrl?: string;
   };
 };
 

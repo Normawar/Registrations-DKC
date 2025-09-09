@@ -11,7 +11,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus, BadgeInfo, Download } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus, BadgeInfo, Download, Link as LinkIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -435,12 +435,20 @@ function SponsorRosterView() {
                     <p className="text-sm text-muted-foreground">
                       Current: Temp ID | Potential USCF ID: {player.potentialUscfMatch?.uscfId}
                     </p>
-                    <div className="mt-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <Badge variant={
                         player.potentialUscfMatch?.confidence === 'high' ? 'default' : 'secondary'
                       } className={player.potentialUscfMatch?.confidence === 'high' ? 'bg-green-600' : ''}>
                         {player.potentialUscfMatch?.confidence} confidence
                       </Badge>
+                      {player.potentialUscfMatch?.uscfHistoryUrl && (
+                        <a href={player.potentialUscfMatch.uscfHistoryUrl} target="_blank" rel="noopener noreferrer">
+                          <Button variant="link" size="sm" className="h-auto p-0 text-xs">
+                            <LinkIcon className="h-3 w-3 mr-1" />
+                            Verify on USCF
+                          </Button>
+                        </a>
+                      )}
                     </div>
                   </div>
                   <div className="space-x-2">
