@@ -56,6 +56,7 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
           } else if (profile.role === 'district_coordinator') {
             userConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
           } else if (profile.role === 'sponsor') {
+            // A sponsor should only see invoices they personally created
             userConfirmations = allConfirmations.filter((c: any) => c.sponsorEmail === profile.email);
           } else if (profile.role === 'individual') {
             userConfirmations = allConfirmations.filter((c: any) => c.parentEmail === profile.email);
@@ -187,10 +188,28 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
   };
 
   const getInvoiceDisplayTitle = (invoice: any): string => {
-    const title = invoice.invoiceTitle || invoice.eventName || 'Registration';
-    const school = invoice.schoolName || 'N/A';
+    // 1. Start with the most specific title if available.
+    let title = invoice.invoiceTitle || invoice.description;
+
+    // 2. If no specific title, use the purchaser's name.
+    if (!title && invoice.purchaserName) {
+        title = `Registration for ${invoice.purchaserName}`;
+    }
+
+    // 3. As a last resort for title, use the event name.
+    if (!title) {
+        title = invoice.eventName || 'Registration';
+    }
+
+    // 4. Append school name if it exists and is different from the title.
+    const school = invoice.schoolName;
+    if (school && school !== 'Individual Registration' && !title.includes(school)) {
+        title = `${title} - ${school}`;
+    }
+
+    // 5. Always append the unique invoice number for clarity.
     const invoiceNum = invoice.invoiceNumber || invoice.id?.slice(-6);
-    return `${title} - ${school} - #${invoiceNum}`;
+    return `${title} - #${invoiceNum}`;
   };
 
   return (
