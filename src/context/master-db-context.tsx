@@ -64,10 +64,10 @@ interface MasterDbContextType {
     players: MasterPlayer[], 
     onProgress?: (progress: { current: number; total: number; message: string }) => void
   ) => Promise<void>;
-  bulkUploadCSVWithProgress: (
+  bulkUploadCSV: (
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
-  ) => Promise<{ uploaded: number; errors: string[] }>; // New function
+  ) => Promise<{ uploaded: number; errors: string[] }>; // Renamed function
   clearDatabase: () => Promise<void>;
   updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
@@ -760,122 +760,121 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     return [...new Set(database.map(p => p.district).filter(Boolean))].sort() as string[];
   }, [database, isDbLoaded]);
 
-  const bulkUploadCSVWithProgress = async (
+  const bulkUploadCSV = async (
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
 ): Promise<{ uploaded: number; errors: string[]; }> => {
-    console.log('🚀 bulkUploadCSVWithProgress called with file:', csvFile.name);
     if (!db) throw new Error("Database not initialized");
-
     const updateProgress = (progress: Partial<UploadProgress>) => {
-        console.log('Progress update:', progress);
-        if (onProgress) {
-            const fullProgress: UploadProgress = {
-                stage: 'parsing', currentBatch: 0, totalBatches: 0,
-                uploadedRecords: 0, totalRecords: 0, percentage: 0,
-                message: 'Starting...', ...progress,
-            };
-            onProgress(fullProgress);
-        }
+      if (onProgress) {
+        const fullProgress: UploadProgress = {
+            stage: 'parsing', currentBatch: 0, totalBatches: 0,
+            uploadedRecords: 0, totalRecords: 0, percentage: 0,
+            message: 'Starting...', ...progress
+        };
+        onProgress(fullProgress);
+      }
     };
-
+  
     try {
-        updateProgress({ stage: 'parsing', message: 'Reading and parsing CSV file...' });
-        const csvText = await csvFile.text();
-        const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
-            Papa.parse(csvText, { header: true, skipEmptyLines: true, complete: resolve, error: reject });
-        });
-        const playersFromCsv = parseCSVData(parseResult.data);
-        if (playersFromCsv.length === 0) {
-            updateProgress({ stage: 'complete', message: 'No valid players found.', percentage: 100 });
-            return { uploaded: 0, errors: ['No valid players found in CSV'] };
-        }
-        
-        console.log(`Parsed ${playersFromCsv.length} players. Starting Firestore upload...`);
+      updateProgress({ stage: 'parsing', message: 'Reading and parsing CSV file...' });
+      const csvText = await csvFile.text();
+      const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
+        Papa.parse(csvText, { header: true, skipEmptyLines: true, complete: resolve, error: reject });
+      });
+      const playersFromCsv = parseCSVData(parseResult.data);
+      if (playersFromCsv.length === 0) {
+        updateProgress({ stage: 'complete', message: 'No valid players found.', percentage: 100 });
+        return { uploaded: 0, errors: ['No valid players found in CSV'] };
+      }
+  
+      updateProgress({ stage: 'uploading', totalRecords: playersFromCsv.length, message: 'Preparing to upload...' });
+  
+      const batchSize = 400;
+      const totalBatches = Math.ceil(playersFromCsv.length / batchSize);
+      let totalUploaded = 0;
+      let errors: string[] = [];
+  
+      const allTempPlayers = database.filter(p => p.id.startsWith('temp_'));
+  
+      for (let i = 0; i < playersFromCsv.length; i += batchSize) {
+        const batchPlayers = playersFromCsv.slice(i, i + batchSize);
+        const currentBatchNum = i / batchSize + 1;
+  
         updateProgress({
-            stage: 'uploading', totalRecords: playersFromCsv.length,
-            message: 'Preparing to upload players to the database...'
+          currentBatch: currentBatchNum, totalBatches, uploadedRecords: totalUploaded,
+          percentage: Math.round((totalUploaded / playersFromCsv.length) * 90),
+          message: `Processing batch ${currentBatchNum} of ${totalBatches}...`
         });
-
-        const batchSize = 400; // Firestore batch limit is 500 writes
-        const totalBatches = Math.ceil(playersFromCsv.length / batchSize);
-        let totalUploaded = 0;
-        let errors: string[] = [];
-
-        for (let i = 0; i < playersFromCsv.length; i += batchSize) {
-            const batchPlayers = playersFromCsv.slice(i, i + batchSize);
-            const currentBatchNum = i / batchSize + 1;
-
-            updateProgress({
-                currentBatch: currentBatchNum, totalBatches, uploadedRecords: totalUploaded,
-                percentage: Math.round((totalUploaded / playersFromCsv.length) * 90),
-                message: `Processing batch ${currentBatchNum} of ${totalBatches}...`
-            });
-
-            const batch = writeBatch(db);
-            const tempPlayerMatches: Map<string, MasterPlayer> = new Map();
-
-            // Pre-fetch temp players for matching based on name and school
-            const tempPlayersInBatch = batchPlayers.filter(p => !p.uscfId || p.uscfId.toUpperCase() === 'NEW' || p.uscfId.startsWith('temp_'));
-            if (tempPlayersInBatch.length > 0) {
-                const namesAndSchoolsToQuery = [...new Set(tempPlayersInBatch.map(p => `${p.firstName?.toLowerCase()}|${p.lastName?.toLowerCase()}|${p.school?.toLowerCase()}`))];
-                
-                // This is a simplification. A real-world scenario might need more complex querying or iterating through all temp players.
-                const existingTempPlayers = database.filter(dbPlayer => 
-                    dbPlayer.id.startsWith('temp_') &&
-                    namesAndSchoolsToQuery.includes(`${dbPlayer.firstName?.toLowerCase()}|${dbPlayer.lastName?.toLowerCase()}|${dbPlayer.school?.toLowerCase()}`)
-                );
-                existingTempPlayers.forEach(p => tempPlayerMatches.set(`${p.firstName?.toLowerCase()}|${p.lastName?.toLowerCase()}|${p.school?.toLowerCase()}`, p));
-            }
-
-            for (const player of batchPlayers) {
-                let docId = player.uscfId;
-                let existingDocData: MasterPlayer | undefined;
-
-                if (docId && docId.toUpperCase() !== 'NEW' && !docId.startsWith('temp_')) {
-                    const docSnap = await getDoc(doc(db, 'players', docId));
-                    if (docSnap.exists()) {
-                        existingDocData = docSnap.data() as MasterPlayer;
-                    }
-                } else {
-                    const matchKey = `${player.firstName?.toLowerCase()}|${player.lastName?.toLowerCase()}|${player.school?.toLowerCase()}`;
-                    const matchedTempPlayer = tempPlayerMatches.get(matchKey);
-
-                    if (matchedTempPlayer) {
-                        // Found a temp player match, migrate them
-                        await deleteDoc(doc(db, 'players', matchedTempPlayer.id)); // Delete the old temp doc
-                        docId = player.id; // Use the new USCF ID as the document ID
-                        existingDocData = matchedTempPlayer; // Use the data from the matched temp player as the base
-                        console.log(`Found match for ${player.firstName} ${player.lastName}. Migrating from temp ID ${matchedTempPlayer.id} to USCF ID ${docId}.`);
-                    } else {
-                        // No match found, this is a truly new player
-                        docId = generatePlayerId('NEW');
-                    }
+  
+        const batch = writeBatch(db);
+  
+        for (const uscfPlayer of batchPlayers) {
+          if (!uscfPlayer.uscfId || uscfPlayer.uscfId.toUpperCase() === 'NEW') continue;
+  
+          const existingPlayerDoc = await getDoc(doc(db, 'players', uscfPlayer.uscfId));
+  
+          if (existingPlayerDoc.exists()) {
+            // Standard update for existing player
+            batch.set(doc(db, 'players', uscfPlayer.uscfId), uscfPlayer, { merge: true });
+          } else {
+            // USCF ID not found, try to match with a temp player
+            const potentialMatches = allTempPlayers.filter(tempPlayer =>
+              tempPlayer.firstName?.toLowerCase() === uscfPlayer.firstName?.toLowerCase() &&
+              tempPlayer.lastName?.toLowerCase() === uscfPlayer.lastName?.toLowerCase()
+            );
+  
+            if (potentialMatches.length === 1) {
+              // Confident match found
+              const tempPlayerToUpdate = potentialMatches[0];
+              const updatedData = {
+                ...tempPlayerToUpdate, // Keep existing detailed data
+                ...uscfPlayer,        // Overwrite with USCF data
+                id: uscfPlayer.uscfId, // Set the new official ID
+                potentialUscfMatch: { // Clear the flag
+                  reviewStatus: 'confirmed' as const,
+                  reviewedBy: 'csv-upload-system',
                 }
-                
-                const finalPlayerData = { ...(existingDocData || {}), ...player, id: docId };
-                const cleanedPlayer = removeUndefined(finalPlayerData);
-                batch.set(doc(db, 'players', docId), cleanedPlayer, { merge: true });
+              };
+              batch.set(doc(db, 'players', uscfPlayer.uscfId), updatedData);
+              batch.delete(doc(db, 'players', tempPlayerToUpdate.id)); // Delete old temp record
+            } else {
+              // No confident match, flag for manual review
+              allTempPlayers.forEach(tempPlayer => {
+                if (
+                  tempPlayer.lastName?.toLowerCase() === uscfPlayer.lastName?.toLowerCase() &&
+                  tempPlayer.firstName?.toLowerCase() === uscfPlayer.firstName?.toLowerCase()
+                ) {
+                  const matchData = {
+                    uscfId: uscfPlayer.uscfId,
+                    confidence: 'high' as const,
+                    matchedOn: ['firstName', 'lastName'],
+                    flaggedDate: new Date().toISOString(),
+                    reviewStatus: 'pending' as const
+                  };
+                  batch.set(doc(db, 'players', tempPlayer.id), { potentialUscfMatch: matchData }, { merge: true });
+                }
+              });
             }
-
-            await batch.commit();
-            totalUploaded += batchPlayers.length;
+          }
         }
-
-        updateProgress({ stage: 'refreshing', percentage: 95, message: 'Uploads complete, refreshing local database...' });
-        await loadDatabase();
-        updateProgress({ stage: 'complete', percentage: 100, message: 'Process finished successfully.' });
-
-        return { uploaded: totalUploaded, errors };
+  
+        await batch.commit();
+        totalUploaded += batchPlayers.length; // This is an approximation of writes
+      }
+  
+      updateProgress({ stage: 'refreshing', percentage: 95, message: 'Uploads complete, refreshing local database...' });
+      await loadDatabase();
+      updateProgress({ stage: 'complete', percentage: 100, message: 'Process finished successfully.' });
+  
+      return { uploaded: playersFromCsv.length, errors };
     } catch (error) {
-        console.error('Enhanced CSV upload failed:', error);
-        updateProgress({
-            stage: 'complete', percentage: 0,
-            message: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-        });
-        throw error;
+      console.error('CSV upload failed:', error);
+      updateProgress({ stage: 'complete', percentage: 0, message: `Upload failed: ${error instanceof Error ? error.message : 'Unknown error'}` });
+      throw error;
     }
-};
+  };
+
 
   const value = {
     database,
@@ -883,7 +882,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     updatePlayer,
     deletePlayer,
     addBulkPlayers,
-    bulkUploadCSVWithProgress,
+    bulkUploadCSV, // Use renamed function
     clearDatabase,
     updateSchoolDistrict,
     isDbLoaded,
@@ -913,4 +912,3 @@ export const useMasterDb = () => {
   }
   return context;
 };
-
