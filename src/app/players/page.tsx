@@ -1,3 +1,4 @@
+
 // Updated src/app/players/page.tsx
 'use client';
 
@@ -99,7 +100,7 @@ export default function PlayersPage() {
       <EnhancedPlayerSearchDialog
         isOpen={isOpen}
         onOpenChange={setIsOpen}
-        onSelectPlayer={handleSelectPlayer}
+        onPlayerSelected={handleSelectPlayer}
         excludeIds={[]} // No exclusions for master database
         title="Search and Add Players"
       />
