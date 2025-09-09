@@ -62,6 +62,7 @@ const cancelInvoiceFlow = ai.defineFlow(
       const cancelableStatuses = ['DRAFT', 'PUBLISHED', 'UNPAID', 'PARTIALLY_PAID'];
       if (!invoice.status || !cancelableStatuses.includes(invoice.status)) {
         console.log(`Invoice ${input.invoiceId} is in status ${invoice.status} and cannot be canceled via API. It will be marked as comped locally.`);
+        // Return the definitive current status from Square
         return {
           invoiceId: invoice.id!,
           status: invoice.status || 'UNKNOWN',
@@ -76,6 +77,7 @@ const cancelInvoiceFlow = ai.defineFlow(
       
       console.log("Successfully canceled invoice:", canceledInvoice);
 
+      // Return the definitive final status from the cancellation response
       return {
         invoiceId: canceledInvoice!.id!,
         status: canceledInvoice!.status!,
@@ -91,7 +93,7 @@ const cancelInvoiceFlow = ai.defineFlow(
         );
 
         if (isNotCancelable) {
-             console.warn(`Invoice ${input.invoiceId} cannot be canceled through the API (likely already paid or in a final state). It will be marked as comped locally.`);
+             console.warn(`Invoice ${input.invoiceId} cannot be canceled through the API (likely already paid or in a final state). Fetching and returning its current state.`);
              const { result: { invoice } } = await invoicesApi.getInvoice(input.invoiceId);
              return { invoiceId: input.invoiceId, status: invoice?.status || 'UNKNOWN' };
         }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -302,20 +303,33 @@ export default function UnifiedInvoiceRegistrations() {
 
     setIsDeleting(true);
     try {
-      if (invoiceToDelete.invoiceId && invoiceToDelete.invoiceId.startsWith('inv:')) {
-        await cancelInvoice({ invoiceId: invoiceToDelete.invoiceId });
+      let finalStatus = 'CANCELED'; // Default status
+      if (invoiceToDelete.invoiceId) {
+        const result = await cancelInvoice({ invoiceId: invoiceToDelete.invoiceId });
+        finalStatus = result.status; // Get the authoritative status from Square
       }
       
+      const invoiceRef = doc(db, 'invoices', invoiceToDelete.id);
+      await setDoc(invoiceRef, { status: finalStatus, invoiceStatus: finalStatus }, { merge: true });
+      
+      // Update local storage as well for immediate UI update
       const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const updatedInvoices = allInvoices.map((inv: any) => inv.id === invoiceToDelete.id ? { ...inv, status: 'CANCELED', invoiceStatus: 'CANCELED' } : inv);
+      const updatedInvoices = allInvoices.map((inv: any) => inv.id === invoiceToDelete.id ? { ...inv, status: finalStatus, invoiceStatus: finalStatus } : inv);
       localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
-
+      
       await loadData();
       
-      toast({ title: 'Record Canceled', description: `Record for ${invoiceToDelete.invoiceTitle} has been marked as canceled.` });
+      toast({ 
+        title: 'Invoice Action Completed', 
+        description: `Invoice ${invoiceToDelete.invoiceNumber || invoiceToDelete.id} status is now ${finalStatus}.` 
+      });
     } catch (error) {
-      console.error("Failed to delete record:", error);
-      toast({ variant: 'destructive', title: 'Deletion Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
+      console.error("Failed to cancel invoice:", error);
+      toast({ 
+        variant: 'destructive', 
+        title: 'Action Failed', 
+        description: error instanceof Error ? error.message : 'An unknown error occurred.' 
+      });
     } finally {
       setIsDeleting(false);
       setIsAlertOpen(false);
