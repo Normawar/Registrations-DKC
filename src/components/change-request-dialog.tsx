@@ -48,6 +48,8 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
           const invoiceSnapshot = await getDocs(invoicesCol);
           const allConfirmations = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+          console.log('Sample invoice data:', allConfirmations[0]);
+
           let userConfirmations: any[] = [];
           
           if (profile.role === 'organizer') {
