@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -60,6 +59,7 @@ export default function UsersPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
     
     const uniqueDistricts = useMemo(() => {
         const districts = new Set(schoolData.map(s => s.district));
@@ -87,6 +87,19 @@ export default function UsersPage() {
     useEffect(() => {
         loadUsers();
     }, []);
+
+    const filteredUsers = useMemo(() => {
+        if (!searchTerm) {
+            return users;
+        }
+        const lowercasedTerm = searchTerm.toLowerCase();
+        return users.filter(user =>
+            (user.firstName?.toLowerCase() || '').includes(lowercasedTerm) ||
+            (user.lastName?.toLowerCase() || '').includes(lowercasedTerm) ||
+            (user.email?.toLowerCase() || '').includes(lowercasedTerm) ||
+            (user.school?.toLowerCase() || '').includes(lowercasedTerm)
+        );
+    }, [searchTerm, users]);
 
     const form = useForm<UserFormValues>({
         resolver: zodResolver(userFormSchema),
@@ -187,6 +200,14 @@ export default function UsersPage() {
                     <CardHeader>
                         <CardTitle>All System Users</CardTitle>
                         <CardDescription>A list of all registered users in the system.</CardDescription>
+                        <div className="pt-4">
+                            <Input
+                                placeholder="Search by name, email, or school..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="max-w-sm"
+                            />
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -200,7 +221,7 @@ export default function UsersPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {users.map((user, index) => (
+                                {filteredUsers.map((user, index) => (
                                     <TableRow key={`${user.email}-${index}`}>
                                         <TableCell className="font-mono">{user.email}</TableCell>
                                         <TableCell>{user.firstName} {user.lastName}</TableCell>
