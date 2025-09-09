@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -47,7 +46,7 @@ export default function UnifiedInvoiceRegistrations() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Enhanced loadData with comprehensive debugging
+  // FIXED: Event-based data loading (replacing the old invoices collection approach)
   const loadData = useCallback(async () => {
     if (!db || !profile) {
       console.log('❌ Missing db or profile:', { db: !!db, profile: !!profile });
@@ -55,7 +54,8 @@ export default function UnifiedInvoiceRegistrations() {
     }
     
     setIsLoading(true);
-    console.log('🔍 Loading data for profile:', {
+    console.log('🎯 === EVENT-BASED INVOICE SEARCH v3.0 ===');
+    console.log('Profile:', {
       role: profile.role,
       district: profile.district,
       school: profile.school,
@@ -63,17 +63,121 @@ export default function UnifiedInvoiceRegistrations() {
     });
     
     try {
-      const invoicesCol = collection(db, 'invoices');
-      const invoiceSnapshot = await getDocs(invoicesCol);
-      let firestoreInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      console.log('📊 Raw Firestore invoices:', firestoreInvoices.length);
+      let allInvoiceData: any[] = [];
       
-      // Debug: Log today's invoices specifically
+      // Strategy 1: Search event subcollections for registration/invoice data
+      console.log('📂 Searching all events for registration subcollections...');
+      const eventsCol = collection(db, 'events');
+      const eventsSnapshot = await getDocs(eventsCol);
+      
+      console.log(`Found ${eventsSnapshot.size} events to search`);
+      
+      for (const eventDoc of eventsSnapshot.docs) {
+        const eventData = eventDoc.data();
+        console.log(`🔍 Checking event: ${eventDoc.id} (${eventData.name || 'Unnamed'})`);
+        
+        // Check multiple possible subcollection names
+        const subCollectionNames = [
+          'confirmations',    // Most likely for registration confirmations
+          'registrations',    // Player registrations
+          'invoices',         // Direct invoices
+          'sponsors',         // Sponsor data
+          'players',          // Player entries
+          'entries',          // Tournament entries
+          'participants',     // Event participants
+          'signups',          // Event signups
+          'payments'          // Payment records
+        ];
+        
+        for (const subName of subCollectionNames) {
+          try {
+            const subCol = collection(eventDoc.ref, subName);
+            const subSnapshot = await getDocs(subCol);
+            
+            if (!subSnapshot.empty) {
+              console.log(`   ✅ Found '${subName}' subcollection: ${subSnapshot.size} documents`);
+              
+              // Sample first document to check structure
+              const firstDoc = subSnapshot.docs[0];
+              const sampleData = firstDoc.data();
+              console.log(`      Sample fields: ${Object.keys(sampleData).join(', ')}`);
+              
+              // Check if this looks like invoice/registration data
+              const invoiceIndicators = [
+                'invoiceNumber', 'invoiceId', 'totalInvoiced', 'sponsorEmail', 
+                'schoolName', 'registrations', 'selections', 'confirmationId',
+                'purchaserEmail', 'totalMoney', 'status', 'invoiceStatus'
+              ];
+              
+              const foundIndicators = invoiceIndicators.filter(field => sampleData.hasOwnProperty(field));
+              if (foundIndicators.length > 0) {
+                console.log(`      🎯 INVOICE DATA DETECTED! Fields: ${foundIndicators.join(', ')}`);
+              }
+              
+              // Add all documents from this subcollection
+              subSnapshot.docs.forEach((subDoc) => {
+                const subData = subDoc.data();
+                allInvoiceData.push({
+                  ...subData,
+                  id: `${eventDoc.id}-${subDoc.id}`, // Unique composite ID
+                  originalDocId: subDoc.id,
+                  parentEventId: eventDoc.id,
+                  parentEventName: eventData.name,
+                  parentEventDate: eventData.date,
+                  sourceType: `event-${subName}`,
+                  sourceCollection: subName
+                });
+              });
+            }
+          } catch (e) {
+            // Subcollection doesn't exist - normal
+          }
+        }
+      }
+      
+      console.log(`📊 Total documents found in event subcollections: ${allInvoiceData.length}`);
+      
+      // Strategy 2: Also check localStorage for confirmations
+      try {
+        const stored = localStorage.getItem('confirmations');
+        if (stored) {
+          const localConfirmations = JSON.parse(stored);
+          console.log(`💾 Found ${localConfirmations.length} items in localStorage`);
+          
+          localConfirmations.forEach((item: any, index: number) => {
+            allInvoiceData.push({
+              ...item,
+              id: item.id || `localStorage-${index}`,
+              sourceType: 'localStorage'
+            });
+          });
+        }
+      } catch (e) {
+        console.error('Error reading localStorage:', e);
+      }
+      
+      // Strategy 3: Check if there's actually an invoices collection (fallback)
+      try {
+        const invoicesCol = collection(db, 'invoices');
+        const invoiceSnapshot = await getDocs(invoicesCol);
+        if (!invoiceSnapshot.empty) {
+          console.log(`✅ Found ${invoiceSnapshot.size} documents in invoices collection`);
+          const invoiceDocs = invoiceSnapshot.docs.map(doc => ({ 
+            id: doc.id, 
+            ...doc.data(),
+            sourceType: 'invoices-collection'
+          }));
+          allInvoiceData.push(...invoiceDocs);
+        }
+      } catch (e) {
+        console.log('No invoices collection found');
+      }
+      
+      // Check for today's data specifically
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayInvoices = firestoreInvoices.filter(inv => {
-        const submissionDate = inv.submissionTimestamp ? new Date(inv.submissionTimestamp) : null;
+      const todayItems = allInvoiceData.filter(item => {
+        const submissionDate = item.submissionTimestamp ? new Date(item.submissionTimestamp) : null;
         if (submissionDate) {
           submissionDate.setHours(0, 0, 0, 0);
           return submissionDate.getTime() === today.getTime();
@@ -81,132 +185,112 @@ export default function UnifiedInvoiceRegistrations() {
         return false;
       });
       
-      console.log('📅 Today\'s invoices found:', todayInvoices.length, todayInvoices);
-
-      // Load from local storage
-      let localConfirmations: any[] = [];
-      try {
-        const stored = localStorage.getItem('confirmations');
-        if (stored) {
-          localConfirmations = JSON.parse(stored);
-        }
-      } catch(e) {
-        console.error("Failed to parse confirmations from local storage", e);
+      console.log(`📅 Today's registrations found: ${todayItems.length}`);
+      if (todayItems.length > 0) {
+        console.log('Sample today item:', todayItems[0]);
       }
-
-      console.log('💾 Local confirmations:', localConfirmations.length);
-
-      // Combine and deduplicate
-      const combinedData = [...firestoreInvoices, ...localConfirmations];
-      console.log('🔄 Combined data before dedup:', combinedData.length);
       
+      // Remove duplicates
       const uniqueDataMap = new Map();
-      combinedData.forEach(item => {
-        if (item.id) {
-          uniqueDataMap.set(item.id, { ...uniqueDataMap.get(item.id), ...item });
+      allInvoiceData.forEach(item => {
+        const key = item.id || item.confirmationId || item.invoiceId || `${item.sourceType}-${Math.random()}`;
+        if (!uniqueDataMap.has(key)) {
+          uniqueDataMap.set(key, { ...item, id: key });
+        } else {
+          // Merge data if duplicate found
+          uniqueDataMap.set(key, { ...uniqueDataMap.get(key), ...item });
         }
       });
-      let invoicesArray = Array.from(uniqueDataMap.values());
-      console.log('✨ After deduplication:', invoicesArray.length);
       
-      // Role-based filtering with enhanced logging
+      let invoicesArray = Array.from(uniqueDataMap.values());
+      console.log(`✨ After deduplication: ${invoicesArray.length}`);
+      
+      // Role-based filtering
       const beforeRoleFilter = invoicesArray.length;
-      console.log('👤 Applying role filter for:', profile.role);
+      console.log(`👤 Applying role filter for: ${profile.role}`);
       
       if (profile.role === 'organizer') {
-        console.log('🏢 Organizer role - showing all invoices (no filtering)');
+        console.log('🏢 Organizer role - showing ALL data (no filtering)');
         // Organizer sees all invoices, no filtering needed
       } else if (profile.role === 'district_coordinator') {
         invoicesArray = invoicesArray.filter((inv: any) => {
           const matches = inv.district === profile.district;
-          if (!matches) {
-            console.log('❌ Invoice filtered out by district:', inv.id, inv.district, 'vs', profile.district);
-          }
           return matches;
         });
-        console.log(`🏫 District coordinator filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
-        
-        if (profile.district === 'PHARR-SAN JUAN-ALAMO ISD') {
-          const beforeGTFilter = invoicesArray.length;
-          invoicesArray = invoicesArray.filter((inv: any) => inv.gtCoordinatorEmail && inv.gtCoordinatorEmail.trim() !== '');
-          console.log(`📧 GT Coordinator email filter: ${beforeGTFilter} -> ${invoicesArray.length}`);
-        }
+        console.log(`🏫 District filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
       } else if (profile.role === 'sponsor') {
         invoicesArray = invoicesArray.filter((inv: any) => {
           const matchesSchool = inv.schoolName === profile.school;
           const matchesDistrict = inv.district === profile.district;
-          if (!matchesSchool || !matchesDistrict) {
-            console.log('❌ Invoice filtered out by school/district:', inv.id, {
-              invoiceSchool: inv.schoolName,
-              profileSchool: profile.school,
-              invoiceDistrict: inv.district,
-              profileDistrict: profile.district
-            });
-          }
           return matchesSchool && matchesDistrict;
         });
         console.log(`🎓 Sponsor filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
       } else if (profile.role === 'individual') {
         invoicesArray = invoicesArray.filter((inv: any) => {
           const matches = inv.parentEmail === profile.email;
-          if (!matches) {
-            console.log('❌ Invoice filtered out by email:', inv.id, inv.parentEmail, 'vs', profile.email);
-          }
           return matches;
         });
         console.log(`👨‍👩‍👧‍👦 Individual filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
       }
 
-      console.log('🎯 Final filtered invoices:', invoicesArray.length);
+      console.log(`🎯 Final filtered data: ${invoicesArray.length}`);
       
-      const mapped = invoicesArray.map((invoice: any) => {
+      // Map to expected format
+      const mapped = invoicesArray.map((item: any) => {
         let registrations: any[] = [];
-        if (invoice.selections) {
-          registrations = Object.keys(invoice.selections).map(playerId => ({
+        if (item.selections) {
+          registrations = Object.keys(item.selections).map(playerId => ({
             id: playerId,
-            ...invoice.selections[playerId]
+            ...item.selections[playerId]
           }));
-        } else if (invoice.registrations) {
-          registrations = invoice.registrations;
+        } else if (item.registrations) {
+          registrations = Array.isArray(item.registrations) ? item.registrations : [];
         }
 
         const getInvoiceTitle = () => {
-          if (invoice.invoiceTitle && typeof invoice.invoiceTitle === 'string' && invoice.invoiceTitle.trim() !== '') {
-            return invoice.invoiceTitle.trim();
+          if (item.invoiceTitle && typeof item.invoiceTitle === 'string' && item.invoiceTitle.trim() !== '') {
+            return item.invoiceTitle.trim();
           }
-          if (invoice.eventName && typeof invoice.eventName === 'string' && invoice.eventName.trim() !== '') {
-            return invoice.eventName.trim();
+          if (item.eventName && typeof item.eventName === 'string' && item.eventName.trim() !== '') {
+            return item.eventName.trim();
           }
-          if (invoice.membershipType) {
-            return `USCF ${invoice.membershipType}`;
+          if (item.parentEventName) {
+            return item.parentEventName;
           }
-          if (invoice.title) {
-            return invoice.title;
+          if (item.membershipType) {
+            return `USCF ${item.membershipType}`;
           }
-          return 'Unknown Event';
+          if (item.title) {
+            return item.title;
+          }
+          return 'Registration Data';
         };
 
         return {
-          ...invoice,
-          id: invoice.id || invoice.invoiceId || invoice.eventId,
+          ...item,
+          id: item.id,
           invoiceTitle: getInvoiceTitle(),
-          companyName: invoice.schoolName || invoice.purchaserName || invoice.school || 'Unknown',
-          contactEmail: invoice.sponsorEmail || invoice.purchaserEmail || invoice.email || 'Unknown',
-          totalAmount: invoice.totalInvoiced || invoice.totalAmount || (invoice.totalMoney?.amount ? parseFloat(invoice.totalMoney.amount) : 0),
-          status: invoice.invoiceStatus || invoice.status || 'UNKNOWN',
+          companyName: item.schoolName || item.purchaserName || item.school || 'Unknown',
+          contactEmail: item.sponsorEmail || item.purchaserEmail || item.email || 'Unknown',
+          totalAmount: item.totalInvoiced || item.totalAmount || (item.totalMoney?.amount ? parseFloat(item.totalMoney.amount) : 0),
+          status: item.invoiceStatus || item.status || 'UNKNOWN',
           registrations: registrations,
         };
       });
       
-      console.log('📋 Final mapped data:', mapped.length);
+      console.log(`📋 Final mapped data: ${mapped.length}`);
+      if (mapped.length > 0) {
+        console.log('Sample mapped item:', mapped[0]);
+      }
+      
       setData(mapped);
       
     } catch (error) {
-      console.error('❌ Error loading unified data from Firestore:', error);
+      console.error('❌ Error in event-based search:', error);
       toast({
         variant: 'destructive',
         title: 'Error Loading Data',
-        description: 'Failed to load invoices. Please try refreshing the page.'
+        description: 'Failed to load registration data. Please try refreshing the page.'
       });
       setData([]);
     } finally {
@@ -220,7 +304,7 @@ export default function UnifiedInvoiceRegistrations() {
     await loadData();
     toast({
       title: 'Data Refreshed',
-      description: 'Invoice data has been reloaded from the database.'
+      description: 'Registration data has been reloaded from all events.'
     });
   }, [loadData, toast]);
   
@@ -264,8 +348,9 @@ export default function UnifiedInvoiceRegistrations() {
         (item.invoiceTitle || '').toLowerCase().includes(lowerSearchTerm) ||
         (item.companyName || '').toLowerCase().includes(lowerSearchTerm) ||
         (item.contactEmail || '').toLowerCase().includes(lowerSearchTerm) ||
+        (item.parentEventName || '').toLowerCase().includes(lowerSearchTerm) ||
         (Array.isArray(item.registrations) && item.registrations.some((reg: any) => 
-          (reg.studentName || '').toLowerCase().includes(lowerSearchTerm) ||
+          (reg.studentName || reg.name || '').toLowerCase().includes(lowerSearchTerm) ||
           (reg.school || '').toLowerCase().includes(lowerSearchTerm)
         ));
 
@@ -279,13 +364,13 @@ export default function UnifiedInvoiceRegistrations() {
       let aValue, bValue;
 
       switch (sortField) {
-        case 'invoiceNumber': aValue = a.invoiceNumber || ''; bValue = b.invoiceNumber || ''; break;
+        case 'invoiceNumber': aValue = a.invoiceNumber || a.originalDocId || ''; bValue = b.invoiceNumber || b.originalDocId || ''; break;
         case 'companyName': aValue = a.companyName || ''; bValue = b.companyName || ''; break;
         case 'invoiceTitle': aValue = a.invoiceTitle || ''; bValue = b.invoiceTitle || ''; break;
         case 'amount': aValue = a.totalAmount || 0; bValue = b.totalAmount || 0; break;
         case 'status': aValue = a.status || ''; bValue = b.status || ''; break;
         case 'studentCount': aValue = a.registrations?.length || 0; bValue = b.registrations?.length || 0; break;
-        case 'eventDate': aValue = a.eventDate ? new Date(a.eventDate).getTime() : 0; bValue = b.eventDate ? new Date(b.eventDate).getTime() : 0; break;
+        case 'eventDate': aValue = a.eventDate || a.parentEventDate ? new Date(a.eventDate || a.parentEventDate).getTime() : 0; bValue = b.eventDate || b.parentEventDate ? new Date(b.eventDate || b.parentEventDate).getTime() : 0; break;
         case 'submissionTimestamp': default: aValue = a.submissionTimestamp ? new Date(a.submissionTimestamp).getTime() : 0; bValue = b.submissionTimestamp ? new Date(b.submissionTimestamp).getTime() : 0; break;
       }
       
@@ -322,6 +407,8 @@ export default function UnifiedInvoiceRegistrations() {
         await cancelInvoice({ invoiceId: invoiceToDelete.invoiceId });
       }
 
+      // Note: For event-based data, deletion logic may need to be different
+      // This assumes there's still an invoices collection for the canceled status
       const invoiceRef = doc(db, 'invoices', invoiceToDelete.id);
       await setDoc(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED' }, { merge: true });
       
@@ -428,9 +515,9 @@ export default function UnifiedInvoiceRegistrations() {
 
         {/* Debug info for development */}
         {process.env.NODE_ENV === 'development' && (
-          <Card className="border-orange-200 bg-orange-50">
+          <Card className="border-blue-200 bg-blue-50">
             <CardHeader>
-              <CardTitle className="text-orange-800">Debug Info</CardTitle>
+              <CardTitle className="text-blue-800">Event-Based Search Active</CardTitle>
             </CardHeader>
             <CardContent className="text-sm">
               <div className="grid grid-cols-2 gap-4">
@@ -438,7 +525,13 @@ export default function UnifiedInvoiceRegistrations() {
                   <strong>Profile:</strong> {profile?.role} | {profile?.school} | {profile?.district}
                 </div>
                 <div>
-                  <strong>Data:</strong> {data.length} raw | {filteredAndSortedData.length} filtered
+                  <strong>Data Sources:</strong> Event subcollections + localStorage
+                </div>
+                <div>
+                  <strong>Data Found:</strong> {data.length} items | {filteredAndSortedData.length} filtered
+                </div>
+                <div>
+                  <strong>Search Method:</strong> Events → Subcollections → Registration Data
                 </div>
               </div>
             </CardContent>
@@ -459,7 +552,7 @@ export default function UnifiedInvoiceRegistrations() {
               ) : (
                 <Skeleton className="h-8 w-3/4" />
               )}
-              <p className="text-xs text-muted-foreground">Across all invoices</p>
+              <p className="text-xs text-muted-foreground">Across all registrations</p>
             </CardContent>
           </Card>
           
@@ -495,7 +588,7 @@ export default function UnifiedInvoiceRegistrations() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Invoices</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Records</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -504,7 +597,7 @@ export default function UnifiedInvoiceRegistrations() {
                ) : (
                  <Skeleton className="h-8 w-1/2" />
                )}
-              <p className="text-xs text-muted-foreground">in the system</p>
+              <p className="text-xs text-muted-foreground">registration records</p>
             </CardContent>
           </Card>
         </div>
@@ -545,7 +638,7 @@ export default function UnifiedInvoiceRegistrations() {
           <CardHeader>
             <CardTitle>All Invoices & Registrations</CardTitle>
             <CardDescription>
-              Showing {filteredAndSortedData.length} invoice(s) with complete registration details
+              Showing {filteredAndSortedData.length} registration record(s) from event subcollections
               {isLoading && " (Loading...)"}
             </CardDescription>
           </CardHeader>
@@ -556,12 +649,12 @@ export default function UnifiedInvoiceRegistrations() {
                   <tr className="border-b">
                     <th className="text-left p-2">
                       <Button variant="ghost" className="h-auto p-0 font-semibold" onClick={() => handleSort('invoiceNumber')}>
-                        Invoice # {getSortIcon('invoiceNumber')}
+                        ID / Invoice # {getSortIcon('invoiceNumber')}
                       </Button>
                     </th>
                     <th className="text-left p-2">
                       <Button variant="ghost" className="h-auto p-0 font-semibold" onClick={() => handleSort('invoiceTitle')}>
-                        Invoice Title {getSortIcon('invoiceTitle')}
+                        Event / Title {getSortIcon('invoiceTitle')}
                       </Button>
                     </th>
                     <th className="text-left p-2">
@@ -603,9 +696,21 @@ export default function UnifiedInvoiceRegistrations() {
                       ))
                   ) : filteredAndSortedData.map((invoice) => (
                     <tr key={invoice.id} className="border-b hover:bg-muted/50">
-                      <td className="p-2 font-medium">#{invoice.invoiceNumber}</td>
+                      <td className="p-2 font-medium">
+                        <div>#{invoice.invoiceNumber || invoice.originalDocId || 'N/A'}</div>
+                        {invoice.sourceType && (
+                          <div className="text-xs text-muted-foreground">
+                            {invoice.sourceType}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-2">
                         <div className="font-medium">{invoice.invoiceTitle}</div>
+                        {invoice.parentEventName && invoice.parentEventName !== invoice.invoiceTitle && (
+                          <div className="text-xs text-muted-foreground">
+                            Event: {invoice.parentEventName}
+                          </div>
+                        )}
                       </td>
                       <td className="p-2">
                         <div className="space-y-1">
@@ -620,7 +725,7 @@ export default function UnifiedInvoiceRegistrations() {
                             {invoice.registrations?.length || 0}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {invoice.registrations?.slice(0, 2).map((reg: any) => reg.studentName).join(', ')}
+                            {invoice.registrations?.slice(0, 2).map((reg: any) => reg.studentName || reg.name).filter(Boolean).join(', ')}
                             {invoice.registrations?.length > 2 && ` +${invoice.registrations.length - 2} more`}
                           </div>
                         </div>
@@ -680,9 +785,12 @@ export default function UnifiedInvoiceRegistrations() {
 
             {clientReady && !isLoading && filteredAndSortedData.length === 0 && (
               <div className="text-center py-8">
-                <p className="text-muted-foreground">No invoices found matching your criteria.</p>
+                <p className="text-muted-foreground">No registration records found matching your criteria.</p>
                 {data.length === 0 && (
-                  <div className="mt-4">
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      This search looks for registration data in event subcollections.
+                    </p>
                     <Button onClick={handleManualRefresh} variant="outline">
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Try Refreshing
@@ -711,7 +819,7 @@ export default function UnifiedInvoiceRegistrations() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete invoice #{invoiceToDelete?.invoiceNumber}. If this is a Square invoice, it will also be canceled. This action cannot be undone.
+              This will permanently delete record #{invoiceToDelete?.invoiceNumber || invoiceToDelete?.originalDocId}. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -722,7 +830,7 @@ export default function UnifiedInvoiceRegistrations() {
               disabled={isDeleting}
             >
               {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete Invoice
+              Delete Record
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
