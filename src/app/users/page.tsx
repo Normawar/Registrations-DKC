@@ -6,13 +6,14 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { collection, getDocs, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import Papa from 'papaparse';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -222,6 +223,45 @@ export default function UsersPage() {
         }
     };
 
+    const handleExportPsjaUsers = () => {
+        const psjaUsers = users.filter(user => user.email.toLowerCase().endsWith('@psjaisd.us'));
+        if (psjaUsers.length === 0) {
+            toast({
+                title: 'No Users Found',
+                description: 'There are no users with a @psjaisd.us email address to export.',
+            });
+            return;
+        }
+
+        const dataToExport = psjaUsers.map(user => ({
+            'First Name': user.firstName,
+            'Last Name': user.lastName,
+            'Email': user.email,
+            'Phone': user.phone,
+            'Role': user.role,
+            'School': user.school,
+            'District': user.district,
+            'Is District Coordinator': user.isDistrictCoordinator ? 'Yes' : 'No',
+            'Bookkeeper Email': user.bookkeeperEmail,
+            'GT Coordinator Email': user.gtCoordinatorEmail,
+        }));
+
+        const csv = Papa.unparse(dataToExport);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'psja_users_export.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast({
+            title: 'Export Successful',
+            description: `${psjaUsers.length} PSJA users have been exported.`,
+        });
+    };
+
     const selectedDistrict = form.watch('district');
     const selectedRole = form.watch('role');
 
@@ -237,13 +277,17 @@ export default function UsersPage() {
                     <CardHeader>
                         <CardTitle>All System Users</CardTitle>
                         <CardDescription>A list of all registered users in the system.</CardDescription>
-                        <div className="pt-4">
+                        <div className="pt-4 flex gap-2">
                             <Input
                                 placeholder="Search by name, email, or school..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="max-w-sm"
                             />
+                            <Button onClick={handleExportPsjaUsers} variant="outline">
+                                <Download className="h-4 w-4 mr-2" />
+                                Export PSJA Users
+                            </Button>
                         </div>
                     </CardHeader>
                     <CardContent>
