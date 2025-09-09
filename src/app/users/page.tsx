@@ -191,8 +191,8 @@ export default function UsersPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {users.map(user => (
-                                    <TableRow key={user.email}>
+                                {users.map((user, index) => (
+                                    <TableRow key={`${user.email}-${index}`}>
                                         <TableCell className="font-mono">{user.email}</TableCell>
                                         <TableCell>{user.firstName} {user.lastName}</TableCell>
                                         <TableCell className='capitalize'>
