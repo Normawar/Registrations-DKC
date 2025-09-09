@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Trash2, FilePenLine } from 'lucide-react';
+import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -35,6 +36,8 @@ type User = {
     bookkeeperEmail?: string;
     gtCoordinatorEmail?: string;
 };
+
+type SortableColumn = 'email' | 'lastName' | 'role' | 'school';
 
 const userFormSchema = z.object({
   email: z.string().email(),
@@ -60,6 +63,7 @@ export default function UsersPage() {
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [sortConfig, setSortConfig] = useState<{ key: SortableColumn; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
     
     const uniqueDistricts = useMemo(() => {
         const districts = new Set(schoolData.map(s => s.district));
@@ -100,6 +104,39 @@ export default function UsersPage() {
             (user.school?.toLowerCase() || '').includes(lowercasedTerm)
         );
     }, [searchTerm, users]);
+
+    const sortedUsers = useMemo(() => {
+        let sortableUsers = [...filteredUsers];
+        if (sortConfig !== null) {
+            sortableUsers.sort((a, b) => {
+                const aValue = (a[sortConfig.key as keyof User] as string | undefined)?.toLowerCase() || '';
+                const bValue = (b[sortConfig.key as keyof User] as string | undefined)?.toLowerCase() || '';
+                if (aValue < bValue) {
+                    return sortConfig.direction === 'ascending' ? -1 : 1;
+                }
+                if (aValue > bValue) {
+                    return sortConfig.direction === 'ascending' ? 1 : -1;
+                }
+                return 0;
+            });
+        }
+        return sortableUsers;
+    }, [filteredUsers, sortConfig]);
+
+    const requestSort = (key: SortableColumn) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+            direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const getSortIcon = (name: SortableColumn) => {
+        if (!sortConfig || sortConfig.key !== name) {
+            return <ArrowUpDown className="h-4 w-4" />;
+        }
+        return sortConfig.direction === 'ascending' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
+    };
 
     const form = useForm<UserFormValues>({
         resolver: zodResolver(userFormSchema),
@@ -213,16 +250,32 @@ export default function UsersPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Name</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>School / District</TableHead>
+                                    <TableHead>
+                                        <Button variant="ghost" onClick={() => requestSort('email')} className="px-0">
+                                            Email {getSortIcon('email')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead>
+                                        <Button variant="ghost" onClick={() => requestSort('lastName')} className="px-0">
+                                            Name {getSortIcon('lastName')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead>
+                                        <Button variant="ghost" onClick={() => requestSort('role')} className="px-0">
+                                            Role {getSortIcon('role')}
+                                        </Button>
+                                    </TableHead>
+                                    <TableHead>
+                                        <Button variant="ghost" onClick={() => requestSort('school')} className="px-0">
+                                            School / District {getSortIcon('school')}
+                                        </Button>
+                                    </TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredUsers.map((user, index) => (
-                                    <TableRow key={`${user.email}-${index}`}>
+                                {sortedUsers.map((user) => (
+                                    <TableRow key={user.email}>
                                         <TableCell className="font-mono">{user.email}</TableCell>
                                         <TableCell>{user.firstName} {user.lastName}</TableCell>
                                         <TableCell className='capitalize'>
