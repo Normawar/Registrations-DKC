@@ -22,6 +22,7 @@ const PlayerInvoiceInfoSchema = z.object({
   baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
   lateFee: z.number().describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
+  isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
 });
 
 const CreateInvoiceInputSchema = z.object({
@@ -169,7 +170,16 @@ const createInvoiceFlow = ai.defineFlow(
       }
 
       // 3. USCF Membership Line Item
-      const uscfActionPlayers = input.players.filter(p => p.uscfAction);
+      const uscfActionPlayers = input.players.filter(p => {
+          if (!p.uscfAction) return false;
+          // For PSJA district, only charge for USCF if the player is NOT a GT player
+          if (input.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+              return !p.isGtPlayer;
+          }
+          // For all other districts, charge if uscfAction is true
+          return true;
+      });
+
       if (uscfActionPlayers.length > 0) {
           const uscfPlayerNotes = uscfActionPlayers.map((p, index) => `${index + 1}. ${p.playerName}`).join('\n');
           lineItems.push({
@@ -179,7 +189,7 @@ const createInvoiceFlow = ai.defineFlow(
                   amount: BigInt(Math.round(input.uscfFee * 100)),
                   currency: 'USD',
               },
-              note: uscfPlayerNotes,
+              note: `This fee applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`,
           });
       }
 

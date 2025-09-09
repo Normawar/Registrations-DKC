@@ -100,6 +100,7 @@ function DistrictRegistrationsContent() {
       'School': reg.player.school,
       'Grade': reg.player.grade,
       'Section': reg.details.section,
+      'USCF Status': reg.details.uscfStatus,
       'Player Type': reg.player.studentType || 'Regular',
       'Invoice #': reg.invoiceNumber || 'N/A'
     }));
@@ -165,6 +166,7 @@ function DistrictRegistrationsContent() {
                       <TableHead>Grade</TableHead>
                       <TableHead>Rating</TableHead>
                       <TableHead>Section</TableHead>
+                      <TableHead>USCF Status</TableHead>
                       <TableHead>Invoice</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -175,6 +177,11 @@ function DistrictRegistrationsContent() {
                         <TableCell>{reg.player.grade}</TableCell>
                         <TableCell>{reg.player.regularRating || 'UNR'}</TableCell>
                         <TableCell>{reg.details.section}</TableCell>
+                        <TableCell>
+                            <Badge variant={reg.details.uscfStatus === 'current' ? 'default' : 'destructive'} className={reg.details.uscfStatus === 'current' ? `bg-green-600` : ''}>
+                                {reg.details.uscfStatus}
+                            </Badge>
+                        </TableCell>
                         <TableCell>{reg.invoiceNumber || 'N/A'}</TableCell>
                       </TableRow>
                     ))}

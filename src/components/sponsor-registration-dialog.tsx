@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -145,9 +146,21 @@ export function SponsorRegistrationDialog({
     const baseTotal = selectedCount * event.regularFee;
     const lateFeeTotal = selectedCount * (currentFee - event.regularFee);
     
-    const uscfCount = Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current').length;
+    let uscfTotal = 0;
     const uscfFee = 24;
-    const uscfTotal = uscfCount * uscfFee;
+    
+    const uscfPlayersToCharge = Object.entries(selectedStudents).filter(([playerId, details]) => {
+      if (details.uscfStatus === 'current') return false;
+      
+      if (profile?.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+        const player = rosterPlayers.find(p => p.id === playerId);
+        return player?.studentType !== 'gt';
+      }
+      
+      return true;
+    });
+
+    uscfTotal = uscfPlayersToCharge.length * uscfFee;
     
     return {
       registrationFees: baseTotal,
@@ -189,6 +202,7 @@ export function SponsorRegistrationDialog({
           baseRegistrationFee: event.regularFee,
           lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
           uscfAction: details.uscfStatus !== 'current',
+          isGtPlayer: student?.studentType === 'gt'
         };
       });
 
@@ -349,6 +363,14 @@ export function SponsorRegistrationDialog({
               {format(new Date(event.date), 'PPP')} • {event.location}
             </p>
           </DialogHeader>
+           {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+              <Alert>
+                  <AlertTitle>PSJA District Notice</AlertTitle>
+                  <AlertDescription>
+                      USCF membership fees for students identified as GT will not be charged on this invoice. The district will handle these memberships separately.
+                  </AlertDescription>
+              </Alert>
+            )}
 
           <div className="space-y-4 flex-1 overflow-y-auto pr-6 -mr-6">
             {rosterPlayers.length === 0 ? (
@@ -383,6 +405,7 @@ export function SponsorRegistrationDialog({
                             <div className="flex-1">
                               <h4 className="font-semibold">
                                 {student.firstName} {student.lastName}
+                                {student.studentType === 'gt' && <Badge variant="secondary" className="ml-2">GT</Badge>}
                               </h4>
                               <div className="text-sm text-muted-foreground space-y-1">
                                 <p>USCF ID: {student.uscfId} | Rating: {student.regularRating || 'UNR'}</p>
@@ -539,7 +562,7 @@ export function SponsorRegistrationDialog({
                 
                 {feeBreakdown.uscfFees > 0 && (
                   <div className="flex justify-between">
-                    <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current').length} × $24)</span>
+                    <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current' && !rosterPlayers.find(p => p.id === Object.keys(selectedStudents)[Object.values(selectedStudents).indexOf(s)])?.studentType?.includes('gt')).length} × $24)</span>
                     <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
                   </div>
                 )}
