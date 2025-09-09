@@ -815,34 +815,40 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             const batch = writeBatch(db);
             const tempPlayerMatches: Map<string, MasterPlayer> = new Map();
 
-            // Pre-fetch temp players for matching
-            const tempPlayersInBatch = batchPlayers.filter(p => !p.id || p.id.startsWith('temp_'));
+            // Pre-fetch temp players for matching based on name and school
+            const tempPlayersInBatch = batchPlayers.filter(p => !p.uscfId || p.uscfId.toUpperCase() === 'NEW' || p.uscfId.startsWith('temp_'));
             if (tempPlayersInBatch.length > 0) {
-                const namesToQuery = [...new Set(tempPlayersInBatch.map(p => `${p.firstName?.toLowerCase()}|${p.lastName?.toLowerCase()}`))];
+                const namesAndSchoolsToQuery = [...new Set(tempPlayersInBatch.map(p => `${p.firstName?.toLowerCase()}|${p.lastName?.toLowerCase()}|${p.school?.toLowerCase()}`))];
+                
+                // This is a simplification. A real-world scenario might need more complex querying or iterating through all temp players.
                 const existingTempPlayers = database.filter(dbPlayer => 
                     dbPlayer.id.startsWith('temp_') &&
-                    namesToQuery.includes(`${dbPlayer.firstName?.toLowerCase()}|${dbPlayer.lastName?.toLowerCase()}`)
+                    namesAndSchoolsToQuery.includes(`${dbPlayer.firstName?.toLowerCase()}|${dbPlayer.lastName?.toLowerCase()}|${dbPlayer.school?.toLowerCase()}`)
                 );
-                existingTempPlayers.forEach(p => tempPlayerMatches.set(`${p.firstName?.toLowerCase()}|${p.lastName?.toLowerCase()}|${p.dob ? new Date(p.dob).toISOString().split('T')[0] : ''}`, p));
+                existingTempPlayers.forEach(p => tempPlayerMatches.set(`${p.firstName?.toLowerCase()}|${p.lastName?.toLowerCase()}|${p.school?.toLowerCase()}`, p));
             }
 
             for (const player of batchPlayers) {
                 let docId = player.uscfId;
                 let existingDocData: MasterPlayer | undefined;
 
-                if (docId && docId.toUpperCase() !== 'NEW') {
+                if (docId && docId.toUpperCase() !== 'NEW' && !docId.startsWith('temp_')) {
                     const docSnap = await getDoc(doc(db, 'players', docId));
                     if (docSnap.exists()) {
                         existingDocData = docSnap.data() as MasterPlayer;
                     }
                 } else {
-                    const matchKey = `${player.firstName?.toLowerCase()}|${player.lastName?.toLowerCase()}|${player.dob ? new Date(player.dob).toISOString().split('T')[0] : ''}`;
+                    const matchKey = `${player.firstName?.toLowerCase()}|${player.lastName?.toLowerCase()}|${player.school?.toLowerCase()}`;
                     const matchedTempPlayer = tempPlayerMatches.get(matchKey);
+
                     if (matchedTempPlayer) {
-                        await deleteDoc(doc(db, 'players', matchedTempPlayer.id));
-                        docId = player.id; // Use the new USCF ID
-                        existingDocData = matchedTempPlayer;
+                        // Found a temp player match, migrate them
+                        await deleteDoc(doc(db, 'players', matchedTempPlayer.id)); // Delete the old temp doc
+                        docId = player.id; // Use the new USCF ID as the document ID
+                        existingDocData = matchedTempPlayer; // Use the data from the matched temp player as the base
+                        console.log(`Found match for ${player.firstName} ${player.lastName}. Migrating from temp ID ${matchedTempPlayer.id} to USCF ID ${docId}.`);
                     } else {
+                        // No match found, this is a truly new player
                         docId = generatePlayerId('NEW');
                     }
                 }
