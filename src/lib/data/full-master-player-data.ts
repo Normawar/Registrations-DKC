@@ -22,6 +22,16 @@ export type MasterPlayer = {
   eventIds: string[];
   createdAt?: string; // ISO date string
   updatedAt?: string; // ISO date string
+  changeHistory?: {
+    timestamp: string;
+    userId: string;
+    userName: string;
+    changes: {
+      field: string;
+      oldValue: any;
+      newValue: any;
+    }[];
+  }[];
 
   // Add these new fields for potential matches
   potentialUscfMatch?: {

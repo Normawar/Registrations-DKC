@@ -58,7 +58,7 @@ export type SearchResult = {
 interface MasterDbContextType {
   database: MasterPlayer[];
   addPlayer: (player: MasterPlayer) => Promise<void>;
-  updatePlayer: (player: MasterPlayer) => Promise<void>;
+  updatePlayer: (player: MasterPlayer, editingProfile: SponsorProfile) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
    addBulkPlayers: (
     players: MasterPlayer[], 
@@ -459,11 +459,48 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     setDatabase([]);
   };
 
-  const updatePlayer = async (updatedPlayer: MasterPlayer) => {
+  const updatePlayer = async (updatedPlayer: MasterPlayer, editingProfile: SponsorProfile) => {
     if (!db) return;
+
+    const oldPlayer = database.find(p => p.id === updatedPlayer.id);
+    if (!oldPlayer) {
+        console.error("Could not find original player to create change history.");
+        return addPlayer(updatedPlayer); // Fallback to add if not found
+    }
+
+    const changedFields: { field: string; oldValue: any; newValue: any }[] = [];
+    (Object.keys(updatedPlayer) as Array<keyof MasterPlayer>).forEach(key => {
+        if (updatedPlayer[key] !== oldPlayer[key]) {
+            changedFields.push({
+                field: key,
+                oldValue: oldPlayer[key],
+                newValue: updatedPlayer[key],
+            });
+        }
+    });
+
+    let finalPlayer = { ...updatedPlayer };
+
+    if (changedFields.length > 0) {
+        const newHistoryEntry = {
+            timestamp: new Date().toISOString(),
+            userId: editingProfile?.uid || 'unknown',
+            userName: `${editingProfile?.firstName} ${editingProfile?.lastName}`.trim() || editingProfile?.email || 'Unknown User',
+            changes: changedFields,
+        };
+
+        finalPlayer = {
+            ...updatedPlayer,
+            changeHistory: [...(oldPlayer.changeHistory || []), newHistoryEntry],
+            updatedAt: new Date().toISOString(),
+        };
+    } else {
+        // No changes, no need to update
+        return;
+    }
     
-    const oldId = updatedPlayer.id;
-    const newUscfId = updatedPlayer.uscfId;
+    const oldId = finalPlayer.id;
+    const newUscfId = finalPlayer.uscfId;
     
     // Check if USCF ID changed from temp ID to real USCF ID
     const isIdMigration = oldId.startsWith('temp_') && 
@@ -474,7 +511,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     if (isIdMigration) {
       const newId = newUscfId;
       const playerWithNewId = {
-        ...updatedPlayer,
+        ...finalPlayer,
         id: newId,
         updatedAt: new Date().toISOString()
       };
@@ -488,11 +525,11 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         prevDb.map(p => p.id === oldId ? playerWithNewId : p)
       );
     } else {
-      const cleanedPlayer = removeUndefined(updatedPlayer);
-      await setDoc(doc(db, 'players', updatedPlayer.id), cleanedPlayer, { merge: true });
+      const cleanedPlayer = removeUndefined(finalPlayer);
+      await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
       
       setDatabase(prevDb => 
-        prevDb.map(p => p.id === updatedPlayer.id ? updatedPlayer : p)
+        prevDb.map(p => p.id === finalPlayer.id ? finalPlayer : p)
       );
     }
   };
