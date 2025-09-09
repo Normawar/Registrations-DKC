@@ -459,7 +459,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const dateValue = e.target.value; if (dateValue) { const parsedDate = new Date(dateValue + 'T00:00:00'); if (!isNaN(parsedDate.getTime())) { field.onChange(parsedDate); } } else { field.onChange(undefined); } }} max={format(new Date(), 'yyyy-MM-dd')} min="1900-01-01" /></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const dateValue = e.target.value; if (dateValue) { const parsedDate = new Date(dateValue + 'T00:00:00'); if (!isNaN(parsedDate.getTime())) { field.onChange(parsedDate); } } else { field.onChange(undefined); } }} min={format(new Date(), 'yyyy-MM-dd')} /></FormControl><FormMessage /></FormMessage /></FormItem>)} />
+                                <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const dateValue = e.target.value; if (dateValue) { const parsedDate = new Date(dateValue + 'T00:00:00'); if (!isNaN(parsedDate.getTime())) { field.onChange(parsedDate); } } else { field.onChange(undefined); } }} min={format(new Date(), 'yyyy-MM-dd')} /></FormControl><FormMessage /></FormItem>)} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
@@ -517,5 +517,3 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         </div>
     );
 }
-
-    
