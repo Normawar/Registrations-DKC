@@ -1459,6 +1459,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   if (!confirmation) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogDescription className="sr-only">Dialog for managing invoice details</DialogDescription>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Loading...</DialogTitle>
@@ -1475,6 +1476,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogDescription className="sr-only">Dialog for managing invoice details</DialogDescription>
         <DialogHeader>
           <DialogTitle>
             <div className="flex items-center gap-2">
@@ -1522,3 +1524,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         )}
       </DialogContent>
     </Dialog>
+  );
+}
