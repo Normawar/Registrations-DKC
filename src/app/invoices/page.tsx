@@ -169,6 +169,49 @@ export default function UnifiedInvoiceRegistrations() {
     }
   }, [profile, toast]);
 
+  // Temporary debug function - add this after loadData
+  const debugFirestoreAccess = useCallback(async () => {
+    console.log('🔍 Debug: Testing Firestore access from component...');
+    
+    if (!db) {
+      console.log('❌ db not available');
+      return;
+    }
+    
+    try {
+      const invoicesCol = collection(db, 'invoices');
+      const snapshot = await getDocs(invoicesCol);
+      console.log(`✅ Component can read invoices: ${snapshot.size} documents`);
+      
+      if (snapshot.size > 0) {
+        console.log('🎯 Sample invoice:', snapshot.docs[0].data());
+        
+        // Check if any are from today
+        const today = new Date().toDateString();
+        let todayCount = 0;
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.submissionTimestamp) {
+            const docDate = new Date(data.submissionTimestamp).toDateString();
+            if (docDate === today) {
+              todayCount++;
+              console.log('📅 Today\'s invoice found:', data);
+            }
+          }
+        });
+        console.log(`📅 Total invoices from today: ${todayCount}`);
+      }
+    } catch (error: any) {
+      console.error('❌ Component cannot read invoices:', error);
+      if (error.code) {
+        console.log(`Error code: ${error.code}`);
+        if (error.code === 'permission-denied') {
+          console.log('🚫 This confirms it\'s a Firestore security rules issue');
+        }
+      }
+    }
+  }, []);
+
   const handleManualRefresh = useCallback(async () => {
     await loadData();
     toast({ title: 'Data Refreshed', description: 'Registration data has been reloaded.' });
@@ -177,9 +220,10 @@ export default function UnifiedInvoiceRegistrations() {
   useEffect(() => {
     if (isProfileLoaded && profile) {
       loadData();
+      debugFirestoreAccess(); // Add this line
     }
     setClientReady(true);
-  }, [isProfileLoaded, profile, loadData]);
+  }, [isProfileLoaded, profile, loadData, debugFirestoreAccess]); // Add debugFirestoreAccess to dependencies
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -268,7 +312,7 @@ export default function UnifiedInvoiceRegistrations() {
 
       await loadData();
       
-      toast({ title: 'Record Canceled', description: `Record for ${invoiceToDelete.invoiceTitle} has been marked as canceled locally.` });
+      toast({ title: 'Record Canceled', description: `Record for ${invoiceToDelete.invoiceTitle} has been marked as canceled.` });
     } catch (error) {
       console.error("Failed to delete record:", error);
       toast({ variant: 'destructive', title: 'Deletion Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
