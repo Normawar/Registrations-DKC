@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, Suspense, useEffect } from 'react';
+import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,7 +10,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus, BadgeInfo } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus, BadgeInfo, Download } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -35,6 +35,7 @@ import { schoolData } from '@/lib/data/school-data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import Papa from 'papaparse';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 type DistrictSortableColumnKey = SortableColumnKey | 'gt';
@@ -781,7 +782,7 @@ function SponsorRosterView() {
 
 function DistrictRosterView() {
     const { profile } = useSponsorProfile();
-    const { database: allPlayers, isDbLoaded, dbDistricts } = useMasterDb();
+    const { database: allPlayers, isDbLoaded, dbDistricts, toast } = useMasterDb();
     const [selectedSchool, setSelectedSchool] = useState('all');
     const [selectedDistrict, setSelectedDistrict] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
@@ -876,6 +877,43 @@ function DistrictRosterView() {
         return selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' || profile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
     }, [profile, selectedDistrict]);
 
+    const handleExportGTRoster = useCallback(() => {
+        const psjaPlayers = allPlayers.filter(p => p.district === 'PHARR-SAN JUAN-ALAMO ISD');
+        const gtPlayers = psjaPlayers.filter(p => p.studentType === 'gt');
+
+        if (gtPlayers.length === 0) {
+            toast({
+                title: "No GT Players Found",
+                description: "There are no players marked as GT in the PHARR-SAN JUAN-ALAMO ISD district.",
+            });
+            return;
+        }
+
+        const dataToExport = gtPlayers.map(player => ({
+            'First Name': player.firstName,
+            'Last Name': player.lastName,
+            'USCF ID': player.uscfId,
+            'School': player.school,
+            'Grade': player.grade,
+            'Rating': player.regularRating || 'UNR',
+            'Email': player.email,
+        }));
+
+        const csv = Papa.unparse(dataToExport);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `psja_gt_roster_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast({
+            title: "Export Successful",
+            description: `${gtPlayers.length} GT players have been exported.`,
+        });
+    }, [allPlayers, toast]);
+
     return (
         <div className="space-y-8">
             <div>
@@ -910,13 +948,19 @@ function DistrictRosterView() {
                     </Select>
                 </div>
                  {(profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') && (
-                    <div className="w-full sm:w-auto">
-                        <Label>Filter by Player Type</Label>
-                        <RadioGroup value={playerTypeFilter} onValueChange={setPlayerTypeFilter} className="flex items-center space-x-4 pt-2">
-                           <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all" className="cursor-pointer">All</Label></div>
-                           <div className="flex items-center space-x-2"><RadioGroupItem value="gt" id="gt" /><Label htmlFor="gt" className="cursor-pointer">GT</Label></div>
-                           <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent" className="cursor-pointer">Independent</Label></div>
-                        </RadioGroup>
+                    <div className="w-full sm:w-auto flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                        <div>
+                            <Label>Filter by Player Type</Label>
+                            <RadioGroup value={playerTypeFilter} onValueChange={setPlayerTypeFilter} className="flex items-center space-x-4 pt-2">
+                               <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all" className="cursor-pointer">All</Label></div>
+                               <div className="flex items-center space-x-2"><RadioGroupItem value="gt" id="gt" /><Label htmlFor="gt" className="cursor-pointer">GT</Label></div>
+                               <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent" className="cursor-pointer">Independent</Label></div>
+                            </RadioGroup>
+                        </div>
+                        <Button onClick={handleExportGTRoster} variant="outline" size="sm">
+                            <Download className="mr-2 h-4 w-4" />
+                            Export GT Roster
+                        </Button>
                     </div>
                  )}
                  <div className="flex items-center space-x-2 pt-2">

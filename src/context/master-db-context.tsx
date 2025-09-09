@@ -10,6 +10,7 @@ import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
 import Papa from 'papaparse';
 import { isValid } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 // --- Types ---
 
@@ -79,6 +80,7 @@ interface MasterDbContextType {
   refreshDatabase: () => void;
   generatePlayerId: (uscfId: string) => string;
   updatePlayerFromUscfData: (uscfData: Partial<MasterPlayer>[]) => Promise<{ updated: number; created: number }>;
+  toast: any;
 }
 
 
@@ -276,6 +278,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, setDatabase] = useState<MasterPlayer[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
   const [isDbError, setIsDbError] = useState(false);
+  const { toast } = useToast();
 
   const loadDatabase = useCallback(async () => {
     if (!db) {
@@ -924,6 +927,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     refreshDatabase,
     generatePlayerId,
     updatePlayerFromUscfData,
+    toast,
   };
 
   return (
