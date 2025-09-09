@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -1462,6 +1462,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Loading...</DialogTitle>
+            <DialogDescription className="sr-only">Loading invoice details</DialogDescription>
           </DialogHeader>
           <div className="py-8 flex justify-center items-center">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -1481,6 +1482,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
               Invoice #{confirmation?.invoiceNumber || 'Unknown'}
             </div>
           </DialogTitle>
+          <DialogDescription className="sr-only">Dialog for viewing invoice details.</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1520,5 +1522,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         )}
       </DialogContent>
     </Dialog>
-  );
-}

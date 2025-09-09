@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -311,6 +311,7 @@ export function SponsorRegistrationDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{event.name}</DialogTitle>
+                    <DialogDescription className="sr-only">Dialog for a closed or restricted event.</DialogDescription>
                 </DialogHeader>
                 <Alert variant="destructive">
                     <Lock className="h-4 w-4" />
@@ -343,6 +344,7 @@ export function SponsorRegistrationDialog({
         <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle>Register Students for {event.name}</DialogTitle>
+            <DialogDescription className="sr-only">A dialog to select students from your roster to register for the event.</DialogDescription>
             <p className="text-sm text-muted-foreground">
               {format(new Date(event.date), 'PPP')} • {event.location}
             </p>
@@ -490,6 +492,7 @@ export function SponsorRegistrationDialog({
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Confirm Registration & Charges</DialogTitle>
+            <DialogDescription className="sr-only">A dialog to confirm student selections and total charges before creating an invoice.</DialogDescription>
             <p className="text-sm text-muted-foreground">
               Review the total charges for {event.name} before creating your invoice.
             </p>

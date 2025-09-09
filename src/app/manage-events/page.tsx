@@ -805,21 +805,36 @@ export default function ManageEventsPage() {
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the event "{eventToDelete?.name}".</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone. This will permanently delete the event "{eventToDelete?.name}".</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
       
       <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Clear All Events?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete all events from the list.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">Clear Events</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Events?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone. This will permanently delete all events from the list.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">Clear Events</AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={isRegistrationsOpen} onOpenChange={setIsRegistrationsOpen}>
         <DialogContent className="sm:max-w-4xl">
-          <DialogHeader><DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle><DialogDescription>{registrations.length} player(s) registered for this event.</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
+            <DialogDescription>{registrations.length} player(s) registered for this event.</DialogDescription>
+          </DialogHeader>
           <div className='my-4 flex items-center justify-end gap-2'>
               <Button onClick={() => handleDownload(false)} disabled={playersForDownload.length === 0} variant="outline" size="sm"><Download className="mr-2 h-4 w-4" />Download New ({playersForDownload.length})</Button>
               <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">Download All ({registrations.length})</Button>
@@ -827,7 +842,16 @@ export default function ManageEventsPage() {
           </div>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
-              <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>USCF ID</TableHead><TableHead>School</TableHead><TableHead>Section</TableHead><TableHead>Invoice #</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableHeader>
+                <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead>USCF ID</TableHead>
+                    <TableHead>School</TableHead>
+                    <TableHead>Section</TableHead>
+                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {registrations.length === 0 ? ( <TableRow><TableCell colSpan={6} className="h-24 text-center">No players registered yet.</TableCell></TableRow> ) : (
                   registrations.map(({ player, details, invoiceId, invoiceNumber }) => {
@@ -857,7 +881,10 @@ export default function ManageEventsPage() {
       
       <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
-          <DialogHeader><DialogTitle>Paste from Spreadsheet</DialogTitle><DialogDescription>Copy event data from your spreadsheet and paste it into the text area below.</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Paste from Spreadsheet</DialogTitle>
+            <DialogDescription>Copy event data from your spreadsheet and paste it into the text area below.</DialogDescription>
+          </DialogHeader>
           <div className="py-4 space-y-4">
             <Tabs defaultValue="events"><TabsList className="grid w-full grid-cols-1"><TabsTrigger value="events">Import Events</TabsTrigger></TabsList>
               <TabsContent value="events"><Textarea placeholder="Paste event data here..." className="h-64" value={pasteData} onChange={(e) => setPasteData(e.target.value)} /></TabsContent>
