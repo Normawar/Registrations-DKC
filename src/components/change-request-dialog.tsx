@@ -51,10 +51,11 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
 
           let userConfirmations: any[] = [];
           
-          if (profile.role === 'district_coordinator') {
+          if (profile.role === 'organizer') {
+            userConfirmations = allConfirmations;
+          } else if (profile.role === 'district_coordinator') {
             userConfirmations = allConfirmations.filter((c: any) => c.district === profile.district);
           } else if (profile.role === 'sponsor') {
-            // A sponsor should only see invoices they have created.
             userConfirmations = allConfirmations.filter((c: any) => c.sponsorEmail === profile.email);
           } else if (profile.role === 'individual') {
             userConfirmations = allConfirmations.filter((c: any) => c.parentEmail === profile.email);
@@ -94,7 +95,9 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
   const availableRosterPlayers = useMemo(() => {
     if (!profile) return [];
     let roster = [];
-    if (profile.isDistrictCoordinator) {
+    if (profile.role === 'organizer') {
+        roster = masterDb; // Organizers can see all players
+    } else if (profile.isDistrictCoordinator) {
         roster = masterDb.filter(p => p.district === profile.district);
     } else {
         roster = masterDb.filter(p => p.school === profile.school && p.district === profile.district);
@@ -166,7 +169,11 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
         details: details,
         submitted: new Date().toISOString(),
         submittedBy: `${profile.firstName} ${profile.lastName}`,
-        status: 'Pending',
+        status: profile.role === 'organizer' ? 'Approved' : 'Pending',
+        ...(profile.role === 'organizer' && {
+            approvedBy: `${profile.firstName} ${profile.lastName}`,
+            approvedAt: new Date().toISOString()
+        })
     };
     
     const requestRef = doc(db, 'requests', id);

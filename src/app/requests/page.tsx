@@ -61,7 +61,7 @@ export default function RequestsPage() {
       } else if (profile.role === 'sponsor') {
           const sponsorConfirmationIds = new Set(
               Array.from(confirmationMap.values())
-                  .filter((c: any) => c.schoolName === profile.school && c.district === profile.district)
+                  .filter((c: any) => c.sponsorEmail === profile.email)
                   .map((c: any) => c.id)
           );
           setRequests(allRequests.filter(req => sponsorConfirmationIds.has(req.confirmationId)));
@@ -147,7 +147,7 @@ export default function RequestsPage() {
                     View and manage player-submitted change requests.
                 </p>
             </div>
-            {profile?.role === 'sponsor' && (
+            {(profile?.role === 'sponsor' || profile?.role === 'organizer') && (
                 <Button onClick={() => setIsRequestDialogOpen(true)}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Make A Change Request
                 </Button>
