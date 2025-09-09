@@ -7,6 +7,8 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, differenceInHours, isSameDay, isValid, parse } from 'date-fns';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -179,7 +181,12 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             lastName: player.lastName,
             uscfId: player.uscfId,
             regularRating: player.regularRating,
-            uscfExpiration: player.expirationDate ? parse(player.expirationDate, 'yyyy-MM-dd', new Date()) : undefined,
+            uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+            dob: player.dob ? new Date(player.dob) : undefined,
+            email: player.email,
+            zipCode: player.zipCode,
+            grade: player.grade,
+            section: player.section,
         });
         setIsPlayerDialogOpen(true);
     };
@@ -258,17 +265,15 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             });
 
             const newConfirmation = {
-                id: result.invoiceId, invoiceId: result.invoiceId, eventName: event.name, eventDate: event.date, 
+                id: result.invoiceId, invoiceId: result.invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date, 
                 submissionTimestamp: new Date().toISOString(), 
                 selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus } }), {}),
                 totalInvoiced, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: recipient.teamCode, invoiceStatus: result.status,
-                purchaserName: recipient.sponsorName, schoolName: recipient.schoolName,
+                purchaserName: recipient.sponsorName, schoolName: recipient.schoolName, sponsorEmail: recipient.sponsorEmail
             };
 
-            const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            localStorage.setItem('confirmations', JSON.stringify([...existingConfirmations, newConfirmation]));
-            const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-            localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
+            const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
+            await setDoc(invoiceDocRef, newConfirmation);
             
             toast({ title: "Invoice Generated Successfully!", description: `Invoice ${result.invoiceNumber || result.invoiceId} for ${stagedPlayers.length} players has been created.` });
             
@@ -291,7 +296,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             const confirmationId = `COMP_${Date.now()}`;
 
             const newConfirmation = {
-                id: confirmationId,
+                id: confirmationId, invoiceId: confirmationId, eventId: event.id,
                 eventName: event.name,
                 eventDate: event.date,
                 submissionTimestamp: new Date().toISOString(),
@@ -301,11 +306,11 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 invoiceStatus: 'COMPED',
                 purchaserName: recipient.sponsorName,
                 schoolName: recipient.schoolName,
+                sponsorEmail: recipient.sponsorEmail,
             };
 
-            const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-            localStorage.setItem('confirmations', JSON.stringify([...existingConfirmations, newConfirmation]));
-            window.dispatchEvent(new Event('storage'));
+            const invoiceDocRef = doc(db, 'invoices', confirmationId);
+            await setDoc(invoiceDocRef, newConfirmation);
 
             toast({
                 title: "Registration Comped",
@@ -338,7 +343,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 </CardHeader>
                 <CardContent>
                     <h2 className="text-xl font-semibold">{event.name}</h2>
-                    <p className="text-muted-foreground">{format(new Date(event.date), 'PPP')} &bull; {event.location}</p>
+                    <p className="text-muted-foreground">{format(new Date(event.date), 'PPP')} • {event.location}</p>
                 </CardContent>
             </Card>
 
@@ -447,7 +452,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const dateValue = e.target.value; if (dateValue) { const parsedDate = new Date(dateValue + 'T00:00:00'); if (!isNaN(parsedDate.getTime())) { field.onChange(parsedDate); } } else { field.onChange(undefined); } }} max={format(new Date(), 'yyyy-MM-dd')} min="1900-01-01" /></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const dateValue = e.target.value; if (dateValue) { const parsedDate = new Date(dateValue + 'T00:00:00'); if (!isNaN(parsedDate.getTime())) { field.onChange(parsedDate); } } else { field.onChange(undefined); } }} min={format(new Date(), 'yyyy-MM-dd')} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const dateValue = e.target.value; if (dateValue) { const parsedDate = new Date(dateValue + 'T00:00:00'); if (!isNaN(parsedDate.getTime())) { field.onChange(parsedDate); } } else { field.onChange(undefined); } }} min={format(new Date(), 'yyyy-MM-dd')} /></FormControl><FormMessage /></FormMessage /></FormItem>)} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />

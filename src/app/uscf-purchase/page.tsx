@@ -10,6 +10,8 @@ import { format, isValid, parse } from 'date-fns';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Image from 'next/image';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -265,9 +267,8 @@ function UscfPurchaseComponent() {
             setInvoice(newMembershipInvoice);
             setInvoiceStatus(result.status);
             
-            const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-            localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newMembershipInvoice]));
-            window.dispatchEvent(new Event('all_invoices_updated'));
+            const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
+            await setDoc(invoiceDocRef, newMembershipInvoice);
 
             toast({ title: 'Invoice Created', description: `Invoice ${result.invoiceNumber} for ${values.players.length} player(s) has been created.` });
         } catch (error) {
@@ -747,7 +748,7 @@ function UscfPurchaseComponent() {
                                         <div>
                                             <p className="font-semibold">Pay via Zelle</p>
                                             <p className="text-sm text-muted-foreground">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p>
-                                            <p className="font-bold text-lg mt-1">956-289-3418</p>
+                                            <p className="font-bold text-lg mt-1">956-393-8875</p>
                                         </div>
                                         <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer">
                                             <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />

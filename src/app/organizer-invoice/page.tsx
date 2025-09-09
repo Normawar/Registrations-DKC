@@ -7,6 +7,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { differenceInHours, isSameDay } from 'date-fns';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -183,7 +185,7 @@ form.reset({
     });
 
     const result = await recreateInvoiceFromRoster({
-        originalInvoiceId: originalInvoice.id,
+        originalInvoiceId: originalInvoice.invoiceId,
         players: playersToInvoice,
         uscfFee: 24,
         sponsorName: values.sponsorName,
@@ -192,15 +194,20 @@ form.reset({
         teamCode: originalInvoice.teamCode,
         eventName: values.invoiceTitle,
         eventDate: eventDetails.date,
+        bookkeeperEmail: originalInvoice.bookkeeperEmail,
+        gtCoordinatorEmail: originalInvoice.gtCoordinatorEmail,
+        district: originalInvoice.district,
+        schoolAddress: originalInvoice.schoolAddress,
+        schoolPhone: originalInvoice.schoolPhone
     });
     
     const newConfirmationRecord = {
         id: result.newInvoiceId, 
+        invoiceId: result.newInvoiceId,
         eventId: originalInvoice.eventId,
         eventName: values.invoiceTitle,
         eventDate: eventDetails.date,
         submissionTimestamp: new Date().toISOString(),
-        invoiceId: result.newInvoiceId,
         invoiceNumber: result.newInvoiceNumber,
         invoiceUrl: result.newInvoiceUrl,
         invoiceStatus: result.newStatus,
@@ -221,41 +228,59 @@ form.reset({
         sponsorEmail: values.sponsorEmail,
     };
     
-    updateLocalStorageWithNewInvoice(newConfirmationRecord, originalInvoice.id);
+    await setDoc(doc(db, 'invoices', result.newInvoiceId), newConfirmationRecord);
+    await setDoc(doc(db, 'invoices', originalInvoice.id), { status: 'CANCELED', invoiceStatus: 'CANCELED' }, { merge: true });
+
 
     toast({
         title: "Event Invoice Recreated",
         description: `Invoice ${result.newInvoiceNumber} has been created to replace the old one.`
     });
-    router.push('/confirmations');
+    router.push('/invoices');
   }
 
   async function handleRecreateOrganizerInvoice(values: InvoiceFormValues) {
+      const schoolInfo = schoolData.find(s => s.schoolName === values.schoolName);
       const result = await recreateOrganizerInvoice({
-          originalInvoiceId: originalInvoice.id,
+          originalInvoiceId: originalInvoice.invoiceId,
           sponsorName: values.sponsorName,
           sponsorEmail: values.sponsorEmail,
           schoolName: values.schoolName,
           invoiceTitle: values.invoiceTitle,
           lineItems: values.lineItems,
+          bookkeeperEmail: originalInvoice.bookkeeperEmail,
+          gtCoordinatorEmail: originalInvoice.gtCoordinatorEmail,
+          district: schoolInfo?.district,
+          schoolAddress: schoolInfo?.streetAddress,
+          schoolPhone: schoolInfo?.phone,
       });
       const newInvoiceRecord = createOrganizerInvoiceRecord(values, result);
-      updateLocalStorageWithNewInvoice(newInvoiceRecord, originalInvoice.id);
+      
+      await setDoc(doc(db, 'invoices', result.newInvoiceId), newInvoiceRecord);
+      await setDoc(doc(db, 'invoices', originalInvoice.id), { status: 'CANCELED', invoiceStatus: 'CANCELED' }, { merge: true });
+
       toastSuccess(newInvoiceRecord, true);
       router.push('/invoices');
   }
 
   async function handleCreateNewOrganizerInvoice(values: InvoiceFormValues) {
+      const schoolInfo = schoolData.find(s => s.schoolName === values.schoolName);
       const result = await createOrganizerInvoice({
           sponsorName: values.sponsorName,
           sponsorEmail: values.sponsorEmail,
           schoolName: values.schoolName,
           invoiceTitle: values.invoiceTitle,
           lineItems: values.lineItems,
+          bookkeeperEmail: originalInvoice?.bookkeeperEmail,
+          gtCoordinatorEmail: originalInvoice?.gtCoordinatorEmail,
+          district: schoolInfo?.district,
+          schoolAddress: schoolInfo?.streetAddress,
+          schoolPhone: schoolInfo?.phone,
       });
       const newInvoiceRecord = createOrganizerInvoiceRecord(values, result);
-      const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newInvoiceRecord]));
+      
+      await setDoc(doc(db, 'invoices', result.invoiceId), newInvoiceRecord);
+
       toastSuccess(newInvoiceRecord, false);
       router.push('/invoices');
   }
@@ -277,28 +302,6 @@ form.reset({
       district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
       lineItems: values.lineItems,
   });
-
-  const updateLocalStorageWithNewInvoice = (newRecord: any, oldInvoiceId: string) => {
-      const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const finalInvoices = existingInvoices.map((inv: any) => 
-          inv.id === oldInvoiceId ? { ...inv, invoiceStatus: 'CANCELED', status: 'CANCELED' } : inv
-      );
-      finalInvoices.push(newRecord);
-      localStorage.setItem('all_invoices', JSON.stringify(finalInvoices));
-
-      // Also update confirmations if it was an event invoice
-      if (newRecord.type === 'event') {
-          const existingConfirmations = JSON.parse(localStorage.getItem('confirmations') || '[]');
-          const finalConfirmations = existingConfirmations.map((c: any) =>
-              c.id === oldInvoiceId ? { ...c, invoiceStatus: 'CANCELED' } : c
-          );
-          finalConfirmations.push(newRecord);
-          localStorage.setItem('confirmations', JSON.stringify(finalConfirmations));
-      }
-
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('all_invoices_updated'));
-  };
   
   const toastSuccess = (result: any, isUpdate: boolean) => {
       toast({

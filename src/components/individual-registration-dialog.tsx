@@ -2,7 +2,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -180,6 +182,7 @@ export function IndividualRegistrationDialog({
         eventName: event.name,
         eventDate: event.date,
         uscfFee: 24,
+        players: playersToInvoice,
         // No bookkeeper or GT coordinator emails for individuals
         bookkeeperEmail: undefined,
         gtCoordinatorEmail: undefined,
@@ -233,14 +236,9 @@ export function IndividualRegistrationDialog({
         invoiceUrl: result.invoiceUrl,
       };
   
-      // Save to localStorage
-      const existingConfirmations = localStorage.getItem('confirmations');
-      const allConfirmations = existingConfirmations ? JSON.parse(existingConfirmations) : [];
-      allConfirmations.push(newConfirmation);
-      localStorage.setItem('confirmations', JSON.stringify(allConfirmations));
-      
-      const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
+      // Save to Firestore
+      const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
+      await setDoc(invoiceDocRef, newConfirmation);
   
       // Show the invoice details modal like sponsors do
       setCreatedInvoiceId(result.invoiceId);
@@ -254,10 +252,6 @@ export function IndividualRegistrationDialog({
       // Reset and close
       setSelectedStudents({});
       onOpenChange(false);
-      
-      // Trigger storage event to update other components
-      window.dispatchEvent(new Event('storage'));
-      window.dispatchEvent(new Event('all_invoices_updated'));
       
     } catch (error) {
       console.error('Registration failed:', error);
@@ -305,6 +299,7 @@ export function IndividualRegistrationDialog({
       <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
         <DialogHeader className="shrink-0">
           <DialogTitle>Register for {event?.name}</DialogTitle>
+          <DialogDescription className="sr-only">A dialog to select students to register for the event.</DialogDescription>
           <p className="text-sm text-muted-foreground">
             {event?.date && format(new Date(event.date), 'PPP')} • {event?.location}
           </p>
