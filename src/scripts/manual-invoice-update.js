@@ -16,29 +16,45 @@ async function updateInvoice() {
     return;
   }
 
-  const invoiceId = 'inv:0-ChBL5kS7M_QOXReaRrBzEhDkEJ8I';
+  const invoiceId = 'inv:0-ChA8tAATqKqV2Vn3-1kOEBDkEJ8I';
   const invoiceRef = doc(db, 'invoices', invoiceId);
 
   // --- Data extracted from the invoice image ---
   const selectionsData = {
-    "16800831": { "section": "Middle School K-8", "status": "active", "uscfStatus": "renewing" },
-    "30298794": { "section": "Middle School K-8", "status": "active", "uscfStatus": "renewing" },
-    "30347260": { "section": "Middle School K-8", "status": "active", "uscfStatus": "renewing" },
-    "30347282": { "section": "Middle School K-8", "status": "active", "uscfStatus": "renewing" },
-    "31487695": { "section": "Middle School K-8", "status": "active", "uscfStatus": "current" },
-    "31487845": { "section": "Middle School K-8", "status": "active", "uscfStatus": "current" },
-    "32114974": { "section": "Middle School K-8", "status": "active", "uscfStatus": "current" },
-    "NEW_Matthew_Gonzalez": { "section": "Middle School K-8", "status": "active", "uscfStatus": "new" },
-    "NEW_Dallas_Evans": { "section": "Middle School K-8", "status": "active", "uscfStatus": "new" },
-    "NEW_Ezra_Rivera": { "section": "Middle School K-8", "status": "active", "uscfStatus": "new" }
+    // Assuming 'NEW' for USCF ID if not available, will need to be updated later.
+    "NEW_Aaliyah_Rodriguez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Alyssa_Cavazos": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Alyssa_Puga": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Devin_Valdez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Diego_Hernandez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Elias_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Elijah_Martinez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Emely_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Hector_Lopez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Jacob_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Joel_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Jorge_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Juan_Marines": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Julian_Cantu": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Matthew_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Sebastian_Salinas": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Victoria_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" },
+    "NEW_Yolotzin_Martinez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing" }
+  };
+  
+  const updatedInvoiceData = {
+    district: "PHARR-SAN JUAN-ALAMO ISD",
+    schoolName: "PSJA MEMORIAL EARLY COLLEGE H S",
+    status: "UNPAID",
+    invoiceStatus: "UNPAID",
+    selections: selectionsData,
   };
 
-  console.log(`Updating invoice ${invoiceId} with ${Object.keys(selectionsData).length} player selections...`);
+
+  console.log(`Updating invoice ${invoiceId} with corrected sponsor info and ${Object.keys(selectionsData).length} player selections...`);
 
   try {
-    await updateDoc(invoiceRef, {
-      selections: selectionsData
-    });
+    await updateDoc(invoiceRef, updatedInvoiceData);
     console.log(`✅ Successfully updated invoice ${invoiceId}.`);
   } catch (error) {
     console.error(`🔥 Error updating invoice:`, error);
@@ -46,4 +62,3 @@ async function updateInvoice() {
 }
 
 updateInvoice().catch(console.error);
-
