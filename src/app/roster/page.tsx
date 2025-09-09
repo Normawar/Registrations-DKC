@@ -20,7 +20,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -620,8 +620,9 @@ function SponsorRosterView() {
                       <TabsTrigger value="history">Change History</TabsTrigger>
                   </TabsList>
               </DialogHeader>
-              <TabsContent value="details">
-                  <div className='flex-1 overflow-y-auto p-6'>
+              <TabsContent value="details" className="flex-1 overflow-y-auto">
+                  <ScrollArea className="h-[60vh] pr-6">
+                    <div className='p-6 pt-0'>
                       <Form {...playerForm}>
                           <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -726,7 +727,8 @@ function SponsorRosterView() {
                               </div>
                           </form>
                       </Form>
-                  </div>
+                    </div>
+                  </ScrollArea>
               </TabsContent>
               <TabsContent value="history">
                   <ChangeHistoryTab player={editingPlayer} />
