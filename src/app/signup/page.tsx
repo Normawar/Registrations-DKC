@@ -141,11 +141,23 @@ const SponsorSignUpForm = () => {
     setIsLoading(true);
     
     try {
-      if (!checkFirebaseConfig()) {
+      if (!checkFirebaseConfig() || !db) {
         toast({
           variant: 'destructive',
           title: 'Configuration Error',
           description: 'Firebase is not properly configured. Please contact support.',
+        });
+        setIsLoading(false);
+        return;
+      }
+      
+      // Prevent duplicate user creation
+      const legacyDocRef = doc(db, 'users', values.email.toLowerCase());
+      const legacyDoc = await getDoc(legacyDocRef);
+      if (legacyDoc.exists()) {
+        form.setError("email", {
+            type: "manual",
+            message: "An account with this email already exists. Please Sign In."
         });
         setIsLoading(false);
         return;
