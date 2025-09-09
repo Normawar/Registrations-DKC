@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -328,7 +327,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             setIsSubmitting(false);
         }
     };
-
 
     return (
         <div className="space-y-8">
