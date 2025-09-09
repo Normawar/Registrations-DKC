@@ -871,6 +871,11 @@ function DistrictRosterView() {
       return sortablePlayers;
     };
     
+    const showGtColumn = useMemo(() => {
+        if (profile?.role === 'organizer' && selectedDistrict === 'all') return true;
+        return selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD' || profile?.district === 'PHARR-SAN JUAN-ALAMO ISD';
+    }, [profile, selectedDistrict]);
+
     return (
         <div className="space-y-8">
             <div>
@@ -948,7 +953,7 @@ function DistrictRosterView() {
                                             <TableHead><Button variant="ghost" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
                                             <TableHead><Button variant="ghost" onClick={() => requestSort('grade')}>Grade {getSortIcon('grade')}</Button></TableHead>
                                             <TableHead><Button variant="ghost" onClick={() => requestSort('section')}>Section {getSortIcon('section')}</Button></TableHead>
-                                            {(profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') && (
+                                            {showGtColumn && (
                                                 <TableHead><Button variant="ghost" onClick={() => requestSort('gt')}>GT {getSortIcon('gt')}</Button></TableHead>
                                             )}
                                         </TableRow>
@@ -964,7 +969,7 @@ function DistrictRosterView() {
                                             <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
                                             <TableCell>{player.grade}</TableCell>
                                             <TableCell>{player.section}</TableCell>
-                                            {(profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || selectedDistrict === 'PHARR-SAN JUAN-ALAMO ISD') && (
+                                            {showGtColumn && (
                                                 <TableCell>
                                                     {player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
                                                 </TableCell>
