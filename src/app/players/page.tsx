@@ -1,3 +1,4 @@
+
 // Updated src/app/players/page.tsx
 'use client';
 
@@ -111,6 +112,7 @@ export default function PlayersPage() {
       ...playerToEdit,
       dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
       uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
+      studentType: playerToEdit.studentType || 'independent',
     });
     setIsEditOpen(true);
   };

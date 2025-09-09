@@ -188,6 +188,7 @@ function SponsorRosterView() {
         ...player,
         dob: player.dob ? new Date(player.dob) : undefined,
         uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+        studentType: player.studentType || 'independent',
     });
     setIsEditPlayerDialogOpen(true);
   };
@@ -218,6 +219,7 @@ function SponsorRosterView() {
       ...playerToEdit,
       dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
       uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
+      studentType: playerToEdit.studentType || 'independent',
     });
     setIsEditPlayerDialogOpen(true);
   };
@@ -589,7 +591,7 @@ function SponsorRosterView() {
                               <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                               <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
-                           {(profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' || editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD') && (
+                           {(editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD') && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={playerForm.control} name="studentType" render={({ field }) => ( 
                                     <FormItem><FormLabel>Student Type</FormLabel>
