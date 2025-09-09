@@ -326,11 +326,17 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             setIsSubmitting(false);
         }
     };
-
+    
     if (!event) {
-        return <Card><CardContent className='pt-6'>Event not found. Please go back to Manage Events and select an event.</CardContent></Card>;
+        return (
+            <Card>
+                <CardContent className='pt-6'>
+                    Event not found. Please go back to Manage Events and select an event.
+                </CardContent>
+            </Card>
+        );
     }
-
+    
     return (
         <div className="space-y-8">
             <div>
