@@ -580,50 +580,64 @@ function ManageEventsContent() {
     return registrations.filter(p => !exportedIds.has(p.player.id) && p.details.status !== 'withdrawn');
   }, [registrations, downloadedPlayers, selectedEventForReg]);
   
-  const handleDownload = (playerList: RegistrationInfo[], type: 'registered' | 'exported' | 'all') => {
-    if (!selectedEventForReg) return;
-    
-    if (playerList.length === 0) {
-      toast({ title: 'No Players to Export', description: 'There are no players in this category to export.' });
-      return;
-    }
-    
-    const csvData = playerList.map(p => ({
-        "Team Code": generateTeamCode({ schoolName: p.player.school, district: p.player.district, studentType: p.player.studentType }),
-        "StudentType": p.player.studentType || 'regular',
-        "Last Name": p.player.lastName,
-        "First Name": p.player.firstName,
-        "Middle Name": p.player.middleName || '',
-        "USCF ID": p.player.uscfId,
-        "Grade": p.player.grade,
-        "Section": p.details.section,
-        "Rating": p.player.regularRating || 'UNR',
-        "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : (type === 'exported' ? 'Exported' : 'Registered'),
-        "Invoice #": p.invoiceNumber || 'N/A'
-    }));
+    const handleDownload = (playerList: RegistrationInfo[], type: 'registered' | 'exported' | 'all') => {
+        if (!selectedEventForReg) return;
 
-    const csv = Papa.unparse(csvData);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    const fileNameSuffix = `${type}_registrations`;
-    link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, "_")}_${fileNameSuffix}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    if (type === 'registered') {
-      const newlyDownloadedIds = playerList.map(p => p.player.id);
-      const updatedDownloads = {
-          ...downloadedPlayers,
-          [selectedEventForReg.id]: [...(downloadedPlayers[selectedEventForReg.id] || []), ...newlyDownloadedIds]
-      };
-      setDownloadedPlayers(updatedDownloads);
-      localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
-    }
-    toast({ title: 'Export Complete', description: `${playerList.length} players exported.`});
-  };
+        if (playerList.length === 0) {
+            toast({ title: 'No Players to Export', description: 'There are no players in this category to export.' });
+            return;
+        }
+
+        const exportedIds = new Set(downloadedPlayers[selectedEventForReg.id] || []);
+
+        const csvData = playerList.map(p => {
+            let status = 'Registered';
+            if (p.details.status === 'withdrawn') {
+                status = 'Withdrawn';
+            } else if (type === 'all') {
+                status = exportedIds.has(p.player.id) ? 'Exported' : 'Registered';
+            } else if (type === 'exported') {
+                status = 'Exported';
+            }
+
+            return {
+                "Team Code": generateTeamCode({ schoolName: p.player.school, district: p.player.district, studentType: p.player.studentType }),
+                "StudentType": p.player.studentType || 'regular',
+                "Last Name": p.player.lastName,
+                "First Name": p.player.firstName,
+                "Middle Name": p.player.middleName || '',
+                "USCF ID": p.player.uscfId,
+                "Grade": p.player.grade,
+                "Section": p.details.section,
+                "Rating": p.player.regularRating || 'UNR',
+                "Status": status,
+                "Invoice #": p.invoiceNumber || 'N/A'
+            };
+        });
+
+        const csv = Papa.unparse(csvData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const fileNameSuffix = `${type}_registrations`;
+        link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, "_")}_${fileNameSuffix}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        if (type === 'registered') {
+            const newlyDownloadedIds = playerList.map(p => p.player.id);
+            const updatedDownloads = {
+                ...downloadedPlayers,
+                [selectedEventForReg.id]: [...(downloadedPlayers[selectedEventForReg.id] || []), ...newlyDownloadedIds]
+            };
+            setDownloadedPlayers(updatedDownloads);
+            localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
+        }
+        
+        toast({ title: 'Export Complete', description: `${playerList.length} players exported.`});
+    };
   
   const handleResetAll = () => {
     if (!selectedEventForReg) return;
@@ -878,10 +892,12 @@ function ManageEventsContent() {
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
-            <div className="flex items-center gap-4 text-sm mt-2">
-                <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
-                <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
-            </div>
+             <DialogDescription>
+               <div className="flex items-center gap-4 text-sm mt-2">
+                 <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
+                 <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
+               </div>
+             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -1002,6 +1018,7 @@ export default function ManageEventsPage() {
     </DistrictCoordinatorGuard>
   );
 }
+
 
 
 
