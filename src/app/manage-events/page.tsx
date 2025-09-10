@@ -94,6 +94,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 
 
 const eventFormSchema = z.object({
@@ -147,6 +148,7 @@ export default function ManageEventsPage() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent, clearAllEvents } = useEvents();
   const { database: allPlayers, isDbLoaded } = useMasterDb();
+  const { profile } = useSponsorProfile();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -566,32 +568,30 @@ export default function ManageEventsPage() {
     setIsDialogOpen(false);
   }
   
-  const playersToExport = useMemo(() => {
+  const exportedPlayers = useMemo(() => {
+    if (!selectedEventForReg) return [];
+    const exportedIds = new Set(downloadedPlayers[selectedEventForReg.id] || []);
+    return registrations.filter(p => exportedIds.has(p.player.id) && p.details.status !== 'withdrawn');
+  }, [registrations, downloadedPlayers, selectedEventForReg]);
+
+  const registeredPlayers = useMemo(() => {
     if (!selectedEventForReg) return [];
     const exportedIds = new Set(downloadedPlayers[selectedEventForReg.id] || []);
     return registrations.filter(p => !exportedIds.has(p.player.id) && p.details.status !== 'withdrawn');
   }, [registrations, downloadedPlayers, selectedEventForReg]);
-
-  const exportedCount = useMemo(() => {
-    if (!selectedEventForReg) return 0;
-    return (downloadedPlayers[selectedEventForReg.id] || []).length;
-  }, [downloadedPlayers, selectedEventForReg]);
   
-  const registeredCount = registrations.length - exportedCount;
-
-  const handleDownload = (downloadAll: boolean = false) => {
+  const handleDownload = (playerList: RegistrationInfo[], type: 'registered' | 'exported' | 'all') => {
     if (!selectedEventForReg) return;
     
-    const playersToProcess = downloadAll ? registrations : playersToExport;
-    if (playersToProcess.length === 0) {
-      toast({ title: 'No Players to Export', description: 'There are no new registrations to export.' });
+    if (playerList.length === 0) {
+      toast({ title: 'No Players to Export', description: 'There are no players in this category to export.' });
       return;
     }
     
-    const csvData = playersToProcess.map(p => ({
+    const csvData = playerList.map(p => ({
         "USCF ID": p.player.uscfId, "First Name": p.player.firstName, "Last Name": p.player.lastName,
         "Rating": p.player.regularRating || 'UNR', "Grade": p.player.grade, "Section": p.details.section,
-        "School": p.player.school, "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : 'Registered'
+        "School": p.player.school, "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : (type === 'exported' ? 'Exported' : 'Registered')
     }));
 
     const csv = Papa.unparse(csvData);
@@ -599,14 +599,14 @@ export default function ManageEventsPage() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_registrations';
+    const fileNameSuffix = `${type}_registrations`;
     link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, "_")}_${fileNameSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
-    if (!downloadAll) {
-      const newlyDownloadedIds = playersToProcess.map(p => p.player.id);
+    if (type === 'registered') {
+      const newlyDownloadedIds = playerList.map(p => p.player.id);
       const updatedDownloads = {
           ...downloadedPlayers,
           [selectedEventForReg.id]: [...(downloadedPlayers[selectedEventForReg.id] || []), ...newlyDownloadedIds]
@@ -614,25 +614,33 @@ export default function ManageEventsPage() {
       setDownloadedPlayers(updatedDownloads);
       localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
     }
-    toast({ title: 'Export Complete', description: `${playersToProcess.length} players exported.`});
+    toast({ title: 'Export Complete', description: `${playerList.length} players exported.`});
   };
   
-  const handleMarkAllAsNew = () => {
+  const handleResetAll = () => {
     if (!selectedEventForReg) return;
     const updatedDownloads = { ...downloadedPlayers };
     delete updatedDownloads[selectedEventForReg.id];
     setDownloadedPlayers(updatedDownloads);
     localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
-    toast({ title: 'Status Reset', description: 'All players marked as new for this event.' });
+    toast({ title: 'Status Reset', description: 'All players for this event are now marked as "Registered".' });
   };
-
-  const handleClearAllNew = () => {
+  
+  const togglePlayerStatus = (playerId: string) => {
     if (!selectedEventForReg) return;
-    const allPlayerIdsForEvent = registrations.map(p => p.player.id);
-    const updatedDownloads = { ...downloadedPlayers, [selectedEventForReg.id]: allPlayerIdsForEvent };
+    const currentExported = downloadedPlayers[selectedEventForReg.id] || [];
+    const isExported = currentExported.includes(playerId);
+    
+    let newExported: string[];
+    if (isExported) {
+      newExported = currentExported.filter(id => id !== playerId);
+    } else {
+      newExported = [...currentExported, playerId];
+    }
+    
+    const updatedDownloads = { ...downloadedPlayers, [selectedEventForReg.id]: newExported };
     setDownloadedPlayers(updatedDownloads);
     localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
-    toast({ title: 'Status Cleared', description: 'All "new" indicators cleared.' });
   };
 
   return (
@@ -858,35 +866,48 @@ export default function ManageEventsPage() {
             <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
             <DialogDescription>
               <div className="flex items-center gap-4 text-sm mt-2">
-                <Badge variant="outline">Registered: {registeredCount}</Badge>
-                <Badge variant="secondary">Exported: {exportedCount}</Badge>
+                <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
+                <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
               </div>
             </DialogDescription>
           </DialogHeader>
-          <div className="border rounded-md p-4 bg-muted/50 my-4 space-y-2">
-            <p className="text-sm font-medium italic">for SwissSys only</p>
-            <div className='flex items-center justify-end gap-2'>
-                <Button 
-                    onClick={() => handleDownload(false)} 
-                    disabled={playersToExport.length === 0} 
-                    size="sm"
-                    className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Export Registered Status ({playersToExport.length})
-                </Button>
-                <Button 
-                    onClick={() => handleDownload(true)} 
-                    disabled={registrations.length === 0} 
-                    size="sm"
-                    className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Download All ({registrations.length})
-                </Button>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground"><span className="mx-1">|</span><button onClick={handleMarkAllAsNew} className="hover:underline">Mark all new</button><span className="mx-1">|</span><button onClick={handleClearAllNew} className="hover:underline">Clear all new</button></div>
+          
+          {profile?.role === 'organizer' && (
+            <div className="space-y-4">
+              <Card className="border-amber-500 bg-amber-50">
+                <CardContent className="p-4 space-y-2">
+                  <p className="text-sm font-medium italic text-amber-800">For SwissSys only:</p>
+                  <div className='flex items-center justify-between gap-2'>
+                      <div className="flex items-center gap-2">
+                          <Button 
+                              onClick={() => handleDownload(registeredPlayers, 'registered')} 
+                              disabled={registeredPlayers.length === 0} 
+                              size="sm"
+                              className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export Registered ({registeredPlayers.length})
+                          </Button>
+                          <Button 
+                              onClick={() => handleDownload(exportedPlayers, 'exported')} 
+                              disabled={exportedPlayers.length === 0} 
+                              size="sm"
+                              className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download Exported ({exportedPlayers.length})
+                          </Button>
+                      </div>
+                      <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
+                  </div>
+                </CardContent>
+              </Card>
+              <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
+                  Download All Registrations ({registrations.length})
+              </Button>
             </div>
-          </div>
+          )}
+
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
               <TableHeader>
@@ -895,13 +916,13 @@ export default function ManageEventsPage() {
                     <TableHead>USCF ID</TableHead>
                     <TableHead>School</TableHead>
                     <TableHead>Section</TableHead>
-                    <TableHead>Invoice #</TableHead>
                     <TableHead>Status</TableHead>
+                    {profile?.role === 'organizer' && <TableHead className="text-right">Action</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {registrations.length === 0 ? ( <TableRow><TableCell colSpan={6} className="h-24 text-center">No players registered yet.</TableCell></TableRow> ) : (
-                  registrations.map(({ player, details, invoiceId, invoiceNumber }) => {
+                {registrations.length === 0 ? ( <TableRow><TableCell colSpan={profile?.role === 'organizer' ? 6 : 5} className="h-24 text-center">No players registered yet.</TableCell></TableRow> ) : (
+                  registrations.map(({ player, details }) => {
                     const isWithdrawn = details.status === 'withdrawn';
                     const isExported = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
                     let status: React.ReactNode = <Badge variant="secondary">Registered</Badge>;
@@ -914,8 +935,14 @@ export default function ManageEventsPage() {
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
-                            <TableCell><Button variant="link" asChild className="p-0 h-auto font-mono"><Link href={`/invoices#${invoiceId}`}>{invoiceNumber || 'N/A'}</Link></Button></TableCell>
                             <TableCell>{status}</TableCell>
+                            {profile?.role === 'organizer' && !isWithdrawn && (
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" onClick={() => togglePlayerStatus(player.id)}>
+                                  Change Status
+                                </Button>
+                              </TableCell>
+                            )}
                         </TableRow>
                     )
                   })
