@@ -432,12 +432,10 @@ export default function DataRepairPage() {
 
       invoicesSnapshot.forEach(docSnap => {
         const invoice = docSnap.data();
-        // Force update any invoice that doesn't already have the correct ID
-        if (invoice.eventId !== libertyEventId) {
-            batch.update(doc(db, 'invoices', docSnap.id), { eventId: libertyEventId });
-            updatedCount++;
-            addLog('success', `Staging update for invoice #${invoice.invoiceNumber || docSnap.id} with hardcoded eventId.`);
-        }
+        // Force update ALL invoices with the hardcoded eventId
+        batch.update(doc(db, 'invoices', docSnap.id), { eventId: libertyEventId });
+        updatedCount++;
+        addLog('success', `Staging update for invoice #${invoice.invoiceNumber || docSnap.id} to ensure correct eventId.`);
       });
       
       if (updatedCount > 0) {
@@ -445,7 +443,7 @@ export default function DataRepairPage() {
         addLog('success', `Successfully updated ${updatedCount} invoices with the Liberty event ID.`);
         toast({ title: 'Repair Complete', description: `${updatedCount} invoices were fixed.` });
       } else {
-        addLog('info', 'No invoices required event ID repairs.');
+        addLog('info', 'No invoices found to repair.');
         toast({ title: 'No Repairs Needed' });
       }
     } catch (e: any) {
