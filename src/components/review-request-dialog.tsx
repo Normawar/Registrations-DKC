@@ -30,6 +30,8 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [originalConfirmation, setOriginalConfirmation] = useState<any>(null);
   const { events } = useEvents();
+  const { database: allPlayers } = useMasterDb();
+
 
   useEffect(() => {
     const fetchConfirmation = async () => {
@@ -75,48 +77,88 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
   };
   
   const handleRecreateInvoice = async () => {
-    // This function will need the full context of the original registration
-    // to build the new player list. This is a simplified example.
     const originalEvent = events.find(e => e.id === originalConfirmation.eventId);
     if (!originalEvent) {
       throw new Error('Original event not found for recreation.');
     }
   
-    // Reconstruct the new player list based on the request
-    let newPlayerList: any[] = Object.keys(originalConfirmation.selections).map(id => ({
-        id: id,
-        ...originalConfirmation.selections[id]
-    }));
+    const fullPlayerDetails = Object.keys(originalConfirmation.selections).map(id => {
+        const player = allPlayers.find(p => p.id === id);
+        return {
+            ...player,
+            ...originalConfirmation.selections[id], // Add section, uscfStatus, etc.
+            id: id,
+        } as MasterPlayer & { uscfStatus: string; section: string };
+    });
+
+    let newPlayerList = [...fullPlayerDetails];
   
     if (request.type === 'Withdrawal') {
-      const playerNameToRemove = request.player;
-      // This is a simplification; you'd need to match more accurately
-      newPlayerList = newPlayerList.filter(p => `${p.firstName} ${p.lastName}` !== playerNameToRemove);
+      const playerNameToRemove = request.player.toLowerCase();
+      newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.toLowerCase() !== playerNameToRemove);
     }
-    // Handle other types like Substitution...
-  
-    // Call the recreate flow
-    // NOTE: This will require fetching more data (sponsor, school info) from the originalConfirmation
-    // For now, we'll log it. In a real scenario, this would be a full implementation.
-    console.log("Recreating invoice with new player list:", newPlayerList);
     
-    // Example call structure (needs more data to be functional)
-    /*
-    await recreateInvoiceFromRoster({
+    if (request.type === 'Substitution') {
+        const playerNameToRemove = request.player.toLowerCase();
+        
+        // This detail must come from the request form, which needs to be updated to provide the new player's ID
+        const newPlayerId = request.details?.split('with ')[1]; 
+        const newPlayer = allPlayers.find(p => p.id === newPlayerId);
+
+        if (newPlayer) {
+            newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.toLowerCase() !== playerNameToRemove);
+            newPlayerList.push({ ...newPlayer, uscfStatus: 'current', section: newPlayer.section || 'High School K-12' });
+        } else {
+            throw new Error('New player for substitution not found in database.');
+        }
+    }
+    
+    const recreationResult = await recreateInvoiceFromRoster({
         originalInvoiceId: originalConfirmation.invoiceId,
         players: newPlayerList.map(p => ({
             playerName: `${p.firstName} ${p.lastName}`,
             uscfId: p.uscfId,
             baseRegistrationFee: originalEvent.regularFee,
-            lateFee: 0,
+            lateFee: (originalConfirmation.totalInvoiced / Object.keys(originalConfirmation.selections).length) - originalEvent.regularFee,
             uscfAction: p.uscfStatus !== 'current',
+            isGtPlayer: p.studentType === 'gt'
         })),
-        uscfFee: 24,
-        sponsorName: originalConfirmation.sponsorName,
-        // ... and all other required fields
+        uscfFee: 24, // Standard USCF fee
+        sponsorName: originalConfirmation.sponsorName || originalConfirmation.purchaserName,
+        sponsorEmail: originalConfirmation.sponsorEmail || originalConfirmation.purchaserEmail,
+        schoolName: originalConfirmation.schoolName,
+        district: originalConfirmation.district,
+        teamCode: originalConfirmation.teamCode,
+        eventName: originalConfirmation.eventName,
+        eventDate: originalConfirmation.eventDate,
+        requestingUserRole: 'organizer',
+        revisionMessage: `Invoice revised on ${format(new Date(), 'PPP')} to reflect: ${request.type} of ${request.player}.`,
     });
-    */
-    toast({ title: "Invoice Recreation Triggered", description: "A new invoice will be generated based on this approval."});
+
+    const newConfirmationRecord = {
+        id: recreationResult.newInvoiceId, 
+        invoiceId: recreationResult.newInvoiceId,
+        eventId: originalConfirmation.eventId,
+        eventName: originalConfirmation.eventName,
+        eventDate: originalConfirmation.eventDate,
+        submissionTimestamp: new Date().toISOString(),
+        invoiceNumber: recreationResult.newInvoiceNumber,
+        invoiceUrl: recreationResult.newInvoiceUrl,
+        invoiceStatus: recreationResult.newStatus,
+        totalInvoiced: recreationResult.newTotalAmount,
+        selections: newPlayerList.reduce((acc, p) => ({ ...acc, [p.id]: { uscfStatus: p.uscfStatus, section: p.section, status: 'active' } }), {}),
+        previousVersionId: originalConfirmation.id, 
+        teamCode: originalConfirmation.teamCode,
+        schoolName: originalConfirmation.schoolName,
+        district: originalConfirmation.district,
+        sponsorName: originalConfirmation.sponsorName,
+        sponsorEmail: originalConfirmation.sponsorEmail,
+    };
+
+    await setDoc(doc(db, 'invoices', recreationResult.newInvoiceId), newConfirmationRecord);
+    await setDoc(doc(db, 'invoices', originalConfirmation.id), { status: 'CANCELED', invoiceStatus: 'CANCELED' }, { merge: true });
+
+    toast({ title: "Invoice Successfully Revised", description: `New invoice #${recreationResult.newInvoiceNumber} has been created.`});
   };
 
   return (
@@ -145,3 +187,4 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     </Dialog>
   );
 }
+
