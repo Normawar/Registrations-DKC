@@ -31,7 +31,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo } from 'react';
@@ -82,6 +82,7 @@ const organizerMenuStructure = {
     { href: "/payment-authorization", icon: ShieldCheck, label: "Payment Authorization" },
     { href: "/invoices", icon: Receipt, label: "All Invoices" },
     { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
+    { href: "/reports", icon: FileBarChart, label: "Reports"},
   ],
   "Backend": [
     { href: "/users", icon: Users, label: "User Management" },
