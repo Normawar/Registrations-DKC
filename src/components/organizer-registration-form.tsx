@@ -713,7 +713,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                                 id="select-all"
                                                 onCheckedChange={toggleSelectAll}
                                                 checked={filteredSchoolRoster.length > 0 && filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id))}
-                                                indeterminate={filteredSchoolRoster.some(p => stagedPlayers.some(sp => sp.id === p.id)) && !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id))}
+                                                indeterminate={filteredSchoolRoster.length > 0 && stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) ? true : undefined}
                                             />
                                         </div>
                                     </TableHead>

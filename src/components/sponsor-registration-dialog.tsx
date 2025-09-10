@@ -491,7 +491,7 @@ export function SponsorRegistrationDialog({
                             id="select-all"
                             onCheckedChange={toggleSelectAll}
                             checked={rosterPlayers.length > 0 && rosterPlayers.every(p => getStudentRegistrationStatus(p).isRegistered || !!selectedStudents[p.id])}
-                            indeterminate={Object.keys(selectedStudents).length > 0 && Object.keys(selectedStudents).length < rosterPlayers.filter(p => !getStudentRegistrationStatus(p).isRegistered).length}
+                            indeterminate={Object.keys(selectedStudents).length > 0 && Object.keys(selectedStudents).length < rosterPlayers.filter(p => !getStudentRegistrationStatus(p).isRegistered).length ? true : undefined}
                         />
                         <Label htmlFor="select-all">Select All</Label>
                     </div>
