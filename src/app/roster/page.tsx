@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
@@ -609,31 +608,31 @@ function SponsorRosterView() {
       {/* Edit Player Dialog */}
       <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
           <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-            <Tabs defaultValue="details" className="w-full">
-              <DialogHeader className="p-6 pb-0 border-b shrink-0">
-                  <DialogTitle>{editingPlayer && database.some(p => p.id === editingPlayer.id) ? 'Edit Player' : 'Add New Player'}</DialogTitle>
-                  <DialogDescription>
-                      Complete the player's information. This will add them to or update their record in the master database.
-                  </DialogDescription>
-                  <TabsList className="grid w-full grid-cols-2 mt-4">
-                      <TabsTrigger value="details">Player Details</TabsTrigger>
-                      <TabsTrigger value="history">Change History</TabsTrigger>
-                  </TabsList>
-              </DialogHeader>
-              <TabsContent value="details" className="flex-1 overflow-y-auto">
-                  <ScrollArea className="h-[60vh] pr-6">
-                    <div className='p-6 pt-0'>
-                      <Form {...playerForm}>
-                          <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                  <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                  <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                  <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                  <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                              </div>
+               <Tabs defaultValue="details" className="w-full">
+                <DialogHeader className="p-6 pb-0 border-b shrink-0">
+                    <DialogTitle>{editingPlayer && database.some(p => p.id === editingPlayer.id) ? 'Edit Player' : 'Add New Player'}</DialogTitle>
+                    <DialogDescription>
+                        Complete the player's information. This will add them to or update their record in the master database.
+                    </DialogDescription>
+                    <TabsList className="grid w-full grid-cols-2 mt-4">
+                        <TabsTrigger value="details">Player Details</TabsTrigger>
+                        <TabsTrigger value="history">Change History</TabsTrigger>
+                    </TabsList>
+                </DialogHeader>
+                <TabsContent value="details">
+                  <div className='flex-1 overflow-y-auto p-6'>
+                    <Form {...playerForm}>
+                        <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
+                            {/* Form fields here */}
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
                                {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
                                 <FormField
                                   control={playerForm.control}
@@ -715,8 +714,8 @@ function SponsorRosterView() {
                                       </FormControl><FormMessage /></FormItem>)} />
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                  <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                  <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                  <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} placeholder="Enter email address" /></FormControl><FormMessage /></FormItem> )} />
@@ -726,18 +725,17 @@ function SponsorRosterView() {
                                 <FormField control={playerForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" {...field} value={field.value || ''} placeholder="Enter phone number" /></FormControl><FormMessage /></FormItem> )} />
                               </div>
                           </form>
-                      </Form>
-                    </div>
-                  </ScrollArea>
-              </TabsContent>
-              <TabsContent value="history">
+                    </Form>
+                  </div>
+                </TabsContent>
+                <TabsContent value="history">
                   <ChangeHistoryTab player={editingPlayer} />
-              </TabsContent>
-            </Tabs>
-            <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
-                <Button type="submit" form="edit-player-form">Save Changes</Button>
-            </DialogFooter>
+                </TabsContent>
+               </Tabs>
+                <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                    <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
+                    <Button type="submit" form="edit-player-form">Save Changes</Button>
+                </DialogFooter>
           </DialogContent>
       </Dialog>
 
@@ -1251,4 +1249,3 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
-
