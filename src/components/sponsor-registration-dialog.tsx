@@ -17,6 +17,7 @@ import { School, User, DollarSign, CheckCircle, Clock, AlertCircle, Lock } from 
 import { format, differenceInHours, isSameDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
+import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
@@ -189,12 +190,81 @@ export function SponsorRegistrationDialog({
     if (!profile || !event || !db) return;
 
     setIsSubmitting(true);
+    
+    const isPsjaDistrict = profile.district === 'PHARR-SAN JUAN-ALAMO ISD';
+    const allSelectedPlayers = Object.entries(selectedStudents).map(([playerId, details]) => ({
+      player: rosterPlayers.find(p => p.id === playerId),
+      details
+    }));
+
+    const hasGt = allSelectedPlayers.some(p => p.player?.studentType === 'gt');
+    const hasIndependent = allSelectedPlayers.some(p => p.player?.studentType !== 'gt');
+
+    // If PSJA and a mix of player types, use the split invoice flow
+    if (isPsjaDistrict && hasGt && hasIndependent) {
+        await handlePsjaSplitInvoice();
+        return;
+    }
+
+    // Otherwise, use the standard single invoice flow
+    await handleStandardInvoice();
+  };
+
+  const handleStandardInvoice = async () => {
+    if (!profile || !event) return;
+
+    const { fee: currentFee } = getFeeForEvent();
+    const lateFeeAmount = currentFee - event.regularFee;
+
+    const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
+      const student = rosterPlayers.find(p => p.id === playerId);
+      return {
+        playerName: `${student?.firstName} ${student?.lastName}`,
+        uscfId: student?.uscfId || '',
+        baseRegistrationFee: event.regularFee,
+        lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+        uscfAction: details.uscfStatus !== 'current',
+        isGtPlayer: student?.studentType === 'gt'
+      };
+    });
+
+    const uscfFee = 24;
+    const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
 
     try {
-      const { fee: currentFee } = getFeeForEvent();
-      const lateFeeAmount = currentFee - event.regularFee;
+      const result = await createInvoice({
+          sponsorName: `${profile.firstName} ${profile.lastName}`,
+          sponsorEmail: profile.email || '',
+          sponsorPhone: profile.phone || '',
+          schoolName: profile.school,
+          teamCode: teamCode,
+          eventName: event.name,
+          eventDate: event.date,
+          uscfFee,
+          players: playersToInvoice,
+          bookkeeperEmail: profile.bookkeeperEmail,
+          gtCoordinatorEmail: profile.gtCoordinatorEmail,
+          schoolAddress: profile.schoolAddress,
+          schoolPhone: profile.schoolPhone,
+          district: profile.district,
+      });
 
-      const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
+      await saveConfirmation(result.invoiceId, result, stagedPlayersForConfirmation(playersToInvoice.map(p => p.playerName)), feeBreakdown.total);
+      
+    } catch (error) {
+        handleInvoiceError(error, "Invoice Creation Failed");
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  const handlePsjaSplitInvoice = async () => {
+    if (!profile || !event) return;
+
+    const { fee: currentFee } = getFeeForEvent();
+    const lateFeeAmount = currentFee - event.regularFee;
+
+    const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
         const student = rosterPlayers.find(p => p.id === playerId);
         return {
           playerName: `${student?.firstName} ${student?.lastName}`,
@@ -204,111 +274,124 @@ export function SponsorRegistrationDialog({
           uscfAction: details.uscfStatus !== 'current',
           isGtPlayer: student?.studentType === 'gt'
         };
+    });
+
+    try {
+      const result = await createPsjaSplitInvoice({
+          sponsorName: `${profile.firstName} ${profile.lastName}`,
+          sponsorEmail: profile.email,
+          bookkeeperEmail: profile.bookkeeperEmail,
+          gtCoordinatorEmail: profile.gtCoordinatorEmail,
+          schoolName: profile.school,
+          schoolAddress: profile.schoolAddress,
+          schoolPhone: profile.schoolPhone,
+          district: 'PHARR-SAN JUAN-ALAMO ISD',
+          teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
+          eventName: event.name,
+          eventDate: event.date,
+          uscfFee: 24,
+          players: playersToInvoice
       });
 
-      const uscfFee = 24;
-      const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
+      let gtInvoiceId: string | null = null;
+      let indInvoiceId: string | null = null;
 
-      const result = await createInvoice({
-        sponsorName: `${profile.firstName} ${profile.lastName}`,
-        sponsorEmail: profile.email || '',
-        sponsorPhone: profile.phone || '',
-        schoolName: profile.school,
-        teamCode: teamCode,
-        eventName: event.name,
-        eventDate: event.date,
-        uscfFee,
-        players: playersToInvoice,
-        bookkeeperEmail: profile.bookkeeperEmail,
-        gtCoordinatorEmail: profile.gtCoordinatorEmail,
-        schoolAddress: profile.schoolAddress,
-        schoolPhone: profile.schoolPhone,
-        district: profile.district,
-      });
-      
-      const newConfirmation = {
-        id: result.invoiceId,
-        invoiceId: result.invoiceId,
-        invoiceNumber: result.invoiceNumber,
-        submissionTimestamp: new Date().toISOString(),
-        eventId: event.id,
-        eventName: event.name,
-        eventDate: event.date,
-        schoolName: profile.school,
-        district: profile.district,
-        teamCode: teamCode,
-        invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
-        selections: Object.fromEntries(
-          Object.entries(selectedStudents).map(([playerId, details]) => [
-            playerId, { ...details, status: 'active' }
-          ])
-        ),
-        totalInvoiced: feeBreakdown.total,
-        totalAmount: feeBreakdown.total,
-        invoiceStatus: result.status,
-        status: result.status,
-        invoiceUrl: result.invoiceUrl,
-        purchaserName: `${profile.firstName} ${profile.lastName}`,
-        sponsorEmail: profile.email,
-        sponsorPhone: profile.phone,
-        contactEmail: profile.email,
-        purchaserEmail: profile.email,
-      };
-      
-      // Enhanced Firestore save with debugging
-      try {
-        console.log('💾 Attempting to save invoice to Firestore...', result.invoiceId);
-        console.log('🔧 DB object:', !!db);
-        console.log('🔧 newConfirmation data:', newConfirmation);
-        
-        if (!db) {
-          throw new Error('Database connection not available');
-        }
-        
-        const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
-        await setDoc(invoiceDocRef, newConfirmation);
-        
-        console.log('✅ Successfully saved invoice to Firestore!');
-        
-      } catch (firestoreError) {
-        console.error('❌ FIRESTORE SAVE FAILED:', firestoreError);
-        toast({
-          variant: 'destructive',
-          title: 'Warning: Invoice created but not saved to database',
-          description: 'The invoice was sent successfully, but there was an issue saving to the system.'
-        });
+      if (result.gtInvoice) {
+        const gtPlayers = playersToInvoice.filter(p => p.isGtPlayer);
+        await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0); // Simplified total for now
+        gtInvoiceId = result.gtInvoice.invoiceId;
+      }
+
+      if (result.independentInvoice) {
+        const indPlayers = playersToInvoice.filter(p => !p.isGtPlayer);
+        await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, 0); // Simplified total
+        indInvoiceId = result.independentInvoice.invoiceId;
       }
       
-      // Also save to localStorage for immediate UI update on sponsor's side
-      const existingConfirmations = localStorage.getItem('confirmations');
-      const allConfirmations = existingConfirmations ? JSON.parse(existingConfirmations) : [];
-      allConfirmations.push(newConfirmation);
-      localStorage.setItem('confirmations', JSON.stringify(allConfirmations));
-      
-      const existingInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      localStorage.setItem('all_invoices', JSON.stringify([...existingInvoices, newConfirmation]));
-
-      setCreatedInvoiceId(result.invoiceId);
+      toast({ title: "Split Invoices Created Successfully!", description: "Two separate invoices for GT and Independent players have been created."});
+      setCreatedInvoiceId(indInvoiceId || gtInvoiceId); // Show the first available invoice
       setShowInvoiceModal(true);
-      toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
-      
-      setSelectedStudents({});
-      setShowConfirmation(false);
-      onOpenChange(false);
-      
-      window.dispatchEvent(new Event('storage'));
+      resetState();
       
     } catch (error) {
-      console.error('Registration failed:', error);
-      const description = error instanceof Error ? error.message : "An unknown error occurred.";
-      toast({
-        variant: 'destructive',
-        title: "Invoice Creation Failed",
-        description: description
-      });
+      handleInvoiceError(error, "Split Invoice Creation Failed");
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
+  };
+
+  const stagedPlayersForConfirmation = (playerNames: string[]) => {
+    return Object.fromEntries(
+        Object.entries(selectedStudents)
+          .filter(([playerId]) => {
+              const student = rosterPlayers.find(p => p.id === playerId);
+              return playerNames.includes(`${student?.firstName} ${student?.lastName}`);
+          })
+          .map(([playerId, details]) => [
+              playerId, { ...details, status: 'active' }
+          ])
+      );
+  };
+  
+  const saveConfirmation = async (invoiceId: string, result: any, playersToConfirm: any[], total: number) => {
+    if(!profile || !event || !db) return;
+    
+    const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
+    
+    const newConfirmation = {
+      id: invoiceId,
+      invoiceId: invoiceId,
+      invoiceNumber: result.invoiceNumber,
+      submissionTimestamp: new Date().toISOString(),
+      eventId: event.id,
+      eventName: event.name,
+      eventDate: event.date,
+      schoolName: profile.school,
+      district: profile.district,
+      teamCode: teamCode,
+      invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
+      selections: Object.fromEntries(
+        Object.entries(selectedStudents).map(([playerId, details]) => [
+          playerId, { ...details, status: 'active' }
+        ])
+      ),
+      totalInvoiced: total,
+      totalAmount: total,
+      invoiceStatus: result.status,
+      status: result.status,
+      invoiceUrl: result.invoiceUrl,
+      purchaserName: `${profile.firstName} ${profile.lastName}`,
+      sponsorEmail: profile.email,
+      sponsorPhone: profile.phone,
+      contactEmail: profile.email,
+      purchaserEmail: profile.email,
+    };
+    
+    const invoiceDocRef = doc(db, 'invoices', invoiceId);
+    await setDoc(invoiceDocRef, newConfirmation);
+    
+    setCreatedInvoiceId(invoiceId);
+    setShowInvoiceModal(true);
+    toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
+    resetState();
+  };
+  
+  const handleInvoiceError = (error: any, title: string) => {
+    console.error(title, error);
+    const description = error instanceof Error ? error.message : "An unknown error occurred.";
+    toast({
+      variant: 'destructive',
+      title: title,
+      description: description
+    });
+  };
+
+  const resetState = () => {
+    setSelectedStudents({});
+    setShowConfirmation(false);
+    onOpenChange(false);
+    // Dispatch events to notify other components of data change
+    window.dispatchEvent(new Event('storage'));
   };
 
   const handleBackToSelection = () => {

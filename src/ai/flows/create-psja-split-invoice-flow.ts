@@ -1,0 +1,91 @@
+
+'use server';
+/**
+ * @fileOverview Orchestrates the creation of two separate invoices for PSJA district registrations.
+ * One invoice is for GT (Gifted & Talented) players, sent to the GT Coordinator.
+ * The other is for Independent/Regular players, sent to the Bookkeeper.
+ */
+
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
+import { createInvoice, CreateInvoiceInput, CreateInvoiceOutput } from './create-invoice-flow';
+
+const PlayerToInvoiceSchema = z.object({
+  playerName: z.string(),
+  uscfId: z.string(),
+  baseRegistrationFee: z.number(),
+  lateFee: z.number(),
+  uscfAction: z.boolean(),
+  isGtPlayer: z.boolean().optional(),
+});
+
+export const CreatePsjaSplitInvoiceInputSchema = z.object({
+  sponsorName: z.string(),
+  sponsorEmail: z.string().email(),
+  bookkeeperEmail: z.string().email().optional().or(z.literal('')),
+  gtCoordinatorEmail: z.string().email().optional().or(z.literal('')),
+  schoolName: z.string(),
+  schoolAddress: z.string().optional(),
+  schoolPhone: z.string().optional(),
+  district: z.literal('PHARR-SAN JUAN-ALAMO ISD'),
+  teamCode: z.string(),
+  eventName: z.string(),
+  eventDate: z.string(),
+  uscfFee: z.number(),
+  players: z.array(PlayerToInvoiceSchema),
+});
+export type CreatePsjaSplitInvoiceInput = z.infer<typeof CreatePsjaSplitInvoiceInputSchema>;
+
+export const CreatePsjaSplitInvoiceOutputSchema = z.object({
+  gtInvoice: CreateInvoiceOutput.optional(),
+  independentInvoice: CreateInvoiceOutput.optional(),
+});
+export type CreatePsjaSplitInvoiceOutput = z.infer<typeof CreatePsjaSplitInvoiceOutputSchema>;
+
+export async function createPsjaSplitInvoice(input: CreatePsjaSplitInvoiceInput): Promise<CreatePsjaSplitInvoiceOutput> {
+  return createPsjaSplitInvoiceFlow(input);
+}
+
+const createPsjaSplitInvoiceFlow = ai.defineFlow(
+  {
+    name: 'createPsjaSplitInvoiceFlow',
+    inputSchema: CreatePsjaSplitInvoiceInputSchema,
+    outputSchema: CreatePsjaSplitInvoiceOutputSchema,
+  },
+  async (input) => {
+    const gtPlayers = input.players.filter(p => p.isGtPlayer);
+    const independentPlayers = input.players.filter(p => !p.isGtPlayer);
+
+    const output: CreatePsjaSplitInvoiceOutput = {};
+
+    // 1. Create invoice for GT players if any exist
+    if (gtPlayers.length > 0) {
+      console.log(`Creating GT invoice for ${gtPlayers.length} players.`);
+      const gtInvoiceInput: CreateInvoiceInput = {
+        ...input,
+        players: gtPlayers,
+        // Send to GT coordinator, not bookkeeper
+        gtCoordinatorEmail: input.gtCoordinatorEmail,
+        bookkeeperEmail: '', // Ensure bookkeeper is not CC'd on the GT invoice
+      };
+      output.gtInvoice = await createInvoice(gtInvoiceInput);
+      console.log(`GT Invoice created:`, output.gtInvoice);
+    }
+
+    // 2. Create invoice for Independent players if any exist
+    if (independentPlayers.length > 0) {
+      console.log(`Creating Independent invoice for ${independentPlayers.length} players.`);
+      const independentInvoiceInput: CreateInvoiceInput = {
+        ...input,
+        players: independentPlayers,
+        // Send to bookkeeper, not GT coordinator
+        bookkeeperEmail: input.bookkeeperEmail,
+        gtCoordinatorEmail: '', // Ensure GT coordinator is not CC'd on the independent invoice
+      };
+      output.independentInvoice = await createInvoice(independentInvoiceInput);
+      console.log(`Independent Invoice created:`, output.independentInvoice);
+    }
+    
+    return output;
+  }
+);
