@@ -608,7 +608,7 @@ function SponsorRosterView() {
 
       {/* Edit Player Dialog */}
       <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
                <Tabs defaultValue="details" className="w-full">
                 <DialogHeader className="p-6 pb-0 border-b shrink-0">
                     <DialogTitle>{editingPlayer && database.some(p => p.id === editingPlayer.id) ? 'Edit Player' : 'Add New Player'}</DialogTitle>
@@ -1381,4 +1381,3 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
-

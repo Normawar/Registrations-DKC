@@ -310,7 +310,7 @@ export function SponsorRegistrationDialog({
         indInvoiceId = result.independentInvoice.invoiceId;
       }
       
-      toast({ title: "Split Invoices Created Successfully!", description: "Two separate invoices for GT and Independent players have been created."});
+      toast({ title: "Split Invoices Created Successfully!", description: "Separate invoices for GT and Independent players have been created."});
       setCreatedInvoiceId(indInvoiceId || gtInvoiceId); // Show the first available invoice
       setShowInvoiceModal(true);
       resetState();
@@ -335,7 +335,7 @@ export function SponsorRegistrationDialog({
       );
   };
   
-  const saveConfirmation = async (invoiceId: string, result: any, playersToConfirm: any[], total: number) => {
+  const saveConfirmation = async (invoiceId: string, result: any, players: any[], total: number) => {
     if(!profile || !event || !db) return;
     
     const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
@@ -491,7 +491,12 @@ export function SponsorRegistrationDialog({
                             id="select-all"
                             onCheckedChange={toggleSelectAll}
                             checked={rosterPlayers.length > 0 && rosterPlayers.every(p => getStudentRegistrationStatus(p).isRegistered || !!selectedStudents[p.id])}
-                            indeterminate={Object.keys(selectedStudents).length > 0 && Object.keys(selectedStudents).length < rosterPlayers.filter(p => !getStudentRegistrationStatus(p).isRegistered).length ? true : undefined}
+                            ref={(el) => {
+                                if (el) {
+                                    const isIndeterminate = Object.keys(selectedStudents).length > 0 && Object.keys(selectedStudents).length < rosterPlayers.filter(p => !getStudentRegistrationStatus(p).isRegistered).length;
+                                    el.indeterminate = isIndeterminate;
+                                }
+                            }}
                         />
                         <Label htmlFor="select-all">Select All</Label>
                     </div>

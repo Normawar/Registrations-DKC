@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -476,9 +475,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
           setIsInvoiceDialogOpen(false);
           
         } catch (error) {
-          console.error("Failed to create split invoice:", error);
-          const description = error instanceof Error ? error.message : "An unknown error occurred.";
-          toast({ variant: "destructive", title: "Submission Error", description });
+          handleInvoiceError(error, "Split Invoice Creation Failed");
         } finally {
             setIsSubmitting(false);
         }
@@ -602,14 +599,18 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             setIsInvoiceDialogOpen(false);
 
         } catch (error) {
-            console.error("Failed to comp registration:", error);
-            const description = error instanceof Error ? error.message : "An unknown error occurred.";
-            toast({ variant: "destructive", title: "Submission Error", description });
+          handleInvoiceError(error, "Failed to comp registration");
         } finally {
             setIsSubmitting(false);
         }
     };
     
+    const handleInvoiceError = (error: any, title: string) => {
+        console.error(title, error);
+        const description = error instanceof Error ? error.message : "An unknown error occurred.";
+        toast({ variant: "destructive", title: "Submission Error", description });
+    };
+
     const getFeeForEvent = () => {
         if (!event) return { fee: 0, type: 'Regular Registration' };
         
@@ -713,7 +714,12 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                                 id="select-all"
                                                 onCheckedChange={toggleSelectAll}
                                                 checked={filteredSchoolRoster.length > 0 && filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id))}
-                                                indeterminate={filteredSchoolRoster.length > 0 && stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) ? true : undefined}
+                                                ref={(el) => {
+                                                    if (el) {
+                                                        const isIndeterminate = filteredSchoolRoster.length > 0 && stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) && !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id));
+                                                        el.indeterminate = isIndeterminate;
+                                                    }
+                                                }}
                                             />
                                         </div>
                                     </TableHead>
