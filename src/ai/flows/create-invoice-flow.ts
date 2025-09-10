@@ -43,6 +43,7 @@ const CreateInvoiceInputSchema = z.object({
     invoiceNumber: z.string().optional().describe('A custom invoice number to assign. If not provided, Square will generate one.'),
     substitutionFee: z.number().optional().describe('A fee for substitutions, if applicable.'),
     description: z.string().optional().describe('An optional description or note for the invoice.'),
+    revisionMessage: z.string().optional().describe('Revision message to include in invoice description'),
 });
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
 
@@ -244,8 +245,11 @@ const createInvoiceFlow = ai.defineFlow(
           ccRecipients.push({ emailAddress: input.gtCoordinatorEmail });
       }
       
-      const defaultDescription = `Thank you for your registration.`;
-      const description = input.description ? `${input.description}\n\n${defaultDescription}` : defaultDescription;
+      const baseDescription = `Thank you for your registration.`;
+      const revisionNote = input.revisionMessage ? `\n\n${input.revisionMessage}` : '';
+      const description = input.description ? 
+          `${input.description}${revisionNote}\n\n${baseDescription}` : 
+          `${baseDescription}${revisionNote}`;
 
       console.log(`Creating invoice for order ID: ${orderId}`);
       const createInvoiceResponse = await invoicesApi.createInvoice({

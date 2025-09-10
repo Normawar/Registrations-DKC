@@ -16,6 +16,7 @@ import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const CancelInvoiceInputSchema = z.object({
   invoiceId: z.string().describe('The ID of the invoice to cancel.'),
+  requestingUserRole: z.string().describe('Role of user requesting the cancellation'),
 });
 export type CancelInvoiceInput = z.infer<typeof CancelInvoiceInputSchema>;
 
@@ -36,6 +37,10 @@ const cancelInvoiceFlow = ai.defineFlow(
     outputSchema: CancelInvoiceOutputSchema,
   },
   async (input) => {
+    if (input.requestingUserRole !== 'organizer') {
+        throw new Error('Only organizers can cancel invoices.');
+    }
+    
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       console.log(`Square not configured. Mock-cancelling invoice ${input.invoiceId}.`);

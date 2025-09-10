@@ -19,6 +19,7 @@ const RecordPaymentInputSchema = z.object({
   paymentMethod: z.string().optional().describe('The method of payment (e.g., Check, Cash App).'),
   externalPaymentId: z.string().optional().describe('A unique ID for the payment from the local system.'),
   organizerInitials: z.string().optional().describe('Initials of the organizer recording the payment.'),
+  requestingUserRole: z.string().describe('Role of user recording the payment'),
 });
 export type RecordPaymentInput = z.infer<typeof RecordPaymentInputSchema>;
 
@@ -42,6 +43,10 @@ const recordPaymentFlow = ai.defineFlow(
     outputSchema: RecordPaymentOutputSchema,
   },
   async (input) => {
+    if (input.requestingUserRole !== 'organizer') {
+        throw new Error('Only organizers can record payments.');
+    }
+
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       console.log(`Square not configured. Mock-recording payment for invoice ${input.invoiceId}.`);

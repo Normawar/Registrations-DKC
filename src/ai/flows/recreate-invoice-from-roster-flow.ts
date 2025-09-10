@@ -42,6 +42,8 @@ const RecreateInvoiceInputSchema = z.object({
     teamCode: z.string().describe('The team code of the sponsor.'),
     eventName: z.string().describe('The name of the event.'),
     eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
+    requestingUserRole: z.string().describe('Role of user requesting the recreation'),
+    revisionMessage: z.string().optional().describe('Message explaining why invoice was recreated'),
 });
 export type RecreateInvoiceInput = z.infer<typeof RecreateInvoiceInputSchema>;
 
@@ -66,6 +68,10 @@ const recreateInvoiceFlow = ai.defineFlow(
     outputSchema: RecreateInvoiceOutputSchema,
   },
   async (input) => {
+    if (input.requestingUserRole !== 'organizer') {
+        throw new Error('Only organizers can recreate invoices.');
+    }
+    
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       console.log(`Square not configured. Mock-recreating invoice based on ${input.originalInvoiceId}.`);
@@ -91,7 +97,7 @@ const recreateInvoiceFlow = ai.defineFlow(
 
       // Step 2: Cancel the original invoice.
       console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
-      await cancelInvoice({ invoiceId: input.originalInvoiceId });
+      await cancelInvoice({ invoiceId: input.originalInvoiceId, requestingUserRole: 'organizer' });
       console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
 
       // Step 3: Use the original invoice number for the new invoice.
@@ -120,7 +126,7 @@ const recreateInvoiceFlow = ai.defineFlow(
           players: playersWithAdjustedFees,
           substitutionFee: totalSubstitutionFee > 0 ? totalSubstitutionFee : undefined,
           invoiceNumber: newInvoiceNumber,
-          description: `Revised on ${format(new Date(), 'PPP')}. This invoice replaces #${originalInvoice.invoiceNumber}.`
+          description: input.revisionMessage || `Revised on ${format(new Date(), 'PPP')}. This invoice replaces #${originalInvoice.invoiceNumber}.`
       });
 
       console.log("Successfully created new invoice:", newInvoiceResult);

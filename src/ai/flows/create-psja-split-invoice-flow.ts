@@ -33,8 +33,9 @@ export const CreatePsjaSplitInvoiceInputSchema = z.object({
   eventDate: z.string(),
   uscfFee: z.number(),
   players: z.array(PlayerToInvoiceSchema),
-  // Add original invoice details for revisioning
   originalInvoiceNumber: z.string().optional(),
+  revisionNumber: z.number().optional().describe('Revision number for this invoice'),
+  revisionMessage: z.string().optional().describe('Message explaining the revision'),
 });
 export type CreatePsjaSplitInvoiceInput = z.infer<typeof CreatePsjaSplitInvoiceInputSchema>;
 
@@ -60,16 +61,17 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
 
     const output: CreatePsjaSplitInvoiceOutput = {};
 
-    // --- Revision Number Logic ---
-    const baseInvoiceNumber = input.originalInvoiceNumber?.split('-rev.')[0] || input.originalInvoiceNumber;
-    const currentRevisionMatch = input.originalInvoiceNumber?.match(/-rev\.(\d+)$/);
-    const currentRevision = currentRevisionMatch ? parseInt(currentRevisionMatch[1], 10) : 1;
+    const revisionSuffix = input.revisionNumber ? `-rev.${input.revisionNumber}` : '';
+    const gtInvoiceNumber = input.originalInvoiceNumber ? 
+        `${input.originalInvoiceNumber}-GT${revisionSuffix}` : 
+        undefined;
+    const indInvoiceNumber = input.originalInvoiceNumber ? 
+        `${input.originalInvoiceNumber}-IND${revisionSuffix}` : 
+        undefined;
     
     // 1. Create invoice for GT players if any exist
     if (gtPlayers.length > 0) {
       console.log(`Creating GT invoice for ${gtPlayers.length} players.`);
-      
-      const gtRevisionNumber = `${baseInvoiceNumber}-GT-rev.${currentRevision + 1}`;
       
       const gtInvoiceInput: CreateInvoiceInput = {
         ...input,
@@ -77,7 +79,8 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
         // Send to GT coordinator, not bookkeeper
         gtCoordinatorEmail: input.gtCoordinatorEmail,
         bookkeeperEmail: '', // Ensure bookkeeper is not CC'd on the GT invoice
-        invoiceNumber: gtRevisionNumber,
+        invoiceNumber: gtInvoiceNumber,
+        description: input.revisionMessage,
       };
       output.gtInvoice = await createInvoice(gtInvoiceInput);
       console.log(`GT Invoice created:`, output.gtInvoice);
@@ -87,15 +90,14 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
     if (independentPlayers.length > 0) {
       console.log(`Creating Independent invoice for ${independentPlayers.length} players.`);
       
-      const indRevisionNumber = `${baseInvoiceNumber}-IND-rev.${currentRevision + 1}`;
-
       const independentInvoiceInput: CreateInvoiceInput = {
         ...input,
         players: independentPlayers,
         // Send to bookkeeper, not GT coordinator
         bookkeeperEmail: input.bookkeeperEmail,
         gtCoordinatorEmail: '', // Ensure GT coordinator is not CC'd on the independent invoice
-        invoiceNumber: indRevisionNumber,
+        invoiceNumber: indInvoiceNumber,
+        description: input.revisionMessage,
       };
       output.independentInvoice = await createInvoice(independentInvoiceInput);
       console.log(`Independent Invoice created:`, output.independentInvoice);

@@ -292,13 +292,26 @@ export default function UnifiedInvoiceRegistrations() {
   };
 
   const confirmDelete = async () => {
-    if (!invoiceToDelete || !db) return;
+    if (!invoiceToDelete || !db || !profile) return;
+
+    if (profile?.role !== 'organizer') {
+        toast({ 
+            variant: 'destructive', 
+            title: 'Permission Denied', 
+            description: 'Only organizers can cancel invoices.' 
+        });
+        setIsAlertOpen(false);
+        return;
+    }
 
     setIsDeleting(true);
     try {
       let finalStatus = 'CANCELED'; // Default status
       if (invoiceToDelete.invoiceId) {
-        const result = await cancelInvoice({ invoiceId: invoiceToDelete.invoiceId });
+        const result = await cancelInvoice({ 
+            invoiceId: invoiceToDelete.invoiceId,
+            requestingUserRole: profile.role
+        });
         finalStatus = result.status; // Get the authoritative status from Square
       }
       
