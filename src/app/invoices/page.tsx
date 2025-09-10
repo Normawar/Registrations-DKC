@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,7 +50,7 @@ export default function UnifiedInvoiceRegistrations() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { dbSchools, dbDistricts, searchPlayers, isDbLoaded } = useMasterDb();
+  const { dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
   const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
   const [districtFilter, setDistrictFilter] = useState('all');
   const [schoolFilter, setSchoolFilter] = useState('all');
@@ -74,117 +74,69 @@ export default function UnifiedInvoiceRegistrations() {
 
 
   const loadData = useCallback(async () => {
-    if (!db || !profile) {
-      console.log('❌ Aborting loadData: db or profile not ready.');
+    if (!db || !isProfileLoaded || !profile) {
+      console.log('❌ Aborting loadData: db, profile, or isProfileLoaded not ready.');
       return;
     }
-    
+
     setIsLoading(true);
-    console.log('🎯 === UNIFIED INVOICE SEARCH v5.0 (Firestore Only) ===');
-    console.log('Profile:', {
-      role: profile.role,
-      district: profile.district,
-      school: profile.school,
-      email: profile.email
-    });
-    
+    console.log(`🎯 Loading invoices for role: ${profile.role}`);
+
     try {
-      let allInvoiceData: any[] = [];
-      
-      const invoicesCol = collection(db, 'invoices');
-      const invoiceSnapshot = await getDocs(invoicesCol);
-      if (!invoiceSnapshot.empty) {
-        const firestoreInvoices = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        allInvoiceData.push(...firestoreInvoices);
-        console.log(`✅ Found ${firestoreInvoices.length} documents in top-level 'invoices' collection.`);
-      } else {
-        console.log("🟡 No documents found in top-level 'invoices' collection.");
-      }
-      
-      if (isDbLoaded && allPlayers.length === 0) {
-        const playerResults = await searchPlayers({maxResults: 50000}); // get all players
-        setAllPlayers(playerResults.players);
-      }
+        let invoicesQuery = query(collection(db, 'invoices'));
 
-      console.log(`🔄 Total data found: ${allInvoiceData.length}`);
-      
-      let invoicesArray = allInvoiceData;
-      const beforeRoleFilter = invoicesArray.length;
-      console.log(`👤 Applying role filter for: ${profile.role}`);
-      
-      if (profile.role === 'organizer') {
-        console.log('🏢 Organizer role - showing ALL data.');
-      } else if (profile.role === 'district_coordinator') {
-        invoicesArray = invoicesArray.filter(inv => inv.district === profile.district);
-        console.log(`🏫 District coordinator filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
-      } else if (profile.role === 'sponsor') {
-        invoicesArray = invoicesArray.filter(inv => inv.schoolName === profile.school && inv.district === profile.district);
-        console.log(`🎓 Sponsor filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
-      } else if (profile.role === 'individual') {
-        invoicesArray = invoicesArray.filter(inv => inv.parentEmail === profile.email);
-        console.log(`👨‍👩‍👧‍👦 Individual filter: ${beforeRoleFilter} -> ${invoicesArray.length}`);
-      }
-
-      console.log(`🎯 Final filtered data count: ${invoicesArray.length}`);
-      
-      const mapped = invoicesArray.map((item: any) => {
-        let registrations: any[] = [];
-        if (item.selections) {
-          registrations = Object.keys(item.selections).map(playerId => {
-            const playerDetails = allPlayers.find(p => p.id === playerId);
-            return { id: playerId, ...item.selections[playerId], ...playerDetails };
-          });
-        } else if (item.registrations) {
-          registrations = Array.isArray(item.registrations) ? item.registrations : [];
+        // Apply server-side filtering based on user role
+        if (profile.role === 'district_coordinator') {
+            invoicesQuery = query(invoicesQuery, where('district', '==', profile.district));
+        } else if (profile.role === 'sponsor') {
+            invoicesQuery = query(invoicesQuery, 
+                where('district', '==', profile.district),
+                where('schoolName', '==', profile.school)
+            );
+        } else if (profile.role === 'individual') {
+            invoicesQuery = query(invoicesQuery, where('parentEmail', '==', profile.email));
         }
+        
+        // For organizers, no role-based filter is applied, fetching all invoices.
+        
+        const invoiceSnapshot = await getDocs(invoicesQuery);
+        const invoicesArray = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-        const getInvoiceTitle = () => {
-          if (item.invoiceTitle && typeof item.invoiceTitle === 'string' && item.invoiceTitle.trim() !== '') return item.invoiceTitle.trim();
-          if (item.parentEventName) return item.parentEventName;
-          if (item.eventName) return item.eventName;
-          if (item.membershipType) return `USCF ${item.membershipType}`;
-          if (item.title) return item.title;
-          return 'Registration Data';
-        };
+        console.log(`✅ Found ${invoicesArray.length} documents for role '${profile.role}'.`);
 
-        return {
-          ...item,
-          id: item.id,
-          invoiceTitle: getInvoiceTitle(),
-          companyName: item.schoolName || item.purchaserName || item.school || 'Unknown',
-          contactEmail: item.sponsorEmail || item.purchaserEmail || item.email || 'Unknown',
-          totalAmount: item.totalInvoiced || item.totalAmount || (item.totalMoney?.amount ? parseFloat(item.totalMoney.amount) : 0),
-          status: item.invoiceStatus || item.status || 'UNKNOWN',
-          registrations: registrations,
-        };
-      });
-      
-      console.log(`📋 Final mapped data: ${mapped.length}`);
-      if (mapped.length > 0) {
-        console.log('Sample mapped item:', mapped[0]);
-      }
-      
-      setData(mapped);
-      
+        const mapped = invoicesArray.map((item: any) => ({
+            ...item,
+            id: item.id,
+            invoiceTitle: item.invoiceTitle || item.eventName || item.title || 'Registration Data',
+            companyName: item.schoolName || item.purchaserName || 'Unknown',
+            contactEmail: item.sponsorEmail || item.purchaserEmail || item.email || 'Unknown',
+            totalAmount: item.totalInvoiced || 0,
+            status: item.invoiceStatus || item.status || 'UNKNOWN',
+            registrations: item.selections 
+                ? Object.keys(item.selections).map(playerId => ({ id: playerId, ...item.selections[playerId] })) 
+                : [],
+        }));
+
+        setData(mapped);
     } catch (error) {
-      console.error('❌ Error loading data from Firestore:', error);
-      toast({ variant: 'destructive', title: 'Error Loading Data', description: 'Failed to load registration data. Please try again.' });
-      setData([]);
+        console.error('❌ Error loading data from Firestore:', error);
+        toast({ variant: 'destructive', title: 'Error Loading Data', description: 'Failed to load registration data. Please try again.' });
+        setData([]);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  }, [profile, toast, allPlayers, isDbLoaded, searchPlayers]);
-
+}, [profile, isProfileLoaded, toast]);
+  
   const handleManualRefresh = useCallback(async () => {
     await loadData();
     toast({ title: 'Data Refreshed', description: 'Registration data has been reloaded.' });
   }, [loadData, toast]);
   
   useEffect(() => {
+    setClientReady(true);
     if (isProfileLoaded && profile) {
       loadData();
     }
-    setClientReady(true);
   }, [isProfileLoaded, profile, loadData]);
 
   const handleSort = (field: string) => {
@@ -418,27 +370,6 @@ export default function UnifiedInvoiceRegistrations() {
             {isLoading ? 'Loading...' : 'Refresh'}
           </Button>
         </div>
-
-        {process.env.NODE_ENV === 'development' && (
-          <Card className="border-blue-200 bg-blue-50">
-            <CardHeader>
-              <CardTitle className="text-blue-800">Unified Search Active</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <strong>Profile:</strong> {profile?.role} | {profile?.school} | {profile?.district}
-                </div>
-                <div>
-                  <strong>Data Source:</strong> Firestore 'invoices' collection
-                </div>
-                <div>
-                  <strong>Data Found:</strong> {data.length} items | {filteredAndSortedData.length} filtered
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
