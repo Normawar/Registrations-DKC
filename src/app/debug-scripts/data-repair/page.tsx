@@ -172,13 +172,13 @@ function GtInvoiceFixer() {
               // 2. Recreate the player list for the split invoice flow
               const playersToInvoice = playersData.map(player => {
                   const selection = invoice.selections[player.id];
-                  const lateFeeAmount = (invoice.totalInvoiced / playersData.length) - eventDetails.regularFee - (selection.uscfStatus !== 'current' ? 24 : 0);
+                  const lateFeeAmount = 0; // Don't recalculate late fees
                   
                   return {
                       playerName: `${player.firstName} ${player.lastName}`,
                       uscfId: player.uscfId,
                       baseRegistrationFee: eventDetails.regularFee,
-                      lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+                      lateFee: lateFeeAmount,
                       uscfAction: selection.uscfStatus !== 'current',
                       isGtPlayer: player.studentType === 'gt',
                   };
@@ -186,7 +186,7 @@ function GtInvoiceFixer() {
               
               addLog(`Recreating invoice(s) for ${playersToInvoice.length} players...`);
               
-              // 3. Call the split invoice flow
+              // 3. Call the split invoice flow with original invoice number
               const result = await createPsjaSplitInvoice({
                   sponsorName: invoice.purchaserName,
                   sponsorEmail: invoice.sponsorEmail,
@@ -201,6 +201,7 @@ function GtInvoiceFixer() {
                   eventDate: invoice.eventDate,
                   uscfFee: 24,
                   players: playersToInvoice,
+                  originalInvoiceNumber: invoice.invoiceNumber,
               });
 
               if (result.gtInvoice) {
@@ -261,6 +262,7 @@ export function StudentTypeUpdater() {
   const [updateLog, setUpdateLog] = useState<string[]>([]);
   const [stats, setStats] = useState<UpdateStats | null>(null);
   const [verificationStats, setVerificationStats] = useState<VerificationStats | null>(null);
+  const { database: allPlayers } = useMasterDb();
 
   const addLog = (message: string) => {
     setUpdateLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
@@ -275,30 +277,18 @@ export function StudentTypeUpdater() {
     try {
       addLog('🚀 Starting Invoice StudentType Update Process...');
       
-      // Step 1: Load all players into memory for fast lookup
-      addLog('📥 Loading player collection...');
-      const playersSnapshot = await getDocs(collection(db, 'players'));
-      
       const playerLookup: Record<string, { studentType: string; name: string; school: string }> = {};
-      let playerCount = 0;
-      
-      playersSnapshot.forEach(doc => {
-        const playerData = doc.data();
-        const uscfId = playerData.uscfId || doc.id;
-        
-        if (uscfId) {
-          playerLookup[uscfId] = {
-            studentType: playerData.studentType || 'regular',
-            name: playerData.name || 'Unknown',
-            school: playerData.school || 'Unknown'
+      allPlayers.forEach(player => {
+        if (player.id) {
+          playerLookup[player.id] = {
+            studentType: player.studentType || 'regular',
+            name: `${player.firstName} ${player.lastName}`,
+            school: player.school || 'Unknown'
           };
-          playerCount++;
         }
       });
+      addLog(`✅ Loaded ${allPlayers.length} players for lookup`);
       
-      addLog(`✅ Loaded ${playerCount} players for lookup`);
-      
-      // Step 2: Load all invoices
       addLog('📥 Loading invoice collection...');
       const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
       
@@ -307,7 +297,6 @@ export function StudentTypeUpdater() {
       let updatedSelectionsCount = 0;
       const updatePromises: Promise<void>[] = [];
       
-      // Step 3: Process each invoice
       invoicesSnapshot.forEach(docSnap => {
         const invoiceData = docSnap.data();
         const invoiceId = docSnap.id;
@@ -321,40 +310,13 @@ export function StudentTypeUpdater() {
         let selectionUpdated = false;
         const updatedSelections = { ...invoiceData.selections };
         
-        // Process each selection in the invoice
         Object.entries(invoiceData.selections).forEach(([playerId, playerData]: [string, any]) => {
-          // Skip if already has studentType
           if (playerData.studentType) {
             return;
           }
           
-          // Extract USCF ID from various formats
-          let uscfId: string | null = null;
-          
-          if (/^\d+$/.test(playerId)) {
-            // Direct USCF ID (like "31487795")
-            uscfId = playerId;
-          } else if (playerId.startsWith('NEW_')) {
-            // NEW players don't have USCF IDs yet, keep as regular
-            updatedSelections[playerId] = {
-              ...playerData,
-              studentType: 'regular'
-            };
-            selectionUpdated = true;
-            return;
-          } else if (playerId.startsWith('temp_')) {
-            // temp players, keep as regular
-            updatedSelections[playerId] = {
-              ...playerData,
-              studentType: 'regular'
-            };
-            selectionUpdated = true;
-            return;
-          }
-          
-          // Look up student type from player collection
-          if (uscfId && playerLookup[uscfId]) {
-            const playerInfo = playerLookup[uscfId];
+          if (playerLookup[playerId]) {
+            const playerInfo = playerLookup[playerId];
             updatedSelections[playerId] = {
               ...playerData,
               studentType: playerInfo.studentType
@@ -362,21 +324,18 @@ export function StudentTypeUpdater() {
             selectionUpdated = true;
             updatedSelectionsCount++;
             
-            addLog(`🔄 ${invoiceData.invoiceNumber || invoiceId}: ${uscfId} → ${playerInfo.studentType} (${playerInfo.name})`);
-          } else if (uscfId) {
-            // USCF ID not found in player collection, default to regular
+            addLog(`🔄 ${invoiceData.invoiceNumber || invoiceId}: ${playerInfo.name} → ${playerInfo.studentType}`);
+          } else {
             updatedSelections[playerId] = {
               ...playerData,
               studentType: 'regular'
             };
             selectionUpdated = true;
             updatedSelectionsCount++;
-            
-            addLog(`❓ ${invoiceData.invoiceNumber || invoiceId}: ${uscfId} → regular (not found in players)`);
+            addLog(`❓ ${invoiceData.invoiceNumber || invoiceId}: Player ID ${playerId} → regular (not found in players)`);
           }
         });
         
-        // Update the invoice if any selections were modified
         if (selectionUpdated) {
           const updatePromise = updateDoc(
             doc(db, 'invoices', invoiceId),
@@ -392,16 +351,14 @@ export function StudentTypeUpdater() {
         }
       });
       
-      // Step 4: Execute all updates
       addLog(`\n🔄 Updating ${updatedInvoices} invoices with studentType data...`);
       await Promise.all(updatePromises);
       
-      // Step 5: Summary
       const finalStats: UpdateStats = {
         totalInvoices: invoiceCount,
         updatedInvoices,
         updatedSelections: updatedSelectionsCount,
-        totalPlayers: playerCount
+        totalPlayers: allPlayers.length
       };
       
       setStats(finalStats);
@@ -410,9 +367,7 @@ export function StudentTypeUpdater() {
       addLog(`   • Total invoices processed: ${finalStats.totalInvoices}`);
       addLog(`   • Invoices updated: ${finalStats.updatedInvoices}`);
       addLog(`   • Player selections updated: ${finalStats.updatedSelections}`);
-      addLog(`   • Players in lookup table: ${finalStats.totalPlayers}`);
       
-      // Step 6: Run verification
       setTimeout(() => {
         verifyStudentTypeUpdate();
       }, 2000);
@@ -440,7 +395,10 @@ export function StudentTypeUpdater() {
       
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
-        if(data.type === 'organizer') return;
+        if(data.lineItems && !data.selections) {
+            addLog(`ⓘ Skipping organizer invoice ${data.invoiceNumber || docSnap.id}.`);
+            return;
+        }
 
         if (data.selections) {
           Object.values(data.selections).forEach((selection: any) => {
