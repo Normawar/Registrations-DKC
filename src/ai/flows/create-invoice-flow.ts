@@ -192,6 +192,7 @@ const createInvoiceFlow = ai.defineFlow(
           if (!p.uscfAction) return false;
           // For PSJA district, ONLY charge for USCF if the player is NOT a GT player
           if (input.district === 'PHARR-SAN JUAN-ALAMO ISD' && p.isGtPlayer) {
+              console.log(`Excluding GT player ${p.playerName} from USCF fee for PSJA district.`);
               return false; // Do not charge GT players from PSJA
           }
           // For all other districts or non-GT PSJA players, charge if uscfAction is true
@@ -317,3 +318,5 @@ const createInvoiceFlow = ai.defineFlow(
     }
   }
 );
+
+    
