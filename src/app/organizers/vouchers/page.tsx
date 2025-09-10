@@ -85,7 +85,6 @@ export default function VoucherManagementPage() {
           const player = database.find(p => p.id === playerId);
           if (player && !assignedPlayerIds.has(playerId)) {
             // GT players can be processed regardless of payment status.
-            // Other players must have a paid invoice.
             const isGt = player.studentType === 'gt';
             const isPaid = confirmation.invoiceStatus === 'PAID' || confirmation.invoiceStatus === 'COMPED';
             
@@ -97,7 +96,8 @@ export default function VoucherManagementPage() {
                 selection,
                 invoiceNumber: confirmation.invoiceNumber || 'N/A',
                 invoiceStatus: confirmation.invoiceStatus || 'UNKNOWN',
-                membershipType: (selection as any).uscfStatus
+                membershipType: (selection as any).uscfStatus,
+                eventName: confirmation.eventName
               });
             }
           }
@@ -120,14 +120,17 @@ export default function VoucherManagementPage() {
   const findExpiringGtPlayers = useCallback(() => {
       if (database.length === 0) return;
       const now = new Date();
+      const assignedPlayerIds = new Set(assignedVouchers.map(v => v.playerId));
+
       const gtPlayers = database.filter(p => p.studentType === 'gt');
       const expiring = gtPlayers.filter(p => 
+        !assignedPlayerIds.has(p.id) &&
         p.uscfExpiration &&
         isSameMonth(new Date(p.uscfExpiration), now) &&
         isSameYear(new Date(p.uscfExpiration), now)
       );
       setExpiringGtPlayers(expiring);
-  }, [database]);
+  }, [database, assignedVouchers]);
 
   useEffect(() => {
     findExpiringGtPlayers();
@@ -175,7 +178,12 @@ export default function VoucherManagementPage() {
         return;
       }
       
-      const unassigned = playersToAssign.filter(p => !assignedVouchers.find(av => av.playerId === p.playerId));
+      const assignedPlayerIds = new Set(assignedVouchers.map(v => v.playerId));
+      const unassigned = playersToAssign.filter(p => {
+          const playerId = p.player?.id || p.id;
+          return !assignedPlayerIds.has(playerId);
+      });
+
       if (unassigned.length === 0) {
         toast({ title: "No players to assign." });
         return;
@@ -462,15 +470,15 @@ export default function VoucherManagementPage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Players Needing Memberships</h3>
                     <Table>
-                      <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Invoice #</TableHead><TableHead>Payment Status</TableHead><TableHead>Type</TableHead><TableHead>Event</TableHead></TableRow></TableHeader>
+                      <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Event</TableHead><TableHead>Invoice #</TableHead><TableHead>Payment Status</TableHead><TableHead>Type</TableHead></TableRow></TableHeader>
                       <TableBody>
                         {pendingMemberships.map(membership => (
                           <TableRow key={membership.playerId}>
                             <TableCell>{membership.player.firstName} {membership.player.lastName}</TableCell>
+                            <TableCell>{membership.eventName}</TableCell>
                             <TableCell>{membership.invoiceNumber}</TableCell>
                             <TableCell>{getStatusBadge(membership.invoiceStatus)}</TableCell>
                             <TableCell><Badge variant={membership.membershipType === 'new' ? 'default' : 'secondary'}>{membership.membershipType}</Badge></TableCell>
-                            <TableCell>{membership.confirmation.eventName}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
