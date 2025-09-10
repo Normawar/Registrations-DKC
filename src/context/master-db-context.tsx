@@ -3,7 +3,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
-import { collection, query, where, orderBy, limit, getDocs, startAfter, Query, DocumentSnapshot, getDoc, setDoc, writeBatch, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, getDocs, startAfter, Query, DocumentSnapshot, getDoc, setDoc, writeBatch, deleteDoc, doc, QueryConstraint } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
@@ -27,6 +27,7 @@ export type UploadProgress = {
 export type SearchCriteria = {
   firstName?: string;
   lastName?: string;
+  middleName?: string;
   uscfId?: string;
   state?: string;
   school?: string;
@@ -508,45 +509,41 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
   
     try {
-      console.log('Starting server-side search with criteria:', criteria);
-      
-      let q: Query = collection(db, 'players');
-      
-      // Apply all conditions
-      Object.entries(criteria).forEach(([key, value]) => {
-          if (value && key !== 'pageSize' && key !== 'lastDoc' && key !== 'excludeIds' && key !== 'firstName' && key !== 'lastName') {
-            q = query(q, where(key, '==', value));
-          }
-      });
-      
-      // Add pagination
-      if (criteria.lastDoc) {
-        q = query(q, startAfter(criteria.lastDoc));
-      }
-      q = query(q, limit(criteria.pageSize || 100));
-      
-      console.log('Executing Firestore query...');
-      const querySnapshot = await getDocs(q);
-      let results = querySnapshot.docs.map(doc => doc.data() as MasterPlayer);
-      
-      console.log(`Firestore returned ${results.length} results`);
-      
-      // Client-side filtering for name searches and excludeIds
-      if (criteria.firstName || criteria.lastName) {
-        results = results.filter(player => 
-            (!criteria.firstName || player.firstName.toLowerCase().includes(criteria.firstName.toLowerCase())) &&
-            (!criteria.lastName || player.lastName.toLowerCase().includes(criteria.lastName.toLowerCase()))
-        );
+      let results: MasterPlayer[] = [];
+  
+      // Prioritize USCF ID search as it's the most specific
+      if (criteria.uscfId) {
+        const docRef = doc(db, 'players', criteria.uscfId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          results = [docSnap.data() as MasterPlayer];
+        }
+      } else {
+        // Fallback to client-side filtering on the full database for other criteria
+        // This is not ideal for very large datasets but works for the current scale.
+        // For a production app with millions of records, a dedicated search service (e.g., Algolia, Elasticsearch)
+        // or more complex Firestore querying would be necessary.
+        results = database.filter(player => {
+          let match = true;
+          if (criteria.firstName && !player.firstName?.toLowerCase().includes(criteria.firstName.toLowerCase())) match = false;
+          if (criteria.lastName && !player.lastName?.toLowerCase().includes(criteria.lastName.toLowerCase())) match = false;
+          if (criteria.middleName && !player.middleName?.toLowerCase().includes(criteria.middleName.toLowerCase())) match = false;
+          if (criteria.state && player.state !== criteria.state) match = false;
+          if (criteria.school && player.school !== criteria.school) match = false;
+          if (criteria.district && player.district !== criteria.district) match = false;
+          if (criteria.minRating && (player.regularRating || 0) < criteria.minRating) match = false;
+          if (criteria.maxRating && (player.regularRating || 0) > criteria.maxRating) match = false;
+          return match;
+        });
       }
       
-      const hasMore = results.length === (criteria.pageSize || 100);
-      const newLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+      const totalFound = results.length;
+      const paginatedResults = results.slice(0, criteria.pageSize || 100);
       
       return {
-        players: results,
-        hasMore,
-        lastDoc: newLastDoc,
-        totalFound: results.length,
+        players: paginatedResults,
+        hasMore: results.length > paginatedResults.length,
+        totalFound: totalFound,
       };
       
     } catch (error) {
