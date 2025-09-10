@@ -22,6 +22,8 @@ const PlayerToInvoiceSchema = z.object({
   lateFee: z.number().describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
   isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
+  isNew: z.boolean().optional().describe('Whether this is a new player added to the invoice.'),
+  isSubstitution: z.boolean().optional().describe('Whether this player is a substitution for another.'),
 });
 
 const RecreateInvoiceInputSchema = z.object({
@@ -98,11 +100,29 @@ const recreateInvoiceFlow = ai.defineFlow(
       const newRevisionNumber = `${baseInvoiceNumber}-rev.${currentRevision + 1}`;
       console.log(`Generated new revision invoice number: ${newRevisionNumber}`);
       
-      // Step 4: Create a new invoice with the updated roster and new invoice number.
+      // Step 4: Intelligent Fee Calculation
+      const SUBSTITUTION_FEE = 2.00;
+      let totalSubstitutionFee = 0;
+
+      const playersWithAdjustedFees = input.players.map(player => {
+        if (player.isSubstitution) {
+          totalSubstitutionFee += SUBSTITUTION_FEE;
+          return { ...player, lateFee: 0 }; // Substitutions don't get late fees
+        }
+        if (!player.isNew) {
+          return { ...player, lateFee: 0 }; // Existing players don't get late fees
+        }
+        // New players (not substitutions) keep their calculated late fees
+        return player;
+      });
+      
+      // Step 5: Create a new invoice with the updated roster and new invoice number.
       console.log(`Creating new invoice with ${input.players.length} players.`);
       
       const newInvoiceResult = await createInvoice({
           ...input,
+          players: playersWithAdjustedFees,
+          substitutionFee: totalSubstitutionFee > 0 ? totalSubstitutionFee : undefined,
           invoiceNumber: newRevisionNumber,
       });
 

@@ -41,6 +41,7 @@ const CreateInvoiceInputSchema = z.object({
     uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
     players: z.array(PlayerInvoiceInfoSchema).describe('An array of players to be invoiced.'),
     invoiceNumber: z.string().optional().describe('A custom invoice number to assign. If not provided, Square will generate one.'),
+    substitutionFee: z.number().optional().describe('A fee for substitutions, if applicable.'),
 });
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
 
@@ -171,6 +172,19 @@ const createInvoiceFlow = ai.defineFlow(
               },
               note: lateFeePlayerNotes,
           });
+      }
+      
+      // 2.5 Substitution Fee Line Item
+      if (input.substitutionFee && input.substitutionFee > 0) {
+        lineItems.push({
+          name: 'Substitution Fee',
+          quantity: '1',
+          basePriceMoney: {
+            amount: BigInt(Math.round(input.substitutionFee * 100)),
+            currency: 'USD',
+          },
+          note: 'Fee for substituting a player after registration.',
+        });
       }
 
       // 3. USCF Membership Line Item (with PSJA GT exception)
