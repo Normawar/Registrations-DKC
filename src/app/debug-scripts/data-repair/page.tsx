@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -52,7 +51,9 @@ export default function DataRepairPage() {
 
   useEffect(() => {
     // Temporary debug export - remove after use
-    (window as any).debugDB = { db, getDocs, collection };
+    if (typeof window !== 'undefined') {
+        (window as any).debugDB = { db, getDocs, collection };
+    }
   }, []);
 
   const addLog = (type: LogEntry['type'], message: string) => {
@@ -276,6 +277,36 @@ export default function DataRepairPage() {
     setIsProcessing(false);
   };
 
+  const exportFullInvoiceData = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'invoices'));
+      const data: any[] = [];
+      
+      snapshot.forEach(doc => {
+        data.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(data, null, 2)], 
+        { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `all_invoices_complete_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log(`Exported ${data.length} complete invoices`);
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="space-y-8 max-w-4xl mx-auto">
@@ -305,11 +336,12 @@ export default function DataRepairPage() {
               disabled={isProcessing}
             />
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex justify-between">
             <Button onClick={parseAndProcessData} disabled={isProcessing}>
               {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isProcessing ? 'Processing...' : 'Process Pasted Data'}
             </Button>
+            <Button onClick={exportFullInvoiceData} variant="outline">Export All Invoices (Complete)</Button>
           </CardFooter>
         </Card>
 
