@@ -2,12 +2,11 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { collection, query, where, orderBy, limit, getDocs, startAfter, Query, DocumentSnapshot, getDoc, setDoc, writeBatch, deleteDoc, doc } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/services/firestore-service';
 import { MasterPlayer, fullMasterPlayerData } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
-import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
 import Papa from 'papaparse';
 import { isValid, parse, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -27,21 +26,13 @@ export type UploadProgress = {
 // Add pagination support to SearchCriteria
 export type SearchCriteria = {
   firstName?: string;
-  middleName?: string;
   lastName?: string;
   uscfId?: string;
   state?: string;
-  grade?: string;
-  section?: string;
   school?: string;
   district?: string;
   minRating?: number;
   maxRating?: number;
-  excludeIds?: string[];
-  maxResults?: number;
-  searchUnassigned?: boolean;
-  sponsorProfile?: SponsorProfile | null;
-  portalType?: 'sponsor' | 'organizer' | 'individual';
   // New pagination fields
   lastDoc?: DocumentSnapshot;
   pageSize?: number;
@@ -56,19 +47,15 @@ export type SearchResult = {
 }
 
 interface MasterDbContextType {
+  database: MasterPlayer[];
   addPlayer: (player: MasterPlayer) => Promise<void>;
-  updatePlayer: (player: MasterPlayer, editingProfile: SponsorProfile) => Promise<void>;
+  updatePlayer: (player: MasterPlayer, editingProfile: SponsorProfile | null) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
-   addBulkPlayers: (
-    players: MasterPlayer[], 
-    onProgress?: (progress: { current: number; total: number; message: string }) => void
-  ) => Promise<void>;
   bulkUploadCSV: (
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
-  ) => Promise<{ uploaded: number; errors: string[] }>; // Renamed function
+  ) => Promise<{ uploaded: number; errors: string[] }>;
   clearDatabase: () => Promise<void>;
-  updateSchoolDistrict: (oldDistrict: string, newDistrict: string) => void;
   isDbLoaded: boolean;
   isDbError: boolean;
   dbPlayerCount: number;
@@ -80,7 +67,6 @@ interface MasterDbContextType {
   generatePlayerId: (uscfId: string) => string;
   updatePlayerFromUscfData: (uscfData: Partial<MasterPlayer>[]) => Promise<{ updated: number; created: number }>;
   toast: any;
-  database: MasterPlayer[];
 }
 
 
@@ -290,32 +276,36 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   const loadDatabase = useCallback(async () => {
-    // This function is now a no-op for initial load to improve performance.
-    // Data will be fetched on demand by components.
-    // It can be used for explicit refreshing if needed.
-    if (!isDbLoaded) { // Only run once on initial setup
+    if (!db) {
+        console.error("Firestore not initialized, skipping DB load.");
+        setIsDbError(true);
+        return;
+    }
+    try {
+        const playersCol = collection(db, 'players');
+        const playerSnapshot = await getDocs(playersCol);
+        if (playerSnapshot.empty) {
+            console.warn("No players in Firestore, seeding from local data.");
+            setDatabase(fullMasterPlayerData);
+        } else {
+            const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+            setDatabase(playerList);
+        }
+    } catch (error) {
+        console.error("Failed to load players from Firestore, using local fallback.", error);
+        setDatabase(fullMasterPlayerData);
+        setIsDbError(true);
+    } finally {
         setIsDbLoaded(true);
     }
-  }, [isDbLoaded]);
+  }, []);
   
   useEffect(() => {
     loadDatabase();
   }, [loadDatabase]);
 
   const refreshDatabase = async () => {
-    if (!db) return;
-    setIsDbLoaded(false);
-    try {
-        const playersCol = collection(db, 'players');
-        const playerSnapshot = await getDocs(playersCol);
-        const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-        setDatabase(playerList);
-        toast({title: "Database Refreshed", description: `Loaded ${playerList.length} players.`});
-    } catch (error) {
-        toast({variant: "destructive", title: "Refresh Failed", description: "Could not reload player data."});
-    } finally {
-        setIsDbLoaded(true);
-    }
+    await loadDatabase();
   };
 
   const addPlayer = async (player: MasterPlayer) => {
@@ -333,7 +323,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         await setDoc(playerRef, cleanedPlayer, { merge: true });
         
         console.log("Player successfully written to Firebase");
-        // No full reload, just update local state if needed
         setDatabase(prev => [...prev.filter(p => p.id !== cleanedPlayer.id), cleanedPlayer]);
 
     } catch (error) {
@@ -342,7 +331,10 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const addBulkPlayers = async (players: MasterPlayer[]) => {
+  const addBulkPlayers = async (
+    players: MasterPlayer[], 
+    onProgress?: (progress: { current: number; total: number; message: string }) => void
+  ) => {
     if (!db) return;
     
     try {
@@ -356,37 +348,23 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         const batchPlayers = players.slice(i, i + batchSize);
         const currentBatchNum = i / batchSize + 1;
         
-        console.log(`Processing batch ${currentBatchNum} of ${totalBatches}...`);
+        onProgress?.({
+            current: currentBatchNum,
+            total: totalBatches,
+            message: `Processing batch ${currentBatchNum} of ${totalBatches}...`
+        });
   
-        // 1. Fetch existing players in the current batch
-        const existingPlayerIds = batchPlayers.map(p => p.id).filter(id => !id.startsWith('temp_'));
-        const existingPlayerDocs = new Map<string, MasterPlayer>();
-        if (existingPlayerIds.length > 0) {
-            const existingQuery = query(collection(db, 'players'), where('id', 'in', existingPlayerIds));
-            const snapshot = await getDocs(existingQuery);
-            snapshot.docs.forEach(doc => existingPlayerDocs.set(doc.id, doc.data() as MasterPlayer));
-        }
-  
-        // 2. Prepare writes
         for (const player of batchPlayers) {
           const cleanedPlayer = removeUndefined(player);
           const docRef = doc(db, 'players', player.id);
-  
-          if (existingPlayerDocs.has(player.id)) {
-            // Player exists, merge data
-            batch.set(docRef, cleanedPlayer, { merge: true });
-          } else {
-            // New player
-            batch.set(docRef, cleanedPlayer);
-          }
+          batch.set(docRef, cleanedPlayer, { merge: true });
         }
         
-        // 3. Commit the batch
         await batch.commit();
         console.log(`Batch ${currentBatchNum} committed.`);
       }
       
-      // Don't reload entire database, trust the writes
+      await loadDatabase();
       console.log('Bulk upload complete.');
     } catch (error) {
       console.error("Error adding bulk players:", error);
@@ -404,10 +382,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     setDatabase([]);
   };
 
-  const updatePlayer = async (updatedPlayer: MasterPlayer, editingProfile: SponsorProfile) => {
+  const updatePlayer = async (updatedPlayer: MasterPlayer, editingProfile: SponsorProfile | null) => {
     if (!db) return;
     
-    // Fetch only the single player to get the old version
     const oldPlayerDoc = await getDoc(doc(db, 'players', updatedPlayer.id));
     const oldPlayer = oldPlayerDoc.exists() ? oldPlayerDoc.data() as MasterPlayer : null;
 
@@ -429,7 +406,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
     let finalPlayer = { ...updatedPlayer };
 
-    if (changedFields.length > 0) {
+    if (changedFields.length > 0 && editingProfile) {
         const newHistoryEntry = {
             timestamp: new Date().toISOString(),
             userId: editingProfile?.uid || 'unknown',
@@ -457,15 +434,18 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       const cleanedPlayer = removeUndefined(playerWithNewId);
       await setDoc(doc(db, 'players', newId), cleanedPlayer);
       await deleteDoc(doc(db, 'players', oldId));
+      setDatabase(prev => [...prev.filter(p => p.id !== oldId), playerWithNewId]);
     } else {
       const cleanedPlayer = removeUndefined(finalPlayer);
       await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
+      setDatabase(prev => prev.map(p => p.id === finalPlayer.id ? finalPlayer : p));
     }
   };
 
   const deletePlayer = async (playerId: string) => {
     if (!db) return;
     await deleteDoc(doc(db, 'players', playerId));
+    setDatabase(prev => prev.filter(p => p.id !== playerId));
   };
 
   const updateSchoolDistrict = (oldDistrict: string, newDistrict: string) => {
@@ -518,6 +498,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await batch.commit();
+    await loadDatabase();
     return stats;
   };
   
@@ -551,15 +532,11 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       console.log(`Firestore returned ${results.length} results`);
       
       // Client-side filtering for name searches and excludeIds
-      if (criteria.firstName || criteria.lastName || criteria.excludeIds) {
-        const excludeSet = new Set(criteria.excludeIds || []);
-        results = results.filter(player => {
-          if (excludeSet.has(player.id)) return false;
-          const nameMatch = 
+      if (criteria.firstName || criteria.lastName) {
+        results = results.filter(player => 
             (!criteria.firstName || player.firstName.toLowerCase().includes(criteria.firstName.toLowerCase())) &&
-            (!criteria.lastName || player.lastName.toLowerCase().includes(criteria.lastName.toLowerCase()));
-          return nameMatch;
-        });
+            (!criteria.lastName || player.lastName.toLowerCase().includes(criteria.lastName.toLowerCase()))
+        );
       }
       
       const hasMore = results.length === (criteria.pageSize || 100);
@@ -569,7 +546,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         players: results,
         hasMore,
         lastDoc: newLastDoc,
-        totalFound: results.length, // this isn't total overall, just total in this batch
+        totalFound: results.length,
       };
       
     } catch (error) {
@@ -579,20 +556,17 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const dbStates = useMemo(() => {
-    if (!isDbLoaded) return ['ALL', 'TX'];
     const states = [...new Set(database.map(p => p.state).filter(Boolean))].sort();
     return ['ALL', 'NO_STATE', ...states] as string[];
-  }, [database, isDbLoaded]);
+  }, [database]);
   
   const dbSchools = useMemo(() => {
-    if (!isDbLoaded) return [];
     return [...new Set(database.map(p => p.school).filter(Boolean))].sort() as string[];
-  }, [database, isDbLoaded]);
+  }, [database]);
 
   const dbDistricts = useMemo(() => {
-    if (!isDbLoaded) return [];
     return [...new Set(database.map(p => p.district).filter(Boolean))].sort() as string[];
-  }, [database, isDbLoaded]);
+  }, [database]);
 
   const bulkUploadCSV = async (
     csvFile: File,
@@ -713,11 +687,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
 
   const value = {
+    database,
     addPlayer,
     updatePlayer,
     deletePlayer,
     addBulkPlayers,
-    bulkUploadCSV, // Use renamed function
+    bulkUploadCSV,
     clearDatabase,
     updateSchoolDistrict,
     isDbLoaded,
@@ -731,7 +706,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     generatePlayerId,
     updatePlayerFromUscfData,
     toast,
-    database
   };
 
   return (
