@@ -242,7 +242,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setStagedPlayers(stagedPlayers.filter(p => p.id !== id));
     };
 
-    const handleGenerateInvoice = async (recipient: InvoiceRecipientValues) => {
+    const handleGenerateTeamInvoice = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db) return;
         setIsSubmitting(true);
         let registrationFeePerPlayer = event.regularFee;
@@ -291,20 +291,92 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
             await setDoc(invoiceDocRef, newConfirmation);
             
-            toast({ title: "Invoice Generated Successfully!", description: `Invoice ${result.invoiceNumber || result.invoiceId} for ${stagedPlayers.length} players has been created.` });
+            toast({ title: "Team Invoice Generated Successfully!", description: `Invoice ${result.invoiceNumber || result.invoiceId} for ${stagedPlayers.length} players has been created.` });
             
             setStagedPlayers([]);
             setIsInvoiceDialogOpen(false);
             
         } catch (error) {
-            console.error("Failed to create invoice:", error);
+            console.error("Failed to create team invoice:", error);
             const description = error instanceof Error ? error.message : "An unknown error occurred.";
             toast({ variant: "destructive", title: "Submission Error", description });
         } finally {
             setIsSubmitting(false);
         }
     };
-    
+
+    const handleGenerateIndividualInvoices = async (recipient: InvoiceRecipientValues) => {
+        if (!event || !db || stagedPlayers.length === 0) return;
+        
+        setIsSubmitting(true);
+        
+        const promises = stagedPlayers.map(async (player) => {
+            let registrationFee = event.regularFee;
+            const eventDate = new Date(event.date);
+            const now = new Date();
+            if (isSameDay(eventDate, now)) { registrationFee = event.dayOfFee; }
+            else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFee = event.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFee = event.lateFee; } }
+            
+            const lateFeeAmount = registrationFee - event.regularFee;
+
+            const playerToInvoice = {
+                playerName: `${player.firstName} ${player.lastName}`,
+                uscfId: player.uscfId,
+                baseRegistrationFee: event.regularFee,
+                lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+                uscfAction: player.uscfStatus !== 'current',
+            };
+
+            const uscfFee = 24;
+            const totalInvoiced = registrationFee + (player.uscfStatus !== 'current' ? uscfFee : 0);
+            
+            try {
+                const result = await createInvoice({
+                    sponsorName: recipient.sponsorName,
+                    sponsorEmail: recipient.sponsorEmail,
+                    schoolName: recipient.schoolName,
+                    teamCode: recipient.teamCode,
+                    eventName: event.name,
+                    eventDate: event.date,
+                    uscfFee,
+                    players: [playerToInvoice],
+                    description: `Invoice for ${player.firstName} ${player.lastName}`
+                });
+
+                const newConfirmation = {
+                    id: result.invoiceId, invoiceId: result.invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date,
+                    submissionTimestamp: new Date().toISOString(),
+                    selections: { [player.id!]: { byes: player.byes, section: player.section, uscfStatus: player.uscfStatus } },
+                    totalInvoiced, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: recipient.teamCode, invoiceStatus: result.status,
+                    purchaserName: recipient.sponsorName, schoolName: recipient.schoolName, sponsorEmail: recipient.sponsorEmail
+                };
+                
+                const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
+                await setDoc(invoiceDocRef, newConfirmation);
+                return { success: true, invoiceNumber: result.invoiceNumber };
+
+            } catch (error) {
+                console.error(`Failed to create invoice for ${player.firstName} ${player.lastName}:`, error);
+                return { success: false, name: `${player.firstName} ${player.lastName}` };
+            }
+        });
+
+        const results = await Promise.all(promises);
+        const successfulInvoices = results.filter(r => r.success).length;
+        const failedInvoices = results.filter(r => !r.success);
+
+        if (successfulInvoices > 0) {
+            toast({ title: `Successfully generated ${successfulInvoices} individual invoices.` });
+        }
+        if (failedInvoices.length > 0) {
+            toast({ variant: "destructive", title: `Failed to create invoices for ${failedInvoices.length} players.`, description: `Players: ${failedInvoices.map(f => f.name).join(', ')}` });
+        }
+        
+        setStagedPlayers([]);
+        setIsInvoiceDialogOpen(false);
+        setIsSubmitting(false);
+    };
+
     const handleCompRegistration = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db) return;
         setIsSubmitting(true);
@@ -534,9 +606,14 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                             <FormField control={invoiceForm.control} name="teamCode" render={({ field }) => ( <FormItem><FormLabel>Team Code</FormLabel><FormControl><Input placeholder="e.g., LIHS" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             
                             <DialogFooter className="flex-col sm:flex-col sm:items-stretch gap-2 pt-4">
-                               <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateInvoice)} disabled={isSubmitting}>
+                                <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateTeamInvoice)} disabled={isSubmitting}>
                                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Generate Invoice
+                                    Invoice as Team
+                                </Button>
+                                
+                                <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleGenerateIndividualInvoices)} disabled={isSubmitting}>
+                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Invoice Individuals
                                 </Button>
                                 
                                 <div className="relative">
@@ -544,7 +621,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                   <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
                                 </div>
                                 
-                                <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleCompRegistration)} disabled={isSubmitting}>
+                                <Button type="button" variant="outline" onClick={invoiceForm.handleSubmit(handleCompRegistration)} disabled={isSubmitting}>
                                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Award className="mr-2 h-4 w-4" />}
                                     Comp Registration (No Invoice)
                                 </Button>
