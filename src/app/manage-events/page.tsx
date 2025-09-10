@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } f
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, isValid, parse } from 'date-fns';
+import { format, isValid, parse, isSameDay } from 'date-fns';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -123,6 +123,8 @@ type StoredConfirmation = {
   invoiceNumber?: string;
   submissionTimestamp: string;
   eventId?: string;
+  eventName: string;
+  eventDate: string;
   selections: Record<string, { section: string; uscfStatus: 'current' | 'new' | 'renewing', status?: 'active' | 'withdrawn' }>;
 };
 
@@ -483,35 +485,52 @@ export default function ManageEventsPage() {
 
   const handleViewRegistrations = async (event: Event) => {
     if (!isDbLoaded || !db) {
-      toast({ variant: 'destructive', title: 'Loading...', description: 'Player database is still loading, please try again in a moment.'});
-      return;
+        toast({ variant: 'destructive', title: 'Loading...', description: 'Player database is still loading, please try again in a moment.' });
+        return;
     }
-  
-    // Fetch all invoices from Firestore
+
     const invoicesCol = collection(db, 'invoices');
     const invoiceSnapshot = await getDocs(invoicesCol);
     const allConfirmations: StoredConfirmation[] = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as StoredConfirmation[];
-  
+    
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
-  
+    const eventDate = new Date(event.date);
+
     for (const conf of allConfirmations) {
-      if (conf.eventId === event.id) {
-        for (const playerId in conf.selections) {
-            const registrationDetails = conf.selections[playerId];
-            const player = playerMap.get(playerId);
-            if (player) {
-                uniquePlayerRegistrations.set(playerId, { 
-                    player, 
-                    details: registrationDetails, 
-                    invoiceId: conf.invoiceId, 
-                    invoiceNumber: conf.invoiceNumber 
-                });
+        // Condition 1: Direct match on eventId
+        const hasEventId = conf.eventId === event.id;
+        
+        // Condition 2: Fallback match on name and date (for older records)
+        const hasMatchingName = conf.eventName === event.name;
+        let hasMatchingDate = false;
+        if (conf.eventDate) {
+            try {
+                hasMatchingDate = isSameDay(new Date(conf.eventDate), eventDate);
+            } catch (e) {
+                console.warn("Could not parse date for invoice", conf.id);
             }
         }
-      }
+
+        if (hasEventId || (hasMatchingName && hasMatchingDate)) {
+            for (const playerId in conf.selections) {
+                if (uniquePlayerRegistrations.has(playerId)) continue; // Already added from a more precise match
+                
+                const registrationDetails = conf.selections[playerId];
+                const player = playerMap.get(playerId);
+                
+                if (player) {
+                    uniquePlayerRegistrations.set(playerId, { 
+                        player, 
+                        details: registrationDetails, 
+                        invoiceId: conf.invoiceId, 
+                        invoiceNumber: conf.invoiceNumber 
+                    });
+                }
+            }
+        }
     }
-  
+
     const eventRegistrations = Array.from(uniquePlayerRegistrations.values());
     
     setRegistrations(eventRegistrations);
