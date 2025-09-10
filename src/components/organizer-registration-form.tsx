@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -33,7 +34,8 @@ import {
     Search,
     Info,
     CalendarIcon,
-    Award
+    Award,
+    CheckCircle
 } from "lucide-react";
 import {
   Dialog,
@@ -74,6 +76,7 @@ import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flo
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Label } from './ui/label';
+import { Badge } from './ui/badge';
 
 // --- Types and Schemas ---
 
@@ -138,11 +141,10 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
 
     // Player search and filter states
     const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
     const { database: masterDatabase, isDbLoaded, dbDistricts, dbSchools } = useMasterDb();
     const [selectedDistrict, setSelectedDistrict] = useState('all');
     const [selectedSchool, setSelectedSchool] = useState('all');
+    const [schoolRoster, setSchoolRoster] = useState<MasterPlayer[]>([]);
 
     const playerForm = useForm<PlayerFormValues>({
         resolver: zodResolver(playerFormSchema),
@@ -154,42 +156,37 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     });
 
     const schoolsForSelectedDistrict = useMemo(() => {
-        if (selectedDistrict === 'all') {
-            return dbSchools;
-        }
+        if (selectedDistrict === 'all') return dbSchools;
         return masterDatabase.filter(p => p.district === selectedDistrict)
                              .map(p => p.school)
                              .filter((value, index, self) => self.indexOf(value) === index)
                              .sort();
     }, [selectedDistrict, masterDatabase, dbSchools]);
 
-    // Debounced search effect
+    // Effect to update roster when school changes
     useEffect(() => {
-        if (searchQuery.length < 3) {
-            setSearchResults([]);
-            return;
+        if (selectedSchool !== 'all' && selectedDistrict !== 'all' && isDbLoaded) {
+            const roster = masterDatabase.filter(p => p.school === selectedSchool && p.district === selectedDistrict);
+            setSchoolRoster(roster);
+        } else {
+            setSchoolRoster([]);
         }
-        setIsSearching(true);
-        const handler = setTimeout(() => {
-            const lowerQuery = searchQuery.toLowerCase();
-            const results = masterDatabase.filter(p => {
-                const schoolMatch = selectedSchool === 'all' || p.school === selectedSchool;
-                const districtMatch = selectedDistrict === 'all' || p.district === selectedDistrict;
-                const nameMatch = `${p.firstName} ${p.lastName}`.toLowerCase().includes(lowerQuery) || p.uscfId.includes(searchQuery);
-                return schoolMatch && districtMatch && nameMatch;
-            }).slice(0, 10);
+    }, [selectedSchool, selectedDistrict, masterDatabase, isDbLoaded]);
 
-            setSearchResults(results);
-            setIsSearching(false);
-        }, 300);
+    const filteredSchoolRoster = useMemo(() => {
+        if (searchQuery.length < 2) return schoolRoster;
+        const lowerQuery = searchQuery.toLowerCase();
+        return schoolRoster.filter(p => 
+            `${p.firstName} ${p.lastName}`.toLowerCase().includes(lowerQuery) ||
+            p.uscfId.includes(searchQuery)
+        );
+    }, [schoolRoster, searchQuery]);
 
-        return () => clearTimeout(handler);
-    }, [searchQuery, masterDatabase, selectedDistrict, selectedSchool]);
-    
     const handleSelectSearchedPlayer = (player: MasterPlayer) => {
-        setSearchQuery('');
-        setSearchResults([]);
-        playerForm.reset({
+        const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < new Date(event?.date ?? new Date());
+        const uscfStatus = player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
+
+        const playerToStage: StagedPlayer = {
             id: player.id,
             firstName: player.firstName,
             lastName: player.lastName,
@@ -201,9 +198,14 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             zipCode: player.zipCode,
             grade: player.grade,
             section: player.section,
-        });
-        setIsPlayerDialogOpen(true);
+            uscfStatus: uscfStatus,
+            studentType: player.studentType,
+            byes: { round1: 'none', round2: 'none' }
+        };
+        setStagedPlayers(prev => [...prev, playerToStage]);
+        toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been staged for registration.` });
     };
+
 
     const handlePlayerFormSubmit = (values: PlayerFormValues) => {
         if (!event) return;
@@ -349,12 +351,12 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     
           if (result.gtInvoice) {
             const gtPlayers = stagedPlayers.filter(p => p.studentType === 'gt');
-            await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, district);
+            await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0); // Simplified total for now
           }
     
           if (result.independentInvoice) {
             const indPlayers = stagedPlayers.filter(p => p.studentType !== 'gt');
-            await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, district);
+            await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, 0); // Simplified total
           }
           
           toast({ title: "Split Invoices Created Successfully!", description: "Separate invoices for GT and Independent players have been created."});
@@ -434,20 +436,25 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setIsSubmitting(false);
     };
 
-    const saveConfirmation = async (invoiceId: string, result: any, players: StagedPlayer[], total: number) => {
-        if(!event || !db) return;
-        const playerSelections = players.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType } }), {});
-    
-        const newConfirmation = {
-            id: invoiceId, invoiceId: invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date, 
-            submissionTimestamp: new Date().toISOString(), 
-            selections: playerSelections,
-            totalInvoiced: total, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: result.teamCode, invoiceStatus: result.status,
-            purchaserName: result.sponsorName, schoolName: result.schoolName, sponsorEmail: result.sponsorEmail, district: result.district
-        };
-    
-        const invoiceDocRef = doc(db, 'invoices', invoiceId);
-        await setDoc(invoiceDocRef, newConfirmation);
+    const saveConfirmation = async (invoiceId: string, result: any, players: any, total: number) => {
+      if(!event || !db) return;
+      const selections = stagedPlayers.reduce((acc, p) => {
+        if (players.some((pl:any) => pl.playerName === `${p.firstName} ${p.lastName}`)) {
+          acc[p.id!] = { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType };
+        }
+        return acc;
+      }, {} as Record<string, any>);
+  
+      const newConfirmation = {
+          id: invoiceId, invoiceId: invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date, 
+          submissionTimestamp: new Date().toISOString(), 
+          selections,
+          totalInvoiced: result.newTotalAmount || total, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: result.teamCode, invoiceStatus: result.status,
+          purchaserName: result.sponsorName, schoolName: result.schoolName, sponsorEmail: result.sponsorEmail, district: result.district
+      };
+  
+      const invoiceDocRef = doc(db, 'invoices', invoiceId);
+      await setDoc(invoiceDocRef, newConfirmation);
     };
     
     const handleCompRegistration = async (recipient: InvoiceRecipientValues) => {
@@ -492,6 +499,27 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         }
     };
     
+    const getFeeForEvent = () => {
+        if (!event) return { fee: 0, type: 'Regular Registration' };
+        
+        const eventDate = new Date(event.date);
+        const now = new Date();
+  
+        if (isSameDay(eventDate, now)) {
+            return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
+        }
+        
+        const hoursUntilEvent = differenceInHours(eventDate, now);
+        
+        if (hoursUntilEvent <= 24) {
+            return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
+        } else if (hoursUntilEvent <= 48) {
+            return { fee: event.lateFee || event.regularFee, type: 'Late Registration' };
+        }
+        
+        return { fee: event.regularFee, type: 'Regular Registration' };
+    };
+    
     if (!event) {
         return (
             <Card>
@@ -521,9 +549,9 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Staged Players ({stagedPlayers.length})</CardTitle>
+                    <CardTitle>School Roster Selection</CardTitle>
                     <CardDescription>
-                        Search the master database for players or add them manually. Once added, they will appear in the table below, ready for registration.
+                        Filter by district and school to load a roster, then search and add players to the staged list.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -540,7 +568,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                         </div>
                         <div>
                             <Label htmlFor="school-filter">School</Label>
-                            <Select value={selectedSchool} onValueChange={setSelectedSchool} disabled={selectedDistrict === 'all'}>
+                            <Select value={selectedSchool} onValueChange={setSelectedSchool}>
                                 <SelectTrigger id="school-filter"><SelectValue placeholder="Select a school" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Schools</SelectItem>
@@ -552,40 +580,62 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                      <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search by USCF ID or Name..."
+                            placeholder="Filter roster by USCF ID or Name..."
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="pl-10"
-                            disabled={!isDbLoaded}
+                            disabled={schoolRoster.length === 0}
                         />
-                         {!isDbLoaded && (
-                            <p className="text-xs text-muted-foreground mt-1">Player database not loaded. Please <Link href="/players" className='underline'>upload it</Link> to enable search.</p>
-                        )}
-                        {searchQuery.length > 2 && (
-                            <Card className="absolute z-10 w-full mt-1 max-h-60 overflow-y-auto">
-                                <CardContent className="p-2">
-                                    {isSearching ? (<div className="p-2 text-center text-sm text-muted-foreground">Searching...</div>)
-                                    : searchResults.length === 0 ? (<div className="p-2 text-center text-sm text-muted-foreground">No results found.</div>)
-                                    : (
-                                        searchResults.map(player => (
-                                            <button
-                                                key={player.id}
-                                                type="button"
-                                                className="w-full text-left p-2 hover:bg-accent rounded-md"
-                                                onClick={() => handleSelectSearchedPlayer(player)}
-                                            >
-                                                <p className="font-medium">{player.firstName} {player.lastName} ({player.state})</p>
-                                                <p className="text-sm text-muted-foreground">ID: {player.uscfId} | Rating: {player.regularRating || 'N/A'}</p>
-                                            </button>
-                                        ))
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
                     </div>
 
+                    <div className="border rounded-md max-h-72 overflow-y-auto">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-background">
+                                <TableRow>
+                                    <TableHead>Player</TableHead>
+                                    <TableHead>USCF ID</TableHead>
+                                    <TableHead>Rating</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {schoolRoster.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">Select a school to view roster.</TableCell>
+                                    </TableRow>
+                                ) : filteredSchoolRoster.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No players match your search in this roster.</TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredSchoolRoster.map(player => {
+                                        const isStaged = stagedPlayers.some(p => p.id === player.id);
+                                        return (
+                                            <TableRow key={player.id}>
+                                                <TableCell className="font-medium">{player.firstName} {player.lastName}</TableCell>
+                                                <TableCell>{player.uscfId}</TableCell>
+                                                <TableCell>{player.regularRating || 'UNR'}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button size="sm" variant="outline" onClick={() => handleSelectSearchedPlayer(player)} disabled={isStaged}>
+                                                        {isStaged ? <><CheckCircle className="mr-2 h-4 w-4 text-green-600"/>Staged</> : 'Add'}
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                     <Button variant="outline" onClick={handleAddPlayerClick}><PlusCircle className="mr-2 h-4 w-4" /> Add Player Manually</Button>
-                    
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Staged Players ({stagedPlayers.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
                     <div className="border rounded-md">
                         <Table>
                             <TableHeader>
