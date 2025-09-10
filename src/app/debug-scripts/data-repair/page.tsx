@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, getDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { schoolData } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
 import Papa from 'papaparse';
+
 
 interface LogEntry {
   type: 'success' | 'error' | 'info';
@@ -44,6 +45,34 @@ export default function DataRepairPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  
+  // Temporary debug export - remove after use
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).debugDB = { db, getDocs, collection };
+
+      // Get all invoices with just basic info first
+      (window as any).debugDB.getDocs((window as any).debugDB.collection((window as any).debugDB.db, 'invoices')).then((snapshot: any) => {
+        const invoices: any[] = [];
+        snapshot.forEach((doc: any) => {
+          const data = doc.data();
+          invoices.push({
+            id: doc.id,
+            invoiceNumber: data.invoiceNumber || 'Unknown',
+            schoolName: data.schoolName || 'Unknown',
+            status: data.status || data.invoiceStatus || 'Unknown',
+            playerCount: data.selections ? Object.keys(data.selections).length : 0,
+            hasPlayerNames: data.selections ? Object.keys(data.selections).some(key => key.includes('_') || isNaN(parseInt(key))) : false
+          });
+        });
+        console.log('=== INVOICE SUMMARY ===');
+        invoices.forEach(inv => {
+          console.log(`#${inv.invoiceNumber} | ${inv.schoolName} | Players: ${inv.playerCount} | Names: ${inv.hasPlayerNames ? 'YES' : 'NO'} | Status: ${inv.status}`);
+        });
+        console.log(`\nTotal invoices: ${invoices.length}`);
+      });
+    }
+  }, []);
 
   const addLog = (type: LogEntry['type'], message: string) => {
     setLogs(prev => [...prev, { type, message }]);
