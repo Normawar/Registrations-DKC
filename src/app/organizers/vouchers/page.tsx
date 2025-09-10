@@ -88,6 +88,8 @@ export default function VoucherManagementPage() {
               player,
               confirmation,
               selection,
+              invoiceNumber: confirmation.invoiceNumber || 'N/A',
+              invoiceStatus: confirmation.invoiceStatus || 'UNKNOWN',
               membershipType: (selection as any).uscfStatus
             });
           }
@@ -263,6 +265,22 @@ export default function VoucherManagementPage() {
       toast({ title: "Voucher Data Cleared" });
     }
   };
+  
+  const getStatusBadge = (status: string) => {
+    const s = (status || 'UNKNOWN').toUpperCase();
+    switch(s) {
+        case 'PAID':
+        case 'COMPED':
+            return <Badge variant="default" className="bg-green-600">Paid</Badge>;
+        case 'UNPAID':
+        case 'PARTIALLY_PAID':
+            return <Badge variant="destructive">Unpaid</Badge>;
+        case 'CANCELED':
+            return <Badge variant="secondary">Canceled</Badge>;
+        default:
+            return <Badge variant="outline">{s}</Badge>;
+    }
+  };
 
   return (
     <AppLayout>
@@ -398,14 +416,15 @@ export default function VoucherManagementPage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Players Needing Memberships</h3>
                     <Table>
-                      <TableHeader><TableRow><TableHead>Player Name</TableHead><TableHead>Type</TableHead><TableHead>Event</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                      <TableHeader><TableRow><TableHead>Player</TableHead><TableHead>Invoice #</TableHead><TableHead>Payment Status</TableHead><TableHead>Type</TableHead><TableHead>Event</TableHead></TableRow></TableHeader>
                       <TableBody>
                         {pendingMemberships.map(membership => (
                           <TableRow key={membership.playerId}>
                             <TableCell>{membership.player.firstName} {membership.player.lastName}</TableCell>
+                            <TableCell>{membership.invoiceNumber}</TableCell>
+                            <TableCell>{getStatusBadge(membership.invoiceStatus)}</TableCell>
                             <TableCell><Badge variant={membership.membershipType === 'new' ? 'default' : 'secondary'}>{membership.membershipType}</Badge></TableCell>
                             <TableCell>{membership.confirmation.eventName}</TableCell>
-                            <TableCell><Badge variant="destructive">Pending Assignment</Badge></TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
