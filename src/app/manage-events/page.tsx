@@ -498,23 +498,24 @@ export default function ManageEventsPage() {
     const eventDate = new Date(event.date);
 
     for (const conf of allConfirmations) {
-        // Condition 1: Direct match on eventId
         const hasEventId = conf.eventId === event.id;
-        
-        // Condition 2: Fallback match on name and date (for older records)
         const hasMatchingName = conf.eventName === event.name;
+        
         let hasMatchingDate = false;
-        if (conf.eventDate) {
-            try {
-                hasMatchingDate = isSameDay(new Date(conf.eventDate), eventDate);
-            } catch (e) {
-                console.warn("Could not parse date for invoice", conf.id);
+        try {
+            if (conf.eventDate) {
+                const confDate = new Date(conf.eventDate);
+                if (isValid(confDate)) {
+                    hasMatchingDate = isSameDay(confDate, eventDate);
+                }
             }
+        } catch (e) {
+            console.warn(`Could not parse date for invoice ${conf.id}: ${conf.eventDate}`);
         }
 
         if (hasEventId || (hasMatchingName && hasMatchingDate)) {
             for (const playerId in conf.selections) {
-                if (uniquePlayerRegistrations.has(playerId)) continue; // Already added from a more precise match
+                if (uniquePlayerRegistrations.has(playerId)) continue;
                 
                 const registrationDetails = conf.selections[playerId];
                 const player = playerMap.get(playerId);
@@ -564,26 +565,29 @@ export default function ManageEventsPage() {
     setIsDialogOpen(false);
   }
   
-  const playersForDownload = useMemo(() => {
+  const playersToExport = useMemo(() => {
     if (!selectedEventForReg) return [];
-    const downloadedIds = new Set(downloadedPlayers[selectedEventForReg.id] || []);
-    return registrations.filter(p => {
-        if (!downloadedIds.has(p.player.id) && p.details.status !== 'withdrawn') return true;
-        if (downloadedIds.has(p.player.id) && p.details.status === 'withdrawn') return true;
-        return false;
-    });
+    const exportedIds = new Set(downloadedPlayers[selectedEventForReg.id] || []);
+    return registrations.filter(p => !exportedIds.has(p.player.id) && p.details.status !== 'withdrawn');
   }, [registrations, downloadedPlayers, selectedEventForReg]);
+
+  const exportedCount = useMemo(() => {
+    if (!selectedEventForReg) return 0;
+    return (downloadedPlayers[selectedEventForReg.id] || []).length;
+  }, [downloadedPlayers, selectedEventForReg]);
   
+  const registeredCount = registrations.length - exportedCount;
+
   const handleDownload = (downloadAll: boolean = false) => {
     if (!selectedEventForReg) return;
     
-    const playersToDownload = downloadAll ? registrations : playersForDownload;
-    if (playersToDownload.length === 0) {
-      toast({ title: 'No Players to Download', description: downloadAll ? 'There are no registered players.' : 'There are no new registrations or withdrawals.' });
+    const playersToProcess = downloadAll ? registrations : playersToExport;
+    if (playersToProcess.length === 0) {
+      toast({ title: 'No Players to Export', description: 'There are no new registrations to export.' });
       return;
     }
     
-    const csvData = playersToDownload.map(p => ({
+    const csvData = playersToProcess.map(p => ({
         "USCF ID": p.player.uscfId, "First Name": p.player.firstName, "Last Name": p.player.lastName,
         "Rating": p.player.regularRating || 'UNR', "Grade": p.player.grade, "Section": p.details.section,
         "School": p.player.school, "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : 'Registered'
@@ -594,14 +598,14 @@ export default function ManageEventsPage() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_updates';
+    const fileNameSuffix = downloadAll ? 'all_registrations' : 'new_registrations';
     link.setAttribute('download', `${selectedEventForReg.name.replace(/\s+/g, "_")}_${fileNameSuffix}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     
     if (!downloadAll) {
-      const newlyDownloadedIds = playersToDownload.map(p => p.player.id);
+      const newlyDownloadedIds = playersToProcess.map(p => p.player.id);
       const updatedDownloads = {
           ...downloadedPlayers,
           [selectedEventForReg.id]: [...(downloadedPlayers[selectedEventForReg.id] || []), ...newlyDownloadedIds]
@@ -609,7 +613,7 @@ export default function ManageEventsPage() {
       setDownloadedPlayers(updatedDownloads);
       localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
     }
-    toast({ title: 'Download Complete', description: `${playersToDownload.length} registrations downloaded.`});
+    toast({ title: 'Export Complete', description: `${playersToProcess.length} players exported.`});
   };
   
   const handleMarkAllAsNew = () => {
@@ -851,11 +855,22 @@ export default function ManageEventsPage() {
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
-            <DialogDescription>{registrations.length} player(s) registered for this event.</DialogDescription>
+            <DialogDescription>
+              <div className="flex items-center gap-4 text-sm mt-2">
+                <Badge variant="outline">Registered: {registeredCount}</Badge>
+                <Badge variant="secondary">Exported: {exportedCount}</Badge>
+              </div>
+            </DialogDescription>
           </DialogHeader>
           <div className='my-4 flex items-center justify-end gap-2'>
-              <Button onClick={() => handleDownload(false)} disabled={playersForDownload.length === 0} variant="outline" size="sm"><Download className="mr-2 h-4 w-4" />Download New ({playersForDownload.length})</Button>
-              <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">Download All ({registrations.length})</Button>
+              <Button onClick={() => handleDownload(false)} disabled={playersToExport.length === 0} variant="outline" size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Export Registered Status ({playersToExport.length})
+              </Button>
+              <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Download All ({registrations.length})
+              </Button>
               <div className="flex items-center gap-1 text-xs text-muted-foreground"><span className="mx-1">|</span><button onClick={handleMarkAllAsNew} className="hover:underline">Mark all new</button><span className="mx-1">|</span><button onClick={handleClearAllNew} className="hover:underline">Clear all new</button></div>
           </div>
           <div className="max-h-[60vh] overflow-y-auto">
@@ -874,10 +889,10 @@ export default function ManageEventsPage() {
                 {registrations.length === 0 ? ( <TableRow><TableCell colSpan={6} className="h-24 text-center">No players registered yet.</TableCell></TableRow> ) : (
                   registrations.map(({ player, details, invoiceId, invoiceNumber }) => {
                     const isWithdrawn = details.status === 'withdrawn';
-                    const isDownloaded = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
+                    const isExported = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
                     let status: React.ReactNode = <Badge variant="secondary">Registered</Badge>;
                     if(isWithdrawn) status = <Badge variant="destructive">Withdrawn</Badge>;
-                    else if(isDownloaded) status = <Badge variant="default" className="bg-green-600 text-white">Active</Badge>;
+                    else if(isExported) status = <Badge variant="default" className="bg-green-600 text-white">Exported</Badge>;
                     
                     return (
                         <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
@@ -917,3 +932,4 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
+
