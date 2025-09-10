@@ -49,31 +49,6 @@ export default function DataRepairPage() {
     setLogs(prev => [...prev, { type, message }]);
   };
 
-  const extractSchoolFromTeamCode = (invoiceText: string): { school: string; district: string } => {
-    // Look for team code pattern in the invoice text
-    for (const [teamCode, schoolName] of Object.entries(SCHOOL_MAPPINGS)) {
-      if (invoiceText.includes(teamCode)) {
-        return { school: schoolName, district: DISTRICT_NAME };
-      }
-    }
-    
-    // Fallback: try to extract from customer info
-    const customerMatch = invoiceText.match(/Customer\s+([^\n]+)\n([^\/\n]+)/);
-    if (customerMatch && customerMatch[2]) {
-      const schoolLine = customerMatch[2].trim();
-      if (schoolLine.includes('/')) {
-        const parts = schoolLine.split('/');
-        return { 
-          school: parts[0].trim(), 
-          district: parts[1] ? parts[1].trim() : DISTRICT_NAME 
-        };
-      }
-      return { school: schoolLine, district: DISTRICT_NAME };
-    }
-    
-    return { school: 'Unknown School', district: DISTRICT_NAME };
-  };
-
   const repairInvoiceEmailFields = async () => {
     setIsProcessing(true);
     addLog('info', 'Starting email field repair process...');
@@ -134,32 +109,29 @@ export default function DataRepairPage() {
     setIsProcessing(false);
   };
 
-  const exportCollectionData = async (collectionName: 'invoices' | 'players') => {
-    setIsProcessing(true);
-    addLog('info', `Exporting ${collectionName} collection...`);
-    try {
-      const snapshot = await getDocs(collection(db, collectionName));
-      const data: any[] = [];
-      snapshot.forEach(doc => {
-        data.push({ id: doc.id, ...doc.data() });
-      });
-
-      const csv = Papa.unparse(data);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${collectionName}_export_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      addLog('success', `Successfully exported ${data.length} documents from ${collectionName}.`);
-    } catch (e: any) {
-      addLog('error', `Export failed: ${e.message}`);
+  const extractSchoolFromTeamCode = (invoiceText: string): { school: string; district: string } => {
+    // Look for team code pattern in the invoice text
+    for (const [teamCode, schoolName] of Object.entries(SCHOOL_MAPPINGS)) {
+      if (invoiceText.includes(teamCode)) {
+        return { school: schoolName, district: DISTRICT_NAME };
+      }
     }
-    setIsProcessing(false);
+    
+    // Fallback: try to extract from customer info
+    const customerMatch = invoiceText.match(/Customer\s+([^\n]+)\n([^\/\n]+)/);
+    if (customerMatch && customerMatch[2]) {
+      const schoolLine = customerMatch[2].trim();
+      if (schoolLine.includes('/')) {
+        const parts = schoolLine.split('/');
+        return { 
+          school: parts[0].trim(), 
+          district: parts[1] ? parts[1].trim() : DISTRICT_NAME 
+        };
+      }
+      return { school: schoolLine, district: DISTRICT_NAME };
+    }
+    
+    return { school: 'Unknown School', district: DISTRICT_NAME };
   };
 
   const parseAndProcessData = async () => {
@@ -279,7 +251,8 @@ export default function DataRepairPage() {
           if (isNew && !existingPlayer) {
             const [firstName, ...lastNameParts] = name.split(' ');
             const lastName = lastNameParts.join(' ') || '';
-            
+            const schoolSection = 'High School K-12'; // Default section
+
             const placeholderPlayer: Partial<MasterPlayer> = {
               id: playerId,
               uscfId: 'NEW',
@@ -288,7 +261,7 @@ export default function DataRepairPage() {
               school,
               district,
               grade: 'N/A',
-              section, // Use school-inferred section
+              section: schoolSection, // Use school-inferred section
               email: 'placeholder@example.com',
               zipCode: '00000',
               events: 0,
@@ -353,6 +326,35 @@ export default function DataRepairPage() {
 
     setIsProcessing(false);
   };
+  
+    const exportCollectionData = async (collectionName: 'invoices' | 'players') => {
+    setIsProcessing(true);
+    addLog('info', `Exporting ${collectionName} collection...`);
+    try {
+      const snapshot = await getDocs(collection(db, collectionName));
+      const data: any[] = [];
+      snapshot.forEach(doc => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+
+      const csv = Papa.unparse(data);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${collectionName}_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      addLog('success', `Successfully exported ${data.length} documents from ${collectionName}.`);
+    } catch (e: any) {
+      addLog('error', `Export failed: ${e.message}`);
+    }
+    setIsProcessing(false);
+  };
+
 
   return (
     <AppLayout>
