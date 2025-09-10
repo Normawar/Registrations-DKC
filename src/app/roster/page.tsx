@@ -1036,6 +1036,18 @@ function DistrictRosterView() {
         });
     }, [allPlayers, toast]);
 
+    const playerCounts = useMemo(() => {
+        const filteredBySchool = selectedSchool === 'all'
+            ? districtPlayers
+            : districtPlayers.filter(p => p.school === selectedSchool);
+        
+        return {
+            all: filteredBySchool.length,
+            gt: filteredBySchool.filter(p => p.studentType === 'gt').length,
+            independent: filteredBySchool.filter(p => p.studentType === 'independent').length,
+        };
+    }, [districtPlayers, selectedSchool]);
+
     return (
         <div className="space-y-8">
             <div>
@@ -1074,9 +1086,9 @@ function DistrictRosterView() {
                         <div>
                             <Label>Filter by Player Type</Label>
                             <RadioGroup value={playerTypeFilter} onValueChange={setPlayerTypeFilter} className="flex items-center space-x-4 pt-2">
-                               <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all" className="cursor-pointer">All</Label></div>
-                               <div className="flex items-center space-x-2"><RadioGroupItem value="gt" id="gt" /><Label htmlFor="gt" className="cursor-pointer">GT</Label></div>
-                               <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent" className="cursor-pointer">Independent</Label></div>
+                               <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all" className="cursor-pointer">All ({playerCounts.all})</Label></div>
+                               <div className="flex items-center space-x-2"><RadioGroupItem value="gt" id="gt" /><Label htmlFor="gt" className="cursor-pointer">GT ({playerCounts.gt})</Label></div>
+                               <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent" className="cursor-pointer">Independent ({playerCounts.independent})</Label></div>
                             </RadioGroup>
                         </div>
                         <div className="flex items-center gap-2">
