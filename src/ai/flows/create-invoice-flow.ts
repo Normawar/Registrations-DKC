@@ -238,10 +238,11 @@ const createInvoiceFlow = ai.defineFlow(
       const formattedEventDate = format(new Date(input.eventDate), 'MM/dd/yyyy');
 
       const ccRecipients: InvoiceRecipient[] = [];
-      if (input.bookkeeperEmail && input.bookkeeperEmail.trim() !== '') {
+      const bookkeeperEmailSchema = z.string().email();
+      if (input.bookkeeperEmail && bookkeeperEmailSchema.safeParse(input.bookkeeperEmail).success) {
           ccRecipients.push({ emailAddress: input.bookkeeperEmail });
       }
-      if (input.gtCoordinatorEmail && input.gtCoordinatorEmail.trim() !== '') {
+      if (input.gtCoordinatorEmail && bookkeeperEmailSchema.safeParse(input.gtCoordinatorEmail).success) {
           ccRecipients.push({ emailAddress: input.gtCoordinatorEmail });
       }
       
