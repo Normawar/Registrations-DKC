@@ -503,17 +503,15 @@ export default function ManageEventsPage() {
         const hasEventId = conf.eventId === event.id;
         
         let hasMatchingNameAndDate = false;
-        if (conf.eventName === event.name) {
-            try {
-                if (conf.eventDate) {
-                    const confDate = parseISO(conf.eventDate);
-                    if (isValid(confDate) && isSameDay(confDate, eventDate)) {
-                        hasMatchingNameAndDate = true;
-                    }
+        try {
+            if (conf.eventName && conf.eventDate) {
+                const confDate = new Date(conf.eventDate); // Handles both ISO strings and Date objects
+                if (isValid(confDate) && conf.eventName === event.name && isSameDay(confDate, eventDate)) {
+                    hasMatchingNameAndDate = true;
                 }
-            } catch (e) {
-                console.warn(`Could not parse date for invoice ${conf.id}: ${conf.eventDate}`);
             }
+        } catch (e) {
+            console.warn(`Could not parse date for invoice ${conf.id}: ${conf.eventDate}`);
         }
 
         if (hasEventId || hasMatchingNameAndDate) {
@@ -895,7 +893,7 @@ export default function ManageEventsPage() {
                                 className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
                             >
                               <Download className="mr-2 h-4 w-4" />
-                              Download Exported ({exportedPlayers.length})
+                              Download Exported List ({exportedPlayers.length})
                             </Button>
                         </div>
                     </CardContent>
@@ -934,7 +932,12 @@ export default function ManageEventsPage() {
                     
                     return (
                         <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
-                            <TableCell className={cn("font-medium", isWithdrawn && "line-through")}>{player.firstName} {player.lastName}</TableCell>
+                            <TableCell className={cn("font-medium", isWithdrawn && "line-through")}>
+                                <div className="flex items-center gap-2">
+                                  {player.firstName} {player.lastName}
+                                  {player.studentType === 'gt' && <Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>}
+                                </div>
+                            </TableCell>
                             <TableCell>{player.uscfId}</TableCell>
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
@@ -976,4 +979,5 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
+
 
