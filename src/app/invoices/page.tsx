@@ -50,8 +50,7 @@ export default function UnifiedInvoiceRegistrations() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
-  const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
+  const { database: allPlayers, dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
   const [districtFilter, setDistrictFilter] = useState('all');
   const [schoolFilter, setSchoolFilter] = useState('all');
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
@@ -62,12 +61,8 @@ export default function UnifiedInvoiceRegistrations() {
     if (districtFilter === 'all') {
       setSchoolsForDistrict(dbSchools);
     } else {
-      const schools = dbSchools.filter(school => {
-        // This is a simplified lookup. A better data structure would be ideal.
-        const schoolEntry = allPlayers.find(p => p.school === school && p.district === districtFilter);
-        return !!schoolEntry;
-      });
-      setSchoolsForDistrict([...new Set(schools)].sort());
+      const schools = [...new Set(allPlayers.filter(p => p.district === districtFilter).map(p => p.school))].sort();
+      setSchoolsForDistrict(schools);
     }
     setSchoolFilter('all');
   }, [districtFilter, dbSchools, allPlayers]);
