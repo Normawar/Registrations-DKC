@@ -870,40 +870,39 @@ function ManageEventsContent() {
           <DialogHeader>
             <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
             <DialogDescription>
-              <div className="flex items-center gap-4 text-sm mt-2">
+              A list of all players registered for this event.
+            </DialogDescription>
+            <div className="flex items-center gap-4 text-sm mt-2">
                 <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
                 <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
-              </div>
-            </DialogDescription>
+            </div>
           </DialogHeader>
           
           <div className="space-y-4">
             {profile?.role === 'organizer' && (
-              <div className="space-y-2">
-                  <div className="border border-amber-500 bg-amber-50 rounded-lg p-4 w-auto inline-block">
-                      <p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p>
-                      <div className='flex items-center gap-2'>
-                          <Button 
-                              onClick={() => handleDownload(registeredPlayers, 'registered')} 
-                              disabled={registeredPlayers.length === 0} 
-                              size="sm"
-                              className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Export Registered ({registeredPlayers.length})
-                          </Button>
-                          <Button 
-                              onClick={() => handleDownload(exportedPlayers, 'exported')} 
-                              disabled={exportedPlayers.length === 0} 
-                              size="sm"
-                              className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Download Exported List ({exportedPlayers.length})
-                          </Button>
-                      </div>
-                  </div>
-              </div>
+                <div className="border border-amber-500 bg-amber-50 rounded-lg p-4 w-auto inline-block">
+                    <p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p>
+                    <div className='flex items-center gap-2'>
+                        <Button 
+                            onClick={() => handleDownload(registeredPlayers, 'registered')} 
+                            disabled={registeredPlayers.length === 0} 
+                            size="sm"
+                            className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Export Registered ({registeredPlayers.length})
+                        </Button>
+                        <Button 
+                            onClick={() => handleDownload(exportedPlayers, 'exported')} 
+                            disabled={exportedPlayers.length === 0} 
+                            size="sm"
+                            className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                        >
+                          <Download className="mr-2 h-4 w-4" />
+                          Download Exported List ({exportedPlayers.length})
+                        </Button>
+                    </div>
+                </div>
             )}
              <div className='flex items-center gap-4 mt-2'>
                   <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
@@ -995,3 +994,4 @@ export default function ManageEventsPage() {
     </DistrictCoordinatorGuard>
   );
 }
+
