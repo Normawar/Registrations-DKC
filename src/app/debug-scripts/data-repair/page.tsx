@@ -251,7 +251,7 @@ export default function DataRepairPage() {
           if (isNew && !existingPlayer) {
             const [firstName, ...lastNameParts] = name.split(' ');
             const lastName = lastNameParts.join(' ') || '';
-            const schoolSection = 'High School K-12'; // Default section
+            const schoolSection = 'High School K-12';
 
             const placeholderPlayer: Partial<MasterPlayer> = {
               id: playerId,
@@ -355,6 +355,36 @@ export default function DataRepairPage() {
     setIsProcessing(false);
   };
 
+  const exportEnhancedInvoiceData = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'invoices'));
+      const data: any[] = [];
+      
+      snapshot.forEach(doc => {
+        data.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      
+      // Download as JSON file
+      const blob = new Blob([JSON.stringify(data, null, 2)], 
+        { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `all_invoices_complete_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log(`Exported ${data.length} complete invoices`);
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
+
 
   return (
     <AppLayout>
@@ -414,7 +444,7 @@ export default function DataRepairPage() {
               disabled={isProcessing}
             />
           </CardContent>
-          <CardFooter className="flex gap-2">
+          <CardFooter className="flex gap-2 flex-wrap">
             <Button onClick={parseAndProcessData} disabled={isProcessing}>
               {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isProcessing ? 'Processing...' : 'Process Pasted Data'}
@@ -424,14 +454,21 @@ export default function DataRepairPage() {
               onClick={() => exportCollectionData('invoices')}
               disabled={isProcessing}
             >
-              Export Invoices
+              Export Invoices (CSV)
             </Button>
             <Button 
               variant="outline" 
               onClick={() => exportCollectionData('players')}
               disabled={isProcessing}
             >
-              Export Players
+              Export Players (CSV)
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={exportEnhancedInvoiceData}
+              disabled={isProcessing}
+            >
+              Enhanced Invoice Export (JSON)
             </Button>
           </CardFooter>
         </Card>
