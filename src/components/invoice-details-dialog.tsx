@@ -23,6 +23,8 @@ import { onAuthStateChanged, signInAnonymously, type User } from 'firebase/auth'
 import { getInvoiceStatusWithPayments } from '@/ai/flows/get-invoice-status-flow';
 import { PaymentHistoryDisplay } from '@/components/unified-payment-system';
 import { Checkbox } from './ui/checkbox';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from './ui/table';
+
 
 const safeString = (value: any): string => {
   if (value === null || value === undefined || value === false || Number.isNaN(value)) {
@@ -1471,6 +1473,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     return null;
   }
 
+  const registeredPlayers = getRegisteredPlayers(confirmation);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1490,6 +1494,29 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
             <div className="bg-white rounded-lg border p-4">
               <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
               <RegistrationDetailsSection invoice={confirmation} profile={profile} />
+              
+                <div className="mt-4">
+                    <h4 className="text-md font-medium mb-2">Registered Players ({registeredPlayers.length})</h4>
+                    <div className="max-h-40 overflow-y-auto border rounded-md">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Player</TableHead>
+                                    <TableHead>Section</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {registeredPlayers.map(player => (
+                                    <TableRow key={player.id}>
+                                        <TableCell>{player.firstName} {player.lastName}</TableCell>
+                                        <TableCell>{confirmation.selections[player.id]?.section || 'N/A'}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </div>
+
             </div>
             <PaymentSummarySection />
             <EnhancedSquareButton />
