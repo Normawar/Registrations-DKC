@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,6 +20,32 @@ interface LogEntry {
   type: 'success' | 'error' | 'info';
   message: string;
 }
+
+// Temporary debug export - remove after use
+if (typeof window !== 'undefined') {
+  (window as any).debugDB = { db, getDocs, collection };
+  // Get all invoices with just basic info first
+  (window as any).debugDB.getDocs(window.debugDB.collection(window.debugDB.db, 'invoices')).then((snapshot: any) => {
+    const invoices: any[] = [];
+    snapshot.forEach((doc: any) => {
+      const data = doc.data();
+      invoices.push({
+        id: doc.id,
+        invoiceNumber: data.invoiceNumber || 'Unknown',
+        schoolName: data.schoolName || 'Unknown',
+        status: data.status || data.invoiceStatus || 'Unknown',
+        playerCount: data.selections ? Object.keys(data.selections).length : 0,
+        hasPlayerNames: data.selections ? Object.keys(data.selections).some((key: string) => key.includes('_') || isNaN(parseInt(key))) : false
+      });
+    });
+    console.log('=== INVOICE SUMMARY ===');
+    invoices.forEach(inv => {
+      console.log(`#${inv.invoiceNumber} | ${inv.schoolName} | Players: ${inv.playerCount} | Names: ${inv.hasPlayerNames ? 'YES' : 'NO'} | Status: ${inv.status}`);
+    });
+    console.log(`\nTotal invoices: ${invoices.length}`);
+  });
+}
+
 
 // School mapping based on the team codes in the raw data
 const SCHOOL_MAPPINGS = {
@@ -379,10 +404,17 @@ export default function DataRepairPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).debugDB) {
+      // Your debug script can be added here inside useEffect
+      // to ensure it runs only on the client side.
+    }
+  }, []);
+
   const addLog = (type: LogEntry['type'], message: string) => {
     setLogs(prev => [...prev, { type, message }]);
   };
-
+  
   const repairInvoiceEmailFields = async () => {
     setIsProcessing(true);
     addLog('info', 'Starting email field repair process...');
