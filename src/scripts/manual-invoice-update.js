@@ -10,55 +10,76 @@
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/services/firestore-service'; // Adjust path if necessary
 
-async function updateInvoice() {
+async function updateInvoices() {
   if (!db) {
     console.error("Firestore is not initialized. Please check your firebase config.");
     return;
   }
 
-  const invoiceId = 'inv:0-ChA8tAATqKqV2Vn3-1kOEBDkEJ8I';
-  const invoiceRef = doc(db, 'invoices', invoiceId);
-
-  // --- Data extracted from the invoice image ---
-  const selectionsData = {
-    // Assuming 'NEW' for USCF ID if not available, will need to be updated later.
-    "NEW_Aaliyah_Rodriguez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Alyssa_Cavazos": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Alyssa_Puga": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Devin_Valdez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Diego_Hernandez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Elias_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Elijah_Martinez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Emely_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Hector_Lopez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Jacob_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Joel_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Jorge_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Juan_Marines": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Julian_Cantu": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Matthew_Gonzalez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Sebastian_Salinas": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Victoria_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-    "NEW_Yolotzin_Martinez": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" }
+  // --- Invoice 1 Data: inv:0-ChBvHo9HhSLsFXoFmT96z3-wEJ8I ---
+  const invoice1Id = 'inv:0-ChBvHo9HhSLsFXoFmT96z3-wEJ8I';
+  const invoice1Ref = doc(db, 'invoices', invoice1Id);
+  const selectionsData1 = {
+    "15863055": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "16801086": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "30299472": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "30309132": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "31488082": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "31499254": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "32046484": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" }
   };
-  
-  const updatedInvoiceData = {
+  const updatedInvoiceData1 = {
     district: "PHARR-SAN JUAN-ALAMO ISD",
-    schoolName: "PSJA MEMORIAL EARLY COLLEGE H S",
+    schoolName: "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS",
+    purchaserName: "Ashley Rodriguez",
+    purchaserEmail: "ashley.rodriguez@psjaisd.us",
+    sponsorEmail: "ashley.rodriguez@psjaisd.us",
     status: "UNPAID",
     invoiceStatus: "UNPAID",
-    selections: selectionsData,
+    selections: selectionsData1,
   };
 
-
-  console.log(`Updating invoice ${invoiceId} with corrected sponsor info and ${Object.keys(selectionsData).length} player selections...`);
-
+  console.log(`Updating invoice ${invoice1Id}...`);
   try {
-    await updateDoc(invoiceRef, updatedInvoiceData);
-    console.log(`✅ Successfully updated invoice ${invoiceId}.`);
+    await updateDoc(invoice1Ref, updatedInvoiceData1);
+    console.log(`✅ Successfully updated invoice ${invoice1Id}.`);
   } catch (error) {
-    console.error(`🔥 Error updating invoice:`, error);
+    console.error(`🔥 Error updating invoice ${invoice1Id}:`, error);
+  }
+
+  // --- Invoice 2 Data: inv:0-ChAn7iUtCfPpjCRGA9NEEaE9EJ8I ---
+  const invoice2Id = 'inv:0-ChAn7iUtCfPpjCRGA9NEEaE9EJ8I';
+  const invoice2Ref = doc(db, 'invoices', invoice2Id);
+  const selectionsData2 = {
+    "30271062": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "30728191": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
+    "31489716": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "31489894": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "31489934": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "32115166": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "32115265": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "32115492": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
+    "temp_Aurik_Romo": { "section": "High School K-12", "status": "active", "uscfStatus": "new", "studentType": "independent" },
+    "temp_Jocelyn_Snow": { "section": "High School K-12", "status": "active", "uscfStatus": "new", "studentType": "independent" }
+  };
+  const updatedInvoiceData2 = {
+    district: "PHARR-SAN JUAN-ALAMO ISD",
+    schoolName: "KENNEDY MIDDLE",
+    purchaserName: "Hernan Cortez",
+    purchaserEmail: "hernan.cortez@psjaisd.us",
+    sponsorEmail: "hernan.cortez@psjaisd.us",
+    status: "UNPAID",
+    invoiceStatus: "UNPAID",
+    selections: selectionsData2,
+  };
+
+  console.log(`Updating invoice ${invoice2Id}...`);
+  try {
+    await updateDoc(invoice2Ref, updatedInvoiceData2);
+    console.log(`✅ Successfully updated invoice ${invoice2Id}.`);
+  } catch (error) {
+    console.error(`🔥 Error updating invoice ${invoice2Id}:`, error);
   }
 }
 
-updateInvoice().catch(console.error);
+updateInvoices().catch(console.error);
