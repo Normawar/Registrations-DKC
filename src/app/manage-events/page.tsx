@@ -903,14 +903,16 @@ function ManageEventsContent() {
                           </Button>
                       </div>
                   </div>
-                  <div className='flex items-center gap-4 mt-2'>
-                      <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
-                          Download All Registrations ({registrations.length})
-                      </Button>
-                       <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
-                  </div>
               </div>
             )}
+             <div className='flex items-center gap-4 mt-2'>
+                  <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
+                      Download All Registrations ({registrations.length})
+                  </Button>
+                  {profile?.role === 'organizer' && (
+                    <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
+                  )}
+              </div>
           </div>
 
 
@@ -941,6 +943,7 @@ function ManageEventsContent() {
                                 <div className="flex items-center gap-2">
                                   {player.firstName} {player.lastName}
                                   {player.studentType === 'gt' && <Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>}
+                                  {player.studentType === 'independent' && <Badge variant="secondary" className="bg-purple-200 text-purple-800">IND</Badge>}
                                 </div>
                             </TableCell>
                             <TableCell>{player.uscfId}</TableCell>
