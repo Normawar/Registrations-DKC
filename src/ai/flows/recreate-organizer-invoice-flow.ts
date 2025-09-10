@@ -23,8 +23,8 @@ const RecreateOrganizerInvoiceInputSchema = z.object({
     originalInvoiceId: z.string().describe('The ID of the invoice to cancel and replace.'),
     sponsorName: z.string().describe('The name of the person or entity to be invoiced.'),
     sponsorEmail: z.string().email().describe('The email of the invoice recipient.'),
-    bookkeeperEmail: z.string().email().optional().or(z.literal('')).describe('The email of the bookkeeper to be CCed.'),
-    gtCoordinatorEmail: z.string().email().optional().or(z.literal('')).describe('The email of the GT Coordinator to be CCed.'),
+    bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
+    gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
     schoolName: z.string().describe('The school associated with this invoice.'),
     schoolAddress: z.string().optional().describe('The address of the school.'),
     schoolPhone: z.string().optional().describe('The phone number of the school.'),
@@ -60,7 +60,7 @@ const recreateOrganizerInvoiceFlow = ai.defineFlow(
     try {
       // Step 1: Cancel the original invoice.
       console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
-      await cancelInvoice({ invoiceId: input.originalInvoiceId });
+      await cancelInvoice({ invoiceId: input.originalInvoiceId, requestingUserRole: 'organizer' });
       console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
 
       // Step 2: Create a new invoice with the updated details and revised title.
