@@ -51,7 +51,7 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
             router.push('/manage-events');
             break;
           case 'district_coordinator':
-            router.push('/district-dashboard');
+            router.push('/auth/role-selection');
             break;
           case 'sponsor':
             if (profile.isDistrictCoordinator) {

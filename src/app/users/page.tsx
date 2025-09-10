@@ -194,8 +194,8 @@ export default function UsersPage() {
       if (isDialogOpen && editingUser) {
         const initialDistrict = editingUser.district || 'None';
         form.reset({
-            email: editingUser.email,
-            role: editingUser.role,
+            email: editingUser.email || '',
+            role: editingUser.role || 'sponsor',
             firstName: editingUser.firstName || '',
             lastName: editingUser.lastName || '',
             school: editingUser.school || '',
@@ -411,9 +411,9 @@ export default function UsersPage() {
                         <div className="p-6">
                             <Form {...form}>
                                 <form id="user-edit-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                                    <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="role" render={({ field }) => (
                                         <FormItem><FormLabel>Role</FormLabel>
@@ -466,7 +466,7 @@ export default function UsersPage() {
                                     <FormField control={form.control} name="school" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>School</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value} disabled={!selectedDistrict}>
+                                            <Select onValueChange={field.onChange} value={field.value} disabled={!form.watch('district')}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
@@ -498,10 +498,10 @@ export default function UsersPage() {
                         <div className="p-6">
                             <Form {...createForm}>
                                 <form id="user-create-form" onSubmit={createForm.handleSubmit(handleCreateUser)} className="space-y-4">
-                                    <FormField control={createForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input type="password" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={createForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={createForm.control} name="role" render={({ field }) => (
                                         <FormItem><FormLabel>Role</FormLabel>

@@ -29,7 +29,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo } from 'react';
@@ -108,7 +108,7 @@ const icons: { [key: string]: React.ElementType } = {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile } = useSponsorProfile();
+  const { profile, updateProfile } = useSponsorProfile();
   
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [confirmations, setConfirmations] = useState<any[]>([]);
@@ -175,6 +175,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     router.push('/');
   };
   
+  const handleRoleToggle = () => {
+    if (profile?.isDistrictCoordinator) {
+      const newRole = profile.role === 'sponsor' ? 'district_coordinator' : 'sponsor';
+      updateProfile({ ...profile, role: newRole });
+      
+      const newPath = newRole === 'sponsor' ? '/dashboard' : '/district-dashboard';
+      router.push(newPath);
+    }
+  };
+
   const menuItems = 
     profile?.role === 'organizer' ? organizerMenuItems :
     profile?.role === 'individual' ? individualMenuItems :
@@ -237,6 +247,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarHeader>
           <SidebarContent>
+            {profile?.isDistrictCoordinator && (
+                 <div className="px-2 mb-2">
+                    <Button variant="secondary" className="w-full h-auto py-2 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-2" onClick={handleRoleToggle}>
+                       <Repeat className="w-4 h-4 mr-2 group-data-[collapsible=icon]:mr-0" />
+                        <span className="group-data-[collapsible=icon]:hidden">
+                            Switch to {profile.role === 'sponsor' ? 'Coordinator' : 'Sponsor'} View
+                        </span>
+                    </Button>
+                </div>
+            )}
             <SidebarMenu>
               {menuItems.map((item) => {
                 let badgeCount = 0;
