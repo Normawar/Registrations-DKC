@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -14,6 +15,8 @@ import { cn } from '@/lib/utils';
 import { schoolData } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
 import Papa from 'papaparse';
+import { isSameDay, parseISO } from 'date-fns';
+import { useEvents, type Event } from '@/hooks/use-events';
 
 
 interface LogEntry {
@@ -39,7 +42,7 @@ if (typeof window !== 'undefined') {
       });
     });
     console.log('=== INVOICE SUMMARY ===');
-    invoices.forEach(inv => {
+    invoices.forEach((inv: any) => {
       console.log(`#${inv.invoiceNumber} | ${inv.schoolName} | Players: ${inv.playerCount} | Names: ${inv.hasPlayerNames ? 'YES' : 'NO'} | Status: ${inv.status}`);
     });
     console.log(`\nTotal invoices: ${invoices.length}`);
@@ -403,6 +406,8 @@ export default function DataRepairPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const [isEventIdRepairing, setIsEventIdRepairing] = useState(false);
+  const { events } = useEvents();
 
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).debugDB) {
@@ -413,6 +418,49 @@ export default function DataRepairPage() {
 
   const addLog = (type: LogEntry['type'], message: string) => {
     setLogs(prev => [...prev, { type, message }]);
+  };
+
+  const repairMissingEventIds = async () => {
+    setIsEventIdRepairing(true);
+    addLog('info', 'Starting Event ID Repair Process...');
+
+    try {
+      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+      let updatedCount = 0;
+      const batch = writeBatch(db);
+
+      invoicesSnapshot.forEach(docSnap => {
+        const invoice = docSnap.data();
+        if (!invoice.eventId && invoice.eventName && invoice.eventDate) {
+          const matchingEvent = events.find(e => 
+            e.name === invoice.eventName && 
+            isSameDay(parseISO(e.date), parseISO(invoice.eventDate))
+          );
+          
+          if (matchingEvent) {
+            batch.update(doc(db, 'invoices', docSnap.id), { eventId: matchingEvent.id });
+            updatedCount++;
+            addLog('success', `Found match for invoice #${invoice.invoiceNumber || docSnap.id}. Staging update with eventId: ${matchingEvent.id}`);
+          } else {
+            addLog('error', `No matching event found for invoice #${invoice.invoiceNumber || docSnap.id} (${invoice.eventName} on ${invoice.eventDate})`);
+          }
+        }
+      });
+      
+      if (updatedCount > 0) {
+        await batch.commit();
+        addLog('success', `Successfully updated ${updatedCount} invoices with missing event IDs.`);
+        toast({ title: 'Repair Complete', description: `${updatedCount} invoices were fixed.` });
+      } else {
+        addLog('info', 'No invoices required event ID repairs.');
+        toast({ title: 'No Repairs Needed' });
+      }
+    } catch (e: any) {
+      addLog('error', `Event ID repair failed: ${e.message}`);
+      toast({ variant: 'destructive', title: 'Repair Failed', description: e.message });
+    }
+
+    setIsEventIdRepairing(false);
   };
   
   const repairInvoiceEmailFields = async () => {
@@ -764,6 +812,25 @@ export default function DataRepairPage() {
         </div>
         
         <StudentTypeUpdater />
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Event ID Repair</CardTitle>
+            <CardDescription>
+              This tool finds invoices that are missing an Event ID and assigns the correct one by matching the event name and date. This is crucial for linking invoices to events correctly.
+            </CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button 
+              onClick={repairMissingEventIds} 
+              disabled={isEventIdRepairing}
+              variant="secondary"
+            >
+              {isEventIdRepairing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isEventIdRepairing ? 'Repairing...' : 'Fix Missing Event IDs'}
+            </Button>
+          </CardFooter>
+        </Card>
 
         <Card>
           <CardHeader>
