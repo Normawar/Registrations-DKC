@@ -18,6 +18,7 @@ import Papa from 'papaparse';
 import { isSameDay, parseISO } from 'date-fns';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
+import { useMasterDb } from '@/context/master-db-context';
 
 
 interface LogEntry {
@@ -157,6 +158,7 @@ function GtInvoiceFixer() {
                       lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
                       uscfAction: selection.uscfStatus !== 'current',
                       isGtPlayer: player.studentType === 'gt',
+                      isNew: false, // Ensure these are treated as existing players
                   };
               });
               
