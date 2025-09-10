@@ -17,7 +17,8 @@ import { generateTeamCode } from '@/lib/school-utils';
 import Papa from 'papaparse';
 import { isSameDay, parseISO } from 'date-fns';
 import { useEvents, type Event } from '@/hooks/use-events';
-import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
+import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
+import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { useMasterDb } from '@/context/master-db-context';
 
 
@@ -175,11 +176,15 @@ function GtInvoiceFixer() {
               if (!eventDetails) {
                   throw new Error(`Event ${invoice.eventId} not found.`);
               }
+              
+              // 1. Cancel the original invoice first
+              addLog(`Canceling original invoice #${invoice.invoiceNumber}...`);
+              await cancelInvoice({ invoiceId: invoice.invoiceId });
+              addLog(`✅ Original invoice canceled.`);
 
-              // Recreate the player list for the recreation flow
+              // 2. Recreate the player list for the split invoice flow
               const playersToInvoice = playersData.map(player => {
                   const selection = invoice.selections[player.id];
-                  // Preserve late fee if it was on original invoice
                   const lateFeeAmount = (invoice.totalInvoiced / playersData.length) - eventDetails.regularFee - (selection.uscfStatus !== 'current' ? 24 : 0);
                   
                   return {
@@ -189,16 +194,13 @@ function GtInvoiceFixer() {
                       lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
                       uscfAction: selection.uscfStatus !== 'current',
                       isGtPlayer: player.studentType === 'gt',
-                      isNew: false, // Ensure these are treated as existing players
                   };
               });
               
-              addLog(`Recreating invoice for ${playersToInvoice.length} players...`);
+              addLog(`Recreating invoice(s) for ${playersToInvoice.length} players...`);
               
-              const result = await recreateInvoiceFromRoster({
-                  originalInvoiceId: invoice.invoiceId,
-                  players: playersToInvoice,
-                  uscfFee: 24, // The flow will correctly ignore this for GT players
+              // 3. Call the split invoice flow
+              const result = await createPsjaSplitInvoice({
                   sponsorName: invoice.purchaserName,
                   sponsorEmail: invoice.sponsorEmail,
                   bookkeeperEmail: invoice.bookkeeperEmail,
@@ -206,13 +208,21 @@ function GtInvoiceFixer() {
                   schoolName: invoice.schoolName,
                   schoolAddress: invoice.schoolAddress,
                   schoolPhone: invoice.schoolPhone,
-                  district: invoice.district,
+                  district: 'PHARR-SAN JUAN-ALAMO ISD',
                   teamCode: invoice.teamCode,
                   eventName: invoice.eventName,
                   eventDate: invoice.eventDate,
+                  uscfFee: 24,
+                  players: playersToInvoice,
               });
 
-              addLog(`✅ Successfully recreated invoice. New ID: ${result.newInvoiceId}, New #: ${result.newInvoiceNumber}`);
+              if (result.gtInvoice) {
+                  addLog(`✅ Successfully recreated GT invoice. New ID: ${result.gtInvoice.invoiceId}, New #: ${result.gtInvoice.invoiceNumber}`);
+              }
+              if (result.independentInvoice) {
+                  addLog(`✅ Successfully recreated Independent invoice. New ID: ${result.independentInvoice.invoiceId}, New #: ${result.independentInvoice.invoiceNumber}`);
+              }
+
               successCount++;
           } catch (error: any) {
               addLog(`❌ ERROR processing invoice ${invoice.id}: ${error.message}`);
@@ -1105,3 +1115,5 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
+
+    
