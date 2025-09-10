@@ -113,8 +113,9 @@ function OrganizerInvoiceContent() {
             lineItems = invoiceToEdit.lineItems;
           }
           
-          const existingTitle = (invoiceToEdit.description || invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim();
+          const existingTitle = (invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim();
           const autoTitle = `${invoiceToEdit.schoolName} - ${format(new Date(), 'MMMM yyyy')}`;
+
 
           form.reset({
             invoiceId: invoiceToEdit.invoiceId || '',
