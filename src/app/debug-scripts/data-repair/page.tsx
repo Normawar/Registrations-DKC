@@ -100,60 +100,52 @@ function GtInvoiceFixer() {
   const addLog = (message: string) => setFixLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
 
   const findInvoicesToFix = async () => {
-      setIsFixing(true);
-      addLog('🔍 Searching for invoices that incorrectly charged GT players...');
-      
-      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-      const allInvoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setIsFixing(true);
+    addLog('🔍 Searching for invoices that incorrectly charged GT players for USCF fees...');
+    
+    const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+    const allInvoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      const psjaUnpaidInvoices = allInvoices.filter(inv => 
-        inv.district === 'PHARR-SAN JUAN-ALAMO ISD' &&
-        inv.status === 'UNPAID' &&
-        inv.selections &&
-        inv.eventId
-      );
-      
-      addLog(`Found ${psjaUnpaidInvoices.length} unpaid PSJA invoices to check.`);
+    const psjaUnpaidInvoices = allInvoices.filter(inv => 
+      inv.district === 'PHARR-SAN JUAN-ALAMO ISD' &&
+      inv.status === 'UNPAID' &&
+      inv.selections &&
+      inv.eventId
+    );
+    
+    addLog(`Found ${psjaUnpaidInvoices.length} unpaid PSJA invoices to check.`);
 
-      const flaggedInvoices = [];
+    const flaggedInvoices = [];
 
-      for (const inv of psjaUnpaidInvoices) {
-        let gtPlayerNeedsUscf = false;
+    for (const inv of psjaUnpaidInvoices) {
+        let hasGtPlayerChargedUscf = false;
         if (!inv.selections) continue;
-
-        const eventDate = new Date(inv.eventDate);
 
         for (const playerId in inv.selections) {
             const selection = inv.selections[playerId];
             const isGt = selection.studentType === 'gt';
             
-            if (isGt) {
-                // Find player in master DB to check their real expiration date
-                const player = allPlayers.find(p => p.id === playerId);
-                if (player) {
-                    const needsRenewal = !player.uscfExpiration || isBefore(new Date(player.uscfExpiration), eventDate);
-                    const isNewUscf = player.uscfId.toUpperCase() === 'NEW';
-
-                    if (needsRenewal || isNewUscf) {
-                        gtPlayerNeedsUscf = true;
-                        break; 
-                    }
-                }
+            // Check if this GT player was charged for USCF membership
+            if (isGt && (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing')) {
+                hasGtPlayerChargedUscf = true;
+                addLog(`Found GT player ${playerId} charged for USCF (status: ${selection.uscfStatus})`);
+                break;
             }
         }
         
-        if (gtPlayerNeedsUscf) {
+        if (hasGtPlayerChargedUscf) {
             flaggedInvoices.push(inv);
-            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} includes a GT player who needs a USCF membership for this event.`);
+            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} incorrectly charged GT player(s) for USCF membership.`);
         }
-      }
+    }
 
-      setInvoicesToFix(flaggedInvoices);
-      addLog(`Found ${flaggedInvoices.length} invoices to fix.`);
-      if (flaggedInvoices.length === 0) {
+    setInvoicesToFix(flaggedInvoices);
+    addLog(`Found ${flaggedInvoices.length} invoices to fix.`);
+    if (flaggedInvoices.length === 0) {
+        addLog("✅ No invoices found with GT players incorrectly charged for USCF fees.");
         toast({ title: "No Invoices to Fix", description: "All unpaid PSJA invoices appear to be correct." });
-      }
-      setIsFixing(false);
+    }
+    setIsFixing(false);
   };
   
   const runFix = async () => {
