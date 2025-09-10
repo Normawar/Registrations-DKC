@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -40,39 +41,343 @@ const SCHOOL_MAPPINGS = {
 
 const DISTRICT_NAME = 'PHARR-SAN JUAN-ALAMO ISD';
 
+// Add this component to your data repair page.tsx
+
+interface UpdateStats {
+  totalInvoices: number;
+  updatedInvoices: number;
+  updatedSelections: number;
+  totalPlayers: number;
+}
+
+interface VerificationStats {
+  gt: number;
+  independent: number;
+  regular: number;
+  missing: number;
+  totalSelections: number;
+}
+
+export function StudentTypeUpdater() {
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateLog, setUpdateLog] = useState<string[]>([]);
+  const [stats, setStats] = useState<UpdateStats | null>(null);
+  const [verificationStats, setVerificationStats] = useState<VerificationStats | null>(null);
+
+  const addLog = (message: string) => {
+    setUpdateLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+  };
+
+  const updateInvoiceStudentTypes = async () => {
+    setIsUpdating(true);
+    setUpdateLog([]);
+    setStats(null);
+    setVerificationStats(null);
+
+    try {
+      addLog('🚀 Starting Invoice StudentType Update Process...');
+      
+      // Step 1: Load all players into memory for fast lookup
+      addLog('📥 Loading player collection...');
+      const playersSnapshot = await getDocs(collection(db, 'players'));
+      
+      const playerLookup: Record<string, { studentType: string; name: string; school: string }> = {};
+      let playerCount = 0;
+      
+      playersSnapshot.forEach(doc => {
+        const playerData = doc.data();
+        const uscfId = playerData.uscfId || doc.id;
+        
+        if (uscfId) {
+          playerLookup[uscfId] = {
+            studentType: playerData.studentType || 'regular',
+            name: playerData.name || 'Unknown',
+            school: playerData.school || 'Unknown'
+          };
+          playerCount++;
+        }
+      });
+      
+      addLog(`✅ Loaded ${playerCount} players for lookup`);
+      
+      // Step 2: Load all invoices
+      addLog('📥 Loading invoice collection...');
+      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+      
+      let invoiceCount = 0;
+      let updatedInvoices = 0;
+      let updatedSelectionsCount = 0;
+      const updatePromises: Promise<void>[] = [];
+      
+      // Step 3: Process each invoice
+      invoicesSnapshot.forEach(docSnap => {
+        const invoiceData = docSnap.data();
+        const invoiceId = docSnap.id;
+        invoiceCount++;
+        
+        if (!invoiceData.selections || Object.keys(invoiceData.selections).length === 0) {
+          addLog(`⏭️  Skipping invoice ${invoiceData.invoiceNumber || invoiceId} - no selections`);
+          return;
+        }
+        
+        let selectionUpdated = false;
+        const updatedSelections = { ...invoiceData.selections };
+        
+        // Process each selection in the invoice
+        Object.entries(invoiceData.selections).forEach(([playerId, playerData]: [string, any]) => {
+          // Skip if already has studentType
+          if (playerData.studentType) {
+            return;
+          }
+          
+          // Extract USCF ID from various formats
+          let uscfId: string | null = null;
+          
+          if (/^\d+$/.test(playerId)) {
+            // Direct USCF ID (like "31487795")
+            uscfId = playerId;
+          } else if (playerId.startsWith('NEW_')) {
+            // NEW players don't have USCF IDs yet, keep as regular
+            updatedSelections[playerId] = {
+              ...playerData,
+              studentType: 'regular'
+            };
+            selectionUpdated = true;
+            return;
+          } else if (playerId.startsWith('temp_')) {
+            // temp players, keep as regular
+            updatedSelections[playerId] = {
+              ...playerData,
+              studentType: 'regular'
+            };
+            selectionUpdated = true;
+            return;
+          }
+          
+          // Look up student type from player collection
+          if (uscfId && playerLookup[uscfId]) {
+            const playerInfo = playerLookup[uscfId];
+            updatedSelections[playerId] = {
+              ...playerData,
+              studentType: playerInfo.studentType
+            };
+            selectionUpdated = true;
+            updatedSelectionsCount++;
+            
+            addLog(`🔄 ${invoiceData.invoiceNumber || invoiceId}: ${uscfId} → ${playerInfo.studentType} (${playerInfo.name})`);
+          } else if (uscfId) {
+            // USCF ID not found in player collection, default to regular
+            updatedSelections[playerId] = {
+              ...playerData,
+              studentType: 'regular'
+            };
+            selectionUpdated = true;
+            updatedSelectionsCount++;
+            
+            addLog(`❓ ${invoiceData.invoiceNumber || invoiceId}: ${uscfId} → regular (not found in players)`);
+          }
+        });
+        
+        // Update the invoice if any selections were modified
+        if (selectionUpdated) {
+          const updatePromise = updateDoc(
+            doc(db, 'invoices', invoiceId),
+            { selections: updatedSelections }
+          ).then(() => {
+            addLog(`✅ Updated invoice ${invoiceData.invoiceNumber || invoiceId}`);
+          }).catch(error => {
+            addLog(`❌ Failed to update invoice ${invoiceData.invoiceNumber || invoiceId}: ${error.message}`);
+          });
+          
+          updatePromises.push(updatePromise);
+          updatedInvoices++;
+        }
+      });
+      
+      // Step 4: Execute all updates
+      addLog(`\n🔄 Updating ${updatedInvoices} invoices with studentType data...`);
+      await Promise.all(updatePromises);
+      
+      // Step 5: Summary
+      const finalStats: UpdateStats = {
+        totalInvoices: invoiceCount,
+        updatedInvoices,
+        updatedSelections: updatedSelectionsCount,
+        totalPlayers: playerCount
+      };
+      
+      setStats(finalStats);
+      addLog('\n🎉 UPDATE COMPLETE!');
+      addLog(`📊 Summary:`);
+      addLog(`   • Total invoices processed: ${finalStats.totalInvoices}`);
+      addLog(`   • Invoices updated: ${finalStats.updatedInvoices}`);
+      addLog(`   • Player selections updated: ${finalStats.updatedSelections}`);
+      addLog(`   • Players in lookup table: ${finalStats.totalPlayers}`);
+      
+      // Step 6: Run verification
+      setTimeout(() => {
+        verifyStudentTypeUpdate();
+      }, 2000);
+      
+    } catch (error) {
+      addLog(`❌ Error during update process: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const verifyStudentTypeUpdate = async () => {
+    try {
+      addLog('\n🔍 Running verification query...');
+      
+      const snapshot = await getDocs(collection(db, 'invoices'));
+      
+      const verifyStats: VerificationStats = {
+        gt: 0,
+        independent: 0,
+        regular: 0,
+        missing: 0,
+        totalSelections: 0
+      };
+      
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.selections) {
+          Object.values(data.selections).forEach((selection: any) => {
+            verifyStats.totalSelections++;
+            const studentType = selection.studentType;
+            
+            if (!studentType) {
+              verifyStats.missing++;
+            } else if (studentType === 'gt') {
+              verifyStats.gt++;
+            } else if (studentType === 'independent') {
+              verifyStats.independent++;
+            } else {
+              verifyStats.regular++;
+            }
+          });
+        }
+      });
+      
+      setVerificationStats(verifyStats);
+      
+      addLog('\n=== VERIFICATION: Student Type Distribution ===');
+      addLog(`GT Students: ${verifyStats.gt}`);
+      addLog(`Independent Students: ${verifyStats.independent}`);
+      addLog(`Regular Students: ${verifyStats.regular}`);
+      addLog(`Missing StudentType: ${verifyStats.missing}`);
+      addLog(`Total Selections: ${verifyStats.totalSelections}`);
+      
+      if (verifyStats.missing === 0) {
+        addLog('✅ All selections now have studentType!');
+      } else {
+        addLog(`⚠️  ${verifyStats.missing} selections still missing studentType`);
+      }
+      
+    } catch (error) {
+      addLog(`❌ Verification error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h3 className="text-lg font-semibold text-blue-900 mb-2">
+          Invoice StudentType Updater
+        </h3>
+        <p className="text-blue-700 text-sm mb-4">
+          This tool updates all invoice selections with the correct studentType from the player collection. 
+          This is needed for invoices created before the studentType functionality was incorporated.
+        </p>
+        
+        <button
+          onClick={updateInvoiceStudentTypes}
+          disabled={isUpdating}
+          className={`px-4 py-2 rounded-md font-medium ${
+            isUpdating
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          {isUpdating ? 'Updating...' : 'Update StudentTypes from Player Collection'}
+        </button>
+      </div>
+
+      {(stats || verificationStats) && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <h4 className="font-semibold text-green-900 mb-2">Update Results</h4>
+          {stats && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+              <div>
+                <div className="font-medium text-green-800">Total Invoices</div>
+                <div className="text-2xl font-bold text-green-600">{stats.totalInvoices}</div>
+              </div>
+              <div>
+                <div className="font-medium text-green-800">Updated Invoices</div>
+                <div className="text-2xl font-bold text-green-600">{stats.updatedInvoices}</div>
+              </div>
+              <div>
+                <div className="font-medium text-green-800">Updated Selections</div>
+                <div className="text-2xl font-bold text-green-600">{stats.updatedSelections}</div>
+              </div>
+              <div>
+                <div className="font-medium text-green-800">Total Players</div>
+                <div className="text-2xl font-bold text-green-600">{stats.totalPlayers}</div>
+              </div>
+            </div>
+          )}
+          
+          {verificationStats && (
+            <div className="border-t border-green-200 pt-4">
+              <h5 className="font-medium text-green-800 mb-2">Student Type Distribution</h5>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                <div>
+                  <div className="font-medium text-green-700">GT Students</div>
+                  <div className="text-xl font-bold text-blue-600">{verificationStats.gt}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-green-700">Independent</div>
+                  <div className="text-xl font-bold text-purple-600">{verificationStats.independent}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-green-700">Regular</div>
+                  <div className="text-xl font-bold text-gray-600">{verificationStats.regular}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-green-700">Missing</div>
+                  <div className="text-xl font-bold text-red-600">{verificationStats.missing}</div>
+                </div>
+                <div>
+                  <div className="font-medium text-green-700">Total</div>
+                  <div className="text-xl font-bold text-green-600">{verificationStats.totalSelections}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {updateLog.length > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <h4 className="font-semibold text-gray-900 mb-2">Update Log</h4>
+          <div className="bg-black text-green-400 p-3 rounded text-xs font-mono max-h-96 overflow-y-auto">
+            {updateLog.map((line, index) => (
+              <div key={index}>{line}</div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 export default function DataRepairPage() {
   const [inputText, setInputText] = useState('');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  
-  // Temporary debug export - remove after use
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).debugDB = { db, getDocs, collection };
-
-      // Get all invoices with just basic info first
-      (window as any).debugDB.getDocs((window as any).debugDB.collection((window as any).debugDB.db, 'invoices')).then((snapshot: any) => {
-        const invoices: any[] = [];
-        snapshot.forEach((doc: any) => {
-          const data = doc.data();
-          invoices.push({
-            id: doc.id,
-            invoiceNumber: data.invoiceNumber || 'Unknown',
-            schoolName: data.schoolName || 'Unknown',
-            status: data.status || data.invoiceStatus || 'Unknown',
-            playerCount: data.selections ? Object.keys(data.selections).length : 0,
-            hasPlayerNames: data.selections ? Object.keys(data.selections).some(key => key.includes('_') || isNaN(parseInt(key))) : false
-          });
-        });
-        console.log('=== INVOICE SUMMARY ===');
-        invoices.forEach(inv => {
-          console.log(`#${inv.invoiceNumber} | ${inv.schoolName} | Players: ${inv.playerCount} | Names: ${inv.hasPlayerNames ? 'YES' : 'NO'} | Status: ${inv.status}`);
-        });
-        console.log(`\nTotal invoices: ${invoices.length}`);
-      });
-    }
-  }, []);
 
   const addLog = (type: LogEntry['type'], message: string) => {
     setLogs(prev => [...prev, { type, message }]);
@@ -137,7 +442,7 @@ export default function DataRepairPage() {
 
     setIsProcessing(false);
   };
-
+  
   const extractSchoolFromTeamCode = (invoiceText: string): { school: string; district: string } => {
     // Look for team code pattern in the invoice text
     for (const [teamCode, schoolName] of Object.entries(SCHOOL_MAPPINGS)) {
@@ -425,6 +730,8 @@ export default function DataRepairPage() {
             This tool will automatically extract school information, player names, and USCF IDs.
           </p>
         </div>
+        
+        <StudentTypeUpdater />
 
         <Card>
           <CardHeader>
