@@ -19,7 +19,7 @@ const PlayerToInvoiceSchema = z.object({
   isGtPlayer: z.boolean().optional(),
 });
 
-export const CreatePsjaSplitInvoiceInputSchema = z.object({
+const CreatePsjaSplitInvoiceInputSchema = z.object({
   sponsorName: z.string(),
   sponsorEmail: z.string().email(),
   bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
@@ -46,7 +46,7 @@ const CreateInvoiceOutputSchema = z.object({
   invoiceUrl: z.string().url().describe('The URL to view the invoice online.'),
 });
 
-export const CreatePsjaSplitInvoiceOutputSchema = z.object({
+const CreatePsjaSplitInvoiceOutputSchema = z.object({
   gtInvoice: CreateInvoiceOutputSchema.optional(),
   independentInvoice: CreateInvoiceOutputSchema.optional(),
 });
