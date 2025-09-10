@@ -91,7 +91,7 @@ export default function DataRepairPage() {
               existingPlayers.set(doc.id, doc.data() as MasterPlayer);
             });
             
-            players.forEach(({ name, uscfId }) => {
+            for (const { name, uscfId } of players) {
                 const isNew = uscfId.toLowerCase() === 'new';
                 const playerId = isNew ? `temp_${name.replace(/\s+/g, '_')}` : uscfId;
 
@@ -107,11 +107,11 @@ export default function DataRepairPage() {
                 selections[playerId] = { section, status: 'active', uscfStatus };
 
                 if (isNew && !existingPlayer) {
-                  let schoolName = invoiceData.schoolName || 'Unknown';
-                  let districtName = invoiceData.district || 'Unknown';
+                  let schoolName = invoiceData.schoolName;
+                  let districtName = invoiceData.district;
 
                   // Attempt to infer from team code if school/district is missing
-                  if ((!invoiceData.schoolName || !invoiceData.district) && invoiceData.teamCode) {
+                  if ((!schoolName || !districtName) && invoiceData.teamCode) {
                     const matchedSchool = schoolData.find(school => generateTeamCode(school) === invoiceData.teamCode);
                     if (matchedSchool) {
                       schoolName = matchedSchool.schoolName;
@@ -122,13 +122,14 @@ export default function DataRepairPage() {
 
                   const [firstName, ...lastNameParts] = name.split(' ');
                   const lastName = lastNameParts.join(' ');
+                  
                   const placeholderPlayer: Partial<MasterPlayer> = {
                     id: playerId,
                     uscfId: 'NEW',
                     firstName,
                     lastName,
-                    school: schoolName,
-                    district: districtName,
+                    school: schoolName || "Unknown",
+                    district: districtName || "Unknown",
                     grade: 'N/A',
                     section: 'N/A',
                     email: 'placeholder@example.com',
@@ -139,7 +140,7 @@ export default function DataRepairPage() {
                   batch.set(doc(db, 'players', playerId), placeholderPlayer);
                   addLog('info', `Staging placeholder for new player: ${name}`);
                 }
-            });
+            }
 
             batch.update(docRef, { selections });
             addLog('success', `Successfully staged updates for invoice ${invoiceId}.`);
