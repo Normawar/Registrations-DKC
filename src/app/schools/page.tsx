@@ -207,6 +207,41 @@ export default function SchoolsPage() {
     });
     if (e.target) e.target.value = '';
   };
+  
+  const handleExportSchools = () => {
+    if (schools.length === 0) {
+        toast({
+            variant: 'destructive',
+            title: 'No Schools to Export',
+            description: 'There are no schools in the database to export.',
+        });
+        return;
+    }
+
+    const dataToExport = schools.map(s => ({
+        'School Name': s.schoolName,
+        'Team Code': s.teamCode,
+        'District': s.district,
+        'City': s.city,
+        'County': s.county,
+        'Phone': s.phone,
+    }));
+    
+    const csv = Papa.unparse(dataToExport);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'school_team_codes.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+        title: 'Export Successful',
+        description: `Downloaded a list of ${schools.length} schools and their team codes.`,
+    });
+  };
 
   const handleAddSchool = () => {
     setEditingSchool(null);
@@ -353,6 +388,9 @@ export default function SchoolsPage() {
             <p className="text-muted-foreground">Add, edit, or delete school and district information.</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={handleExportSchools}>
+              <Download className="mr-2 h-4 w-4" /> Export All Schools
+            </Button>
             <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" /> Import CSV</Button>
             <Button onClick={handleAddSchool}><PlusCircle className="mr-2 h-4 w-4" /> Add New School</Button>
