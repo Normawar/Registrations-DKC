@@ -75,6 +75,7 @@ const organizerMenuItems = [
   { href: "/organizers/vouchers", icon: FileText, label: "Voucher Management" },
   { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
+  { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
 ];
 
 const individualMenuItems = [
