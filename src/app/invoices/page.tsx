@@ -28,7 +28,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { useRouter } from 'next/navigation';
-import { useMasterDb } from '@/context/master-db-context';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 export default function UnifiedInvoiceRegistrations() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,25 +50,26 @@ export default function UnifiedInvoiceRegistrations() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { dbSchools, dbDistricts } = useMasterDb();
+  const { dbSchools, dbDistricts, database: allPlayers } = useMasterDb();
   const [districtFilter, setDistrictFilter] = useState('all');
   const [schoolFilter, setSchoolFilter] = useState('all');
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+  const [playerTypeFilter, setPlayerTypeFilter] = useState('all');
+
 
   useEffect(() => {
     if (districtFilter === 'all') {
       setSchoolsForDistrict(dbSchools);
     } else {
-      // In a real app, you might have a mapping of districts to schools
-      // For now, we'll just filter what we have. This assumes school names are unique enough.
-      // This part would need a more robust data structure for perfect filtering.
-      const schoolsInDistrict = data
-        .filter(item => item.district === districtFilter)
-        .map(item => item.companyName);
-      setSchoolsForDistrict([...new Set(schoolsInDistrict)].sort());
+      const schools = dbSchools.filter(school => {
+        // This is a simplified lookup. A better data structure would be ideal.
+        const schoolEntry = allPlayers.find(p => p.school === school && p.district === districtFilter);
+        return !!schoolEntry;
+      });
+      setSchoolsForDistrict([...new Set(schools)].sort());
     }
     setSchoolFilter('all');
-  }, [districtFilter, dbSchools, data]);
+  }, [districtFilter, dbSchools, allPlayers]);
 
 
   const loadData = useCallback(async () => {
@@ -121,7 +124,10 @@ export default function UnifiedInvoiceRegistrations() {
       const mapped = invoicesArray.map((item: any) => {
         let registrations: any[] = [];
         if (item.selections) {
-          registrations = Object.keys(item.selections).map(playerId => ({ id: playerId, ...item.selections[playerId] }));
+          registrations = Object.keys(item.selections).map(playerId => {
+            const playerDetails = allPlayers.find(p => p.id === playerId);
+            return { id: playerId, ...item.selections[playerId], ...playerDetails };
+          });
         } else if (item.registrations) {
           registrations = Array.isArray(item.registrations) ? item.registrations : [];
         }
@@ -161,7 +167,7 @@ export default function UnifiedInvoiceRegistrations() {
     } finally {
       setIsLoading(false);
     }
-  }, [profile, toast]);
+  }, [profile, toast, allPlayers]);
 
   const handleManualRefresh = useCallback(async () => {
     await loadData();
@@ -193,23 +199,32 @@ export default function UnifiedInvoiceRegistrations() {
 
   const filteredAndSortedData = useMemo(() => {
     const filtered = data.filter((item: any) => {
-      const lowerSearchTerm = searchTerm.toLowerCase();
-      const matchesSearch = 
-        (item.invoiceNumber || '').toLowerCase().includes(lowerSearchTerm) ||
-        (item.invoiceTitle || '').toLowerCase().includes(lowerSearchTerm) ||
-        (item.companyName || '').toLowerCase().includes(lowerSearchTerm) ||
-        (item.contactEmail || '').toLowerCase().includes(lowerSearchTerm) ||
-        (item.parentEventName || '').toLowerCase().includes(lowerSearchTerm) ||
-        (Array.isArray(item.registrations) && item.registrations.some((reg: any) => 
-          (reg.studentName || reg.name || '').toLowerCase().includes(lowerSearchTerm) ||
-          (reg.school || '').toLowerCase().includes(lowerSearchTerm)
-        ));
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        const matchesSearch = 
+            (item.invoiceNumber || '').toLowerCase().includes(lowerSearchTerm) ||
+            (item.invoiceTitle || '').toLowerCase().includes(lowerSearchTerm) ||
+            (item.companyName || '').toLowerCase().includes(lowerSearchTerm) ||
+            (item.contactEmail || '').toLowerCase().includes(lowerSearchTerm) ||
+            (item.parentEventName || '').toLowerCase().includes(lowerSearchTerm) ||
+            (Array.isArray(item.registrations) && item.registrations.some((reg: any) => 
+                (reg.firstName || '').toLowerCase().includes(lowerSearchTerm) ||
+                (reg.lastName || '').toLowerCase().includes(lowerSearchTerm)
+            ));
 
-      const matchesStatus = statusFilter === 'all' || (item.status && item.status.toUpperCase() === statusFilter.toUpperCase());
-      const matchesDistrict = districtFilter === 'all' || (item.district === districtFilter);
-      const matchesSchool = schoolFilter === 'all' || (item.companyName === schoolFilter);
+        const matchesStatus = statusFilter === 'all' || (item.status && item.status.toUpperCase() === statusFilter.toUpperCase());
+        const matchesDistrict = districtFilter === 'all' || (item.district === districtFilter);
+        const matchesSchool = schoolFilter === 'all' || (item.companyName === schoolFilter);
 
-      return matchesSearch && matchesStatus && matchesDistrict && matchesSchool;
+        let matchesPlayerType = true;
+        if (playerTypeFilter !== 'all') {
+            if (item.registrations?.length > 0) {
+                matchesPlayerType = item.registrations.some((reg: MasterPlayer) => reg.studentType === playerTypeFilter);
+            } else {
+                matchesPlayerType = false;
+            }
+        }
+
+        return matchesSearch && matchesStatus && matchesDistrict && matchesSchool && matchesPlayerType;
     });
 
     return filtered.sort((a: any, b: any) => {
@@ -234,7 +249,27 @@ export default function UnifiedInvoiceRegistrations() {
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [data, searchTerm, statusFilter, sortField, sortDirection, districtFilter, schoolFilter]);
+  }, [data, searchTerm, statusFilter, sortField, sortDirection, districtFilter, schoolFilter, playerTypeFilter]);
+
+  const playerCounts = useMemo(() => {
+    let allPlayersInFilteredInvoices = new Set<string>();
+    let gtPlayers = new Set<string>();
+    let independentPlayers = new Set<string>();
+
+    filteredAndSortedData.forEach(invoice => {
+        invoice.registrations?.forEach((reg: MasterPlayer) => {
+            allPlayersInFilteredInvoices.add(reg.id);
+            if (reg.studentType === 'gt') gtPlayers.add(reg.id);
+            if (reg.studentType === 'independent') independentPlayers.add(reg.id);
+        });
+    });
+
+    return {
+        all: allPlayersInFilteredInvoices.size,
+        gt: gtPlayers.size,
+        independent: independentPlayers.size
+    };
+}, [filteredAndSortedData]);
 
   const handleViewInvoice = (invoice: any) => {
     setSelectedInvoice(invoice);
@@ -455,36 +490,65 @@ export default function UnifiedInvoiceRegistrations() {
             <CardTitle>Filters</CardTitle>
             <CardDescription>Search and filter your invoices and registrations</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="md:col-span-2">
-                <Input
-                  placeholder="Search by invoice #, company, event, student name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="PAID">Paid</SelectItem>
-                  <SelectItem value="PARTIALLY_PAID">Partially Paid</SelectItem>
-                  <SelectItem value="UNPAID">Unpaid</SelectItem>
-                  <SelectItem value="PENDING-PO">Pending Verification</SelectItem>
-                  <SelectItem value="COMPED">Comped</SelectItem>
-                  <SelectItem value="CANCELED">Canceled</SelectItem>
-                </SelectContent>
-              </Select>
-               {profile?.role === 'organizer' && (
-                <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                  <SelectTrigger><SelectValue placeholder="Filter by district" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Districts</SelectItem>
-                    {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-               )}
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                    <Label>Search</Label>
+                    <Input
+                      placeholder="Search by invoice #, school, event, student..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <div>
+                    <Label>Status</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="PAID">Paid</SelectItem>
+                        <SelectItem value="PARTIALLY_PAID">Partially Paid</SelectItem>
+                        <SelectItem value="UNPAID">Unpaid</SelectItem>
+                        <SelectItem value="PENDING-PO">Pending Verification</SelectItem>
+                        <SelectItem value="COMPED">Comped</SelectItem>
+                        <SelectItem value="CANCELED">Canceled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                </div>
+                {profile?.role === 'organizer' && (
+                    <div>
+                        <Label>District</Label>
+                        <Select value={districtFilter} onValueChange={setDistrictFilter}>
+                          <SelectTrigger><SelectValue placeholder="Filter by district" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Districts</SelectItem>
+                            {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
+                <div>
+                    <Label>School</Label>
+                     <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+                      <SelectTrigger><SelectValue placeholder="Filter by school" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Schools</SelectItem>
+                        {schoolsForDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                </div>
+                {(districtFilter === 'PHARR-SAN JUAN-ALAMO ISD') && (
+                    <div className="lg:col-span-2">
+                        <Label>Player Type</Label>
+                        <RadioGroup value={playerTypeFilter} onValueChange={setPlayerTypeFilter} className="flex items-center space-x-4 pt-2">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all" className="cursor-pointer">All ({playerCounts.all})</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="gt" id="gt" /><Label htmlFor="gt" className="cursor-pointer">GT ({playerCounts.gt})</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="independent" id="independent" /><Label htmlFor="independent" className="cursor-pointer">Independent ({playerCounts.independent})</Label></div>
+                        </RadioGroup>
+                    </div>
+                )}
             </div>
           </CardContent>
         </Card>
@@ -580,7 +644,7 @@ export default function UnifiedInvoiceRegistrations() {
                             {invoice.registrations?.length || 0}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {invoice.registrations?.slice(0, 2).map((reg: any) => reg.studentName || reg.name).filter(Boolean).join(', ')}
+                            {invoice.registrations?.slice(0, 2).map((reg: any) => reg.firstName || reg.studentName || reg.name).filter(Boolean).join(', ')}
                             {invoice.registrations?.length > 2 && ` +${invoice.registrations.length - 2} more`}
                           </div>
                         </div>
