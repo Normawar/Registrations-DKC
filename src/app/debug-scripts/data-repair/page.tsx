@@ -118,27 +118,25 @@ function GtInvoiceFixer() {
       const flaggedInvoices = [];
 
       for (const inv of psjaUnpaidInvoices) {
-        const eventDetails = events.find(e => e.id === inv.eventId);
-        if (!eventDetails) continue;
-
-        let gtUscfCharge = 0;
-        const uscfFee = 24;
+        let gtPlayerWasCharged = false;
+        if (!inv.selections) continue;
 
         for (const playerId in inv.selections) {
             const selection = inv.selections[playerId];
             const player = allPlayers.find(p => p.id === playerId);
-            const isGt = player?.studentType === 'gt';
             
-            if (isGt && (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing')) {
-                // If a GT player was charged for USCF, add it to our counter
-                gtUscfCharge += uscfFee;
+            const isGt = player?.studentType === 'gt';
+            const uscfActionNeeded = selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing';
+
+            if (isGt && uscfActionNeeded) {
+                gtPlayerWasCharged = true;
+                break; // Found one, no need to check others on this invoice
             }
         }
         
-        // A more direct check: if we calculated any USCF charges for GT players, the invoice is wrong.
-        if (gtUscfCharge > 0) {
+        if (gtPlayerWasCharged) {
             flaggedInvoices.push(inv);
-            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} (Total: $${inv.totalInvoiced}) includes $${gtUscfCharge.toFixed(2)} in incorrect USCF fees for GT players.`);
+            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} includes a GT player marked for USCF payment.`);
         }
       }
 
