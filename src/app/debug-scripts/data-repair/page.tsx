@@ -121,37 +121,24 @@ function GtInvoiceFixer() {
         const eventDetails = events.find(e => e.id === inv.eventId);
         if (!eventDetails) continue;
 
-        const playerCount = Object.keys(inv.selections).length;
-        if (playerCount === 0) continue;
-        
-        let expectedTotal = 0;
-        let hasGtPlayerWithUscfCharge = false;
+        let gtUscfCharge = 0;
+        const uscfFee = 24;
 
         for (const playerId in inv.selections) {
             const selection = inv.selections[playerId];
             const player = allPlayers.find(p => p.id === playerId);
             const isGt = player?.studentType === 'gt';
             
-            // Assume the base fee applies to everyone. Any deviation is a "late fee".
-            expectedTotal += eventDetails.regularFee;
-
-            if (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing') {
-                if (!isGt) {
-                  // Only add USCF fee to expected total if NOT a GT player
-                  expectedTotal += 24;
-                } else {
-                  // This is a GT player who was marked for a USCF action
-                  hasGtPlayerWithUscfCharge = true;
-                }
+            if (isGt && (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing')) {
+                // If a GT player was charged for USCF, add it to our counter
+                gtUscfCharge += uscfFee;
             }
         }
         
-        // A late fee would make totalInvoiced > expectedTotal. 
-        // We only flag if the invoice has a GT player who needed a membership
-        // AND the total invoiced is greater than our calculated expected total (which accounts for non-GT USCF fees).
-        if (hasGtPlayerWithUscfCharge && inv.totalInvoiced > expectedTotal) {
+        // A more direct check: if we calculated any USCF charges for GT players, the invoice is wrong.
+        if (gtUscfCharge > 0) {
             flaggedInvoices.push(inv);
-            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} (Total: $${inv.totalInvoiced}, Expected: >$${expectedTotal}) has GT players with USCF charges.`);
+            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} (Total: $${inv.totalInvoiced}) includes $${gtUscfCharge.toFixed(2)} in incorrect USCF fees for GT players.`);
         }
       }
 
