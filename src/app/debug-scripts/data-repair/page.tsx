@@ -93,40 +93,71 @@ function GtInvoiceFixer() {
   const [isFixing, setIsFixing] = useState(false);
   const [invoicesToFix, setInvoicesToFix] = useState<any[]>([]);
   const { database: allPlayers } = useMasterDb();
+  const { events } = useEvents();
   const { toast } = useToast();
 
   const addLog = (message: string) => setFixLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
 
   const findInvoicesToFix = async () => {
-    setIsFixing(true);
-    addLog('🔍 Searching for invoices...');
-    const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-    const allInvoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setIsFixing(true);
+      addLog('🔍 Searching for invoices that incorrectly charged GT players...');
+      
+      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+      const allInvoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    const psjaUnpaidInvoices = allInvoices.filter(inv => 
-      inv.district === 'PHARR-SAN JUAN-ALAMO ISD' &&
-      inv.status === 'UNPAID' &&
-      inv.selections
-    );
-    
-    addLog(`Found ${psjaUnpaidInvoices.length} unpaid PSJA invoices.`);
+      const psjaUnpaidInvoices = allInvoices.filter(inv => 
+        inv.district === 'PHARR-SAN JUAN-ALAMO ISD' &&
+        inv.status === 'UNPAID' &&
+        inv.selections &&
+        inv.eventId
+      );
+      
+      addLog(`Found ${psjaUnpaidInvoices.length} unpaid PSJA invoices to check.`);
 
-    const flaggedInvoices = psjaUnpaidInvoices.filter(inv => {
-      return Object.entries(inv.selections).some(([playerId, selection]: [string, any]) => {
-        if (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing') {
-          const player = allPlayers.find(p => p.id === playerId);
-          return player?.studentType === 'gt';
+      const flaggedInvoices = [];
+
+      for (const inv of psjaUnpaidInvoices) {
+        const eventDetails = events.find(e => e.id === inv.eventId);
+        if (!eventDetails) continue;
+
+        const playerCount = Object.keys(inv.selections).length;
+        if (playerCount === 0) continue;
+        
+        let chargedUscfCount = 0;
+        let expectedTotal = 0;
+
+        for (const playerId in inv.selections) {
+            const selection = inv.selections[playerId];
+            expectedTotal += eventDetails.regularFee; // Base fee
+            
+            if (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing') {
+                chargedUscfCount++;
+                expectedTotal += 24; // USCF Fee
+            }
         }
-        return false;
-      });
-    });
+        
+        const invoiceHasUscfCharges = inv.totalInvoiced > (eventDetails.regularFee * playerCount);
 
-    setInvoicesToFix(flaggedInvoices);
-    addLog(`Found ${flaggedInvoices.length} invoices with GT players who were charged USCF fees.`);
-    if (flaggedInvoices.length === 0) {
-      toast({ title: "No Invoices to Fix", description: "All unpaid PSJA invoices are correct." });
-    }
-    setIsFixing(false);
+        if (invoiceHasUscfCharges) {
+            const hasGtPlayerWithUscfCharge = Object.keys(inv.selections).some(playerId => {
+                const player = allPlayers.find(p => p.id === playerId);
+                const selection = inv.selections[playerId];
+                return player?.studentType === 'gt' && (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing');
+            });
+
+            if (hasGtPlayerWithUscfCharge) {
+                flaggedInvoices.push(inv);
+                addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} (Total: $${inv.totalInvoiced}) has GT players with USCF charges.`);
+            }
+        }
+      }
+
+      setInvoicesToFix(flaggedInvoices);
+      addLog(`Found ${flaggedInvoices.length} invoices to fix.`);
+      if (flaggedInvoices.length === 0) {
+        toast({ title: "No Invoices to Fix", description: "All unpaid PSJA invoices appear to be correct." });
+      }
+      setIsFixing(false);
   };
   
   const runFix = async () => {
@@ -140,15 +171,15 @@ function GtInvoiceFixer() {
               
               const playerIds = Object.keys(invoice.selections);
               const playersData = playerIds.map(id => allPlayers.find(p => p.id === id)).filter(Boolean) as MasterPlayer[];
-              const eventInfo = await getDoc(doc(db, 'events', invoice.eventId));
-              if (!eventInfo.exists()) {
+              const eventDetails = events.find(e => e.id === invoice.eventId);
+              if (!eventDetails) {
                   throw new Error(`Event ${invoice.eventId} not found.`);
               }
-              const eventDetails = eventInfo.data() as Event;
 
               // Recreate the player list for the recreation flow
               const playersToInvoice = playersData.map(player => {
                   const selection = invoice.selections[player.id];
+                  // Preserve late fee if it was on original invoice
                   const lateFeeAmount = (invoice.totalInvoiced / playersData.length) - eventDetails.regularFee - (selection.uscfStatus !== 'current' ? 24 : 0);
                   
                   return {
