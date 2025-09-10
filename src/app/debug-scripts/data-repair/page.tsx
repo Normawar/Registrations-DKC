@@ -971,8 +971,8 @@ export default function DataRepairPage() {
           </p>
         </div>
         
-        <GtInvoiceFixer />
         <StudentTypeUpdater />
+        <GtInvoiceFixer />
         
         <Card>
           <CardHeader>
