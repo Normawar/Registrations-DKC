@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Trophy, ArrowRight } from 'lucide-react';
+import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck } from 'lucide-react';
 import Link from 'next/link';
 
 function ReportsPageContent() {
@@ -14,7 +14,7 @@ function ReportsPageContent() {
       <div>
         <h1 className="text-3xl font-bold font-headline">Reports Directory</h1>
         <p className="text-muted-foreground">
-          Generate and view detailed reports on sponsors and tournament registrations.
+          Generate and view detailed reports on sponsors, registrations, and data integrity.
         </p>
       </div>
 
@@ -66,6 +66,79 @@ function ReportsPageContent() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-red-100 p-3 rounded-full">
+                <UserCog className="h-6 w-6 text-red-600" />
+              </div>
+              <div>
+                <CardTitle>USCF ID Verification Report</CardTitle>
+                <CardDescription>Identify players with missing or "NEW" USCF IDs.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Find players who need their USCF ID verified or assigned before a tournament. Includes quick links to search the USCF database.
+            </p>
+            <Button asChild>
+              <Link href="/reports/uscf-verification">
+                View USCF Report <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-green-100 p-3 rounded-full">
+                <ClipboardCheck className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <CardTitle>Missing Player Data Report</CardTitle>
+                <CardDescription>Find players with incomplete profiles (missing grade or section).</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Ensure every player can be properly sectioned by fixing records with missing grade or section information.
+            </p>
+            <Button asChild>
+              <Link href="/reports/missing-data">
+                View Data Report <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-purple-100 p-3 rounded-full">
+                <BadgeCheck className="h-6 w-6 text-purple-600" />
+              </div>
+              <div>
+                <CardTitle>PSJA Student Type Report</CardTitle>
+                <CardDescription>Audit PSJA players to ensure they are marked as GT or Independent.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              This report lists all players in the PSJA district whose "Student Type" has not been set, which is critical for correct invoicing.
+            </p>
+            <Button asChild>
+              <Link href="/reports/psja-student-type">
+                View PSJA Report <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   );
