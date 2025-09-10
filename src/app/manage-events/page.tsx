@@ -95,6 +95,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { DistrictCoordinatorGuard } from '@/components/auth-guard';
 
 
 const eventFormSchema = z.object({
@@ -144,7 +145,7 @@ type StoredDownloads = {
   [eventId: string]: string[]; // Array of player IDs that have been downloaded
 };
 
-export default function ManageEventsPage() {
+function ManageEventsContent() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent, clearAllEvents } = useEvents();
   const { database: allPlayers, isDbLoaded } = useMasterDb();
@@ -651,28 +652,30 @@ export default function ManageEventsPage() {
               Create, edit, and manage your tournament events and fees.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import Events</Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
-                    Import Events from CSV
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setIsPasteDialogOpen(true)}>
-                    Paste from Sheet
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button onClick={handleAddEvent}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Event
-            </Button>
-             <Button variant="destructive" onClick={() => setIsClearAlertOpen(true)}>
-              <Delete className="mr-2 h-4 w-4" /> Clear All Events
-            </Button>
-          </div>
+          {profile?.role === 'organizer' && (
+            <div className="flex items-center gap-2">
+              <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import Events</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
+                      Import Events from CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setIsPasteDialogOpen(true)}>
+                      Paste from Sheet
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button onClick={handleAddEvent}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add New Event
+              </Button>
+              <Button variant="destructive" onClick={() => setIsClearAlertOpen(true)}>
+                <Delete className="mr-2 h-4 w-4" /> Clear All Events
+              </Button>
+            </div>
+          )}
         </div>
         
         <Card>
@@ -727,9 +730,13 @@ export default function ManageEventsPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                            <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                            {profile?.role === 'organizer' && (
+                              <>
+                                <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                                <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -872,38 +879,36 @@ export default function ManageEventsPage() {
           
           <div className="space-y-4">
             {profile?.role === 'organizer' && (
-              <div className="space-y-4">
-                <Card className="border-amber-500 bg-amber-50">
-                    <CardContent className="p-4">
-                        <p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p>
-                        <div className='flex items-center gap-2'>
-                            <Button 
-                                onClick={() => handleDownload(registeredPlayers, 'registered')} 
-                                disabled={registeredPlayers.length === 0} 
-                                size="sm"
-                                className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                            >
-                              <Download className="mr-2 h-4 w-4" />
-                              Export Registered ({registeredPlayers.length})
-                            </Button>
-                            <Button 
-                                onClick={() => handleDownload(exportedPlayers, 'exported')} 
-                                disabled={exportedPlayers.length === 0} 
-                                size="sm"
-                                className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                            >
-                              <Download className="mr-2 h-4 w-4" />
-                              Download Exported List ({exportedPlayers.length})
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-                <div className='flex items-center justify-between'>
-                    <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
-                        Download All Registrations ({registrations.length})
-                    </Button>
-                    <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
-                </div>
+              <div className="space-y-2">
+                  <div className="border border-amber-500 bg-amber-50 rounded-lg p-4 w-auto inline-block">
+                      <p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p>
+                      <div className='flex items-center gap-2'>
+                          <Button 
+                              onClick={() => handleDownload(registeredPlayers, 'registered')} 
+                              disabled={registeredPlayers.length === 0} 
+                              size="sm"
+                              className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export Registered ({registeredPlayers.length})
+                          </Button>
+                          <Button 
+                              onClick={() => handleDownload(exportedPlayers, 'exported')} 
+                              disabled={exportedPlayers.length === 0} 
+                              size="sm"
+                              className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Download Exported List ({exportedPlayers.length})
+                          </Button>
+                      </div>
+                  </div>
+                  <div className='flex items-center gap-4 mt-2'>
+                      <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
+                          Download All Registrations ({registrations.length})
+                      </Button>
+                       <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
+                  </div>
               </div>
             )}
           </div>
@@ -980,4 +985,10 @@ export default function ManageEventsPage() {
   );
 }
 
-
+export default function ManageEventsPage() {
+  return (
+    <DistrictCoordinatorGuard>
+      <ManageEventsContent />
+    </DistrictCoordinatorGuard>
+  );
+}
