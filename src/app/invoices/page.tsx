@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { useRouter } from 'next/navigation';
+import { useMasterDb } from '@/context/master-db-context';
 
 export default function UnifiedInvoiceRegistrations() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -46,6 +47,27 @@ export default function UnifiedInvoiceRegistrations() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const { dbSchools, dbDistricts } = useMasterDb();
+  const [districtFilter, setDistrictFilter] = useState('all');
+  const [schoolFilter, setSchoolFilter] = useState('all');
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (districtFilter === 'all') {
+      setSchoolsForDistrict(dbSchools);
+    } else {
+      // In a real app, you might have a mapping of districts to schools
+      // For now, we'll just filter what we have. This assumes school names are unique enough.
+      // This part would need a more robust data structure for perfect filtering.
+      const schoolsInDistrict = data
+        .filter(item => item.district === districtFilter)
+        .map(item => item.companyName);
+      setSchoolsForDistrict([...new Set(schoolsInDistrict)].sort());
+    }
+    setSchoolFilter('all');
+  }, [districtFilter, dbSchools, data]);
+
 
   const loadData = useCallback(async () => {
     if (!db || !profile) {
@@ -184,7 +206,10 @@ export default function UnifiedInvoiceRegistrations() {
         ));
 
       const matchesStatus = statusFilter === 'all' || (item.status && item.status.toUpperCase() === statusFilter.toUpperCase());
-      return matchesSearch && matchesStatus;
+      const matchesDistrict = districtFilter === 'all' || (item.district === districtFilter);
+      const matchesSchool = schoolFilter === 'all' || (item.companyName === schoolFilter);
+
+      return matchesSearch && matchesStatus && matchesDistrict && matchesSchool;
     });
 
     return filtered.sort((a: any, b: any) => {
@@ -209,7 +234,7 @@ export default function UnifiedInvoiceRegistrations() {
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [data, searchTerm, statusFilter, sortField, sortDirection]);
+  }, [data, searchTerm, statusFilter, sortField, sortDirection, districtFilter, schoolFilter]);
 
   const handleViewInvoice = (invoice: any) => {
     setSelectedInvoice(invoice);
@@ -431,8 +456,8 @@ export default function UnifiedInvoiceRegistrations() {
             <CardDescription>Search and filter your invoices and registrations</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
+            <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="md:col-span-2">
                 <Input
                   placeholder="Search by invoice #, company, event, student name..."
                   value={searchTerm}
@@ -440,9 +465,7 @@ export default function UnifiedInvoiceRegistrations() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="PAID">Paid</SelectItem>
@@ -453,6 +476,15 @@ export default function UnifiedInvoiceRegistrations() {
                   <SelectItem value="CANCELED">Canceled</SelectItem>
                 </SelectContent>
               </Select>
+               {profile?.role === 'organizer' && (
+                <Select value={districtFilter} onValueChange={setDistrictFilter}>
+                  <SelectTrigger><SelectValue placeholder="Filter by district" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Districts</SelectItem>
+                    {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+               )}
             </div>
           </CardContent>
         </Card>
