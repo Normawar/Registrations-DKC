@@ -1048,6 +1048,55 @@ function DistrictRosterView() {
         };
     }, [districtPlayers, selectedSchool]);
 
+    const filteredPlayersForExport = useMemo(() => {
+        return districtPlayers.filter(player => {
+            const schoolMatch = selectedSchool === 'all' || player.school === selectedSchool;
+            if (!schoolMatch) return false;
+            
+            if (showGtColumn) {
+                const playerTypeMatch = playerTypeFilter === 'all' || player.studentType === playerTypeFilter;
+                return playerTypeMatch;
+            }
+            return true;
+        });
+    }, [districtPlayers, selectedSchool, playerTypeFilter, showGtColumn]);
+
+    const handleExportAllRosters = useCallback(() => {
+        if (filteredPlayersForExport.length === 0) {
+            toast({
+                title: "No Players to Export",
+                description: "There are no players matching the current filter criteria.",
+            });
+            return;
+        }
+    
+        const dataToExport = filteredPlayersForExport.map(player => ({
+            'Team Code': generateTeamCode({ schoolName: player.school, district: player.district, studentType: player.studentType }),
+            'StudentType': player.studentType || 'regular',
+            'Last Name': player.lastName,
+            'First Name': player.firstName,
+            'Middle Name': player.middleName || '',
+            'USCF ID': player.uscfId,
+            'Grade': player.grade,
+            'Section': player.section,
+            'Rating': player.regularRating || 'UNR',
+        }));
+    
+        const csv = Papa.unparse(dataToExport);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.setAttribute('download', `roster_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    
+        toast({
+            title: "Export Successful",
+            description: `${filteredPlayersForExport.length} players have been exported.`,
+        });
+    }, [filteredPlayersForExport, toast]);
+
     return (
         <div className="space-y-8">
             <div>
@@ -1103,11 +1152,17 @@ function DistrictRosterView() {
                         </div>
                     </div>
                  )}
-                 <div className="flex items-center space-x-2 pt-2">
-                    <Checkbox id="active-schools" checked={showActiveOnly} onCheckedChange={(checked) => setShowActiveOnly(!!checked)} />
-                    <Label htmlFor="active-schools" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Show only schools with players
-                    </Label>
+                 <div className="flex-grow flex items-end justify-between w-full">
+                    <div className="flex items-center space-x-2 pt-2">
+                        <Checkbox id="active-schools" checked={showActiveOnly} onCheckedChange={(checked) => setShowActiveOnly(!!checked)} />
+                        <Label htmlFor="active-schools" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                            Show only schools with players
+                        </Label>
+                    </div>
+                    <Button onClick={handleExportAllRosters} variant="default" size="sm">
+                        <Download className="mr-2 h-4 w-4" />
+                        Export All Rosters ({filteredPlayersForExport.length})
+                    </Button>
                 </div>
             </div>
 
