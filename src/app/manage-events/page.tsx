@@ -892,12 +892,13 @@ function ManageEventsContent() {
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
-             <DialogDescription>
-               <div className="flex items-center gap-4 text-sm mt-2">
-                 <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
-                 <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
-               </div>
-             </DialogDescription>
+            <DialogDescription className="sr-only">
+              View registrations for the selected event.
+            </DialogDescription>
+             <div className="flex items-center gap-4 text-sm pt-2">
+               <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
+               <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
+             </div>
           </DialogHeader>
           
           <div className="space-y-4">
@@ -1018,6 +1019,7 @@ export default function ManageEventsPage() {
     </DistrictCoordinatorGuard>
   );
 }
+
 
 
 
