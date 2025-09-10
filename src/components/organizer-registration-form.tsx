@@ -572,12 +572,12 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
           totalInvoiced: result.newTotalAmount || total, 
           invoiceUrl: result.invoiceUrl, 
           invoiceNumber: result.invoiceNumber, 
-          teamCode: result.teamCode || invoiceForm.getValues('teamCode') || `TEAM_${Date.now()}`,
+          teamCode: result.teamCode || invoiceForm.getValues('teamCode'),
           invoiceStatus: result.status,
-          purchaserName: result.sponsorName || invoiceForm.getValues('sponsorName'),
-          schoolName: result.schoolName || invoiceForm.getValues('schoolName'),
-          sponsorEmail: result.sponsorEmail || invoiceForm.getValues('sponsorEmail'),
-          district: result.district
+          purchaserName: result.sponsorName || invoiceForm.getValues('sponsorName'), 
+          schoolName: result.schoolName || invoiceForm.getValues('schoolName'), 
+          sponsorEmail: result.sponsorEmail || invoiceForm.getValues('sponsorEmail'), 
+          district: result.district || masterDatabase.find(p => p.school === invoiceForm.getValues('schoolName'))?.district || ''
       };
     
       const invoiceDocRef = doc(db, 'invoices', invoiceId);
