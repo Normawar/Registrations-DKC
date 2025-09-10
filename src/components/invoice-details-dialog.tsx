@@ -1503,58 +1503,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
             <div className="bg-white rounded-lg border p-4">
               <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
               <RegistrationDetailsSection invoice={confirmation} profile={profile} />
-              
-                <div className="mt-4">
-                    <h4 className="text-md font-medium mb-2">Registered Players ({registeredPlayers.length})</h4>
-                    <div className="max-h-40 overflow-y-auto border rounded-md">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Player</TableHead>
-                                    <TableHead>Section</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {registeredPlayers.map(player => (
-                                    <TableRow key={player.id}>
-                                        <TableCell>{player.firstName} {player.lastName}</TableCell>
-                                        <TableCell>{confirmation.selections[player.id]?.section || 'N/A'}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </div>
-                 {uscfPurchases.length > 0 && (
-                    <div className="mt-4">
-                        <h4 className="text-md font-medium mb-2">USCF Memberships Purchased ({uscfPurchases.length})</h4>
-                        <div className="max-h-40 overflow-y-auto border rounded-md">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Player</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {uscfPurchases.map(player => (
-                                        <TableRow key={player.id}>
-                                            <TableCell>{player.firstName} {player.lastName}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={confirmation.selections[player.id]?.uscfStatus === 'new' ? 'default' : 'secondary'} className="capitalize">
-                                                    {confirmation.selections[player.id]?.uscfStatus}
-                                                </Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
-                )}
+              <PaymentSummarySection />
+              <EnhancedSquareButton />
             </div>
-            <PaymentSummarySection />
-            <EnhancedSquareButton />
           </div>
 
           <div>
