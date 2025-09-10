@@ -42,6 +42,7 @@ const CreateInvoiceInputSchema = z.object({
     players: z.array(PlayerInvoiceInfoSchema).describe('An array of players to be invoiced.'),
     invoiceNumber: z.string().optional().describe('A custom invoice number to assign. If not provided, Square will generate one.'),
     substitutionFee: z.number().optional().describe('A fee for substitutions, if applicable.'),
+    description: z.string().optional().describe('An optional description or note for the invoice.'),
 });
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceInputSchema>;
 
@@ -242,6 +243,9 @@ const createInvoiceFlow = ai.defineFlow(
       if (input.gtCoordinatorEmail && input.gtCoordinatorEmail.trim() !== '') {
           ccRecipients.push({ emailAddress: input.gtCoordinatorEmail });
       }
+      
+      const defaultDescription = `Thank you for your registration.`;
+      const description = input.description ? `${input.description}\n\n${defaultDescription}` : defaultDescription;
 
       console.log(`Creating invoice for order ID: ${orderId}`);
       const createInvoiceResponse = await invoicesApi.createInvoice({
@@ -264,7 +268,7 @@ const createInvoiceFlow = ai.defineFlow(
           },
           invoiceNumber: input.invoiceNumber,
           title: `${input.teamCode} @ ${formattedEventDate} ${input.eventName}`,
-          description: `Thank you for your registration.`,
+          description: description,
         }
       });
       

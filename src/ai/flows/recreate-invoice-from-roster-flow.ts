@@ -14,6 +14,7 @@ import { getSquareClient } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
+import { format } from 'date-fns';
 
 const PlayerToInvoiceSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
@@ -93,12 +94,9 @@ const recreateInvoiceFlow = ai.defineFlow(
       await cancelInvoice({ invoiceId: input.originalInvoiceId });
       console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
 
-      // Step 3: Determine the new invoice number for the revision.
-      const baseInvoiceNumber = originalInvoice.invoiceNumber?.split('-rev.')[0] || originalInvoice.invoiceNumber || originalInvoice.id;
-      const currentRevisionMatch = originalInvoice.invoiceNumber?.match(/-rev\.(\d+)$/);
-      const currentRevision = currentRevisionMatch ? parseInt(currentRevisionMatch[1], 10) : 1;
-      const newRevisionNumber = `${baseInvoiceNumber}-rev.${currentRevision + 1}`;
-      console.log(`Generated new revision invoice number: ${newRevisionNumber}`);
+      // Step 3: Use the original invoice number for the new invoice.
+      const newInvoiceNumber = originalInvoice.invoiceNumber || undefined;
+      console.log(`Using original invoice number for new invoice: ${newInvoiceNumber}`);
       
       // Step 4: Intelligent Fee Calculation
       const SUBSTITUTION_FEE = 2.00;
@@ -121,7 +119,8 @@ const recreateInvoiceFlow = ai.defineFlow(
           ...input,
           players: playersWithAdjustedFees,
           substitutionFee: totalSubstitutionFee > 0 ? totalSubstitutionFee : undefined,
-          invoiceNumber: newRevisionNumber,
+          invoiceNumber: newInvoiceNumber,
+          description: `Revised on ${format(new Date(), 'PPP')}. This invoice replaces #${originalInvoice.invoiceNumber}.`
       });
 
       console.log("Successfully created new invoice:", newInvoiceResult);

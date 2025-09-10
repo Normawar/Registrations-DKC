@@ -552,6 +552,15 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
   
     return [];
   }, [masterDatabase]);
+
+  const uscfPurchases = useMemo(() => {
+    if (!confirmation?.selections) return [];
+    const playerIds = Object.keys(confirmation.selections).filter(playerId => 
+      confirmation.selections[playerId].uscfStatus === 'new' || 
+      confirmation.selections[playerId].uscfStatus === 'renewing'
+    );
+    return masterDatabase.filter(player => playerIds.includes(player.id));
+  }, [confirmation, masterDatabase]);
   
   const calculatedTotalPaid = useMemo(() => {
     if (!confirmation?.paymentHistory) return 0;
@@ -1516,7 +1525,33 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                         </Table>
                     </div>
                 </div>
-
+                 {uscfPurchases.length > 0 && (
+                    <div className="mt-4">
+                        <h4 className="text-md font-medium mb-2">USCF Memberships Purchased ({uscfPurchases.length})</h4>
+                        <div className="max-h-40 overflow-y-auto border rounded-md">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Player</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {uscfPurchases.map(player => (
+                                        <TableRow key={player.id}>
+                                            <TableCell>{player.firstName} {player.lastName}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={confirmation.selections[player.id]?.uscfStatus === 'new' ? 'default' : 'secondary'} className="capitalize">
+                                                    {confirmation.selections[player.id]?.uscfStatus}
+                                                </Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                )}
             </div>
             <PaymentSummarySection />
             <EnhancedSquareButton />
