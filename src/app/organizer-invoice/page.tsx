@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, Suspense } from 'react';
@@ -6,7 +7,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { differenceInHours, isSameDay } from 'date-fns';
+import { differenceInHours, isSameDay, format } from 'date-fns';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 
@@ -112,12 +113,15 @@ function OrganizerInvoiceContent() {
             lineItems = invoiceToEdit.lineItems;
           }
           
+          const existingTitle = (invoiceToEdit.description || invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim();
+          const autoTitle = `${invoiceToEdit.schoolName} - ${format(new Date(), 'MMMM yyyy')}`;
+
           form.reset({
             invoiceId: invoiceToEdit.invoiceId || '',
             schoolName: invoiceToEdit.schoolName || '',
             sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName || '',
             sponsorEmail: invoiceToEdit.sponsorEmail || '',
-            invoiceTitle: (invoiceToEdit.description || invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim(),
+            invoiceTitle: existingTitle || autoTitle,
             lineItems: lineItems.length > 0 ? lineItems.map(item => ({
               ...item,
               id: item.id || '',
@@ -182,6 +186,7 @@ function OrganizerInvoiceContent() {
             baseRegistrationFee: eventDetails.regularFee,
             lateFee: lateFee > 0 ? lateFee : 0,
             uscfAction: uscfPlayerIds.has(player.id),
+            isGtPlayer: player.studentType === 'gt'
         };
     });
 
@@ -199,7 +204,8 @@ function OrganizerInvoiceContent() {
         gtCoordinatorEmail: originalInvoice.gtCoordinatorEmail,
         district: originalInvoice.district,
         schoolAddress: originalInvoice.schoolAddress,
-        schoolPhone: originalInvoice.schoolPhone
+        schoolPhone: originalInvoice.schoolPhone,
+        requestingUserRole: 'organizer'
     });
     
     const newConfirmationRecord = {
