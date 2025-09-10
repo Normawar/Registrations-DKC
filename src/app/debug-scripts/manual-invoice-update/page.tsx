@@ -25,69 +25,38 @@ export default function ManualInvoiceUpdatePage() {
         setLogs([...newLogs]);
       };
 
-      // --- Invoice 1 Data ---
-      const invoice1Id = 'inv:0-ChBvHo9HhSLsFXoFmT96z3-wEJ8I';
-      const invoice1Ref = doc(db, 'invoices', invoice1Id);
-      const selectionsData1 = {
-        "15863055": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "16801086": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "30299472": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "30309132": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "31488082": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "31499254": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "32046484": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" }
+      // --- Invoice 4304 Data ---
+      const invoiceId = 'inv:0-ChCmSldsxygecLHLDtuGWraXEJ8I';
+      const invoiceRef = doc(db, 'invoices', invoiceId);
+      
+      const selectionsData = {
+        "31498736": { "section": "High School K-12", "status": "active", "uscfStatus": "current" },
+        "32052839": { "section": "High School K-12", "status": "active", "uscfStatus": "current" },
+        "32052866": { "section": "High School K-12", "status": "active", "uscfStatus": "current" },
+        "32052881": { "section": "High School K-12", "status": "active", "uscfStatus": "current" },
+        "temp_Mia_Monrreal": { "section": "High School K-12", "status": "active", "uscfStatus": "new" },
+        "temp_Diego_Cortes": { "section": "High School K-12", "status": "active", "uscfStatus": "new" },
+        "temp_Ryan_Garcia": { "section": "High School K-12", "status": "active", "uscfStatus": "new" },
+        "temp_Liam_Madrigal": { "section": "High School K-12", "status": "active", "uscfStatus": "new" }
       };
-      const updatedInvoiceData1 = {
+
+      const updatedInvoiceData = {
         district: "PHARR-SAN JUAN-ALAMO ISD",
-        schoolName: "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS",
-        purchaserName: "Ashley Rodriguez",
-        purchaserEmail: "ashley.rodriguez@psjaisd.us",
-        sponsorEmail: "ashley.rodriguez@psjaisd.us",
+        schoolName: "DR WILLIAM LONG EL",
+        purchaserName: "Yeimi Garcia",
+        purchaserEmail: "yeimi.garcia@psjaisd.us",
+        sponsorEmail: "yeimi.garcia@psjaisd.us",
         status: "UNPAID",
         invoiceStatus: "UNPAID",
-        selections: selectionsData1,
+        selections: selectionsData,
       };
 
-      addLog(`Updating invoice ${invoice1Id}...`);
+      addLog(`Updating invoice ${invoiceId} (#4304)...`);
       try {
-        await updateDoc(invoice1Ref, updatedInvoiceData1);
-        addLog(`✅ Successfully updated invoice ${invoice1Id}.`);
+        await updateDoc(invoiceRef, updatedInvoiceData);
+        addLog(`✅ Successfully updated invoice ${invoiceId}.`);
       } catch (error: any) {
-        addLog(`🔥 Error updating invoice ${invoice1Id}: ${error.message}`);
-      }
-
-      // --- Invoice 2 Data ---
-      const invoice2Id = 'inv:0-ChAn7iUtCfPpjCRGA9NEEaE9EJ8I';
-      const invoice2Ref = doc(db, 'invoices', invoice2Id);
-      const selectionsData2 = {
-        "30271062": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "30728191": { "section": "High School K-12", "status": "active", "uscfStatus": "renewing", "studentType": "independent" },
-        "31489716": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "31489894": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "31489934": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "32115166": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "32115265": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "32115492": { "section": "High School K-12", "status": "active", "uscfStatus": "current", "studentType": "independent" },
-        "temp_Aurik_Romo": { "section": "High School K-12", "status": "active", "uscfStatus": "new", "studentType": "independent" },
-        "temp_Jocelyn_Snow": { "section": "High School K-12", "status": "active", "uscfStatus": "new", "studentType": "independent" }
-      };
-      const updatedInvoiceData2 = {
-        district: "PHARR-SAN JUAN-ALAMO ISD",
-        schoolName: "KENNEDY MIDDLE",
-        purchaserName: "Hernan Cortez",
-        purchaserEmail: "hernan.cortez@psjaisd.us",
-        sponsorEmail: "hernan.cortez@psjaisd.us",
-        status: "UNPAID",
-        invoiceStatus: "UNPAID",
-        selections: selectionsData2,
-      };
-
-      addLog(`Updating invoice ${invoice2Id}...`);
-      try {
-        await updateDoc(invoice2Ref, updatedInvoiceData2);
-        addLog(`✅ Successfully updated invoice ${invoice2Id}.`);
-      } catch (error: any) {
-        addLog(`🔥 Error updating invoice ${invoice2Id}: ${error.message}`);
+        addLog(`🔥 Error updating invoice ${invoiceId}: ${error.message}`);
       }
 
       addLog("--- Update script finished ---");
@@ -103,7 +72,7 @@ export default function ManualInvoiceUpdatePage() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Manual Invoice Data Update</h1>
           <p className="text-muted-foreground mt-2">
-            This page runs a one-time script to correct registration data in Firestore.
+            This page runs a one-time script to correct registration data for invoice #4304 in Firestore.
           </p>
         </div>
 

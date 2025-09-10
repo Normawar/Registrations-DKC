@@ -34,6 +34,8 @@ import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo } from 'react';
 import type { ChangeRequest } from '@/lib/data/requests-data';
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 
 const sponsorMenuItems = [
@@ -76,6 +78,7 @@ const organizerMenuItems = [
   { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
   { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
+  { href: "/debug-scripts/manual-invoice-update", icon: Wrench, label: "Manual Invoice Fix" },
 ];
 
 const individualMenuItems = [
@@ -106,13 +109,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [confirmations, setConfirmations] = useState<any[]>([]);
 
   useEffect(() => {
-      const loadData = () => {
+      const loadData = async () => {
+        if (!db) return;
         try {
-            const storedRequests = localStorage.getItem('change_requests');
-            setChangeRequests(storedRequests ? JSON.parse(storedRequests) : []);
+            const [requestSnapshot, invoiceSnapshot] = await Promise.all([
+                getDocs(collection(db, 'requests')),
+                getDocs(collection(db, 'invoices'))
+            ]);
             
-            const storedConfirmations = localStorage.getItem('confirmations');
-            setConfirmations(storedConfirmations ? JSON.parse(storedConfirmations) : []);
+            const allRequests = requestSnapshot.docs.map(doc => doc.data() as ChangeRequest);
+            setChangeRequests(allRequests);
+            
+            const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
+            setConfirmations(allConfirmations);
+            
         } catch (error) {
             console.error("Failed to load data for sidebar notifications:", error);
             setChangeRequests([]);
@@ -121,11 +131,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       };
 
       loadData();
-      // Listen for changes from other tabs.
-      window.addEventListener('storage', loadData);
-      return () => {
-          window.removeEventListener('storage', loadData);
-      };
   }, []);
 
   const pendingRequestsCount = useMemo(() => {
