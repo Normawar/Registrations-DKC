@@ -507,8 +507,8 @@ export default function ManageEventsPage() {
             try {
                 if (conf.eventDate) {
                     const confDate = parseISO(conf.eventDate);
-                    if (isValid(confDate)) {
-                        hasMatchingNameAndDate = isSameDay(confDate, eventDate);
+                    if (isValid(confDate) && isSameDay(confDate, eventDate)) {
+                        hasMatchingNameAndDate = true;
                     }
                 }
             } catch (e) {
@@ -872,41 +872,44 @@ export default function ManageEventsPage() {
             </DialogDescription>
           </DialogHeader>
           
-          {profile?.role === 'organizer' && (
-            <div className="space-y-4">
-              <Card className="border-amber-500 bg-amber-50">
-                <CardContent className="p-4 space-y-2">
-                  <p className="text-sm font-medium italic text-amber-800">For SwissSys only:</p>
-                  <div className='flex items-center justify-between gap-2'>
-                      <div className="flex items-center gap-2">
-                          <Button 
-                              onClick={() => handleDownload(registeredPlayers, 'registered')} 
-                              disabled={registeredPlayers.length === 0} 
-                              size="sm"
-                              className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Export Registered ({registeredPlayers.length})
-                          </Button>
-                          <Button 
-                              onClick={() => handleDownload(exportedPlayers, 'exported')} 
-                              disabled={exportedPlayers.length === 0} 
-                              size="sm"
-                              className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Download Exported ({exportedPlayers.length})
-                          </Button>
-                      </div>
-                      <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
-                  </div>
-                </CardContent>
-              </Card>
-              <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
-                  Download All Registrations ({registrations.length})
-              </Button>
-            </div>
-          )}
+          <div className="space-y-4">
+            {profile?.role === 'organizer' && (
+              <div className="space-y-4">
+                <Card className="border-amber-500 bg-amber-50">
+                    <CardContent className="p-4">
+                        <p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p>
+                        <div className='flex items-center gap-2'>
+                            <Button 
+                                onClick={() => handleDownload(registeredPlayers, 'registered')} 
+                                disabled={registeredPlayers.length === 0} 
+                                size="sm"
+                                className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Export Registered ({registeredPlayers.length})
+                            </Button>
+                            <Button 
+                                onClick={() => handleDownload(exportedPlayers, 'exported')} 
+                                disabled={exportedPlayers.length === 0} 
+                                size="sm"
+                                className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Download Exported ({exportedPlayers.length})
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+                <div className='flex items-center justify-between'>
+                    <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
+                        Download All Registrations ({registrations.length})
+                    </Button>
+                    <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
+                </div>
+              </div>
+            )}
+          </div>
+
 
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
@@ -973,3 +976,4 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
+
