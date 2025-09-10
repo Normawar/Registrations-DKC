@@ -432,7 +432,8 @@ export default function DataRepairPage() {
 
       invoicesSnapshot.forEach(docSnap => {
         const invoice = docSnap.data();
-        if (!invoice.eventId) {
+        // Force update any invoice that doesn't already have the correct ID
+        if (invoice.eventId !== libertyEventId) {
             batch.update(doc(db, 'invoices', docSnap.id), { eventId: libertyEventId });
             updatedCount++;
             addLog('success', `Staging update for invoice #${invoice.invoiceNumber || docSnap.id} with hardcoded eventId.`);
