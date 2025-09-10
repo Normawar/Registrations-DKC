@@ -22,8 +22,8 @@ const PlayerToInvoiceSchema = z.object({
 export const CreatePsjaSplitInvoiceInputSchema = z.object({
   sponsorName: z.string(),
   sponsorEmail: z.string().email(),
-  bookkeeperEmail: z.string().email().optional().or(z.literal('')),
-  gtCoordinatorEmail: z.string().email().optional().or(z.literal('')),
+  bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
+  gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
   schoolName: z.string(),
   schoolAddress: z.string().optional(),
   schoolPhone: z.string().optional(),
@@ -80,7 +80,7 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
         gtCoordinatorEmail: input.gtCoordinatorEmail,
         bookkeeperEmail: '', // Ensure bookkeeper is not CC'd on the GT invoice
         invoiceNumber: gtInvoiceNumber,
-        description: input.revisionMessage,
+        revisionMessage: input.revisionMessage,
       };
       output.gtInvoice = await createInvoice(gtInvoiceInput);
       console.log(`GT Invoice created:`, output.gtInvoice);
@@ -97,7 +97,7 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
         bookkeeperEmail: input.bookkeeperEmail,
         gtCoordinatorEmail: '', // Ensure GT coordinator is not CC'd on the independent invoice
         invoiceNumber: indInvoiceNumber,
-        description: input.revisionMessage,
+        revisionMessage: input.revisionMessage,
       };
       output.independentInvoice = await createInvoice(independentInvoiceInput);
       console.log(`Independent Invoice created:`, output.independentInvoice);
