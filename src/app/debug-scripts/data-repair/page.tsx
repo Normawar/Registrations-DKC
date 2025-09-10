@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -432,10 +431,14 @@ export default function DataRepairPage() {
       invoicesSnapshot.forEach(docSnap => {
         const invoice = docSnap.data();
         if (!invoice.eventId && invoice.eventName && invoice.eventDate) {
-          const matchingEvent = events.find(e => 
-            e.name === invoice.eventName && 
-            isSameDay(parseISO(e.date), parseISO(invoice.eventDate))
-          );
+          const matchingEvent = events.find(e => {
+            const eventDate = new Date(e.date);
+            const invoiceDate = new Date(invoice.eventDate);
+            return e.name === invoice.eventName && 
+                   eventDate.getFullYear() === invoiceDate.getFullYear() &&
+                   eventDate.getMonth() === invoiceDate.getMonth() &&
+                   eventDate.getDate() === invoiceDate.getDate();
+          });
           
           if (matchingEvent) {
             batch.update(doc(db, 'invoices', docSnap.id), { eventId: matchingEvent.id });
@@ -791,7 +794,6 @@ export default function DataRepairPage() {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
       
       console.log(`Exported ${data.length} complete invoices`);
     } catch (error) {
