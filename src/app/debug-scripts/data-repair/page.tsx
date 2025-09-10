@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { doc, getDoc, updateDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -12,6 +12,8 @@ import { Loader2, CheckCircle, XCircle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { cn } from '@/lib/utils';
+import { schoolData } from '@/lib/data/school-data';
+import { generateTeamCode } from '@/lib/school-utils';
 
 interface LogEntry {
   type: 'success' | 'error' | 'info';
@@ -44,7 +46,6 @@ export default function DataRepairPage() {
 
     let processedCount = 0;
     
-    // Start from the first actual invoice data block
     for (let i = 2; i < parts.length; i += 2) {
         const invoiceId = `inv:${parts[i-1]}`.trim();
         const invoiceText = parts[i];
@@ -106,6 +107,19 @@ export default function DataRepairPage() {
                 selections[playerId] = { section, status: 'active', uscfStatus };
 
                 if (isNew && !existingPlayer) {
+                  let schoolName = invoiceData.schoolName || 'Unknown';
+                  let districtName = invoiceData.district || 'Unknown';
+
+                  // Attempt to infer from team code if school/district is missing
+                  if ((!invoiceData.schoolName || !invoiceData.district) && invoiceData.teamCode) {
+                    const matchedSchool = schoolData.find(school => generateTeamCode(school) === invoiceData.teamCode);
+                    if (matchedSchool) {
+                      schoolName = matchedSchool.schoolName;
+                      districtName = matchedSchool.district;
+                      addLog('info', `Inferred School '${schoolName}' from team code ${invoiceData.teamCode}.`);
+                    }
+                  }
+
                   const [firstName, ...lastNameParts] = name.split(' ');
                   const lastName = lastNameParts.join(' ');
                   const placeholderPlayer: Partial<MasterPlayer> = {
@@ -113,8 +127,8 @@ export default function DataRepairPage() {
                     uscfId: 'NEW',
                     firstName,
                     lastName,
-                    school: invoiceData.schoolName || "Unknown",
-                    district: invoiceData.district || "Unknown",
+                    school: schoolName,
+                    district: districtName,
                     grade: 'N/A',
                     section: 'N/A',
                     email: 'placeholder@example.com',
