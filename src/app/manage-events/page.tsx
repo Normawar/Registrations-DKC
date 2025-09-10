@@ -96,6 +96,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { DistrictCoordinatorGuard } from '@/components/auth-guard';
+import { generateTeamCode } from '@/lib/school-utils';
 
 
 const eventFormSchema = z.object({
@@ -590,7 +591,9 @@ function ManageEventsContent() {
     const csvData = playerList.map(p => ({
         "USCF ID": p.player.uscfId, "First Name": p.player.firstName, "Last Name": p.player.lastName,
         "Rating": p.player.regularRating || 'UNR', "Grade": p.player.grade, "Section": p.details.section,
-        "School": p.player.school, "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : (type === 'exported' ? 'Exported' : 'Registered')
+        "Team Code": generateTeamCode({ schoolName: p.player.school, district: p.player.district, studentType: p.player.studentType }),
+        "Student Type": p.player.studentType || 'regular',
+        "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : (type === 'exported' ? 'Exported' : 'Registered')
     }));
 
     const csv = Papa.unparse(csvData);
@@ -869,9 +872,6 @@ function ManageEventsContent() {
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
-            <DialogDescription>
-              A list of all players registered for this event.
-            </DialogDescription>
             <div className="flex items-center gap-4 text-sm mt-2">
                 <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
                 <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
