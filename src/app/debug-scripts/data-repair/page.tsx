@@ -14,6 +14,9 @@ import { cn } from '@/lib/utils';
 import { schoolData } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
 
+// Temporary debug export - remove after use
+(window as any).debugDB = { db, getDocs, collection };
+
 interface LogEntry {
   type: 'success' | 'error' | 'info';
   message: string;
