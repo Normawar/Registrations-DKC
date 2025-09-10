@@ -7,7 +7,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, differenceInHours, isSameDay, isValid, parse } from 'date-fns';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 
 import { Button } from "@/components/ui/button";
@@ -283,6 +283,46 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     const handleRemovePlayer = (id: string) => {
         setStagedPlayers(stagedPlayers.filter(p => p.id !== id));
     };
+
+    const handleOpenInvoiceDialog = async () => {
+        if (selectedSchool === 'all' || !db) {
+            toast({
+                variant: 'destructive',
+                title: 'No School Selected',
+                description: 'Please select a specific school to assign the invoice to.',
+            });
+            return;
+        }
+
+        // Find a sponsor for the selected school
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('school', '==', selectedSchool), limit(1));
+        const querySnapshot = await getDocs(q);
+
+        let sponsorName = '';
+        let sponsorEmail = '';
+
+        if (!querySnapshot.empty) {
+            const sponsorDoc = querySnapshot.docs[0].data();
+            sponsorName = `${sponsorDoc.firstName} ${sponsorDoc.lastName}`;
+            sponsorEmail = sponsorDoc.email;
+        } else {
+            toast({
+                title: "No Sponsor Found",
+                description: `No default sponsor found for ${selectedSchool}. Please enter their details manually.`,
+            });
+        }
+        
+        invoiceForm.reset({
+            schoolName: selectedSchool,
+            sponsorName: sponsorName,
+            sponsorEmail: sponsorEmail,
+            teamCode: generateTeamCode({ schoolName: selectedSchool, district: selectedDistrict }),
+        });
+
+        setIsInvoiceDialogOpen(true);
+    };
+
 
     const handleGenerateTeamInvoice = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db) return;
@@ -708,7 +748,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button onClick={() => setIsInvoiceDialogOpen(true)} disabled={stagedPlayers.length === 0}>
+                    <Button onClick={handleOpenInvoiceDialog} disabled={stagedPlayers.length === 0}>
                         Proceed to Register ({stagedPlayers.length} Players)
                     </Button>
                 </CardFooter>
