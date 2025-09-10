@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle, XCircle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
+import { cn } from '@/lib/utils';
 
 interface LogEntry {
   type: 'success' | 'error' | 'info';
@@ -37,18 +38,19 @@ export default function DataRepairPage() {
     setLogs([]);
     addLog('info', 'Starting data processing...');
 
-    const invoiceRegex = /for inv:([\w:-]+)/;
-    const rawInvoices = inputText.split(invoiceRegex);
+    const invoiceRegex = /for inv:([\w:-]+)/g;
+    const parts = inputText.split(invoiceRegex);
     const batch = writeBatch(db);
 
     let processedCount = 0;
-
-    for (let i = 1; i < rawInvoices.length; i += 2) {
-        const invoiceId = `inv:${rawInvoices[i]}`.trim();
-        const invoiceText = rawInvoices[i+1];
+    
+    // Start from the first actual invoice data block
+    for (let i = 2; i < parts.length; i += 2) {
+        const invoiceId = `inv:${parts[i-1]}`.trim();
+        const invoiceText = parts[i];
 
         if (!invoiceId || !invoiceText || invoiceId === 'inv:') {
-            addLog('error', `Skipping invalid entry at block ${Math.floor(i / 2) + 1}. Check formatting.`);
+            addLog('error', `Skipping invalid entry at block ${Math.floor(i / 2)}. Check formatting.`);
             continue;
         }
 
