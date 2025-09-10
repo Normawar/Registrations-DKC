@@ -46,6 +46,7 @@ const sponsorMenuItems = [
   { href: "/invoices", icon: Receipt, label: "Invoices & Payments" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+  { href: "/team-codes", icon: Code, label: "Team Codes"},
   { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/quick-start-guide", icon: BookOpen, label: "Quick Start Guide" },
 ];
@@ -58,6 +59,7 @@ const districtCoordinatorMenuItems = [
     { href: "/invoices", icon: Receipt, label: "District Invoices" },
     { href: "/requests", icon: KnightIcon, label: "District Requests" },
     { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+    { href: "/team-codes", icon: Code, label: "Team Codes"},
     { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
@@ -89,6 +91,7 @@ const individualMenuItems = [
   { href: "/events", icon: RookIcon, label: "Register for event" },
   { href: "/invoices", icon: Receipt, label: "Invoices & Payments" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
+  { href: "/team-codes", icon: Code, label: "Team Codes"},
   { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
