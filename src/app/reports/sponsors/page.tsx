@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, Search, Printer } from 'lucide-react';
+import { Download, Search, Printer, Loader2 } from 'lucide-react';
 import { generateTeamCode } from '@/lib/school-utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -31,14 +31,24 @@ type SponsorUser = {
 function SponsorsReportPageContent() {
   const [sponsors, setSponsors] = useState<SponsorUser[]>([]);
   const [sponsorSearchTerm, setSponsorSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastLoadTime, setLastLoadTime] = useState<number>(0);
 
   const loadData = useCallback(async () => {
+    if (Date.now() - lastLoadTime < 5 * 60 * 1000) return; // Cache for 5 minutes
+    
     if (!db) return;
-    const usersQuery = query(collection(db, 'users'), where('role', 'in', ['sponsor', 'district_coordinator']));
-    const usersSnapshot = await getDocs(usersQuery);
-    const sponsorList = usersSnapshot.docs.map(doc => doc.data() as SponsorUser);
-    setSponsors(sponsorList);
-  }, []);
+    setIsLoading(true);
+    try {
+      const usersQuery = query(collection(db, 'users'), where('role', 'in', ['sponsor', 'district_coordinator']));
+      const usersSnapshot = await getDocs(usersQuery);
+      const sponsorList = usersSnapshot.docs.map(doc => doc.data() as SponsorUser);
+      setSponsors(sponsorList);
+      setLastLoadTime(Date.now());
+    } finally {
+      setIsLoading(false);
+    }
+  }, [lastLoadTime]);
 
   useEffect(() => {
     loadData();
@@ -93,6 +103,17 @@ function SponsorsReportPageContent() {
             <Button onClick={handleExportSponsors}><Download className="mr-2 h-4 w-4"/>Export</Button>
         </div>
       </div>
+      
+      {isLoading && (
+        <Card>
+            <CardContent className="p-6">
+                <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading report data...
+                </div>
+            </CardContent>
+        </Card>
+      )}
       
       <Card>
         <CardHeader className="no-print">

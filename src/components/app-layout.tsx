@@ -34,9 +34,9 @@ import { Button } from "@/components/ui/button";
 import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart, FileQuestion } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { ChangeRequest } from '@/lib/data/requests-data';
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -122,13 +122,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [confirmations, setConfirmations] = useState<any[]>([]);
 
   useEffect(() => {
-      const loadData = async () => {
-        if (!db) return;
+    const loadData = async () => {
+        if (!db || !profile) return;
         try {
-            const [requestSnapshot, invoiceSnapshot] = await Promise.all([
-                getDocs(collection(db, 'requests')),
-                getDocs(collection(db, 'invoices'))
-            ]);
+            const queries = [];
+            
+            // Only load pending requests
+            queries.push(getDocs(query(
+                collection(db, 'requests'), 
+                where('status', '==', 'Pending'),
+                limit(100)
+            )));
+            
+            // Only load recent invoices for payment status
+            queries.push(getDocs(query(
+                collection(db, 'invoices'),
+                where('paymentStatus', '==', 'pending-po'),
+                limit(50)
+            )));
+
+            const [requestSnapshot, invoiceSnapshot] = await Promise.all(queries);
             
             const allRequests = requestSnapshot.docs.map(doc => doc.data() as ChangeRequest);
             setChangeRequests(allRequests);
@@ -137,14 +150,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             setConfirmations(allConfirmations);
             
         } catch (error) {
-            console.error("Failed to load data for sidebar notifications:", error);
+            console.error("Failed to load sidebar notification data:", error);
             setChangeRequests([]);
             setConfirmations([]);
         }
       };
 
       loadData();
-  }, []);
+  }, [profile]);
 
   const pendingRequestsCount = useMemo(() => {
     if (!profile) return 0;
@@ -153,23 +166,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         return changeRequests.filter(r => r.status === 'Pending').length;
     }
     
-    if (profile.role === 'sponsor' && profile.isDistrictCoordinator) {
-        const districtConfirmationIds = new Set(confirmations
-            .filter(c => c.district === profile.district)
-            .map(c => c.id));
-        return changeRequests.filter(req => req.status === 'Pending' && districtConfirmationIds.has(req.confirmationId)).length;
-    }
-
-    if (profile.role === 'sponsor') {
-        const sponsorConfirmationIds = new Set(confirmations
-            .filter(c => c.schoolName === profile.school && c.district === profile.district)
-            .map(c => c.id));
-        
-        return changeRequests.filter(req => req.status === 'Pending' && sponsorConfirmationIds.has(req.confirmationId)).length;
-    }
-    
+    // For non-organizers, we cannot reliably filter on the client
+    // without fetching all invoices. This count will be primarily for organizers.
+    // A more advanced solution would involve a dedicated 'notifications' collection.
     return 0;
-  }, [profile, changeRequests, confirmations]);
+    
+  }, [profile, changeRequests]);
 
   const pendingPaymentsCount = useMemo(() => {
     if (profile?.role !== 'organizer') return 0;

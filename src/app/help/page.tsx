@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,36 +17,39 @@ import {
 
 // A simple markdown-to-HTML renderer
 const MarkdownRenderer = ({ content }: { content: string }) => {
-    const lines = content.trim().split('\n');
-    const html = lines.map((line, index) => {
-        if (line.startsWith('## ')) {
-            return <h2 key={index} className="text-2xl font-bold mt-6 mb-3 border-b pb-2">{line.substring(3)}</h2>;
-        }
-        if (line.startsWith('### ')) {
-            return <h3 key={index} className="text-xl font-semibold mt-4 mb-2">{line.substring(4)}</h3>;
-        }
-        if (line.trim().match(/^\d+\./)) {
-            return <p key={index} className="mb-2 pl-4">{line}</p>;
-        }
-        if (line.trim() === '') {
-            return <br key={index} />;
-        }
-        return <p key={index} className="mb-4 text-muted-foreground leading-relaxed">{line}</p>;
-    }).reduce((acc, elem, index) => {
-        if (elem.props.className?.includes('pl-4')) {
-            const prev = acc[acc.length - 1];
-            if (prev && prev.type === 'ol') {
-                prev.props.children.push(<li key={index}>{elem}</li>);
-            } else {
-                acc.push(<ol key={index} className="list-decimal list-inside space-y-2">{<li>{elem}</li>}</ol>);
+    const renderedContent = useMemo(() => {
+        const lines = content.trim().split('\n');
+        const html = lines.map((line, index) => {
+            if (line.startsWith('## ')) {
+                return <h2 key={index} className="text-2xl font-bold mt-6 mb-3 border-b pb-2">{line.substring(3)}</h2>;
             }
-        } else {
-            acc.push(elem);
-        }
-        return acc;
-    }, [] as JSX.Element[]);
-    
-    return <>{html}</>;
+            if (line.startsWith('### ')) {
+                return <h3 key={index} className="text-xl font-semibold mt-4 mb-2">{line.substring(4)}</h3>;
+            }
+            if (line.trim().match(/^\d+\./)) {
+                return <p key={index} className="mb-2 pl-4">{line}</p>;
+            }
+            if (line.trim() === '') {
+                return <br key={index} />;
+            }
+            return <p key={index} className="mb-4 text-muted-foreground leading-relaxed">{line}</p>;
+        }).reduce((acc, elem, index) => {
+            if (elem.props.className?.includes('pl-4')) {
+                const prev = acc[acc.length - 1];
+                if (prev && prev.type === 'ol') {
+                    prev.props.children.push(<li key={index}>{elem}</li>);
+                } else {
+                    acc.push(<ol key={index} className="list-decimal list-inside space-y-2">{<li>{elem}</li>}</ol>);
+                }
+            } else {
+                acc.push(elem);
+            }
+            return acc;
+        }, [] as JSX.Element[]);
+        return html;
+    }, [content]);
+
+    return <>{renderedContent}</>;
 };
 
 export default function HelpPage() {
@@ -64,13 +67,13 @@ export default function HelpPage() {
         );
     }, [searchTerm]);
 
-    const handleTopicSelect = (topic: HelpTopic) => {
+    const handleTopicSelect = useCallback((topic: HelpTopic) => {
         setSelectedTopic(topic);
-        const element = document.getElementById('topic-content');
-        if (element) {
-            element.scrollIntoView({ behavior: 'smooth' });
-        }
-    };
+        setTimeout(() => {
+            const element = document.getElementById('topic-content');
+            element?.scrollIntoView({ behavior: 'smooth' });
+        }, 0);
+    }, []);
 
     return (
         <AppLayout>

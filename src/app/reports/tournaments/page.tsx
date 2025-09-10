@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, Search, Printer } from 'lucide-react';
+import { Download, Search, Printer, Loader2 } from 'lucide-react';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -34,41 +34,51 @@ function TournamentsReportPageContent() {
   const { events } = useEvents();
   const [tournamentReport, setTournamentReport] = useState<TournamentReportData>({});
   const [tournamentSearchTerm, setTournamentSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastLoadTime, setLastLoadTime] = useState<number>(0);
 
   const loadData = useCallback(async () => {
+    if (Date.now() - lastLoadTime < 5 * 60 * 1000) return; // Cache for 5 minutes
+
     if (!db) return;
-    const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-    const allInvoices = invoicesSnapshot.docs.map(doc => doc.data());
-    
-    const report: TournamentReportData = {};
+    setIsLoading(true);
+    try {
+      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+      const allInvoices = invoicesSnapshot.docs.map(doc => doc.data());
+      
+      const report: TournamentReportData = {};
 
-    events.forEach(event => {
-      const eventInvoices = allInvoices.filter(inv => inv.eventId === event.id);
-      const schoolRegistrations: { [key: string]: number } = {};
+      events.forEach(event => {
+        const eventInvoices = allInvoices.filter(inv => inv.eventId === event.id);
+        const schoolRegistrations: { [key: string]: number } = {};
 
-      eventInvoices.forEach(invoice => {
-        const school = invoice.schoolName || 'Unknown School';
-        const playerCount = Object.keys(invoice.selections || {}).length;
-        if (playerCount > 0) {
-          schoolRegistrations[school] = (schoolRegistrations[school] || 0) + playerCount;
+        eventInvoices.forEach(invoice => {
+          const school = invoice.schoolName || 'Unknown School';
+          const playerCount = Object.keys(invoice.selections || {}).length;
+          if (playerCount > 0) {
+            schoolRegistrations[school] = (schoolRegistrations[school] || 0) + playerCount;
+          }
+        });
+        
+        const registrations = Object.entries(schoolRegistrations).map(([schoolName, playerCount]) => ({
+          schoolName,
+          playerCount,
+        })).sort((a,b) => b.playerCount - a.playerCount);
+
+        if (registrations.length > 0) {
+          report[event.id] = {
+            event,
+            registrations,
+            totalPlayers: registrations.reduce((sum, reg) => sum + reg.playerCount, 0),
+          };
         }
       });
-      
-      const registrations = Object.entries(schoolRegistrations).map(([schoolName, playerCount]) => ({
-        schoolName,
-        playerCount,
-      })).sort((a,b) => b.playerCount - a.playerCount);
-
-      if (registrations.length > 0) {
-        report[event.id] = {
-          event,
-          registrations,
-          totalPlayers: registrations.reduce((sum, reg) => sum + reg.playerCount, 0),
-        };
-      }
-    });
-    setTournamentReport(report);
-  }, [events]);
+      setTournamentReport(report);
+      setLastLoadTime(Date.now());
+    } finally {
+      setIsLoading(false);
+    }
+  }, [events, lastLoadTime]);
 
   useEffect(() => {
     if (events.length > 0) {
@@ -132,6 +142,12 @@ function TournamentsReportPageContent() {
             </div>
         </CardHeader>
         <CardContent>
+          {isLoading && (
+            <div className="flex items-center gap-2 p-6">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading report data...
+            </div>
+          )}
           <div className="space-y-6">
             {filteredTournaments.map(reportData => (
               <Card key={reportData.event.id} className="break-inside-avoid">
@@ -166,7 +182,7 @@ function TournamentsReportPageContent() {
                 </CardContent>
               </Card>
             ))}
-             {filteredTournaments.length === 0 && (
+             {filteredTournaments.length === 0 && !isLoading && (
                 <div className="text-center py-12 text-muted-foreground">
                     <p>No tournaments match your search criteria.</p>
                 </div>
