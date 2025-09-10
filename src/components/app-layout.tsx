@@ -68,7 +68,6 @@ const districtCoordinatorMenuItems = [
 const organizerMenuStructure = {
   "Tournament Data": [
     { href: "/manage-events", icon: FolderKanban, label: "Manage Events" },
-    { href: "/organizer-registration", icon: RookIcon, label: "Register for Event" },
     { href: "/requests", icon: KnightIcon, label: "Change Requests" },
     { href: "/organizers/vouchers", icon: FileText, label: "Voucher Management" },
     { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },

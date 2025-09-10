@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -73,6 +74,7 @@ import { useEvents, type Event } from '@/hooks/use-events';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Label } from './ui/label';
 
 // --- Types and Schemas ---
 
@@ -134,11 +136,13 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Player search states
+    // Player search and filter states
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<MasterPlayer[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const { database: masterDatabase, isDbLoaded } = useMasterDb();
+    const { database: masterDatabase, isDbLoaded, dbDistricts, dbSchools } = useMasterDb();
+    const [selectedDistrict, setSelectedDistrict] = useState('all');
+    const [selectedSchool, setSelectedSchool] = useState('all');
 
     const playerForm = useForm<PlayerFormValues>({
         resolver: zodResolver(playerFormSchema),
@@ -149,6 +153,16 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         resolver: zodResolver(invoiceRecipientSchema),
     });
 
+    const schoolsForSelectedDistrict = useMemo(() => {
+        if (selectedDistrict === 'all') {
+            return dbSchools;
+        }
+        return masterDatabase.filter(p => p.district === selectedDistrict)
+                             .map(p => p.school)
+                             .filter((value, index, self) => self.indexOf(value) === index)
+                             .sort();
+    }, [selectedDistrict, masterDatabase, dbSchools]);
+
     // Debounced search effect
     useEffect(() => {
         if (searchQuery.length < 3) {
@@ -157,16 +171,20 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         }
         setIsSearching(true);
         const handler = setTimeout(() => {
-            const results = masterDatabase.filter(p => 
-                p.uscfId.includes(searchQuery) || 
-                `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
-            ).slice(0, 10);
+            const lowerQuery = searchQuery.toLowerCase();
+            const results = masterDatabase.filter(p => {
+                const schoolMatch = selectedSchool === 'all' || p.school === selectedSchool;
+                const districtMatch = selectedDistrict === 'all' || p.district === selectedDistrict;
+                const nameMatch = `${p.firstName} ${p.lastName}`.toLowerCase().includes(lowerQuery) || p.uscfId.includes(searchQuery);
+                return schoolMatch && districtMatch && nameMatch;
+            }).slice(0, 10);
+
             setSearchResults(results);
             setIsSearching(false);
         }, 300);
 
         return () => clearTimeout(handler);
-    }, [searchQuery, masterDatabase]);
+    }, [searchQuery, masterDatabase, selectedDistrict, selectedSchool]);
     
     const handleSelectSearchedPlayer = (player: MasterPlayer) => {
         setSearchQuery('');
@@ -362,6 +380,28 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    <div className='grid md:grid-cols-2 gap-4'>
+                        <div>
+                            <Label htmlFor="district-filter">District</Label>
+                            <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                                <SelectTrigger id="district-filter"><SelectValue placeholder="Select a district" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Districts</SelectItem>
+                                    {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label htmlFor="school-filter">School</Label>
+                            <Select value={selectedSchool} onValueChange={setSelectedSchool} disabled={selectedDistrict === 'all'}>
+                                <SelectTrigger id="school-filter"><SelectValue placeholder="Select a school" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Schools</SelectItem>
+                                    {schoolsForSelectedDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
                      <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
