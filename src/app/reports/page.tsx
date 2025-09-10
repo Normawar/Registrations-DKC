@@ -193,8 +193,8 @@ function ReportsPageContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSponsors.map(sponsor => (
-                  <TableRow key={sponsor.email}>
+                {filteredSponsors.map((sponsor, index) => (
+                  <TableRow key={`${sponsor.email}-${index}`}>
                     <TableCell className="font-mono">{generateTeamCode({ schoolName: sponsor.school, district: sponsor.district })}</TableCell>
                     <TableCell>{sponsor.firstName} {sponsor.lastName}</TableCell>
                     <TableCell>{sponsor.email}<br/>{sponsor.phone}</TableCell>
@@ -271,7 +271,9 @@ function ReportsPageContent() {
 export default function ReportsPage() {
     return (
         <OrganizerGuard>
-            <ReportsPageContent />
+            <AppLayout>
+                <ReportsPageContent />
+            </AppLayout>
         </OrganizerGuard>
     )
 }
