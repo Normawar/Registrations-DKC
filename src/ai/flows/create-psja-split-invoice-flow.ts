@@ -8,7 +8,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { createInvoice, type CreateInvoiceInput, type CreateInvoiceOutput } from './create-invoice-flow';
+import { createInvoice, type CreateInvoiceInput } from './create-invoice-flow';
 
 const PlayerToInvoiceSchema = z.object({
   playerName: z.string(),
