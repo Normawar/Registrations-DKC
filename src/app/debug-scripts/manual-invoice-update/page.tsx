@@ -85,6 +85,7 @@ const gtPlayersByNameAndSchool = new Set([
 
 const correctedInvoices = [
   { invoiceId: 'inv:0-ChBvHo9HhSLsFXoFmT96z3-wEJ8I', invoiceNumber: '4314', purchaserName: 'Ashley Rodriguez', purchaserEmail: 'ashley.rodriguez@psjaisd.us', players: [ { name: 'Esteban Garza JR', uscfId: '15863055' }, { name: 'Kate Fernandez', uscfId: '16801086' }, { name: 'Raul Gonzalez III', uscfId: '30299472' }, { name: 'Orlando Delgado Garcia', uscfId: '30309132' }, { name: 'Jorge Cantu Alvarez', uscfId: '31488082' }, { name: 'Diego Bocanegra Amaro', uscfId: '31499254' }, { name: 'Azul Cuevas Elizalde', uscfId: '32046484' } ], uscfRenewals: [] },
+  { invoiceId: 'inv:0-ChBqF8jY6Yf2Kk8YxH4-mJj0EJ8I', invoiceNumber: '4313', purchaserName: 'Kanie De Leon', purchaserEmail: 'kanie.deleon@psjaisd.us', players: [ { name: 'Lia Salazar', uscfId: '30764804' }, { name: 'Alize Garcia', uscfId: '30764848' }, { name: 'Mia Flores', uscfId: '30764869' }, { name: 'Diego Salazar', uscfId: '31489349' }, { name: 'Adrin Tamez', uscfId: '31489397' } ], uscfRenewals: [] },
   { invoiceId: 'inv:0-ChAn7iUtCfPpjCRGA9NEEaE9EJ8I', invoiceNumber: '4312', purchaserName: 'Hernan Cortez', purchaserEmail: 'hernan.cortez@psjaisd.us', players: [ { name: 'Luis Cortez', uscfId: '30271062' }, { name: 'Rodrigo Izaguirre', uscfId: '30728191' }, { name: 'Jesus Cordero', uscfId: '31489716' }, { name: 'Jayden Jimenez', uscfId: '31489894' }, { name: 'Raul Pedraza Jr.', uscfId: '31489934' }, { name: 'Ruben Elizondo', uscfId: '32115166' }, { name: 'Norberto Gonzalez', uscfId: '32115265' }, { name: 'Ruben Paez', uscfId: '32115492' }, { name: 'Aurik Romo', uscfId: 'NEW' }, { name: 'Jocelyn Snow', uscfId: 'NEW' } ], uscfRenewals: ['Rodrigo Izaguirre', 'Aurik Romo', 'Jocelyn Snow'] },
   { invoiceId: 'inv:0-ChBdDmnPzwd4w1bnyDo6_TiqEJ8I', invoiceNumber: '4311', purchaserName: 'Corina Perez', purchaserEmail: 'corina.perez@psjaisd.us', players: [ { name: 'Arianna Cantu', uscfId: '32063642' }, { name: 'Austin Salinas', uscfId: '32063726' }, { name: 'Jace Sandoval', uscfId: '32063733' }, { name: 'Adrian Villa', uscfId: '32063759' }, { name: 'Hiram Flores', uscfId: '32064001' }, { name: 'Landen Valerio', uscfId: '32115736' }, { name: 'Saori Tamez', uscfId: '32115752' }, { name: 'Matthew De La Cruz', uscfId: '32156812' }, { name: 'Amirah Jalili', uscfId: '32156857' }, { name: 'Shenell Vaca', uscfId: '32156866' }, { name: 'Silas De La Garza', uscfId: '32157003' } ], uscfRenewals: [] },
   { invoiceId: 'inv:0-ChBNQswPcqy73RC1UKsvtOzjEJ8I', invoiceNumber: '4310', purchaserName: 'Vivian Barbosa', purchaserEmail: 'vivian.barbosa@psjaisd.us', players: [ { name: 'Ethan Gonzalez', uscfId: '30308816' }, { name: 'Ezra Gonzalez', uscfId: '30764897' }, { name: 'Noah Vives', uscfId: '31491001' }, { name: 'Abel Garza', uscfId: 'NEW' }, { name: 'Lizeth De Leon', uscfId: 'NEW' }, { name: 'Alayna Calderon', uscfId: 'NEW' }, { name: 'Gael Torres', uscfId: 'NEW' }, { name: 'Noe Garza', uscfId: 'NEW' }, { name: 'Rocco Sloss', uscfId: 'NEW' }, { name: 'Vanessa Lopez', uscfId: 'NEW' }, { name: 'Lucia Gonzalez', uscfId: 'NEW' }, { name: 'Josue Contreras', uscfId: 'NEW' } ], uscfRenewals: ['Alayna Calderon', 'Gael Torres', 'Noe Garza', 'Rocco Sloss', 'Vanessa Lopez', 'Lucia Gonzalez', 'Josue Contreras'] },
@@ -131,7 +132,7 @@ export default function ManualInvoiceUpdatePage() {
         setErrorCount(errors);
       };
 
-      addLog(`--- Starting PSJA Invoice Data Migration for 18 Invoices ---`);
+      addLog(`--- Starting PSJA Invoice Data Migration for 19 Invoices ---`);
       const batch = writeBatch(db);
 
       for (const inv of correctedInvoices) {
@@ -210,7 +211,7 @@ export default function ManualInvoiceUpdatePage() {
         <div>
           <h1 className="text-3xl font-bold font-headline">PSJA Invoice Data Correction</h1>
           <p className="text-muted-foreground mt-2">
-            This page runs a one-time script to correct registration data for 18 specific PSJA invoices in Firestore.
+            This page runs a one-time script to correct registration data for 19 specific PSJA invoices in Firestore.
           </p>
         </div>
 
