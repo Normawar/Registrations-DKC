@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -422,6 +423,7 @@ export default function DataRepairPage() {
   const repairMissingEventIds = async () => {
     setIsEventIdRepairing(true);
     addLog('info', 'Starting Event ID Repair Process...');
+    const libertyEventId = 'evt-1757125186611-0.8707914537148768';
 
     try {
       const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
@@ -430,29 +432,16 @@ export default function DataRepairPage() {
 
       invoicesSnapshot.forEach(docSnap => {
         const invoice = docSnap.data();
-        if (!invoice.eventId && invoice.eventName && invoice.eventDate) {
-          const matchingEvent = events.find(e => {
-            const eventDate = new Date(e.date);
-            const invoiceDate = new Date(invoice.eventDate);
-            return e.name === invoice.eventName && 
-                   eventDate.getFullYear() === invoiceDate.getFullYear() &&
-                   eventDate.getMonth() === invoiceDate.getMonth() &&
-                   eventDate.getDate() === invoiceDate.getDate();
-          });
-          
-          if (matchingEvent) {
-            batch.update(doc(db, 'invoices', docSnap.id), { eventId: matchingEvent.id });
+        if (!invoice.eventId) {
+            batch.update(doc(db, 'invoices', docSnap.id), { eventId: libertyEventId });
             updatedCount++;
-            addLog('success', `Found match for invoice #${invoice.invoiceNumber || docSnap.id}. Staging update with eventId: ${matchingEvent.id}`);
-          } else {
-            addLog('error', `No matching event found for invoice #${invoice.invoiceNumber || docSnap.id} (${invoice.eventName} on ${invoice.eventDate})`);
-          }
+            addLog('success', `Staging update for invoice #${invoice.invoiceNumber || docSnap.id} with hardcoded eventId.`);
         }
       });
       
       if (updatedCount > 0) {
         await batch.commit();
-        addLog('success', `Successfully updated ${updatedCount} invoices with missing event IDs.`);
+        addLog('success', `Successfully updated ${updatedCount} invoices with the Liberty event ID.`);
         toast({ title: 'Repair Complete', description: `${updatedCount} invoices were fixed.` });
       } else {
         addLog('info', 'No invoices required event ID repairs.');
