@@ -81,6 +81,7 @@ import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
+import { generateTeamCode } from '@/lib/school-utils';
 
 // --- Types and Schemas ---
 
@@ -405,7 +406,9 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 eventName: event.name,
                 eventDate: event.date,
                 uscfFee,
-                players: playersToInvoice
+                players: playersToInvoice,
+                bookkeeperEmail: '',
+                gtCoordinatorEmail: '',
             });
 
             const newConfirmation = {
@@ -456,7 +459,9 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             eventName: event.name,
             eventDate: event.date,
             uscfFee: 24,
-            players: playersToInvoice
+            players: playersToInvoice,
+            bookkeeperEmail: '',
+            gtCoordinatorEmail: '',
           });
     
           if (result.gtInvoice) {
@@ -516,7 +521,9 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     eventDate: event.date,
                     uscfFee,
                     players: [playerToInvoice],
-                    description: `Invoice for ${player.firstName} ${player.lastName}`
+                    description: `Invoice for ${player.firstName} ${player.lastName}`,
+                    bookkeeperEmail: '',
+                    gtCoordinatorEmail: '',
                 });
 
                 await saveConfirmation(result.invoiceId, result, [player], totalInvoiced);
