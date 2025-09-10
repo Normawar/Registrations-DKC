@@ -2,13 +2,13 @@
 'use client';
 
 import { useState } from 'react';
-import { doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
 
@@ -37,19 +37,20 @@ export default function DataRepairPage() {
     setLogs([]);
     addLog('info', 'Starting data processing...');
 
-    const invoiceRegex = /for inv:([\w:-]+)/g;
-    const invoices = inputText.split(invoiceRegex);
+    const invoiceRegex = /for inv:([\w:-]+)/;
+    const rawInvoices = inputText.split(invoiceRegex);
     const batch = writeBatch(db);
 
     let processedCount = 0;
 
-    // The first element is the text before the first match, so we skip it.
-    // We iterate in steps of 2: [invoiceId, invoiceText, invoiceId, invoiceText, ...]
-    for (let i = 1; i < invoices.length; i += 2) {
-        const invoiceId = `inv:${invoices[i]}`.trim();
-        const invoiceText = invoices[i+1];
+    for (let i = 1; i < rawInvoices.length; i += 2) {
+        const invoiceId = `inv:${rawInvoices[i]}`.trim();
+        const invoiceText = rawInvoices[i+1];
 
-        if (!invoiceId || !invoiceText) continue;
+        if (!invoiceId || !invoiceText || invoiceId === 'inv:') {
+            addLog('error', `Skipping invalid entry at block ${Math.floor(i / 2) + 1}. Check formatting.`);
+            continue;
+        }
 
         addLog('info', `Processing Invoice ID: ${invoiceId}`);
         const docRef = doc(db, 'invoices', invoiceId);
@@ -63,9 +64,8 @@ export default function DataRepairPage() {
 
             const invoiceData = docSnap.data();
             const selections: Record<string, any> = {};
-            const players: { uscfId: string, name: string }[] = [];
+            const players: { name: string, uscfId: string }[] = [];
             
-            // Regex to find player lines like "1. Esteban Garza JR (15863055)"
             const playerRegex = /\d+\.\s+([\w\s.\-ÁÉÍÓÚÑáéíóúñ'JRIII]+?)\s+\(([\w\d]+)\)/g;
             let match;
             while ((match = playerRegex.exec(invoiceText)) !== null) {
@@ -92,11 +92,9 @@ export default function DataRepairPage() {
                 const isNew = uscfId.toLowerCase() === 'new';
                 const playerId = isNew ? `temp_${name.replace(/\s+/g, '_')}` : uscfId;
 
-                // For existing players, find their section from the master DB if possible
                 const existingPlayer = existingPlayers.get(playerId);
                 const section = existingPlayer?.section || 'High School K-12';
                 
-                // Determine USCF Status based on existing data
                 const uscfStatus = isNew
                   ? 'new'
                   : (invoiceText.includes('USCF Membership') && invoiceText.includes(name))
@@ -105,7 +103,6 @@ export default function DataRepairPage() {
 
                 selections[playerId] = { section, status: 'active', uscfStatus };
 
-                // If player is 'new', we may need to create a placeholder master player doc
                 if (isNew && !existingPlayer) {
                   const [firstName, ...lastNameParts] = name.split(' ');
                   const lastName = lastNameParts.join(' ');
@@ -124,13 +121,12 @@ export default function DataRepairPage() {
                     eventIds: []
                   };
                   batch.set(doc(db, 'players', playerId), placeholderPlayer);
-                  addLog('info', `Creating placeholder for new player: ${name}`);
+                  addLog('info', `Staging placeholder for new player: ${name}`);
                 }
             });
 
-            // Update the invoice document in the batch
             batch.update(docRef, { selections });
-            addLog('success', `Successfully processed and staged updates for invoice ${invoiceId}.`);
+            addLog('success', `Successfully staged updates for invoice ${invoiceId}.`);
             processedCount++;
 
         } catch (e: any) {
@@ -153,7 +149,6 @@ export default function DataRepairPage() {
 
     setIsProcessing(false);
   };
-
 
   return (
     <AppLayout>
@@ -206,10 +201,10 @@ export default function DataRepairPage() {
                                 {log.type === 'success' && <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />}
                                 {log.type === 'error' && <XCircle className="h-4 w-4 text-red-500 shrink-0" />}
                                 {log.type === 'info' && <Info className="h-4 w-4 text-blue-500 shrink-0" />}
-                                <p className={
+                                <p className={cn(
                                     log.type === 'success' ? 'text-green-700' :
                                     log.type === 'error' ? 'text-red-700' : 'text-blue-700'
-                                }>{log.message}</p>
+                                )}>{log.message}</p>
                             </div>
                         ))
                     )}
@@ -220,4 +215,3 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
-
