@@ -79,6 +79,7 @@ const organizerMenuItems = [
   { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
   { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
   { href: "/debug-scripts/manual-invoice-update", icon: Wrench, label: "Manual Invoice Fix" },
+  { href: "/debug-scripts/data-migration", icon: Wrench, label: "Data Migration Tool" },
 ];
 
 const individualMenuItems = [
