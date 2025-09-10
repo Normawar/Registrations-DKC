@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { schoolData } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
 import Papa from 'papaparse';
-import { isSameDay, parseISO } from 'date-fns';
+import { isSameDay, parseISO, isBefore } from 'date-fns';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
@@ -118,25 +118,33 @@ function GtInvoiceFixer() {
       const flaggedInvoices = [];
 
       for (const inv of psjaUnpaidInvoices) {
-        let gtPlayerWasCharged = false;
+        let gtPlayerNeedsUscf = false;
         if (!inv.selections) continue;
+
+        const eventDate = new Date(inv.eventDate);
 
         for (const playerId in inv.selections) {
             const selection = inv.selections[playerId];
-            const player = allPlayers.find(p => p.id === playerId);
+            const isGt = selection.studentType === 'gt';
             
-            const isGt = player?.studentType === 'gt';
-            const uscfActionNeeded = selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing';
+            if (isGt) {
+                // Find player in master DB to check their real expiration date
+                const player = allPlayers.find(p => p.id === playerId);
+                if (player) {
+                    const needsRenewal = !player.uscfExpiration || isBefore(new Date(player.uscfExpiration), eventDate);
+                    const isNewUscf = player.uscfId.toUpperCase() === 'NEW';
 
-            if (isGt && uscfActionNeeded) {
-                gtPlayerWasCharged = true;
-                break; // Found one, no need to check others on this invoice
+                    if (needsRenewal || isNewUscf) {
+                        gtPlayerNeedsUscf = true;
+                        break; 
+                    }
+                }
             }
         }
         
-        if (gtPlayerWasCharged) {
+        if (gtPlayerNeedsUscf) {
             flaggedInvoices.push(inv);
-            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} includes a GT player marked for USCF payment.`);
+            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} includes a GT player who needs a USCF membership for this event.`);
         }
       }
 
@@ -440,6 +448,8 @@ export function StudentTypeUpdater() {
       
       snapshot.forEach(docSnap => {
         const data = docSnap.data();
+        if(data.type === 'organizer') return;
+
         if (data.selections) {
           Object.values(data.selections).forEach((selection: any) => {
             verifyStats.totalSelections++;
@@ -1102,5 +1112,3 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
-
-    
