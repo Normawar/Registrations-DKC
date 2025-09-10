@@ -476,15 +476,15 @@ const SponsorPaymentComponent = () => {
 interface InvoiceDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  confirmationId: string;
+  confirmation: any;
 }
 
-export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: InvoiceDetailsDialogProps) {
+export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialConfirmation }: InvoiceDetailsDialogProps) {
   const { toast } = useToast();
   const { profile } = useSponsorProfile();
   const { database: masterDatabase } = useMasterDb();
   
-  const [confirmation, setConfirmation] = useState<any>(null);
+  const [confirmation, setConfirmation] = useState<any>(initialConfirmation);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   
   const [isUpdating, setIsUpdating] = useState(false);
@@ -565,16 +565,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
 
   useEffect(() => {
     if (!isOpen) return;
-
-    const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-    const currentConf = allInvoices.find((c: any) => c.id === confirmationId);
-    if (currentConf) {
-        setConfirmation(currentConf);
-        
-        // Load selected payment methods
-        const savedMethods = currentConf.selectedPaymentMethods || [];
-        setSelectedPaymentMethods(savedMethods);
-    }
+    
+    // Reset state when dialog opens with new confirmation
+    setConfirmation(initialConfirmation);
+    const savedMethods = initialConfirmation.selectedPaymentMethods || [];
+    setSelectedPaymentMethods(savedMethods);
+    setInitialPaymentValuesSet(false); // Force re-initialization
   
     if (!auth || !storage) {
         setAuthError("Firebase is not configured, so file uploads are disabled.");
@@ -595,7 +591,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
         setIsAuthReady(true);
     });
     return () => unsubscribe();
-  }, [isOpen, confirmationId]);
+  }, [isOpen, initialConfirmation]);
 
   useEffect(() => {
     if (confirmation && !initialPaymentValuesSet) {
@@ -1472,20 +1468,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmationId }: Invoic
       };
 
   if (!confirmation) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogDescription className="sr-only">Dialog for managing invoice details</DialogDescription>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Loading...</DialogTitle>
-            <DialogDescription className="sr-only">Loading invoice details</DialogDescription>
-          </DialogHeader>
-          <div className="py-8 flex justify-center items-center">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
+    return null;
   }
 
   return (

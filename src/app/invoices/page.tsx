@@ -632,7 +632,7 @@ export default function UnifiedInvoiceRegistrations() {
               setShowInvoiceModal(false);
               setSelectedInvoice(null);
             }}
-            confirmationId={selectedInvoice.id}
+            confirmation={selectedInvoice}
           />
         )}
       </div>
