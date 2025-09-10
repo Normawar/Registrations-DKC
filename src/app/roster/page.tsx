@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
@@ -865,12 +866,18 @@ function SponsorRosterView() {
 
 function DistrictRosterView() {
     const { profile } = useSponsorProfile();
-    const { database: allPlayers, isDbLoaded, dbDistricts, toast } = useMasterDb();
+    const { database: allPlayers, isDbLoaded, dbDistricts, toast, updatePlayer } = useMasterDb();
     const [selectedSchool, setSelectedSchool] = useState('all');
     const [selectedDistrict, setSelectedDistrict] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
     const [playerTypeFilter, setPlayerTypeFilter] = useState('all');
     const [showActiveOnly, setShowActiveOnly] = useState(false);
+    const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
+    const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
+
+    const playerForm = useForm<PlayerFormValues>({
+        resolver: zodResolver(playerFormSchema),
+    });
 
     useEffect(() => {
         if (profile?.role === 'district_coordinator' && profile.district) {
@@ -1095,6 +1102,38 @@ function DistrictRosterView() {
         });
     }, [filteredPlayersForExport, toast]);
 
+    const handleEditPlayer = (player: MasterPlayer) => {
+        setEditingPlayer(player);
+        playerForm.reset({
+            ...player,
+            dob: player.dob ? new Date(player.dob) : undefined,
+            uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+        });
+        setIsEditPlayerDialogOpen(true);
+    };
+
+    const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
+        if (!editingPlayer || !profile) return;
+    
+        const { uscfExpiration, dob, ...restOfValues } = values;
+        
+        const updatedPlayerRecord: MasterPlayer = {
+            ...editingPlayer,
+            ...restOfValues,
+            dob: dob ? dob.toISOString() : undefined,
+            uscfExpiration: uscfExpiration ? uscfExpiration.toISOString() : undefined,
+        };
+
+        await updatePlayer(updatedPlayerRecord, profile);
+        toast({ 
+            title: "Player Updated", 
+            description: `${values.firstName} ${values.lastName}'s information has been updated.`
+        });
+        
+        setIsEditPlayerDialogOpen(false);
+        setEditingPlayer(null);
+    };
+
     return (
         <div className="space-y-8">
             <div>
@@ -1193,6 +1232,7 @@ function DistrictRosterView() {
                                             {showGtColumn && (
                                                 <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('gt')}>GT {getSortIcon('gt')}</Button></TableHead>
                                             )}
+                                            <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -1211,6 +1251,11 @@ function DistrictRosterView() {
                                                     {player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
                                                 </TableCell>
                                             )}
+                                            <TableCell className="text-right">
+                                                <Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                            </TableCell>
                                         </TableRow>
                                         ))}
                                     </TableBody>
@@ -1221,6 +1266,44 @@ function DistrictRosterView() {
                     </Card>
                 )
             })}
+             <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
+                <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
+                    {/* The same edit player dialog as in SponsorRosterView will be used */}
+                    <DialogHeader className="p-6 pb-0 border-b shrink-0"><DialogTitle>Edit Player</DialogTitle></DialogHeader>
+                    <div className='flex-1 overflow-y-auto p-6'>
+                    <Form {...playerForm}>
+                        <form id="edit-player-form-district" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
+                            {/* Form fields here, same as sponsor view */}
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <FormField control={playerForm.control} name="studentType" render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                <FormLabel>Student Type</FormLabel>
+                                <FormControl>
+                                    <RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT</FormLabel></FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )} />
+                        </form>
+                    </Form>
+                    </div>
+                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                        <Button variant="ghost" onClick={() => setIsEditPlayerDialogOpen(false)}>Cancel</Button>
+                        <Button type="submit" form="edit-player-form-district">Save Changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

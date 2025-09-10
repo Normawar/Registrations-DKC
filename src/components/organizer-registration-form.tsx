@@ -35,7 +35,10 @@ import {
     Info,
     CalendarIcon,
     Award,
-    CheckCircle
+    CheckCircle,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
 import {
   Dialog,
@@ -125,6 +128,8 @@ const invoiceRecipientSchema = z.object({
 });
 type InvoiceRecipientValues = z.infer<typeof invoiceRecipientSchema>;
 
+type SortableColumnKey = 'lastName' | 'uscfId' | 'regularRating';
+
 // --- Main Component ---
 
 export function OrganizerRegistrationForm({ eventId }: { eventId: string | null }) {
@@ -145,6 +150,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     const [selectedDistrict, setSelectedDistrict] = useState('all');
     const [selectedSchool, setSelectedSchool] = useState('all');
     const [schoolRoster, setSchoolRoster] = useState<MasterPlayer[]>([]);
+    const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
 
     const playerForm = useForm<PlayerFormValues>({
         resolver: zodResolver(playerFormSchema),
@@ -174,13 +180,45 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     }, [selectedSchool, selectedDistrict, masterDatabase, isDbLoaded]);
 
     const filteredSchoolRoster = useMemo(() => {
-        if (searchQuery.length < 2) return schoolRoster;
-        const lowerQuery = searchQuery.toLowerCase();
-        return schoolRoster.filter(p => 
-            `${p.firstName} ${p.lastName}`.toLowerCase().includes(lowerQuery) ||
-            p.uscfId.includes(searchQuery)
-        );
-    }, [schoolRoster, searchQuery]);
+        let filtered = schoolRoster;
+
+        if (searchQuery.length > 0) {
+            const lowerQuery = searchQuery.toLowerCase();
+            filtered = filtered.filter(p => 
+                `${p.firstName} ${p.lastName}`.toLowerCase().includes(lowerQuery) ||
+                p.uscfId.includes(searchQuery)
+            );
+        }
+        
+        if (sortConfig) {
+            filtered.sort((a, b) => {
+                const key = sortConfig.key;
+                let aVal: any = a[key as keyof MasterPlayer] ?? '';
+                let bVal: any = b[key as keyof MasterPlayer] ?? '';
+                
+                if (typeof aVal === 'string' && typeof bVal === 'string') {
+                    return sortConfig.direction === 'ascending' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                }
+                
+                const result = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+                return sortConfig.direction === 'ascending' ? result : -result;
+            });
+        }
+        return filtered;
+    }, [schoolRoster, searchQuery, sortConfig]);
+
+    const requestSort = (key: SortableColumnKey) => {
+        let direction: 'ascending' | 'descending' = 'ascending';
+        if (sortConfig?.key === key && sortConfig.direction === 'ascending') {
+          direction = 'descending';
+        }
+        setSortConfig({ key, direction });
+    };
+      
+    const getSortIcon = (columnKey: SortableColumnKey) => {
+        if (!sortConfig || sortConfig.key !== columnKey) return <ArrowUpDown className="ml-2 h-4 w-4" />;
+        return sortConfig.direction === 'ascending' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+    };
 
     const handleSelectSearchedPlayer = (player: MasterPlayer) => {
         const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < new Date(event?.date ?? new Date());
@@ -592,9 +630,9 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                         <Table>
                             <TableHeader className="sticky top-0 bg-background">
                                 <TableRow>
-                                    <TableHead>Player</TableHead>
-                                    <TableHead>USCF ID</TableHead>
-                                    <TableHead>Rating</TableHead>
+                                    <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('lastName')}>Player {getSortIcon('lastName')}</Button></TableHead>
+                                    <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
+                                    <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
                                     <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
