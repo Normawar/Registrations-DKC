@@ -589,10 +589,15 @@ function ManageEventsContent() {
     }
     
     const csvData = playerList.map(p => ({
-        "USCF ID": p.player.uscfId, "First Name": p.player.firstName, "Last Name": p.player.lastName,
-        "Rating": p.player.regularRating || 'UNR', "Grade": p.player.grade, "Section": p.details.section,
         "Team Code": generateTeamCode({ schoolName: p.player.school, district: p.player.district, studentType: p.player.studentType }),
-        "Student Type": p.player.studentType || 'regular',
+        "StudentType": p.player.studentType || 'regular',
+        "Last Name": p.player.lastName,
+        "First Name": p.player.firstName,
+        "Middle Name": p.player.middleName || '',
+        "USCF ID": p.player.uscfId,
+        "Grade": p.player.grade,
+        "Section": p.details.section,
+        "Rating": p.player.regularRating || 'UNR',
         "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : (type === 'exported' ? 'Exported' : 'Registered')
     }));
 
@@ -904,14 +909,14 @@ function ManageEventsContent() {
                     </div>
                 </div>
             )}
-             <div className='flex items-center gap-4 mt-2'>
-                  <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
-                      Download All Registrations ({registrations.length})
-                  </Button>
-                  {profile?.role === 'organizer' && (
-                    <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
-                  )}
-              </div>
+            <div className='flex items-center gap-4 mt-2'>
+                <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
+                    Download All Registrations ({registrations.length})
+                </Button>
+                {profile?.role === 'organizer' && (
+                  <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
+                )}
+            </div>
           </div>
 
 
