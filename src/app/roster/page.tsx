@@ -11,7 +11,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus, BadgeInfo, Download, Link as LinkIcon } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ArrowUp, ArrowDown, Search, Edit, Check, UserPlus, BadgeInfo, Download, Link as LinkIcon, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -20,7 +20,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -866,7 +866,7 @@ function SponsorRosterView() {
 
 function DistrictRosterView() {
     const { profile } = useSponsorProfile();
-    const { database: allPlayers, isDbLoaded, dbDistricts, toast, updatePlayer } = useMasterDb();
+    const { database: allPlayers, isDbLoaded, dbDistricts, toast, updatePlayer, deletePlayer } = useMasterDb();
     const [selectedSchool, setSelectedSchool] = useState('all');
     const [selectedDistrict, setSelectedDistrict] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
@@ -874,6 +874,8 @@ function DistrictRosterView() {
     const [showActiveOnly, setShowActiveOnly] = useState(false);
     const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
+    const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
 
     const playerForm = useForm<PlayerFormValues>({
         resolver: zodResolver(playerFormSchema),
@@ -1134,6 +1136,23 @@ function DistrictRosterView() {
         setEditingPlayer(null);
     };
 
+    const handleDeletePlayer = (player: MasterPlayer) => {
+        setPlayerToDelete(player);
+        setIsAlertOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (playerToDelete) {
+            await deletePlayer(playerToDelete.id);
+            toast({
+                title: "Player Deleted",
+                description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the database.`,
+            });
+        }
+        setIsAlertOpen(false);
+        setPlayerToDelete(null);
+    };
+
     return (
         <div className="space-y-8">
             <div>
@@ -1252,9 +1271,25 @@ function DistrictRosterView() {
                                                 </TableCell>
                                             )}
                                             <TableCell className="text-right">
-                                                <Button variant="ghost" size="sm" onClick={() => handleEditPlayer(player)}>
-                                                    <Edit className="h-4 w-4" />
-                                                </Button>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <span className="sr-only">Toggle menu</span>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                        <DropdownMenuItem onSelect={() => handleEditPlayer(player)}>
+                                                            <Edit className="mr-2 h-4 w-4" />
+                                                            Edit Player
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onSelect={() => handleDeletePlayer(player)} className="text-destructive">
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            Delete Player
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </TableCell>
                                         </TableRow>
                                         ))}
@@ -1304,6 +1339,20 @@ function DistrictRosterView() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the player record for {playerToDelete?.firstName} {playerToDelete?.lastName} from the database.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete Player</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
