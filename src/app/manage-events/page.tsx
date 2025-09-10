@@ -598,7 +598,8 @@ function ManageEventsContent() {
         "Grade": p.player.grade,
         "Section": p.details.section,
         "Rating": p.player.regularRating || 'UNR',
-        "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : (type === 'exported' ? 'Exported' : 'Registered')
+        "Status": p.details.status === 'withdrawn' ? 'Withdrawn' : (type === 'exported' ? 'Exported' : 'Registered'),
+        "Invoice #": p.invoiceNumber || 'N/A'
     }));
 
     const csv = Papa.unparse(csvData);
@@ -877,17 +878,15 @@ function ManageEventsContent() {
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
-            <DialogDescription>
-              <div className="flex items-center gap-4 text-sm mt-2">
+            <div className="flex items-center gap-4 text-sm mt-2">
                 <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
                 <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
-              </div>
-            </DialogDescription>
+            </div>
           </DialogHeader>
           
           <div className="space-y-4">
             {profile?.role === 'organizer' && (
-                <div className="border border-amber-500 bg-amber-50 rounded-lg p-4 w-auto inline-block">
+                <div className="border border-amber-500 bg-amber-50 rounded-lg p-4 inline-block">
                     <p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p>
                     <div className='flex items-center gap-2'>
                         <Button 
@@ -897,7 +896,7 @@ function ManageEventsContent() {
                             className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
                         >
                           <Download className="mr-2 h-4 w-4" />
-                          Export Registered ({registeredPlayers.length})
+                          Export Registered Players ({registeredPlayers.length})
                         </Button>
                         <Button 
                             onClick={() => handleDownload(exportedPlayers, 'exported')} 
@@ -931,12 +930,13 @@ function ManageEventsContent() {
                     <TableHead>School</TableHead>
                     <TableHead>Section</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Invoice #</TableHead>
                     {profile?.role === 'organizer' && <TableHead className="text-right">Action</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {registrations.length === 0 ? ( <TableRow><TableCell colSpan={profile?.role === 'organizer' ? 6 : 5} className="h-24 text-center">No players registered yet.</TableCell></TableRow> ) : (
-                  registrations.map(({ player, details }) => {
+                {registrations.length === 0 ? ( <TableRow><TableCell colSpan={profile?.role === 'organizer' ? 7 : 6} className="h-24 text-center">No players registered yet.</TableCell></TableRow> ) : (
+                  registrations.map(({ player, details, invoiceNumber }) => {
                     const isWithdrawn = details.status === 'withdrawn';
                     const isExported = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
                     let status: React.ReactNode = <Badge variant="secondary">Registered</Badge>;
@@ -956,6 +956,7 @@ function ManageEventsContent() {
                             <TableCell>{player.school}</TableCell>
                             <TableCell>{details.section}</TableCell>
                             <TableCell>{status}</TableCell>
+                            <TableCell>{invoiceNumber || 'N/A'}</TableCell>
                             {profile?.role === 'organizer' && !isWithdrawn && (
                               <TableCell className="text-right">
                                 <Button variant="ghost" size="sm" onClick={() => togglePlayerStatus(player.id)}>
@@ -1001,5 +1002,6 @@ export default function ManageEventsPage() {
     </DistrictCoordinatorGuard>
   );
 }
+
 
 
