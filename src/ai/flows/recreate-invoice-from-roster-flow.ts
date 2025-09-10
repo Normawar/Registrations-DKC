@@ -109,10 +109,8 @@ const recreateInvoiceFlow = ai.defineFlow(
           totalSubstitutionFee += SUBSTITUTION_FEE;
           return { ...player, lateFee: 0 }; // Substitutions don't get late fees
         }
-        if (!player.isNew) {
-          return { ...player, lateFee: 0 }; // Existing players don't get late fees
-        }
-        // New players (not substitutions) keep their calculated late fees
+        // For existing players (not new, not substitutions), keep their original late fee.
+        // For new players, keep the late fee calculated on the client side.
         return player;
       });
       
