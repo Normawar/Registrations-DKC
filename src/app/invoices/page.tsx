@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -630,12 +631,13 @@ export default function UnifiedInvoiceRegistrations() {
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button 
+                               <Button 
                                 variant="destructive" 
-                                size="icon" 
+                                size="sm" 
                                 onClick={() => handleCancelInvoiceClick(invoice)}
+                                className="gap-1"
                               >
-                                <XCircle className="h-4 w-4" />
+                                Cancel
                               </Button>
                             </>
                           )}
