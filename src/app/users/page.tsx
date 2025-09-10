@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -313,8 +314,8 @@ export default function UsersPage() {
         });
     };
 
-    const selectedDistrict = form.watch('district');
-    const selectedRole = form.watch('role');
+    const selectedRoleInEdit = form.watch('role');
+    const selectedRoleInCreate = createForm.watch('role');
 
     return (
         <AppLayout>
@@ -426,7 +427,7 @@ export default function UsersPage() {
                                         </Select><FormMessage />
                                         </FormItem>
                                     )} />
-                                    {selectedRole === 'sponsor' && (
+                                    {selectedRoleInEdit === 'sponsor' && (
                                         <FormField
                                             control={form.control}
                                             name="isDistrictCoordinator"
@@ -501,7 +502,7 @@ export default function UsersPage() {
                                     <FormField control={createForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={createForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={createForm.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={createForm.control} name="role" render={({ field }) => (
                                         <FormItem><FormLabel>Role</FormLabel>
                                         <Select onValueChange={(value) => createForm.setValue('role', value as User['role'])} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
@@ -514,6 +515,43 @@ export default function UsersPage() {
                                         </Select><FormMessage />
                                         </FormItem>
                                     )} />
+                                    
+                                    {(selectedRoleInCreate === 'sponsor' || selectedRoleInCreate === 'district_coordinator') && (
+                                        <FormField
+                                            control={createForm.control}
+                                            name="district"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>District</FormLabel>
+                                                    <Select onValueChange={(value) => handleDistrictChange(value, createForm)} value={field.value}>
+                                                        <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
+                                                        <SelectContent>
+                                                            {uniqueDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    )}
+                                    {selectedRoleInCreate === 'sponsor' && (
+                                        <FormField
+                                            control={createForm.control}
+                                            name="school"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>School</FormLabel>
+                                                    <Select onValueChange={field.onChange} value={field.value} disabled={!createForm.watch('district')}>
+                                                        <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
+                                                        <SelectContent>
+                                                            {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    )}
                                 </form>
                             </Form>
                         </div>
