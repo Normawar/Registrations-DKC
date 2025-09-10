@@ -37,7 +37,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import Papa from 'papaparse';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsContent } from '@/components/ui/tabs';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 type DistrictSortableColumnKey = SortableColumnKey | 'gt';
@@ -104,7 +104,7 @@ function SponsorRosterView() {
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
   const [pendingPlayer, setPendingPlayer] = useState<MasterPlayer | null>(null);
 
   const { profile, isProfileLoaded } = useSponsorProfile();
@@ -536,12 +536,12 @@ function SponsorRosterView() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')}>Player Name {getSortIcon('lastName')}</Button></TableHead>
-                  <TableHead><Button variant="ghost" onClick={() => requestSort('teamCode')}>Team Code {getSortIcon('teamCode')}</Button></TableHead>
-                  <TableHead><Button variant="ghost" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
-                  <TableHead><Button variant="ghost" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
-                  <TableHead><Button variant="ghost" onClick={() => requestSort('grade')}>Grade {getSortIcon('grade')}</Button></TableHead>
-                  <TableHead><Button variant="ghost" onClick={() => requestSort('section')}>Section {getSortIcon('section')}</Button></TableHead>
+                  <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('lastName')}>Player Name {getSortIcon('lastName')}</Button></TableHead>
+                  <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('teamCode')}>Team Code {getSortIcon('teamCode')}</Button></TableHead>
+                  <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
+                  <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
+                  <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('grade')}>Grade {getSortIcon('grade')}</Button></TableHead>
+                  <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('section')}>Section {getSortIcon('section')}</Button></TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -565,7 +565,7 @@ function SponsorRosterView() {
                       <TableCell>{player.regularRating || 'UNR'}</TableCell>
                       <TableCell>{player.grade}</TableCell>
                       <TableCell>{player.section}</TableCell>
-                       <TableCell>
+                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
@@ -870,7 +870,7 @@ function DistrictRosterView() {
     const { database: allPlayers, isDbLoaded, dbDistricts, toast } = useMasterDb();
     const [selectedSchool, setSelectedSchool] = useState('all');
     const [selectedDistrict, setSelectedDistrict] = useState('all');
-    const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
     const [playerTypeFilter, setPlayerTypeFilter] = useState('all');
     const [showActiveOnly, setShowActiveOnly] = useState(false);
 
@@ -1186,14 +1186,14 @@ function DistrictRosterView() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')}>Player Name {getSortIcon('lastName')}</Button></TableHead>
-                                            <TableHead><Button variant="ghost" onClick={() => requestSort('teamCode')}>Team Code {getSortIcon('teamCode')}</Button></TableHead>
-                                            <TableHead><Button variant="ghost" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
-                                            <TableHead><Button variant="ghost" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
-                                            <TableHead><Button variant="ghost" onClick={() => requestSort('grade')}>Grade {getSortIcon('grade')}</Button></TableHead>
-                                            <TableHead><Button variant="ghost" onClick={() => requestSort('section')}>Section {getSortIcon('section')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('lastName')}>Player Name {getSortIcon('lastName')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('teamCode')}>Team Code {getSortIcon('teamCode')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('grade')}>Grade {getSortIcon('grade')}</Button></TableHead>
+                                            <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('section')}>Section {getSortIcon('section')}</Button></TableHead>
                                             {showGtColumn && (
-                                                <TableHead><Button variant="ghost" onClick={() => requestSort('gt')}>GT {getSortIcon('gt')}</Button></TableHead>
+                                                <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('gt')}>GT {getSortIcon('gt')}</Button></TableHead>
                                             )}
                                         </TableRow>
                                     </TableHeader>
@@ -1251,3 +1251,4 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
+
