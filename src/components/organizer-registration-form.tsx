@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -552,31 +553,35 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     };
 
     const saveConfirmation = async (invoiceId: string, result: any, players: any[], total: number) => {
-        if(!event || !db) return;
-        const selections = stagedPlayers.reduce((acc, p) => {
-          if (players.some((pl:any) => pl.playerName === `${p.firstName} ${p.lastName}`)) {
-            acc[p.id!] = { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType };
-          }
-          return acc;
-        }, {} as Record<string, any>);
+      if(!event || !db) return;
+      const selections = stagedPlayers.reduce((acc, p) => {
+        if (players.some((pl:any) => pl.playerName === `${p.firstName} ${p.lastName}`)) {
+          acc[p.id!] = { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType };
+        }
+        return acc;
+      }, {} as Record<string, any>);
     
-        const newConfirmation = {
-            id: invoiceId, invoiceId: invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date, 
-            submissionTimestamp: new Date().toISOString(), 
-            selections,
-            totalInvoiced: result.newTotalAmount || total, 
-            invoiceUrl: result.invoiceUrl, 
-            invoiceNumber: result.invoiceNumber, 
-            teamCode: result.teamCode || invoiceForm.getValues('teamCode') || `TEAM_${Date.now()}`,
-            invoiceStatus: result.status,
-            purchaserName: result.sponsorName, 
-            schoolName: result.schoolName, 
-            sponsorEmail: result.sponsorEmail, 
-            district: result.district
-        };
+      const newConfirmation = {
+          id: invoiceId, 
+          invoiceId: invoiceId, 
+          eventId: event.id, 
+          eventName: event.name, 
+          eventDate: event.date, 
+          submissionTimestamp: new Date().toISOString(), 
+          selections,
+          totalInvoiced: result.newTotalAmount || total, 
+          invoiceUrl: result.invoiceUrl, 
+          invoiceNumber: result.invoiceNumber, 
+          teamCode: result.teamCode || invoiceForm.getValues('teamCode') || `TEAM_${Date.now()}`,
+          invoiceStatus: result.status,
+          purchaserName: result.sponsorName || invoiceForm.getValues('sponsorName'),
+          schoolName: result.schoolName || invoiceForm.getValues('schoolName'),
+          sponsorEmail: result.sponsorEmail || invoiceForm.getValues('sponsorEmail'),
+          district: result.district
+      };
     
-        const invoiceDocRef = doc(db, 'invoices', invoiceId);
-        await setDoc(invoiceDocRef, newConfirmation);
+      const invoiceDocRef = doc(db, 'invoices', invoiceId);
+      await setDoc(invoiceDocRef, newConfirmation);
     };
     
     const handleCompRegistration = async (recipient: InvoiceRecipientValues) => {
@@ -729,13 +734,10 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                                 onCheckedChange={toggleSelectAll}
                                                 checked={filteredSchoolRoster.length > 0 && filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id))}
                                                 ref={(el) => {
-                                                  if (el) {
-                                                    const isIndeterminate =
-                                                      filteredSchoolRoster.length > 0 &&
-                                                      stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) &&
-                                                      !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id));
-                                                    el.indeterminate = isIndeterminate;
-                                                  }
+                                                    if (el) {
+                                                        const isIndeterminate = filteredSchoolRoster.length > 0 && stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) && !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id));
+                                                        el.indeterminate = isIndeterminate;
+                                                    }
                                                 }}
                                             />
                                         </div>
