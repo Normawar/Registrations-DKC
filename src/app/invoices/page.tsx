@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building, AlertCircle, Edit, Trash2, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building, AlertCircle, Edit, Trash2, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -47,8 +47,8 @@ export default function UnifiedInvoiceRegistrations() {
   const router = useRouter();
 
   const [isAlertOpen, setIsAlertOpen] = useState(false);
-  const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [invoiceToCancel, setInvoiceToCancel] = useState<any | null>(null);
+  const [isCanceling, setIsCanceling] = useState(false);
 
   const { database: allPlayers, dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
   const [districtFilter, setDistrictFilter] = useState('all');
@@ -233,13 +233,13 @@ export default function UnifiedInvoiceRegistrations() {
     router.push(`/organizer-invoice?edit=${invoiceId}`);
   };
 
-  const handleDeleteInvoice = (invoice: any) => {
-    setInvoiceToDelete(invoice);
+  const handleCancelInvoiceClick = (invoice: any) => {
+    setInvoiceToCancel(invoice);
     setIsAlertOpen(true);
   };
 
-  const confirmDelete = async () => {
-    if (!invoiceToDelete || !db || !profile) return;
+  const confirmCancel = async () => {
+    if (!invoiceToCancel || !db || !profile) return;
 
     if (profile?.role !== 'organizer') {
         toast({ 
@@ -251,25 +251,25 @@ export default function UnifiedInvoiceRegistrations() {
         return;
     }
 
-    setIsDeleting(true);
+    setIsCanceling(true);
     try {
       let finalStatus = 'CANCELED'; // Default status
-      if (invoiceToDelete.invoiceId) {
+      if (invoiceToCancel.invoiceId) {
         const result = await cancelInvoice({ 
-            invoiceId: invoiceToDelete.invoiceId,
+            invoiceId: invoiceToCancel.invoiceId,
             requestingUserRole: profile.role
         });
         finalStatus = result.status; // Get the authoritative status from Square
       }
       
-      const invoiceRef = doc(db, 'invoices', invoiceToDelete.id);
+      const invoiceRef = doc(db, 'invoices', invoiceToCancel.id);
       await setDoc(invoiceRef, { status: finalStatus, invoiceStatus: finalStatus }, { merge: true });
       
       await loadData();
       
       toast({ 
         title: 'Invoice Action Completed', 
-        description: `Invoice ${invoiceToDelete.invoiceNumber || invoiceToDelete.id} status is now ${finalStatus}.` 
+        description: `Invoice ${invoiceToCancel.invoiceNumber || invoiceToCancel.id} status is now ${finalStatus}.` 
       });
     } catch (error) {
       console.error("Failed to cancel invoice:", error);
@@ -279,9 +279,9 @@ export default function UnifiedInvoiceRegistrations() {
         description: error instanceof Error ? error.message : 'An unknown error occurred.' 
       });
     } finally {
-      setIsDeleting(false);
+      setIsCanceling(false);
       setIsAlertOpen(false);
-      setInvoiceToDelete(null);
+      setInvoiceToCancel(null);
     }
   };
 
@@ -633,9 +633,9 @@ export default function UnifiedInvoiceRegistrations() {
                               <Button 
                                 variant="destructive" 
                                 size="icon" 
-                                onClick={() => handleDeleteInvoice(invoice)}
+                                onClick={() => handleCancelInvoiceClick(invoice)}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <XCircle className="h-4 w-4" />
                               </Button>
                             </>
                           )}
@@ -681,20 +681,20 @@ export default function UnifiedInvoiceRegistrations() {
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure you want to cancel this invoice?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete record #{invoiceToDelete?.invoiceNumber || invoiceToDelete?.originalDocId}. This action cannot be undone.
+              This will cancel the invoice in Square and update the local status to CANCELED. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Back</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={confirmDelete} 
+              onClick={confirmCancel} 
               className="bg-destructive hover:bg-destructive/90" 
-              disabled={isDeleting}
+              disabled={isCanceling}
             >
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Delete Record
+              {isCanceling && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, Cancel Invoice
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
