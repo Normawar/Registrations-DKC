@@ -17,6 +17,7 @@ import { generateTeamCode } from '@/lib/school-utils';
 import Papa from 'papaparse';
 import { isSameDay, parseISO } from 'date-fns';
 import { useEvents, type Event } from '@/hooks/use-events';
+import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
 
 
 interface LogEntry {
@@ -85,6 +86,145 @@ interface VerificationStats {
   missing: number;
   totalSelections: number;
 }
+
+function GtInvoiceFixer() {
+  const [fixLog, setFixLog] = useState<string[]>([]);
+  const [isFixing, setIsFixing] = useState(false);
+  const [invoicesToFix, setInvoicesToFix] = useState<any[]>([]);
+  const { database: allPlayers } = useMasterDb();
+  const { toast } = useToast();
+
+  const addLog = (message: string) => setFixLog(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+
+  const findInvoicesToFix = async () => {
+    setIsFixing(true);
+    addLog('🔍 Searching for invoices...');
+    const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+    const allInvoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    const psjaUnpaidInvoices = allInvoices.filter(inv => 
+      inv.district === 'PHARR-SAN JUAN-ALAMO ISD' &&
+      inv.status === 'UNPAID' &&
+      inv.selections
+    );
+    
+    addLog(`Found ${psjaUnpaidInvoices.length} unpaid PSJA invoices.`);
+
+    const flaggedInvoices = psjaUnpaidInvoices.filter(inv => {
+      return Object.entries(inv.selections).some(([playerId, selection]: [string, any]) => {
+        if (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing') {
+          const player = allPlayers.find(p => p.id === playerId);
+          return player?.studentType === 'gt';
+        }
+        return false;
+      });
+    });
+
+    setInvoicesToFix(flaggedInvoices);
+    addLog(`Found ${flaggedInvoices.length} invoices with GT players who were charged USCF fees.`);
+    if (flaggedInvoices.length === 0) {
+      toast({ title: "No Invoices to Fix", description: "All unpaid PSJA invoices are correct." });
+    }
+    setIsFixing(false);
+  };
+  
+  const runFix = async () => {
+      setIsFixing(true);
+      addLog(`🚀 Starting fix for ${invoicesToFix.length} invoices...`);
+      let successCount = 0;
+
+      for (const invoice of invoicesToFix) {
+          try {
+              addLog(`--- Processing Invoice #${invoice.invoiceNumber} (${invoice.id}) ---`);
+              
+              const playerIds = Object.keys(invoice.selections);
+              const playersData = playerIds.map(id => allPlayers.find(p => p.id === id)).filter(Boolean) as MasterPlayer[];
+              const eventInfo = await getDoc(doc(db, 'events', invoice.eventId));
+              if (!eventInfo.exists()) {
+                  throw new Error(`Event ${invoice.eventId} not found.`);
+              }
+              const eventDetails = eventInfo.data() as Event;
+
+              // Recreate the player list for the recreation flow
+              const playersToInvoice = playersData.map(player => {
+                  const selection = invoice.selections[player.id];
+                  const lateFeeAmount = (invoice.totalInvoiced / playersData.length) - eventDetails.regularFee - (selection.uscfStatus !== 'current' ? 24 : 0);
+                  
+                  return {
+                      playerName: `${player.firstName} ${player.lastName}`,
+                      uscfId: player.uscfId,
+                      baseRegistrationFee: eventDetails.regularFee,
+                      lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+                      uscfAction: selection.uscfStatus !== 'current',
+                      isGtPlayer: player.studentType === 'gt',
+                  };
+              });
+              
+              addLog(`Recreating invoice for ${playersToInvoice.length} players...`);
+              
+              const result = await recreateInvoiceFromRoster({
+                  originalInvoiceId: invoice.invoiceId,
+                  players: playersToInvoice,
+                  uscfFee: 24, // The flow will correctly ignore this for GT players
+                  sponsorName: invoice.purchaserName,
+                  sponsorEmail: invoice.sponsorEmail,
+                  bookkeeperEmail: invoice.bookkeeperEmail,
+                  gtCoordinatorEmail: invoice.gtCoordinatorEmail,
+                  schoolName: invoice.schoolName,
+                  schoolAddress: invoice.schoolAddress,
+                  schoolPhone: invoice.schoolPhone,
+                  district: invoice.district,
+                  teamCode: invoice.teamCode,
+                  eventName: invoice.eventName,
+                  eventDate: invoice.eventDate,
+              });
+
+              addLog(`✅ Successfully recreated invoice. New ID: ${result.newInvoiceId}, New #: ${result.newInvoiceNumber}`);
+              successCount++;
+          } catch (error: any) {
+              addLog(`❌ ERROR processing invoice ${invoice.id}: ${error.message}`);
+          }
+      }
+      
+      addLog(`--- FIX COMPLETE: ${successCount} of ${invoicesToFix.length} invoices processed successfully. ---`);
+      toast({ title: 'Invoice Fix Complete', description: `${successCount} invoices were successfully recreated.` });
+      setInvoicesToFix([]); // Clear list after running
+      setIsFixing(false);
+  };
+
+
+  return (
+    <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+      <h3 className="text-lg font-semibold text-orange-900 mb-2">Fix PSJA GT Player Invoices</h3>
+      <p className="text-orange-700 text-sm mb-4">
+        This tool finds unpaid invoices for the PSJA district where GT players were incorrectly charged for USCF memberships and recreates them with the correct totals.
+      </p>
+      
+      <div className="flex gap-4">
+        <Button onClick={findInvoicesToFix} disabled={isFixing || invoicesToFix.length > 0}>
+          {isFixing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          {invoicesToFix.length > 0 ? 'Invoices Found' : '1. Find Invoices to Fix'}
+        </Button>
+        {invoicesToFix.length > 0 && (
+          <Button onClick={runFix} disabled={isFixing}>
+            {isFixing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            2. Recreate {invoicesToFix.length} Invoice(s)
+          </Button>
+        )}
+      </div>
+
+      {fixLog.length > 0 && (
+        <div className="mt-4 bg-black text-green-400 p-3 rounded text-xs font-mono max-h-96 overflow-y-auto">
+          {fixLog.map((line, index) => (
+            <div key={index}>{line}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 export function StudentTypeUpdater() {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -801,6 +941,7 @@ export default function DataRepairPage() {
           </p>
         </div>
         
+        <GtInvoiceFixer />
         <StudentTypeUpdater />
         
         <Card>
