@@ -17,6 +17,8 @@ import {
   SidebarInset,
   SidebarMenuBadge,
   SidebarTrigger,
+  SidebarGroup,
+  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -63,27 +65,31 @@ const districtCoordinatorMenuItems = [
     { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
-const organizerMenuItems = [
-  { href: "/profile", icon: User, label: "Profile" },
-  { href: "/manage-events", icon: FolderKanban, label: "Manage Events" },
-  { href: "/payment-authorization", icon: ShieldCheck, label: "Payment Authorization" },
-  { href: "/players", icon: PawnIcon, label: "Master Player Database" },
-  { href: "/schools", icon: School, label: "Schools & Districts" },
-  { href: "/team-codes", icon: Code, label: "Team Codes"},
-  { href: "/roster", icon: Users, label: "District Rosters" },
-  { href: "/users", icon: Users, label: "User Management" },
-  { href: "/invoices", icon: Receipt, label: "All Invoices" },
-  { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
-  { href: "/organizer-registration", icon: RookIcon, label: "Register for Event" },
-  { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
-  { href: "/requests", icon: KnightIcon, label: "Change Requests" },
-  { href: "/organizers/vouchers", icon: FileText, label: "Voucher Management" },
-  { href: "/previous-events", icon: History, label: "Previous Events" },
-  { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
-  { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
-  { href: "/debug-scripts/manual-invoice-update", icon: Wrench, label: "Manual Invoice Fix" },
-  { href: "/debug-scripts/data-migration", icon: Wrench, label: "Data Migration Tool" },
-];
+const organizerMenuStructure = {
+  "Tournament Data": [
+    { href: "/manage-events", icon: FolderKanban, label: "Manage Events" },
+    { href: "/organizer-registration", icon: RookIcon, label: "Register for Event" },
+    { href: "/requests", icon: KnightIcon, label: "Change Requests" },
+    { href: "/organizers/vouchers", icon: FileText, label: "Voucher Management" },
+    { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
+    { href: "/players", icon: PawnIcon, label: "Master Player Database" },
+    { href: "/schools", icon: School, label: "Schools & Districts" },
+    { href: "/team-codes", icon: Code, label: "Team Codes" },
+    { href: "/previous-events", icon: History, label: "Previous Events" },
+  ],
+  "Accounting": [
+    { href: "/payment-authorization", icon: ShieldCheck, label: "Payment Authorization" },
+    { href: "/invoices", icon: Receipt, label: "All Invoices" },
+    { href: "/organizer-invoice", icon: PlusCircle, label: "Create Custom Invoice" },
+  ],
+  "Backend": [
+    { href: "/users", icon: Users, label: "User Management" },
+    { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
+    { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
+    { href: "/debug-scripts/manual-invoice-update", icon: Wrench, label: "Manual Invoice Fix" },
+    { href: "/debug-scripts/data-migration", icon: Wrench, label: "Data Migration Tool" },
+  ]
+};
 
 const individualMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
@@ -186,7 +192,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   const menuItems = 
-    profile?.role === 'organizer' ? organizerMenuItems :
+    profile?.role === 'organizer' ? null :
     profile?.role === 'individual' ? individualMenuItems :
     profile?.role === 'district_coordinator' ? districtCoordinatorMenuItems :
     sponsorMenuItems;
@@ -258,34 +264,46 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </div>
             )}
             <SidebarMenu>
-              {menuItems.map((item) => {
-                let badgeCount = 0;
-                if (item.href === '/requests') {
-                  badgeCount = pendingRequestsCount;
-                } else if (item.href === '/payment-authorization') {
-                  badgeCount = pendingPaymentsCount;
-                }
-
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={pathname.startsWith(item.href)}
-                      tooltip={{ children: item.label, side: "right" }}
-                    >
-                      <Link href={item.href}>
-                        <item.icon className="w-5 h-5" />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                    {badgeCount > 0 && (
-                      <SidebarMenuBadge className="bg-destructive text-destructive-foreground">
-                        {badgeCount}
-                      </SidebarMenuBadge>
-                    )}
-                  </SidebarMenuItem>
-                );
-              })}
+              {profile?.role === 'organizer' ? (
+                Object.entries(organizerMenuStructure).map(([groupName, items]) => (
+                  <SidebarGroup key={groupName}>
+                    <SidebarGroupLabel>{groupName}</SidebarGroupLabel>
+                    {items.map(item => {
+                        let badgeCount = 0;
+                        if (item.href === '/requests') badgeCount = pendingRequestsCount;
+                        else if (item.href === '/payment-authorization') badgeCount = pendingPaymentsCount;
+                        return (
+                           <SidebarMenuItem key={item.href}>
+                              <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)} tooltip={{ children: item.label, side: "right" }}>
+                                  <Link href={item.href}>
+                                      <item.icon className="w-5 h-5" />
+                                      <span>{item.label}</span>
+                                  </Link>
+                              </SidebarMenuButton>
+                              {badgeCount > 0 && ( <SidebarMenuBadge className="bg-destructive text-destructive-foreground">{badgeCount}</SidebarMenuBadge> )}
+                          </SidebarMenuItem>
+                        )
+                    })}
+                  </SidebarGroup>
+                ))
+              ) : (
+                menuItems?.map((item) => {
+                  let badgeCount = 0;
+                  if (item.href === '/requests') badgeCount = pendingRequestsCount;
+                  else if (item.href === '/payment-authorization') badgeCount = pendingPaymentsCount;
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)} tooltip={{ children: item.label, side: "right" }}>
+                        <Link href={item.href}>
+                          <item.icon className="w-5 h-5" />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      {badgeCount > 0 && ( <SidebarMenuBadge className="bg-destructive text-destructive-foreground">{badgeCount}</SidebarMenuBadge> )}
+                    </SidebarMenuItem>
+                  );
+                })
+              )}
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter>
