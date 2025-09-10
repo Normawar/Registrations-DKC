@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { doc, getDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
@@ -13,11 +13,7 @@ import { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { cn } from '@/lib/utils';
 import { schoolData } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
-
-// Temporary debug export - remove after use
-if (typeof window !== 'undefined') {
-  (window as any).debugDB = { db, getDocs, collection };
-}
+import Papa from 'papaparse';
 
 interface LogEntry {
   type: 'success' | 'error' | 'info';
@@ -49,13 +45,6 @@ export default function DataRepairPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    // Temporary debug export - remove after use
-    if (typeof window !== 'undefined') {
-        (window as any).debugDB = { db, getDocs, collection };
-    }
-  }, []);
-
   const addLog = (type: LogEntry['type'], message: string) => {
     setLogs(prev => [...prev, { type, message }]);
   };
@@ -83,6 +72,94 @@ export default function DataRepairPage() {
     }
     
     return { school: 'Unknown School', district: DISTRICT_NAME };
+  };
+
+  const repairInvoiceEmailFields = async () => {
+    setIsProcessing(true);
+    addLog('info', 'Starting email field repair process...');
+    
+    try {
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const usersMap = new Map();
+        usersSnapshot.forEach(doc => {
+            const userData = doc.data();
+            usersMap.set(userData.email, userData);
+        });
+        addLog('info', `Loaded ${usersMap.size} user profiles.`);
+
+        const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+        const batch = writeBatch(db);
+        let updatedCount = 0;
+
+        invoicesSnapshot.forEach(doc => {
+            const invoice = doc.data();
+            const sponsorEmail = invoice.sponsorEmail || invoice.purchaserEmail;
+
+            if (sponsorEmail && usersMap.has(sponsorEmail)) {
+                const userProfile = usersMap.get(sponsorEmail);
+                let needsUpdate = false;
+                const updateData: any = {};
+
+                if (!invoice.bookkeeperEmail && userProfile.bookkeeperEmail) {
+                    updateData.bookkeeperEmail = userProfile.bookkeeperEmail;
+                    needsUpdate = true;
+                }
+                if (!invoice.gtCoordinatorEmail && userProfile.gtCoordinatorEmail) {
+                    updateData.gtCoordinatorEmail = userProfile.gtCoordinatorEmail;
+                    needsUpdate = true;
+                }
+
+                if (needsUpdate) {
+                    batch.update(doc.ref, updateData);
+                    updatedCount++;
+                    addLog('info', `Staged update for invoice ${doc.id} to add missing email fields.`);
+                }
+            }
+        });
+
+        if (updatedCount > 0) {
+            await batch.commit();
+            addLog('success', `Email Repair Complete: Successfully updated ${updatedCount} invoices.`);
+            toast({ title: 'Repair Complete', description: `${updatedCount} invoices were updated with missing email fields.` });
+        } else {
+            addLog('info', 'No invoices needed email field repairs.');
+            toast({ title: 'No Repairs Needed', description: 'All invoices already have the necessary email fields.' });
+        }
+
+    } catch (e: any) {
+        addLog('error', `Email repair failed: ${e.message}`);
+        toast({ variant: 'destructive', title: 'Repair Failed', description: e.message });
+    }
+
+    setIsProcessing(false);
+  };
+
+  const exportCollectionData = async (collectionName: 'invoices' | 'players') => {
+    setIsProcessing(true);
+    addLog('info', `Exporting ${collectionName} collection...`);
+    try {
+      const snapshot = await getDocs(collection(db, collectionName));
+      const data: any[] = [];
+      snapshot.forEach(doc => {
+        data.push({ id: doc.id, ...doc.data() });
+      });
+
+      const csv = Papa.unparse(data);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${collectionName}_export_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      addLog('success', `Successfully exported ${data.length} documents from ${collectionName}.`);
+    } catch (e: any) {
+      addLog('error', `Export failed: ${e.message}`);
+    }
+    setIsProcessing(false);
   };
 
   const parseAndProcessData = async () => {
@@ -208,10 +285,10 @@ export default function DataRepairPage() {
               uscfId: 'NEW',
               firstName,
               lastName,
-              school: school || 'Unknown School',
-              district: district || 'Unknown District',
+              school,
+              district,
               grade: 'N/A',
-              section: section, // Use school-inferred section
+              section, // Use school-inferred section
               email: 'placeholder@example.com',
               zipCode: '00000',
               events: 0,
@@ -277,36 +354,6 @@ export default function DataRepairPage() {
     setIsProcessing(false);
   };
 
-  const exportFullInvoiceData = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, 'invoices'));
-      const data: any[] = [];
-      
-      snapshot.forEach(doc => {
-        data.push({
-          id: doc.id,
-          ...doc.data()
-        });
-      });
-      
-      // Download as JSON file
-      const blob = new Blob([JSON.stringify(data, null, 2)], 
-        { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `all_invoices_complete_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      console.log(`Exported ${data.length} complete invoices`);
-    } catch (error) {
-      console.error('Export failed:', error);
-    }
-  };
-
   return (
     <AppLayout>
       <div className="space-y-8 max-w-4xl mx-auto">
@@ -317,6 +364,35 @@ export default function DataRepairPage() {
             This tool will automatically extract school information, player names, and USCF IDs.
           </p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Email Field Repair</CardTitle>
+            <CardDescription>
+              Repair missing bookkeeper and GT coordinator emails by pulling them from user profiles.
+              This fixes invoices created when the automatic population wasn't working.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              This will match sponsor emails to user profiles and populate missing:
+            </p>
+            <ul className="text-sm text-muted-foreground mt-2 ml-4 list-disc">
+              <li>bookkeeperEmail from user profile</li>
+              <li>gtCoordinatorEmail from user profile</li>
+            </ul>
+          </CardContent>
+          <CardFooter>
+            <Button 
+              onClick={repairInvoiceEmailFields} 
+              disabled={isProcessing}
+              variant="secondary"
+            >
+              {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isProcessing ? 'Repairing...' : 'Repair Email Fields'}
+            </Button>
+          </CardFooter>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -336,12 +412,25 @@ export default function DataRepairPage() {
               disabled={isProcessing}
             />
           </CardContent>
-          <CardFooter className="flex justify-between">
+          <CardFooter className="flex gap-2">
             <Button onClick={parseAndProcessData} disabled={isProcessing}>
               {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isProcessing ? 'Processing...' : 'Process Pasted Data'}
             </Button>
-            <Button onClick={exportFullInvoiceData} variant="outline">Export All Invoices (Complete)</Button>
+            <Button 
+              variant="outline" 
+              onClick={() => exportCollectionData('invoices')}
+              disabled={isProcessing}
+            >
+              Export Invoices
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => exportCollectionData('players')}
+              disabled={isProcessing}
+            >
+              Export Players
+            </Button>
           </CardFooter>
         </Card>
 
