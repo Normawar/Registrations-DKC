@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { differenceInHours, isSameDay } from 'date-fns';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 
 import { AppLayout } from "@/components/app-layout";
@@ -78,12 +78,13 @@ function OrganizerInvoiceContent() {
   useEffect(() => {
     const editId = searchParams.get('edit');
     if (editId) {
-      const allInvoicesRaw = localStorage.getItem('all_invoices');
-      if (allInvoicesRaw) {
-        const allInvoices = JSON.parse(allInvoicesRaw);
-        const invoiceToEdit = allInvoices.find((inv: any) => inv.id === editId);
+      const fetchInvoice = async () => {
+        if (!db) return;
+        const docRef = doc(db, 'invoices', editId);
+        const docSnap = await getDoc(docRef);
         
-        if (invoiceToEdit) {
+        if (docSnap.exists()) {
+          const invoiceToEdit = { id: docSnap.id, ...docSnap.data() };
           setOriginalInvoice(invoiceToEdit);
           setIsEditing(true);
           let lineItems: z.infer<typeof lineItemSchema>[] = [];
@@ -111,30 +112,30 @@ function OrganizerInvoiceContent() {
             lineItems = invoiceToEdit.lineItems;
           }
           
-          // In your useEffect, ensure no undefined values
-form.reset({
-  invoiceId: invoiceToEdit.invoiceId || '',
-  schoolName: invoiceToEdit.schoolName || '',
-  sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName || '',
-  sponsorEmail: invoiceToEdit.sponsorEmail || '',
-  invoiceTitle: (invoiceToEdit.description || invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim(),
-  lineItems: lineItems.length > 0 ? lineItems.map(item => ({
-    ...item,
-    id: item.id || '',
-    name: item.name || '',
-    amount: item.amount || 0,
-    note: item.note || '',
-    isUscf: item.isUscf || false
-  })) : [{ 
-    id: '', 
-    name: '', 
-    amount: 0, 
-    note: '', 
-    isUscf: false 
-  }],
-});
+          form.reset({
+            invoiceId: invoiceToEdit.invoiceId || '',
+            schoolName: invoiceToEdit.schoolName || '',
+            sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName || '',
+            sponsorEmail: invoiceToEdit.sponsorEmail || '',
+            invoiceTitle: (invoiceToEdit.description || invoiceToEdit.invoiceTitle || '').split('-rev.')[0].trim(),
+            lineItems: lineItems.length > 0 ? lineItems.map(item => ({
+              ...item,
+              id: item.id || '',
+              name: item.name || '',
+              amount: item.amount || 0,
+              note: item.note || '',
+              isUscf: item.isUscf || false
+            })) : [{ 
+              id: '', 
+              name: '', 
+              amount: 0, 
+              note: '', 
+              isUscf: false 
+            }],
+          });
         }
-      }
+      };
+      fetchInvoice();
     }
   }, [searchParams, form, events, allPlayers]);
 

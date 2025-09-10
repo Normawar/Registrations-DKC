@@ -34,7 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dialog";
 import { SponsorGuard } from "@/components/auth-guard";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/services/firestore-service";
 
 function DashboardContent() {
@@ -56,18 +56,18 @@ function DashboardContent() {
   const loadRecentActivity = useCallback(async () => {
     if (!db || !profile) return;
 
-    const invoicesCol = collection(db, 'invoices');
-    const invoiceSnapshot = await getDocs(invoicesCol);
-    const allInvoices = invoiceSnapshot.docs.map(doc => doc.data());
+    let q = query(collection(db, 'invoices'));
 
-    let userInvoices;
     if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
-      userInvoices = allInvoices.filter(inv => inv.district === profile.district && inv.schoolName === profile.school);
-    } else {
-      userInvoices = allInvoices;
+      q = query(q, where('district', '==', profile.district), where('schoolName', '==', profile.school));
+    } else if (profile.role === 'individual') {
+        q = query(q, where('parentEmail', '==', profile.email));
     }
+
+    const invoiceSnapshot = await getDocs(q);
+    const allInvoices = invoiceSnapshot.docs.map(doc => doc.data());
     
-    const activity = userInvoices
+    const activity = allInvoices
       .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime())
       .slice(0, 5)
       .map(inv => {

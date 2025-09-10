@@ -25,7 +25,7 @@ import { FileText, ImageIcon, History, Eye } from "lucide-react";
 import { useEvents } from '@/hooks/use-events';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 
 export default function PreviousEventsPage() {
@@ -36,16 +36,25 @@ export default function PreviousEventsPage() {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
     const loadData = useCallback(async () => {
-        if (!db) return;
-        const invoicesCol = collection(db, 'invoices');
-        const invoiceSnapshot = await getDocs(invoicesCol);
+        if (!db || !profile) return;
+
+        let q = query(collection(db, 'invoices'));
+        if(profile.role === 'sponsor'){
+            q = query(q, where('sponsorEmail', '==', profile.email));
+        } else if (profile.role === 'individual'){
+            q = query(q, where('parentEmail', '==', profile.email));
+        }
+
+        const invoiceSnapshot = await getDocs(q);
         const allConfirmations = invoiceSnapshot.docs.map(doc => doc.data());
         setConfirmations(allConfirmations);
-    }, []);
+    }, [profile]);
     
     useEffect(() => {
-      loadData();
-    }, [loadData]);
+        if(profile) {
+            loadData();
+        }
+    }, [loadData, profile]);
 
 
     const previousEvents = useMemo(() => {
@@ -60,11 +69,7 @@ export default function PreviousEventsPage() {
     const findConfirmationForEvent = (eventId: string) => {
         if (!profile) return null;
         
-        return confirmations.find(conf => 
-            conf.eventId === eventId &&
-            conf.schoolName === profile.school &&
-            conf.district === profile.district
-        );
+        return confirmations.find(conf => conf.eventId === eventId);
     };
     
     const handleViewInvoice = (confirmation: any) => {
