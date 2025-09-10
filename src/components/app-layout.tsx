@@ -56,7 +56,7 @@ const sponsorMenuItems = [
 const districtCoordinatorMenuItems = [
     { href: "/profile", icon: User, label: "Profile" },
     { href: "/district-dashboard", icon: LayoutDashboard, label: "District Dashboard" },
-    { href: "/roster", icon: PawnIcon, label: "District Rosters" },
+    { href: "/roster", icon: Users, label: "District Rosters" },
     { href: "/district-registrations", icon: UserCheck, label: "District Registrations" },
     { href: "/invoices", icon: Receipt, label: "District Invoices" },
     { href: "/requests", icon: KnightIcon, label: "District Requests" },
