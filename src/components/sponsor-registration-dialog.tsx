@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -20,6 +21,7 @@ import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Checkbox } from './ui/checkbox';
 
 
 interface SponsorRegistrationDialogProps {
@@ -397,6 +399,24 @@ export function SponsorRegistrationDialog({
   const handleBackToSelection = () => {
     setShowConfirmation(false);
   };
+  
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const newSelections = rosterPlayers
+        .filter(student => !getStudentRegistrationStatus(student).isRegistered)
+        .reduce((acc, student) => {
+          const isExpired = !student.uscfExpiration || new Date(student.uscfExpiration) < new Date(event?.date);
+          acc[student.id] = {
+            section: student.section || 'High School K-12',
+            uscfStatus: student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
+          };
+          return acc;
+        }, {} as Record<string, { section: string; uscfStatus: string }>);
+      setSelectedStudents(newSelections);
+    } else {
+      setSelectedStudents({});
+    }
+  };
 
   if (!event) return null;
 
@@ -464,7 +484,18 @@ export function SponsorRegistrationDialog({
               </div>
             ) : (
               <div className="grid gap-4">
-                <h3 className="text-lg font-semibold">Select Students to Register</h3>
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Select Students to Register</h3>
+                    <div className="flex items-center space-x-2">
+                        <Checkbox
+                            id="select-all"
+                            onCheckedChange={toggleSelectAll}
+                            checked={rosterPlayers.length > 0 && rosterPlayers.every(p => getStudentRegistrationStatus(p).isRegistered || !!selectedStudents[p.id])}
+                            indeterminate={Object.keys(selectedStudents).length > 0 && Object.keys(selectedStudents).length < rosterPlayers.filter(p => !getStudentRegistrationStatus(p).isRegistered).length}
+                        />
+                        <Label htmlFor="select-all">Select All</Label>
+                    </div>
+                </div>
                 
                 {rosterPlayers.map(student => {
                   const status = getStudentRegistrationStatus(student);

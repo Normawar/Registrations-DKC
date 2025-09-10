@@ -957,7 +957,7 @@ function DistrictRosterView() {
             return sortConfig.direction === 'ascending' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
           }
           
-          const result = aVal < bVal ? -1 : aVal > bVal ? 1 : -1;
+          const result = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
           return sortConfig.direction === 'ascending' ? result : -result;
         });
       }
@@ -1381,3 +1381,4 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
+

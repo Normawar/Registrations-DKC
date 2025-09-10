@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -80,6 +81,7 @@ import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
+import { Checkbox } from './ui/checkbox';
 
 // --- Types and Schemas ---
 
@@ -242,6 +244,37 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         };
         setStagedPlayers(prev => [...prev, playerToStage]);
         toast({ title: "Player Added", description: `${player.firstName} ${player.lastName} has been staged for registration.` });
+    };
+
+    const toggleSelectAll = (checked: boolean) => {
+        if (checked) {
+            const playersToStage = filteredSchoolRoster
+                .filter(p => !stagedPlayers.some(sp => sp.id === p.id))
+                .map(player => {
+                    const isExpired = !player.uscfExpiration || new Date(player.uscfExpiration) < new Date(event?.date ?? new Date());
+                    const uscfStatus = player.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
+                    return {
+                        id: player.id,
+                        firstName: player.firstName,
+                        lastName: player.lastName,
+                        uscfId: player.uscfId,
+                        regularRating: player.regularRating,
+                        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+                        dob: player.dob ? new Date(player.dob) : undefined,
+                        email: player.email,
+                        zipCode: player.zipCode,
+                        grade: player.grade,
+                        section: player.section,
+                        uscfStatus: uscfStatus,
+                        studentType: player.studentType,
+                        byes: { round1: 'none', round2: 'none' }
+                    };
+                });
+            setStagedPlayers(prev => [...prev, ...playersToStage]);
+        } else {
+            const rosterIds = new Set(filteredSchoolRoster.map(p => p.id));
+            setStagedPlayers(prev => prev.filter(p => !rosterIds.has(p.id!)));
+        }
     };
 
 
@@ -447,7 +480,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
           const description = error instanceof Error ? error.message : "An unknown error occurred.";
           toast({ variant: "destructive", title: "Submission Error", description });
         } finally {
-          setIsSubmitting(false);
+            setIsSubmitting(false);
         }
       };
 
@@ -673,7 +706,17 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                     <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('lastName')}>Player {getSortIcon('lastName')}</Button></TableHead>
                                     <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
                                     <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('regularRating')}>Rating {getSortIcon('regularRating')}</Button></TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
+                                    <TableHead className="text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <Label htmlFor="select-all" className="sr-only">Select All</Label>
+                                            <Checkbox
+                                                id="select-all"
+                                                onCheckedChange={toggleSelectAll}
+                                                checked={filteredSchoolRoster.length > 0 && filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id))}
+                                                indeterminate={filteredSchoolRoster.some(p => stagedPlayers.some(sp => sp.id === p.id)) && !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id))}
+                                            />
+                                        </div>
+                                    </TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
