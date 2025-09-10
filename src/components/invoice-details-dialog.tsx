@@ -552,15 +552,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
   
     return [];
   }, [masterDatabase]);
-
-  const uscfPurchases = useMemo(() => {
-    if (!confirmation?.selections) return [];
-    const playerIds = Object.keys(confirmation.selections).filter(playerId => 
-      confirmation.selections[playerId].uscfStatus === 'new' || 
-      confirmation.selections[playerId].uscfStatus === 'renewing'
-    );
-    return masterDatabase.filter(player => playerIds.includes(player.id));
-  }, [confirmation, masterDatabase]);
   
   const calculatedTotalPaid = useMemo(() => {
     if (!confirmation?.paymentHistory) return 0;
