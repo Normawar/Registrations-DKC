@@ -8,7 +8,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { createInvoice, CreateInvoiceInput, CreateInvoiceOutput } from './create-invoice-flow';
+import { createInvoice, type CreateInvoiceInput, type CreateInvoiceOutput } from './create-invoice-flow';
 
 const PlayerToInvoiceSchema = z.object({
   playerName: z.string(),
@@ -39,9 +39,16 @@ export const CreatePsjaSplitInvoiceInputSchema = z.object({
 });
 export type CreatePsjaSplitInvoiceInput = z.infer<typeof CreatePsjaSplitInvoiceInputSchema>;
 
+const CreateInvoiceOutputSchema = z.object({
+  invoiceId: z.string().describe('The unique ID for the generated invoice.'),
+  invoiceNumber: z.string().optional().describe('The user-facing invoice number.'),
+  status: z.string().describe('The status of the invoice (e.g., DRAFT, PUBLISHED).'),
+  invoiceUrl: z.string().url().describe('The URL to view the invoice online.'),
+});
+
 export const CreatePsjaSplitInvoiceOutputSchema = z.object({
-  gtInvoice: CreateInvoiceOutput.optional(),
-  independentInvoice: CreateInvoiceOutput.optional(),
+  gtInvoice: CreateInvoiceOutputSchema.optional(),
+  independentInvoice: CreateInvoiceOutputSchema.optional(),
 });
 export type CreatePsjaSplitInvoiceOutput = z.infer<typeof CreatePsjaSplitInvoiceOutputSchema>;
 

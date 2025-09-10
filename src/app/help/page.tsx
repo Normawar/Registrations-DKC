@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+import React from 'react';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -114,7 +115,7 @@ export default function HelpPage() {
                                                 onClick={() => handleTopicSelect(topic)}
                                                 className="w-full text-left p-2 rounded-md hover:bg-accent flex items-center gap-3 transition-colors"
                                             >
-                                                <topic.icon className="h-5 w-5 text-primary" />
+                                                {React.createElement(topic.icon || FileQuestion, { className: "h-5 w-5 text-primary" })}
                                                 <span className="font-medium">{topic.title}</span>
                                             </button>
                                         </li>
@@ -131,7 +132,7 @@ export default function HelpPage() {
                                 {selectedTopic ? (
                                     <article>
                                         <div className="flex items-center gap-4 mb-4">
-                                            <selectedTopic.icon className="h-8 w-8 text-primary" />
+                                            {React.createElement(selectedTopic.icon || FileQuestion, { className: "h-8 w-8 text-primary" })}
                                             <h1 className="text-3xl font-bold font-headline">{selectedTopic.title}</h1>
                                         </div>
                                         <MarkdownRenderer content={selectedTopic.content} />
