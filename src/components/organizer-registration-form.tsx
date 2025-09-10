@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -72,6 +70,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
+import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Label } from './ui/label';
@@ -112,6 +111,7 @@ type PlayerFormValues = z.infer<typeof playerFormSchema>;
 type StagedPlayer = PlayerFormValues & {
     uscfStatus: 'current' | 'new' | 'renewing';
     byes: { round1: string; round2: string };
+    studentType?: 'gt' | 'independent';
 };
 
 const invoiceRecipientSchema = z.object({
@@ -210,11 +210,13 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const eventDate = new Date(event.date);
         const isExpired = !values.uscfExpiration || values.uscfExpiration < eventDate;
         const uscfStatus = values.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current';
+        const playerDetails = masterDatabase.find(p => p.id === values.id);
 
         const playerToStage: StagedPlayer = {
             ...values,
             id: values.id || `temp-${Date.now()}`,
             uscfStatus,
+            studentType: playerDetails?.studentType,
             byes: { round1: 'none', round2: 'none' }
         };
 
@@ -244,6 +246,18 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
 
     const handleGenerateTeamInvoice = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db) return;
+        
+        const district = masterDatabase.find(p => p.school === recipient.schoolName)?.district;
+        const isPsjaDistrict = district === 'PHARR-SAN JUAN-ALAMO ISD';
+
+        const hasGt = stagedPlayers.some(p => p.studentType === 'gt');
+        const hasIndependent = stagedPlayers.some(p => p.studentType !== 'gt');
+        
+        if (isPsjaDistrict && hasGt && hasIndependent) {
+            await handlePsjaSplitInvoice(recipient, district);
+            return;
+        }
+
         setIsSubmitting(true);
         let registrationFeePerPlayer = event.regularFee;
         const eventDate = new Date(event.date);
@@ -259,6 +273,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 baseRegistrationFee: event.regularFee,
                 lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
                 uscfAction: p.uscfStatus !== 'current',
+                isGtPlayer: p.studentType === 'gt',
             };
         });
 
@@ -274,6 +289,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         try {
             const result = await createInvoice({
                 ...recipient,
+                district,
                 eventName: event.name,
                 eventDate: event.date,
                 uscfFee,
@@ -283,9 +299,9 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             const newConfirmation = {
                 id: result.invoiceId, invoiceId: result.invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date, 
                 submissionTimestamp: new Date().toISOString(), 
-                selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus } }), {}),
+                selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType } }), {}),
                 totalInvoiced, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: recipient.teamCode, invoiceStatus: result.status,
-                purchaserName: recipient.sponsorName, schoolName: recipient.schoolName, sponsorEmail: recipient.sponsorEmail
+                purchaserName: recipient.sponsorName, schoolName: recipient.schoolName, sponsorEmail: recipient.sponsorEmail, district
             };
 
             const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
@@ -304,6 +320,56 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             setIsSubmitting(false);
         }
     };
+    
+    const handlePsjaSplitInvoice = async (recipient: InvoiceRecipientValues, district: string) => {
+        if (!event) return;
+        setIsSubmitting(true);
+    
+        const { fee: currentFee } = getFeeForEvent();
+        const lateFeeAmount = currentFee - event.regularFee;
+    
+        const playersToInvoice = stagedPlayers.map(p => ({
+            playerName: `${p.firstName} ${p.lastName}`,
+            uscfId: p.uscfId,
+            baseRegistrationFee: event.regularFee,
+            lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+            uscfAction: p.uscfStatus !== 'current',
+            isGtPlayer: p.studentType === 'gt'
+        }));
+    
+        try {
+          const result = await createPsjaSplitInvoice({
+            ...recipient,
+            district: 'PHARR-SAN JUAN-ALAMO ISD',
+            eventName: event.name,
+            eventDate: event.date,
+            uscfFee: 24,
+            players: playersToInvoice
+          });
+    
+          if (result.gtInvoice) {
+            const gtPlayers = stagedPlayers.filter(p => p.studentType === 'gt');
+            await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, district);
+          }
+    
+          if (result.independentInvoice) {
+            const indPlayers = stagedPlayers.filter(p => p.studentType !== 'gt');
+            await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, district);
+          }
+          
+          toast({ title: "Split Invoices Created Successfully!", description: "Separate invoices for GT and Independent players have been created."});
+          
+          setStagedPlayers([]);
+          setIsInvoiceDialogOpen(false);
+          
+        } catch (error) {
+          console.error("Failed to create split invoice:", error);
+          const description = error instanceof Error ? error.message : "An unknown error occurred.";
+          toast({ variant: "destructive", title: "Submission Error", description });
+        } finally {
+          setIsSubmitting(false);
+        }
+      };
 
     const handleGenerateIndividualInvoices = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db || stagedPlayers.length === 0) return;
@@ -343,16 +409,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     description: `Invoice for ${player.firstName} ${player.lastName}`
                 });
 
-                const newConfirmation = {
-                    id: result.invoiceId, invoiceId: result.invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date,
-                    submissionTimestamp: new Date().toISOString(),
-                    selections: { [player.id!]: { byes: player.byes, section: player.section, uscfStatus: player.uscfStatus } },
-                    totalInvoiced, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: recipient.teamCode, invoiceStatus: result.status,
-                    purchaserName: recipient.sponsorName, schoolName: recipient.schoolName, sponsorEmail: recipient.sponsorEmail
-                };
-                
-                const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
-                await setDoc(invoiceDocRef, newConfirmation);
+                await saveConfirmation(result.invoiceId, result, [player], totalInvoiced);
                 return { success: true, invoiceNumber: result.invoiceNumber };
 
             } catch (error) {
@@ -377,12 +434,29 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setIsSubmitting(false);
     };
 
+    const saveConfirmation = async (invoiceId: string, result: any, players: StagedPlayer[], total: number) => {
+        if(!event || !db) return;
+        const playerSelections = players.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType } }), {});
+    
+        const newConfirmation = {
+            id: invoiceId, invoiceId: invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date, 
+            submissionTimestamp: new Date().toISOString(), 
+            selections: playerSelections,
+            totalInvoiced: total, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: result.teamCode, invoiceStatus: result.status,
+            purchaserName: result.sponsorName, schoolName: result.schoolName, sponsorEmail: result.sponsorEmail, district: result.district
+        };
+    
+        const invoiceDocRef = doc(db, 'invoices', invoiceId);
+        await setDoc(invoiceDocRef, newConfirmation);
+    };
+    
     const handleCompRegistration = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db) return;
         setIsSubmitting(true);
         try {
             const confirmationId = `COMP_${Date.now()}`;
-
+            const district = masterDatabase.find(p => p.school === recipient.schoolName)?.district;
+            
             const newConfirmation = {
                 id: confirmationId, invoiceId: confirmationId, eventId: event.id,
                 eventName: event.name,
@@ -395,6 +469,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 purchaserName: recipient.sponsorName,
                 schoolName: recipient.schoolName,
                 sponsorEmail: recipient.sponsorEmail,
+                district
             };
 
             const invoiceDocRef = doc(db, 'invoices', confirmationId);
