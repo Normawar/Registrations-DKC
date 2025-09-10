@@ -1,4 +1,14 @@
 
+export type SchoolNote = {
+  id: string;
+  type: 'lesson' | 'general';
+  title: string;
+  content: string;
+  timestamp: string; // ISO date string
+  poFileUrl?: string;
+  poFileName?: string;
+};
+
 export type School = {
   district: string;
   schoolName: string;
@@ -11,6 +21,7 @@ export type School = {
   students: string;
   state: string;
   county: string;
+  notes?: SchoolNote[];
 };
 
 export const schoolData: School[] = [
@@ -441,7 +452,7 @@ export const schoolData: School[] = [
   { "district": "JUBILEE ACADEMIES", "schoolName": "JUBILEE LEADERSHIP ACADEMY", "streetAddress": "4434 ROLAND", "city": "SAN ANTONIO", "zip": "78222", "zip4": "", "phone": "(956)641-4150", "charter": "Yes", "students": "590", "state": "TX", "county": "Cameron County" },
   { "district": "JUBILEE ACADEMIES", "schoolName": "JUBILEE LIVING WAY", "streetAddress": "4434 ROLAND RD", "city": "SAN ANTONIO", "zip": "78222", "zip4": "", "phone": "(956)708-2020", "charter": "Yes", "students": "385", "state": "TX", "county": "Cameron County" },
   { "district": "SAN BENITO CISD", "schoolName": "JUDGE OSCAR DE LA FUENTE EL", "streetAddress": "2700 S SAM HOUSTON", "city": "SAN BENITO", "zip": "78586", "zip4": "", "phone": "(956)361-6820", "charter": "No", "students": "236", "state": "TX", "county": "Cameron County" },
-  { "district": "BROWNSVILLE ISD", "schoolName": "KELLER EL", "streetAddress": "2540 W ALTON GLOOR", "city": "BROWNSVILLE", "zip": "78520", "zip4": "", "phone": "(956)547-4400", "charter": "No", "students": "515", "state": "TX", "county": "Cameron County" },
+  { "district": "BROWNSVILLE ISD", "schoolName": "KELLER EL", "streetAddress": "2540 W ALTON GLOOR BLVD", "city": "BROWNSVILLE", "zip": "78520", "zip4": "", "phone": "(956)547-4400", "charter": "No", "students": "515", "state": "TX", "county": "Cameron County" },
   { "district": "SAN BENITO CISD", "schoolName": "LA ENCANTADA EL", "streetAddress": "35001 FM 1577", "city": "SAN BENITO", "zip": "78586", "zip4": "4501", "phone": "(956)361-6760", "charter": "No", "students": "482", "state": "TX", "county": "Cameron County" },
   { "district": "LA FERIA ISD", "schoolName": "LA FERIA ACADEMY", "streetAddress": "505 N VILLARREAL ST", "city": "LA FERIA", "zip": "78559", "zip4": "", "phone": "(956)797-8360", "charter": "No", "students": "19", "state": "TX", "county": "Cameron County" },
   { "district": "LA FERIA ISD", "schoolName": "LA FERIA EARLY COLLEGE H S", "streetAddress": "901 N CANAL ST", "city": "LA FERIA", "zip": "78559", "zip4": "5105", "phone": "(956)797-8370", "charter": "No", "students": "912", "state": "TX", "county": "Cameron County" },

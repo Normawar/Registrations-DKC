@@ -2,11 +2,14 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { collection, getDocs, doc, writeBatch, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { auth, storage } from '@/lib/firebase';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -25,9 +28,9 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { schoolData as initialSchoolData, type School } from "@/lib/data/school-data";
+import { schoolData as initialSchoolData, type School, type SchoolNote } from "@/lib/data/school-data";
 import { generateTeamCode } from '@/lib/school-utils';
-import { PlusCircle, MoreHorizontal, Upload, Trash2, FilePenLine, Edit } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Upload, Trash2, FilePenLine, Edit, Download, Paperclip } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -60,6 +63,9 @@ import { useToast } from '@/hooks/use-toast';
 import Papa from 'papaparse';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { format } from 'date-fns';
 
 export type SchoolWithTeamCode = School & { id: string; teamCode: string };
 
@@ -89,6 +95,14 @@ export default function SchoolsPage() {
 
   const [selectedDistrictToEdit, setSelectedDistrictToEdit] = useState<string | null>(null);
   const [newDistrictName, setNewDistrictName] = useState('');
+  
+  // Note states
+  const [noteType, setNoteType] = useState<'lesson' | 'general'>('general');
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [poFile, setPoFile] = useState<File | null>(null);
+  const [editingNote, setEditingNote] = useState<SchoolNote | null>(null);
+
 
   const loadSchools = useCallback(async () => {
     if (!db) return;
@@ -101,12 +115,12 @@ export default function SchoolsPage() {
         const batch = writeBatch(db);
         initialSchoolData.forEach((school, index) => {
             const id = `school-${index}-${Date.now()}`;
-            const schoolWithId = { ...school, id, teamCode: generateTeamCode(school) };
+            const schoolWithId = { ...school, id, teamCode: generateTeamCode(school), notes: [] };
             const docRef = doc(db, 'schools', id);
             batch.set(docRef, schoolWithId);
         });
         await batch.commit();
-        setSchools(initialSchoolData.map((s, i) => ({ ...s, id: `school-${i}-${Date.now()}`, teamCode: generateTeamCode(s) })));
+        setSchools(initialSchoolData.map((s, i) => ({ ...s, id: `school-${i}-${Date.now()}`, teamCode: generateTeamCode(s), notes: [] })));
     } else {
         const schoolList = schoolSnapshot.docs.map(doc => doc.data() as SchoolWithTeamCode);
         setSchools(schoolList);
@@ -118,6 +132,15 @@ export default function SchoolsPage() {
     loadSchools();
   }, [loadSchools]);
 
+  useEffect(() => {
+    if (!isDialogOpen) {
+      setEditingNote(null);
+      setNoteTitle('');
+      setNoteContent('');
+      setPoFile(null);
+    }
+  }, [isDialogOpen]);
+
 
   const uniqueDistricts = useMemo(() => {
     const districts = new Set(schools.map(s => s.district));
@@ -126,16 +149,7 @@ export default function SchoolsPage() {
 
   const form = useForm<SchoolFormValues>({
     resolver: zodResolver(schoolFormSchema),
-    defaultValues: {
-      schoolName: '',
-      district: '',
-      streetAddress: '',
-      city: '',
-      zip: '',
-      phone: '',
-      county: '',
-      state: 'TX',
-    },
+    defaultValues: { schoolName: '', district: '', streetAddress: '', city: '', zip: '', phone: '', county: '', state: 'TX' },
   });
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
@@ -164,7 +178,8 @@ export default function SchoolsPage() {
                         students: row['Students'] || row['students'] || '',
                         state: row['State'] || row['state'] || 'TX',
                         zip4: row['ZIP 4-digit'] || row['zip4'] || '',
-                        teamCode: ''
+                        teamCode: '',
+                        notes: [],
                     };
                     if (!school.schoolName || !school.district) throw new Error('Missing required school name or district.');
                     school.teamCode = generateTeamCode({ schoolName: school.schoolName, district: school.district });
@@ -195,10 +210,7 @@ export default function SchoolsPage() {
 
   const handleAddSchool = () => {
     setEditingSchool(null);
-    form.reset({
-      schoolName: '', district: '', streetAddress: '', city: '',
-      zip: '', phone: '', county: '', state: 'TX',
-    });
+    form.reset({ schoolName: '', district: '', streetAddress: '', city: '', zip: '', phone: '', county: '', state: 'TX' });
     setIsDialogOpen(true);
   };
 
@@ -232,10 +244,10 @@ export default function SchoolsPage() {
         schoolToSave = { ...editingSchool, ...values, teamCode };
     } else {
         schoolToSave = {
-            ...(values as Omit<School, 'charter'|'students'|'zip4'>),
+            ...(values as Omit<School, 'charter'|'students'|'zip4'|'notes'>),
             id: `school-${Date.now()}`,
             teamCode,
-            charter: '', students: '', zip4: '',
+            charter: '', students: '', zip4: '', notes: [],
         };
     }
     
@@ -246,6 +258,70 @@ export default function SchoolsPage() {
     setEditingSchool(null);
   }
 
+  const handleNoteSave = async () => {
+    if (!editingSchool || !noteTitle.trim() || !noteContent.trim() || !db) return;
+
+    let poFileUrl = editingNote?.poFileUrl;
+    let poFileName = editingNote?.poFileName;
+
+    if (noteType === 'lesson' && poFile) {
+        const storageRef = ref(storage, `school_pos/${editingSchool.id}/${poFile.name}`);
+        await uploadBytes(storageRef, poFile);
+        poFileUrl = await getDownloadURL(storageRef);
+        poFileName = poFile.name;
+    }
+    
+    const newNote: SchoolNote = {
+      id: editingNote?.id || `note-${Date.now()}`,
+      type: noteType,
+      title: noteTitle,
+      content: noteContent,
+      timestamp: new Date().toISOString(),
+      ...(noteType === 'lesson' && { poFileUrl, poFileName }),
+    };
+
+    const updatedNotes = editingNote
+      ? editingSchool.notes?.map(n => n.id === editingNote.id ? newNote : n) || [newNote]
+      : [...(editingSchool.notes || []), newNote];
+      
+    const updatedSchool = { ...editingSchool, notes: updatedNotes };
+
+    await setDoc(doc(db, "schools", updatedSchool.id), updatedSchool, { merge: true });
+    setEditingSchool(updatedSchool);
+
+    toast({ title: editingNote ? 'Note Updated' : 'Note Added' });
+    setEditingNote(null);
+    setNoteTitle('');
+    setNoteContent('');
+    setPoFile(null);
+  };
+  
+  const handleEditNote = (note: SchoolNote) => {
+    setEditingNote(note);
+    setNoteType(note.type);
+    setNoteTitle(note.title);
+    setNoteContent(note.content);
+    setPoFile(null);
+  };
+  
+  const handleCancelEditNote = () => {
+    setEditingNote(null);
+    setNoteTitle('');
+    setNoteContent('');
+    setPoFile(null);
+  };
+  
+  const handleDeleteNote = async (noteId: string) => {
+    if (!editingSchool || !db) return;
+    
+    const updatedNotes = editingSchool.notes?.filter(n => n.id !== noteId) || [];
+    const updatedSchool = { ...editingSchool, notes: updatedNotes };
+
+    await setDoc(doc(db, "schools", updatedSchool.id), updatedSchool, { merge: true });
+    setEditingSchool(updatedSchool);
+    toast({ title: 'Note Deleted' });
+  };
+  
   const handleRenameDistrict = async () => {
     if (!selectedDistrictToEdit || !newDistrictName.trim() || !db) return;
     
@@ -348,33 +424,100 @@ export default function SchoolsPage() {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>{editingSchool ? "Edit School" : "Add New School"}</DialogTitle>
-            <DialogDescription>Fill out the details for the school below. The Team Code will be generated automatically.</DialogDescription>
+            <DialogTitle>{editingSchool ? "Edit School & Notes" : "Add New School"}</DialogTitle>
+            <DialogDescription>
+              {editingSchool ? 'Update school details or manage notes below.' : 'Fill out the details for the school.'}
+            </DialogDescription>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="schoolName" render={({ field }) => ( <FormItem><FormLabel>School Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              </div>
-              <FormField control={form.control} name="streetAddress" render={({ field }) => ( <FormItem><FormLabel>Street Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField control={form.control} name="city" render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="zip" render={({ field }) => ( <FormItem><FormLabel>ZIP Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="county" render={({ field }) => ( <FormItem><FormLabel>County</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              </div>
-              <DialogFooter className="pt-4">
-                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                <Button type="submit">{editingSchool ? "Save Changes" : "Add School"}</Button>
-              </DialogFooter>
-            </form>
-          </Form>
+          <div className="grid md:grid-cols-2 gap-6 flex-1 overflow-y-auto pr-2">
+            {/* Left side: School Details Form */}
+            <div className="space-y-4">
+              <Form {...form}>
+                <form id="school-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+                    <FormField control={form.control} name="schoolName" render={({ field }) => ( <FormItem><FormLabel>School Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="streetAddress" render={({ field }) => ( <FormItem><FormLabel>Street Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField control={form.control} name="city" render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                      <FormField control={form.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                      <FormField control={form.control} name="zip" render={({ field }) => ( <FormItem><FormLabel>ZIP Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                      <FormField control={form.control} name="county" render={({ field }) => ( <FormItem><FormLabel>County</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    </div>
+                    <Button type="submit" className="w-full">{editingSchool ? "Save School Changes" : "Add School"}</Button>
+                </form>
+              </Form>
+            </div>
+            {/* Right side: Notes section */}
+            <div className="space-y-4 border-l pl-6">
+                <h3 className="text-lg font-semibold">Organizer Notes</h3>
+                {/* Add/Edit Note Form */}
+                <Card className="bg-muted/50">
+                    <CardHeader>
+                        <CardTitle className="text-base">{editingNote ? 'Edit Note' : 'Add New Note'}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <Select value={noteType} onValueChange={(v) => setNoteType(v as 'lesson' | 'general')} disabled={!!editingNote}>
+                            <SelectTrigger><SelectValue placeholder="Select note type..." /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="general">General Note</SelectItem>
+                                <SelectItem value="lesson">Lesson/Training Note</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Input placeholder="Note Title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} />
+                        <Textarea placeholder="Note content..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} />
+                        {noteType === 'lesson' && (
+                            <div>
+                                <Label htmlFor="po-file">PO Document (PDF)</Label>
+                                <Input id="po-file" type="file" accept=".pdf" onChange={(e) => setPoFile(e.target.files?.[0] || null)} />
+                            </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={handleNoteSave} disabled={!noteTitle || !noteContent}>{editingNote ? 'Update Note' : 'Save Note'}</Button>
+                          {editingNote && <Button size="sm" variant="ghost" onClick={handleCancelEditNote}>Cancel Edit</Button>}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Existing Notes List */}
+                <div className="space-y-2">
+                    <h4 className="font-semibold text-sm">Previous Notes</h4>
+                    <ScrollArea className="h-64 border rounded-md p-2">
+                        {(editingSchool?.notes || []).length > 0 ? (
+                           [...(editingSchool?.notes || [])].reverse().map(note => (
+                                <div key={note.id} className="p-2 border-b last:border-b-0">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-medium">{note.title} <Badge variant="secondary" className="ml-2">{note.type}</Badge></p>
+                                            <p className="text-xs text-muted-foreground">{format(new Date(note.timestamp), 'PPP')}</p>
+                                            <p className="text-sm mt-1">{note.content}</p>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <Button variant="ghost" size="sm" onClick={() => handleEditNote(note)}>Edit</Button>
+                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteNote(note.id)}>Delete</Button>
+                                        </div>
+                                    </div>
+                                    {note.poFileUrl && (
+                                        <Button asChild variant="link" size="sm" className="p-0 h-auto">
+                                            <a href={note.poFileUrl} target="_blank" rel="noopener noreferrer"><Download className="mr-1 h-3 w-3" />{note.poFileName}</a>
+                                        </Button>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-sm text-center text-muted-foreground py-4">No notes for this school yet.</p>
+                        )}
+                    </ScrollArea>
+                </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       
@@ -388,7 +531,7 @@ export default function SchoolsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogContent>
+        </DialogContent>
       </AlertDialog>
     </AppLayout>
   );
