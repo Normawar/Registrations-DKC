@@ -73,6 +73,7 @@ const organizerMenuStructure = {
     { href: "/organizers/vouchers", icon: FileText, label: "Voucher Management" },
     { href: "/membership", icon: BishopIcon, label: "Purchase USCF Membership" },
     { href: "/players", icon: PawnIcon, label: "Master Player Database" },
+    { href: "/roster", icon: Users, label: "District Rosters" },
     { href: "/schools", icon: School, label: "Schools & Districts" },
     { href: "/team-codes", icon: Code, label: "Team Codes" },
     { href: "/previous-events", icon: History, label: "Previous Events" },
