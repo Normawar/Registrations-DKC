@@ -102,6 +102,7 @@ const correctedInvoices = [
   { invoiceId: 'inv:0-ChBuPdz9VuWBFSlozSR4g8JwEJ8I', invoiceNumber: '4296', purchaserName: 'Juan Lopez', purchaserEmail: 'juan.lopez1@psjaisd.us', players: [ { name: 'Lucas Arevalo', uscfId: '32052478' } ], uscfRenewals: ['Lucas Arevalo'] },
   { invoiceId: 'inv:0-ChAZegmuSRaJb6UkJ3umHdvnEJ8I', invoiceNumber: '4294', purchaserName: 'Juan Lopez', purchaserEmail: 'juan.lopez1@psjaisd.us', players: [ { name: 'Kalee Hernandez', uscfId: '31487795' }, { name: 'Emma Morales', uscfId: '32114990' }, { name: 'Andrea Munoz', uscfId: '32157067' }, { name: 'Ezra Ruiz', uscfId: '32157070' }, { name: 'Manuel Garcia', uscfId: '32256496' }, { name: 'Madelynn Garza', uscfId: '32256631' }, { name: 'Mikayla Anzaldua', uscfId: 'NEW' }, { name: 'Francisco Morales', uscfId: 'NEW' }, { name: 'Emily Requenez', uscfId: 'NEW' }, { name: 'Emmanuel Barrera', uscfId: 'NEW' } ], uscfRenewals: ['Mikayla Anzaldua', 'Francisco Morales', 'Emily Requenez', 'Emmanuel Barrera'] },
   { invoiceId: 'inv:0-ChDjAuarf29_ABRKzwxUMhNKEJ8I', invoiceNumber: '4293', purchaserName: 'Juan Lopez', purchaserEmail: 'juan.lopez1@psjaisd.us', players: [ { name: 'Sophia Rangel', uscfId: '30308734' }, { name: 'Natalie Garcia', uscfId: '30764837' }, { name: 'Giancarlo Garcia', uscfId: '32052515' }, { name: 'Ryan Moreno', uscfId: '32052572' }, { name: 'Giovanni Garcia', uscfId: '32195702' }, { name: 'Michael Alaniz', uscfId: '30728261' }, { name: 'Joshua Flores', uscfId: 'NEW' }, { name: 'Dariel Gonzalez', uscfId: 'NEW' }, { name: 'Romeo Cano', uscfId: 'NEW' }, { name: 'Jayde Valle', uscfId: 'NEW' }, { name: 'Jadiel Garcia', uscfId: 'NEW' } ], uscfRenewals: ['Sophia Rangel', 'Natalie Garcia', 'Giancarlo Garcia', 'Ryan Moreno', 'Giovanni Garcia', 'Michael Alaniz', 'Joshua Flores', 'Dariel Gonzalez', 'Romeo Cano', 'Jayde Valle', 'Jadiel Garcia'] },
+  { invoiceId: 'inv:0-ChDR7q-F0W8c3_001d90c12cEJ8I', invoiceNumber: '4320', purchaserName: 'Omar Armenta', purchaserEmail: 'omar.armenta@psjaisd.us', players: [ { name: 'Ivan Ramirez', uscfId: '30298479' }, { name: 'Skylar Mendiola', uscfId: '30769940' }, { name: 'Kenzie Aviles', uscfId: '31488558' }, { name: 'Gabriella Rendon', uscfId: '31488628' }, { name: 'Ruben Salinas', uscfId: '31488644' }, { name: 'AnnaBelle Tagle', uscfId: '31488924' }, { name: 'Jorge Cantu', uscfId: 'NEW' }, { name: 'Melinna Zuniga', uscfId: 'NEW' }, { name: 'Luke Castro', uscfId: 'NEW' } ], uscfRenewals: ['Jorge Cantu', 'Melinna Zuniga', 'Luke Castro'] }
 ];
 
 function generatePlayerId(uscfId: string, name: string): string {
@@ -241,5 +242,8 @@ export default function ManualInvoiceUpdatePage() {
       </div>
     </AppLayout>
   );
+
+    
+}
 
     
