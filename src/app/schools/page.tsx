@@ -531,7 +531,7 @@ export default function SchoolsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
           </AlertDialogFooter>
-        </DialogContent>
+        </AlertDialogContent>
       </AlertDialog>
     </AppLayout>
   );
