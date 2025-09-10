@@ -11,8 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from '@/hooks/use-toast';
 import { useMasterDb } from '@/context/master-db-context';
 import Papa from 'papaparse';
-import { format } from 'date-fns';
-import { Upload, Download, UserPlus, FileText, CheckCircle, Loader2, ClipboardPaste } from 'lucide-react';
+import { format, isSameMonth, isSameYear } from 'date-fns';
+import { Upload, Download, UserPlus, FileText, CheckCircle, Loader2, ClipboardPaste, Sparkles } from 'lucide-react';
 import { collection, doc, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Textarea } from '@/components/ui/textarea';
@@ -45,6 +45,7 @@ export default function VoucherManagementPage() {
   const [assignedVouchers, setAssignedVouchers] = useState<VoucherAssignment[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pastedVouchers, setPastedVouchers] = useState('');
+  const [expiringGtPlayers, setExpiringGtPlayers] = useState<any[]>([]);
 
   // Load data from Firestore on component mount
   const loadData = async () => {
@@ -83,15 +84,22 @@ export default function VoucherManagementPage() {
         if ((selection as any).uscfStatus === 'new' || (selection as any).uscfStatus === 'renewing') {
           const player = database.find(p => p.id === playerId);
           if (player && !assignedPlayerIds.has(playerId)) {
-            pending.push({
-              playerId,
-              player,
-              confirmation,
-              selection,
-              invoiceNumber: confirmation.invoiceNumber || 'N/A',
-              invoiceStatus: confirmation.invoiceStatus || 'UNKNOWN',
-              membershipType: (selection as any).uscfStatus
-            });
+            // GT players can be processed regardless of payment status.
+            // Other players must have a paid invoice.
+            const isGt = player.studentType === 'gt';
+            const isPaid = confirmation.invoiceStatus === 'PAID' || confirmation.invoiceStatus === 'COMPED';
+            
+            if (isGt || isPaid) {
+              pending.push({
+                playerId,
+                player,
+                confirmation,
+                selection,
+                invoiceNumber: confirmation.invoiceNumber || 'N/A',
+                invoiceStatus: confirmation.invoiceStatus || 'UNKNOWN',
+                membershipType: (selection as any).uscfStatus
+              });
+            }
           }
         }
       }
@@ -108,6 +116,22 @@ export default function VoucherManagementPage() {
       loadPendingMemberships();
     }
   }, [database, assignedVouchers, loadPendingMemberships]);
+
+  const findExpiringGtPlayers = useCallback(() => {
+      if (database.length === 0) return;
+      const now = new Date();
+      const gtPlayers = database.filter(p => p.studentType === 'gt');
+      const expiring = gtPlayers.filter(p => 
+        p.uscfExpiration &&
+        isSameMonth(new Date(p.uscfExpiration), now) &&
+        isSameYear(new Date(p.uscfExpiration), now)
+      );
+      setExpiringGtPlayers(expiring);
+  }, [database]);
+
+  useEffect(() => {
+    findExpiringGtPlayers();
+  }, [findExpiringGtPlayers]);
 
 
   const extractVoucherNumbers = (text: string): string[] => {
@@ -145,53 +169,57 @@ export default function VoucherManagementPage() {
     }
   };
 
-  const autoAssignVouchers = async () => {
-    if (availableVouchers.length === 0 || !db) {
-      toast({ title: "No Available Vouchers", variant: "destructive" });
-      return;
-    }
-
-    const unassigned = pendingMemberships.filter(p => !assignedVouchers.find(av => av.playerId === p.playerId));
-    if (unassigned.length === 0) {
-      toast({ title: "No Pending Memberships to Assign" }); return;
-    }
-
-    const assignmentsToMake = Math.min(unassigned.length, availableVouchers.length);
-    const newAssignments: VoucherAssignment[] = [];
-    
-    unassigned.slice(0, assignmentsToMake).forEach((membership, index) => {
-      const voucherNumber = availableVouchers[index];
-      newAssignments.push({
-        id: `${membership.playerId}-${Date.now()}`,
-        playerId: membership.playerId,
-        playerName: `${membership.player.firstName} ${membership.player.lastName}`,
-        voucherNumber,
-        membershipType: membership.membershipType,
-        assignedDate: new Date().toISOString(),
-        eventName: membership.confirmation.eventName,
-        playerEmail: membership.player.email,
-        playerPhone: membership.player.phone,
-        playerAddress: `${membership.player.address || ''} ${membership.player.city || ''} ${membership.player.state || ''} ${membership.player.zipCode || ''}`.trim(),
-        playerBirthDate: membership.player.dob,
+  const autoAssignVouchers = async (playersToAssign: any[], membershipType: 'new' | 'renewing' = 'renewing') => {
+      if (availableVouchers.length === 0) {
+        toast({ title: "No Available Vouchers", variant: "destructive" });
+        return;
+      }
+      
+      const unassigned = playersToAssign.filter(p => !assignedVouchers.find(av => av.playerId === p.playerId));
+      if (unassigned.length === 0) {
+        toast({ title: "No players to assign." });
+        return;
+      }
+      
+      const assignmentsToMake = Math.min(unassigned.length, availableVouchers.length);
+      const newAssignments: VoucherAssignment[] = [];
+      
+      unassigned.slice(0, assignmentsToMake).forEach((item, index) => {
+        const voucherNumber = availableVouchers[index];
+        const player = item.player || item; // Handle both pending memberships and direct player objects
+        const confirmation = item.confirmation || {};
+        
+        newAssignments.push({
+          id: `${player.id}-${Date.now()}`,
+          playerId: player.id,
+          playerName: `${player.firstName} ${player.lastName}`,
+          voucherNumber,
+          membershipType: item.membershipType || membershipType,
+          assignedDate: new Date().toISOString(),
+          eventName: confirmation.eventName,
+          playerEmail: player.email,
+          playerPhone: player.phone,
+          playerAddress: `${player.address || ''} ${player.city || ''} ${player.state || ''} ${player.zipCode || ''}`.trim(),
+          playerBirthDate: player.dob,
+        });
       });
-    });
-
-    const batch = writeBatch(db);
-    newAssignments.forEach(assignment => {
-        const docRef = doc(db, 'assignedVouchers', assignment.id);
-        batch.set(docRef, assignment);
-    });
-    
-    const usedVouchers = availableVouchers.slice(0, assignmentsToMake);
-    usedVouchers.forEach(voucher => {
-        const docRef = doc(db, 'vouchers', voucher);
-        batch.delete(docRef);
-    });
-
-    await batch.commit();
-    await loadData();
-    
-    toast({ title: "Vouchers Assigned Successfully", description: `${newAssignments.length} vouchers have been assigned.` });
+  
+      const batch = writeBatch(db);
+      newAssignments.forEach(assignment => {
+          const docRef = doc(db, 'assignedVouchers', assignment.id);
+          batch.set(docRef, assignment);
+      });
+      
+      const usedVouchers = availableVouchers.slice(0, assignmentsToMake);
+      usedVouchers.forEach(voucher => {
+          const docRef = doc(db, 'vouchers', voucher);
+          batch.delete(docRef);
+      });
+  
+      await batch.commit();
+      await loadData();
+      
+      toast({ title: "Vouchers Assigned Successfully", description: `${newAssignments.length} vouchers have been assigned.` });
   };
   
   const updatePlayerUscfId = async (assignmentId: string, newUscfId: string) => {
@@ -401,8 +429,26 @@ export default function VoucherManagementPage() {
           <TabsContent value="assign" className="space-y-6">
             <Card>
               <CardHeader>
+                <CardTitle>GT Player Membership Renewals</CardTitle>
+                <CardDescription>
+                  This tool finds GT players whose USCF memberships are expiring this month.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                    <p className="text-sm">Found <span className="font-bold">{expiringGtPlayers.length}</span> GT players with memberships expiring this month.</p>
+                    <Button onClick={() => autoAssignVouchers(expiringGtPlayers)} disabled={expiringGtPlayers.length === 0}>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Assign Vouchers to Expiring GT Players
+                    </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Auto-Assign Vouchers</CardTitle>
-                <CardDescription>Automatically assign available vouchers to players who need new or renewed memberships.</CardDescription>
+                <CardDescription>Automatically assign available vouchers to players who need new or renewed memberships from event registrations.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
@@ -410,7 +456,7 @@ export default function VoucherManagementPage() {
                     <p><strong>Available vouchers:</strong> {availableVouchers.length}</p>
                     <p><strong>Players needing memberships:</strong> {pendingMemberships.length}</p>
                   </div>
-                  <Button onClick={autoAssignVouchers} disabled={availableVouchers.length === 0 || pendingMemberships.length === 0}>Auto-Assign Vouchers</Button>
+                  <Button onClick={() => autoAssignVouchers(pendingMemberships)} disabled={availableVouchers.length === 0 || pendingMemberships.length === 0}>Auto-Assign Vouchers</Button>
                 </div>
                 {pendingMemberships.length > 0 && (
                   <div>
