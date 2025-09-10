@@ -28,6 +28,7 @@ import Link from 'next/link';
 import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ChangeRequestDialog } from '@/components/change-request-dialog';
+import { ReviewRequestDialog } from '@/components/review-request-dialog';
 
 type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy' | 'eventDate' | 'action' | 'invoiceNumber';
 
@@ -37,6 +38,7 @@ export default function RequestsPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'submitted', direction: 'descending' });
   const [confirmationsMap, setConfirmationsMap] = useState<Map<string, any>>(new Map());
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [reviewingRequest, setReviewingRequest] = useState<ChangeRequest | null>(null);
 
   const loadData = useCallback(async () => {
     if (!db || !profile) return;
@@ -132,7 +134,7 @@ export default function RequestsPage() {
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
-  const handleRequestCreated = () => {
+  const handleRequestCreatedOrUpdated = () => {
     loadData();
   };
 
@@ -208,15 +210,15 @@ export default function RequestsPage() {
                                 </TableCell>
                                 <TableCell>
                                     {request.status === 'Pending' && profile?.role === 'organizer' ? (
-                                        <Button asChild variant="outline" size="sm">
-                                          <Link href={`/invoices#${request.confirmationId}`}>Review Request</Link>
+                                        <Button variant="outline" size="sm" onClick={() => setReviewingRequest(request)}>
+                                          Review Request
                                         </Button>
-                                    ) : (
+                                    ) : request.status !== 'Pending' ? (
                                         <div className="text-xs text-muted-foreground">
                                             <p>By {request.approvedBy || 'N/A'}</p>
                                             <p>{request.approvedAt ? format(new Date(request.approvedAt), 'MM/dd/yy, p') : ''}</p>
                                         </div>
-                                    )}
+                                    ) : null}
                                 </TableCell>
                             </TableRow>
                         );
@@ -233,7 +235,19 @@ export default function RequestsPage() {
           isOpen={isRequestDialogOpen}
           onOpenChange={setIsRequestDialogOpen}
           profile={profile}
-          onRequestCreated={handleRequestCreated}
+          onRequestCreated={handleRequestCreatedOrUpdated}
+        />
+      )}
+      
+      {profile?.role === 'organizer' && reviewingRequest && (
+        <ReviewRequestDialog
+          isOpen={!!reviewingRequest}
+          onOpenChange={(open) => {
+            if (!open) setReviewingRequest(null);
+          }}
+          request={reviewingRequest}
+          profile={profile}
+          onRequestUpdated={handleRequestCreatedOrUpdated}
         />
       )}
     </AppLayout>
