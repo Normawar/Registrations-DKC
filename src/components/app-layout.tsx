@@ -31,7 +31,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart, FileQuestion } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo } from 'react';
@@ -193,11 +193,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const menuItems = 
-    profile?.role === 'organizer' ? null :
-    profile?.role === 'individual' ? individualMenuItems :
-    profile?.role === 'district_coordinator' ? districtCoordinatorMenuItems :
-    sponsorMenuItems;
+  const getMenuItems = () => {
+      if (!profile) return [];
+      let items = [];
+      switch(profile.role) {
+          case 'organizer': return null; // Special handling for organizer
+          case 'individual': items = individualMenuItems; break;
+          case 'district_coordinator': items = districtCoordinatorMenuItems; break;
+          default: items = sponsorMenuItems; break;
+      }
+      return [...items, { href: "/help", icon: FileQuestion, label: "Help" }];
+  };
+
+  const menuItems = getMenuItems();
 
   const AvatarComponent = profile && profile.avatarType === 'icon' ? icons[profile.avatarValue] : null;
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;

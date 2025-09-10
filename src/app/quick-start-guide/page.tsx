@@ -6,7 +6,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Image from 'next/image';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Lightbulb, Users, Calendar, Receipt } from 'lucide-react';
+import { Lightbulb, Users, Calendar, Receipt, FileQuestion } from 'lucide-react';
+import Link from 'next/link';
 
 export default function QuickStartGuidePage() {
   return (
@@ -23,7 +24,7 @@ export default function QuickStartGuidePage() {
             <Lightbulb className="h-4 w-4" />
             <AlertTitle>First Things First: Your Roster</AlertTitle>
             <AlertDescription>
-                The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the <a href="/roster" className="font-semibold underline">Roster</a> page to get started.
+                The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the <Link href="/roster" className="font-semibold underline">Roster</Link> page to get started.
             </AlertDescription>
         </Alert>
 
@@ -42,8 +43,8 @@ export default function QuickStartGuidePage() {
                   <CardTitle className="text-base">Adding a Player to Your Roster</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm">1. Navigate to the <a href="/roster" className="font-medium underline">Roster</a> page from the sidebar.</p>
-                  <p className="text-sm">2. Click the <strong>Add Player from Database</strong> button. This will open a search dialog.</p>
+                  <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar.</p>
+                  <p className="text-sm">2. Click the <strong>Add from Database</strong> button. This will open a search dialog.</p>
                   <p className="text-sm">3. Search for your student by name or USCF ID. The master database contains thousands of players.</p>
                   <div className="border rounded-lg p-4 bg-muted/50">
                      <Image src="https://drive.google.com/uc?export=view&id=1YYVXkLkDI2aGd2aCBGA9H8_bIEp_KUqV" alt="A screenshot of the player search dialog." width={600} height={350} className="rounded-md" data-ai-hint="player search dialog" />
@@ -68,8 +69,8 @@ export default function QuickStartGuidePage() {
                   <CardTitle className="text-base">Event Registration Process</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm">1. Go to the <a href="/dashboard" className="font-medium underline">Dashboard</a> or <a href="/events" className="font-medium underline">Register for Event</a> page.</p>
-                  <p className="text-sm">2. Find an upcoming event and click the <strong>Register for event</strong> button.</p>
+                  <p className="text-sm">1. Go to the <Link href="/dashboard" className="font-medium underline">Dashboard</Link> or <Link href="/events" className="font-medium underline">Register for Event</Link> page.</p>
+                  <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
                   <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
                      <Image src="https://drive.google.com/uc?export=view&id=1M1fuDS6gpQEiUfu_AjPSUgzObNmUZMd5" alt="A screenshot showing the event list with the register button highlighted." width={600} height={400} className="rounded-md" data-ai-hint="event registration list" />
                      <Image src="https://drive.google.com/uc?export=view&id=1L5jZas7XBqEz8RzUaTgFiqz2GeOJnUi2" alt="A screenshot of the registration dialog." width={600} height={400} className="rounded-md" data-ai-hint="registration dialog" />
@@ -97,15 +98,28 @@ export default function QuickStartGuidePage() {
                   <CardTitle className="text-base">Viewing and Paying Invoices</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm">1. Navigate to the <a href="/invoices" className="font-medium underline">Invoices & Payments</a> page from the sidebar.</p>
+                  <p className="text-sm">1. Navigate to the <Link href="/invoices" className="font-medium underline">Invoices & Payments</Link> page from the sidebar.</p>
                   <p className="text-sm">2. Here you will see a list of all your invoices and their current status (e.g., Paid, Unpaid, Canceled).</p>
-                  <p className="text-sm">3. Click on an invoice to view its full details, see the list of registered players, and access the secure Square payment link.</p>
+                  <p className="text-sm">3. Click <strong>Details</strong> to view a specific invoice. From here, you can see the registered players and submit payment information.</p>
+                  <p className="text-sm">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
+                  <p className="text-sm">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
                    <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
                     <Image src="https://drive.google.com/uc?export=view&id=1sWg-9mNqA5mk8y45jlOUG1nbqnmrl1pO" alt="A screenshot of the invoice details view." width={600} height={400} className="rounded-md" data-ai-hint="invoice details modal" />
                     <Image src="https://drive.google.com/uc?export=view&id=1ATxdq8q8RL-0DhnGmXTK9KMQ2HjFEVzJ" alt="A screenshot of the invoice details view showing payment options." width={600} height={400} className="rounded-md" data-ai-hint="invoice payment options" />
                   </div>
                 </CardContent>
               </Card>
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="item-4">
+            <AccordionTrigger className="text-lg font-semibold">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 p-2 rounded-full"><FileQuestion className="h-5 w-5 text-primary" /></div>
+                Need More Help?
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pl-12 pt-2 space-y-4">
+                <p>For more detailed instructions on every feature, please visit our new <Link href="/help" className="font-semibold underline">Help Center</Link>.</p>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
