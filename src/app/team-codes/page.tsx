@@ -37,15 +37,19 @@ import { Download, Search } from 'lucide-react';
 import { type School } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Label } from '@/components/ui/label';
+import { useMasterDb } from '@/context/master-db-context';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 type SchoolWithTeamCode = School & { id: string; teamCode: string };
 
 function TeamCodesPageContent() {
   const { toast } = useToast();
+  const { database: allPlayers } = useMasterDb();
   const [schools, setSchools] = useState<SchoolWithTeamCode[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [districtFilter, setDistrictFilter] = useState('all');
+  const [rosterFilter, setRosterFilter] = useState('all'); // 'all' or 'withRoster'
 
   const loadSchools = useCallback(async () => {
     if (!db) return;
@@ -85,6 +89,10 @@ function TeamCodesPageContent() {
     return Array.from(districts).sort();
   }, [schools]);
 
+  const schoolsWithRosters = useMemo(() => {
+    return new Set(allPlayers.map(player => player.school));
+  }, [allPlayers]);
+
   const filteredSchools = useMemo(() => {
     return schools.filter(school => {
       const lowerSearchTerm = searchTerm.toLowerCase();
@@ -94,9 +102,11 @@ function TeamCodesPageContent() {
         school.district.toLowerCase().includes(lowerSearchTerm) ||
         school.teamCode.toLowerCase().includes(lowerSearchTerm);
 
-      return matchesDistrict && matchesSearch;
+      const matchesRoster = rosterFilter === 'all' || schoolsWithRosters.has(school.schoolName);
+
+      return matchesDistrict && matchesSearch && matchesRoster;
     }).sort((a, b) => a.schoolName.localeCompare(b.schoolName));
-  }, [schools, districtFilter, searchTerm]);
+  }, [schools, districtFilter, searchTerm, rosterFilter, schoolsWithRosters]);
 
   const handleExport = () => {
     if (filteredSchools.length === 0) {
@@ -147,36 +157,45 @@ function TeamCodesPageContent() {
               Use the filters to narrow down the list, then download the results.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row gap-4 items-end">
-            <div className="grid gap-1.5 flex-1 w-full sm:w-auto">
-              <Label htmlFor="search-filter">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="search-filter"
-                  placeholder="Search by School, District, or Team Code..."
-                  className="pl-8"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-end">
+              <div className="grid gap-1.5 flex-1 w-full sm:w-auto">
+                <Label htmlFor="search-filter">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="search-filter"
+                    placeholder="Search by School, District, or Team Code..."
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
               </div>
+              <div className="grid gap-1.5 flex-1 w-full sm:w-auto">
+                <Label htmlFor="district-filter">Filter by District</Label>
+                <Select value={districtFilter} onValueChange={setDistrictFilter}>
+                  <SelectTrigger id="district-filter">
+                    <SelectValue placeholder="Select a district..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Districts</SelectItem>
+                    {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleExport}>
+                <Download className="mr-2 h-4 w-4" />
+                Download List ({filteredSchools.length})
+              </Button>
             </div>
-            <div className="grid gap-1.5 flex-1 w-full sm:w-auto">
-              <Label htmlFor="district-filter">Filter by District</Label>
-              <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                <SelectTrigger id="district-filter">
-                  <SelectValue placeholder="Select a district..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Districts</SelectItem>
-                  {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div>
+              <Label>Roster Status</Label>
+              <RadioGroup value={rosterFilter} onValueChange={setRosterFilter} className="flex items-center space-x-4 pt-2">
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all" className="cursor-pointer">All Schools</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="withRoster" id="withRoster" /><Label htmlFor="withRoster" className="cursor-pointer">Only Schools with Rosters</Label></div>
+              </RadioGroup>
             </div>
-            <Button onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" />
-              Download List ({filteredSchools.length})
-            </Button>
           </CardContent>
         </Card>
 
