@@ -526,140 +526,50 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       return { players: [], hasMore: false, totalFound: 0 };
     }
   
-    const {
-      firstName, middleName, lastName, uscfId, state, grade, section, school, district,
-      minRating, maxRating, pageSize = 100, lastDoc, sponsorProfile, portalType
-    } = criteria;
-  
     try {
       console.log('Starting server-side search with criteria:', criteria);
       
       let q: Query = collection(db, 'players');
       
-      // Build efficient Firestore queries
-      const conditions: any[] = [];
-      
-      // Exact match filters (most efficient)
-      if (state && state !== 'ALL' && state !== 'NO_STATE') {
-        conditions.push(where('state', '==', state));
-      }
-      
-      if (grade && grade.trim()) {
-        conditions.push(where('grade', '==', grade));
-      }
-      
-      if (section && section.trim()) {
-        conditions.push(where('section', '==', section));
-      }
-      
-      if (school && school.trim()) {
-        conditions.push(where('school', '==', school));
-      }
-      
-      if (district && district.trim()) {
-        conditions.push(where('district', '==', district));
-      }
-  
-      // USCF ID exact match (most common search)
-      if (uscfId && uscfId.trim()) {
-        conditions.push(where('uscfId', '==', uscfId.trim()));
-      }
-      
-      // Rating range queries
-      if (minRating !== undefined) {
-        conditions.push(where('regularRating', '>=', minRating));
-      }
-      if (maxRating !== undefined) {
-        conditions.push(where('regularRating', '<=', maxRating));
-      }
-      
       // Apply all conditions
-      conditions.forEach(condition => {
-        q = query(q, condition);
+      Object.entries(criteria).forEach(([key, value]) => {
+          if (value && key !== 'pageSize' && key !== 'lastDoc' && key !== 'excludeIds' && key !== 'firstName' && key !== 'lastName') {
+            q = query(q, where(key, '==', value));
+          }
       });
       
-      // For name searches, we'll need to do client-side filtering
-      // since Firestore doesn't support efficient text search
-      const needsClientFiltering = firstName || middleName || lastName;
-      
-      // If no server-side filters and need client filtering, limit initial fetch
-      if (conditions.length === 0 && needsClientFiltering) {
-        q = query(q, limit(1000)); // Fetch first 1000 for name filtering
-      } else {
-        // Add pagination
-        if (lastDoc) {
-          q = query(q, startAfter(lastDoc));
-        }
-        q = query(q, limit(pageSize));
+      // Add pagination
+      if (criteria.lastDoc) {
+        q = query(q, startAfter(criteria.lastDoc));
       }
-      
-      // Add ordering for consistent pagination
-      q = query(q, orderBy('uscfId'));
+      q = query(q, limit(criteria.pageSize || 100));
       
       console.log('Executing Firestore query...');
       const querySnapshot = await getDocs(q);
-      let results = querySnapshot.docs.map(doc => ({
-        ...doc.data(),
-        _docRef: doc // Store doc reference for pagination
-      } as MasterPlayer & { _docRef: DocumentSnapshot }));
+      let results = querySnapshot.docs.map(doc => doc.data() as MasterPlayer);
       
       console.log(`Firestore returned ${results.length} results`);
       
-      // Client-side filtering for name searches and complex criteria
-      if (needsClientFiltering || criteria.excludeIds?.length) {
+      // Client-side filtering for name searches and excludeIds
+      if (criteria.firstName || criteria.lastName || criteria.excludeIds) {
         const excludeSet = new Set(criteria.excludeIds || []);
-        
         results = results.filter(player => {
-          // Exclude IDs
           if (excludeSet.has(player.id)) return false;
-          
-          // Name filtering (case-insensitive partial match)
-          if (firstName && !player.firstName?.toLowerCase().includes(firstName.toLowerCase())) {
-            return false;
-          }
-          if (middleName && !player.middleName?.toLowerCase().includes(middleName.toLowerCase())) {
-            return false;
-          }
-          if (lastName && !player.lastName?.toLowerCase().includes(lastName.toLowerCase())) {
-            return false;
-          }
-          
-          return true;
+          const nameMatch = 
+            (!criteria.firstName || player.firstName.toLowerCase().includes(criteria.firstName.toLowerCase())) &&
+            (!criteria.lastName || player.lastName.toLowerCase().includes(criteria.lastName.toLowerCase()));
+          return nameMatch;
         });
       }
       
-      // Handle sponsor/organizer specific filtering
-      if (sponsorProfile && portalType === 'sponsor') {
-        results = results.filter(player => {
-          const isUnassigned = !player.school || player.school.trim() === '';
-          const belongsToSponsor = player.school === sponsorProfile.school && 
-                                  player.district === sponsorProfile.district;
-          return isUnassigned || belongsToSponsor;
-        });
-      }
-      
-      // Limit final results
-      const maxResults = criteria.maxResults || pageSize;
-      const hasMore = results.length === pageSize && !needsClientFiltering;
-      const finalResults = results.slice(0, maxResults);
-      
-      // Get last document for pagination
-      const newLastDoc = finalResults.length > 0 ? 
-        (finalResults[finalResults.length - 1] as any)._docRef : undefined;
-      
-      // Clean up _docRef before returning
-      const cleanResults = finalResults.map(player => {
-        const { _docRef, ...cleanPlayer } = player as any;
-        return cleanPlayer;
-      });
-      
-      console.log(`Returning ${cleanResults.length} filtered results`);
+      const hasMore = results.length === (criteria.pageSize || 100);
+      const newLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
       
       return {
-        players: cleanResults,
+        players: results,
         hasMore,
         lastDoc: newLastDoc,
-        totalFound: cleanResults.length
+        totalFound: results.length, // this isn't total overall, just total in this batch
       };
       
     } catch (error) {
