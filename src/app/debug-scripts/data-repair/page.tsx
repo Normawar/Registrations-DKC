@@ -124,32 +124,34 @@ function GtInvoiceFixer() {
         const playerCount = Object.keys(inv.selections).length;
         if (playerCount === 0) continue;
         
-        let chargedUscfCount = 0;
         let expectedTotal = 0;
+        let hasGtPlayerWithUscfCharge = false;
 
         for (const playerId in inv.selections) {
             const selection = inv.selections[playerId];
-            expectedTotal += eventDetails.regularFee; // Base fee
+            const player = allPlayers.find(p => p.id === playerId);
+            const isGt = player?.studentType === 'gt';
             
+            // Assume the base fee applies to everyone. Any deviation is a "late fee".
+            expectedTotal += eventDetails.regularFee;
+
             if (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing') {
-                chargedUscfCount++;
-                expectedTotal += 24; // USCF Fee
+                if (!isGt) {
+                  // Only add USCF fee to expected total if NOT a GT player
+                  expectedTotal += 24;
+                } else {
+                  // This is a GT player who was marked for a USCF action
+                  hasGtPlayerWithUscfCharge = true;
+                }
             }
         }
         
-        const invoiceHasUscfCharges = inv.totalInvoiced > (eventDetails.regularFee * playerCount);
-
-        if (invoiceHasUscfCharges) {
-            const hasGtPlayerWithUscfCharge = Object.keys(inv.selections).some(playerId => {
-                const player = allPlayers.find(p => p.id === playerId);
-                const selection = inv.selections[playerId];
-                return player?.studentType === 'gt' && (selection.uscfStatus === 'new' || selection.uscfStatus === 'renewing');
-            });
-
-            if (hasGtPlayerWithUscfCharge) {
-                flaggedInvoices.push(inv);
-                addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} (Total: $${inv.totalInvoiced}) has GT players with USCF charges.`);
-            }
+        // A late fee would make totalInvoiced > expectedTotal. 
+        // We only flag if the invoice has a GT player who needed a membership
+        // AND the total invoiced is greater than our calculated expected total (which accounts for non-GT USCF fees).
+        if (hasGtPlayerWithUscfCharge && inv.totalInvoiced > expectedTotal) {
+            flaggedInvoices.push(inv);
+            addLog(`🚩 FLAGGED: Invoice #${inv.invoiceNumber} (Total: $${inv.totalInvoiced}, Expected: >$${expectedTotal}) has GT players with USCF charges.`);
         }
       }
 
