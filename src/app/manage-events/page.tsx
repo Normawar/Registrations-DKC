@@ -499,21 +499,22 @@ export default function ManageEventsPage() {
 
     for (const conf of allConfirmations) {
         const hasEventId = conf.eventId === event.id;
-        const hasMatchingName = conf.eventName === event.name;
         
-        let hasMatchingDate = false;
-        try {
-            if (conf.eventDate) {
-                const confDate = new Date(conf.eventDate);
-                if (isValid(confDate)) {
-                    hasMatchingDate = isSameDay(confDate, eventDate);
+        let hasMatchingNameAndDate = false;
+        if (conf.eventName === event.name) {
+            try {
+                if (conf.eventDate) {
+                    const confDate = parseISO(conf.eventDate);
+                    if (isValid(confDate)) {
+                        hasMatchingNameAndDate = isSameDay(confDate, eventDate);
+                    }
                 }
+            } catch (e) {
+                console.warn(`Could not parse date for invoice ${conf.id}: ${conf.eventDate}`);
             }
-        } catch (e) {
-            console.warn(`Could not parse date for invoice ${conf.id}: ${conf.eventDate}`);
         }
 
-        if (hasEventId || (hasMatchingName && hasMatchingDate)) {
+        if (hasEventId || hasMatchingNameAndDate) {
             for (const playerId in conf.selections) {
                 if (uniquePlayerRegistrations.has(playerId)) continue;
                 
@@ -862,16 +863,29 @@ export default function ManageEventsPage() {
               </div>
             </DialogDescription>
           </DialogHeader>
-          <div className='my-4 flex items-center justify-end gap-2'>
-              <Button onClick={() => handleDownload(false)} disabled={playersToExport.length === 0} variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export Registered Status ({playersToExport.length})
-              </Button>
-              <Button onClick={() => handleDownload(true)} disabled={registrations.length === 0} variant="secondary" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Download All ({registrations.length})
-              </Button>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground"><span className="mx-1">|</span><button onClick={handleMarkAllAsNew} className="hover:underline">Mark all new</button><span className="mx-1">|</span><button onClick={handleClearAllNew} className="hover:underline">Clear all new</button></div>
+          <div className="border rounded-md p-4 bg-muted/50 my-4 space-y-2">
+            <p className="text-sm font-medium italic">for SwissSys only</p>
+            <div className='flex items-center justify-end gap-2'>
+                <Button 
+                    onClick={() => handleDownload(false)} 
+                    disabled={playersToExport.length === 0} 
+                    size="sm"
+                    className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Export Registered Status ({playersToExport.length})
+                </Button>
+                <Button 
+                    onClick={() => handleDownload(true)} 
+                    disabled={registrations.length === 0} 
+                    size="sm"
+                    className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download All ({registrations.length})
+                </Button>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground"><span className="mx-1">|</span><button onClick={handleMarkAllAsNew} className="hover:underline">Mark all new</button><span className="mx-1">|</span><button onClick={handleClearAllNew} className="hover:underline">Clear all new</button></div>
+            </div>
           </div>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
@@ -932,4 +946,3 @@ export default function ManageEventsPage() {
     </AppLayout>
   );
 }
-
