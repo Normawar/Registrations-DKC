@@ -19,6 +19,7 @@ const PlayerToInvoiceSchema = z.object({
   isGtPlayer: z.boolean().optional(),
 });
 
+export type CreatePsjaSplitInvoiceInput = z.infer<typeof CreatePsjaSplitInvoiceInputSchema>;
 const CreatePsjaSplitInvoiceInputSchema = z.object({
   sponsorName: z.string(),
   sponsorEmail: z.string().email(),
@@ -37,7 +38,6 @@ const CreatePsjaSplitInvoiceInputSchema = z.object({
   revisionNumber: z.number().optional().describe('Revision number for this invoice'),
   revisionMessage: z.string().optional().describe('Message explaining the revision'),
 });
-export type CreatePsjaSplitInvoiceInput = z.infer<typeof CreatePsjaSplitInvoiceInputSchema>;
 
 const CreateInvoiceOutputSchema = z.object({
   invoiceId: z.string().describe('The unique ID for the generated invoice.'),
@@ -46,11 +46,11 @@ const CreateInvoiceOutputSchema = z.object({
   invoiceUrl: z.string().url().describe('The URL to view the invoice online.'),
 });
 
+export type CreatePsjaSplitInvoiceOutput = z.infer<typeof CreatePsjaSplitInvoiceOutputSchema>;
 const CreatePsjaSplitInvoiceOutputSchema = z.object({
   gtInvoice: CreateInvoiceOutputSchema.optional(),
   independentInvoice: CreateInvoiceOutputSchema.optional(),
 });
-export type CreatePsjaSplitInvoiceOutput = z.infer<typeof CreatePsjaSplitInvoiceOutputSchema>;
 
 export async function createPsjaSplitInvoice(input: CreatePsjaSplitInvoiceInput): Promise<CreatePsjaSplitInvoiceOutput> {
   return createPsjaSplitInvoiceFlow(input);
@@ -88,6 +88,7 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
         bookkeeperEmail: '', // Ensure bookkeeper is not CC'd on the GT invoice
         invoiceNumber: gtInvoiceNumber,
         revisionMessage: input.revisionMessage,
+        teamCode: input.teamCode, // Ensure teamCode is passed
       };
       output.gtInvoice = await createInvoice(gtInvoiceInput);
       console.log(`GT Invoice created:`, output.gtInvoice);
@@ -105,11 +106,12 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
         gtCoordinatorEmail: '', // Ensure GT coordinator is not CC'd on the independent invoice
         invoiceNumber: indInvoiceNumber,
         revisionMessage: input.revisionMessage,
+        teamCode: input.teamCode, // Ensure teamCode is passed
       };
       output.independentInvoice = await createInvoice(independentInvoiceInput);
       console.log(`Independent Invoice created:`, output.independentInvoice);
     }
-    
+
     return output;
   }
 );
