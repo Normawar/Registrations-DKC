@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Download, Search } from 'lucide-react';
 import { type School } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
+import { Label } from '@/components/ui/label';
 
 type SchoolWithTeamCode = School & { id: string; teamCode: string };
 
