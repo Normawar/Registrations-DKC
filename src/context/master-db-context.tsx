@@ -56,7 +56,6 @@ export type SearchResult = {
 }
 
 interface MasterDbContextType {
-  database: MasterPlayer[];
   addPlayer: (player: MasterPlayer) => Promise<void>;
   updatePlayer: (player: MasterPlayer, editingProfile: SponsorProfile) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
@@ -81,6 +80,7 @@ interface MasterDbContextType {
   generatePlayerId: (uscfId: string) => string;
   updatePlayerFromUscfData: (uscfData: Partial<MasterPlayer>[]) => Promise<{ updated: number; created: number }>;
   toast: any;
+  database: MasterPlayer[];
 }
 
 
@@ -290,90 +290,32 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   const loadDatabase = useCallback(async () => {
-    if (!db) {
-        console.error("Firestore not initialized.");
-        setIsDbError(true);
+    // This function is now a no-op for initial load to improve performance.
+    // Data will be fetched on demand by components.
+    // It can be used for explicit refreshing if needed.
+    if (!isDbLoaded) { // Only run once on initial setup
         setIsDbLoaded(true);
-        return;
     }
-    setIsDbLoaded(false);
-    setIsDbError(false);
-    try {
-        const playersCol = collection(db, 'players');
-        const playerSnapshot = await getDocs(playersCol);
-        
-        if (playerSnapshot.empty) {
-            console.log("Player database is empty. Seeding with master CSV data...");
-            
-            try {
-                const response = await fetch('/data/master-players.csv');
-                if (!response.ok) throw new Error(`Failed to fetch CSV: ${response.statusText}`);
-                
-                const csvText = await response.text();
-                
-                const parseResult = await new Promise<Papa.ParseResult<any>>((resolve, reject) => {
-                    Papa.parse(csvText, { header: true, skipEmptyLines: true, complete: resolve, error: reject });
-                });
-                
-                const seedPlayers = parseCSVData(parseResult.data);
-                
-                if (seedPlayers.length > 0) {
-                    const batchSize = 500;
-                    for (let i = 0; i < seedPlayers.length; i += batchSize) {
-                        const batch = writeBatch(db);
-                        const batchPlayers = seedPlayers.slice(i, i + batchSize);
-                        
-                        batchPlayers.forEach(player => {
-                            const cleanedPlayer = removeUndefined(player);
-                            const docRef = doc(db, 'players', player.id);
-                            batch.set(docRef, cleanedPlayer);
-                        });
-                        await batch.commit();
-                    }
-                    
-                    setDatabase(seedPlayers);
-                    console.log(`Seeding complete. Imported ${seedPlayers.length} players from master CSV.`);
-                } else {
-                    console.warn("No valid players found in master CSV data. Falling back to placeholder data.");
-                    const batch = writeBatch(db);
-                    fullMasterPlayerData.forEach(player => {
-                        const cleanedPlayer = removeUndefined(player);
-                        const docRef = doc(db, 'players', player.id);
-                        batch.set(docRef, cleanedPlayer);
-                    });
-                    await batch.commit();
-                    setDatabase(fullMasterPlayerData);
-                }
-            } catch (csvError) {
-                console.error("Error loading master CSV, falling back to placeholder data:", csvError);
-                const batch = writeBatch(db);
-                fullMasterPlayerData.forEach(player => {
-                    const cleanedPlayer = removeUndefined(player);
-                    const docRef = doc(db, 'players', player.id);
-                    batch.set(docRef, cleanedPlayer);
-                });
-                await batch.commit();
-                setDatabase(fullMasterPlayerData);
-            }
-        } else {
-            const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-            setDatabase(playerList);
-            console.log(`Loaded ${playerList.length} players from Firestore.`);
-        }
-    } catch (error) {
-      console.error("Failed to load player database from Firestore:", error);
-      setIsDbError(true);
-    } finally {
-      setIsDbLoaded(true);
-    }
-  }, []);
+  }, [isDbLoaded]);
   
   useEffect(() => {
     loadDatabase();
   }, [loadDatabase]);
 
-  const refreshDatabase = () => {
-    loadDatabase();
+  const refreshDatabase = async () => {
+    if (!db) return;
+    setIsDbLoaded(false);
+    try {
+        const playersCol = collection(db, 'players');
+        const playerSnapshot = await getDocs(playersCol);
+        const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+        setDatabase(playerList);
+        toast({title: "Database Refreshed", description: `Loaded ${playerList.length} players.`});
+    } catch (error) {
+        toast({variant: "destructive", title: "Refresh Failed", description: "Could not reload player data."});
+    } finally {
+        setIsDbLoaded(true);
+    }
   };
 
   const addPlayer = async (player: MasterPlayer) => {
@@ -391,7 +333,9 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         await setDoc(playerRef, cleanedPlayer, { merge: true });
         
         console.log("Player successfully written to Firebase");
-        await loadDatabase(); // Ensure UI consistency by reloading from source
+        // No full reload, just update local state if needed
+        setDatabase(prev => [...prev.filter(p => p.id !== cleanedPlayer.id), cleanedPlayer]);
+
     } catch (error) {
         console.error("Error adding player:", error);
         throw error;
@@ -442,8 +386,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         console.log(`Batch ${currentBatchNum} committed.`);
       }
       
-      await loadDatabase();
-      console.log('Bulk upload complete and database reloaded.');
+      // Don't reload entire database, trust the writes
+      console.log('Bulk upload complete.');
     } catch (error) {
       console.error("Error adding bulk players:", error);
       throw error;
@@ -462,8 +406,11 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const updatePlayer = async (updatedPlayer: MasterPlayer, editingProfile: SponsorProfile) => {
     if (!db) return;
+    
+    // Fetch only the single player to get the old version
+    const oldPlayerDoc = await getDoc(doc(db, 'players', updatedPlayer.id));
+    const oldPlayer = oldPlayerDoc.exists() ? oldPlayerDoc.data() as MasterPlayer : null;
 
-    const oldPlayer = database.find(p => p.id === updatedPlayer.id);
     if (!oldPlayer) {
         console.error("Could not find original player to create change history.");
         return addPlayer(updatedPlayer); // Fallback to add if not found
@@ -496,49 +443,29 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             updatedAt: new Date().toISOString(),
         };
     } else {
-        // No changes, no need to update
-        return;
+        return; // No changes
     }
     
     const oldId = finalPlayer.id;
     const newUscfId = finalPlayer.uscfId;
     
-    // Check if USCF ID changed from temp ID to real USCF ID
-    const isIdMigration = oldId.startsWith('temp_') && 
-                         newUscfId && 
-                         newUscfId.toUpperCase() !== 'NEW' && 
-                         newUscfId !== oldId;
+    const isIdMigration = oldId.startsWith('temp_') && newUscfId && newUscfId.toUpperCase() !== 'NEW' && newUscfId !== oldId;
     
     if (isIdMigration) {
       const newId = newUscfId;
-      const playerWithNewId = {
-        ...finalPlayer,
-        id: newId,
-        updatedAt: new Date().toISOString()
-      };
-      
+      const playerWithNewId = { ...finalPlayer, id: newId, updatedAt: new Date().toISOString() };
       const cleanedPlayer = removeUndefined(playerWithNewId);
-      
       await setDoc(doc(db, 'players', newId), cleanedPlayer);
       await deleteDoc(doc(db, 'players', oldId));
-      
-      setDatabase(prevDb => 
-        prevDb.map(p => p.id === oldId ? playerWithNewId : p)
-      );
     } else {
       const cleanedPlayer = removeUndefined(finalPlayer);
       await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
-      
-      setDatabase(prevDb => 
-        prevDb.map(p => p.id === finalPlayer.id ? finalPlayer : p)
-      );
     }
   };
 
   const deletePlayer = async (playerId: string) => {
     if (!db) return;
     await deleteDoc(doc(db, 'players', playerId));
-    await loadDatabase();
   };
 
   const updateSchoolDistrict = (oldDistrict: string, newDistrict: string) => {
@@ -564,12 +491,10 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
             const updatedData = {
                 regularRating: uscfPlayer.regularRating !== undefined ? uscfPlayer.regularRating : existingData.regularRating,
                 uscfExpiration: uscfPlayer.uscfExpiration || existingData.uscfExpiration,
-                // Add any other fields from USCF that should be updated
             };
             batch.update(playerRef, updatedData);
             stats.updated++;
         } else {
-            // Player doesn't exist, create a new record
             const newPlayerData: MasterPlayer = {
                 id: playerId,
                 uscfId: uscfPlayer.uscfId,
@@ -593,7 +518,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     }
 
     await batch.commit();
-    await loadDatabase();
     return stats;
   };
   
@@ -879,7 +803,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
 
   const value = {
-    database,
     addPlayer,
     updatePlayer,
     deletePlayer,
@@ -898,6 +821,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     generatePlayerId,
     updatePlayerFromUscfData,
     toast,
+    database
   };
 
   return (

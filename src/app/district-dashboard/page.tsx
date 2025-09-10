@@ -21,28 +21,38 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
-import { useMasterDb } from "@/context/master-db-context";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Building, Users, FileText, Award } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DistrictCoordinatorGuard } from "@/components/auth-guard";
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
+import { MasterPlayer } from '@/lib/data/full-master-player-data';
 
 
 function DistrictDashboardContent() {
   const { profile } = useSponsorProfile();
-  const { database: allPlayers } = useMasterDb();
   const [clientReady, setClientReady] = useState(false);
+  const [districtPlayers, setDistrictPlayers] = useState<MasterPlayer[]>([]);
 
   useEffect(() => {
     setClientReady(true);
   }, []);
-
-  const districtPlayers = useMemo(() => {
-    if (!profile?.district) return [];
-    return allPlayers.filter(p => p.district === profile.district);
-  }, [allPlayers, profile?.district]);
   
+  const loadDistrictPlayers = useCallback(async () => {
+    if (!profile?.district || !db) return;
+    const playersQuery = query(collection(db, 'players'), where('district', '==', profile.district));
+    const querySnapshot = await getDocs(playersQuery);
+    const players = querySnapshot.docs.map(doc => doc.data() as MasterPlayer);
+    setDistrictPlayers(players);
+  }, [profile?.district]);
+
+  useEffect(() => {
+    loadDistrictPlayers();
+  }, [loadDistrictPlayers]);
+
+
   const districtSchools = useMemo(() => {
     if (!profile?.district) return [];
     const schools = districtPlayers

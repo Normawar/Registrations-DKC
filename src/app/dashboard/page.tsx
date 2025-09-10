@@ -27,7 +27,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { format, isSameDay } from "date-fns";
 import { Info, FileText, ImageIcon, Lock } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { useMasterDb } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -36,10 +35,10 @@ import { SponsorRegistrationDialog } from "@/components/sponsor-registration-dia
 import { SponsorGuard } from "@/components/auth-guard";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/services/firestore-service";
+import { MasterPlayer } from "@/lib/data/full-master-player-data";
 
 function DashboardContent() {
   const { events } = useEvents();
-  const { database: allPlayers } = useMasterDb();
   const { profile } = useSponsorProfile();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -47,17 +46,34 @@ function DashboardContent() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [rosterPlayers, setRosterPlayers] = useState<MasterPlayer[]>([]);
+  const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
 
   useEffect(() => {
     setClientReady(true);
     setSelectedDate(new Date());
   }, []);
 
-  const loadRecentActivity = useCallback(async () => {
+  const loadDashboardData = useCallback(async () => {
     if (!db || !profile) return;
 
-    let q = query(collection(db, 'invoices'));
+    // Fetch roster players for the specific school
+    const playersQuery = query(collection(db, 'players'), 
+      where('district', '==', profile.district), 
+      where('school', '==', profile.school)
+    );
+    const playersSnapshot = await getDocs(playersQuery);
+    const schoolRoster = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+    setRosterPlayers(schoolRoster);
+    
+    // Fetch all players (for name lookups in recent activity)
+    // In a production app with millions of players, this should be optimized
+    const allPlayersSnapshot = await getDocs(collection(db, 'players'));
+    const allPlayerData = allPlayersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+    setAllPlayers(allPlayerData);
 
+    // Fetch recent invoices
+    let q = query(collection(db, 'invoices'));
     if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
       q = query(q, where('district', '==', profile.district), where('schoolName', '==', profile.school));
     } else if (profile.role === 'individual') {
@@ -72,7 +88,7 @@ function DashboardContent() {
       .slice(0, 5)
       .map(inv => {
         const firstPlayerName = Object.keys(inv.selections || {}).length > 0
-          ? allPlayers.find(p => p.id === Object.keys(inv.selections)[0])?.firstName || 'Unknown Player'
+          ? allPlayerData.find(p => p.id === Object.keys(inv.selections)[0])?.firstName || 'Unknown Player'
           : 'N/A';
         
         return {
@@ -86,18 +102,13 @@ function DashboardContent() {
       });
 
     setRecentActivity(activity);
-  }, [profile, allPlayers]);
+  }, [profile]);
   
   useEffect(() => {
-    if(profile && allPlayers.length > 0) {
-      loadRecentActivity();
+    if(profile) {
+      loadDashboardData();
     }
-  }, [profile, allPlayers, loadRecentActivity]);
-
-  const rosterPlayers = useMemo(() => {
-    if (!profile || profile.role !== 'sponsor') return [];
-    return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
-  }, [allPlayers, profile]);
+  }, [profile, loadDashboardData]);
 
   const playersWithMissingInfo = useMemo(() => {
     return rosterPlayers.filter(player => {

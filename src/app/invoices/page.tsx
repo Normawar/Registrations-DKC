@@ -50,7 +50,8 @@ export default function UnifiedInvoiceRegistrations() {
   const [invoiceToDelete, setInvoiceToDelete] = useState<any | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { dbSchools, dbDistricts, database: allPlayers } = useMasterDb();
+  const { dbSchools, dbDistricts, searchPlayers, isDbLoaded } = useMasterDb();
+  const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
   const [districtFilter, setDistrictFilter] = useState('all');
   const [schoolFilter, setSchoolFilter] = useState('all');
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
@@ -98,6 +99,11 @@ export default function UnifiedInvoiceRegistrations() {
         console.log(`✅ Found ${firestoreInvoices.length} documents in top-level 'invoices' collection.`);
       } else {
         console.log("🟡 No documents found in top-level 'invoices' collection.");
+      }
+      
+      if (isDbLoaded && allPlayers.length === 0) {
+        const playerResults = await searchPlayers({maxResults: 50000}); // get all players
+        setAllPlayers(playerResults.players);
       }
 
       console.log(`🔄 Total data found: ${allInvoiceData.length}`);
@@ -167,7 +173,7 @@ export default function UnifiedInvoiceRegistrations() {
     } finally {
       setIsLoading(false);
     }
-  }, [profile, toast, allPlayers]);
+  }, [profile, toast, allPlayers, isDbLoaded, searchPlayers]);
 
   const handleManualRefresh = useCallback(async () => {
     await loadData();
