@@ -25,6 +25,8 @@ import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/services/firestore-service';
 import { createUserByOrganizer } from '@/lib/simple-auth';
+import { Loader2 } from 'lucide-react';
+
 
 type User = {
     email: string;
@@ -153,6 +155,19 @@ export default function UsersPage() {
     
     const createForm = useForm<CreateUserFormValues>({
         resolver: zodResolver(createUserFormSchema),
+        defaultValues: {
+            email: '',
+            role: 'sponsor',
+            firstName: '',
+            lastName: '',
+            school: '',
+            district: 'None',
+            isDistrictCoordinator: false,
+            phone: '',
+            bookkeeperEmail: '',
+            gtCoordinatorEmail: '',
+            password: '',
+        }
     });
 
     const handleDistrictChange = (district: string, formInstance: any, resetSchool: boolean = true) => {
@@ -398,7 +413,7 @@ export default function UsersPage() {
                                     <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="role" render={({ field }) => (
                                         <FormItem><FormLabel>Role</FormLabel>
                                         <Select onValueChange={(value) => form.setValue('role', value as User['role'])} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
@@ -459,8 +474,8 @@ export default function UsersPage() {
                                             <FormMessage />
                                         </FormItem>
                                     )} />
-                                    <FormField control={form.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper Email</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={form.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper Email</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={form.control} name="gtCoordinatorEmail" render={({ field }) => ( <FormItem><FormLabel>GT Coordinator Email</FormLabel><FormControl><Input type="email" placeholder="gt.coordinator@example.com" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                 </form>
                             </Form>
                         </div>
