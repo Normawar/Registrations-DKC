@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, getDoc, writeBatch, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
@@ -15,7 +16,9 @@ import { schoolData } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
 
 // Temporary debug export - remove after use
-(window as any).debugDB = { db, getDocs, collection };
+if (typeof window !== 'undefined') {
+  (window as any).debugDB = { db, getDocs, collection };
+}
 
 interface LogEntry {
   type: 'success' | 'error' | 'info';
@@ -46,6 +49,11 @@ export default function DataRepairPage() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Temporary debug export - remove after use
+    (window as any).debugDB = { db, getDocs, collection };
+  }, []);
 
   const addLog = (type: LogEntry['type'], message: string) => {
     setLogs(prev => [...prev, { type, message }]);
@@ -199,8 +207,8 @@ export default function DataRepairPage() {
               uscfId: 'NEW',
               firstName,
               lastName,
-              school,
-              district,
+              school: school || 'Unknown School',
+              district: district || 'Unknown District',
               grade: 'N/A',
               section: section, // Use school-inferred section
               email: 'placeholder@example.com',
