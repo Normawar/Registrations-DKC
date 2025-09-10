@@ -2,7 +2,7 @@
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { sendPasswordResetEmail, type User } from 'firebase/auth';
 
 
 // Simple signup function with detailed error logging
@@ -81,6 +81,55 @@ export async function simpleSignUp(email: string, password: string, userData: an
     throw new Error(userFriendlyMessage);
   }
 }
+
+// Function for organizers to create new users
+export async function createUserByOrganizer(email: string, password: string, userData: any) {
+    console.log('🚀 Starting user creation by organizer...');
+    
+    if (!auth || !db) {
+        throw new Error('Firebase services are not available.');
+    }
+
+    try {
+        const { createUserWithEmailAndPassword } = await import('firebase/auth');
+        const { doc, setDoc } = await import('firebase/firestore');
+
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+
+        const userProfile = {
+            ...userData,
+            email: email.toLowerCase(),
+            uid: user.uid,
+            createdAt: new Date().toISOString(),
+            forceProfileUpdate: true, // Flag to force profile completion
+        };
+        
+        await setDoc(doc(db, 'users', user.uid), userProfile);
+        
+        console.log(`✅ User ${email} created successfully by an organizer.`);
+        return { success: true, user, profile: userProfile };
+
+    } catch (error: any) {
+        console.error('❌ User creation by organizer failed:', error);
+        let userFriendlyMessage = 'Failed to create user.';
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                userFriendlyMessage = 'An account with this email already exists.';
+                break;
+            case 'auth/weak-password':
+                userFriendlyMessage = 'The temporary password is too weak. Please use at least 6 characters.';
+                break;
+            case 'auth/invalid-email':
+                userFriendlyMessage = 'Please enter a valid email address for the new user.';
+                break;
+            default:
+                if (error.message) userFriendlyMessage = error.message;
+        }
+        throw new Error(userFriendlyMessage);
+    }
+}
+
 
 // Simple signin function with detailed error logging
 export async function simpleSignIn(email: string, password: string) {

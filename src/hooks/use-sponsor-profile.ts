@@ -23,6 +23,7 @@ export type SponsorProfile = {
   role: 'sponsor' | 'organizer' | 'individual' | 'district_coordinator';
   isDistrictCoordinator?: boolean;
   uid?: string; // Ensure UID is part of the profile
+  forceProfileUpdate?: boolean; // Flag to force profile completion
 };
 
 // This hook now manages the auth user and their profile data together

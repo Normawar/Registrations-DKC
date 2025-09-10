@@ -36,7 +36,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { KingIcon, QueenIcon, RookIcon, BishopIcon, KnightIcon, PawnIcon } from '@/components/icons/chess-icons';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { auth, storage } from '@/lib/firebase';
-import { Loader2, Building, User } from 'lucide-react';
+import { Loader2, Building, User, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateTeamCode } from '@/lib/school-utils';
@@ -342,7 +342,8 @@ export default function ProfilePage() {
   };
   
   function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
-    updateProfile(values);
+    // Clear the profile update flag when the user saves
+    updateProfile({ ...values, forceProfileUpdate: false });
     toast({
       title: 'Profile Updated',
       description: 'Your information has been successfully saved.',
@@ -381,6 +382,16 @@ export default function ProfilePage() {
             View and edit your account information.
           </p>
         </div>
+
+        {profile?.forceProfileUpdate && (
+            <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Complete Your Profile</AlertTitle>
+                <AlertDescription>
+                    Welcome! Please review and complete your profile information below. You must save your profile before you can access the rest of the site.
+                </AlertDescription>
+            </Alert>
+        )}
         
         {profile?.isDistrictCoordinator && (
           <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download, UserPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -24,6 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/services/firestore-service';
+import { createUserByOrganizer } from '@/lib/simple-auth';
 
 type User = {
     email: string;
@@ -53,18 +54,25 @@ const userFormSchema = z.object({
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 });
 
+const createUserFormSchema = userFormSchema.extend({
+    password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
+});
+
 type UserFormValues = z.infer<typeof userFormSchema>;
+type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 export default function UsersPage() {
     const { toast } = useToast();
     const [users, setUsers] = useState<User[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumn; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
+    const [isCreatingUser, setIsCreatingUser] = useState(false);
     
     const uniqueDistricts = useMemo(() => {
         const districts = new Set(schoolData.map(s => s.district));
@@ -142,16 +150,20 @@ export default function UsersPage() {
     const form = useForm<UserFormValues>({
         resolver: zodResolver(userFormSchema),
     });
+    
+    const createForm = useForm<CreateUserFormValues>({
+        resolver: zodResolver(createUserFormSchema),
+    });
 
-    const handleDistrictChange = (district: string, resetSchool: boolean = true) => {
-        form.setValue('district', district);
+    const handleDistrictChange = (district: string, formInstance: any, resetSchool: boolean = true) => {
+        formInstance.setValue('district', district);
         if (resetSchool) {
-            form.setValue('school', '');
+            formInstance.setValue('school', '');
         }
         if (district === 'None') {
             setSchoolsForDistrict(allSchoolNames);
             if (resetSchool) {
-              form.setValue('school', 'Homeschool');
+              formInstance.setValue('school', 'Homeschool');
             }
         } else {
             const filteredSchools = schoolData
@@ -177,7 +189,7 @@ export default function UsersPage() {
             bookkeeperEmail: editingUser.bookkeeperEmail || '',
             gtCoordinatorEmail: editingUser.gtCoordinatorEmail || '',
         });
-        handleDistrictChange(initialDistrict, false);
+        handleDistrictChange(initialDistrict, form, false);
       }
     }, [isDialogOpen, editingUser, form]);
 
@@ -220,6 +232,30 @@ export default function UsersPage() {
         } catch (error) {
             console.error("Error updating user:", error);
             toast({ variant: 'destructive', title: "Update Failed", description: "Could not update user in the database." });
+        }
+    };
+    
+    const handleCreateUser = async (values: CreateUserFormValues) => {
+        setIsCreatingUser(true);
+        try {
+            const { password, ...profileData } = values;
+            await createUserByOrganizer(values.email, password, profileData);
+            toast({
+                title: "User Created Successfully",
+                description: `${values.email} has been created and can now log in with their temporary password.`,
+            });
+            loadUsers();
+            setIsCreateDialogOpen(false);
+            createForm.reset();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "An unknown error occurred.";
+            toast({
+                variant: 'destructive',
+                title: 'User Creation Failed',
+                description: message,
+            });
+        } finally {
+            setIsCreatingUser(false);
         }
     };
 
@@ -268,9 +304,14 @@ export default function UsersPage() {
     return (
         <AppLayout>
             <div className="space-y-8">
-                <div>
-                    <h1 className="text-3xl font-bold font-headline">User Management</h1>
-                    <p className="text-muted-foreground">View, edit, and manage all system users.</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold font-headline">User Management</h1>
+                        <p className="text-muted-foreground">View, edit, and manage all system users.</p>
+                    </div>
+                    <Button onClick={() => setIsCreateDialogOpen(true)}>
+                        <UserPlus className="mr-2 h-4 w-4" /> Create New User
+                    </Button>
                 </div>
 
                 <Card>
@@ -397,7 +438,7 @@ export default function UsersPage() {
                                     <FormField control={form.control} name="district" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>District</FormLabel>
-                                            <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value}>
+                                            <Select onValueChange={(value) => handleDistrictChange(value, form)} value={field.value}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
                                                 <SelectContent>
                                                     {uniqueDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
@@ -427,6 +468,47 @@ export default function UsersPage() {
                     <DialogFooter className="p-6 pt-4 border-t shrink-0">
                         <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
                         <Button type="submit" form="user-edit-form">Save Changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col p-0">
+                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
+                        <DialogTitle>Create New User</DialogTitle>
+                        <DialogDescription>Enter the new user's details and a temporary password.</DialogDescription>
+                    </DialogHeader>
+                     <ScrollArea className="flex-1 overflow-y-auto">
+                        <div className="p-6">
+                            <Form {...createForm}>
+                                <form id="user-create-form" onSubmit={createForm.handleSubmit(handleCreateUser)} className="space-y-4">
+                                    <FormField control={createForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={createForm.control} name="role" render={({ field }) => (
+                                        <FormItem><FormLabel>Role</FormLabel>
+                                        <Select onValueChange={(value) => createForm.setValue('role', value as User['role'])} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="sponsor">Sponsor</SelectItem>
+                                                <SelectItem value="organizer">Organizer</SelectItem>
+                                                <SelectItem value="individual">Individual</SelectItem>
+                                                <SelectItem value="district_coordinator">District Coordinator</SelectItem>
+                                            </SelectContent>
+                                        </Select><FormMessage />
+                                        </FormItem>
+                                    )} />
+                                </form>
+                            </Form>
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                        <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                        <Button type="submit" form="user-create-form" disabled={isCreatingUser}>
+                            {isCreatingUser && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Create User
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
