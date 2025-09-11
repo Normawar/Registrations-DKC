@@ -183,7 +183,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   };
   
   const handleRoleToggle = () => {
-    if (profile?.isDistrictCoordinator) {
+    if (profile?.isDistrictCoordinator && profile.role !== 'organizer') {
         router.push('/auth/role-selection');
     }
   };
@@ -215,7 +215,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     {profile?.avatarType === 'upload' ? (
                         <Avatar className="h-8 w-8">
                             <AvatarImage src={profile.avatarValue} alt="User Avatar" />
-                            <AvatarFallback>{profile.firstName.charAt(0)}</AvatarFallback>
+                            <AvatarFallback>{profile.firstName?.charAt(0)}</AvatarFallback>
                         </Avatar>
                     ) : AvatarComponent ? (
                         <AvatarComponent className="w-8 h-8 text-sidebar-primary shrink-0" />
@@ -225,12 +225,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
                     <p className="font-headline text-base font-bold text-sidebar-foreground truncate">
-                        {profile ? `${''}${profile.firstName} ${profile.lastName}` : 'User Name'}
+                        {profile ? `${profile.firstName} ${profile.lastName}` : 'User Name'}
                     </p>
                     {profile?.role === 'sponsor' && (
                       <>
                         <p className="text-xs text-sidebar-foreground/80 truncate">
-                            {profile.isDistrictCoordinator ? `${''}${profile.district} Coordinator` : profile.school || 'School Name'}
+                            {profile.isDistrictCoordinator ? `${profile.district} Coordinator` : profile.school || 'School Name'}
                         </p>
                         {teamCode && !profile.isDistrictCoordinator && (
                           <p className="text-xs font-bold text-sidebar-primary truncate font-mono">
@@ -258,7 +258,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarHeader>
           <SidebarContent>
-            {profile?.isDistrictCoordinator && (
+            {profile?.isDistrictCoordinator && profile.role !== 'organizer' && (
                  <div className="px-2 mb-2">
                     <Button variant="secondary" className="w-full h-auto py-2 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-2" onClick={handleRoleToggle}>
                        <Repeat className="w-4 h-4 mr-2 group-data-[collapsible=icon]:mr-0" />
@@ -320,7 +320,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <AvatarFallback>{profile ? profile.firstName.charAt(0) : 'U'}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden group-data-[collapsible=icon]:hidden">
-                <p className="font-semibold text-sm truncate">{profile ? `${''}${profile.firstName} ${profile.lastName}` : 'User'}</p>
+                <p className="font-semibold text-sm truncate">{profile ? `${profile.firstName} ${profile.lastName}` : 'User'}</p>
                 <p className="text-xs text-sidebar-foreground/70 truncate">
                   {profile ? profile.email : 'user@chessmate.com'}
                 </p>
