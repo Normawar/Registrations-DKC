@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
@@ -120,20 +121,31 @@ function SponsorRosterView() {
   });
   
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbSchools);
-  const selectedDistrict = createPlayerForm.watch('district');
-
-  useEffect(() => {
+  
+  const handleDistrictChange = (district: string, formInstance: any, resetSchool: boolean = true) => {
+      formInstance.setValue('district', district);
       let filteredSchools;
-      if (selectedDistrict === 'all' || selectedDistrict === 'None') {
+      if (district === 'all' || district === 'None') {
           filteredSchools = dbSchools;
       } else {
           filteredSchools = dbSchools.filter(school => 
-              schoolData.find(s => s.schoolName === school)?.district === selectedDistrict
+              schoolData.find(s => s.schoolName === school)?.district === district
           );
       }
       setSchoolsForDistrict(['TestSchool', ...filteredSchools]);
-      createPlayerForm.setValue('school', '');
-  }, [selectedDistrict, dbSchools, createPlayerForm]);
+      if (resetSchool) {
+          formInstance.setValue('school', '');
+      }
+  };
+
+  const selectedDistrict = createPlayerForm.watch('district');
+
+  useEffect(() => {
+      if (selectedDistrict) {
+        handleDistrictChange(selectedDistrict, createPlayerForm, true);
+      }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDistrict, dbSchools]);
 
   // Update form defaults when profile loads
   useEffect(() => {
@@ -1464,3 +1476,4 @@ export default function RosterPage() {
     
 
     
+
