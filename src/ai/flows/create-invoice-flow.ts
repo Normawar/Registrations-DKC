@@ -23,10 +23,11 @@ const PlayerInvoiceInfoSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
   uscfId: z.string().describe('The USCF ID of the player.'),
   baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
-  lateFee: z.number().describe('The late fee applied, if any.'),
+  lateFee: z.number().optional().nullable().describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
   isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
   section: z.string().optional().describe('The tournament section for the player.'),
+  waiveLateFee: z.boolean().optional().describe('Flag to waive late fee for a player.'),
 });
 
 const CreateInvoiceInputSchema = z.object({
@@ -70,40 +71,53 @@ const createInvoiceFlow = ai.defineFlow(
     outputSchema: CreateInvoiceOutputSchema,
   },
   async (input) => {
-    // Step 0: Save/Update player data in Firestore
-    if (db && input.players.length > 0) {
-        console.log(`Processing ${input.players.length} players for Firestore save/update...`);
-        const batch = writeBatch(db);
-        for (const player of input.players) {
-            const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;
-            const playerRef = doc(db, 'players', playerId);
-            
-            const [firstName, ...lastNameParts] = player.playerName.split(' ');
-            const lastName = lastNameParts.join(' ');
+    // Step 0: Globally fix all null or undefined fields in players
+    const processedPlayers = input.players.map(p => ({
+      ...p,
+      playerName: p.playerName ?? 'undefined undefined',
+      uscfId: p.uscfId ?? 'NEW',
+      baseRegistrationFee: p.baseRegistrationFee ?? 0,
+      lateFee: p.lateFee ?? 0,
+      uscfAction: p.uscfAction ?? false,
+      isGtPlayer: p.isGtPlayer ?? false,
+      waiveLateFee: p.waiveLateFee ?? false,
+    }));
 
-            const playerData = {
-                id: playerId,
-                uscfId: player.uscfId,
-                firstName: firstName,
-                lastName: lastName,
-                school: input.schoolName,
-                district: input.district,
-                studentType: player.isGtPlayer ? 'gt' : 'independent',
-                section: player.section,
-                updatedAt: new Date().toISOString(),
-            };
+    // Step 1: Save/Update player data in Firestore
+    if (db && processedPlayers.length > 0) {
+      console.log(`Processing ${processedPlayers.length} players for Firestore save/update...`);
+      for (const player of processedPlayers) {
+        const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;
+        const playerRef = doc(db, 'players', playerId);
+        const playerDoc = await getDoc(playerRef);
 
-            batch.set(playerRef, playerData, { merge: true });
-            console.log(`Staged update for player ${player.playerName} (ID: ${playerId}) in Firestore.`);
+        const [firstName, ...lastNameParts] = player.playerName.split(' ');
+        const lastName = lastNameParts.join(' ');
+
+        const playerData = {
+          id: playerId,
+          uscfId: player.uscfId,
+          firstName,
+          lastName,
+          school: input.schoolName,
+          district: input.district,
+          studentType: player.isGtPlayer ? 'gt' : 'independent',
+          section: player.section,
+          updatedAt: new Date().toISOString(),
+        };
+
+        if (playerDoc.exists()) {
+          await setDoc(playerRef, playerData, { merge: true });
+          console.log(`Updated player ${player.playerName} (ID: ${playerId}) in Firestore.`);
+        } else {
+          await setDoc(playerRef, { ...playerData, createdAt: new Date().toISOString() }, { merge: true });
+          console.log(`Created new player ${player.playerName} (ID: ${playerId}) in Firestore.`);
         }
-        await batch.commit();
-        console.log('Player data batch committed to Firestore.');
+      }
     }
-
 
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
-      console.log("Square not configured. Returning mock invoice for createInvoiceFlow.");
       const mockInvoiceId = `MOCK_INV_${randomUUID()}`;
       return {
         invoiceId: mockInvoiceId,
@@ -116,249 +130,152 @@ const createInvoiceFlow = ai.defineFlow(
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
-    
-    console.log("Starting Square invoice creation with input:", input);
 
     try {
-      // Find or create a customer
-      console.log(`Searching for customer with email: ${input.sponsorEmail}`);
+      // --- Customer Creation / Lookup ---
       const searchCustomersResponse = await customersApi.searchCustomers({
         query: {
-          filter: {
-            emailAddress: {
-              exact: input.sponsorEmail,
-            },
-          },
+          filter: { emailAddress: { exact: input.sponsorEmail } },
         },
       });
-      
+
       const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
 
       let customerId: string;
-      if (searchCustomersResponse.result.customers && searchCustomersResponse.result.customers.length > 0) {
+      if (searchCustomersResponse.result.customers?.length) {
         const customer = searchCustomersResponse.result.customers[0];
         customerId = customer.id!;
-        console.log(`Found existing customer with ID: ${customerId}`);
-        
-        const address: Address = {
-            addressLine1: input.schoolAddress,
-        };
-
-        console.log(`Updating customer ${customerId} with company name: ${companyName}`);
         await customersApi.updateCustomer(customerId, {
-            companyName: companyName,
-            phoneNumber: input.schoolPhone,
-            address: address
+          companyName,
+          phoneNumber: input.schoolPhone,
+          address: { addressLine1: input.schoolAddress },
         });
-        
       } else {
-        console.log("Customer not found, creating a new one...");
         const [firstName, ...lastNameParts] = input.sponsorName.split(' ');
-        
-        const address: Address = {
-            addressLine1: input.schoolAddress,
-        };
-
         const createCustomerResponse = await customersApi.createCustomer({
           idempotencyKey: randomUUID(),
           givenName: firstName,
           familyName: lastNameParts.join(' '),
           emailAddress: input.sponsorEmail,
-          companyName: companyName,
+          companyName,
           phoneNumber: input.schoolPhone,
-          address: address,
+          address: { addressLine1: input.schoolAddress },
           note: `Team Code: ${input.teamCode}`,
         });
         customerId = createCustomerResponse.result.customer!.id!;
-        console.log(`Created new customer with ID: ${customerId}`);
       }
-      
-      // Create an Order
+
+      // --- Order Line Items ---
       const lineItems: OrderLineItem[] = [];
 
-      // 1. Registration Line Item
-      if (input.players.length > 0) {
-          const registrationFee = input.players[0].baseRegistrationFee;
-          const playerNotes = input.players.map((p, index) => {
-            const studentType = p.isGtPlayer ? ' (GT)' : '';
-            return `${index + 1}. ${p.playerName} (${p.uscfId})${studentType}`;
-          }).join('\n');
+      // 1. Registration
+      if (processedPlayers.length > 0) {
+        const registrationFee = processedPlayers[0].baseRegistrationFee;
+        const playerNotes = processedPlayers
+          .map((p, idx) => `${idx + 1}. ${p.playerName} (${p.uscfId})${p.isGtPlayer ? ' (GT)' : ''}`)
+          .join('\n');
 
-          lineItems.push({
-              name: `Tournament Registration`,
-              quantity: String(input.players.length),
-              basePriceMoney: {
-                  amount: BigInt(Math.round(registrationFee * 100)),
-                  currency: 'USD',
-              },
-              note: playerNotes,
-          });
+        lineItems.push({
+          name: 'Tournament Registration',
+          quantity: String(processedPlayers.length),
+          basePriceMoney: { amount: BigInt(Math.round(registrationFee * 100)), currency: 'USD' },
+          note: playerNotes,
+        });
       }
 
-      // 2. Late Fee Line Item
-      const lateFeePlayers = input.players.filter(p => p.lateFee > 0);
+      // 2. Late Fees (exclude waived)
+      const lateFeePlayers = processedPlayers.filter(p => p.lateFee > 0 && !p.waiveLateFee);
       if (lateFeePlayers.length > 0) {
-          const lateFee = lateFeePlayers[0].lateFee;
-          const lateFeePlayerNotes = lateFeePlayers.map((p, index) => `${index + 1}. ${p.playerName}`).join('\n');
-          lineItems.push({
-              name: 'Late Fee',
-              quantity: String(lateFeePlayers.length),
-              basePriceMoney: {
-                  amount: BigInt(Math.round(lateFee * 100)),
-                  currency: 'USD',
-              },
-              note: lateFeePlayerNotes,
-          });
+        const lateFee = lateFeePlayers[0].lateFee;
+        const lateFeePlayerNotes = lateFeePlayers.map((p, i) => `${i + 1}. ${p.playerName}`).join('\n');
+        lineItems.push({
+          name: 'Late Fee',
+          quantity: String(lateFeePlayers.length),
+          basePriceMoney: { amount: BigInt(Math.round(lateFee * 100)), currency: 'USD' },
+          note: lateFeePlayerNotes,
+        });
       }
-      
-      // 2.5 Substitution Fee Line Item
+
+      // 3. Substitution Fee
       if (input.substitutionFee && input.substitutionFee > 0) {
         lineItems.push({
           name: 'Substitution Fee',
           quantity: '1',
-          basePriceMoney: {
-            amount: BigInt(Math.round(input.substitutionFee * 100)),
-            currency: 'USD',
-          },
+          basePriceMoney: { amount: BigInt(Math.round(input.substitutionFee * 100)), currency: 'USD' },
           note: 'Fee for substituting a player after registration.',
         });
       }
 
-      // 3. USCF Membership Line Item (with PSJA GT exception)
-      const uscfActionPlayers = input.players.filter(p => {
-          if (!p.uscfAction) return false;
-          // For PSJA district, ONLY charge for USCF if the player is NOT a GT player
-          if (input.district === 'PHARR-SAN JUAN-ALAMO ISD' && p.isGtPlayer) {
-              console.log(`Excluding GT player ${p.playerName} from USCF fee for PSJA district.`);
-              return false; // Do not charge GT players from PSJA
-          }
-          // For all other districts or non-GT PSJA players, charge if uscfAction is true
-          return true;
+      // 4. USCF Fee (exclude GT for PSJA district)
+      const uscfActionPlayers = processedPlayers.filter(p => {
+        if (!p.uscfAction) return false;
+        if (input.district === 'PHARR-SAN JUAN-ALAMO ISD' && p.isGtPlayer) return false;
+        return true;
       });
 
       if (uscfActionPlayers.length > 0) {
-          const uscfPlayerNotes = uscfActionPlayers.map((p, index) => `${index + 1}. ${p.playerName}`).join('\n');
-          let note = `Applies to players needing USCF membership.\n${uscfPlayerNotes}`;
-          if(input.district === 'PHARR-SAN JUAN-ALAMO ISD') {
-            note = `Applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`;
-          }
-
-          lineItems.push({
-              name: 'USCF Membership (New/Renew)',
-              quantity: String(uscfActionPlayers.length),
-              basePriceMoney: {
-                  amount: BigInt(Math.round(input.uscfFee * 100)),
-                  currency: 'USD',
-              },
-              note: note,
-          });
+        const uscfPlayerNotes = uscfActionPlayers.map((p, i) => `${i + 1}. ${p.playerName}`).join('\n');
+        lineItems.push({
+          name: 'USCF Membership (New/Renew)',
+          quantity: String(uscfActionPlayers.length),
+          basePriceMoney: { amount: BigInt(Math.round(input.uscfFee * 100)), currency: 'USD' },
+          note: input.district === 'PHARR-SAN JUAN-ALAMO ISD'
+            ? `Applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`
+            : `Applies to players needing USCF membership.\n${uscfPlayerNotes}`,
+        });
       }
 
-      console.log("Creating order with line items:", JSON.stringify(lineItems, (key, value) => typeof value === 'bigint' ? value.toString() : value, 2));
+      // --- Create Order ---
       const createOrderResponse = await ordersApi.createOrder({
         idempotencyKey: randomUUID(),
-        order: {
-          locationId: locationId,
-          customerId: customerId,
-          lineItems: lineItems,
-        },
+        order: { locationId, customerId, lineItems },
       });
-
       const orderId = createOrderResponse.result.order!.id!;
-      console.log(`Created order with ID: ${orderId}`);
 
-      // Create an Invoice from the Order
+      // --- Create Invoice ---
       const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 7); // Invoice due in 7 days
+      dueDate.setDate(dueDate.getDate() + 7);
       const formattedEventDate = format(new Date(input.eventDate), 'MM/dd/yyyy');
 
       const ccRecipients: InvoiceRecipient[] = [];
-      const bookkeeperEmailSchema = z.string().email();
-      if (input.bookkeeperEmail && bookkeeperEmailSchema.safeParse(input.bookkeeperEmail).success) {
-          ccRecipients.push({ emailAddress: input.bookkeeperEmail });
-      }
-      if (input.gtCoordinatorEmail && bookkeeperEmailSchema.safeParse(input.gtCoordinatorEmail).success) {
-          ccRecipients.push({ emailAddress: input.gtCoordinatorEmail });
-      }
-      
-      const baseDescription = `Thank you for your registration.`;
-      const revisionNote = input.revisionMessage ? `\n\n${input.revisionMessage}` : '';
-      const description = input.description ? 
-          `${input.description}${revisionNote}\n\n${baseDescription}` : 
-          `${baseDescription}${revisionNote}`;
+      if (input.bookkeeperEmail?.trim()) ccRecipients.push({ emailAddress: input.bookkeeperEmail });
+      if (input.gtCoordinatorEmail?.trim()) ccRecipients.push({ emailAddress: input.gtCoordinatorEmail });
 
-      console.log(`Creating invoice for order ID: ${orderId}`);
+      const revisionNote = input.revisionMessage ? `\n\n${input.revisionMessage}` : '';
+      const baseDescription = 'Thank you for your registration.';
+      const description = input.description ? `${input.description}${revisionNote}\n\n${baseDescription}` : `${baseDescription}${revisionNote}`;
+
       const createInvoiceResponse = await invoicesApi.createInvoice({
         idempotencyKey: randomUUID(),
         invoice: {
-          orderId: orderId,
-          primaryRecipient: {
-            customerId: customerId,
-          },
-          ccRecipients: ccRecipients.length > 0 ? ccRecipients : undefined,
-          paymentRequests: [{
-            requestType: 'BALANCE',
-            dueDate: dueDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
-          }],
+          orderId,
+          primaryRecipient: { customerId },
+          ccRecipients: ccRecipients.length ? ccRecipients : undefined,
+          paymentRequests: [{ requestType: 'BALANCE', dueDate: dueDate.toISOString().split('T')[0] }],
           deliveryMethod: 'EMAIL',
-          acceptedPaymentMethods: {
-            card: true,
-            squareGiftCard: true,
-            bankAccount: true, // For ACH payments
-          },
+          acceptedPaymentMethods: { card: true, squareGiftCard: true, bankAccount: true },
           invoiceNumber: input.invoiceNumber,
           title: `${input.teamCode} @ ${formattedEventDate} ${input.eventName}`,
-          description: description,
-        }
+          description,
+        },
       });
-      
-      const draftInvoice = createInvoiceResponse.result.invoice!;
-      console.log("Successfully created DRAFT invoice:", draftInvoice);
 
-      // Publish the invoice to make it active
-      console.log(`Publishing invoice ID: ${draftInvoice.id!}`);
-      await invoicesApi.publishInvoice(draftInvoice.id!, {
-        version: draftInvoice.version!,
-        idempotencyKey: randomUUID(),
-      });
-      
-      // Fetch the final invoice to ensure the publicUrl is available and stable
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      const draftInvoice = createInvoiceResponse.result.invoice!;
+      await invoicesApi.publishInvoice(draftInvoice.id!, { version: draftInvoice.version!, idempotencyKey: randomUUID() });
+      await new Promise(r => setTimeout(r, 2000));
       const { result: { invoice: finalInvoice } } = await invoicesApi.getInvoice(draftInvoice.id!);
 
-      console.log("Successfully retrieved final invoice:", finalInvoice);
-      
-      if (!finalInvoice || !finalInvoice.publicUrl) {
-          console.error("Final invoice is missing a publicUrl.");
-          throw new Error("Failed to retrieve public URL for the invoice after publishing.");
-      }
+      if (!finalInvoice?.publicUrl) throw new Error('Failed to retrieve public URL for the invoice.');
 
-      return {
-        invoiceId: finalInvoice.id!,
-        invoiceNumber: finalInvoice.invoiceNumber,
-        status: finalInvoice.status!,
-        invoiceUrl: finalInvoice.publicUrl!,
-      };
+      return { invoiceId: finalInvoice.id!, invoiceNumber: finalInvoice.invoiceNumber, status: finalInvoice.status!, invoiceUrl: finalInvoice.publicUrl! };
 
     } catch (error) {
       if (error instanceof ApiError) {
-        const errorResult = error.result || {};
-        const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
-        console.error('Square API Error in createInvoiceFlow:', JSON.stringify(errorResult, null, 2));
-        let errorMessage: string;
-        if (errors.length > 0) {
-            errorMessage = errors.map((e: any) => `[${e.category}/${e.code}]: ${e.detail}`).join(', ');
-        } else {
-            errorMessage = JSON.stringify(errorResult);
-        }
+        const errors = Array.isArray(error.result?.errors) ? error.result!.errors : [];
+        const errorMessage = errors.length ? errors.map(e => `[${e.category}/${e.code}]: ${e.detail}`).join(', ') : JSON.stringify(error.result);
         throw new Error(`Square Error: ${errorMessage}`);
-      } else {
-        console.error('An unexpected error occurred during invoice creation:', error);
-        if (error instanceof Error) {
-            throw new Error(`${error.message}`);
-        }
-        throw new Error('An unexpected error occurred during invoice creation.');
       }
+      throw error instanceof Error ? new Error(error.message) : new Error('Unexpected error during invoice creation.');
     }
   }
 );
