@@ -146,7 +146,7 @@ function TournamentsReportPageContent() {
   const handleExportTournament = (reportData: TournamentReportData[string]) => {
     const { event, registrations, totalPlayers, totalGt, totalInd } = reportData;
 
-    // 1. School Totals Sheet
+    // --- Sheet 1: School Totals ---
     const schoolTotalsData = registrations.map(r => ({
       'School': r.schoolName,
       'Total Players': r.playerCount,
@@ -162,34 +162,35 @@ function TournamentsReportPageContent() {
       'Independent Players': totalInd
     };
     
-    const wsSchoolTotals = XLSX.utils.json_to_sheet([...schoolTotalsData, grandTotalRow], { skipHeader: false });
+    const wsSchoolTotals = XLSX.utils.json_to_sheet([...schoolTotalsData, grandTotalRow]);
 
-    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E5E7EB" } }, border: { bottom: { style: "thin" } } };
-    const totalRowStyle = { font: { bold: true }, border: { top: { style: "thin" } } };
-    const allBorders = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    // Define styles
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E5E7EB" } } };
+    const totalRowStyle = { font: { bold: true } };
+    const grandTotalCellStyle = { font: { bold: true }, fill: { fgColor: { rgb: "FFFF00" } } }; // Yellow fill
 
+    // Apply styles
     const range = XLSX.utils.decode_range(wsSchoolTotals['!ref']!);
     for (let C = range.s.c; C <= range.e.c; ++C) {
+      // Header style
       const headerAddress = XLSX.utils.encode_cell({c:C, r:0});
       if(wsSchoolTotals[headerAddress]) wsSchoolTotals[headerAddress].s = headerStyle;
 
+      // Totals row style
       const totalAddress = XLSX.utils.encode_cell({c:C, r:range.e.r});
-      if(wsSchoolTotals[totalAddress]) wsSchoolTotals[totalAddress].s = totalRowStyle;
-
-       for(let R = range.s.r; R <= range.e.r; ++R) {
-        const cellAddress = XLSX.utils.encode_cell({c:C, r:R});
-        if (!wsSchoolTotals[cellAddress]) continue;
-        if (!wsSchoolTotals[cellAddress].s) wsSchoolTotals[cellAddress].s = {};
-         wsSchoolTotals[cellAddress].s.border = allBorders;
+      if(wsSchoolTotals[totalAddress]) {
+          wsSchoolTotals[totalAddress].s = totalRowStyle;
+          // Specific style for the grand total number cell
+          if (C === 1) { // "Total Players" column
+             wsSchoolTotals[totalAddress].s = grandTotalCellStyle;
+          }
       }
     }
-    wsSchoolTotals["!autofilter"] = { ref: XLSX.utils.encode_range(range) };
+    
+    wsSchoolTotals["!autofilter"] = { ref: XLSX.utils.encode_range({s: {c:0, r:0}, e: {c: range.e.c, r: range.e.r -1 }}) };
+    wsSchoolTotals['!cols'] = [ {wch:40}, {wch:15}, {wch:15}, {wch:20} ];
 
-    const colWidths = [ {wch:40}, {wch:15}, {wch:15}, {wch:20} ];
-    wsSchoolTotals['!cols'] = colWidths;
-
-
-    // 2. GT Players Sheet
+    // --- Sheet 2: GT Players ---
     const gtPlayersData = registrations.flatMap(r =>
         r.players.filter(p => p.studentType === 'gt').map(p => ({
             'School': r.schoolName, 'Player Name': p.name, 'USCF ID': p.uscfId,
@@ -199,8 +200,7 @@ function TournamentsReportPageContent() {
     if (!wsGtPlayers['!cols']) wsGtPlayers['!cols'] = [];
     wsGtPlayers['!cols'] = [{wch:40}, {wch:25}, {wch:15}];
 
-
-    // 3. Independent Players Sheet
+    // --- Sheet 3: Independent Players ---
     const indPlayersData = registrations.flatMap(r =>
         r.players.filter(p => p.studentType !== 'gt').map(p => ({
             'School': r.schoolName, 'Player Name': p.name, 'USCF ID': p.uscfId,
@@ -210,13 +210,13 @@ function TournamentsReportPageContent() {
      if (!wsIndPlayers['!cols']) wsIndPlayers['!cols'] = [];
     wsIndPlayers['!cols'] = [{wch:40}, {wch:25}, {wch:15}];
     
-    // Create workbook
+    // --- Create Workbook ---
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, wsSchoolTotals, 'School Totals');
     XLSX.utils.book_append_sheet(wb, wsGtPlayers, 'GT Players');
     XLSX.utils.book_append_sheet(wb, wsIndPlayers, 'Independent Players');
 
-    XLSX.writeFile(wb, `${event.name.replace(/\s+/g, '_')}_report.xlsx`);
+    XLSX.writeFile(wb, `${event.name.replace(/[^a-zA-Z0-9]/g, '_')}_report.xlsx`);
   };
   
   const handlePrint = () => {
