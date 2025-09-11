@@ -76,7 +76,7 @@ function TournamentsReportPageContent() {
         });
 
         const schoolPlayerMap: Map<string, Map<string, PlayerDetail>> = new Map();
-        const activeRegistrations = new Set<string>(); // Tracks PlayerID-EventID to avoid duplicates
+        const activeRegistrations = new Set<string>(); // Tracks PlayerID to avoid duplicates per event
 
         // Process active invoices first
         eventInvoices
@@ -91,8 +91,7 @@ function TournamentsReportPageContent() {
                 const schoolPlayers = schoolPlayerMap.get(schoolName)!;
 
                 for (const playerId in invoice.selections) {
-                    const registrationKey = `${playerId}-${event.id}`;
-                    if (activeRegistrations.has(registrationKey)) continue;
+                    if (activeRegistrations.has(playerId)) continue;
 
                     const player = playerMap.get(playerId);
                     
@@ -102,7 +101,7 @@ function TournamentsReportPageContent() {
                         uscfId: player ? player.uscfId : 'N/A',
                         studentType: player ? player.studentType : 'independent'
                     });
-                    activeRegistrations.add(registrationKey);
+                    activeRegistrations.add(playerId);
                 }
             });
         
@@ -110,7 +109,7 @@ function TournamentsReportPageContent() {
             const registrations = Array.from(schoolPlayerMap.entries()).map(([schoolName, playersMap]) => {
                 const players = Array.from(playersMap.values());
                 const gtCount = players.filter(p => p.studentType === 'gt').length;
-                const indCount = players.length - gtCount;
+                const indCount = players.filter(p => p.studentType !== 'gt').length;
                 
                 return {
                     schoolName,
