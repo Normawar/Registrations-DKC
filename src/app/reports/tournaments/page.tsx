@@ -13,16 +13,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, Search, Printer, Loader2 } from 'lucide-react';
+import { Download, Search, Printer, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
+
+type PlayerDetail = {
+  id: string;
+  name: string;
+  uscfId: string;
+  studentType?: 'gt' | 'independent';
+};
 
 type TournamentRegistrationInfo = {
   schoolName: string;
   playerCount: number;
   gtCount: number;
   indCount: number;
+  players: PlayerDetail[];
 };
 
 type TournamentReportData = {
@@ -42,6 +52,7 @@ function TournamentsReportPageContent() {
   const [tournamentSearchTerm, setTournamentSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
+  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
 
   const loadData = useCallback(async () => {
     if (Date.now() - lastLoadTime < 5 * 60 * 1000 && Object.keys(tournamentReport).length > 0) return;
@@ -57,23 +68,33 @@ function TournamentsReportPageContent() {
 
       events.forEach(event => {
         const eventInvoices = allInvoices.filter(inv => inv.eventId === event.id);
-        const schoolRegistrations: { [key: string]: { playerCount: number; gtCount: number; indCount: number; } } = {};
+        const schoolRegistrations: { [key: string]: { playerCount: number; gtCount: number; indCount: number; players: PlayerDetail[] } } = {};
 
         eventInvoices.forEach(invoice => {
           const school = invoice.schoolName || 'Unknown School';
           if (!invoice.selections) return;
 
           if (!schoolRegistrations[school]) {
-            schoolRegistrations[school] = { playerCount: 0, gtCount: 0, indCount: 0 };
+            schoolRegistrations[school] = { playerCount: 0, gtCount: 0, indCount: 0, players: [] };
           }
           
           Object.keys(invoice.selections).forEach(playerId => {
             const player = playerMap.get(playerId);
             schoolRegistrations[school].playerCount++;
-            if (player?.studentType === 'gt') {
-              schoolRegistrations[school].gtCount++;
+            if (player) {
+              schoolRegistrations[school].players.push({
+                id: player.id,
+                name: `${player.firstName} ${player.lastName}`,
+                uscfId: player.uscfId,
+                studentType: player.studentType
+              });
+              if (player.studentType === 'gt') {
+                schoolRegistrations[school].gtCount++;
+              } else {
+                schoolRegistrations[school].indCount++;
+              }
             } else {
-              schoolRegistrations[school].indCount++;
+               schoolRegistrations[school].indCount++;
             }
           });
         });
@@ -81,6 +102,7 @@ function TournamentsReportPageContent() {
         const registrations = Object.entries(schoolRegistrations).map(([schoolName, counts]) => ({
           schoolName,
           ...counts,
+          players: counts.players.sort((a,b) => a.name.localeCompare(b.name))
         })).sort((a,b) => b.playerCount - a.playerCount);
 
         if (registrations.length > 0) {
@@ -119,19 +141,21 @@ function TournamentsReportPageContent() {
   }, [tournamentReport, tournamentSearchTerm]);
 
   const handleExportTournament = (reportData: any) => {
-    const dataToExport = reportData.registrations.map((r: any) => ({
-      'Tournament': reportData.event.name,
-      'Event Date': format(new Date(reportData.event.date), 'yyyy-MM-dd'),
-      'School': r.schoolName,
-      'Total Players': r.playerCount,
-      'GT Players': r.gtCount,
-      'Independent Players': r.indCount,
-    }));
+    const dataToExport = reportData.registrations.flatMap((r: any) => 
+        r.players.map((p: PlayerDetail) => ({
+            'Tournament': reportData.event.name,
+            'Event Date': format(new Date(reportData.event.date), 'yyyy-MM-dd'),
+            'School': r.schoolName,
+            'Player Name': p.name,
+            'USCF ID': p.uscfId,
+            'Student Type': p.studentType === 'gt' ? 'GT' : 'Independent'
+        }))
+    );
     const csv = Papa.unparse(dataToExport);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `${reportData.event.name.replace(/\s+/g, '_')}_report.csv`);
+    link.setAttribute('download', `${reportData.event.name.replace(/\s+/g, '_')}_detailed_report.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -139,6 +163,10 @@ function TournamentsReportPageContent() {
   
   const handlePrint = () => {
     window.print();
+  };
+
+  const toggleCollapsible = (id: string) => {
+      setOpenCollapsibles(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
@@ -189,11 +217,10 @@ function TournamentsReportPageContent() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ScrollArea className="h-[200px] border rounded-md">
-                    <Table>
+                  <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>School</TableHead>
+                          <TableHead className="w-1/2">School</TableHead>
                           <TableHead className="text-right">GT</TableHead>
                           <TableHead className="text-right">IND</TableHead>
                           <TableHead className="text-right">Total</TableHead>
@@ -201,16 +228,58 @@ function TournamentsReportPageContent() {
                       </TableHeader>
                       <TableBody>
                         {reportData.registrations.map(reg => (
-                          <TableRow key={reg.schoolName}>
-                            <TableCell>{reg.schoolName}</TableCell>
-                            <TableCell className="text-right">{reg.gtCount}</TableCell>
-                            <TableCell className="text-right">{reg.indCount}</TableCell>
-                            <TableCell className="text-right font-semibold">{reg.playerCount}</TableCell>
-                          </TableRow>
+                          <Collapsible asChild key={reg.schoolName} open={openCollapsibles[reportData.event.id + reg.schoolName]} onOpenChange={() => toggleCollapsible(reportData.event.id + reg.schoolName)}>
+                            <>
+                              <CollapsibleTrigger asChild>
+                                <TableRow className="cursor-pointer hover:bg-muted/50">
+                                  <TableCell className="font-medium flex items-center">
+                                      {openCollapsibles[reportData.event.id + reg.schoolName] ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                      {reg.schoolName}
+                                  </TableCell>
+                                  <TableCell className="text-right">{reg.gtCount}</TableCell>
+                                  <TableCell className="text-right">{reg.indCount}</TableCell>
+                                  <TableCell className="text-right font-semibold">{reg.playerCount}</TableCell>
+                                </TableRow>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent asChild>
+                                  <tr className="bg-muted/20">
+                                      <TableCell colSpan={4} className="p-0">
+                                          <div className="p-4">
+                                              <h4 className="font-semibold mb-2 text-sm">Player Details</h4>
+                                              <ScrollArea className="h-40 border rounded-md">
+                                                <Table>
+                                                    <TableHeader>
+                                                        <TableRow>
+                                                            <TableHead>Player Name</TableHead>
+                                                            <TableHead>USCF ID</TableHead>
+                                                            <TableHead>Type</TableHead>
+                                                        </TableRow>
+                                                    </TableHeader>
+                                                    <TableBody>
+                                                    {reg.players.map(p => (
+                                                        <TableRow key={p.id}>
+                                                            <TableCell>{p.name}</TableCell>
+                                                            <TableCell>{p.uscfId}</TableCell>
+                                                            <TableCell>
+                                                                {p.studentType === 'gt' 
+                                                                    ? <Badge variant="secondary">GT</Badge> 
+                                                                    : <Badge variant="outline">IND</Badge>
+                                                                }
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                    </TableBody>
+                                                </Table>
+                                              </ScrollArea>
+                                          </div>
+                                      </TableCell>
+                                  </tr>
+                              </CollapsibleContent>
+                            </>
+                          </Collapsible>
                         ))}
                       </TableBody>
                     </Table>
-                  </ScrollArea>
                 </CardContent>
               </Card>
             ))}
