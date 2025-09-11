@@ -29,12 +29,14 @@ export async function simpleSignUp(email: string, password: string, userData: an
     const { doc, setDoc } = await import('firebase/firestore');
 
     let userCredential;
+    let isExistingUser = false;
     try {
       // Create the user
       userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log('✅ User created with UID:', userCredential.user.uid);
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
+        isExistingUser = true;
         console.log('⚠️ Auth user already exists, attempting to sign in to restore profile.');
         userCredential = await signInWithEmailAndPassword(auth, email, password);
         console.log('✅ Existing user signed in with UID:', userCredential.user.uid);
@@ -48,11 +50,14 @@ export async function simpleSignUp(email: string, password: string, userData: an
       ...userData,
       email: email.toLowerCase(),
       uid: userCredential.user.uid,
-      createdAt: new Date().toISOString(),
+      // Only set createdAt timestamp if it's a truly new user
+      ...(isExistingUser ? {} : { createdAt: new Date().toISOString() }),
+      updatedAt: new Date().toISOString(), // Always update timestamp
     };
 
     console.log('💾 Saving user profile to Firestore...');
-    await setDoc(doc(db, 'users', userCredential.user.uid), userProfile);
+    // Use setDoc with merge:true to create or overwrite/update the profile
+    await setDoc(doc(db, 'users', userCredential.user.uid), userProfile, { merge: true });
     console.log('✅ User profile saved successfully');
 
     return {
@@ -175,7 +180,8 @@ export async function simpleSignIn(email: string, password: string) {
 
     // Get user profile from Firestore
     console.log('📖 Loading user profile from Firestore...');
-    const profileDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+    const profileDocRef = doc(db, 'users', userCredential.user.uid);
+    const profileDoc = await getDoc(profileDocRef);
 
     if (!profileDoc.exists()) {
       console.warn('⚠️ User profile not found in Firestore for UID, checking for legacy doc...');
@@ -183,18 +189,19 @@ export async function simpleSignIn(email: string, password: string) {
       if (legacyDoc.exists()) {
         console.log('📦 Found legacy profile, migrating...');
         const legacyData = legacyDoc.data();
-        await setDoc(doc(db, 'users', userCredential.user.uid), {
+        const profileToSave = {
           ...legacyData,
           uid: userCredential.user.uid,
           migratedAt: new Date().toISOString()
-        });
+        };
+        await setDoc(profileDocRef, profileToSave);
         return {
           success: true,
           user: userCredential.user,
-          profile: legacyData
+          profile: profileToSave
         };
       } else {
-        throw new Error('User profile not found. Please contact support.');
+        throw new Error('User profile not found. Please sign up to create a profile.');
       }
     }
 
