@@ -191,7 +191,8 @@ export async function simpleSignIn(email: string, password: string) {
         console.log('📦 Found legacy profile, migrating...');
         const legacyData = legacyDoc.data();
         const profileToSave: SponsorProfile = {
-          ...(legacyData as Omit<SponsorProfile, 'uid'>), // Cast to ensure base properties
+          ...(legacyData as Omit<SponsorProfile, 'uid' | 'email'>), // Cast to ensure base properties
+          email: email.toLowerCase(), // Ensure email is included
           uid: userCredential.user.uid,
           migratedAt: new Date().toISOString()
         };
@@ -223,13 +224,17 @@ export async function simpleSignIn(email: string, password: string) {
     // If sign-in fails, check for a legacy profile and prompt user to sign up
     // to complete the migration.
     if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-        const legacyDocRef = doc(db, 'users', email.toLowerCase());
-        const legacyDoc = await getDoc(legacyDocRef);
-        
-        if (legacyDoc.exists()) {
-            userFriendlyMessage = "Your account needs to be updated. Please use the 'Sign Up' tab to create a new password for your existing account.";
+        if (db) {
+            const legacyDocRef = doc(db, 'users', email.toLowerCase());
+            const legacyDoc = await getDoc(legacyDocRef);
+            
+            if (legacyDoc.exists()) {
+                userFriendlyMessage = "Your account needs to be updated. Please use the 'Sign Up' tab to create a new password for your existing account.";
+            } else {
+                userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
+            }
         } else {
-            userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
+             userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
         }
     } else {
       switch (error.code) {

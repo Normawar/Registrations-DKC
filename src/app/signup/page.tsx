@@ -1,5 +1,5 @@
 
-// src/app/signup/page.tsx - Updated with Firebase Auth
+// src/app/signup/page.tsx - Updated with Data Correction for Organizer Account
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ import { schoolData as initialSchoolData, type School } from '@/lib/data/school-
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
-import { simpleSignUp, checkFirebaseConfig } from '@/lib/simple-auth';
+import { simpleSignUp, simpleSignIn, checkFirebaseConfig } from '@/lib/simple-auth';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -55,6 +55,49 @@ const sponsorFormSchema = z.object({
     message: "GT Coordinator Email is required for this district.",
     path: ["gtCoordinatorEmail"],
 });
+
+// Helper function to correct organizer account data
+async function correctOrganizerAccountData(email: string, password: string) {
+  console.log('🔧 Attempting to correct organizer account data for:', email);
+  
+  try {
+    // First, try to sign in to get the user's UID
+    const signInResult = await simpleSignIn(email, password);
+    
+    if (signInResult.success && signInResult.user) {
+      const uid = signInResult.user.uid;
+      console.log('✅ Successfully signed in, UID:', uid);
+      
+      // Now update the user's profile in Firestore with correct organizer data
+      const userDocRef = doc(db, 'users', uid);
+      const correctedProfile: Partial<SponsorProfile> & {correctedAt?: string} = {
+        role: 'organizer',
+        isDistrictCoordinator: true,
+        district: 'All Districts', // Organizers can manage all districts
+        school: 'Dark Knight Chess', // Organization name
+        updatedAt: new Date().toISOString(),
+        correctedAt: new Date().toISOString(), // Mark when this correction happened
+      };
+      
+      await updateDoc(userDocRef, correctedProfile);
+      console.log('✅ Profile corrected successfully');
+      
+      // Return the corrected profile
+      const updatedProfile = { ...signInResult.profile, ...correctedProfile };
+      return {
+        success: true,
+        user: signInResult.user,
+        profile: updatedProfile
+      };
+    }
+    
+    throw new Error('Failed to sign in for data correction');
+    
+  } catch (error) {
+    console.error('❌ Data correction failed:', error);
+    throw error;
+  }
+}
 
 const SponsorSignUpForm = () => {
   const router = useRouter();
@@ -151,6 +194,32 @@ const SponsorSignUpForm = () => {
         return;
       }
 
+      // Special handling for organizer account correction
+      if (values.email.toLowerCase() === 'norma@dkchess.com') {
+        console.log('🔧 Detected organizer account, attempting data correction...');
+        
+        try {
+          const correctionResult = await correctOrganizerAccountData(values.email, values.password);
+          
+          if (correctionResult.success) {
+            await updateProfile(correctionResult.profile as SponsorProfile);
+            
+            toast({
+              title: "Account Corrected!",
+              description: "Your organizer account has been updated with the correct permissions.",
+            });
+            
+            setTimeout(() => {
+              router.push('/manage-events');
+            }, 100);
+            return;
+          }
+        } catch (correctionError) {
+          console.log('Data correction failed, proceeding with normal signup flow...');
+          // If correction fails, continue with normal signup process
+        }
+      }
+
       const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
       let role: SponsorProfile['role'] = isCoordinator ? 'district_coordinator' : 'sponsor';
 
@@ -182,8 +251,14 @@ const SponsorSignUpForm = () => {
             description: `Your ${role} account has been configured.`,
         });
         
+        // Redirect based on role
+        let redirectPath = '/profile';
+        if (role === 'organizer') redirectPath = '/manage-events';
+        else if (role === 'district_coordinator') redirectPath = '/district-dashboard';
+        else redirectPath = '/dashboard';
+        
         setTimeout(() => {
-          router.push('/profile');
+          router.push(redirectPath);
         }, 100);
       }
     } catch (error) {
@@ -263,6 +338,32 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         return;
       }
 
+      // Special handling for organizer account correction
+      if (role === 'organizer' && values.email.toLowerCase() === 'norma@dkchess.com') {
+        console.log('🔧 Detected organizer account in individual form, attempting data correction...');
+        
+        try {
+          const correctionResult = await correctOrganizerAccountData(values.email, values.password);
+          
+          if (correctionResult.success) {
+            await updateProfile(correctionResult.profile as SponsorProfile);
+            
+            toast({
+              title: "Account Corrected!",
+              description: "Your organizer account has been updated with the correct permissions.",
+            });
+            
+            setTimeout(() => {
+              router.push('/manage-events');
+            }, 100);
+            return;
+          }
+        } catch (correctionError) {
+          console.log('Data correction failed, proceeding with normal signup flow...');
+          // If correction fails, continue with normal signup process
+        }
+      }
+
       const { password, email, ...profileValues } = values;
       let userRole: SponsorProfile['role'] = role;
 
@@ -282,15 +383,15 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       const profileData: Omit<SponsorProfile, 'uid' | 'email'> = {
           ...profileValues,
           phone: '',
-          district: 'None',
-          school: 'Homeschool',
+          district: userRole === 'organizer' ? 'All Districts' : 'None',
+          school: userRole === 'organizer' ? 'Dark Knight Chess' : 'Homeschool',
           gtCoordinatorEmail: '',
           bookkeeperEmail: '',
           schoolAddress: '',
           schoolPhone: '',
           role: userRole,
           avatarType: 'icon',
-          avatarValue: 'PawnIcon',
+          avatarValue: userRole === 'organizer' ? 'KingIcon' : 'PawnIcon',
           isDistrictCoordinator: userRole === 'organizer', // Organizers are also coordinators
       };
       
