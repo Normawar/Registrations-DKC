@@ -3,10 +3,11 @@
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail, type User } from 'firebase/auth';
+import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
 
 // Simple signup function with detailed error logging
-export async function simpleSignUp(email: string, password: string, userData: any) {
+export async function simpleSignUp(email: string, password: string, userData: Omit<SponsorProfile, 'uid' | 'email'>) {
   console.log('🚀 Starting signup process...');
   
   try {
@@ -46,7 +47,7 @@ export async function simpleSignUp(email: string, password: string, userData: an
     }
 
     // Save user profile to Firestore
-    const userProfile = {
+    const userProfile: SponsorProfile = {
       ...userData,
       email: email.toLowerCase(),
       uid: userCredential.user.uid,
@@ -189,8 +190,8 @@ export async function simpleSignIn(email: string, password: string) {
       if (legacyDoc.exists()) {
         console.log('📦 Found legacy profile, migrating...');
         const legacyData = legacyDoc.data();
-        const profileToSave = {
-          ...legacyData,
+        const profileToSave: SponsorProfile = {
+          ...(legacyData as Omit<SponsorProfile, 'uid'>), // Cast to ensure base properties
           uid: userCredential.user.uid,
           migratedAt: new Date().toISOString()
         };
@@ -205,7 +206,7 @@ export async function simpleSignIn(email: string, password: string) {
       }
     }
 
-    const profile = profileDoc.data();
+    const profile = profileDoc.data() as SponsorProfile;
     console.log('✅ User profile loaded successfully');
 
     return {

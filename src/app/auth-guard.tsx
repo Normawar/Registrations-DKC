@@ -1,3 +1,4 @@
+
 // src/components/auth-guard.tsx - Route protection component
 'use client';
 
@@ -34,18 +35,15 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       return;
     }
 
+    // Check if user has the required role.
+    // Organizers have access to all roles.
+    // District coordinators have access to sponsor roles.
+    const hasRequiredRole = 
+      profile.role === 'organizer' ||
+      profile.role === requiredRole || 
+      (requiredRole === 'sponsor' && profile.role === 'district_coordinator');
 
-    if (requiredRole) {
-      // Check if user has the required role.
-      // Organizers have access to all roles.
-      // District coordinators have access to sponsor roles.
-      const hasRequiredRole = 
-        profile.role === 'organizer' ||
-        profile.role === requiredRole || 
-        (requiredRole === 'sponsor' && profile.role === 'district_coordinator');
-
-
-      if (!hasRequiredRole) {
+    if (requiredRole && !hasRequiredRole) {
         // User doesn't have the required role, redirect to their primary dashboard
         switch (profile.role) {
           case 'organizer':
@@ -74,7 +72,6 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
             router.push('/');
         }
         return;
-      }
     }
   }, [profile, loading, requiredRole, router, redirectTo, pathname]);
 
@@ -91,11 +88,11 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     );
   }
   
-    const hasRequiredRoleCheck = !requiredRole || (profile && (
-        profile.role === 'organizer' ||
-        profile.role === requiredRole ||
-        (requiredRole === 'sponsor' && profile.role === 'district_coordinator')
-    ));
+  const hasRequiredRoleCheck = !requiredRole || (profile && (
+    profile.role === 'organizer' ||
+    profile.role === requiredRole ||
+    (requiredRole === 'sponsor' && profile.role === 'district_coordinator')
+  ));
 
 
   // Don't render children if user is not authenticated or doesn't have the role yet

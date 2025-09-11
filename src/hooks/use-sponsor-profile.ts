@@ -22,8 +22,11 @@ export type SponsorProfile = {
   avatarValue: string; // Icon name or image URL
   role: 'sponsor' | 'organizer' | 'individual' | 'district_coordinator';
   isDistrictCoordinator?: boolean;
-  uid?: string; // Ensure UID is part of the profile
+  uid: string; // UID is now required
   forceProfileUpdate?: boolean; // Flag to force profile completion
+  createdAt?: string;
+  updatedAt?: string;
+  migratedAt?: string;
 };
 
 // This hook now manages the auth user and their profile data together

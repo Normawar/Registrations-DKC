@@ -152,19 +152,24 @@ const SponsorSignUpForm = () => {
       }
 
       const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
-      const role = isCoordinator ? 'district_coordinator' : 'sponsor';
+      let role: SponsorProfile['role'] = isCoordinator ? 'district_coordinator' : 'sponsor';
+
+      // Special override for organizer account
+      if (values.email.toLowerCase() === 'norma@dkchess.com') {
+          role = 'organizer';
+      }
 
       const { password, email, ...profileValues } = values;
       const schoolInfo = schoolData.find(s => s.schoolName === profileValues.school);
       
-      const profileData = {
+      const profileData: Omit<SponsorProfile, 'uid' | 'email'> = {
         ...profileValues,
         role: role,
         avatarType: 'icon',
         avatarValue: 'KingIcon',
         schoolAddress: schoolInfo?.streetAddress || '',
         schoolPhone: schoolInfo?.phone || '',
-        isDistrictCoordinator: isCoordinator,
+        isDistrictCoordinator: isCoordinator || role === 'organizer', // Organizers are also coordinators
       };
       
       const result = await simpleSignUp(email, password, profileData);
@@ -174,7 +179,7 @@ const SponsorSignUpForm = () => {
         
         toast({
             title: "Account Ready!",
-            description: `Your ${role} account has been created or restored.`,
+            description: `Your ${role} account has been configured.`,
         });
         
         setTimeout(() => {
@@ -259,19 +264,22 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       }
 
       const { password, email, ...profileValues } = values;
-      const userRole = role === 'organizer' && email.toLowerCase().endsWith('@dkchess.com') ? 'organizer' : role;
+      let userRole: SponsorProfile['role'] = role;
 
-
-      if (role === 'organizer' && !email.toLowerCase().endsWith('@dkchess.com')) {
-        form.setError('email', {
-          type: 'manual',
-          message: 'Only @dkchess.com emails can register as organizers.',
-        });
-        setIsLoading(false);
-        return;
+      if (role === 'organizer') {
+        if (email.toLowerCase() === 'norma@dkchess.com') {
+          userRole = 'organizer';
+        } else if (!email.toLowerCase().endsWith('@dkchess.com')) {
+          form.setError('email', {
+            type: 'manual',
+            message: 'Only @dkchess.com emails can register as organizers.',
+          });
+          setIsLoading(false);
+          return;
+        }
       }
 
-      const profileData = {
+      const profileData: Omit<SponsorProfile, 'uid' | 'email'> = {
           ...profileValues,
           phone: '',
           district: 'None',
@@ -283,13 +291,14 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
           role: userRole,
           avatarType: 'icon',
           avatarValue: 'PawnIcon',
+          isDistrictCoordinator: userRole === 'organizer', // Organizers are also coordinators
       };
       
       const result = await simpleSignUp(email, password, profileData);
       
       if (result.success) {
         // Since simpleSignUp now returns the profile, we can use it directly
-        const finalProfile = { ...result.profile, role: userRole };
+        const finalProfile = { ...result.profile, role: userRole, isDistrictCoordinator: userRole === 'organizer' };
         await updateProfile(finalProfile as SponsorProfile);
         
         toast({
