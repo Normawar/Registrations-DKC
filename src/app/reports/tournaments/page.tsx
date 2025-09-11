@@ -161,18 +161,6 @@ function TournamentsReportPageContent() {
       'Independent Players': r.indCount,
     }));
     
-    schoolTotalsData.push({}); // Spacer row
-    schoolTotalsData.push({
-        'School': 'Totals',
-        'Total Players': totalPlayers,
-        'GT Players': totalGt,
-        'Independent Players': totalInd,
-    });
-    schoolTotalsData.push({
-        'School': 'Grand Total',
-        'Total Players': totalPlayers,
-    });
-
     // 2. GT Players Sheet
     const gtPlayersData = registrations.flatMap(r =>
         r.players.filter(p => p.studentType === 'gt').map(p => ({
@@ -196,55 +184,55 @@ function TournamentsReportPageContent() {
     );
 
     // Create worksheets
-    const wsSchoolTotals = XLSX.utils.json_to_sheet(schoolTotalsData);
+    const wsSchoolTotals = XLSX.utils.json_to_sheet(schoolTotalsData, { skipHeader: false });
     const wsGtPlayers = XLSX.utils.json_to_sheet(gtPlayersData);
     const wsIndPlayers = XLSX.utils.json_to_sheet(indPlayersData);
     
-    // --- Professional Formatting ---
+    // --- Professional Table Formatting ---
     const wb = XLSX.utils.book_new();
+    
+    // School Totals Table
+    const range = XLSX.utils.decode_range(wsSchoolTotals['!ref']!);
+    wsSchoolTotals['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+    wsSchoolTotals['!table'] = {
+        ref: XLSX.utils.encode_range(range),
+        name: "SchoolTotals",
+        displayName: "SchoolTotals",
+        styleInfo: {
+            name: "TableStyleMedium9", // This is a standard Excel table style (blue with banded rows)
+            showFirstColumn: false,
+            showLastColumn: false,
+            showRowStripes: true,
+            showColumnStripes: false,
+        },
+        totalsRowShown: false
+    };
+    
+    // Add Totals and Grand Total rows with formulas
+    const totalsRowNumber = range.e.r + 2; // +1 for zero-based, +1 for empty row
+    const grandTotalRowNumber = totalsRowNumber + 1;
 
+    XLSX.utils.sheet_add_aoa(wsSchoolTotals, [['Totals']], { origin: `A${totalsRowNumber}` });
+    XLSX.utils.sheet_add_aoa(wsSchoolTotals, [[{t:'n', v:totalPlayers, f:`SUBTOTAL(109,B2:B${range.e.r + 1})`}]], { origin: `B${totalsRowNumber}` });
+    XLSX.utils.sheet_add_aoa(wsSchoolTotals, [[{t:'n', v:totalGt, f:`SUBTOTAL(109,C2:C${range.e.r + 1})`}]], { origin: `C${totalsRowNumber}` });
+    XLSX.utils.sheet_add_aoa(wsSchoolTotals, [[{t:'n', v:totalInd, f:`SUBTOTAL(109,D2:D${range.e.r + 1})`}]], { origin: `D${totalsRowNumber}` });
+    
+    XLSX.utils.sheet_add_aoa(wsSchoolTotals, [['Grand Total']], { origin: `A${grandTotalRowNumber}` });
+    XLSX.utils.sheet_add_aoa(wsSchoolTotals, [[{t:'n', v:totalPlayers, f:`SUBTOTAL(109,B2:B${range.e.r + 1})`}]], { origin: `B${grandTotalRowNumber}` });
+
+    wsSchoolTotals['!ref'] = XLSX.utils.encode_range({s: range.s, e: {c: range.e.c, r: grandTotalRowNumber-1}});
+
+    // Auto-fit columns for all sheets
     [wsSchoolTotals, wsGtPlayers, wsIndPlayers].forEach(ws => {
       if (!ws['!cols']) ws['!cols'] = [];
       const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-      data[0].forEach((col, i) => {
-        const maxWidth = Math.max(
-          ...data.map(row => row[i] ? String(row[i]).length : 0)
-        );
-        if (!ws['!cols'][i] || ws['!cols'][i].wch < maxWidth) {
-          ws['!cols'][i] = { wch: maxWidth + 2 };
-        }
-      });
-      
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      for (let R = range.s.r; R <= range.e.r; ++R) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-          const cell_address = { c: C, r: R };
-          const cell_ref = XLSX.utils.encode_cell(cell_address);
-          if (!ws[cell_ref]) continue;
-
-          // Add borders to all cells
-          if (!ws[cell_ref].s) ws[cell_ref].s = {};
-          ws[cell_ref].s.border = { top: {style:"thin"}, bottom: {style:"thin"}, left: {style:"thin"}, right: {style:"thin"} };
-
-          if (R === 0) { // Header row
-            ws[cell_ref].s.font = { bold: true };
-            ws[cell_ref].s.fill = { fgColor: { rgb: "E0E0E0" } };
-          }
-        }
+      if (data && data.length > 0) {
+        const colWidths = data[0].map((_, i) => ({
+          wch: Math.max(...data.map(row => row[i] ? String(row[i]).length : 0))
+        }));
+        ws['!cols'] = colWidths;
       }
     });
-    
-    // Bold the totals rows on the first sheet
-    const totalsRowIndex = schoolTotalsData.length - 2;
-    const grandTotalRowIndex = schoolTotalsData.length - 1;
-
-    for (let C = 0; C <= 3; ++C) {
-        let totalsCellRef = XLSX.utils.encode_cell({c: C, r: totalsRowIndex});
-        if (wsSchoolTotals[totalsCellRef]) wsSchoolTotals[totalsCellRef].s.font = { bold: true };
-        
-        let grandTotalsCellRef = XLSX.utils.encode_cell({c: C, r: grandTotalRowIndex});
-        if (wsSchoolTotals[grandTotalsCellRef]) wsSchoolTotals[grandTotalsCellRef].s.font = { bold: true };
-    }
 
 
     XLSX.utils.book_append_sheet(wb, wsSchoolTotals, 'School Totals');
