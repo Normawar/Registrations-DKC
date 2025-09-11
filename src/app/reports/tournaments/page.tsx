@@ -149,12 +149,11 @@ function TournamentsReportPageContent() {
     const { event, registrations, totalPlayers, totalGt, totalInd } = reportData;
 
     // --- Define Styles ---
-    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E0E0E0" } }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
-    const totalRowStyle = { font: { bold: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
-    const cellBorder = { border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
-    const stripe1Style = { fill: { fgColor: { rgb: "FFFFFF" } }, ...cellBorder };
-    const stripe2Style = { fill: { fgColor: { rgb: "F0F8FF" } }, ...cellBorder }; // AliceBlue for light blue stripe
-    const yellowHighlightStyle = { ...totalRowStyle, fill: { fgColor: { rgb: "FFFF00" } } };
+    const thinBorder = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "D3D3D3" } }, border: thinBorder };
+    const totalRowStyle = { font: { bold: true }, border: thinBorder };
+    const stripe1Style = { fill: { fgColor: { rgb: "FFFFFF" } }, border: thinBorder };
+    const stripe2Style = { fill: { fgColor: { rgb: "F0F8FF" } }, border: thinBorder }; // AliceBlue for light blue stripe
     
     // --- Sheet 1: School Totals ---
     const schoolTotalsHeaders = ['School', 'Total Players', 'GT Players', 'Independent Players'];
@@ -166,12 +165,7 @@ function TournamentsReportPageContent() {
     ]));
 
     // Add Grand Total row
-    const grandTotalRow = [
-      'Grand Total',
-      totalPlayers,
-      totalGt,
-      totalInd,
-    ];
+    const grandTotalRow = [ 'Grand Total', totalPlayers, totalGt, totalInd ];
     schoolTotalsData.push(grandTotalRow);
     
     const wsSchoolTotals = XLSX.utils.aoa_to_sheet([schoolTotalsHeaders, ...schoolTotalsData]);
@@ -182,20 +176,16 @@ function TournamentsReportPageContent() {
 
     // Apply styles
     schoolTotalsHeaders.forEach((_, C) => {
-        const cellRef = XLSX.utils.encode_cell({ r: 0, c: C });
-        wsSchoolTotals[cellRef].s = headerStyle;
+      const cellRef = XLSX.utils.encode_cell({ r: 0, c: C });
+      if (wsSchoolTotals[cellRef]) wsSchoolTotals[cellRef].s = headerStyle;
     });
 
     schoolTotalsData.forEach((row, R) => {
-        const style = (R % 2 === 0) ? stripe1Style : stripe2Style;
         const isTotalRow = R === schoolTotalsData.length - 1;
+        const style = isTotalRow ? totalRowStyle : (R % 2 === 0) ? stripe1Style : stripe2Style;
         row.forEach((_, C) => {
             const cellRef = XLSX.utils.encode_cell({ r: R + 1, c: C });
-            if (isTotalRow) {
-                wsSchoolTotals[cellRef].s = (C === 1) ? yellowHighlightStyle : totalRowStyle;
-            } else {
-                wsSchoolTotals[cellRef].s = style;
-            }
+            if (wsSchoolTotals[cellRef]) wsSchoolTotals[cellRef].s = style;
         });
     });
 
