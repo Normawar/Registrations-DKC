@@ -109,14 +109,16 @@ const recreateInvoiceFlow = ai.defineFlow(
       let totalSubstitutionFee = 0;
 
       const playersWithAdjustedFees = input.players.map(player => {
+        // Robustly ensure lateFee is a number.
+        const lateFee = player.lateFee ?? 0;
+        
         if (player.isSubstitution) {
           totalSubstitutionFee += SUBSTITUTION_FEE;
           return { ...player, lateFee: 0 }; // Substitutions don't get late fees
         }
         // For existing players (not new, not substitutions), keep their original late fee.
         // For new players, keep the late fee calculated on the client side.
-        // Ensure lateFee is a number, defaulting to 0 if null/undefined.
-        return { ...player, lateFee: player.lateFee ?? 0 };
+        return { ...player, lateFee: lateFee };
       });
       
       // Step 5: Create a new invoice with the updated roster and new invoice number.
