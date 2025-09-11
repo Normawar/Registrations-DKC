@@ -1,4 +1,3 @@
-
 // src/components/auth-guard.tsx - Route protection component
 'use client';
 
@@ -29,32 +28,40 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       return;
     }
     
-    // NEW: Check if profile completion is required
+    // Check if profile completion is required
     if (profile.forceProfileUpdate && pathname !== '/profile') {
       router.push('/profile');
       return;
     }
 
 
-    if (profile && requiredRole) {
-      // Check if user has required role
+    if (requiredRole) {
+      // Check if user has the required role.
+      // Organizers have access to all roles.
+      // District coordinators have access to sponsor roles.
       const hasRequiredRole = 
+        profile.role === 'organizer' ||
         profile.role === requiredRole || 
-        (requiredRole === 'sponsor' && profile.role === 'district_coordinator') ||
-        (requiredRole === 'organizer' && profile.role === 'district_coordinator');
+        (requiredRole === 'sponsor' && profile.role === 'district_coordinator');
 
 
       if (!hasRequiredRole) {
-        // User doesn't have required role, redirect to appropriate dashboard
+        // User doesn't have the required role, redirect to their primary dashboard
         switch (profile.role) {
           case 'organizer':
             router.push('/manage-events');
             break;
           case 'district_coordinator':
-            router.push('/auth/role-selection');
+             // If they are also a sponsor, give them the choice.
+            if (profile.isDistrictCoordinator) {
+                router.push('/auth/role-selection');
+            } else {
+                router.push('/district-dashboard');
+            }
             break;
           case 'sponsor':
-            if (profile.isDistrictCoordinator) {
+            // If they are also a district coordinator, give them the choice.
+             if (profile.isDistrictCoordinator) {
               router.push('/auth/role-selection');
             } else {
               router.push('/dashboard');
@@ -85,9 +92,9 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
   }
   
     const hasRequiredRoleCheck = !requiredRole || (profile && (
+        profile.role === 'organizer' ||
         profile.role === requiredRole ||
-        (requiredRole === 'sponsor' && profile.role === 'district_coordinator') ||
-        (requiredRole === 'organizer' && profile.role === 'district_coordinator')
+        (requiredRole === 'sponsor' && profile.role === 'district_coordinator')
     ));
 
 
