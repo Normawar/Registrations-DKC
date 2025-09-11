@@ -1,11 +1,10 @@
 
-
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { format, isSameDay, parseISO } from 'date-fns';
 
 import { AppLayout } from '@/components/app-layout';
@@ -90,7 +89,7 @@ function TournamentsReportPageContent() {
 
             for (const playerId in invoice.selections) {
                 if (schoolPlayers.has(playerId)) continue;
-
+        
                 const player = playerMap.get(playerId);
                 
                 schoolPlayers.set(playerId, {
@@ -150,26 +149,57 @@ function TournamentsReportPageContent() {
     ).sort((a, b) => new Date(b.event.date).getTime() - new Date(a.event.date).getTime());
   }, [tournamentReport, tournamentSearchTerm]);
 
-  const handleExportTournament = (reportData: any) => {
-    const dataToExport = reportData.registrations.flatMap((r: any) => 
-        r.players.map((p: PlayerDetail) => ({
-            'Tournament': reportData.event.name,
-            'Event Date': format(new Date(reportData.event.date), 'yyyy-MM-dd'),
+    const handleExportTournament = (reportData: TournamentReportData[string]) => {
+        const { event, registrations } = reportData;
+    
+        // 1. School Totals Sheet
+        const schoolTotalsData = registrations.map(r => ({
             'School': r.schoolName,
-            'Player Name': p.name,
-            'USCF ID': p.uscfId,
-            'Student Type': p.studentType === 'gt' ? 'GT' : 'Independent'
-        }))
-    );
-    const csv = Papa.unparse(dataToExport);
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `${reportData.event.name.replace(/\s+/g, '_')}_detailed_report.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+            'Total Players': r.playerCount,
+            'GT Players': r.gtCount,
+            'Independent Players': r.indCount,
+        }));
+    
+        // 2. GT Players Sheet
+        const gtPlayersData = registrations.flatMap(r =>
+            r.players
+                .filter(p => p.studentType === 'gt')
+                .map(p => ({
+                    'Tournament': event.name,
+                    'Event Date': format(new Date(event.date), 'yyyy-MM-dd'),
+                    'School': r.schoolName,
+                    'Player Name': p.name,
+                    'USCF ID': p.uscfId,
+                }))
+        );
+    
+        // 3. Independent Players Sheet
+        const indPlayersData = registrations.flatMap(r =>
+            r.players
+                .filter(p => p.studentType !== 'gt')
+                .map(p => ({
+                    'Tournament': event.name,
+                    'Event Date': format(new Date(event.date), 'yyyy-MM-dd'),
+                    'School': r.schoolName,
+                    'Player Name': p.name,
+                    'USCF ID': p.uscfId,
+                }))
+        );
+    
+        // Create worksheets
+        const wsSchoolTotals = XLSX.utils.json_to_sheet(schoolTotalsData);
+        const wsGtPlayers = XLSX.utils.json_to_sheet(gtPlayersData);
+        const wsIndPlayers = XLSX.utils.json_to_sheet(indPlayersData);
+    
+        // Create workbook and append sheets
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, wsSchoolTotals, 'School Totals');
+        XLSX.utils.book_append_sheet(wb, wsGtPlayers, 'GT Players');
+        XLSX.utils.book_append_sheet(wb, wsIndPlayers, 'Independent Players');
+    
+        // Generate and download the file
+        XLSX.writeFile(wb, `${event.name.replace(/\s+/g, '_')}_report.xlsx`);
+    };
   
   const handlePrint = () => {
     window.print();
