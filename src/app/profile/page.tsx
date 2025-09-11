@@ -203,6 +203,7 @@ export default function ProfilePage() {
   }, [schoolData]);
   
   const handleDistrictChange = (district: string) => {
+    profileForm.setValue('district', district);
     let filteredSchools: string[];
     if (district === 'None') {
         filteredSchools = allSchoolNames;
@@ -213,6 +214,7 @@ export default function ProfilePage() {
             .sort();
     }
     setSchoolsForDistrict([...new Set(filteredSchools)]);
+    profileForm.setValue('school', '');
   };
   
   useEffect(() => {
@@ -504,13 +506,13 @@ export default function ProfilePage() {
                             <FormField control={profileForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={profileForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={profileForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} disabled /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={profileForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Cell Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         {isSponsorOrCoordinator && (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { handleDistrictChange(value); profileForm.setValue('school', ''); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { handleDistrictChange(value); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                     <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!isSchoolListReady}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
