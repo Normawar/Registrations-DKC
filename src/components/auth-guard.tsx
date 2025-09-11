@@ -1,4 +1,4 @@
-// src/components/auth-guard.tsx - Route protection component
+// src/components/auth-guard.tsx - Route protection component with fixed organizer logic
 'use client';
 
 import { useEffect } from 'react';
@@ -33,16 +33,36 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       router.push('/profile');
       return;
     }
+    
+    // PRIORITY 1: Handle organizers first - they should NEVER go to role selection
+    // Organizers have ultimate permissions and should go directly to their dashboard
+    if (profile.role === 'organizer') {
+      // If organizer is not on an organizer page and no specific role is required, send to manage-events
+      if (!requiredRole && pathname !== '/manage-events' && !pathname.startsWith('/manage-events')) {
+        router.push('/manage-events');
+        return;
+      }
+      // If a role is required and it's not organizer, organizers can access anything
+      // So we let them through (no redirect needed)
+    }
+    
+    // PRIORITY 2: Handle multi-role for non-organizers only
+    // This logic should only apply to district coordinators who are NOT organizers
+    else if (profile.isDistrictCoordinator && profile.role === 'district_coordinator') {
+      if (pathname !== '/auth/role-selection') {
+        router.push('/auth/role-selection');
+        return;
+      }
+    }
 
+    // PRIORITY 3: Handle role-based access control
     if (requiredRole) {
-      // Check if user has the required role. Organizers have access to all roles.
-      // District coordinators have access to sponsor roles.
-      const hasRequiredRole = 
-        profile.role === 'organizer' ||
-        profile.role === requiredRole || 
-        (requiredRole === 'sponsor' && profile.role === 'district_coordinator');
+      const isOrganizer = profile.role === 'organizer';
+      const isRequired = profile.role === requiredRole;
+      const isCoordinatorAccessingSponsorPage = profile.role === 'district_coordinator' && requiredRole === 'sponsor';
 
-
+      const hasRequiredRole = isOrganizer || isRequired || isCoordinatorAccessingSponsorPage;
+      
       if (!hasRequiredRole) {
         // User doesn't have required role, redirect to their primary dashboard
         switch (profile.role) {
@@ -50,20 +70,10 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
             router.push('/manage-events');
             break;
           case 'district_coordinator':
-            // If they are also a sponsor, give them the choice. Otherwise, go to district dash.
-            if (profile.isDistrictCoordinator) {
-                router.push('/auth/role-selection');
-            } else {
-                router.push('/district-dashboard');
-            }
+             router.push('/district-dashboard');
             break;
           case 'sponsor':
-            // If they are also a district coordinator, give them the choice.
-             if (profile.isDistrictCoordinator) {
-              router.push('/auth/role-selection');
-            } else {
               router.push('/dashboard');
-            }
             break;
           case 'individual':
             router.push('/individual-dashboard');
@@ -94,7 +104,6 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     profile.role === requiredRole ||
     (requiredRole === 'sponsor' && profile.role === 'district_coordinator')
   ));
-
 
   // Don't render children if user is not authenticated or doesn't have the role yet
   if (!profile || !hasRequiredRoleCheck || profile.forceProfileUpdate) {
