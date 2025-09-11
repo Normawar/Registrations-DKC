@@ -150,73 +150,109 @@ function TournamentsReportPageContent() {
     ).sort((a, b) => new Date(b.event.date).getTime() - new Date(a.event.date).getTime());
   }, [tournamentReport, tournamentSearchTerm]);
 
-    const handleExportTournament = (reportData: TournamentReportData[string]) => {
-        const { event, registrations, totalPlayers, totalGt, totalInd } = reportData;
+  const handleExportTournament = (reportData: TournamentReportData[string]) => {
+    const { event, registrations, totalPlayers, totalGt, totalInd } = reportData;
+
+    // 1. School Totals Sheet
+    const schoolTotalsData = registrations.map(r => ({
+      'School': r.schoolName,
+      'Total Players': r.playerCount,
+      'GT Players': r.gtCount,
+      'Independent Players': r.indCount,
+    }));
     
-        // 1. School Totals Sheet
-        const schoolTotalsData = registrations.map(r => ({
+    schoolTotalsData.push({}); // Spacer row
+    schoolTotalsData.push({
+        'School': 'Totals',
+        'Total Players': totalPlayers,
+        'GT Players': totalGt,
+        'Independent Players': totalInd,
+    });
+    schoolTotalsData.push({
+        'School': 'Grand Total',
+        'Total Players': totalPlayers,
+    });
+
+    // 2. GT Players Sheet
+    const gtPlayersData = registrations.flatMap(r =>
+        r.players.filter(p => p.studentType === 'gt').map(p => ({
+            'Tournament': event.name,
+            'Event Date': format(new Date(event.date), 'yyyy-MM-dd'),
             'School': r.schoolName,
-            'Total Players': r.playerCount,
-            'GT Players': r.gtCount,
-            'Independent Players': r.indCount,
-        }));
+            'Player Name': p.name,
+            'USCF ID': p.uscfId,
+        }))
+    );
+
+    // 3. Independent Players Sheet
+    const indPlayersData = registrations.flatMap(r =>
+        r.players.filter(p => p.studentType !== 'gt').map(p => ({
+            'Tournament': event.name,
+            'Event Date': format(new Date(event.date), 'yyyy-MM-dd'),
+            'School': r.schoolName,
+            'Player Name': p.name,
+            'USCF ID': p.uscfId,
+        }))
+    );
+
+    // Create worksheets
+    const wsSchoolTotals = XLSX.utils.json_to_sheet(schoolTotalsData);
+    const wsGtPlayers = XLSX.utils.json_to_sheet(gtPlayersData);
+    const wsIndPlayers = XLSX.utils.json_to_sheet(indPlayersData);
+    
+    // --- Professional Formatting ---
+    const wb = XLSX.utils.book_new();
+
+    [wsSchoolTotals, wsGtPlayers, wsIndPlayers].forEach(ws => {
+      if (!ws['!cols']) ws['!cols'] = [];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+      data[0].forEach((col, i) => {
+        const maxWidth = Math.max(
+          ...data.map(row => row[i] ? String(row[i]).length : 0)
+        );
+        if (!ws['!cols'][i] || ws['!cols'][i].wch < maxWidth) {
+          ws['!cols'][i] = { wch: maxWidth + 2 };
+        }
+      });
+      
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell_address = { c: C, r: R };
+          const cell_ref = XLSX.utils.encode_cell(cell_address);
+          if (!ws[cell_ref]) continue;
+
+          // Add borders to all cells
+          if (!ws[cell_ref].s) ws[cell_ref].s = {};
+          ws[cell_ref].s.border = { top: {style:"thin"}, bottom: {style:"thin"}, left: {style:"thin"}, right: {style:"thin"} };
+
+          if (R === 0) { // Header row
+            ws[cell_ref].s.font = { bold: true };
+            ws[cell_ref].s.fill = { fgColor: { rgb: "E0E0E0" } };
+          }
+        }
+      }
+    });
+    
+    // Bold the totals rows on the first sheet
+    const totalsRowIndex = schoolTotalsData.length - 2;
+    const grandTotalRowIndex = schoolTotalsData.length - 1;
+
+    for (let C = 0; C <= 3; ++C) {
+        let totalsCellRef = XLSX.utils.encode_cell({c: C, r: totalsRowIndex});
+        if (wsSchoolTotals[totalsCellRef]) wsSchoolTotals[totalsCellRef].s.font = { bold: true };
         
-        // Add Totals row
-        schoolTotalsData.push({}); // Empty row for spacing
-        schoolTotalsData.push({
-            'School': 'Totals',
-            'Total Players': totalPlayers,
-            'GT Players': totalGt,
-            'Independent Players': totalInd,
-        });
+        let grandTotalsCellRef = XLSX.utils.encode_cell({c: C, r: grandTotalRowIndex});
+        if (wsSchoolTotals[grandTotalsCellRef]) wsSchoolTotals[grandTotalsCellRef].s.font = { bold: true };
+    }
 
-        // Add Grand Total row
-         schoolTotalsData.push({
-            'School': 'Grand Total',
-            'Total Players': totalPlayers,
-        });
 
-    
-        // 2. GT Players Sheet
-        const gtPlayersData = registrations.flatMap(r =>
-            r.players
-                .filter(p => p.studentType === 'gt')
-                .map(p => ({
-                    'Tournament': event.name,
-                    'Event Date': format(new Date(event.date), 'yyyy-MM-dd'),
-                    'School': r.schoolName,
-                    'Player Name': p.name,
-                    'USCF ID': p.uscfId,
-                }))
-        );
-    
-        // 3. Independent Players Sheet
-        const indPlayersData = registrations.flatMap(r =>
-            r.players
-                .filter(p => p.studentType !== 'gt')
-                .map(p => ({
-                    'Tournament': event.name,
-                    'Event Date': format(new Date(event.date), 'yyyy-MM-dd'),
-                    'School': r.schoolName,
-                    'Player Name': p.name,
-                    'USCF ID': p.uscfId,
-                }))
-        );
-    
-        // Create worksheets
-        const wsSchoolTotals = XLSX.utils.json_to_sheet(schoolTotalsData);
-        const wsGtPlayers = XLSX.utils.json_to_sheet(gtPlayersData);
-        const wsIndPlayers = XLSX.utils.json_to_sheet(indPlayersData);
-    
-        // Create workbook and append sheets
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, wsSchoolTotals, 'School Totals');
-        XLSX.utils.book_append_sheet(wb, wsGtPlayers, 'GT Players');
-        XLSX.utils.book_append_sheet(wb, wsIndPlayers, 'Independent Players');
-    
-        // Generate and download the file
-        XLSX.writeFile(wb, `${event.name.replace(/\s+/g, '_')}_report.xlsx`);
-    };
+    XLSX.utils.book_append_sheet(wb, wsSchoolTotals, 'School Totals');
+    XLSX.utils.book_append_sheet(wb, wsGtPlayers, 'GT Players');
+    XLSX.utils.book_append_sheet(wb, wsIndPlayers, 'Independent Players');
+
+    XLSX.writeFile(wb, `${event.name.replace(/\s+/g, '_')}_report.xlsx`);
+  };
   
   const handlePrint = () => {
     window.print();
