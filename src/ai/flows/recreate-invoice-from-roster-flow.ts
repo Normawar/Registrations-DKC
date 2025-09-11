@@ -4,6 +4,7 @@
  * @fileOverview Creates a new Square invoice to replace an old one.
  * This flow correctly handles updating an event registration invoice by first canceling
  * the original invoice, then creating a brand new one with the updated roster.
+ * It includes dynamic late fee calculation and data sanitization.
  */
 
 import {ai} from '@/ai/genkit';
@@ -16,15 +17,26 @@ import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
 import { format } from 'date-fns';
 
+// --- New, more robust types and logic for late fee calculation ---
+
 const PlayerToInvoiceSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
   uscfId: z.string().describe('The USCF ID of the player.'),
   baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
-  lateFee: z.number().describe('The late fee applied, if any.'),
+  lateFee: z.number().nullable().optional().describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
   isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
   isNew: z.boolean().optional().describe('Whether this is a new player added to the invoice.'),
   isSubstitution: z.boolean().optional().describe('Whether this player is a substitution for another.'),
+  waiveLateFee: z.boolean().optional().describe('Organizer-only flag to waive the late fee.'),
+  registrationDate: z.string().optional().describe('ISO string of when the player was registered.'),
+});
+
+const EventConfigSchema = z.object({
+  eventDate: z.string(),
+  earlyDeadlineDays: z.number().optional(),
+  standardLateFee: z.number().optional(),
+  gtLateFee: z.number().optional(),
 });
 
 const RecreateInvoiceInputSchema = z.object({
@@ -44,6 +56,7 @@ const RecreateInvoiceInputSchema = z.object({
     eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
     requestingUserRole: z.string().describe('Role of user requesting the recreation'),
     revisionMessage: z.string().optional().describe('Message explaining why invoice was recreated'),
+    eventConfig: EventConfigSchema.optional(),
 });
 export type RecreateInvoiceInput = z.infer<typeof RecreateInvoiceInputSchema>;
 
@@ -56,6 +69,22 @@ const RecreateInvoiceOutputSchema = z.object({
   newInvoiceUrl: z.string().url(),
 });
 export type RecreateInvoiceOutput = z.infer<typeof RecreateInvoiceOutputSchema>;
+
+function calculateLateFee(player: z.infer<typeof PlayerToInvoiceSchema>, config: z.infer<typeof EventConfigSchema>): number {
+  const today = player.registrationDate ? new Date(player.registrationDate) : new Date();
+  const event = new Date(config.eventDate);
+
+  const earlyDeadline = new Date(event);
+  const earlyDays = config.earlyDeadlineDays ?? 14;
+  earlyDeadline.setDate(event.getDate() - earlyDays);
+
+  if (today <= earlyDeadline) return 0;
+
+  const standardLateFee = config.standardLateFee ?? 5;
+  const gtLateFee = config.gtLateFee ?? 3;
+
+  return player.isGtPlayer ? gtLateFee : standardLateFee;
+}
 
 export async function recreateInvoiceFromRoster(input: RecreateInvoiceInput): Promise<RecreateInvoiceOutput> {
   return recreateInvoiceFlow(input);
@@ -71,22 +100,28 @@ const recreateInvoiceFlow = ai.defineFlow(
     if (input.requestingUserRole !== 'organizer') {
       throw new Error('Only organizers can recreate invoices.');
     }
-
-    // SANITIZE INPUT: Remove invalid players and ensure lateFee is a number
+    
+    // --- Data Sanitization and Fee Calculation ---
     const SUBSTITUTION_FEE = 2.0;
     let totalSubstitutionFee = 0;
+    
+    const eventConfig = input.eventConfig ?? { eventDate: input.eventDate };
 
     const sanitizedPlayers = input.players
-      .filter(player => player.playerName && player.playerName !== 'undefined undefined')
-      .map(player => {
-        const lateFee = typeof player.lateFee === 'number' ? player.lateFee : 0;
-
-        if (player.isSubstitution) {
-          totalSubstitutionFee += SUBSTITUTION_FEE;
-          return { ...player, lateFee: 0 }; // Substitutions don't get late fees
+      .filter(p => p.playerName && p.playerName !== "undefined undefined")
+      .map(p => {
+        let lateFee = typeof p.lateFee === "number" ? p.lateFee : calculateLateFee(p, eventConfig);
+        
+        if (input.requestingUserRole === "organizer" && p.waiveLateFee) {
+          lateFee = 0;
         }
 
-        return { ...player, lateFee }; // sanitized lateFee
+        if (p.isSubstitution) {
+          totalSubstitutionFee += SUBSTITUTION_FEE;
+          return { ...p, lateFee: 0 };
+        }
+        
+        return { ...p, lateFee };
       });
 
     const sanitizedInput = {
@@ -94,6 +129,7 @@ const recreateInvoiceFlow = ai.defineFlow(
       players: sanitizedPlayers,
     };
 
+    // --- Mocking for Unconfigured Environments ---
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       console.log(`Square not configured. Mock-recreating invoice based on ${sanitizedInput.originalInvoiceId}.`);
