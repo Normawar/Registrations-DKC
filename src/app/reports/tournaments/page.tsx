@@ -107,7 +107,7 @@ function TournamentsReportPageContent() {
             const playerDetail: PlayerDetail = {
               id: playerId,
               name: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
-              uscfId: player ? player.uscfId : playerId,
+              uscfId: player ? player.uscfId : 'N/A',
               studentType: regInfo.studentType,
             };
 
@@ -325,5 +325,3 @@ export default function TournamentsReportPage() {
         </OrganizerGuard>
     )
 }
-
-    
