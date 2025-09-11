@@ -21,14 +21,15 @@ import { format } from 'date-fns';
 
 const PlayerToInvoiceSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
-  uscfId: z.string().describe('The USCF ID of the player.'),
+  uscfId: z.string().optional().describe('The USCF ID of the player.'),
   baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
-  lateFee: z.number().describe('The late fee applied, if any.'),
+  lateFee: z.union([z.number(), z.null()]).describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
   isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
   isNew: z.boolean().optional().describe('Whether this is a new player added to the invoice.'),
   isSubstitution: z.boolean().optional().describe('Whether this player is a substitution for another.'),
   waiveLateFee: z.boolean().optional().describe('Organizer-only flag to waive the late fee.'),
+  lateFeeOverride: z.number().optional().describe('Organizer override for late fee amount.'),
   registrationDate: z.string().optional().describe('ISO string of when the player was registered.'),
 });
 
@@ -110,26 +111,27 @@ const recreateInvoiceFlow = ai.defineFlow(
     const sanitizedPlayers = input.players
       .filter(p => p.playerName && p.playerName !== "undefined undefined")
       .map(p => {
-        // Calculate late fee if not already provided
-        let lateFee = typeof p.lateFee === "number"
-          ? p.lateFee
-          : calculateLateFee(p, eventConfig);
-
-        // Organizer override
-        if (input.requestingUserRole === "organizer" && p.waiveLateFee) {
+        let lateFee = 0;
+        
+        // Handle the organizer controls first
+        if (p.waiveLateFee) {
           lateFee = 0;
+        } else if (typeof p.lateFeeOverride === 'number') {
+          lateFee = p.lateFeeOverride;
+        } else if (p.lateFee !== null && typeof p.lateFee === 'number') {
+          // Use existing lateFee if it's a valid number
+          lateFee = p.lateFee;
+        } else {
+          // Calculate late fee based on event config
+          lateFee = calculateLateFee(p, eventConfig);
         }
 
-        // Substitution handling
         if (p.isSubstitution) {
           totalSubstitutionFee += SUBSTITUTION_FEE;
-          lateFee = 0;
+          return { ...p, lateFee: 0 };
         }
-
-        return {
-          ...p,
-          lateFee, // ✅ always a number
-        };
+        
+        return { ...p, lateFee };
       });
 
     const sanitizedInput = {
