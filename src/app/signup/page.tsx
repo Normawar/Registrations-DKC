@@ -259,6 +259,8 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       }
 
       const { password, email, ...profileValues } = values;
+      const userRole = role === 'organizer' && email.toLowerCase().endsWith('@dkchess.com') ? 'organizer' : role;
+
 
       if (role === 'organizer' && !email.toLowerCase().endsWith('@dkchess.com')) {
         form.setError('email', {
@@ -278,7 +280,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
           bookkeeperEmail: '',
           schoolAddress: '',
           schoolPhone: '',
-          role: role,
+          role: userRole,
           avatarType: 'icon',
           avatarValue: 'PawnIcon',
       };
@@ -286,14 +288,18 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       const result = await simpleSignUp(email, password, profileData);
       
       if (result.success) {
+        // Since simpleSignUp now returns the profile, we can use it directly
+        const finalProfile = { ...result.profile, role: userRole };
+        await updateProfile(finalProfile as SponsorProfile);
+        
         toast({
             title: "Account Ready!",
-            description: `Your new ${role} account has been successfully created or restored.`,
+            description: `Your new ${userRole} account has been successfully created or restored.`,
         });
 
         let path = '/dashboard';
-        if (role === 'individual') path = '/individual-dashboard';
-        else if (role === 'organizer') path = '/manage-events';
+        if (userRole === 'individual') path = '/individual-dashboard';
+        else if (userRole === 'organizer') path = '/manage-events';
         
         setTimeout(() => {
           router.push(path);
