@@ -98,17 +98,34 @@ const recreateInvoiceFlow = ai.defineFlow(
     outputSchema: RecreateInvoiceOutputSchema,
   },
   async (input) => {
-    if (input.requestingUserRole !== 'organizer') {
+    // Add this immediately after the flow function begins
+    console.log('Applying null-to-zero transformation...');
+
+    const transformedInput = {
+      ...input,
+      players: input.players.map((player, index) => ({
+        ...player,
+        lateFee: player.lateFee === null ? 0 : player.lateFee,
+        uscfId: player.uscfId || "NEW",
+        playerName: (!player.playerName || player.playerName === 'undefined undefined') 
+          ? `Student_${index + 1}_${player.isGtPlayer ? 'GT' : 'REG'}_${player.uscfAction ? 'USCF' : 'EXISTING'}`
+          : player.playerName
+      }))
+    };
+
+    console.log(`Processed ${transformedInput.players.length} players with transformations`);
+
+    if (transformedInput.requestingUserRole !== 'organizer') {
       throw new Error('Only organizers can recreate invoices.');
     }
 
     const SUBSTITUTION_FEE = 2.0;
     let totalSubstitutionFee = 0;
 
-    const eventConfig = input.eventConfig ?? { eventDate: input.eventDate };
+    const eventConfig = transformedInput.eventConfig ?? { eventDate: transformedInput.eventDate };
 
     // --- Data sanitization and late fee calculation ---
-    const sanitizedPlayers = input.players
+    const sanitizedPlayers = transformedInput.players
       .filter(p => p.playerName && p.playerName !== "undefined undefined")
       .map(p => {
         let lateFee = 0;
@@ -135,7 +152,7 @@ const recreateInvoiceFlow = ai.defineFlow(
       });
 
     const sanitizedInput = {
-      ...input,
+      ...transformedInput,
       players: sanitizedPlayers,
     };
 
