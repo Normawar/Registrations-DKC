@@ -68,6 +68,8 @@ function TournamentsReportPageContent() {
         const eventDate = parseISO(event.date);
         
         const eventInvoices = allInvoices.filter(inv => {
+            if (inv.status === 'CANCELED' || inv.invoiceStatus === 'CANCELED') return false;
+
             if (inv.eventId === event.id) return true;
             try {
                 const invDate = inv.eventDate ? parseISO(inv.eventDate) : null;
@@ -78,7 +80,6 @@ function TournamentsReportPageContent() {
         const schoolPlayerMap: Map<string, Map<string, PlayerDetail>> = new Map();
         
         eventInvoices.forEach(invoice => {
-            if (invoice.status === 'CANCELED' || invoice.invoiceStatus === 'CANCELED') return;
             if (!invoice.selections) return;
 
             const schoolName = invoice.schoolName || 'Unknown School';
@@ -94,7 +95,7 @@ function TournamentsReportPageContent() {
                 
                 schoolPlayers.set(playerId, {
                     id: playerId,
-                    name: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
+                    name: player ? `${player.firstName} ${player.lastName}`.trim() : 'Unknown Player',
                     uscfId: player ? player.uscfId : 'N/A',
                     studentType: player ? player.studentType : 'independent'
                 });
@@ -150,7 +151,7 @@ function TournamentsReportPageContent() {
   }, [tournamentReport, tournamentSearchTerm]);
 
     const handleExportTournament = (reportData: TournamentReportData[string]) => {
-        const { event, registrations } = reportData;
+        const { event, registrations, totalPlayers, totalGt, totalInd } = reportData;
     
         // 1. School Totals Sheet
         const schoolTotalsData = registrations.map(r => ({
@@ -159,6 +160,22 @@ function TournamentsReportPageContent() {
             'GT Players': r.gtCount,
             'Independent Players': r.indCount,
         }));
+        
+        // Add Totals row
+        schoolTotalsData.push({}); // Empty row for spacing
+        schoolTotalsData.push({
+            'School': 'Totals',
+            'Total Players': totalPlayers,
+            'GT Players': totalGt,
+            'Independent Players': totalInd,
+        });
+
+        // Add Grand Total row
+         schoolTotalsData.push({
+            'School': 'Grand Total',
+            'Total Players': totalPlayers,
+        });
+
     
         // 2. GT Players Sheet
         const gtPlayersData = registrations.flatMap(r =>
