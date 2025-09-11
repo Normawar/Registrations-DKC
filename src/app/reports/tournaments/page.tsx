@@ -1,11 +1,12 @@
 
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import Papa from 'papaparse';
-import { format } from 'date-fns';
+import { format, isSameDay, parseISO } from 'date-fns';
 
 import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
@@ -55,9 +56,7 @@ function TournamentsReportPageContent() {
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
 
   const loadData = useCallback(async () => {
-    if (Date.now() - lastLoadTime < 5 * 60 * 1000 && Object.keys(tournamentReport).length > 0) return;
-
-    if (!db || !isDbLoaded) return;
+    if (!db || !isDbLoaded || events.length === 0) return;
     setIsLoading(true);
     try {
       const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
@@ -67,7 +66,18 @@ function TournamentsReportPageContent() {
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
       events.forEach(event => {
-        const eventInvoices = allInvoices.filter(inv => inv.eventId === event.id);
+        const eventDate = parseISO(event.date);
+        
+        const eventInvoices = allInvoices.filter(inv => {
+            if (inv.eventId === event.id) return true;
+            try {
+                const invDate = inv.eventDate ? parseISO(inv.eventDate) : null;
+                return inv.eventName === event.name && invDate && isSameDay(invDate, eventDate);
+            } catch {
+                return false;
+            }
+        });
+
         const schoolRegistrations: { [key: string]: { playerCount: number; gtCount: number; indCount: number; players: PlayerDetail[] } } = {};
 
         eventInvoices.forEach(invoice => {
@@ -124,7 +134,7 @@ function TournamentsReportPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [events, lastLoadTime, allPlayers, isDbLoaded, tournamentReport]);
+  }, [events, allPlayers, isDbLoaded]);
 
   useEffect(() => {
     if (events.length > 0 && isDbLoaded) {

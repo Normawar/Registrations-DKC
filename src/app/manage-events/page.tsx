@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } f
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, isValid, parse, isSameDay } from 'date-fns';
+import { format, isValid, parse, isSameDay, parseISO } from 'date-fns';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -500,44 +500,29 @@ function ManageEventsContent() {
     
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
     const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
-    const eventDate = new Date(event.date);
+    const eventDate = parseISO(event.date);
 
     const activeConfirmations = allConfirmations.filter(conf => 
-        conf.eventId === event.id && 
         conf.invoiceStatus !== 'CANCELED' && 
         conf.invoiceStatus !== 'COMPED'
     );
 
     for (const conf of activeConfirmations) {
-        const hasEventId = conf.eventId === event.id;
+        if (conf.eventId !== event.id) continue;
         
-        let hasMatchingNameAndDate = false;
-        try {
-            if (conf.eventName && conf.eventDate) {
-                const confDate = new Date(conf.eventDate); // Handles both ISO strings and Date objects
-                if (isValid(confDate) && conf.eventName === event.name && isSameDay(confDate, eventDate)) {
-                    hasMatchingNameAndDate = true;
-                }
-            }
-        } catch (e) {
-            console.warn(`Could not parse date for invoice ${conf.id}: ${conf.eventDate}`);
-        }
-
-        if (hasEventId || hasMatchingNameAndDate) {
-            for (const playerId in conf.selections) {
-                if (uniquePlayerRegistrations.has(playerId)) continue;
-                
-                const registrationDetails = conf.selections[playerId];
-                const player = playerMap.get(playerId);
-                
-                if (player) {
-                    uniquePlayerRegistrations.set(playerId, { 
-                        player, 
-                        details: registrationDetails, 
-                        invoiceId: conf.invoiceId, 
-                        invoiceNumber: conf.invoiceNumber 
-                    });
-                }
+        for (const playerId in conf.selections) {
+            if (uniquePlayerRegistrations.has(playerId)) continue;
+            
+            const registrationDetails = conf.selections[playerId];
+            const player = playerMap.get(playerId);
+            
+            if (player) {
+                uniquePlayerRegistrations.set(playerId, { 
+                    player, 
+                    details: registrationDetails, 
+                    invoiceId: conf.invoiceId, 
+                    invoiceNumber: conf.invoiceNumber 
+                });
             }
         }
     }
@@ -1026,10 +1011,3 @@ export default function ManageEventsPage() {
     </DistrictCoordinatorGuard>
   );
 }
-
-
-
-
-
-
-
