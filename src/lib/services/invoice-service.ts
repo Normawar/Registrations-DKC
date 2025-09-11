@@ -1,4 +1,3 @@
-// src/lib/services/invoice-service.ts
 'use server';
 
 import { 
@@ -8,68 +7,33 @@ import {
 } from '@/ai/flows/recreate-invoice-from-roster-flow';
 
 export async function recreateInvoiceFromRoster(input: any): Promise<RecreateInvoiceOutput> {
-    console.log('Processing invoice with null-to-zero conversion...');
+    // CRITICAL: Transform ALL null lateFee values to 0 before processing
+    const fixedData = JSON.parse(JSON.stringify(input)); // Deep clone
     
-    // Convert null lateFee to 0 and preserve all players including "undefined undefined"
-    const processedInput = {
-        ...input,
-        players: input.players.map((player: any, index: number) => {
-            // Generate a meaningful name for undefined players based on their data
-            let playerName = player.playerName;
-            
-            if (!playerName || playerName === 'undefined undefined') {
-                // Create a descriptive placeholder that includes their characteristics
-                const gtStatus = player.isGtPlayer ? 'GT' : 'Regular';
-                const uscfStatus = player.uscfAction ? 'New USCF' : 'Has USCF';
-                const uscfId = player.uscfId || 'No ID';
-                
-                playerName = `Student ${index + 1} (${gtStatus}, ${uscfStatus}, ${uscfId})`;
-                
-                console.log(`Created placeholder name: "${playerName}" for player at index ${index}`);
-            }
-            
-            return {
-                ...player,
-                playerName,
-                lateFee: 0, // Convert null to 0 to bypass Genkit bug - flow will recalculate
-                uscfId: player.uscfId || "NEW"
-            };
-        })
-    };
-
-    // Log the processing results
-    const originalCount = input.players.length;
-    const processedCount = processedInput.players.length;
-    const placeholderCount = processedInput.players.filter((p: any) => 
-        p.playerName.startsWith('Student ')
-    ).length;
-    
-    console.log(`Invoice processing summary:
-    - Original players: ${originalCount}
-    - Processed players: ${processedCount}
-    - Placeholder names created: ${placeholderCount}
-    - Valid existing names: ${processedCount - placeholderCount}`);
-    
-    // List all players for verification
-    console.log('All players in invoice:');
-    processedInput.players.forEach((p: any, i: number) => {
-        console.log(`  ${i + 1}. ${p.playerName} - ${p.isGtPlayer ? 'GT' : 'Regular'} - ${p.uscfAction ? 'USCF Action' : 'No USCF Action'}`);
-    });
-
-    try {
-        const result = await recreateInvoiceFromRosterFlow(processedInput);
-        
-        console.log(`Invoice created successfully with ${processedCount} players`);
-        
-        if (placeholderCount > 0) {
-            console.log(`⚠️ IMPORTANT: ${placeholderCount} players have placeholder names and need manual review/correction in the final invoice.`);
+    fixedData.players = fixedData.players.map((player: any, index: number) => {
+        // Fix the lateFee issue
+        if (player.lateFee === null) {
+            player.lateFee = 0;
         }
         
-        return result;
-    } catch (error: any) {
-        console.error('Invoice creation failed:', error);
-        throw new Error(`Invoice creation failed: ${error.message}`);
-    }
+        // Fix missing uscfId
+        if (!player.uscfId) {
+            player.uscfId = "NEW";
+        }
+        
+        // Create descriptive name for undefined players
+        if (!player.playerName || player.playerName === 'undefined undefined') {
+            const gtStatus = player.isGtPlayer ? 'GT' : 'Regular';
+            const uscfStatus = player.uscfAction ? 'NewUSCF' : 'HasUSCF';
+            player.playerName = `Student${index + 1}_${gtStatus}_${uscfStatus}`;
+        }
+        
+        return player;
+    });
+    
+    console.log(`Processing ${fixedData.players.length} players with fixed data`);
+    
+    return await recreateInvoiceFromRosterFlow(fixedData);
 }
 
 // Helper function to analyze what we're working with
