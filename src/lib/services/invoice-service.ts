@@ -1,5 +1,4 @@
 
-// src/lib/services/invoice-service.ts
 'use server';
 
 import { 
@@ -7,16 +6,14 @@ import {
     type RecreateInvoiceInput,
     type RecreateInvoiceOutput
 } from '@/ai/flows/recreate-invoice-from-roster-flow';
+import { analyzePlayerData } from './actions/analyze-data';
 
 export async function recreateInvoiceFromRoster(input: any): Promise<RecreateInvoiceOutput> {
-    console.log('🔍 Input validation debug:', {
-        firstPlayerLateFee: input.players[0]?.lateFee,
-        firstPlayerLateFeeType: typeof input.players[0]?.lateFee,
-        isNull: input.players[0]?.lateFee === null,
-        isUndefined: input.players[0]?.lateFee === undefined
-    });
+    
+    // Run the data analysis for debugging purposes
+    await analyzePlayerData(input);
 
-    // Workaround: Convert data to ensure clean validation
+    // Clean and transform the data before sending to the flow
     const transformedInput = {
         ...input,
         players: input.players
@@ -62,8 +59,6 @@ export async function recreateInvoiceFromRoster(input: any): Promise<RecreateInv
                 return cleanPlayer;
             })
     };
-
-    console.log('🔍 Transformed first player:', transformedInput.players[0]);
 
     try {
         return await recreateInvoiceFromRosterFlow(transformedInput);
