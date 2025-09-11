@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -74,36 +75,32 @@ function TournamentsReportPageContent() {
                 return inv.eventName === event.name && invDate && isSameDay(invDate, eventDate);
             } catch { return false; }
         });
-
+        
         const schoolPlayerMap: Map<string, Map<string, PlayerDetail>> = new Map();
-        const activeRegistrations = new Set<string>(); // Tracks PlayerID to avoid duplicates per event
+        
+        eventInvoices.forEach(invoice => {
+            if (invoice.status === 'CANCELED' || invoice.invoiceStatus === 'CANCELED') return;
+            if (!invoice.selections) return;
 
-        // Process active invoices first
-        eventInvoices
-            .filter(inv => inv.invoiceStatus !== 'CANCELED' && inv.status !== 'CANCELED')
-            .forEach(invoice => {
-                if (!invoice.selections) return;
-                const schoolName = invoice.schoolName || 'Unknown School';
+            const schoolName = invoice.schoolName || 'Unknown School';
+            if (!schoolPlayerMap.has(schoolName)) {
+                schoolPlayerMap.set(schoolName, new Map());
+            }
+            const schoolPlayers = schoolPlayerMap.get(schoolName)!;
 
-                if (!schoolPlayerMap.has(schoolName)) {
-                    schoolPlayerMap.set(schoolName, new Map());
-                }
-                const schoolPlayers = schoolPlayerMap.get(schoolName)!;
+            for (const playerId in invoice.selections) {
+                if (schoolPlayers.has(playerId)) continue;
 
-                for (const playerId in invoice.selections) {
-                    if (activeRegistrations.has(playerId)) continue;
-
-                    const player = playerMap.get(playerId);
-                    
-                    schoolPlayers.set(playerId, {
-                        id: playerId,
-                        name: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
-                        uscfId: player ? player.uscfId : 'N/A',
-                        studentType: player ? player.studentType : 'independent'
-                    });
-                    activeRegistrations.add(playerId);
-                }
-            });
+                const player = playerMap.get(playerId);
+                
+                schoolPlayers.set(playerId, {
+                    id: playerId,
+                    name: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
+                    uscfId: player ? player.uscfId : 'N/A',
+                    studentType: player ? player.studentType : 'independent'
+                });
+            }
+        });
         
         if (schoolPlayerMap.size > 0) {
             const registrations = Array.from(schoolPlayerMap.entries()).map(([schoolName, playersMap]) => {

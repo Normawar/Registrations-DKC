@@ -277,12 +277,25 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   const loadDatabase = useCallback(async () => {
-    // Default to loading local data for performance.
-    // Use refreshDatabase() for explicit Firestore fetching.
+    if (!db) {
+        console.error("Firestore not initialized.");
+        setIsDbError(true);
+        setIsDbLoaded(true);
+        return;
+    }
+    setIsDbLoaded(false);
     try {
-        setDatabase(fullMasterPlayerData);
+        const playersCol = collection(db, 'players');
+        const playerSnapshot = await getDocs(playersCol);
+        if (!playerSnapshot.empty) {
+            const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+            setDatabase(playerList);
+        } else {
+            console.warn("No players found in Firestore. Check if this is expected.");
+            setDatabase([]);
+        }
     } catch (error) {
-        console.error("Failed to load local player data.", error);
+        console.error("Failed to load player data from Firestore.", error);
         setIsDbError(true);
     } finally {
         setIsDbLoaded(true);
@@ -294,35 +307,8 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   }, [loadDatabase]);
 
   const refreshDatabase = async () => {
-    if (!db) {
-        console.error("Firestore not initialized, cannot refresh.");
-        toast({ variant: 'destructive', title: 'Database Error', description: 'Cannot connect to the database to refresh data.' });
-        setIsDbError(true);
-        return;
-    }
-    
-    setIsDbLoaded(false);
-    toast({ title: 'Refreshing Database', description: 'Fetching the latest player data from the server...' });
-    try {
-        const playersCol = collection(db, 'players');
-        const playerSnapshot = await getDocs(playersCol);
-        if (!playerSnapshot.empty) {
-            const playerList = playerSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-            setDatabase(playerList);
-            toast({ title: 'Database Refreshed', description: `Loaded ${playerList.length} player records.` });
-        } else {
-            // Fallback to local if remote is empty
-            setDatabase(fullMasterPlayerData);
-            toast({ variant: 'destructive', title: 'No Remote Data', description: 'No player data found in the database. Using local copy.' });
-        }
-    } catch (error) {
-        console.error("Failed to refresh players from Firestore.", error);
-        setDatabase(fullMasterPlayerData);
-        setIsDbError(true);
-        toast({ variant: 'destructive', title: 'Refresh Failed', description: 'Could not load data from the database. Using local copy.' });
-    } finally {
-        setIsDbLoaded(true);
-    }
+    await loadDatabase();
+    toast({ title: 'Database Refreshed', description: 'Fetched the latest player data from the server.' });
   };
 
   const addPlayer = async (player: MasterPlayer) => {
