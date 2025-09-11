@@ -75,48 +75,49 @@ function TournamentsReportPageContent() {
             } catch { return false; }
         });
 
+        // De-duplicate player registrations, prioritizing non-canceled invoices
+        const uniquePlayerRegistrations = new Map<string, { school: string, studentType?: 'gt' | 'independent' }>();
+
+        // Process non-canceled invoices first
+        eventInvoices
+            .filter(inv => inv.invoiceStatus !== 'CANCELED')
+            .forEach(invoice => {
+                if (!invoice.selections) return;
+                for (const playerId in invoice.selections) {
+                    if (!uniquePlayerRegistrations.has(playerId)) {
+                        const player = playerMap.get(playerId);
+                        uniquePlayerRegistrations.set(playerId, {
+                            school: invoice.schoolName || 'Unknown School',
+                            studentType: player?.studentType
+                        });
+                    }
+                }
+        });
+        
         const schoolRegistrations: { [key: string]: { gtCount: number; indCount: number; players: PlayerDetail[] } } = {};
 
-        for (const invoice of eventInvoices) {
-          const school = invoice.schoolName || 'Unknown School';
-          if (!invoice.selections) continue;
-
-          if (!schoolRegistrations[school]) {
-            schoolRegistrations[school] = { gtCount: 0, indCount: 0, players: [] };
-          }
-          
-          for (const playerId of Object.keys(invoice.selections)) {
-            // Get the most current player data from the master database
+        for (const [playerId, regInfo] of uniquePlayerRegistrations.entries()) {
             const player = playerMap.get(playerId);
-            const invoiceSelection = invoice.selections[playerId];
+            const school = regInfo.school;
+
+            if (!schoolRegistrations[school]) {
+              schoolRegistrations[school] = { gtCount: 0, indCount: 0, players: [] };
+            }
             
-            if (player) {
-                // Use studentType from master database as the source of truth
-                const studentType = player.studentType;
+            const playerDetail: PlayerDetail = {
+              id: playerId,
+              name: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
+              uscfId: player ? player.uscfId : playerId,
+              studentType: regInfo.studentType,
+            };
 
-                schoolRegistrations[school].players.push({
-                    id: player.id,
-                    name: `${player.firstName} ${player.lastName}`,
-                    uscfId: player.uscfId,
-                    studentType: studentType,
-                });
-
-                if (studentType === 'gt') {
-                    schoolRegistrations[school].gtCount++;
-                } else {
-                    schoolRegistrations[school].indCount++;
-                }
+            schoolRegistrations[school].players.push(playerDetail);
+            
+            if (regInfo.studentType === 'gt') {
+                schoolRegistrations[school].gtCount++;
             } else {
-                // Fallback for players not in the master DB
-                schoolRegistrations[school].players.push({
-                    id: playerId,
-                    name: 'Unknown Player',
-                    uscfId: playerId,
-                    studentType: 'independent',
-                });
                 schoolRegistrations[school].indCount++;
             }
-          }
         }
         
         const registrations = Object.entries(schoolRegistrations).map(([schoolName, data]) => ({
@@ -249,7 +250,7 @@ function TournamentsReportPageContent() {
                       </TableHeader>
                       {reportData.registrations.map(reg => (
                         <Collapsible asChild key={reg.schoolName} open={openCollapsibles[reportData.event.id + reg.schoolName]} onOpenChange={() => toggleCollapsible(reportData.event.id + reg.schoolName)}>
-                          <tbody>
+                          <tbody key={reg.schoolName}>
                             <CollapsibleTrigger asChild>
                               <TableRow className="cursor-pointer hover:bg-muted/50">
                                 <TableCell className="font-medium flex items-center">
