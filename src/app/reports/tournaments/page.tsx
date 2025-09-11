@@ -4,8 +4,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
-import * as XLSX from 'xlsx';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 
 import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
@@ -20,11 +19,12 @@ import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { handleExportTournament } from '@/lib/utils/exportTournament';
 
 type PlayerDetail = {
   id: string;
   name: string;
-  uscfId: string;
+  uscfId?: string;
   studentType?: 'gt' | 'independent' | 'regular';
 };
 
@@ -145,82 +145,6 @@ function TournamentsReportPageContent() {
     ).sort((a, b) => new Date(b.event.date).getTime() - new Date(a.event.date).getTime());
   }, [tournamentReport, tournamentSearchTerm]);
 
-  const handleExportTournament = (reportData: TournamentReportData[string]) => {
-    const { event, registrations, totalPlayers, totalGt, totalInd } = reportData;
-
-    // --- Define Styles ---
-    const thinBorder = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
-    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "D3D3D3" } }, border: thinBorder };
-    const totalRowStyle = { font: { bold: true }, border: thinBorder };
-    const stripe1Style = { fill: { fgColor: { rgb: "FFFFFF" } }, border: thinBorder };
-    const stripe2Style = { fill: { fgColor: { rgb: "F0F8FF" } }, border: thinBorder }; // AliceBlue for light blue stripe
-    
-    // --- Sheet 1: School Totals ---
-    const schoolTotalsHeaders = ['School', 'Total Players', 'GT Players', 'Independent Players'];
-    const schoolTotalsData = registrations.map(r => ([
-      r.schoolName,
-      r.playerCount,
-      r.gtCount,
-      r.indCount,
-    ]));
-
-    // Add Grand Total row
-    const grandTotalRow = [ 'Grand Total', totalPlayers, totalGt, totalInd ];
-    schoolTotalsData.push(grandTotalRow);
-    
-    const wsSchoolTotals = XLSX.utils.aoa_to_sheet([schoolTotalsHeaders, ...schoolTotalsData]);
-    
-    // Auto-fit columns
-    const cols = [{ wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
-    wsSchoolTotals['!cols'] = cols;
-
-    // Apply styles
-    schoolTotalsHeaders.forEach((_, C) => {
-      const cellRef = XLSX.utils.encode_cell({ r: 0, c: C });
-      if (wsSchoolTotals[cellRef]) wsSchoolTotals[cellRef].s = headerStyle;
-    });
-
-    schoolTotalsData.forEach((row, R) => {
-        const isTotalRow = R === schoolTotalsData.length - 1;
-        const style = isTotalRow ? totalRowStyle : (R % 2 === 0) ? stripe1Style : stripe2Style;
-        row.forEach((_, C) => {
-            const cellRef = XLSX.utils.encode_cell({ r: R + 1, c: C });
-            if (wsSchoolTotals[cellRef]) wsSchoolTotals[cellRef].s = style;
-        });
-    });
-
-    wsSchoolTotals['!autofilter'] = { ref: `A1:D${registrations.length + 1}` };
-
-
-    // --- Sheet 2: GT Players ---
-    const gtPlayersData = registrations.flatMap(r =>
-        r.players.filter(p => p.studentType === 'gt').map(p => ({
-            'School': r.schoolName, 'Player Name': p.name, 'USCF ID': p.uscfId,
-        }))
-    );
-    const wsGtPlayers = XLSX.utils.json_to_sheet(gtPlayersData);
-    if (!wsGtPlayers['!cols']) wsGtPlayers['!cols'] = [];
-    wsGtPlayers['!cols'] = [{wch:40}, {wch:25}, {wch:15}];
-
-    // --- Sheet 3: Independent Players ---
-    const indPlayersData = registrations.flatMap(r =>
-        r.players.filter(p => p.studentType !== 'gt').map(p => ({
-            'School': r.schoolName, 'Player Name': p.name, 'USCF ID': p.uscfId,
-        }))
-    );
-    const wsIndPlayers = XLSX.utils.json_to_sheet(indPlayersData);
-     if (!wsIndPlayers['!cols']) wsIndPlayers['!cols'] = [];
-    wsIndPlayers['!cols'] = [{wch:40}, {wch:25}, {wch:15}];
-    
-    // --- Create Workbook ---
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, wsSchoolTotals, 'School Totals');
-    XLSX.utils.book_append_sheet(wb, wsGtPlayers, 'GT Players');
-    XLSX.utils.book_append_sheet(wb, wsIndPlayers, 'Independent Players');
-
-    XLSX.writeFile(wb, `${event.name.replace(/[^a-zA-Z0-9]/g, '_')}_report.xlsx`);
-  };
-  
   const handlePrint = () => {
     window.print();
   };
@@ -277,94 +201,94 @@ function TournamentsReportPageContent() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Table className="border rounded-lg overflow-hidden">
-                    <TableHeader>
-                      <TableRow className="bg-blue-600 text-white hover:bg-blue-700">
-                        <TableHead className="w-1/2 font-semibold text-white">School</TableHead>
-                        <TableHead className="text-right font-semibold text-white">GT</TableHead>
-                        <TableHead className="text-right font-semibold text-white">IND</TableHead>
-                        <TableHead className="text-right font-semibold text-white">Total</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                <Table className="border rounded-lg overflow-hidden">
+                  <TableHeader>
+                    <TableRow className="bg-blue-600 text-white hover:bg-blue-700">
+                      <TableHead className="w-1/2 font-semibold text-white">School</TableHead>
+                      <TableHead className="text-right font-semibold text-white">GT</TableHead>
+                      <TableHead className="text-right font-semibold text-white">IND</TableHead>
+                      <TableHead className="text-right font-semibold text-white">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
 
-                    {reportData.registrations.map((reg, idx) => (
-                      <Collapsible
-                        asChild
-                        key={reg.schoolName}
-                        open={openCollapsibles[reportData.event.id + reg.schoolName]}
-                        onOpenChange={() =>
-                          toggleCollapsible(reportData.event.id + reg.schoolName)
+                  {reportData.registrations.map((reg, idx) => (
+                    <Collapsible
+                      asChild
+                      key={reg.schoolName}
+                      open={openCollapsibles[reportData.event.id + reg.schoolName]}
+                      onOpenChange={() =>
+                        toggleCollapsible(reportData.event.id + reg.schoolName)
+                      }
+                    >
+                      <tbody
+                        className={
+                          idx % 2 === 0 ? "bg-white" : "bg-blue-50" // striped rows
                         }
                       >
-                        <tbody
-                          className={
-                            idx % 2 === 0 ? "bg-white" : "bg-blue-50" // striped rows
-                          }
-                        >
-                          <CollapsibleTrigger asChild>
-                            <TableRow className="cursor-pointer hover:bg-blue-100 transition-colors">
-                              <TableCell className="font-medium flex items-center">
-                                {openCollapsibles[reportData.event.id + reg.schoolName] ? (
-                                  <ChevronDown className="h-4 w-4 mr-2" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 mr-2" />
-                                )}
-                                {reg.schoolName}
-                              </TableCell>
-                              <TableCell className="text-right">{reg.gtCount}</TableCell>
-                              <TableCell className="text-right">{reg.indCount}</TableCell>
-                              <TableCell className="text-right font-bold">
-                                {reg.playerCount}
-                              </TableCell>
-                            </TableRow>
-                          </CollapsibleTrigger>
+                        <CollapsibleTrigger asChild>
+                          <TableRow className="cursor-pointer hover:bg-blue-100 transition-colors">
+                            <TableCell className="font-medium flex items-center">
+                              {openCollapsibles[reportData.event.id + reg.schoolName] ? (
+                                <ChevronDown className="h-4 w-4 mr-2" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 mr-2" />
+                              )}
+                              {reg.schoolName}
+                            </TableCell>
+                            <TableCell className="text-right">{reg.gtCount}</TableCell>
+                            <TableCell className="text-right">{reg.indCount}</TableCell>
+                            <TableCell className="text-right font-bold">
+                              {reg.playerCount}
+                            </TableCell>
+                          </TableRow>
+                        </CollapsibleTrigger>
 
-                          <CollapsibleContent asChild>
-                            <tr>
-                              <TableCell colSpan={4} className="p-0 bg-gray-50">
-                                <div className="p-4 border-t">
-                                  <h4 className="font-semibold mb-2 text-sm text-gray-700">
-                                    Player Details
-                                  </h4>
-                                  <ScrollArea className="h-40 border rounded-md bg-white">
-                                    <Table>
-                                      <TableHeader>
-                                        <TableRow className="bg-gray-200 text-gray-700 hover:bg-gray-200">
-                                          <TableHead>Player Name</TableHead>
-                                          <TableHead>USCF ID</TableHead>
-                                          <TableHead>Type</TableHead>
+                        <CollapsibleContent asChild>
+                          <tr>
+                            <TableCell colSpan={4} className="p-0 bg-gray-50">
+                              <div className="p-4 border-t">
+                                <h4 className="font-semibold mb-2 text-sm text-gray-700">
+                                  Player Details
+                                </h4>
+                                <ScrollArea className="h-40 border rounded-md bg-white">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-gray-200 text-gray-700 hover:bg-gray-200">
+                                        <TableHead>Player Name</TableHead>
+                                        <TableHead>USCF ID</TableHead>
+                                        <TableHead>Type</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {reg.players.map((p, i) => (
+                                        <TableRow
+                                          key={p.id}
+                                          className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                                        >
+                                          <TableCell>{p.name}</TableCell>
+                                          <TableCell>{p.uscfId}</TableCell>
+                                          <TableCell>
+                                            {p.studentType === "gt" ? (
+                                              <Badge className="bg-blue-600 text-white">
+                                                GT
+                                              </Badge>
+                                            ) : (
+                                              <Badge variant="outline">IND</Badge>
+                                            )}
+                                          </TableCell>
                                         </TableRow>
-                                      </TableHeader>
-                                      <TableBody>
-                                        {reg.players.map((p, i) => (
-                                          <TableRow
-                                            key={p.id}
-                                            className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                                          >
-                                            <TableCell>{p.name}</TableCell>
-                                            <TableCell>{p.uscfId}</TableCell>
-                                            <TableCell>
-                                              {p.studentType === "gt" ? (
-                                                <Badge className="bg-blue-600 text-white">
-                                                  GT
-                                                </Badge>
-                                              ) : (
-                                                <Badge variant="outline">IND</Badge>
-                                              )}
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
-                                      </TableBody>
-                                    </Table>
-                                  </ScrollArea>
-                                </div>
-                              </TableCell>
-                            </tr>
-                          </CollapsibleContent>
-                        </tbody>
-                      </Collapsible>
-                    ))}
-                  </Table>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </ScrollArea>
+                              </div>
+                            </TableCell>
+                          </tr>
+                        </CollapsibleContent>
+                      </tbody>
+                    </Collapsible>
+                  ))}
+                </Table>
                 </CardContent>
               </Card>
             ))}
