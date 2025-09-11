@@ -150,18 +150,6 @@ const SponsorSignUpForm = () => {
         setIsLoading(false);
         return;
       }
-      
-      // Prevent duplicate user creation
-      const legacyDocRef = doc(db, 'users', values.email.toLowerCase());
-      const legacyDoc = await getDoc(legacyDocRef);
-      if (legacyDoc.exists()) {
-        form.setError("email", {
-            type: "manual",
-            message: "An account with this email already exists. Please Sign In."
-        });
-        setIsLoading(false);
-        return;
-      }
 
       const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
       const role = isCoordinator ? 'district_coordinator' : 'sponsor';
@@ -185,8 +173,8 @@ const SponsorSignUpForm = () => {
         await updateProfile(result.profile as SponsorProfile);
         
         toast({
-            title: "Account Created!",
-            description: `Your ${role} account has been created successfully.`,
+            title: "Account Ready!",
+            description: `Your ${role} account has been created or restored.`,
         });
         
         setTimeout(() => {
@@ -260,9 +248,6 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
     setIsLoading(true);
     
     try {
-      const { simpleSignUp, checkFirebaseConfig } = await import('@/lib/simple-auth');
-      
-      // Check Firebase configuration first
       if (!checkFirebaseConfig()) {
         toast({
           variant: 'destructive',
@@ -302,8 +287,8 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       
       if (result.success) {
         toast({
-            title: "Account Created!",
-            description: `Your new ${role} account has been successfully created.`,
+            title: "Account Ready!",
+            description: `Your new ${role} account has been successfully created or restored.`,
         });
 
         let path = '/dashboard';

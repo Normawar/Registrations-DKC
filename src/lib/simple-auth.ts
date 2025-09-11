@@ -25,12 +25,23 @@ export async function simpleSignUp(email: string, password: string, userData: an
     console.log('📧 Creating user with email:', email);
 
     // Import Firebase functions dynamically to avoid SSR issues
-    const { createUserWithEmailAndPassword } = await import('firebase/auth');
+    const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import('firebase/auth');
     const { doc, setDoc } = await import('firebase/firestore');
 
-    // Create the user
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    console.log('✅ User created with UID:', userCredential.user.uid);
+    let userCredential;
+    try {
+      // Create the user
+      userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      console.log('✅ User created with UID:', userCredential.user.uid);
+    } catch (error: any) {
+      if (error.code === 'auth/email-already-in-use') {
+        console.log('⚠️ Auth user already exists, attempting to sign in to restore profile.');
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+        console.log('✅ Existing user signed in with UID:', userCredential.user.uid);
+      } else {
+        throw error; // Re-throw other auth errors
+      }
+    }
 
     // Save user profile to Firestore
     const userProfile = {
@@ -58,10 +69,14 @@ export async function simpleSignUp(email: string, password: string, userData: an
     
     switch (error.code) {
       case 'auth/email-already-in-use':
-        userFriendlyMessage = 'An account with this email already exists. Please sign in instead.';
+        // This case is now handled above, but as a fallback:
+        userFriendlyMessage = 'An account with this email already exists. Please sign in or try to sign up again to restore your profile.';
+        break;
+      case 'auth/wrong-password':
+        userFriendlyMessage = 'Incorrect password for this existing account. Please try signing in, or use the "Forgot Password" link on the Sign In page.';
         break;
       case 'auth/weak-password':
-        userFriendlyMessage = 'Password is too weak. Please use at least 6 characters.';
+        userFriendlyMessage = 'Password is too weak. Please use at least 8 characters.';
         break;
       case 'auth/invalid-email':
         userFriendlyMessage = 'Please enter a valid email address.';
