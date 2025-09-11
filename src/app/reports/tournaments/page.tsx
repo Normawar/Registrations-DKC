@@ -86,30 +86,35 @@ function TournamentsReportPageContent() {
           }
           
           for (const playerId of Object.keys(invoice.selections)) {
+            // Get the most current player data from the master database
             const player = playerMap.get(playerId);
+            const invoiceSelection = invoice.selections[playerId];
             
             if (player) {
-              schoolRegistrations[school].players.push({
-                id: player.id,
-                name: `${player.firstName} ${player.lastName}`,
-                uscfId: player.uscfId,
-                studentType: player.studentType,
-              });
+                // Use studentType from master database as the source of truth
+                const studentType = player.studentType;
 
-              if (player.studentType === 'gt') {
-                schoolRegistrations[school].gtCount++;
-              } else {
-                schoolRegistrations[school].indCount++;
-              }
+                schoolRegistrations[school].players.push({
+                    id: player.id,
+                    name: `${player.firstName} ${player.lastName}`,
+                    uscfId: player.uscfId,
+                    studentType: studentType,
+                });
+
+                if (studentType === 'gt') {
+                    schoolRegistrations[school].gtCount++;
+                } else {
+                    schoolRegistrations[school].indCount++;
+                }
             } else {
-              // Player not found in master DB, default to IND
-              schoolRegistrations[school].players.push({
-                id: playerId,
-                name: 'Unknown Player',
-                uscfId: playerId,
-                studentType: 'independent',
-              });
-              schoolRegistrations[school].indCount++;
+                // Fallback for players not in the master DB
+                schoolRegistrations[school].players.push({
+                    id: playerId,
+                    name: 'Unknown Player',
+                    uscfId: playerId,
+                    studentType: 'independent',
+                });
+                schoolRegistrations[school].indCount++;
             }
           }
         }
@@ -319,3 +324,5 @@ export default function TournamentsReportPage() {
         </OrganizerGuard>
     )
 }
+
+    
