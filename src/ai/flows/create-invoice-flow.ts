@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Creates an invoice with the Square API.
+ * @fileOverview Creates an invoice with the Square API and saves player data to Firestore.
  *
  * - createInvoice - A function that handles the invoice creation process.
  * - CreateInvoiceInput - The input type for the createInvoice function.
@@ -15,6 +15,9 @@ import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } fro
 import { format } from 'date-fns';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
+import { generateTeamCode } from '@/lib/school-utils';
 
 const PlayerInvoiceInfoSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
@@ -66,6 +69,39 @@ const createInvoiceFlow = ai.defineFlow(
     outputSchema: CreateInvoiceOutputSchema,
   },
   async (input) => {
+    // Step 0: Save/Update player data in Firestore
+    if (db && input.players.length > 0) {
+        console.log(`Processing ${input.players.length} players for Firestore save/update...`);
+        for (const player of input.players) {
+            const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;
+            const playerRef = doc(db, 'players', playerId);
+            const playerDoc = await getDoc(playerRef);
+
+            const [firstName, ...lastNameParts] = player.playerName.split(' ');
+            const lastName = lastNameParts.join(' ');
+
+            const playerData = {
+                id: playerId,
+                uscfId: player.uscfId,
+                firstName: firstName,
+                lastName: lastName,
+                school: input.schoolName,
+                district: input.district,
+                studentType: player.isGtPlayer ? 'gt' : 'independent',
+                updatedAt: new Date().toISOString(),
+            };
+
+            if (playerDoc.exists()) {
+                await setDoc(playerRef, playerData, { merge: true });
+                console.log(`Updated player ${player.playerName} (ID: ${playerId}) in Firestore.`);
+            } else {
+                await setDoc(playerRef, { ...playerData, createdAt: new Date().toISOString() }, { merge: true });
+                console.log(`Created new player ${player.playerName} (ID: ${playerId}) in Firestore.`);
+            }
+        }
+    }
+
+
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       console.log("Square not configured. Returning mock invoice for createInvoiceFlow.");
@@ -327,3 +363,5 @@ const createInvoiceFlow = ai.defineFlow(
     }
   }
 );
+
+    
