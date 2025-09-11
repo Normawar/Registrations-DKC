@@ -184,11 +184,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   
   const handleRoleToggle = () => {
     if (profile?.isDistrictCoordinator) {
-      const newRole = profile.role === 'sponsor' ? 'district_coordinator' : 'sponsor';
-      updateProfile({ ...profile, role: newRole });
-      
-      const newPath = newRole === 'sponsor' ? '/dashboard' : '/district-dashboard';
-      router.push(newPath);
+        router.push('/auth/role-selection');
     }
   };
 
@@ -267,7 +263,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <Button variant="secondary" className="w-full h-auto py-2 group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-2" onClick={handleRoleToggle}>
                        <Repeat className="w-4 h-4 mr-2 group-data-[collapsible=icon]:mr-0" />
                         <span className="group-data-[collapsible=icon]:hidden">
-                            Switch to {profile.role === 'sponsor' ? 'Coordinator' : 'Sponsor'} View
+                            Switch Role
                         </span>
                     </Button>
                 </div>

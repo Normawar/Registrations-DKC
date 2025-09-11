@@ -35,15 +35,12 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       return;
     }
 
-    // Check if user has the required role.
-    // Organizers have access to all roles.
-    // District coordinators have access to sponsor roles.
-    const hasRequiredRole = 
-      profile.role === 'organizer' ||
-      profile.role === requiredRole || 
-      (requiredRole === 'sponsor' && profile.role === 'district_coordinator');
+    // Special case: if a district coordinator is trying to access a sponsor route, let them.
+    const isCoordinatorAccessingSponsorRoute = requiredRole === 'sponsor' && profile.role === 'district_coordinator';
 
-    if (requiredRole && !hasRequiredRole) {
+    // If a required role is specified, check for a match.
+    // Organizers have access to all roles.
+    if (requiredRole && profile.role !== requiredRole && profile.role !== 'organizer' && !isCoordinatorAccessingSponsorRoute) {
         // User doesn't have the required role, redirect to their primary dashboard
         switch (profile.role) {
           case 'organizer':

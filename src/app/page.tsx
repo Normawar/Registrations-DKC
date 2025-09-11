@@ -95,18 +95,29 @@ const LoginForm = ({ role }: { role: 'sponsor' | 'individual' | 'organizer' }) =
                     description: `Welcome back, ${result.profile.firstName}!`,
                 });
                 
-                setTimeout(() => {
-                    switch (result.profile.role) {
-                        case 'organizer': router.push('/manage-events'); break;
-                        case 'district_coordinator': router.push('/district-dashboard'); break;
-                        case 'sponsor':
-                             if (result.profile.isDistrictCoordinator) { router.push('/auth/role-selection'); } 
-                             else { router.push('/dashboard'); }
-                            break;
-                        case 'individual': router.push('/individual-dashboard'); break;
-                        default: router.push('/dashboard');
-                    }
-                }, 100);
+                // If user is a district coordinator and a sponsor, give them a choice.
+                if (result.profile.isDistrictCoordinator && result.profile.role !== 'organizer') {
+                  router.push('/auth/role-selection');
+                  return;
+                }
+                
+                // Otherwise, direct them to their primary dashboard.
+                switch (result.profile.role) {
+                  case 'organizer':
+                    router.push('/manage-events');
+                    break;
+                  case 'district_coordinator':
+                    router.push('/district-dashboard');
+                    break;
+                  case 'sponsor':
+                    router.push('/dashboard');
+                    break;
+                  case 'individual':
+                    router.push('/individual-dashboard');
+                    break;
+                  default:
+                    router.push('/dashboard'); // Fallback
+                }
             }
         } catch (error) {
             console.error('Login error:', error);
