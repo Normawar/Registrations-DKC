@@ -49,6 +49,13 @@ const nextConfig: NextConfig = {
         ...config.resolve.fallback,
         fs: false,
       };
+      
+      // These modules are server-side only
+      config.externals.push({
+        'exceljs': 'commonjs exceljs',
+        'file-saver': 'commonjs file-saver',
+        'alasql': 'commonjs alasql',
+      });
     }
 
     return config;
