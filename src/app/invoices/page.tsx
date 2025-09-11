@@ -318,7 +318,7 @@ export default function UnifiedInvoiceRegistrations() {
       'COMPED': 'default',
       'UNPAID': 'destructive', 
       'OVERDUE': 'destructive',
-      'CANCELED': 'destructive',
+      'CANCELED': 'secondary',
       'PARTIALLY_PAID': 'secondary',
     };
     
@@ -578,7 +578,9 @@ export default function UnifiedInvoiceRegistrations() {
                             </td>
                           </tr>
                       ))
-                  ) : filteredAndSortedData.map((invoice) => (
+                  ) : filteredAndSortedData.map((invoice) => {
+                    const isFinalState = ['PAID', 'COMPED', 'CANCELED'].includes(invoice.status?.toUpperCase());
+                    return (
                     <tr key={invoice.id} className="border-b hover:bg-muted/50">
                       <td className="p-2 font-medium">
                         <div>#{invoice.invoiceNumber || invoice.originalDocId || 'N/A'}</div>
@@ -636,14 +638,16 @@ export default function UnifiedInvoiceRegistrations() {
                                 variant="outline" 
                                 size="icon" 
                                 onClick={() => handleEditInvoice(invoice.id)}
+                                disabled={isFinalState}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                                <Button 
-                                variant="destructive" 
+                                variant={isFinalState ? 'secondary' : 'destructive'}
                                 size="sm" 
                                 onClick={() => handleCancelInvoiceClick(invoice)}
                                 className="gap-1"
+                                disabled={isFinalState}
                               >
                                 Cancel
                               </Button>
@@ -652,7 +656,7 @@ export default function UnifiedInvoiceRegistrations() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
