@@ -3,7 +3,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -16,6 +16,7 @@ interface AuthGuardProps {
 export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuardProps) {
   const { profile, loading } = useSponsorProfile();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (loading) {
@@ -27,13 +28,20 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       router.push(redirectTo);
       return;
     }
+    
+    // NEW: Check if profile completion is required
+    if (profile.forceProfileUpdate && pathname !== '/profile') {
+      router.push('/profile');
+      return;
+    }
+
 
     if (profile && requiredRole) {
       // Check if user has required role
       const hasRequiredRole = 
         profile.role === requiredRole || 
         (requiredRole === 'sponsor' && profile.role === 'district_coordinator') ||
-        (requiredRole === 'district_coordinator' && profile.role === 'organizer');
+        (requiredRole === 'organizer' && profile.role === 'district_coordinator');
 
 
       if (!hasRequiredRole) {
@@ -43,7 +51,7 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
             router.push('/manage-events');
             break;
           case 'district_coordinator':
-            router.push('/district-dashboard');
+            router.push('/auth/role-selection');
             break;
           case 'sponsor':
             if (profile.isDistrictCoordinator) {
@@ -61,7 +69,7 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
         return;
       }
     }
-  }, [profile, loading, requiredRole, router, redirectTo]);
+  }, [profile, loading, requiredRole, router, redirectTo, pathname]);
 
   // Show loading state while checking authentication
   if (loading) {
@@ -79,12 +87,12 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     const hasRequiredRoleCheck = !requiredRole || (profile && (
         profile.role === requiredRole ||
         (requiredRole === 'sponsor' && profile.role === 'district_coordinator') ||
-        (requiredRole === 'district_coordinator' && profile.role === 'organizer')
+        (requiredRole === 'organizer' && profile.role === 'district_coordinator')
     ));
 
 
   // Don't render children if user is not authenticated or doesn't have the role yet
-  if (!profile || !hasRequiredRoleCheck) {
+  if (!profile || !hasRequiredRoleCheck || profile.forceProfileUpdate) {
     return null;
   }
 
