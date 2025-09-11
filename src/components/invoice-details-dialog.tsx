@@ -533,24 +533,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
   const [creditCardLast4, setCreditCardLast4] = useState('');
 
   const getRegisteredPlayers = useCallback((conf: any) => {
-    if (!conf) return [];
-  
-    // Primary method: Use the 'selections' map
-    if (conf.selections && typeof conf.selections === 'object' && Object.keys(conf.selections).length > 0) {
-      const playerIds = Object.keys(conf.selections);
-      return masterDatabase.filter(player => playerIds.includes(player.id));
+    if (!conf || !conf.selections || typeof conf.selections !== 'object') {
+        return [];
     }
-  
-    // Fallback method: Use the 'students' array from migrated data
-    if (Array.isArray(conf.students) && conf.students.length > 0) {
-      // Assuming students array contains objects with a 'name' field
-      const studentNames = new Set(conf.students.map((s: any) => s.name.toLowerCase()));
-      return masterDatabase.filter(player => 
-        studentNames.has(`${player.firstName} ${player.lastName}`.toLowerCase())
-      );
-    }
-  
-    return [];
+    const playerIds = Object.keys(conf.selections);
+    return masterDatabase.filter(player => playerIds.includes(player.id));
   }, [masterDatabase]);
   
   const calculatedTotalPaid = useMemo(() => {
@@ -1478,7 +1465,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogDescription className="sr-only">Dialog for managing invoice details</DialogDescription>
         <DialogHeader>
           <DialogTitle>
             <div className="flex items-center gap-2">
@@ -1494,6 +1480,32 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
             <div className="bg-white rounded-lg border p-4">
               <h3 className="text-lg font-semibold mb-4">Registration Details</h3>
               <RegistrationDetailsSection invoice={confirmation} profile={profile} />
+              
+                <div className="mt-4">
+                    <h4 className="text-md font-medium mb-2">Registered Players</h4>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>USCF ID</TableHead>
+                                <TableHead>Section</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {registeredPlayers.length === 0 && (
+                                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No players on this invoice.</TableCell></TableRow>
+                            )}
+                            {registeredPlayers.map(player => (
+                                <TableRow key={player.id}>
+                                    <TableCell>{player.firstName} {player.lastName}</TableCell>
+                                    <TableCell>{player.uscfId}</TableCell>
+                                    <TableCell>{confirmation?.selections?.[player.id]?.section}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+
               <PaymentSummarySection />
               <EnhancedSquareButton />
             </div>
@@ -1528,3 +1540,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
+
+    

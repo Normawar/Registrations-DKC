@@ -15,7 +15,7 @@ import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } fro
 import { format } from 'date-fns';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
 
@@ -26,6 +26,7 @@ const PlayerInvoiceInfoSchema = z.object({
   lateFee: z.number().describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
   isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
+  section: z.string().optional().describe('The tournament section for the player.'),
 });
 
 const CreateInvoiceInputSchema = z.object({
@@ -72,11 +73,11 @@ const createInvoiceFlow = ai.defineFlow(
     // Step 0: Save/Update player data in Firestore
     if (db && input.players.length > 0) {
         console.log(`Processing ${input.players.length} players for Firestore save/update...`);
+        const batch = writeBatch(db);
         for (const player of input.players) {
             const playerId = player.uscfId.toUpperCase() !== 'NEW' ? player.uscfId : `temp_${randomUUID()}`;
             const playerRef = doc(db, 'players', playerId);
-            const playerDoc = await getDoc(playerRef);
-
+            
             const [firstName, ...lastNameParts] = player.playerName.split(' ');
             const lastName = lastNameParts.join(' ');
 
@@ -88,17 +89,15 @@ const createInvoiceFlow = ai.defineFlow(
                 school: input.schoolName,
                 district: input.district,
                 studentType: player.isGtPlayer ? 'gt' : 'independent',
+                section: player.section,
                 updatedAt: new Date().toISOString(),
             };
 
-            if (playerDoc.exists()) {
-                await setDoc(playerRef, playerData, { merge: true });
-                console.log(`Updated player ${player.playerName} (ID: ${playerId}) in Firestore.`);
-            } else {
-                await setDoc(playerRef, { ...playerData, createdAt: new Date().toISOString() }, { merge: true });
-                console.log(`Created new player ${player.playerName} (ID: ${playerId}) in Firestore.`);
-            }
+            batch.set(playerRef, playerData, { merge: true });
+            console.log(`Staged update for player ${player.playerName} (ID: ${playerId}) in Firestore.`);
         }
+        await batch.commit();
+        console.log('Player data batch committed to Firestore.');
     }
 
 
