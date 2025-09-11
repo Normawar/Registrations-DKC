@@ -19,7 +19,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -1037,7 +1037,7 @@ function DistrictRosterView() {
             return sortConfig.direction === 'ascending' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
           }
           
-          const result = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
+          const result = aVal < bVal ? -1 : aVal > bVal ? 1 : -1;
           return sortConfig.direction === 'ascending' ? result : -result;
         });
       }
@@ -1461,5 +1461,6 @@ export default function RosterPage() {
     </AppLayout>
   );
 }
+    
 
     
