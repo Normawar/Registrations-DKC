@@ -52,11 +52,11 @@ function TournamentsReportPageContent() {
   const [tournamentReport, setTournamentReport] = useState<TournamentReportData>({});
   const [tournamentSearchTerm, setTournamentSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [lastLoadTime, setLastLoadTime] = useState<number>(0);
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({});
 
   const loadData = useCallback(async () => {
     if (!db || !isDbLoaded || events.length === 0) return;
+    
     setIsLoading(true);
     try {
       const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
@@ -65,7 +65,7 @@ function TournamentsReportPageContent() {
       const report: TournamentReportData = {};
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
-      events.forEach(event => {
+      for (const event of events) {
         const eventDate = parseISO(event.date);
         
         const eventInvoices = allInvoices.filter(inv => {
@@ -73,30 +73,29 @@ function TournamentsReportPageContent() {
             try {
                 const invDate = inv.eventDate ? parseISO(inv.eventDate) : null;
                 return inv.eventName === event.name && invDate && isSameDay(invDate, eventDate);
-            } catch {
-                return false;
-            }
+            } catch { return false; }
         });
 
         const schoolRegistrations: { [key: string]: { playerCount: number; gtCount: number; indCount: number; players: PlayerDetail[] } } = {};
 
-        eventInvoices.forEach(invoice => {
+        for (const invoice of eventInvoices) {
           const school = invoice.schoolName || 'Unknown School';
-          if (!invoice.selections) return;
+          if (!invoice.selections) continue;
 
           if (!schoolRegistrations[school]) {
             schoolRegistrations[school] = { playerCount: 0, gtCount: 0, indCount: 0, players: [] };
           }
           
-          Object.keys(invoice.selections).forEach(playerId => {
+          for (const playerId of Object.keys(invoice.selections)) {
             const player = playerMap.get(playerId);
             schoolRegistrations[school].playerCount++;
+            
             if (player) {
               schoolRegistrations[school].players.push({
                 id: player.id,
                 name: `${player.firstName} ${player.lastName}`,
                 uscfId: player.uscfId,
-                studentType: player.studentType
+                studentType: player.studentType,
               });
               if (player.studentType === 'gt') {
                 schoolRegistrations[school].gtCount++;
@@ -104,16 +103,22 @@ function TournamentsReportPageContent() {
                 schoolRegistrations[school].indCount++;
               }
             } else {
-               schoolRegistrations[school].indCount++;
+              schoolRegistrations[school].indCount++; // Default to IND if player not found
+              schoolRegistrations[school].players.push({
+                id: playerId,
+                name: 'Unknown Player',
+                uscfId: playerId,
+                studentType: 'independent',
+              });
             }
-          });
-        });
+          }
+        }
         
-        const registrations = Object.entries(schoolRegistrations).map(([schoolName, counts]) => ({
+        const registrations = Object.entries(schoolRegistrations).map(([schoolName, data]) => ({
           schoolName,
-          ...counts,
-          players: counts.players.sort((a,b) => a.name.localeCompare(b.name))
-        })).sort((a,b) => b.playerCount - a.playerCount);
+          ...data,
+          players: data.players.sort((a, b) => a.name.localeCompare(b.name))
+        })).sort((a, b) => b.playerCount - a.playerCount);
 
         if (registrations.length > 0) {
           const totalPlayers = registrations.reduce((sum, reg) => sum + reg.playerCount, 0);
@@ -128,9 +133,8 @@ function TournamentsReportPageContent() {
             totalInd,
           };
         }
-      });
+      }
       setTournamentReport(report);
-      setLastLoadTime(Date.now());
     } finally {
       setIsLoading(false);
     }
@@ -206,7 +210,7 @@ function TournamentsReportPageContent() {
             </div>
         </CardHeader>
         <CardContent>
-          {isLoading && !isDbLoaded && (
+          {(isLoading || !isDbLoaded) && (
             <div className="flex items-center gap-2 p-6">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading report data...
@@ -238,7 +242,7 @@ function TournamentsReportPageContent() {
                       </TableHeader>
                       {reportData.registrations.map(reg => (
                         <Collapsible asChild key={reg.schoolName} open={openCollapsibles[reportData.event.id + reg.schoolName]} onOpenChange={() => toggleCollapsible(reportData.event.id + reg.schoolName)}>
-                          <tbody key={reg.schoolName}>
+                          <tbody>
                             <CollapsibleTrigger asChild>
                               <TableRow className="cursor-pointer hover:bg-muted/50">
                                 <TableCell className="font-medium flex items-center">
@@ -291,7 +295,7 @@ function TournamentsReportPageContent() {
                 </CardContent>
               </Card>
             ))}
-             {filteredTournaments.length === 0 && !isLoading && (
+             {filteredTournaments.length === 0 && !isLoading && isDbLoaded && (
                 <div className="text-center py-12 text-muted-foreground">
                     <p>No tournaments match your search criteria.</p>
                 </div>
