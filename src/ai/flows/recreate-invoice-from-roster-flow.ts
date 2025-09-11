@@ -23,7 +23,7 @@ const PlayerToInvoiceSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
   uscfId: z.string().describe('The USCF ID of the player.'),
   baseRegistrationFee: z.number().describe('The base registration fee for the event.'),
-  lateFee: z.number().nullable().optional().describe('The late fee applied, if any.'),
+  lateFee: z.number().describe('The late fee applied, if any.'),
   uscfAction: z.boolean().describe('Whether a USCF membership action (new/renew) is needed.'),
   isGtPlayer: z.boolean().optional().describe('Whether the player is in the Gifted & Talented program.'),
   isNew: z.boolean().optional().describe('Whether this is a new player added to the invoice.'),
