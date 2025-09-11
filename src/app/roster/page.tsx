@@ -37,7 +37,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import Papa from 'papaparse';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 type DistrictSortableColumnKey = SortableColumnKey | 'gt';
@@ -123,20 +123,21 @@ function SponsorRosterView() {
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbSchools);
   
   const handleDistrictChange = (district: string, formInstance: any, resetSchool: boolean = true) => {
-      formInstance.setValue('district', district);
-      let filteredSchools;
-      if (district === 'all' || district === 'None') {
-          filteredSchools = dbSchools;
-      } else {
-          filteredSchools = dbSchools.filter(school => 
-              schoolData.find(s => s.schoolName === school)?.district === district
-          );
-      }
-      setSchoolsForDistrict(['TestSchool', ...filteredSchools]);
-      if (resetSchool) {
-          formInstance.setValue('school', '');
-      }
+    formInstance.setValue('district', district);
+    let filteredSchools;
+    if (district === 'all' || district === 'None') {
+        filteredSchools = dbSchools;
+    } else {
+        filteredSchools = dbSchools.filter(school => 
+            schoolData.find(s => s.schoolName === school)?.district === district
+        );
+    }
+    setSchoolsForDistrict(['TestSchool', ...filteredSchools]);
+    if (resetSchool) {
+        formInstance.setValue('school', '');
+    }
   };
+
 
   const selectedDistrict = createPlayerForm.watch('district');
 
@@ -848,8 +849,10 @@ function SponsorRosterView() {
                                         onChange={(e) => field.onChange(e.target.value)}
                                       />
                                     </FormControl>
-                                    <FormDescription>
-                                        Enter a numeric rating, or type UNR/NEW.
+                                    <FormDescription className="flex items-center gap-2">
+                                        Enter a number or use a quick select option:
+                                        <Button type="button" size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => createPlayerForm.setValue('regularRating', 'UNR' as any)}>UNR</Button>
+                                        <Button type="button" size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => createPlayerForm.setValue('regularRating', 'NEW' as any)}>NEW</Button>
                                     </FormDescription>
                                     <FormMessage />
                                   </FormItem>
@@ -1476,4 +1479,5 @@ export default function RosterPage() {
     
 
     
+
 
