@@ -18,7 +18,7 @@ export async function recreateInvoiceFromRoster(input: any): Promise<RecreateInv
                 playerName: player.playerName,
                 uscfId: player.uscfId || "NEW",
                 baseRegistrationFee: player.baseRegistrationFee,
-                lateFee: player.lateFee, // Schema now supports null
+                lateFee: player.lateFee, // Keep as null, schema now supports it
                 uscfAction: player.uscfAction,
                 isGtPlayer: player.isGtPlayer || false,
                 isNew: player.isNew || false,
