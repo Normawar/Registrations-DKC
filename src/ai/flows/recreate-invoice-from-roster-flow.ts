@@ -101,16 +101,30 @@ const recreateInvoiceFlow = ai.defineFlow(
       throw new Error('Only organizers can recreate invoices.');
     }
     
+    // --- Global player field normalization ---
+    const normalizedPlayers = input.players.map(p => ({
+      playerName: p.playerName ?? 'undefined undefined',
+      uscfId: p.uscfId ?? 'NEW',
+      baseRegistrationFee: typeof p.baseRegistrationFee === 'number' ? p.baseRegistrationFee : 0,
+      lateFee: typeof p.lateFee === 'number' ? p.lateFee : 0,
+      uscfAction: typeof p.uscfAction === 'boolean' ? p.uscfAction : false,
+      isGtPlayer: typeof p.isGtPlayer === 'boolean' ? p.isGtPlayer : false,
+      isNew: typeof p.isNew === 'boolean' ? p.isNew : false,
+      isSubstitution: typeof p.isSubstitution === 'boolean' ? p.isSubstitution : false,
+      waiveLateFee: typeof p.waiveLateFee === 'boolean' ? p.waiveLateFee : false,
+      registrationDate: p.registrationDate ?? new Date().toISOString(),
+    }));
+
     // --- Data Sanitization and Fee Calculation ---
     const SUBSTITUTION_FEE = 2.0;
     let totalSubstitutionFee = 0;
     
     const eventConfig = input.eventConfig ?? { eventDate: input.eventDate };
 
-    const sanitizedPlayers = input.players
+    const sanitizedPlayers = normalizedPlayers
       .filter(p => p.playerName && p.playerName !== "undefined undefined")
       .map(p => {
-        let lateFee = typeof p.lateFee === "number" ? p.lateFee : calculateLateFee(p, eventConfig);
+        let lateFee = p.lateFee; // Start with the normalized fee
         
         if (input.requestingUserRole === "organizer" && p.waiveLateFee) {
           lateFee = 0;
