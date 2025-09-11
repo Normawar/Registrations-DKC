@@ -72,11 +72,33 @@ const recreateInvoiceFlow = ai.defineFlow(
       throw new Error('Only organizers can recreate invoices.');
     }
 
+    // SANITIZE INPUT: Remove invalid players and ensure lateFee is a number
+    const SUBSTITUTION_FEE = 2.0;
+    let totalSubstitutionFee = 0;
+
+    const sanitizedPlayers = input.players
+      .filter(player => player.playerName && player.playerName !== 'undefined undefined')
+      .map(player => {
+        const lateFee = typeof player.lateFee === 'number' ? player.lateFee : 0;
+
+        if (player.isSubstitution) {
+          totalSubstitutionFee += SUBSTITUTION_FEE;
+          return { ...player, lateFee: 0 }; // Substitutions don't get late fees
+        }
+
+        return { ...player, lateFee }; // sanitized lateFee
+      });
+
+    const sanitizedInput = {
+      ...input,
+      players: sanitizedPlayers,
+    };
+
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
-      console.log(`Square not configured. Mock-recreating invoice based on ${input.originalInvoiceId}.`);
+      console.log(`Square not configured. Mock-recreating invoice based on ${sanitizedInput.originalInvoiceId}.`);
       return {
-        oldInvoiceId: input.originalInvoiceId,
+        oldInvoiceId: sanitizedInput.originalInvoiceId,
         newInvoiceId: `MOCK_RECREATED_${randomUUID()}`,
         newInvoiceNumber: 'MOCK-rev.2',
         newTotalAmount: 0,
@@ -88,56 +110,37 @@ const recreateInvoiceFlow = ai.defineFlow(
     const squareClient = await getSquareClient();
 
     try {
-      // Step 1: Get original invoice to fetch its number
-      console.log(`Fetching original invoice: ${input.originalInvoiceId}`);
-      const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(input.originalInvoiceId);
+      // Step 1: Get original invoice
+      console.log(`Fetching original invoice: ${sanitizedInput.originalInvoiceId}`);
+      const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(sanitizedInput.originalInvoiceId);
 
       if (!originalInvoice) {
-        throw new Error(`Could not find original invoice with ID: ${input.originalInvoiceId}`);
+        throw new Error(`Could not find original invoice with ID: ${sanitizedInput.originalInvoiceId}`);
       }
 
-      // Step 2: Cancel the original invoice.
-      console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
-      await cancelInvoice({ invoiceId: input.originalInvoiceId, requestingUserRole: 'organizer' });
-      console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
+      // Step 2: Cancel the original invoice
+      console.log(`Canceling original invoice: ${sanitizedInput.originalInvoiceId}`);
+      await cancelInvoice({ invoiceId: sanitizedInput.originalInvoiceId, requestingUserRole: 'organizer' });
+      console.log(`Successfully canceled original invoice: ${sanitizedInput.originalInvoiceId}`);
 
-      // Step 3: Use the original invoice number for the new invoice.
+      // Step 3: Use original invoice number
       const newInvoiceNumber = originalInvoice.invoiceNumber || undefined;
       console.log(`Using original invoice number for new invoice: ${newInvoiceNumber}`);
 
-      // Step 4: Intelligent Fee Calculation
-      const SUBSTITUTION_FEE = 2.0;
-      let totalSubstitutionFee = 0;
-
-      // SANITIZE: Remove invalid players and ensure lateFee is always a number
-      const playersWithSanitizedFees = input.players
-        .filter(player => player.playerName && player.playerName !== 'undefined undefined')
-        .map(player => {
-          const lateFee = typeof player.lateFee === 'number' ? player.lateFee : 0;
-
-          if (player.isSubstitution) {
-            totalSubstitutionFee += SUBSTITUTION_FEE;
-            return { ...player, lateFee: 0 }; // Substitutions don't get late fees
-          }
-
-          return { ...player, lateFee }; // sanitized lateFee
-        });
-
-      // Step 5: Create a new invoice with the updated roster and new invoice number.
-      console.log(`Creating new invoice with ${playersWithSanitizedFees.length} players.`);
-
+      // Step 4: Create new invoice
+      console.log(`Creating new invoice with ${sanitizedPlayers.length} players.`);
       const newInvoiceResult = await createInvoice({
-        ...input,
-        players: playersWithSanitizedFees,
+        ...sanitizedInput,
+        players: sanitizedPlayers,
         substitutionFee: totalSubstitutionFee > 0 ? totalSubstitutionFee : undefined,
         invoiceNumber: newInvoiceNumber,
         description:
-          input.revisionMessage || `Revised on ${format(new Date(), 'PPP')}. This invoice replaces #${originalInvoice.invoiceNumber}.`,
+          sanitizedInput.revisionMessage || `Revised on ${format(new Date(), 'PPP')}. This invoice replaces #${originalInvoice.invoiceNumber}.`,
       });
 
       console.log('Successfully created new invoice:', newInvoiceResult);
 
-      // Compute total amount
+      // Step 5: Compute total amount
       let newTotal = 0;
       if (newInvoiceResult.invoiceId) {
         const { result: { invoice } } = await squareClient.invoicesApi.getInvoice(newInvoiceResult.invoiceId);
@@ -146,7 +149,7 @@ const recreateInvoiceFlow = ai.defineFlow(
       }
 
       return {
-        oldInvoiceId: input.originalInvoiceId,
+        oldInvoiceId: sanitizedInput.originalInvoiceId,
         newInvoiceId: newInvoiceResult.invoiceId,
         newInvoiceNumber: newInvoiceResult.invoiceNumber,
         newStatus: newInvoiceResult.status,
@@ -162,7 +165,7 @@ const recreateInvoiceFlow = ai.defineFlow(
         const errorMessage = errors.map((e: any) => `[${e.category}/${e.code}]: ${e.detail}`).join(', ');
         throw new Error(`Square Error: ${errorMessage}`);
       } else {
-        console.error('An unexpected error occurred during invoice recreation:', error);
+        console.error('Unexpected error during invoice recreation:', error);
         if (error instanceof Error) {
           throw new Error(`${error.message}`);
         }
