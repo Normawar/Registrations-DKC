@@ -357,6 +357,16 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setIsInvoiceDialogOpen(true);
     };
 
+    const calculateTotalForPlayers = (players: StagedPlayer[], feePerPlayer: number) => {
+        const uscfFee = 24;
+        return players.reduce((total, player) => {
+          let playerTotal = feePerPlayer;
+          if (player.uscfStatus !== 'current' && player.studentType !== 'gt') {
+            playerTotal += uscfFee;
+          }
+          return total + playerTotal;
+        }, 0);
+    };
 
     const handleGenerateTeamInvoice = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db) return;
@@ -391,14 +401,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             };
         });
 
-        const uscfFee = 24;
-        let totalInvoiced = 0;
-        stagedPlayers.forEach(p => {
-            totalInvoiced += registrationFeePerPlayer;
-            if (p.uscfStatus !== 'current') {
-                totalInvoiced += uscfFee;
-            }
-        });
+        const totalInvoiced = calculateTotalForPlayers(stagedPlayers, registrationFeePerPlayer);
 
         try {
             const result = await createInvoice({
@@ -406,22 +409,13 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 district,
                 eventName: event.name,
                 eventDate: event.date,
-                uscfFee,
+                uscfFee: 24,
                 players: playersToInvoice,
                 bookkeeperEmail: '',
                 gtCoordinatorEmail: '',
             });
 
-            const newConfirmation = {
-                id: result.invoiceId, invoiceId: result.invoiceId, eventId: event.id, eventName: event.name, eventDate: event.date, 
-                submissionTimestamp: new Date().toISOString(), 
-                selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType } }), {}),
-                totalInvoiced, invoiceUrl: result.invoiceUrl, invoiceNumber: result.invoiceNumber, teamCode: recipient.teamCode, invoiceStatus: result.status,
-                purchaserName: recipient.sponsorName, schoolName: recipient.schoolName, sponsorEmail: recipient.sponsorEmail, district
-            };
-
-            const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
-            await setDoc(invoiceDocRef, newConfirmation);
+            await saveConfirmation(result.invoiceId, result, playersToInvoice, totalInvoiced);
             
             toast({ title: "Team Invoice Generated Successfully!", description: `Invoice ${result.invoiceNumber || result.invoiceId} for ${stagedPlayers.length} players has been created.` });
             
@@ -437,17 +431,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         }
     };
     
-    const calculateTotalForPlayers = (players: StagedPlayer[], feePerPlayer: number) => {
-        const uscfFee = 24;
-        return players.reduce((total, player) => {
-          let playerTotal = feePerPlayer;
-          if (player.uscfStatus !== 'current' && player.studentType !== 'gt') {
-            playerTotal += uscfFee;
-          }
-          return total + playerTotal;
-        }, 0);
-    };
-
     const handlePsjaSplitInvoice = async (recipient: InvoiceRecipientValues, district: string) => {
         if (!event) return;
         setIsSubmitting(true);
@@ -477,14 +460,14 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
           });
     
           if (result.gtInvoice) {
-            const gtPlayers = stagedPlayers.filter(p => p.studentType === 'gt');
-            const gtTotal = calculateTotalForPlayers(gtPlayers, currentFee);
+            const gtPlayers = playersToInvoice.filter(p => p.isGtPlayer);
+            const gtTotal = calculateTotalForPlayers(stagedPlayers.filter(p => p.studentType === 'gt'), currentFee);
             await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, gtTotal);
           }
     
           if (result.independentInvoice) {
-            const indPlayers = stagedPlayers.filter(p => p.studentType !== 'gt');
-            const indTotal = calculateTotalForPlayers(indPlayers, currentFee);
+            const indPlayers = playersToInvoice.filter(p => !p.isGtPlayer);
+            const indTotal = calculateTotalForPlayers(stagedPlayers.filter(p => p.studentType !== 'gt'), currentFee);
             await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, indTotal);
           }
           
@@ -498,7 +481,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         } finally {
             setIsSubmitting(false);
         }
-    };
+      };
 
     const handleGenerateIndividualInvoices = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db || stagedPlayers.length === 0) return;
@@ -540,7 +523,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     gtCoordinatorEmail: '',
                 });
 
-                await saveConfirmation(result.invoiceId, result, [player], totalInvoiced);
+                await saveConfirmation(result.invoiceId, result, [playerToInvoice], totalInvoiced);
                 return { success: true, invoiceNumber: result.invoiceNumber };
 
             } catch (error) {
@@ -565,49 +548,65 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setIsSubmitting(false);
     };
 
-    const saveConfirmation = async (invoiceId: string, result: any, players: any[], total: number) => {
+    const saveConfirmation = async (invoiceId: string, result: any, playersList: any[], total: number) => {
         if (!event || !db) {
-            console.error('Missing event or db in saveConfirmation');
-            throw new Error('Cannot save confirmation: missing dependencies');
+          console.error('Missing event or db in saveConfirmation');
+          throw new Error('Cannot save confirmation: missing dependencies');
         }
-    
-        const selections = stagedPlayers.reduce((acc, p) => {
-            if (players.some((pl: any) => pl.playerName === `${p.firstName} ${p.lastName}`)) {
-                acc[p.id!] = { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType };
-            }
-            return acc;
-        }, {} as Record<string, any>);
-    
+        
+        const selections = Object.fromEntries(
+            stagedPlayers
+              .filter(player => {
+                return playersList.some(pl => pl.playerName === `${player.firstName} ${player.lastName}`);
+              })
+              .map(player => [
+                player.id!,
+                {
+                  firstName: player.firstName,
+                  lastName: player.lastName,
+                  uscfId: player.uscfId,
+                  grade: player.grade,
+                  section: player.section,
+                  email: player.email,
+                  zipCode: player.zipCode,
+                  byes: player.byes,
+                  uscfStatus: player.uscfStatus,
+                  studentType: player.studentType,
+                  status: 'active'
+                }
+              ])
+        );
+      
         const teamCode = result.teamCode || 
-            invoiceForm.getValues('teamCode') || 
-            generateTeamCode({ schoolName: selectedSchool, district: selectedDistrict });
-    
+          invoiceForm.getValues('teamCode') || 
+          generateTeamCode({ schoolName: selectedSchool, district: selectedDistrict });
+        
         const newConfirmation = {
-            id: invoiceId,
-            invoiceId: invoiceId,
-            eventId: event.id,
-            eventName: event.name,
-            eventDate: event.date,
-            submissionTimestamp: new Date().toISOString(),
-            selections,
-            totalInvoiced: result.newTotalAmount || total,
-            invoiceUrl: result.invoiceUrl,
-            invoiceNumber: result.invoiceNumber,
+            id: invoiceId, 
+            invoiceId: invoiceId, 
+            eventId: event.id, 
+            eventName: event.name, 
+            eventDate: event.date, 
+            submissionTimestamp: new Date().toISOString(), 
+            selections: selections,
+            totalInvoiced: result.newTotalAmount || total, 
+            invoiceUrl: result.invoiceUrl, 
+            invoiceNumber: result.invoiceNumber, 
             teamCode: teamCode,
             invoiceStatus: result.status,
-            purchaserName: result.sponsorName || invoiceForm.getValues('sponsorName'),
-            schoolName: result.schoolName || invoiceForm.getValues('schoolName'),
-            sponsorEmail: result.sponsorEmail || invoiceForm.getValues('sponsorEmail'),
+            purchaserName: result.sponsorName || invoiceForm.getValues('sponsorName'), 
+            schoolName: result.schoolName || invoiceForm.getValues('schoolName'), 
+            sponsorEmail: result.sponsorEmail || invoiceForm.getValues('sponsorEmail'), 
             district: result.district || masterDatabase.find(p => p.school === invoiceForm.getValues('schoolName'))?.district || ''
         };
-    
+      
         try {
-            const invoiceDocRef = doc(db, 'invoices', invoiceId);
-            await setDoc(invoiceDocRef, newConfirmation);
-            console.log('Successfully saved confirmation to Firestore:', newConfirmation);
+          const invoiceDocRef = doc(db, 'invoices', invoiceId);
+          await setDoc(invoiceDocRef, newConfirmation);
+          console.log('Successfully saved confirmation to Firestore:', newConfirmation);
         } catch (error) {
-            console.error('Failed to save confirmation to Firestore:', error);
-            throw error;
+          console.error('Failed to save confirmation to Firestore:', error);
+          throw error;
         }
     };
     
@@ -762,7 +761,8 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                                 checked={filteredSchoolRoster.length > 0 && filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id))}
                                                 ref={(el) => {
                                                     if (el) {
-                                                        el.indeterminate = filteredSchoolRoster.length > 0 && stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) && !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id));
+                                                        const isIndeterminate = filteredSchoolRoster.length > 0 && stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) && !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id));
+                                                        el.indeterminate = isIndeterminate;
                                                     }
                                                 }}
                                             />
