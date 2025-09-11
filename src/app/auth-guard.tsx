@@ -1,4 +1,3 @@
-
 // src/components/auth-guard.tsx - Route protection component
 'use client';
 
@@ -35,19 +34,23 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       return;
     }
 
-    // Special case: if a district coordinator is trying to access a sponsor route, let them.
-    const isCoordinatorAccessingSponsorRoute = requiredRole === 'sponsor' && profile.role === 'district_coordinator';
+    if (requiredRole) {
+      // Check if user has the required role. Organizers have access to all roles.
+      // District coordinators have access to sponsor roles.
+      const hasRequiredRole = 
+        profile.role === 'organizer' ||
+        profile.role === requiredRole || 
+        (requiredRole === 'sponsor' && profile.role === 'district_coordinator');
 
-    // If a required role is specified, check for a match.
-    // Organizers have access to all roles.
-    if (requiredRole && profile.role !== requiredRole && profile.role !== 'organizer' && !isCoordinatorAccessingSponsorRoute) {
-        // User doesn't have the required role, redirect to their primary dashboard
+
+      if (!hasRequiredRole) {
+        // User doesn't have required role, redirect to their primary dashboard
         switch (profile.role) {
           case 'organizer':
             router.push('/manage-events');
             break;
           case 'district_coordinator':
-             // If they are also a sponsor, give them the choice.
+            // If they are also a sponsor, give them the choice. Otherwise, go to district dash.
             if (profile.isDistrictCoordinator) {
                 router.push('/auth/role-selection');
             } else {
@@ -69,6 +72,7 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
             router.push('/');
         }
         return;
+      }
     }
   }, [profile, loading, requiredRole, router, redirectTo, pathname]);
 
