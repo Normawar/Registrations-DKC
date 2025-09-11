@@ -1,4 +1,3 @@
-
 // src/components/auth-guard.tsx - Route protection component
 'use client';
 
@@ -29,7 +28,7 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       return;
     }
     
-    // NEW: Check if profile completion is required
+    // Check if profile completion is required
     if (profile.forceProfileUpdate && pathname !== '/profile') {
       router.push('/profile');
       return;
@@ -37,15 +36,16 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
 
 
     if (profile && requiredRole) {
-      // Check if user has required role
+      // Check if user has the required role. Organizers have access to all roles.
+      // District coordinators have access to sponsor roles.
       const hasRequiredRole = 
+        profile.role === 'organizer' ||
         profile.role === requiredRole || 
-        (requiredRole === 'sponsor' && profile.role === 'district_coordinator') ||
-        (requiredRole === 'district_coordinator' && profile.role === 'organizer');
+        (requiredRole === 'sponsor' && profile.role === 'district_coordinator');
 
 
       if (!hasRequiredRole) {
-        // User doesn't have required role, redirect to appropriate dashboard
+        // User doesn't have required role, redirect to their primary dashboard
         switch (profile.role) {
           case 'organizer':
             router.push('/manage-events');
@@ -84,11 +84,11 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     );
   }
   
-    const hasRequiredRoleCheck = !requiredRole || (profile && (
-        profile.role === requiredRole ||
-        (requiredRole === 'sponsor' && profile.role === 'district_coordinator') ||
-        (requiredRole === 'district_coordinator' && profile.role === 'organizer')
-    ));
+  const hasRequiredRoleCheck = !requiredRole || (profile && (
+    profile.role === 'organizer' ||
+    profile.role === requiredRole ||
+    (requiredRole === 'sponsor' && profile.role === 'district_coordinator')
+  ));
 
 
   // Don't render children if user is not authenticated or doesn't have the role yet
