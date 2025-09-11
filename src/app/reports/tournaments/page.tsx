@@ -80,7 +80,7 @@ function TournamentsReportPageContent() {
 
         // Process non-canceled invoices first
         eventInvoices
-            .filter(inv => inv.invoiceStatus !== 'CANCELED')
+            .filter(inv => inv.invoiceStatus !== 'CANCELED' && inv.status !== 'CANCELED')
             .forEach(invoice => {
                 if (!invoice.selections) return;
                 for (const playerId in invoice.selections) {
