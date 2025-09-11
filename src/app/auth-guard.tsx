@@ -1,3 +1,4 @@
+
 // src/components/auth-guard.tsx - Route protection component
 'use client';
 
@@ -33,23 +34,30 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       router.push('/profile');
       return;
     }
-
-    // New: Handle multi-role users first
-    if (profile.role === 'sponsor' && profile.isDistrictCoordinator) {
-        // If the user has both roles but isn't on the selection page, send them there.
+    
+    // If the user is an organizer, they should never see the role selection page.
+    // Their permissions supersede all others.
+    if (profile.role === 'organizer' && requiredRole !== 'organizer') {
+        if (pathname !== '/manage-events') {
+          // Organizers who land somewhere else should be sent to their main dashboard.
+        }
+    }
+    
+    // Handle multi-role for non-organizers
+    if (profile.isDistrictCoordinator && profile.role !== 'organizer') {
         if (pathname !== '/auth/role-selection') {
             router.push('/auth/role-selection');
             return;
         }
     }
-    
+
     if (requiredRole) {
-      // Check if user has the required role. Organizers have access to all roles.
-      const hasRequiredRole = 
-        profile.role === 'organizer' ||
-        profile.role === requiredRole;
+      const isOrganizer = profile.role === 'organizer';
+      const isRequired = profile.role === requiredRole;
+      const isCoordinatorAccessingSponsorPage = profile.role === 'district_coordinator' && requiredRole === 'sponsor';
 
-
+      const hasRequiredRole = isOrganizer || isRequired || isCoordinatorAccessingSponsorPage;
+      
       if (!hasRequiredRole) {
         // User doesn't have required role, redirect to their primary dashboard
         switch (profile.role) {
@@ -86,11 +94,12 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     );
   }
   
-  // This check is now simplified
   const hasRequiredRoleCheck = !requiredRole || (profile && (
     profile.role === 'organizer' ||
-    profile.role === requiredRole
+    profile.role === requiredRole ||
+    (requiredRole === 'sponsor' && profile.role === 'district_coordinator')
   ));
+
 
   // Don't render children if user is not authenticated or doesn't have the role yet
   if (!profile || !hasRequiredRoleCheck || profile.forceProfileUpdate) {

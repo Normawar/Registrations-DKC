@@ -37,6 +37,15 @@ export default function RoleSelectionPage() {
   };
   
   const isOrganizer = profile.role === 'organizer';
+  const primaryRole = isOrganizer ? 'organizer' : 'district_coordinator';
+  const primaryRolePath = isOrganizer ? '/manage-events' : '/district-dashboard';
+  const primaryRoleIcon = isOrganizer ? <Crown className="h-10 w-10 text-primary" /> : <Building className="h-10 w-10 text-primary" />;
+  const primaryRoleTitle = isOrganizer ? 'Organizer' : 'District Coordinator';
+  const primaryRoleDescription = isOrganizer ? 'Access the dashboard for All Events' : `Access the dashboard for ${profile.district}`;
+  const primaryRoleDetails = isOrganizer
+    ? 'Manage events, users, payments, and system-wide settings.'
+    : 'View and manage rosters, registrations, and invoices for all schools within your district.';
+
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
@@ -57,22 +66,19 @@ export default function RoleSelectionPage() {
         
         <div className="grid md:grid-cols-2 gap-6">
           <Card 
-            onClick={() => handleRoleSelection(isOrganizer ? '/manage-events' : '/district-dashboard', isOrganizer ? 'organizer' : 'district_coordinator')}
+            onClick={() => handleRoleSelection(primaryRolePath, primaryRole)}
             className="cursor-pointer hover:shadow-lg hover:border-primary transition-all duration-200"
           >
             <CardHeader className="flex flex-row items-center gap-4">
-              {isOrganizer ? <Crown className="h-10 w-10 text-primary" /> : <Building className="h-10 w-10 text-primary" />}
+              {primaryRoleIcon}
               <div>
-                <CardTitle>{isOrganizer ? 'Organizer' : 'District Coordinator'}</CardTitle>
-                <CardDescription>Access the dashboard for {isOrganizer ? 'All Events' : profile.district}.</CardDescription>
+                <CardTitle>{primaryRoleTitle}</CardTitle>
+                <CardDescription>{primaryRoleDescription}</CardDescription>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-sm">
-                {isOrganizer 
-                    ? 'Manage events, users, payments, and system-wide settings.'
-                    : 'View and manage rosters, registrations, and invoices for all schools within your district.'
-                }
+                {primaryRoleDetails}
               </p>
             </CardContent>
           </Card>
