@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
@@ -76,19 +75,18 @@ function TournamentsReportPageContent() {
             } catch { return false; }
         });
 
-        const schoolRegistrations: { [key: string]: { playerCount: number; gtCount: number; indCount: number; players: PlayerDetail[] } } = {};
+        const schoolRegistrations: { [key: string]: { gtCount: number; indCount: number; players: PlayerDetail[] } } = {};
 
         for (const invoice of eventInvoices) {
           const school = invoice.schoolName || 'Unknown School';
           if (!invoice.selections) continue;
 
           if (!schoolRegistrations[school]) {
-            schoolRegistrations[school] = { playerCount: 0, gtCount: 0, indCount: 0, players: [] };
+            schoolRegistrations[school] = { gtCount: 0, indCount: 0, players: [] };
           }
           
           for (const playerId of Object.keys(invoice.selections)) {
             const player = playerMap.get(playerId);
-            schoolRegistrations[school].playerCount++;
             
             if (player) {
               schoolRegistrations[school].players.push({
@@ -97,26 +95,30 @@ function TournamentsReportPageContent() {
                 uscfId: player.uscfId,
                 studentType: player.studentType,
               });
+
               if (player.studentType === 'gt') {
                 schoolRegistrations[school].gtCount++;
               } else {
                 schoolRegistrations[school].indCount++;
               }
             } else {
-              schoolRegistrations[school].indCount++; // Default to IND if player not found
+              // Player not found in master DB, default to IND
               schoolRegistrations[school].players.push({
                 id: playerId,
                 name: 'Unknown Player',
                 uscfId: playerId,
                 studentType: 'independent',
               });
+              schoolRegistrations[school].indCount++;
             }
           }
         }
         
         const registrations = Object.entries(schoolRegistrations).map(([schoolName, data]) => ({
           schoolName,
-          ...data,
+          gtCount: data.gtCount,
+          indCount: data.indCount,
+          playerCount: data.gtCount + data.indCount,
           players: data.players.sort((a, b) => a.name.localeCompare(b.name))
         })).sort((a, b) => b.playerCount - a.playerCount);
 
