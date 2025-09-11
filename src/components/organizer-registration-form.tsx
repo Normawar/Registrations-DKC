@@ -437,6 +437,17 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         }
     };
     
+    const calculateTotalForPlayers = (players: StagedPlayer[], feePerPlayer: number) => {
+        const uscfFee = 24;
+        return players.reduce((total, player) => {
+          let playerTotal = feePerPlayer;
+          if (player.uscfStatus !== 'current' && player.studentType !== 'gt') {
+            playerTotal += uscfFee;
+          }
+          return total + playerTotal;
+        }, 0);
+    };
+
     const handlePsjaSplitInvoice = async (recipient: InvoiceRecipientValues, district: string) => {
         if (!event) return;
         setIsSubmitting(true);
@@ -467,12 +478,14 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     
           if (result.gtInvoice) {
             const gtPlayers = stagedPlayers.filter(p => p.studentType === 'gt');
-            await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0); // Simplified total for now
+            const gtTotal = calculateTotalForPlayers(gtPlayers, currentFee);
+            await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, gtTotal);
           }
     
           if (result.independentInvoice) {
             const indPlayers = stagedPlayers.filter(p => p.studentType !== 'gt');
-            await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, 0); // Simplified total
+            const indTotal = calculateTotalForPlayers(indPlayers, currentFee);
+            await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, indTotal);
           }
           
           toast({ title: "Split Invoices Created Successfully!", description: "Separate invoices for GT and Independent players have been created."});
@@ -485,7 +498,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         } finally {
             setIsSubmitting(false);
         }
-      };
+    };
 
     const handleGenerateIndividualInvoices = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db || stagedPlayers.length === 0) return;
@@ -553,35 +566,49 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     };
 
     const saveConfirmation = async (invoiceId: string, result: any, players: any[], total: number) => {
-      if(!event || !db) return;
-      const selections = stagedPlayers.reduce((acc, p) => {
-        if (players.some((pl:any) => pl.playerName === `${p.firstName} ${p.lastName}`)) {
-          acc[p.id!] = { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType };
+        if (!event || !db) {
+            console.error('Missing event or db in saveConfirmation');
+            throw new Error('Cannot save confirmation: missing dependencies');
         }
-        return acc;
-      }, {} as Record<string, any>);
     
-      const newConfirmation = {
-          id: invoiceId, 
-          invoiceId: invoiceId, 
-          eventId: event.id, 
-          eventName: event.name, 
-          eventDate: event.date, 
-          submissionTimestamp: new Date().toISOString(), 
-          selections,
-          totalInvoiced: result.newTotalAmount || total, 
-          invoiceUrl: result.invoiceUrl, 
-          invoiceNumber: result.invoiceNumber, 
-          teamCode: result.teamCode || invoiceForm.getValues('teamCode'),
-          invoiceStatus: result.status,
-          purchaserName: result.sponsorName || invoiceForm.getValues('sponsorName'), 
-          schoolName: result.schoolName || invoiceForm.getValues('schoolName'), 
-          sponsorEmail: result.sponsorEmail || invoiceForm.getValues('sponsorEmail'), 
-          district: result.district || masterDatabase.find(p => p.school === invoiceForm.getValues('schoolName'))?.district || ''
-      };
+        const selections = stagedPlayers.reduce((acc, p) => {
+            if (players.some((pl: any) => pl.playerName === `${p.firstName} ${p.lastName}`)) {
+                acc[p.id!] = { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType };
+            }
+            return acc;
+        }, {} as Record<string, any>);
     
-      const invoiceDocRef = doc(db, 'invoices', invoiceId);
-      await setDoc(invoiceDocRef, newConfirmation);
+        const teamCode = result.teamCode || 
+            invoiceForm.getValues('teamCode') || 
+            generateTeamCode({ schoolName: selectedSchool, district: selectedDistrict });
+    
+        const newConfirmation = {
+            id: invoiceId,
+            invoiceId: invoiceId,
+            eventId: event.id,
+            eventName: event.name,
+            eventDate: event.date,
+            submissionTimestamp: new Date().toISOString(),
+            selections,
+            totalInvoiced: result.newTotalAmount || total,
+            invoiceUrl: result.invoiceUrl,
+            invoiceNumber: result.invoiceNumber,
+            teamCode: teamCode,
+            invoiceStatus: result.status,
+            purchaserName: result.sponsorName || invoiceForm.getValues('sponsorName'),
+            schoolName: result.schoolName || invoiceForm.getValues('schoolName'),
+            sponsorEmail: result.sponsorEmail || invoiceForm.getValues('sponsorEmail'),
+            district: result.district || masterDatabase.find(p => p.school === invoiceForm.getValues('schoolName'))?.district || ''
+        };
+    
+        try {
+            const invoiceDocRef = doc(db, 'invoices', invoiceId);
+            await setDoc(invoiceDocRef, newConfirmation);
+            console.log('Successfully saved confirmation to Firestore:', newConfirmation);
+        } catch (error) {
+            console.error('Failed to save confirmation to Firestore:', error);
+            throw error;
+        }
     };
     
     const handleCompRegistration = async (recipient: InvoiceRecipientValues) => {
@@ -735,8 +762,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                                 checked={filteredSchoolRoster.length > 0 && filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id))}
                                                 ref={(el) => {
                                                     if (el) {
-                                                        const isIndeterminate = filteredSchoolRoster.length > 0 && stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) && !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id));
-                                                        el.indeterminate = isIndeterminate;
+                                                        el.indeterminate = filteredSchoolRoster.length > 0 && stagedPlayers.some(sp => filteredSchoolRoster.find(p => p.id === sp.id)) && !filteredSchoolRoster.every(p => stagedPlayers.some(sp => sp.id === p.id));
                                                     }
                                                 }}
                                             />
