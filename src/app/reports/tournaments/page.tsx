@@ -146,52 +146,59 @@ function TournamentsReportPageContent() {
   const handleExportTournament = (reportData: TournamentReportData[string]) => {
     const { event, registrations, totalPlayers, totalGt, totalInd } = reportData;
 
+    // --- Define Styles ---
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E0E0E0" } }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
+    const totalRowStyle = { font: { bold: true }, border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
+    const cellBorder = { border: { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } } };
+    const stripe1Style = { fill: { fgColor: { rgb: "FFFFFF" } }, ...cellBorder };
+    const stripe2Style = { fill: { fgColor: { rgb: "F0F8FF" } }, ...cellBorder }; // AliceBlue for light blue stripe
+    const yellowHighlightStyle = { ...totalRowStyle, fill: { fgColor: { rgb: "FFFF00" } } };
+    
     // --- Sheet 1: School Totals ---
-    const schoolTotalsData = registrations.map(r => ({
-      'School': r.schoolName,
-      'Total Players': r.playerCount,
-      'GT Players': r.gtCount,
-      'Independent Players': r.indCount,
-    }));
-    
-    // Add Grand Total row with correct calculations
-    const grandTotalRow = {
-      'School': 'Grand Total',
-      'Total Players': totalPlayers,
-      'GT Players': totalGt,
-      'Independent Players': totalInd,
-    };
-    
-    const wsSchoolTotals = XLSX.utils.json_to_sheet([...schoolTotalsData, grandTotalRow]);
+    const schoolTotalsHeaders = ['School', 'Total Players', 'GT Players', 'Independent Players'];
+    const schoolTotalsData = registrations.map(r => ([
+      r.schoolName,
+      r.playerCount,
+      r.gtCount,
+      r.indCount,
+    ]));
 
-    // Define column widths for better readability
-    wsSchoolTotals['!cols'] = [ {wch:40}, {wch:15}, {wch:15}, {wch:20} ];
-
-    // Apply Table Formatting
-    const range = XLSX.utils.decode_range(wsSchoolTotals['!ref']!);
-    wsSchoolTotals['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
-    wsSchoolTotals['!table'] = {
-        ref: XLSX.utils.encode_range(range),
-        name: `Registrations_${event.name.replace(/[^a-zA-Z0-9]/g, '_')}`,
-        displayName: 'Registrations',
-        styleInfo: {
-            theme: "TableStyleLight9", // A light blue theme
-            showFirstColumn: false,
-            showLastColumn: false,
-            showRowStripes: true,
-            showColumnStripes: false,
-        },
-        totalsRowShown: false // We are adding a manual totals row
-    };
+    // Add Grand Total row
+    const grandTotalRow = [
+      'Grand Total',
+      totalPlayers,
+      totalGt,
+      totalInd,
+    ];
+    schoolTotalsData.push(grandTotalRow);
     
-    // Manually style the Grand Total row for emphasis
-    const totalRowIndex = range.e.r;
-    for(let C = range.s.c; C <= range.e.c; ++C) {
-        const cellAddress = XLSX.utils.encode_cell({r: totalRowIndex, c: C});
-        if(wsSchoolTotals[cellAddress]) {
-            wsSchoolTotals[cellAddress].s = { font: { bold: true } };
-        }
-    }
+    const wsSchoolTotals = XLSX.utils.aoa_to_sheet([schoolTotalsHeaders, ...schoolTotalsData]);
+    
+    // Auto-fit columns
+    const cols = [{ wch: 40 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
+    wsSchoolTotals['!cols'] = cols;
+
+    // Apply styles
+    schoolTotalsHeaders.forEach((_, C) => {
+        const cellRef = XLSX.utils.encode_cell({ r: 0, c: C });
+        wsSchoolTotals[cellRef].s = headerStyle;
+    });
+
+    schoolTotalsData.forEach((row, R) => {
+        const style = (R % 2 === 0) ? stripe1Style : stripe2Style;
+        const isTotalRow = R === schoolTotalsData.length - 1;
+        row.forEach((_, C) => {
+            const cellRef = XLSX.utils.encode_cell({ r: R + 1, c: C });
+            if (isTotalRow) {
+                wsSchoolTotals[cellRef].s = (C === 1) ? yellowHighlightStyle : totalRowStyle;
+            } else {
+                wsSchoolTotals[cellRef].s = style;
+            }
+        });
+    });
+
+    wsSchoolTotals['!autofilter'] = { ref: `A1:D${registrations.length + 1}` };
+
 
     // --- Sheet 2: GT Players ---
     const gtPlayersData = registrations.flatMap(r =>
@@ -364,5 +371,3 @@ export default function TournamentsReportPage() {
         </OrganizerGuard>
     )
 }
-
-    
