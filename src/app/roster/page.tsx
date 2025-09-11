@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
@@ -824,7 +825,27 @@ function SponsorRosterView() {
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter USCF ID or 'NEW'" /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField
+                                  control={createPlayerForm.control}
+                                  name="regularRating"
+                                  render={({ field }) => (
+                                      <FormItem>
+                                          <FormLabel>Rating</FormLabel>
+                                          <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+                                              <FormControl>
+                                                  <SelectTrigger>
+                                                      <SelectValue placeholder="Select rating status" />
+                                                  </SelectTrigger>
+                                              </FormControl>
+                                              <SelectContent>
+                                                  <SelectItem value="UNR">UNR (Unrated)</SelectItem>
+                                                  <SelectItem value="NEW">NEW</SelectItem>
+                                              </SelectContent>
+                                          </Select>
+                                          <FormMessage />
+                                      </FormItem>
+                                  )}
+                              />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={createPlayerForm.control} name="dob" render={({ field }) => ( 
@@ -858,7 +879,7 @@ function SponsorRosterView() {
                                       onChange={(e) => {
                                         const dateValue = e.target.value;
                                         if (dateValue) {
-                                          const parsedDate = new Date(dateValue + 'T0:00:00');
+                                          const parsedDate = new Date(dateValue + 'T00:00:00');
                                           if (!isNaN(parsedDate.getTime())) {
                                             field.onChange(parsedDate);
                                           }
