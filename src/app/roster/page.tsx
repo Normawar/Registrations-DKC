@@ -1,9 +1,7 @@
-
-
 'use client';
 
 import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
@@ -108,7 +106,7 @@ function SponsorRosterView() {
   const [pendingPlayer, setPendingPlayer] = useState<MasterPlayer | null>(null);
 
   const { profile, isProfileLoaded } = useSponsorProfile();
-  const { database, addPlayer, updatePlayer, isDbLoaded, generatePlayerId } = useMasterDb();
+  const { database, addPlayer, updatePlayer, isDbLoaded, generatePlayerId, dbDistricts, dbSchools } = useMasterDb();
   
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
@@ -119,6 +117,22 @@ function SponsorRosterView() {
   const createPlayerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
   });
+  
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbSchools);
+  const selectedDistrict = createPlayerForm.watch('district');
+
+  useEffect(() => {
+      if (selectedDistrict === 'all') {
+          setSchoolsForDistrict(dbSchools);
+      } else {
+          setSchoolsForDistrict(
+              dbSchools.filter(school => 
+                  schoolData.find(s => s.schoolName === school)?.district === selectedDistrict
+              )
+          );
+      }
+      createPlayerForm.setValue('school', '');
+  }, [selectedDistrict, dbSchools, createPlayerForm]);
 
   // Update form defaults when profile loads
   useEffect(() => {
@@ -702,7 +716,7 @@ function SponsorRosterView() {
                                           onChange={(e) => {
                                             const dateValue = e.target.value;
                                             if (dateValue) {
-                                              const parsedDate = new Date(dateValue + 'T00:00:00');
+                                              const parsedDate = new Date(dateValue + 'T0:00:00');
                                               if (!isNaN(parsedDate.getTime())) {
                                                 field.onChange(parsedDate);
                                               }
@@ -757,8 +771,38 @@ function SponsorRosterView() {
                               <FormField control={createPlayerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                              <FormField control={createPlayerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} disabled value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                              <FormField control={createPlayerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} disabled value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField
+                                control={createPlayerForm.control}
+                                name="district"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>District</FormLabel>
+                                        <Select onValueChange={(value) => { field.onChange(value); setSchoolsForDistrict(dbSchools.filter(school => schoolData.find(s => s.schoolName === school)?.district === value)); createPlayerForm.setValue('school', ''); }} value={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={createPlayerForm.control}
+                                name="school"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>School</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
+                                            <SelectContent>
+                                                {schoolsForDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter USCF ID or 'NEW'" /></FormControl><FormMessage /></FormItem> )} />
@@ -774,7 +818,7 @@ function SponsorRosterView() {
                                       onChange={(e) => {
                                         const dateValue = e.target.value;
                                         if (dateValue) {
-                                          const parsedDate = new Date(dateValue + 'T00:00:00');
+                                          const parsedDate = new Date(dateValue + 'T0:00:00');
                                           if (!isNaN(parsedDate.getTime())) {
                                             field.onChange(parsedDate);
                                           }
@@ -796,7 +840,7 @@ function SponsorRosterView() {
                                       onChange={(e) => {
                                         const dateValue = e.target.value;
                                         if (dateValue) {
-                                          const parsedDate = new Date(dateValue + 'T00:00:00');
+                                          const parsedDate = new Date(dateValue + 'T0:00:00');
                                           if (!isNaN(parsedDate.getTime())) {
                                             field.onChange(parsedDate);
                                           }
@@ -812,7 +856,7 @@ function SponsorRosterView() {
                               <FormField control={createPlayerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                               <FormField control={createPlayerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                           </div>
-                          {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                          {createPlayerForm.watch('district') === 'PHARR-SAN JUAN-ALAMO ISD' && (
                               <FormField
                                 control={createPlayerForm.control}
                                 name="studentType"
