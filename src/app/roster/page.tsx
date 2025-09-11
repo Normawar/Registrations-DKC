@@ -125,7 +125,7 @@ function SponsorRosterView() {
 
   useEffect(() => {
       let filteredSchools;
-      if (selectedDistrict === 'all') {
+      if (selectedDistrict === 'all' || selectedDistrict === 'None') {
           filteredSchools = dbSchools;
       } else {
           filteredSchools = dbSchools.filter(school => 
@@ -156,9 +156,7 @@ function SponsorRosterView() {
       });
       // Trigger initial school list update
       if (profile.district) {
-          const initialSchools = dbSchools.filter(school => 
-              schoolData.find(s => s.schoolName === school)?.district === profile.district
-          );
+          const initialSchools = dbSchools.filter(school => schoolData.find(s => s.schoolName === school)?.district === profile.district);
           setSchoolsForDistrict(['TestSchool', ...initialSchools]);
       } else {
           setSchoolsForDistrict(['TestSchool', ...dbSchools]);
@@ -795,7 +793,7 @@ function SponsorRosterView() {
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>District</FormLabel>
-                                        <Select onValueChange={(value) => { field.onChange(value); setSchoolsForDistrict(dbSchools.filter(school => schoolData.find(s => s.schoolName === school)?.district === value)); createPlayerForm.setValue('school', ''); }} value={field.value}>
+                                        <Select onValueChange={(value) => handleDistrictChange(value, createPlayerForm)} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
                                             <SelectContent>
                                                 <SelectItem value="all">All Districts</SelectItem>
@@ -826,25 +824,25 @@ function SponsorRosterView() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                               <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter USCF ID or 'NEW'" /></FormControl><FormMessage /></FormItem> )} />
                               <FormField
-                                  control={createPlayerForm.control}
-                                  name="regularRating"
-                                  render={({ field }) => (
-                                      <FormItem>
-                                          <FormLabel>Rating</FormLabel>
-                                          <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
-                                              <FormControl>
-                                                  <SelectTrigger>
-                                                      <SelectValue placeholder="Select rating status" />
-                                                  </SelectTrigger>
-                                              </FormControl>
-                                              <SelectContent>
-                                                  <SelectItem value="UNR">UNR (Unrated)</SelectItem>
-                                                  <SelectItem value="NEW">NEW</SelectItem>
-                                              </SelectContent>
-                                          </Select>
-                                          <FormMessage />
-                                      </FormItem>
-                                  )}
+                                control={createPlayerForm.control}
+                                name="regularRating"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Rating</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="text"
+                                        placeholder="e.g., 599 or UNR"
+                                        value={field.value?.toString() || ''}
+                                        onChange={(e) => field.onChange(e.target.value)}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                        Enter a numeric rating, or type UNR/NEW.
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
                               />
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
