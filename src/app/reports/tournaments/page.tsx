@@ -75,71 +75,61 @@ function TournamentsReportPageContent() {
             } catch { return false; }
         });
 
-        // De-duplicate player registrations, prioritizing non-canceled invoices
-        const uniquePlayerRegistrations = new Map<string, { school: string, studentType?: 'gt' | 'independent' }>();
+        const schoolPlayerMap: Map<string, Map<string, PlayerDetail>> = new Map();
 
-        // Process non-canceled invoices first
+        // Process active invoices first to ensure they take precedence
         eventInvoices
             .filter(inv => inv.invoiceStatus !== 'CANCELED' && inv.status !== 'CANCELED')
             .forEach(invoice => {
                 if (!invoice.selections) return;
+                const schoolName = invoice.schoolName || 'Unknown School';
+
+                if (!schoolPlayerMap.has(schoolName)) {
+                    schoolPlayerMap.set(schoolName, new Map());
+                }
+                const schoolPlayers = schoolPlayerMap.get(schoolName)!;
+
                 for (const playerId in invoice.selections) {
-                    if (!uniquePlayerRegistrations.has(playerId)) {
-                        const player = playerMap.get(playerId);
-                        uniquePlayerRegistrations.set(playerId, {
-                            school: invoice.schoolName || 'Unknown School',
-                            studentType: player?.studentType
+                    if (schoolPlayers.has(playerId)) continue;
+
+                    const player = playerMap.get(playerId);
+                    if (player) {
+                        schoolPlayers.set(playerId, {
+                            id: player.id,
+                            name: `${player.firstName} ${player.lastName}`,
+                            uscfId: player.uscfId,
+                            studentType: player.studentType
                         });
                     }
                 }
-        });
+            });
         
-        const schoolRegistrations: { [key: string]: { gtCount: number; indCount: number; players: PlayerDetail[] } } = {};
+        if (schoolPlayerMap.size > 0) {
+            const registrations = Array.from(schoolPlayerMap.entries()).map(([schoolName, playersMap]) => {
+                const players = Array.from(playersMap.values());
+                const gtCount = players.filter(p => p.studentType === 'gt').length;
+                const indCount = players.length - gtCount;
+                
+                return {
+                    schoolName,
+                    playerCount: players.length,
+                    gtCount,
+                    indCount,
+                    players: players.sort((a, b) => a.name.localeCompare(b.name)),
+                };
+            }).sort((a, b) => b.playerCount - a.playerCount);
 
-        for (const [playerId, regInfo] of uniquePlayerRegistrations.entries()) {
-            const player = playerMap.get(playerId);
-            const school = regInfo.school;
-
-            if (!schoolRegistrations[school]) {
-              schoolRegistrations[school] = { gtCount: 0, indCount: 0, players: [] };
-            }
-            
-            const playerDetail: PlayerDetail = {
-              id: playerId,
-              name: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
-              uscfId: player ? player.uscfId : 'N/A',
-              studentType: regInfo.studentType,
-            };
-
-            schoolRegistrations[school].players.push(playerDetail);
-            
-            if (regInfo.studentType === 'gt') {
-                schoolRegistrations[school].gtCount++;
-            } else {
-                schoolRegistrations[school].indCount++;
-            }
-        }
-        
-        const registrations = Object.entries(schoolRegistrations).map(([schoolName, data]) => ({
-          schoolName,
-          gtCount: data.gtCount,
-          indCount: data.indCount,
-          playerCount: data.gtCount + data.indCount,
-          players: data.players.sort((a, b) => a.name.localeCompare(b.name))
-        })).sort((a, b) => b.playerCount - a.playerCount);
-
-        if (registrations.length > 0) {
-          const totalPlayers = registrations.reduce((sum, reg) => sum + reg.playerCount, 0);
-          const totalGt = registrations.reduce((sum, reg) => sum + reg.gtCount, 0);
-          const totalInd = registrations.reduce((sum, reg) => sum + reg.indCount, 0);
+            const totalPlayers = registrations.reduce((sum, reg) => sum + reg.playerCount, 0);
+            const totalGt = registrations.reduce((sum, reg) => sum + reg.gtCount, 0);
+            const totalInd = registrations.reduce((sum, reg) => sum + reg.indCount, 0);
           
-          report[event.id] = {
-            event,
-            registrations,
-            totalPlayers,
-            totalGt,
-            totalInd,
-          };
+            report[event.id] = {
+                event,
+                registrations,
+                totalPlayers,
+                totalGt,
+                totalInd,
+            };
         }
       }
       setTournamentReport(report);
