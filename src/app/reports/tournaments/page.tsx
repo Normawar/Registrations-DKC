@@ -24,7 +24,7 @@ type PlayerDetail = {
   id: string;
   name: string;
   uscfId: string;
-  studentType?: 'gt' | 'independent';
+  studentType?: 'gt' | 'independent' | 'regular';
 };
 
 type TournamentRegistrationInfo = {
@@ -93,14 +93,14 @@ function TournamentsReportPageContent() {
                     if (schoolPlayers.has(playerId)) continue;
 
                     const player = playerMap.get(playerId);
-                    if (player) {
-                        schoolPlayers.set(playerId, {
-                            id: player.id,
-                            name: `${player.firstName} ${player.lastName}`,
-                            uscfId: player.uscfId,
-                            studentType: player.studentType
-                        });
-                    }
+                    
+                    // Process ALL players, not just those found in master DB
+                    schoolPlayers.set(playerId, {
+                        id: playerId,
+                        name: player ? `${player.firstName} ${player.lastName}` : 'Unknown Player',
+                        uscfId: player ? player.uscfId : 'N/A',
+                        studentType: player ? player.studentType : 'independent' // Default to independent if not found
+                    });
                 }
             });
         
