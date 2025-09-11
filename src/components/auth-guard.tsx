@@ -34,8 +34,7 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       return;
     }
 
-
-    if (profile && requiredRole) {
+    if (requiredRole) {
       // Check if user has the required role. Organizers have access to all roles.
       // District coordinators have access to sponsor roles.
       const hasRequiredRole = 
@@ -51,10 +50,16 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
             router.push('/manage-events');
             break;
           case 'district_coordinator':
-            router.push('/auth/role-selection');
+            // If they are also a sponsor, give them the choice. Otherwise, go to district dash.
+            if (profile.isDistrictCoordinator) {
+                router.push('/auth/role-selection');
+            } else {
+                router.push('/district-dashboard');
+            }
             break;
           case 'sponsor':
-            if (profile.isDistrictCoordinator) {
+            // If they are also a district coordinator, give them the choice.
+             if (profile.isDistrictCoordinator) {
               router.push('/auth/role-selection');
             } else {
               router.push('/dashboard');
