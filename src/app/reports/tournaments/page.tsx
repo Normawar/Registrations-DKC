@@ -16,10 +16,13 @@ import { Input } from '@/components/ui/input';
 import { Download, Search, Printer, Loader2 } from 'lucide-react';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 
 type TournamentRegistrationInfo = {
   schoolName: string;
   playerCount: number;
+  gtCount: number;
+  indCount: number;
 };
 
 type TournamentReportData = {
@@ -27,49 +30,70 @@ type TournamentReportData = {
     event: Event;
     registrations: TournamentRegistrationInfo[];
     totalPlayers: number;
+    totalGt: number;
+    totalInd: number;
   };
 };
 
 function TournamentsReportPageContent() {
   const { events } = useEvents();
+  const { database: allPlayers, isDbLoaded } = useMasterDb();
   const [tournamentReport, setTournamentReport] = useState<TournamentReportData>({});
   const [tournamentSearchTerm, setTournamentSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
 
   const loadData = useCallback(async () => {
-    if (Date.now() - lastLoadTime < 5 * 60 * 1000) return; // Cache for 5 minutes
+    if (Date.now() - lastLoadTime < 5 * 60 * 1000 && Object.keys(tournamentReport).length > 0) return;
 
-    if (!db) return;
+    if (!db || !isDbLoaded) return;
     setIsLoading(true);
     try {
       const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
       const allInvoices = invoicesSnapshot.docs.map(doc => doc.data());
       
       const report: TournamentReportData = {};
+      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
       events.forEach(event => {
         const eventInvoices = allInvoices.filter(inv => inv.eventId === event.id);
-        const schoolRegistrations: { [key: string]: number } = {};
+        const schoolRegistrations: { [key: string]: { playerCount: number; gtCount: number; indCount: number; } } = {};
 
         eventInvoices.forEach(invoice => {
           const school = invoice.schoolName || 'Unknown School';
-          const playerCount = Object.keys(invoice.selections || {}).length;
-          if (playerCount > 0) {
-            schoolRegistrations[school] = (schoolRegistrations[school] || 0) + playerCount;
+          if (!invoice.selections) return;
+
+          if (!schoolRegistrations[school]) {
+            schoolRegistrations[school] = { playerCount: 0, gtCount: 0, indCount: 0 };
           }
+          
+          Object.keys(invoice.selections).forEach(playerId => {
+            const player = playerMap.get(playerId);
+            schoolRegistrations[school].playerCount++;
+            if (player?.studentType === 'gt') {
+              schoolRegistrations[school].gtCount++;
+            } else {
+              schoolRegistrations[school].indCount++;
+            }
+          });
         });
         
-        const registrations = Object.entries(schoolRegistrations).map(([schoolName, playerCount]) => ({
+        const registrations = Object.entries(schoolRegistrations).map(([schoolName, counts]) => ({
           schoolName,
-          playerCount,
+          ...counts,
         })).sort((a,b) => b.playerCount - a.playerCount);
 
         if (registrations.length > 0) {
+          const totalPlayers = registrations.reduce((sum, reg) => sum + reg.playerCount, 0);
+          const totalGt = registrations.reduce((sum, reg) => sum + reg.gtCount, 0);
+          const totalInd = registrations.reduce((sum, reg) => sum + reg.indCount, 0);
+          
           report[event.id] = {
             event,
             registrations,
-            totalPlayers: registrations.reduce((sum, reg) => sum + reg.playerCount, 0),
+            totalPlayers,
+            totalGt,
+            totalInd,
           };
         }
       });
@@ -78,13 +102,13 @@ function TournamentsReportPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [events, lastLoadTime]);
+  }, [events, lastLoadTime, allPlayers, isDbLoaded, tournamentReport]);
 
   useEffect(() => {
-    if (events.length > 0) {
+    if (events.length > 0 && isDbLoaded) {
       loadData();
     }
-  }, [loadData, events]);
+  }, [loadData, events, isDbLoaded]);
   
   const filteredTournaments = useMemo(() => {
     const term = tournamentSearchTerm.toLowerCase();
@@ -99,7 +123,9 @@ function TournamentsReportPageContent() {
       'Tournament': reportData.event.name,
       'Event Date': format(new Date(reportData.event.date), 'yyyy-MM-dd'),
       'School': r.schoolName,
-      'Registered Players': r.playerCount,
+      'Total Players': r.playerCount,
+      'GT Players': r.gtCount,
+      'Independent Players': r.indCount,
     }));
     const csv = Papa.unparse(dataToExport);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -142,7 +168,7 @@ function TournamentsReportPageContent() {
             </div>
         </CardHeader>
         <CardContent>
-          {isLoading && (
+          {isLoading && !isDbLoaded && (
             <div className="flex items-center gap-2 p-6">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading report data...
@@ -155,7 +181,9 @@ function TournamentsReportPageContent() {
                   <div className="flex justify-between items-center">
                     <div>
                       <CardTitle className="text-lg">{reportData.event.name}</CardTitle>
-                      <CardDescription>{format(new Date(reportData.event.date), 'PPP')} • {reportData.totalPlayers} Players</CardDescription>
+                      <CardDescription>
+                        {format(new Date(reportData.event.date), 'PPP')} • {reportData.totalPlayers} Players ({reportData.totalGt} GT, {reportData.totalInd} IND)
+                      </CardDescription>
                     </div>
                     <Button onClick={() => handleExportTournament(reportData)} variant="outline" size="sm" className="no-print"><Download className="mr-2 h-4 w-4"/>Export</Button>
                   </div>
@@ -166,14 +194,18 @@ function TournamentsReportPageContent() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>School</TableHead>
-                          <TableHead className="text-right"># Registered Players</TableHead>
+                          <TableHead className="text-right">GT</TableHead>
+                          <TableHead className="text-right">IND</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {reportData.registrations.map(reg => (
                           <TableRow key={reg.schoolName}>
                             <TableCell>{reg.schoolName}</TableCell>
-                            <TableCell className="text-right">{reg.playerCount}</TableCell>
+                            <TableCell className="text-right">{reg.gtCount}</TableCell>
+                            <TableCell className="text-right">{reg.indCount}</TableCell>
+                            <TableCell className="text-right font-semibold">{reg.playerCount}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
