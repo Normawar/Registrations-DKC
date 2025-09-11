@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { Building, User } from 'lucide-react';
+import { Building, User, Crown } from 'lucide-react';
 import Image from 'next/image';
 
 export default function RoleSelectionPage() {
@@ -29,12 +29,14 @@ export default function RoleSelectionPage() {
     );
   }
 
-  const handleRoleSelection = (path: string, role: 'sponsor' | 'district_coordinator') => {
+  const handleRoleSelection = (path: string, role: 'sponsor' | 'district_coordinator' | 'organizer') => {
     if (profile) {
       updateProfile({ ...profile, role });
     }
     router.push(path);
   };
+  
+  const isOrganizer = profile.uid === 'norma@dkchess.com'; // A simple way to identify the main organizer
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
@@ -55,19 +57,22 @@ export default function RoleSelectionPage() {
         
         <div className="grid md:grid-cols-2 gap-6">
           <Card 
-            onClick={() => handleRoleSelection('/district-dashboard', 'district_coordinator')}
+            onClick={() => handleRoleSelection(isOrganizer ? '/manage-events' : '/district-dashboard', isOrganizer ? 'organizer' : 'district_coordinator')}
             className="cursor-pointer hover:shadow-lg hover:border-primary transition-all duration-200"
           >
             <CardHeader className="flex flex-row items-center gap-4">
-              <Building className="h-10 w-10 text-primary" />
+              {isOrganizer ? <Crown className="h-10 w-10 text-primary" /> : <Building className="h-10 w-10 text-primary" />}
               <div>
-                <CardTitle>District Coordinator</CardTitle>
-                <CardDescription>Access the dashboard for {profile.district}.</CardDescription>
+                <CardTitle>{isOrganizer ? 'Organizer' : 'District Coordinator'}</CardTitle>
+                <CardDescription>Access the dashboard for {isOrganizer ? 'All Events' : profile.district}.</CardDescription>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-sm">
-                View and manage rosters, registrations, and invoices for all schools within your district.
+                {isOrganizer 
+                    ? 'Manage events, users, payments, and system-wide settings.'
+                    : 'View and manage rosters, registrations, and invoices for all schools within your district.'
+                }
               </p>
             </CardContent>
           </Card>
