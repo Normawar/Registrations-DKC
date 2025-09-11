@@ -55,15 +55,23 @@ export function useSponsorProfile() {
 
     if (newProfileData === null) {
       setProfile(null);
+      // Also clear from local storage
+      localStorage.removeItem(`user_profile_${user.uid}`);
       return;
     }
 
+    // Merge new data with existing profile
     const updatedProfile = { ...(profile || {}), ...newProfileData, email: user.email, uid: user.uid } as SponsorProfile;
 
     try {
+        // Update Firestore
         const docRef = doc(db, "users", user.uid);
         await setDoc(docRef, updatedProfile, { merge: true });
+        
+        // Update local state and localStorage
         setProfile(updatedProfile);
+        localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(updatedProfile));
+
     } catch (error) {
         console.error("Failed to save sponsor profile to Firestore", error);
     }

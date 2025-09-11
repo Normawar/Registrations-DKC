@@ -166,7 +166,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     
     // For non-organizers, we cannot reliably filter on the client
     // without fetching all invoices. This count will be primarily for organizers.
-    // A more advanced solution would involve a dedicated 'notifications' collection.
     return 0;
     
   }, [profile, changeRequests]);
@@ -354,5 +353,3 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    
