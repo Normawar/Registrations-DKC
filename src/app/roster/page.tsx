@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
@@ -122,15 +123,15 @@ function SponsorRosterView() {
   const selectedDistrict = createPlayerForm.watch('district');
 
   useEffect(() => {
+      let filteredSchools;
       if (selectedDistrict === 'all') {
-          setSchoolsForDistrict(dbSchools);
+          filteredSchools = dbSchools;
       } else {
-          setSchoolsForDistrict(
-              dbSchools.filter(school => 
-                  schoolData.find(s => s.schoolName === school)?.district === selectedDistrict
-              )
+          filteredSchools = dbSchools.filter(school => 
+              schoolData.find(s => s.schoolName === school)?.district === selectedDistrict
           );
       }
+      setSchoolsForDistrict(['TestSchool', ...filteredSchools]);
       createPlayerForm.setValue('school', '');
   }, [selectedDistrict, dbSchools, createPlayerForm]);
 
@@ -146,14 +147,23 @@ function SponsorRosterView() {
         zipCode: '',
         uscfId: '',
         school: profile.school || '',
-        district: profile.district || '',
+        district: profile.district || 'all',
         grade: '',
         section: '',
         state: '',
         studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
       });
+      // Trigger initial school list update
+      if (profile.district) {
+          const initialSchools = dbSchools.filter(school => 
+              schoolData.find(s => s.schoolName === school)?.district === profile.district
+          );
+          setSchoolsForDistrict(['TestSchool', ...initialSchools]);
+      } else {
+          setSchoolsForDistrict(['TestSchool', ...dbSchools]);
+      }
     }
-  }, [profile, createPlayerForm]);
+  }, [profile, createPlayerForm, dbSchools]);
 
   const rosterPlayers = useMemo(() => {
     if (!isProfileLoaded || !isDbLoaded || !profile) return [];
@@ -304,12 +314,19 @@ function SponsorRosterView() {
         zipCode: '',
         uscfId: '',
         school: profile.school || '',
-        district: profile.district || '',
+        district: profile.district || 'all',
         grade: '',
         section: '',
         state: '',
         studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
     });
+    // Trigger school list update for the dialog
+    if (profile.district) {
+        const initialSchools = dbSchools.filter(school => schoolData.find(s => s.schoolName === school)?.district === profile.district);
+        setSchoolsForDistrict(['TestSchool', ...initialSchools]);
+    } else {
+        setSchoolsForDistrict(['TestSchool', ...dbSchools]);
+    }
     setIsCreatePlayerDialogOpen(true);
   };
 
@@ -349,7 +366,7 @@ function SponsorRosterView() {
       zipCode: '',
       uscfId: '',
       school: profile.school || '',
-      district: profile.district || '',
+      district: profile.district || 'all',
       grade: '',
       section: '',
       state: '',
@@ -370,7 +387,7 @@ function SponsorRosterView() {
       zipCode: '',
       uscfId: '',
       school: profile.school || '',
-      district: profile.district || '',
+      district: profile.district || 'all',
       grade: '',
       section: '',
       state: '',
@@ -780,6 +797,7 @@ function SponsorRosterView() {
                                         <Select onValueChange={(value) => { field.onChange(value); setSchoolsForDistrict(dbSchools.filter(school => schoolData.find(s => s.schoolName === school)?.district === value)); createPlayerForm.setValue('school', ''); }} value={field.value}>
                                             <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
                                             <SelectContent>
+                                                <SelectItem value="all">All Districts</SelectItem>
                                                 {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                                             </SelectContent>
                                         </Select>
@@ -818,7 +836,7 @@ function SponsorRosterView() {
                                       onChange={(e) => {
                                         const dateValue = e.target.value;
                                         if (dateValue) {
-                                          const parsedDate = new Date(dateValue + 'T0:00:00');
+                                          const parsedDate = new Date(dateValue + 'T00:00:00');
                                           if (!isNaN(parsedDate.getTime())) {
                                             field.onChange(parsedDate);
                                           }
