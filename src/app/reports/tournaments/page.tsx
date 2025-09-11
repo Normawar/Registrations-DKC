@@ -65,16 +65,9 @@ function TournamentsReportPageContent() {
       const playerMap = new Map(allPlayers.map(p => [p.id, p]));
 
       for (const event of events) {
-        const eventDate = parseISO(event.date);
-        
         const eventInvoices = allInvoices.filter(inv => {
             if (inv.status === 'CANCELED' || inv.invoiceStatus === 'CANCELED') return false;
-
-            if (inv.eventId === event.id) return true;
-            try {
-                const invDate = inv.eventDate ? parseISO(inv.eventDate) : null;
-                return inv.eventName === event.name && invDate && isSameDay(invDate, eventDate);
-            } catch { return false; }
+            return inv.eventId === event.id;
         });
         
         const schoolPlayerMap: Map<string, Map<string, PlayerDetail>> = new Map();
@@ -161,75 +154,64 @@ function TournamentsReportPageContent() {
       'Independent Players': r.indCount,
     }));
     
-    // Add Grand Total row for calculation, but it won't be part of the main table data
+    // Add Grand Total row
     const grandTotalRow = {
       'School': 'Grand Total',
       'Total Players': totalPlayers,
+      'GT Players': totalGt,
+      'Independent Players': totalInd
     };
-    const wsSchoolTotals = XLSX.utils.json_to_sheet(schoolTotalsData, { skipHeader: false });
-    // Append the Grand Total row separately after the table data
-    XLSX.utils.sheet_add_json(wsSchoolTotals, [grandTotalRow], { skipHeader: true, origin: -1 });
+    
+    const wsSchoolTotals = XLSX.utils.json_to_sheet([...schoolTotalsData, grandTotalRow], { skipHeader: false });
+
+    const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: "E5E7EB" } }, border: { bottom: { style: "thin" } } };
+    const totalRowStyle = { font: { bold: true }, border: { top: { style: "thin" } } };
+    const allBorders = { top: { style: "thin" }, bottom: { style: "thin" }, left: { style: "thin" }, right: { style: "thin" } };
+
+    const range = XLSX.utils.decode_range(wsSchoolTotals['!ref']!);
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const headerAddress = XLSX.utils.encode_cell({c:C, r:0});
+      if(wsSchoolTotals[headerAddress]) wsSchoolTotals[headerAddress].s = headerStyle;
+
+      const totalAddress = XLSX.utils.encode_cell({c:C, r:range.e.r});
+      if(wsSchoolTotals[totalAddress]) wsSchoolTotals[totalAddress].s = totalRowStyle;
+
+       for(let R = range.s.r; R <= range.e.r; ++R) {
+        const cellAddress = XLSX.utils.encode_cell({c:C, r:R});
+        if (!wsSchoolTotals[cellAddress]) continue;
+        if (!wsSchoolTotals[cellAddress].s) wsSchoolTotals[cellAddress].s = {};
+         wsSchoolTotals[cellAddress].s.border = allBorders;
+      }
+    }
+    wsSchoolTotals["!autofilter"] = { ref: XLSX.utils.encode_range(range) };
+
+    const colWidths = [ {wch:40}, {wch:15}, {wch:15}, {wch:20} ];
+    wsSchoolTotals['!cols'] = colWidths;
+
 
     // 2. GT Players Sheet
     const gtPlayersData = registrations.flatMap(r =>
         r.players.filter(p => p.studentType === 'gt').map(p => ({
-            'Tournament': event.name,
-            'Event Date': format(new Date(event.date), 'yyyy-MM-dd'),
-            'School': r.schoolName,
-            'Player Name': p.name,
-            'USCF ID': p.uscfId,
+            'School': r.schoolName, 'Player Name': p.name, 'USCF ID': p.uscfId,
         }))
     );
+    const wsGtPlayers = XLSX.utils.json_to_sheet(gtPlayersData);
+    if (!wsGtPlayers['!cols']) wsGtPlayers['!cols'] = [];
+    wsGtPlayers['!cols'] = [{wch:40}, {wch:25}, {wch:15}];
+
 
     // 3. Independent Players Sheet
     const indPlayersData = registrations.flatMap(r =>
         r.players.filter(p => p.studentType !== 'gt').map(p => ({
-            'Tournament': event.name,
-            'Event Date': format(new Date(event.date), 'yyyy-MM-dd'),
-            'School': r.schoolName,
-            'Player Name': p.name,
-            'USCF ID': p.uscfId,
+            'School': r.schoolName, 'Player Name': p.name, 'USCF ID': p.uscfId,
         }))
     );
-
-    // Create worksheets
-    const wsGtPlayers = XLSX.utils.json_to_sheet(gtPlayersData);
     const wsIndPlayers = XLSX.utils.json_to_sheet(indPlayersData);
+     if (!wsIndPlayers['!cols']) wsIndPlayers['!cols'] = [];
+    wsIndPlayers['!cols'] = [{wch:40}, {wch:25}, {wch:15}];
     
-    // --- Professional Table Formatting for School Totals sheet ---
+    // Create workbook
     const wb = XLSX.utils.book_new();
-    
-    const range = XLSX.utils.decode_range(wsSchoolTotals['!ref']!);
-    // Define the table range to NOT include the Grand Total row
-    const tableRange = { s: range.s, e: { r: range.e.r - 1, c: range.e.c } };
-
-    wsSchoolTotals['!table'] = {
-        ref: XLSX.utils.encode_range(tableRange),
-        name: "SchoolTotals",
-        displayName: "SchoolTotals",
-        styleInfo: {
-            name: "TableStyleMedium9",
-            showFirstColumn: false,
-            showLastColumn: false,
-            showRowStripes: true,
-            showColumnStripes: false,
-        },
-        totalsRow: true, // Enable the totals row feature
-        totalsRowLabel: 'Totals',
-    };
-
-    // Auto-fit columns for all sheets
-    [wsSchoolTotals, wsGtPlayers, wsIndPlayers].forEach(ws => {
-      if (!ws['!cols']) ws['!cols'] = [];
-      const data = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-      if (data && data.length > 0) {
-        const colWidths = data[0].map((_, i) => ({
-          wch: Math.max(...data.map(row => row[i] ? String(row[i]).length : 0)) + 2 // Add padding
-        }));
-        ws['!cols'] = colWidths;
-      }
-    });
-
     XLSX.utils.book_append_sheet(wb, wsSchoolTotals, 'School Totals');
     XLSX.utils.book_append_sheet(wb, wsGtPlayers, 'GT Players');
     XLSX.utils.book_append_sheet(wb, wsIndPlayers, 'Independent Players');
