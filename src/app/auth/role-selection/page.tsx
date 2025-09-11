@@ -36,7 +36,7 @@ export default function RoleSelectionPage() {
     router.push(path);
   };
   
-  const isOrganizer = profile.uid === 'norma@dkchess.com'; // A simple way to identify the main organizer
+  const isOrganizer = profile.role === 'organizer';
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
