@@ -33,6 +33,25 @@ import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
+const getStudentBreakdown = (invoice: any) => {
+    if (!invoice.selections) return '0';
+    
+    const students = Object.values(invoice.selections);
+    const gtCount = students.filter((s: any) => s.studentType === 'gt').length;
+    const independentCount = students.filter((s: any) => s.studentType !== 'gt').length;
+    const totalCount = students.length;
+  
+    // For PSJA split invoices, show type breakdown
+    if (invoice.district === 'PHARR-SAN JUAN-ALAMO ISD' && (gtCount > 0 || independentCount > 0)) {
+      if (gtCount > 0 && independentCount === 0) return `GT (${gtCount})`;
+      if (independentCount > 0 && gtCount === 0) return `IND (${independentCount})`;
+      if (gtCount > 0 && independentCount > 0) return `GT (${gtCount}) + IND (${independentCount})`;
+    }
+    
+    // For other districts, just show total
+    return `${totalCount}`;
+};
+
 export default function UnifiedInvoiceRegistrations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -583,18 +602,7 @@ export default function UnifiedInvoiceRegistrations() {
                           <div className="text-sm text-muted-foreground">{invoice.contactEmail}</div>
                         </div>
                       </td>
-                      <td className="p-2">
-                        <div className="space-y-1">
-                          <div className="font-medium flex items-center gap-1">
-                            <Users className="h-4 w-4" />
-                            {invoice.registrations?.length || 0}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {invoice.registrations?.slice(0, 2).map((reg: any) => reg.firstName || reg.studentName || reg.name).filter(Boolean).join(', ')}
-                            {invoice.registrations?.length > 2 && ` +${invoice.registrations.length - 2} more`}
-                          </div>
-                        </div>
-                      </td>
+                      <td className="p-2 font-medium">{getStudentBreakdown(invoice)}</td>
                       <td className="p-2">
                         <div className="space-y-1">
                           <div className="font-medium">${(invoice.totalAmount || 0).toFixed(2)}</div>

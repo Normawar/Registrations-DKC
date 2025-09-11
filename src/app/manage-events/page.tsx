@@ -129,6 +129,7 @@ type StoredConfirmation = {
   eventName: string;
   eventDate: string;
   selections: Record<string, { section: string; uscfStatus: 'current' | 'new' | 'renewing', status?: 'active' | 'withdrawn' }>;
+  invoiceStatus?: 'CANCELED' | 'COMPED' | 'PAID' | 'UNPAID';
 };
 
 type RegistrationInfo = {
@@ -501,7 +502,13 @@ function ManageEventsContent() {
     const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
     const eventDate = new Date(event.date);
 
-    for (const conf of allConfirmations) {
+    const activeConfirmations = allConfirmations.filter(conf => 
+        conf.eventId === event.id && 
+        conf.invoiceStatus !== 'CANCELED' && 
+        conf.invoiceStatus !== 'COMPED'
+    );
+
+    for (const conf of activeConfirmations) {
         const hasEventId = conf.eventId === event.id;
         
         let hasMatchingNameAndDate = false;
@@ -1019,6 +1026,7 @@ export default function ManageEventsPage() {
     </DistrictCoordinatorGuard>
   );
 }
+
 
 
 
