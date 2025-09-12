@@ -31,6 +31,7 @@ const PlayerToInvoiceSchema = z.object({
   waiveLateFee: z.boolean().optional().describe('Organizer-only flag to waive the late fee.'),
   lateFeeOverride: z.number().optional().describe('Organizer override for late fee amount.'),
   registrationDate: z.string().optional().describe('ISO string of when the player was registered.'),
+  section: z.string().optional(),
 });
 
 const EventConfigSchema = z.object({
@@ -137,6 +138,7 @@ const recreateInvoiceFlow = ai.defineFlow(
           waiveLateFee: Boolean(player.waiveLateFee),
           lateFeeOverride: player.lateFeeOverride ? Number(player.lateFeeOverride) : undefined,
           registrationDate: String(player.registrationDate || new Date().toISOString()),
+          section: player.section || 'High School K-12',
         };
       }),
       uscfFee: Number(input.uscfFee || 24),
@@ -190,6 +192,7 @@ const recreateInvoiceFlow = ai.defineFlow(
     const sanitizedInput = {
       ...transformedInput,
       players: sanitizedPlayers,
+      eventName: transformedInput.eventName.replace(/\(PSJA students only\)/i, '').trim(),
     };
 
     // Rest of your existing flow logic (Square API calls, etc.)
@@ -254,3 +257,5 @@ const recreateInvoiceFlow = ai.defineFlow(
     }
   }
 );
+
+    
