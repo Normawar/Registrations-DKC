@@ -8,7 +8,7 @@ import { AppLayout } from '@/components/app-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, CheckCircle, XCircle, Info, RefreshCw } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Info, RefreshCw, FilePenLine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,7 @@ import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow
 import { randomUUID } from 'crypto';
 import { getSquareClient } from '@/lib/square-client';
 import { ApiError } from 'square';
+import { correctedData as migrationDataSource } from './data-migration/page';
 
 
 interface LogEntry {
@@ -32,7 +33,118 @@ interface LogEntry {
   message: string;
 }
 
-// --- New Orphaned Approval Cleanup Utility ---
+// --- Player Name & Data Repair Utility ---
+function PlayerDataRepairer() {
+    const { toast } = useToast();
+    const { database: allPlayers, refreshDatabase } = useMasterDb();
+    const [isRepairing, setIsRepairing] = useState(false);
+    const [repairLogs, setRepairLogs] = useState<string[]>([]);
+    
+    const addLog = (message: string) => {
+        setRepairLogs(prev => [...prev, message]);
+    };
+
+    const handleRepairNames = async () => {
+        setIsRepairing(true);
+        setRepairLogs([]);
+        addLog('🚀 Starting player name repair process...');
+
+        if (!db) {
+            addLog('❌ Firestore not initialized. Aborting.');
+            setIsRepairing(false);
+            return;
+        }
+
+        try {
+            // Find players with placeholder names
+            const placeholderPlayers = allPlayers.filter(p => p.firstName?.startsWith('Student'));
+            
+            if (placeholderPlayers.length === 0) {
+                addLog('✅ No players with placeholder names found. Database is clean!');
+                toast({ title: 'No Repairs Needed', description: 'All player names appear to be correct.' });
+                setIsRepairing(false);
+                return;
+            }
+            
+            addLog(`🔍 Found ${placeholderPlayers.length} players with placeholder names to repair.`);
+
+            const batch = writeBatch(db);
+            let repairedCount = 0;
+
+            for (const player of placeholderPlayers) {
+                const dataSourceEntry = migrationDataSource.find(source => source.uscfId === player.uscfId);
+                
+                if (dataSourceEntry && dataSourceEntry.studentName) {
+                    const [firstName, ...lastNameParts] = dataSourceEntry.studentName.split(' ');
+                    const lastName = lastNameParts.join(' ');
+                    
+                    if (firstName && lastName) {
+                        const playerRef = doc(db, 'players', player.id);
+                        batch.update(playerRef, {
+                            firstName: firstName,
+                            lastName: lastName,
+                        });
+                        repairedCount++;
+                        addLog(`✅ Repaired ${player.id}: ${player.firstName} ${player.lastName} -> ${firstName} ${lastName}`);
+                    } else {
+                        addLog(`⚠️ Skipping ${player.id}: Could not parse name from source data '${dataSourceEntry.studentName}'`);
+                    }
+                } else {
+                     addLog(`❌ Could not find repair source for player ID: ${player.id}`);
+                }
+            }
+
+            if (repairedCount > 0) {
+                await batch.commit();
+                addLog(`🎉 --- REPAIR COMPLETE: ${repairedCount} player records updated. ---`);
+                toast({ title: 'Repair Complete', description: `${repairedCount} player names have been corrected in the database.`});
+                await refreshDatabase();
+            } else {
+                addLog('🤷 No players could be automatically repaired.');
+                toast({ title: 'Repair Finished', description: 'No players could be automatically repaired.'});
+            }
+            
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            addLog(`❌ FATAL ERROR during repair: ${errorMessage}`);
+            toast({ variant: 'destructive', title: 'Repair Failed', description: errorMessage });
+        } finally {
+            setIsRepairing(false);
+        }
+    };
+    
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Player Name & Data Repair</CardTitle>
+                <CardDescription>
+                    This tool scans for players with placeholder names (e.g., "Student_1...") and corrects them using the original data migration source.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={handleRepairNames} disabled={isRepairing}>
+                    {isRepairing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isRepairing ? 'Repairing Names...' : 'Find & Repair Player Names'}
+                </Button>
+            </CardContent>
+            {repairLogs.length > 0 && (
+                <CardFooter>
+                    <div className="w-full bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">Repair Log</h4>
+                        <div className="bg-black text-white p-3 rounded text-xs font-mono max-h-60 overflow-y-auto">
+                            {repairLogs.map((line, index) => (
+                                <div key={index} className={cn(line.startsWith('❌') ? 'text-red-400' : line.startsWith('✅') ? 'text-green-400' : 'text-gray-300')}>{line}</div>
+                            ))}
+                        </div>
+                    </div>
+                </CardFooter>
+            )}
+        </Card>
+    );
+}
+
+
+// --- Orphaned Approval Cleanup Utility ---
 
 interface OrphanedApproval {
   requestId: string;
@@ -826,6 +938,7 @@ export default function DataRepairPage() {
         </div>
         
         <StudentTypeUpdater />
+        <PlayerDataRepairer />
         <OrphanedApprovalFixer />
         
       </div>
