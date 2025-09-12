@@ -63,6 +63,8 @@ async function findAndFixOrphanedApprovals(allPlayers: MasterPlayer[]) {
 
   // 2. Check each approved request against actual invoice state
   for (const request of approvedRequests) {
+    if (request.processedAsOrphan) continue; // Skip already processed ones
+    
     const confirmationDoc = await getDoc(doc(db, 'invoices', request.confirmationId));
     
     if (!confirmationDoc.exists()) {
@@ -284,8 +286,6 @@ export async function runJosueCleanup(allPlayers: MasterPlayer[]) {
 }
 
 // StudentTypeUpdater Component (existing)
-// ... [rest of the StudentTypeUpdater component is unchanged] ...
-
 export function StudentTypeUpdater() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateLog, setUpdateLog] = useState<string[]>([]);
@@ -665,7 +665,3 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
-
-    
-
-    
