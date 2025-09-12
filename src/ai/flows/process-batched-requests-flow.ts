@@ -6,13 +6,12 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { doc, getDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, getDocs, collection } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { recreateInvoiceFromRoster } from './recreate-invoice-from-roster-flow';
-import { useEvents } from '@/hooks/use-events'; // This is a hook, cannot be used in a server-side flow. This will need to be addressed.
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
-import { getEvents } from '@/hooks/use-events';
+import { type Event } from '@/hooks/use-events';
 
 
 const BatchedRequestInputSchema = z.object({
@@ -56,7 +55,10 @@ const processBatchedRequestsFlow = ai.defineFlow(
     const errors: string[] = [];
     const batch = writeBatch(db);
 
-    const { events } = getEvents(); // We need a way to get events on the server.
+    // Fetch all necessary data from Firestore at the beginning
+    const eventsSnapshot = await getDocs(collection(db, 'events'));
+    const allEvents = eventsSnapshot.docs.map(doc => doc.data() as Event);
+
     const playersSnapshot = await getDocs(collection(db, 'players'));
     const allPlayers = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
 
@@ -85,7 +87,7 @@ const processBatchedRequestsFlow = ai.defineFlow(
                 throw new Error(`Original invoice ${request.confirmationId} not found.`);
             }
             const originalConfirmation = originalConfirmationDoc.data();
-            const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
+            const eventDetails = allEvents.find(e => e.id === originalConfirmation.eventId);
             if (!eventDetails) throw new Error('Original event not found.');
     
             let newSelections = { ...(originalConfirmation.selections || {}) };
@@ -169,11 +171,3 @@ const processBatchedRequestsFlow = ai.defineFlow(
     return { processedCount, failedCount, errors };
   }
 );
-
-// This is a placeholder for a server-side event fetching mechanism.
-// In a real app, you might fetch this from a database or a config file.
-function getEvents() {
-    return {
-        events: [] // This needs to be populated with actual event data on the server
-    };
-}

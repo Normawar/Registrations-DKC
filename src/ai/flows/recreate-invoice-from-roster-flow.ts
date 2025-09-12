@@ -86,9 +86,10 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
       }
 
       // Step 3: Create a new invoice with the updated details.
-      const revisionNumber = (originalInvoice?.title?.match(/rev\.(\d+)/)?.[1] || '1') + 1;
+      const existingRevision = originalInvoice?.invoiceNumber?.match(/-rev\.(\d+)/);
+      const nextRevisionNumber = existingRevision ? parseInt(existingRevision[1], 10) + 1 : 2;
       const baseInvoiceNumber = originalInvoice?.invoiceNumber?.split('-rev.')[0];
-      const newInvoiceNumber = baseInvoiceNumber ? `${baseInvoiceNumber}-rev.${revisionNumber}` : undefined;
+      const newInvoiceNumber = baseInvoiceNumber ? `${baseInvoiceNumber}-rev.${nextRevisionNumber}` : undefined;
       const revisionMessage = `Revised based on your request. Original Invoice: #${originalInvoice?.invoiceNumber}. This invoice replaces the original.`;
       
       const newInvoiceInput = {
