@@ -146,6 +146,10 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     }
     const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
     if (!eventDetails) throw new Error('Original event not found.');
+    
+    if (!allPlayers || allPlayers.length === 0) {
+      throw new Error("Master player database is not loaded yet. Please try again.");
+    }
 
     let newSelections = { ...(originalConfirmation.selections || {}) };
     let playerNameToRemove = request.player;
@@ -185,7 +189,10 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     }
 
     const newPlayerRoster = Object.keys(newSelections).map(playerId => {
-        const player = allPlayers.find(p => p.id === playerId)!;
+        const player = allPlayers.find(p => p.id === playerId);
+        if (!player) {
+            throw new Error(`Player with ID ${playerId} not found in master database`);
+        }
         return {
             playerName: `${player.firstName} ${player.lastName}`,
             uscfId: player.uscfId,
