@@ -534,13 +534,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
   const [creditCardAmount, setCreditCardAmount] = useState('');
   const [creditCardLast4, setCreditCardLast4] = useState('');
 
-  const getRegisteredPlayers = useCallback((conf: any) => {
-    if (!conf || !conf.selections || typeof conf.selections !== 'object') {
+  const registeredPlayers = useMemo(() => {
+    if (!confirmation || !confirmation.selections || typeof confirmation.selections !== 'object') {
         return [];
     }
-    const playerIds = Object.keys(conf.selections);
-    return masterDatabase.filter(player => playerIds.includes(player.id));
-  }, [masterDatabase]);
+    const playerIds = Object.keys(confirmation.selections);
+    return playerIds.map(id => {
+      const player = masterDatabase.find(p => p.id === id);
+      if (player) {
+        return player;
+      }
+      return { id, firstName: 'Unknown', lastName: 'Player' }; // Fallback
+    }) as (MasterPlayer | { id: string; firstName: string; lastName: string })[];
+  }, [confirmation, masterDatabase]);
   
   const calculatedTotalPaid = useMemo(() => {
     if (!confirmation?.paymentHistory) return 0;
@@ -1018,6 +1024,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                   invoiceId: confirmation.invoiceId,
                   amount: totalSelectedAmount,
                   note: `${newPayments.map(p => `${p.method}: $${p.amount}`).join(', ')} recorded by ${organizerInitials}`,
+                  requestingUserRole: 'organizer', // Add this
                 });
                 
                 toast({
@@ -1462,7 +1469,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     return null;
   }
 
-  const registeredPlayers = getRegisteredPlayers(confirmation);
   const eventDetails = events.find(e => e.id === confirmation.eventId);
   const uscfFee = 24;
 
@@ -1503,9 +1509,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                             )}
                             {registeredPlayers.map(player => {
                                 const playerDetails = confirmation?.selections?.[player.id];
+                                if (!playerDetails) return null;
+
                                 const regFee = eventDetails?.regularFee || 0;
-                                const lateFee = (confirmation.totalInvoiced / Object.keys(confirmation.selections).length) - regFee - ((playerDetails?.uscfStatus !== 'current' && player.studentType !== 'gt') ? uscfFee : 0);
-                                const playerUscfFee = (playerDetails?.uscfStatus !== 'current' && player.studentType !== 'gt') ? uscfFee : 0;
+                                const lateFee = (confirmation.totalInvoiced / Object.keys(confirmation.selections).length) - regFee - ((playerDetails?.uscfStatus !== 'current' && ('studentType' in player && player.studentType !== 'gt')) ? uscfFee : 0);
+                                const playerUscfFee = (playerDetails?.uscfStatus !== 'current' && ('studentType' in player && player.studentType !== 'gt')) ? uscfFee : 0;
                                 const playerTotal = regFee + lateFee + playerUscfFee;
                                 
                                 return (
