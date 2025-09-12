@@ -44,55 +44,103 @@ interface OrphanedApproval {
   status: 'Approved';
 }
 
+// Fixed version with proper null checking
 async function findAndFixOrphanedApprovals(allPlayers: MasterPlayer[]) {
   console.log('🔍 Scanning for approved requests that were never processed...');
   
-  // 1. Find all approved requests
-  const requestsSnapshot = await getDocs(
-    query(collection(db, 'requests'), where('status', '==', 'Approved'))
-  );
-  
-  const approvedRequests = requestsSnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  })) as OrphanedApproval[];
-
-  console.log(`Found ${approvedRequests.length} approved requests to verify`);
-
-  const orphanedApprovals: OrphanedApproval[] = [];
-
-  // 2. Check each approved request against actual invoice state
-  for (const request of approvedRequests) {
-    if (request.processedAsOrphan) continue; // Skip already processed ones
+  try {
+    // 1. Find all approved requests with better error handling
+    const requestsSnapshot = await getDocs(
+      query(collection(db, 'requests'), where('status', '==', 'Approved'))
+    );
     
-    const confirmationDoc = await getDoc(doc(db, 'invoices', request.confirmationId));
-    
-    if (!confirmationDoc.exists()) {
-      console.log(`⚠️ Confirmation ${request.confirmationId} not found for request ${request.id}`);
-      continue;
-    }
+    const approvedRequests = requestsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      console.log('Request data:', { id: doc.id, ...data }); // Debug log
+      return {
+        id: doc.id,
+        ...data
+      };
+    }).filter(request => {
+      // Filter out requests with missing required fields
+      if (!request.playerName || !request.confirmationId || !request.type) {
+        console.warn(`Skipping request ${request.id} - missing required fields`, request);
+        return false;
+      }
+      return true;
+    }) as OrphanedApproval[];
 
-    const confirmationData = confirmationDoc.data();
-    
-    // Check if player is still in selections (meaning withdrawal wasn't processed)
-    if (request.type === 'Withdrawal') {
-      const playerStillExists = Object.keys(confirmationData.selections || {}).some(playerId => {
-        const player = allPlayers.find(p => p.id === playerId);
-        if (!player) return false;
+    console.log(`Found ${approvedRequests.length} valid approved requests to verify`);
+
+    const orphanedApprovals: OrphanedApproval[] = [];
+
+    // 2. Check each approved request against actual invoice state
+    for (const request of approvedRequests) {
+      try {
+        console.log(`Checking request: ${request.id} - ${request.playerName} (${request.type})`);
         
-        const playerFullName = `${player.firstName} ${player.lastName}`.toLowerCase();
-        return playerFullName === request.playerName.toLowerCase();
-      });
+        const confirmationDoc = await getDoc(doc(db, 'invoices', request.confirmationId));
+        
+        if (!confirmationDoc.exists()) {
+          console.log(`⚠️ Confirmation ${request.confirmationId} not found for request ${request.id}`);
+          continue;
+        }
 
-      if (playerStillExists) {
-        orphanedApprovals.push(request);
-        console.log(`❌ ORPHANED: ${request.playerName} withdrawal was approved but player still on invoice`);
+        const confirmationData = confirmationDoc.data();
+        
+        if (!confirmationData || !confirmationData.selections) {
+          console.log(`⚠️ No selections found in confirmation ${request.confirmationId}`);
+          continue;
+        }
+
+        // Check if player is still in selections (meaning withdrawal wasn't processed)
+        if (request.type === 'Withdrawal') {
+          const playerStillExists = Object.keys(confirmationData.selections).some(playerId => {
+            const player = allPlayers.find(p => p.id === playerId);
+            if (!player) return false;
+            
+            // Safe string comparison with null checks
+            const playerFirstName = (player.firstName || '').trim();
+            const playerLastName = (player.lastName || '').trim();
+            const requestPlayerName = (request.playerName || '').trim();
+            
+            if (!playerFirstName || !playerLastName || !requestPlayerName) {
+              console.warn(`Skipping player comparison - missing names:`, {
+                playerId,
+                playerFirstName,
+                playerLastName,
+                requestPlayerName
+              });
+              return false;
+            }
+            
+            const playerFullName = `${playerFirstName} ${playerLastName}`.toLowerCase();
+            const requestNameLower = requestPlayerName.toLowerCase();
+            
+            console.log(`Comparing: "${playerFullName}" vs "${requestNameLower}"`);
+            return playerFullName === requestNameLower;
+          });
+
+          if (playerStillExists) {
+            orphanedApprovals.push(request);
+            console.log(`❌ ORPHANED: ${request.playerName} withdrawal was approved but player still on invoice`);
+          } else {
+            console.log(`✅ ${request.playerName} withdrawal was properly processed`);
+          }
+        }
+      } catch (requestError) {
+        console.error(`Error processing request ${request.id}:`, requestError);
+        continue;
       }
     }
-  }
 
-  console.log(`🎯 Found ${orphanedApprovals.length} orphaned approvals that need processing`);
-  return orphanedApprovals;
+    console.log(`🎯 Found ${orphanedApprovals.length} orphaned approvals that need processing`);
+    return orphanedApprovals;
+    
+  } catch (error: any) {
+    console.error('Error in findAndFixOrphanedApprovals:', error);
+    throw new Error(`Cleanup scan failed: ${error.message}`);
+  }
 }
 
 async function processOrphanedApprovals(orphanedApprovals: OrphanedApproval[], allPlayers: MasterPlayer[]) {
@@ -144,7 +192,7 @@ async function updateSquareInvoiceForOrphaned(invoiceId: string, changesSummary:
     
     await squareClient.invoicesApi.updateInvoice(invoiceId, {
       invoice: {
-        version: invoice.version,
+        version: invoice.version!,
         description: updatedDescription
       },
       idempotencyKey: randomUUID()
@@ -278,6 +326,93 @@ export async function runJosueCleanup(allPlayers: MasterPlayer[]) {
     
   } catch (error: any) {
     console.error('❌ Cleanup failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// Simplified manual cleanup for Josue specifically
+export async function fixJosueSpecifically(allPlayers: MasterPlayer[]) {
+  console.log('🎯 Looking specifically for Josue Contreras...');
+  
+  try {
+    // Find Josue's request directly
+    const requestsSnapshot = await getDocs(
+      query(
+        collection(db, 'requests'),
+        where('status', '==', 'Approved'),
+        where('type', '==', 'Withdrawal')
+      )
+    );
+    
+    const josueRequest = requestsSnapshot.docs.find(doc => {
+      const data = doc.data();
+      const playerName = (data.playerName || '').toLowerCase();
+      return playerName.includes('josue') && playerName.includes('contreras');
+    });
+
+    if (!josueRequest) {
+      console.log('No Josue request found');
+      return { success: false, message: 'Josue request not found' };
+    }
+
+    const requestData = josueRequest.data();
+    console.log('Found Josue request:', { id: josueRequest.id, ...requestData });
+
+    // Get his confirmation
+    const confirmationDoc = await getDoc(doc(db, 'invoices', requestData.confirmationId));
+    if (!confirmationDoc.exists()) {
+      throw new Error('Confirmation not found');
+    }
+
+    const confirmationData = confirmationDoc.data();
+    console.log('Current selections count:', Object.keys(confirmationData.selections || {}).length);
+
+    // Find Josue in selections
+    const josuePlayerId = Object.keys(confirmationData.selections || {}).find(playerId => {
+      const player = allPlayers.find(p => p.id === playerId);
+      if (!player) return false;
+      
+      const fullName = `${player.firstName || ''} ${player.lastName || ''}`.toLowerCase();
+      return fullName.includes('josue') && fullName.includes('contreras');
+    });
+
+    if (!josuePlayerId) {
+      console.log('Josue not found in current selections - may already be removed');
+      return { success: true, message: 'Josue already removed from invoice' };
+    }
+
+    // Remove Josue from selections
+    const updatedSelections = { ...confirmationData.selections };
+    delete updatedSelections[josuePlayerId];
+
+    // Update the confirmation
+    await updateDoc(doc(db, 'invoices', requestData.confirmationId), {
+      selections: updatedSelections,
+      lastModified: new Date().toISOString(),
+      changeHistory: [
+        ...(confirmationData.changeHistory || []),
+        {
+          timestamp: new Date().toISOString(),
+          changes: ['Processed orphaned withdrawal: Josue Contreras'],
+          type: 'manual_orphan_fix',
+          requestId: josueRequest.id
+        }
+      ]
+    });
+
+    console.log(`✅ Removed Josue from invoice. Players remaining: ${Object.keys(updatedSelections).length}`);
+
+    return {
+      success: true,
+      message: 'Josue successfully removed from invoice',
+      playersRemaining: Object.keys(updatedSelections).length
+    };
+
+  } catch (error: any) {
+    console.error('Error fixing Josue specifically:', error);
     return {
       success: false,
       error: error.message
@@ -568,6 +703,7 @@ function OrphanedApprovalFixer() {
     const { toast } = useToast();
     const { database: allPlayers } = useMasterDb();
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isFixingJosue, setIsFixingJosue] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const [foundOrphans, setFoundOrphans] = useState<OrphanedApproval[]>([]);
 
@@ -605,6 +741,29 @@ function OrphanedApprovalFixer() {
             setIsProcessing(false);
         }
     };
+    
+    const handleFixJosue = async () => {
+        setIsFixingJosue(true);
+        setLogs([]);
+        const addLog = (message: string) => setLogs(prev => [...prev, message]);
+        addLog('🚀 Starting specific fix for Josue Contreras...');
+        
+        try {
+            const result = await fixJosueSpecifically(allPlayers);
+            if(result.success) {
+                addLog(`✅ Success: ${result.message}`);
+                toast({ title: 'Fix Successful', description: result.message });
+            } else {
+                addLog(`❌ Error: ${result.error || result.message}`);
+                toast({ variant: 'destructive', title: 'Fix Failed', description: result.error || result.message });
+            }
+        } catch (error: any) {
+             addLog(`❌ FATAL ERROR during specific fix: ${error.message}`);
+             toast({ variant: 'destructive', title: 'Fix Failed', description: error.message });
+        } finally {
+            setIsFixingJosue(false);
+        }
+    };
 
     return (
         <Card>
@@ -612,11 +771,19 @@ function OrphanedApprovalFixer() {
                 <CardTitle>Fix Orphaned Approvals</CardTitle>
                 <CardDescription>This tool finds "Approved" change requests that were never actually processed and corrects the corresponding invoices.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-4">
                 <Button onClick={handleRunCleanup} disabled={isProcessing}>
                     {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isProcessing ? 'Scanning & Fixing...' : 'Run Cleanup Now'}
+                    {isProcessing ? 'Scanning & Fixing...' : 'Run General Orphaned Approval Cleanup'}
                 </Button>
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                  <h4 className="font-bold text-yellow-800">Specific Fix</h4>
+                  <p className="text-sm text-yellow-700 mt-1">If the general cleanup doesn't work, use this button to apply a targeted fix for the "Josue Contreras" withdrawal issue.</p>
+                  <Button onClick={handleFixJosue} disabled={isFixingJosue} variant="destructive" className="mt-3">
+                      {isFixingJosue && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isFixingJosue ? 'Fixing...' : 'Fix Josue Contreras Withdrawal'}
+                  </Button>
+                </div>
             </CardContent>
             {logs.length > 0 && (
                 <CardFooter>
