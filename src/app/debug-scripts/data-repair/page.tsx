@@ -123,15 +123,15 @@ function PlayerDataRepairer() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Player Name & Data Repair</CardTitle>
+                <CardTitle>Square Migration Tool</CardTitle>
                 <CardDescription>
-                    This tool scans for players with placeholder names (e.g., "Student_1...") and corrects them using the original data migration source.
+                    Use this tool to fix player names that were corrupted during the initial data migration. It corrects placeholder names (e.g., "Student_1...") using the original data source.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <Button onClick={handleRepairNames} disabled={isRepairing}>
                     {isRepairing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {isRepairing ? 'Repairing Names...' : 'Find & Repair Player Names'}
+                    {isRepairing ? 'Repairing Names...' : 'Run Square Migration Tool'}
                 </Button>
             </CardContent>
             {repairLogs.length > 0 && (
@@ -952,3 +952,4 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
+
