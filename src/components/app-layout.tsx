@@ -30,7 +30,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart, FileQuestion } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart, FileQuestion, TestTube2 } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -85,6 +85,7 @@ const organizerMenuStructure = {
   "Backend": [
     { href: "/users", icon: Users, label: "User Management" },
     { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
+    { href: "/debug-api", icon: TestTube2, label: "API Tester" },
     { href: "/debug-scripts/revert-request-status", icon: Wrench, label: "Revert Request Status" },
     { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
   ]
