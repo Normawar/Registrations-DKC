@@ -24,6 +24,7 @@ import { getInvoiceStatusWithPayments } from '@/ai/flows/get-invoice-status-flow
 import { PaymentHistoryDisplay } from '@/components/unified-payment-system';
 import { Checkbox } from './ui/checkbox';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from './ui/table';
+import { useEvents } from '@/hooks/use-events';
 
 
 const safeString = (value: any): string => {
@@ -485,6 +486,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
   const { toast } = useToast();
   const { profile } = useSponsorProfile();
   const { database: masterDatabase } = useMasterDb();
+  const { events } = useEvents();
   
   const [confirmation, setConfirmation] = useState<any>(initialConfirmation);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
@@ -829,7 +831,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                 </div>
                 <div className="flex justify-between">
                     <span>Total Paid</span>
-                    <span className="font-medium text-green-600">${totalPaid.toFixed(2)}</span>
+                    <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-base font-semibold">
@@ -1224,7 +1226,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
             unifiedPaymentHistory.push({
               ...squarePayment,
               squarePaymentId: squarePayment.id,
-              method: squarePayment.method || 'credit_card',
+              method: squarePayment.method,
               source: 'square'
             });
           }
@@ -1461,6 +1463,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
   }
 
   const registeredPlayers = getRegisteredPlayers(confirmation);
+  const eventDetails = events.find(e => e.id === confirmation.eventId);
+  const uscfFee = 24;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1487,21 +1491,30 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Name</TableHead>
-                                <TableHead>USCF ID</TableHead>
-                                <TableHead>Section</TableHead>
+                                <TableHead className="text-right">Reg. Fee</TableHead>
+                                <TableHead className="text-right">USCF Fee</TableHead>
+                                <TableHead className="text-right">Total</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {registeredPlayers.length === 0 && (
-                                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No players on this invoice.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No players on this invoice.</TableCell></TableRow>
                             )}
-                            {registeredPlayers.map(player => (
-                                <TableRow key={player.id}>
-                                    <TableCell>{player.firstName} {player.lastName}</TableCell>
-                                    <TableCell>{player.uscfId}</TableCell>
-                                    <TableCell>{confirmation?.selections?.[player.id]?.section}</TableCell>
-                                </TableRow>
-                            ))}
+                            {registeredPlayers.map(player => {
+                                const playerDetails = confirmation?.selections?.[player.id];
+                                const regFee = eventDetails?.regularFee || 0;
+                                const playerUscfFee = (playerDetails?.uscfStatus !== 'current' && player.studentType !== 'gt') ? uscfFee : 0;
+                                const playerTotal = regFee + playerUscfFee;
+                                
+                                return (
+                                    <TableRow key={player.id}>
+                                        <TableCell>{player.firstName} {player.lastName}</TableCell>
+                                        <TableCell className="text-right">${regFee.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">${playerUscfFee.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-medium">${playerTotal.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </div>
@@ -1540,5 +1553,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
-
-    

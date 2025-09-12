@@ -94,19 +94,19 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     let newPlayerList = [...fullPlayerDetails];
   
     if (request.type === 'Withdrawal') {
-      const playerNameToRemove = request.player.toLowerCase();
-      newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.toLowerCase() !== playerNameToRemove);
+      const playerNameToRemove = request.player.toLowerCase().trim();
+      newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() !== playerNameToRemove);
     }
     
     if (request.type === 'Substitution') {
-        const playerNameToRemove = request.player.toLowerCase();
+        const playerNameToRemove = request.player.toLowerCase().trim();
         
         // This detail must come from the request form, which needs to be updated to provide the new player's ID
         const newPlayerId = request.details?.split('with ')[1]; 
         const newPlayer = allPlayers.find(p => p.id === newPlayerId);
 
         if (newPlayer) {
-            newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.toLowerCase() !== playerNameToRemove);
+            newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() !== playerNameToRemove);
             newPlayerList.push({ ...newPlayer, uscfStatus: 'current', section: newPlayer.section || 'High School K-12' });
         } else {
             throw new Error('New player for substitution not found in database.');
@@ -187,4 +187,3 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     </Dialog>
   );
 }
-
