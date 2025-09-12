@@ -1,32 +1,29 @@
 'use client';
 
-import { processBatchedRequestsFlow } from '@/ai/flows/process-batched-requests-flow';
+import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow';
 
 export default function Page() {
   async function handleGet() {
-    const result = await processBatchedRequestsFlow('GET');
-    // ✅ result: GetResponse
-    console.log(result.message);
+    const result = await processBatchedRequests('GET');
+    console.log('Client got:', result);
   }
 
   async function handlePostWithStrings() {
-    const result = await processBatchedRequestsFlow('POST', {
+    const result = await processBatchedRequests('POST', {
       action: 'process',
       batchId: 'abc123',
-      items: ['a', 'b', 'c'], // ✅ typed as string[]
+      items: ['a', 'b', 'c'],
     });
-    // ✅ result.received.items is string[]
-    console.log(result.received.items[0].toUpperCase());
+    console.log('Client got:', result);
   }
 
   async function handlePostWithObjects() {
-    const result = await processBatchedRequestsFlow('POST', {
+    const result = await processBatchedRequests('POST', {
       action: 'process',
       batchId: 'xyz789',
-      items: [{ id: 1 }, { id: 2 }], // ✅ typed as {id:number}[]
+      items: [{ id: 1 }, { id: 2 }],
     });
-    // ✅ result.received.items[0].id is number
-    console.log(result.received.items[0].id + 10);
+    console.log('Client got:', result);
   }
 
   return (
