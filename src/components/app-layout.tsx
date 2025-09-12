@@ -85,9 +85,8 @@ const organizerMenuStructure = {
   "Backend": [
     { href: "/users", icon: Users, label: "User Management" },
     { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
+    { href: "/debug-scripts/revert-request-status", icon: Wrench, label: "Revert Request Status" },
     { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
-    { href: "/debug-scripts/manual-invoice-update", icon: Wrench, label: "Manual Invoice Fix" },
-    { href: "/debug-scripts/data-migration", icon: Wrench, label: "Data Migration Tool" },
   ]
 };
 

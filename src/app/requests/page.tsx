@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -49,8 +48,6 @@ export default function RequestsPage() {
   const [reviewingRequest, setReviewingRequest] = useState<ChangeRequest | null>(null);
   const [selectedRequests, setSelectedRequests] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
-  const [requestToRevert, setRequestToRevert] = useState<ChangeRequest | null>(null);
-  const [isReverting, setIsReverting] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!db || !profile) return;
@@ -205,32 +202,6 @@ export default function RequestsPage() {
     }
   };
 
-  const handleRevertClick = (request: ChangeRequest) => {
-    setRequestToRevert(request);
-  };
-
-  const confirmRevert = async () => {
-    if (!requestToRevert || !db) return;
-    setIsReverting(true);
-    try {
-        const requestRef = doc(db, "requests", requestToRevert.id);
-        await updateDoc(requestRef, {
-            status: 'Pending',
-            approvedBy: null,
-            approvedAt: null,
-        });
-        toast({ title: "Status Reverted", description: `Request for ${requestToRevert.player} is now pending.` });
-        await loadData();
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'Error', description: "Failed to revert request status." });
-        console.error("Failed to revert status:", error);
-    } finally {
-        setIsReverting(false);
-        setRequestToRevert(null);
-    }
-  };
-
-
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -337,11 +308,6 @@ export default function RequestsPage() {
                                             <Button variant="outline" size="sm" onClick={() => setReviewingRequest(request)}>
                                                 {request.status === 'Pending' ? 'Review' : <Eye className="h-4 w-4" />}
                                             </Button>
-                                            {request.status !== 'Pending' && (
-                                                <Button variant="outline" size="sm" onClick={() => handleRevertClick(request)}>
-                                                    <RefreshCw className="h-4 w-4" />
-                                                </Button>
-                                            )}
                                           </>
                                         )}
                                         {request.status !== 'Pending' && (
@@ -381,26 +347,6 @@ export default function RequestsPage() {
           profile={profile}
           onRequestUpdated={handleRequestCreatedOrUpdated}
         />
-      )}
-
-      {requestToRevert && (
-        <AlertDialog open={!!requestToRevert} onOpenChange={() => setRequestToRevert(null)}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Revert Request Status?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This will change the status of the request for "{requestToRevert.player}" back to "Pending". This allows you to re-process it. Are you sure?
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={confirmRevert} disabled={isReverting}>
-                        {isReverting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Yes, Revert to Pending
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
       )}
     </AppLayout>
   );
