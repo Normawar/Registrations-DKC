@@ -166,7 +166,12 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
       const detailsMatch = request.details?.match(/with (.*)/);
       const newPlayerName = detailsMatch ? detailsMatch[1].replace(/\..*/, '').trim() : null;
 
-      if (!playerToRemoveId || !newPlayerName) throw new Error("Could not identify players for substitution.");
+      if (!playerToRemoveId) {
+        throw new Error(`Could not find player "${playerNameToRemove}" in current selections to substitute.`);
+      }
+      if (!newPlayerName) {
+        throw new Error(`Could not extract replacement player name from details: "${request.details}"`);
+      }
 
       delete newSelections[playerToRemoveId];
       
