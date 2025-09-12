@@ -174,7 +174,7 @@ export default function ManualInvoiceUpdatePage() {
                 invoiceId: inv.invoiceId,
                 invoiceNumber: inv.invoiceNumber,
                 type: 'event', // Mark as an event registration
-                eventName: "Liberty MS (PSJA students only) on September 13th, 2025",
+                eventName: "Liberty MS on September 13th, 2025",
                 eventDate: "2025-09-13T00:00:00.000Z",
                 submissionTimestamp: new Date('2025-09-08T12:00:00Z').toISOString(),
                 purchaserName: sponsor.firstName + ' ' + sponsor.lastName,

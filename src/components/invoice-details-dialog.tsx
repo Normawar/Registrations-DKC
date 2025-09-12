@@ -1492,24 +1492,27 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead className="text-right">Reg. Fee</TableHead>
+                                <TableHead className="text-right">Late Fee</TableHead>
                                 <TableHead className="text-right">USCF Fee</TableHead>
                                 <TableHead className="text-right">Total</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {registeredPlayers.length === 0 && (
-                                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground">No players on this invoice.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No players on this invoice.</TableCell></TableRow>
                             )}
                             {registeredPlayers.map(player => {
                                 const playerDetails = confirmation?.selections?.[player.id];
                                 const regFee = eventDetails?.regularFee || 0;
+                                const lateFee = (confirmation.totalInvoiced / Object.keys(confirmation.selections).length) - regFee - ((playerDetails?.uscfStatus !== 'current' && player.studentType !== 'gt') ? uscfFee : 0);
                                 const playerUscfFee = (playerDetails?.uscfStatus !== 'current' && player.studentType !== 'gt') ? uscfFee : 0;
-                                const playerTotal = regFee + playerUscfFee;
+                                const playerTotal = regFee + lateFee + playerUscfFee;
                                 
                                 return (
                                     <TableRow key={player.id}>
                                         <TableCell>{player.firstName} {player.lastName}</TableCell>
                                         <TableCell className="text-right">${regFee.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">${lateFee > 0 ? lateFee.toFixed(2) : '0.00'}</TableCell>
                                         <TableCell className="text-right">${playerUscfFee.toFixed(2)}</TableCell>
                                         <TableCell className="text-right font-medium">${playerTotal.toFixed(2)}</TableCell>
                                     </TableRow>

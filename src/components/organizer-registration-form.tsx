@@ -102,7 +102,7 @@ const playerFormSchema = z.object({
   section: z.string().min(1, "Please select a section."),
   email: z.string().email({ message: "Please enter a valid email." }),
   dob: z.date({ required_error: "Date of birth is required."}),
-  zipCode: z.string().min(5, { message: "Please enter a valid 5-digit zip code." }),
+  zipCode: z.string().min(5, { message: "A valid 5-digit zip code is required." }),
 }).refine(data => {
     if (data.uscfId.toUpperCase() !== 'NEW') { return data.uscfExpiration !== undefined; }
     return true;
@@ -407,7 +407,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             const result = await createInvoice({
                 ...recipient,
                 district,
-                eventName: event.name,
+                eventName: event.name.replace(/\(PSJA students only\)/i, '').trim(),
                 eventDate: event.date,
                 uscfFee: 24,
                 players: playersToInvoice,
@@ -451,7 +451,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
           const result = await createPsjaSplitInvoice({
             ...recipient,
             district: 'PHARR-SAN JUAN-ALAMO ISD',
-            eventName: event.name,
+            eventName: event.name.replace(/\(PSJA students only\)/i, '').trim(),
             eventDate: event.date,
             uscfFee: 24,
             players: playersToInvoice,
@@ -514,7 +514,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     sponsorEmail: recipient.sponsorEmail,
                     schoolName: recipient.schoolName,
                     teamCode: recipient.teamCode,
-                    eventName: event.name,
+                    eventName: event.name.replace(/\(PSJA students only\)/i, '').trim(),
                     eventDate: event.date,
                     uscfFee,
                     players: [playerToInvoice],
@@ -585,7 +585,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             id: invoiceId, 
             invoiceId: invoiceId, 
             eventId: event.id, 
-            eventName: event.name, 
+            eventName: event.name.replace(/\(PSJA students only\)/i, '').trim(), 
             eventDate: event.date, 
             submissionTimestamp: new Date().toISOString(), 
             selections: selections,
@@ -619,7 +619,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             
             const newConfirmation = {
                 id: confirmationId, invoiceId: confirmationId, eventId: event.id,
-                eventName: event.name,
+                eventName: event.name.replace(/\(PSJA students only\)/i, '').trim(),
                 eventDate: event.date,
                 submissionTimestamp: new Date().toISOString(),
                 selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus } }), {}),
@@ -699,7 +699,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     <CardTitle>Selected Event</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <h2 className="text-xl font-semibold">{event.name}</h2>
+                    <h2 className="text-xl font-semibold">{event.name.replace(/\(PSJA students only\)/i, '').trim()}</h2>
                     <p className="text-muted-foreground">{format(new Date(event.date), 'PPP')} • {event.location}</p>
                 </CardContent>
             </Card>
