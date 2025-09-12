@@ -13,7 +13,7 @@ import { type ChangeRequest } from '@/lib/data/requests-data';
 import { Loader2 } from 'lucide-react';
 import { useEvents } from '@/hooks/use-events';
 import { format } from 'date-fns';
-import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
+import { recreateInvoiceAction } from '@/app/requests/actions';
 import { Label } from './ui/label';
 import { Checkbox } from './ui/checkbox';
 
@@ -57,7 +57,10 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
   }, [isOpen, request]);
   
   useEffect(() => {
-    calculateChargeSummary(originalConfirmation, request, waiveFees);
+    if(originalConfirmation && request) {
+      calculateChargeSummary(originalConfirmation, request, waiveFees);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waiveFees, originalConfirmation, request]);
 
   const calculateChargeSummary = (confirmation: any, currentRequest: ChangeRequest, shouldWaiveFees: boolean) => {
@@ -195,7 +198,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         };
     });
 
-    const { oldInvoiceId, newInvoiceId, newInvoiceNumber } = await recreateInvoiceFromRoster({
+    const actionResult = await recreateInvoiceAction({
         originalInvoiceId: originalConfirmation.invoiceId,
         players: newPlayerRoster,
         uscfFee: 24,
@@ -208,6 +211,12 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         eventDate: originalConfirmation.eventDate,
         revisionMessage: `Request #${request.id} processed: ${request.type} for ${request.player}`
     });
+
+    if (!actionResult.success) {
+      throw new Error(actionResult.error);
+    }
+
+    const { newInvoiceNumber } = actionResult.data;
 
     const requestRef = doc(db, 'requests', request.id);
     await updateDoc(requestRef, { 
