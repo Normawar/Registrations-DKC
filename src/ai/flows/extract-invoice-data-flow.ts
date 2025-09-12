@@ -7,10 +7,9 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { createInvoice } from './create-invoice-flow';
-import { recreateInvoiceFromRoster } from './recreate-invoice-from-roster-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 
@@ -115,6 +114,8 @@ const extractInvoiceDataFlow = ai.defineFlow(
       }
       
       const playersToInvoice = [];
+      const selections: Record<string, any> = {};
+
       for (const player of extracted.players) {
         const [firstName, ...lastNameParts] = player.playerName.split(' ');
         const lastName = lastNameParts.join(' ') || 'Unknown';
@@ -122,8 +123,6 @@ const extractInvoiceDataFlow = ai.defineFlow(
         const baseRegistrationFee = player.fee > uscfFee ? player.fee - uscfFee : player.fee;
         const uscfAction = player.fee > baseRegistrationFee;
 
-        // A real implementation would search for existing players first
-        // For this tool, we will create new players to ensure data integrity from the invoice
         const newPlayerId = player.uscfId || `temp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
         
         const newPlayerData: MasterPlayer = {
@@ -151,6 +150,12 @@ const extractInvoiceDataFlow = ai.defineFlow(
             lateFee: 0,
             uscfAction: uscfAction,
         });
+
+        selections[newPlayerId] = {
+            section: '',
+            status: 'active',
+            uscfStatus: uscfAction ? 'new' : 'current'
+        };
       }
 
       // Step 3: Create or update the invoice
@@ -160,10 +165,11 @@ const extractInvoiceDataFlow = ai.defineFlow(
       let action: 'created' | 'updated' = 'created';
 
       if (existingInvoice) {
-        // Invoice exists, so we update it by recreating it.
+        // Invoice exists, so we update it in place.
         action = 'updated';
-        const recreateInput = {
-          originalInvoiceId: existingInvoice.invoiceId,
+        const totalInvoiced = playersToInvoice.reduce((acc, p) => acc + p.baseRegistrationFee + (p.lateFee || 0) + (p.uscfAction ? uscfFee : 0), 0);
+        const updatedInvoiceData = {
+          ...existingInvoice,
           sponsorName: extracted.sponsorName,
           sponsorEmail: extracted.sponsorEmail,
           schoolName: extracted.schoolName,
@@ -171,16 +177,17 @@ const extractInvoiceDataFlow = ai.defineFlow(
           teamCode: teamCode,
           eventName: extracted.eventName,
           eventDate: extracted.eventDate,
-          uscfFee: uscfFee,
-          players: playersToInvoice,
-          requestingUserRole: 'organizer'
+          selections: selections,
+          totalInvoiced: totalInvoiced,
+          updatedAt: new Date().toISOString(),
         };
-        const recreationResult = await recreateInvoiceFromRoster(recreateInput);
+        const invoiceRef = doc(db, 'invoices', existingInvoice.id);
+        await setDoc(invoiceRef, updatedInvoiceData, { merge: true });
+
         invoiceResult = {
-          invoiceId: recreationResult.newInvoiceId,
-          invoiceNumber: recreationResult.newInvoiceNumber,
-          status: recreationResult.newStatus,
-          invoiceUrl: recreationResult.newInvoiceUrl,
+          invoiceId: existingInvoice.id,
+          invoiceNumber: existingInvoice.invoiceNumber,
+          status: existingInvoice.status || 'DRAFT',
         };
       } else {
         // No invoice found, create a new one.
