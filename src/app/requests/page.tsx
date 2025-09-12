@@ -1,7 +1,8 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, doc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,17 +19,21 @@ import { format } from 'date-fns';
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { processBatchedRequests } from './actions';
 
+type EnrichedChangeRequest = ChangeRequest & {
+    schoolName?: string;
+    invoiceNumber?: string;
+};
 
 export default function RequestsPage() {
     const { profile, isProfileLoaded } = useSponsorProfile();
     const { toast } = useToast();
-    const [requests, setRequests] = useState<ChangeRequest[]>([]);
+    const [requests, setRequests] = useState<EnrichedChangeRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState('Pending');
     const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
 
-    const [selectedRequest, setSelectedRequest] = useState<ChangeRequest | null>(null);
+    const [selectedRequest, setSelectedRequest] = useState<EnrichedChangeRequest | null>(null);
     const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
     
     const loadRequests = useCallback(async () => {
@@ -39,14 +44,35 @@ export default function RequestsPage() {
             let q = collection(db, 'requests');
             let queries: any[] = [orderBy('submitted', 'desc'), limit(200)];
             
-            // Non-organizers only see their own requests
             if (profile.role !== 'organizer') {
                 queries.unshift(where('submittedBy', '==', `${profile.firstName} ${profile.lastName}`));
             }
 
             const requestSnapshot = await getDocs(query(q, ...queries));
             const requestList = requestSnapshot.docs.map(doc => doc.data() as ChangeRequest);
-            setRequests(requestList);
+            
+            // Enrich requests with invoice data
+            const enrichedRequests: EnrichedChangeRequest[] = await Promise.all(
+                requestList.map(async (req) => {
+                    if (!req.confirmationId) return req;
+                    try {
+                        const invoiceDoc = await getDoc(doc(db, 'invoices', req.confirmationId));
+                        if (invoiceDoc.exists()) {
+                            const invoiceData = invoiceDoc.data();
+                            return {
+                                ...req,
+                                schoolName: invoiceData.schoolName,
+                                invoiceNumber: invoiceData.invoiceNumber,
+                            };
+                        }
+                    } catch (e) {
+                        console.error(`Could not fetch invoice ${req.confirmationId} for request ${req.id}`);
+                    }
+                    return req;
+                })
+            );
+
+            setRequests(enrichedRequests);
         } catch (error) {
             console.error("Error loading change requests:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch change requests.' });
@@ -192,7 +218,9 @@ export default function RequestsPage() {
                                                     />
                                                 </TableHead>
                                             )}
-                                            <TableHead>Event</TableHead>
+                                            <TableHead>Invoice #</TableHead>
+                                            <TableHead>School</TableHead>
+                                            <TableHead>Event Date</TableHead>
                                             <TableHead>Player</TableHead>
                                             <TableHead>Request Type</TableHead>
                                             <TableHead>Submitted</TableHead>
@@ -202,9 +230,9 @@ export default function RequestsPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {isLoading ? (
-                                            <TableRow><TableCell colSpan={isOrganizer ? 7 : 6} className="h-24 text-center">Loading requests...</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={isOrganizer ? 8 : 7} className="h-24 text-center">Loading requests...</TableCell></TableRow>
                                         ) : filteredRequests.length === 0 ? (
-                                            <TableRow><TableCell colSpan={isOrganizer ? 7 : 6} className="h-24 text-center">No requests found matching your filter.</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={isOrganizer ? 8 : 7} className="h-24 text-center">No requests found matching your filter.</TableCell></TableRow>
                                         ) : (
                                             filteredRequests.map(req => (
                                                 <TableRow key={req.id}>
@@ -217,7 +245,9 @@ export default function RequestsPage() {
                                                             />
                                                         </TableCell>
                                                     )}
-                                                    <TableCell>{req.event}</TableCell>
+                                                    <TableCell>{req.invoiceNumber || 'N/A'}</TableCell>
+                                                    <TableCell>{req.schoolName || 'N/A'}</TableCell>
+                                                    <TableCell>{req.eventDate ? format(new Date(req.eventDate), 'PPP') : 'N/A'}</TableCell>
                                                     <TableCell>{req.player}</TableCell>
                                                     <TableCell>{req.type}</TableCell>
                                                     <TableCell>{format(new Date(req.submitted), 'PPP')}</TableCell>

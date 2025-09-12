@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -19,7 +20,7 @@ import { Checkbox } from './ui/checkbox';
 interface ReviewRequestDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  request: ChangeRequest;
+  request: ChangeRequest & { schoolName?: string; invoiceNumber?: string };
   profile: SponsorProfile;
   onRequestUpdated: () => void;
 }
@@ -255,11 +256,15 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
           <DialogDescription>Review the details below and approve or deny the request.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-            <div><span className="font-semibold">Event:</span> {request.event}</div>
-            <div><span className="font-semibold">Player:</span> {request.player}</div>
-            <div><span className="font-semibold">Request Type:</span> {request.type}</div>
-            <div><span className="font-semibold">Details:</span> <p className="text-sm text-muted-foreground p-2 bg-muted rounded-md">{request.details}</p></div>
-            <div><span className="font-semibold">Submitted By:</span> {request.submittedBy} on {format(new Date(request.submitted), 'PPP p')}</div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <div><span className="font-semibold text-muted-foreground">Invoice #:</span> {request.invoiceNumber || 'N/A'}</div>
+                <div><span className="font-semibold text-muted-foreground">School:</span> {request.schoolName || 'N/A'}</div>
+                <div><span className="font-semibold text-muted-foreground">Event Date:</span> {request.eventDate ? format(new Date(request.eventDate), 'PPP') : 'N/A'}</div>
+                <div><span className="font-semibold text-muted-foreground">Player:</span> {request.player}</div>
+            </div>
+            <div><span className="font-semibold text-muted-foreground">Request Type:</span> {request.type}</div>
+            <div><span className="font-semibold text-muted-foreground">Details:</span> <p className="text-sm p-2 bg-muted rounded-md mt-1">{request.details}</p></div>
+            <div><span className="font-semibold text-muted-foreground">Submitted By:</span> {request.submittedBy} on {format(new Date(request.submitted), 'PPP p')}</div>
 
             {chargeSummary && (
                 <div className="border-t pt-4 mt-4">
