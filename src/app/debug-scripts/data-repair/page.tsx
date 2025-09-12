@@ -73,7 +73,7 @@ function PlayerDataRepairer() {
             let repairedCount = 0;
 
             for (const player of placeholderPlayers) {
-                // Attempt to find a match in the migration data source
+                // Attempt to find a match in the migration data source by USCF ID
                 let dataSourceEntry = migrationDataSource.find(source => source.uscfId && source.uscfId === player.uscfId);
                 
                 // If no match by USCF ID, try matching by email as a fallback
@@ -952,5 +952,3 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
-
-    
