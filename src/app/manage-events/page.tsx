@@ -95,7 +95,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { DistrictCoordinatorGuard } from '@/components/auth-guard';
+import { OrganizerGuard } from '@/components/auth-guard';
 import { generateTeamCode } from '@/lib/school-utils';
 
 
@@ -1006,8 +1006,8 @@ function ManageEventsContent() {
 
 export default function ManageEventsPage() {
   return (
-    <DistrictCoordinatorGuard>
+    <OrganizerGuard>
       <ManageEventsContent />
-    </DistrictCoordinatorGuard>
+    </OrganizerGuard>
   );
 }
