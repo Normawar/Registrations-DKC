@@ -184,14 +184,14 @@ const createInvoiceFlow = ai.defineFlow(
       }
 
       // 2. Late Fees (exclude waived)
-      const lateFeePlayers = processedPlayers.filter(p => p.lateFee > 0 && !p.waiveLateFee);
+      const lateFeePlayers = processedPlayers.filter(p => p.lateFee && p.lateFee > 0 && !p.waiveLateFee);
       if (lateFeePlayers.length > 0) {
         const lateFee = lateFeePlayers[0].lateFee;
         const lateFeePlayerNotes = lateFeePlayers.map((p, i) => `${i + 1}. ${p.playerName}`).join('\n');
         lineItems.push({
           name: 'Late Fee',
           quantity: String(lateFeePlayers.length),
-          basePriceMoney: { amount: BigInt(Math.round(lateFee * 100)), currency: 'USD' },
+          basePriceMoney: { amount: BigInt(Math.round(lateFee! * 100)), currency: 'USD' },
           note: lateFeePlayerNotes,
         });
       }
@@ -279,5 +279,3 @@ const createInvoiceFlow = ai.defineFlow(
     }
   }
 );
-
-    

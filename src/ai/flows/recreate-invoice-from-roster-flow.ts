@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Recreates an invoice with an updated player roster.
@@ -75,10 +76,14 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
       // Step 1: Get original invoice details to construct the revised invoice number
       const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(input.originalInvoiceId);
 
-      // Step 2: Cancel the original invoice.
-      console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
-      await cancelInvoice({ invoiceId: input.originalInvoiceId, requestingUserRole: 'organizer' });
-      console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
+      if (originalInvoice?.status === 'CANCELED') {
+        console.log(`Original invoice ${input.originalInvoiceId} is already canceled. Proceeding to create new invoice without canceling again.`);
+      } else {
+        // Step 2: Cancel the original invoice.
+        console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
+        await cancelInvoice({ invoiceId: input.originalInvoiceId, requestingUserRole: 'organizer' });
+        console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
+      }
 
       // Step 3: Create a new invoice with the updated details.
       const revisionNumber = (originalInvoice?.title?.match(/rev\.(\d+)/)?.[1] || '1') + 1;

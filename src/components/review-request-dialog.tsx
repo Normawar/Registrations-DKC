@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -14,6 +14,8 @@ import { Loader2 } from 'lucide-react';
 import { useEvents } from '@/hooks/use-events';
 import { format } from 'date-fns';
 import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
+import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
 
 interface ReviewRequestDialogProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
   const [chargeSummary, setChargeSummary] = useState<{ credit: number; newCharges: number; netChange: number } | null>(null);
+  const [waiveFees, setWaiveFees] = useState(false);
 
   useEffect(() => {
     const fetchConfirmation = async () => {
@@ -39,17 +42,26 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         if (docSnap.exists()) {
           const confirmationData = { id: docSnap.id, ...docSnap.data() };
           setOriginalConfirmation(confirmationData);
-          calculateChargeSummary(confirmationData);
+          calculateChargeSummary(confirmationData, request, false);
         } else {
           console.error(`Confirmation with ID ${request.confirmationId} not found.`);
         }
+      } else if (!isOpen) {
+        // Reset state on close
+        setWaiveFees(false);
+        setChargeSummary(null);
+        setOriginalConfirmation(null);
       }
     };
     fetchConfirmation();
-  }, [isOpen, request.confirmationId]);
+  }, [isOpen, request]);
+  
+  useEffect(() => {
+    calculateChargeSummary(originalConfirmation, request, waiveFees);
+  }, [waiveFees, originalConfirmation, request]);
 
-  const calculateChargeSummary = (confirmation: any) => {
-    if (!confirmation || !request) {
+  const calculateChargeSummary = (confirmation: any, currentRequest: ChangeRequest, shouldWaiveFees: boolean) => {
+    if (!confirmation || !currentRequest) {
       setChargeSummary(null);
       return;
     }
@@ -62,30 +74,37 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     const uscfFee = 24;
 
     const getPlayerFee = (player: MasterPlayer, selections: any) => {
-      let fee = eventDetails.regularFee; // Assuming regular fee for simplicity
+      let fee = eventDetails.regularFee;
       if (selections[player.id]?.uscfStatus !== 'current') {
         fee += uscfFee;
       }
       return fee;
     };
-
-    if (request.type === 'Withdrawal') {
-      const playerToRemove = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === request.player.toLowerCase());
+    
+    if (currentRequest.type === 'Withdrawal') {
+      const playerToRemove = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === currentRequest.player.toLowerCase());
       if (playerToRemove && confirmation.selections[playerToRemove.id]) {
         credit = getPlayerFee(playerToRemove, confirmation.selections);
       }
-    } else if (request.type === 'Substitution') {
-      const playerToRemove = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === request.player.toLowerCase());
+    } else if (currentRequest.type === 'Substitution') {
+      const playerToRemove = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === currentRequest.player.toLowerCase());
       if (playerToRemove && confirmation.selections[playerToRemove.id]) {
         credit = getPlayerFee(playerToRemove, confirmation.selections);
       }
       
-      const detailsMatch = request.details?.match(/with (.*)/);
+      const detailsMatch = currentRequest.details?.match(/with (.*)/);
       const newPlayerName = detailsMatch ? detailsMatch[1].replace(/\..*/, '').trim() : null;
       const playerToAdd = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === newPlayerName?.toLowerCase());
       
       if (playerToAdd) {
-        newCharges = getPlayerFee(playerToAdd, { [playerToAdd.id]: { uscfStatus: 'current' } }); // Simplified assumption
+        let charge = eventDetails.regularFee;
+        if (!shouldWaiveFees) {
+            // Apply late fee logic here if necessary in the future
+        }
+        if (playerToAdd.uscfId.toUpperCase() === 'NEW' || !playerToAdd.uscfExpiration || new Date(playerToAdd.uscfExpiration) < new Date(eventDetails.date)) {
+            charge += uscfFee;
+        }
+        newCharges = charge;
       }
     }
 
@@ -170,7 +189,9 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
             baseRegistrationFee: eventDetails.regularFee,
             lateFee: 0,
             uscfAction: newSelections[playerId].uscfStatus !== 'current',
-            isGtPlayer: player.studentType === 'gt'
+            isGtPlayer: player.studentType === 'gt',
+            waiveLateFee: waiveFees, // Pass the waiver flag
+            section: newSelections[playerId].section
         };
     });
 
@@ -185,6 +206,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         teamCode: originalConfirmation.teamCode,
         eventName: originalConfirmation.eventName,
         eventDate: originalConfirmation.eventDate,
+        revisionMessage: `Request #${request.id} processed: ${request.type} for ${request.player}`
     });
 
     const requestRef = doc(db, 'requests', request.id);
@@ -223,6 +245,14 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
                             <span>{chargeSummary.netChange < 0 ? `-$${Math.abs(chargeSummary.netChange).toFixed(2)}` : `+$${chargeSummary.netChange.toFixed(2)}`}</span>
                         </div>
                     </div>
+                    {chargeSummary.netChange > 0 && (
+                        <div className="flex items-center space-x-2 mt-4">
+                            <Checkbox id="waive-fees" checked={waiveFees} onCheckedChange={(checked) => setWaiveFees(!!checked)} />
+                            <Label htmlFor="waive-fees" className="text-sm font-medium">
+                                Waive Additional Fees
+                            </Label>
+                        </div>
+                    )}
                     <p className="text-xs text-muted-foreground mt-2">Note: This is an estimate. The final invoice will reflect exact charges.</p>
                 </div>
             )}
