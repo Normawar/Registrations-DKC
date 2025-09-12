@@ -5,16 +5,15 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
 import { ApiError } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
 import {
   RecreateInvoiceInputSchema,
-  RecreateInvoiceInput,
+  type RecreateInvoiceInput,
   RecreateInvoiceOutputSchema,
-  RecreateInvoiceOutput,
+  type RecreateInvoiceOutput,
 } from './schemas';
 
 

@@ -10,9 +10,8 @@ import { type ChangeRequest } from '@/lib/data/requests-data';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import {
   BatchedRequestInputSchema,
-  ProcessBatchInput,
   ProcessBatchOutputSchema,
-  ProcessBatchOutput,
+  type ProcessBatchOutput,
 } from './schemas';
 
 // Define the Event type directly in the server-side flow to avoid client-side imports.

@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -157,7 +156,11 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     if (request.type === 'Substitution') {
       const playerToRemoveId = Object.keys(newSelections).find(id => {
           const player = allPlayers.find(p => p.id === id);
-          return player && `${player.firstName} ${player.lastName}`.trim().toLowerCase() === playerNameToRemove.toLowerCase();
+          if (!player) {
+              console.warn(`Player with ID ${id} not found, skipping.`);
+              return false;
+          }
+          return `${player.firstName} ${player.lastName}`.trim().toLowerCase() === playerNameToRemove.toLowerCase();
       });
       
       const detailsMatch = request.details?.match(/with (.*)/);
@@ -179,7 +182,11 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     } else if (request.type === 'Withdrawal') {
       const playerToRemoveId = Object.keys(newSelections).find(id => {
         const player = allPlayers.find(p => p.id === id);
-        return player && `${player.firstName} ${player.lastName}`.trim().toLowerCase() === playerNameToRemove.toLowerCase();
+        if (!player) {
+            console.warn(`Player with ID ${id} not found, skipping.`);
+            return false;
+        }
+        return `${player.firstName} ${player.lastName}`.trim().toLowerCase() === playerNameToRemove.toLowerCase();
       });
       if (playerToRemoveId) {
         delete newSelections[playerToRemoveId];

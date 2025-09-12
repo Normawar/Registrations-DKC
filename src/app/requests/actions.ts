@@ -2,7 +2,7 @@
 
 import { processBatchedRequestsFlow } from '@/ai/flows/process-batched-requests-flow';
 import { recreateInvoiceFromRoster as recreateInvoiceFromRosterFlow } from '@/ai/flows/recreate-invoice-from-roster-flow';
-import type { ProcessBatchInput, ProcessBatchOutput, RecreateInvoiceInput } from '@/ai/flows/schemas';
+import type { ProcessBatchInput, ProcessBatchOutput, RecreateInvoiceInput, RecreateInvoiceOutput } from '@/ai/flows/schemas';
 
 /**
  * Server action to process a batch of change requests.
@@ -23,12 +23,11 @@ export async function processBatchedRequests(input: ProcessBatchInput): Promise<
   }
 }
 
-
 /**
  * Server action to recreate an invoice from a roster.
  * This acts as a safe wrapper around the Genkit flow.
  */
-export async function recreateInvoiceAction(input: RecreateInvoiceInput) {
+export async function recreateInvoiceAction(input: RecreateInvoiceInput): Promise<{ success: true, data: RecreateInvoiceOutput } | { success: false, error: string }> {
   try {
     const result = await recreateInvoiceFromRosterFlow(input);
     return { success: true, data: result };
