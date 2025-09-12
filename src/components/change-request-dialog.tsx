@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -163,7 +164,7 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
     const id = `req-${Date.now()}`;
     const newRequest: ChangeRequest = {
         id,
-        confirmationId: selectedConfirmation.id,
+        confirmationId: selectedConfirmation.id, // Use the correct Firestore document ID
         player,
         event: selectedConfirmation.eventName,
         eventDate: selectedConfirmation.eventDate,
