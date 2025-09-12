@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -12,7 +13,7 @@ import { type ChangeRequest } from '@/lib/data/requests-data';
 import { Loader2 } from 'lucide-react';
 import { useEvents } from '@/hooks/use-events';
 import { format } from 'date-fns';
-import { rebuildInvoiceFromRoster } from '@/ai/flows/rebuild-invoice-from-roster-flow';
+import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
 
 interface ReviewRequestDialogProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
   const [originalConfirmation, setOriginalConfirmation] = useState<any>(null);
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
+  const [chargeSummary, setChargeSummary] = useState<{ credit: number; newCharges: number; netChange: number } | null>(null);
 
   useEffect(() => {
     const fetchConfirmation = async () => {
@@ -35,7 +37,9 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         const docRef = doc(db, 'invoices', request.confirmationId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setOriginalConfirmation({ id: docSnap.id, ...docSnap.data() });
+          const confirmationData = { id: docSnap.id, ...docSnap.data() };
+          setOriginalConfirmation(confirmationData);
+          calculateChargeSummary(confirmationData);
         } else {
           console.error(`Confirmation with ID ${request.confirmationId} not found.`);
         }
@@ -43,6 +47,50 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     };
     fetchConfirmation();
   }, [isOpen, request.confirmationId]);
+
+  const calculateChargeSummary = (confirmation: any) => {
+    if (!confirmation || !request) {
+      setChargeSummary(null);
+      return;
+    }
+
+    const eventDetails = events.find(e => e.id === confirmation.eventId);
+    if (!eventDetails) return;
+
+    let credit = 0;
+    let newCharges = 0;
+    const uscfFee = 24;
+
+    const getPlayerFee = (player: MasterPlayer, selections: any) => {
+      let fee = eventDetails.regularFee; // Assuming regular fee for simplicity
+      if (selections[player.id]?.uscfStatus !== 'current') {
+        fee += uscfFee;
+      }
+      return fee;
+    };
+
+    if (request.type === 'Withdrawal') {
+      const playerToRemove = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === request.player.toLowerCase());
+      if (playerToRemove && confirmation.selections[playerToRemove.id]) {
+        credit = getPlayerFee(playerToRemove, confirmation.selections);
+      }
+    } else if (request.type === 'Substitution') {
+      const playerToRemove = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === request.player.toLowerCase());
+      if (playerToRemove && confirmation.selections[playerToRemove.id]) {
+        credit = getPlayerFee(playerToRemove, confirmation.selections);
+      }
+      
+      const detailsMatch = request.details?.match(/with (.*)/);
+      const newPlayerName = detailsMatch ? detailsMatch[1].replace(/\..*/, '').trim() : null;
+      const playerToAdd = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === newPlayerName?.toLowerCase());
+      
+      if (playerToAdd) {
+        newCharges = getPlayerFee(playerToAdd, { [playerToAdd.id]: { uscfStatus: 'current' } }); // Simplified assumption
+      }
+    }
+
+    setChargeSummary({ credit, newCharges, netChange: newCharges - credit });
+  };
 
   const handleDecision = async (decision: 'Approved' | 'Denied') => {
     setIsSubmitting(true);
@@ -77,7 +125,6 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
     if (!eventDetails) throw new Error('Original event not found.');
 
-    // 1. Construct the new player roster based on the request
     let newSelections = { ...(originalConfirmation.selections || {}) };
     let playerNameToRemove = request.player;
     
@@ -99,7 +146,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
 
       newSelections[newPlayer.id] = { 
         section: newPlayer.section, 
-        uscfStatus: newPlayer.uscfId.toUpperCase() === 'NEW' ? 'new' : 'current', // Simplified status
+        uscfStatus: newPlayer.uscfId.toUpperCase() === 'NEW' ? 'new' : 'current',
         status: 'active' 
       };
 
@@ -114,8 +161,6 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         throw new Error(`Could not find player "${playerNameToRemove}" in original invoice to withdraw.`);
       }
     }
-    // Note: Other request types like "Section Change" or "Bye" can be handled here by modifying `newSelections`.
-    // For now, they result in a recreation with the same roster but a new invoice number.
 
     const newPlayerRoster = Object.keys(newSelections).map(playerId => {
         const player = allPlayers.find(p => p.id === playerId)!;
@@ -123,41 +168,33 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
             playerName: `${player.firstName} ${player.lastName}`,
             uscfId: player.uscfId,
             baseRegistrationFee: eventDetails.regularFee,
-            lateFee: 0, // Late fees could be recalculated here if needed
+            lateFee: 0,
             uscfAction: newSelections[playerId].uscfStatus !== 'current',
             isGtPlayer: player.studentType === 'gt'
         };
     });
 
-    // 2. Call the reliable rebuild flow
-    const result = await rebuildInvoiceFromRoster({
-        invoiceId: originalConfirmation.invoiceId,
+    const { oldInvoiceId, newInvoiceId, newInvoiceNumber } = await recreateInvoiceFromRoster({
+        originalInvoiceId: originalConfirmation.invoiceId,
         players: newPlayerRoster,
-        uscfFee: 24, // Standard fee
+        uscfFee: 24,
+        requestingUserRole: 'organizer',
+        sponsorName: originalConfirmation.sponsorName,
+        sponsorEmail: originalConfirmation.sponsorEmail,
+        schoolName: originalConfirmation.schoolName,
+        teamCode: originalConfirmation.teamCode,
+        eventName: originalConfirmation.eventName,
+        eventDate: originalConfirmation.eventDate,
     });
 
-    // 3. Update local Firestore records
-    const batch = writeBatch(db);
-
-    // Update the original invoice
-    const invoiceRef = doc(db, 'invoices', originalConfirmation.id);
-    batch.update(invoiceRef, { 
-      selections: newSelections,
-      notes: `Updated based on request ${request.id}.`,
-      // You would also recalculate and update the total here
-    });
-
-    // Update the request status
     const requestRef = doc(db, 'requests', request.id);
-    batch.update(requestRef, { 
+    await updateDoc(requestRef, { 
       status: 'Approved',
       approvedBy: `${profile.firstName} ${profile.lastName}`,
       approvedAt: new Date().toISOString(),
     });
-    
-    await batch.commit();
 
-    toast({ title: "Request Approved & Invoice Updated", description: `The invoice has been modified successfully.` });
+    toast({ title: "Request Approved & Invoice Recreated", description: `New invoice ${newInvoiceNumber} has replaced the old one.` });
   };
 
   return (
@@ -173,6 +210,22 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
             <div><span className="font-semibold">Request Type:</span> {request.type}</div>
             <div><span className="font-semibold">Details:</span> <p className="text-sm text-muted-foreground p-2 bg-muted rounded-md">{request.details}</p></div>
             <div><span className="font-semibold">Submitted By:</span> {request.submittedBy} on {format(new Date(request.submitted), 'PPP p')}</div>
+
+            {chargeSummary && (
+                <div className="border-t pt-4 mt-4">
+                    <h4 className="font-semibold mb-2">Charge Summary</h4>
+                    <div className="space-y-1 text-sm">
+                        <div className="flex justify-between"><span>Credit for removed items:</span> <span>-${chargeSummary.credit.toFixed(2)}</span></div>
+                        <div className="flex justify-between"><span>New item charges:</span> <span>+${chargeSummary.newCharges.toFixed(2)}</span></div>
+                        <div className="border-t my-1"></div>
+                        <div className={`flex justify-between font-bold ${chargeSummary.netChange < 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <span>Net Change to Invoice:</span>
+                            <span>{chargeSummary.netChange < 0 ? `-$${Math.abs(chargeSummary.netChange).toFixed(2)}` : `+$${chargeSummary.netChange.toFixed(2)}`}</span>
+                        </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">Note: This is an estimate. The final invoice will reflect exact charges.</p>
+                </div>
+            )}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -181,7 +234,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
               <Button variant="destructive" onClick={() => handleDecision('Denied')} disabled={isSubmitting}>Deny</Button>
               <Button onClick={() => handleDecision('Approved')} disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Approve Request
+                Confirm & Process Change
               </Button>
             </>
           )}
