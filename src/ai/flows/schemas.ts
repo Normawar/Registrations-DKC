@@ -1,4 +1,3 @@
-'use server';
 /**
  * @fileOverview Centralized Zod schemas for Genkit flows.
  * This file contains all the Zod schema definitions and their inferred types
