@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -72,9 +73,15 @@ function PlayerDataRepairer() {
             let repairedCount = 0;
 
             for (const player of placeholderPlayers) {
-                const dataSourceEntry = migrationDataSource.find(source => source.uscfId === player.uscfId);
+                // Attempt to find a match in the migration data source
+                let dataSourceEntry = migrationDataSource.find(source => source.uscfId && source.uscfId === player.uscfId);
                 
-                if (dataSourceEntry && dataSourceEntry.studentName) {
+                // If no match by USCF ID, try matching by email as a fallback
+                if (!dataSourceEntry && player.email) {
+                    dataSourceEntry = migrationDataSource.find(source => source.email && source.email.toLowerCase() === player.email.toLowerCase());
+                }
+
+                if (dataSourceEntry && dataSourceEntry.studentName && dataSourceEntry.studentName !== '[System ID]') {
                     const [firstName, ...lastNameParts] = dataSourceEntry.studentName.split(' ');
                     const lastName = lastNameParts.join(' ');
                     
@@ -90,7 +97,7 @@ function PlayerDataRepairer() {
                         addLog(`⚠️ Skipping ${player.id}: Could not parse name from source data '${dataSourceEntry.studentName}'`);
                     }
                 } else {
-                     addLog(`❌ Could not find repair source for player ID: ${player.id}`);
+                     addLog(`❌ Could not find repair source for player ID: ${player.id} (Email: ${player.email || 'N/A'})`);
                 }
             }
 
@@ -945,3 +952,5 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
+
+    
