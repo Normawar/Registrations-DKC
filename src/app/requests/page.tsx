@@ -1,42 +1,259 @@
 'use client';
 
-import { testBatchAction } from './actions';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
+import { AppLayout } from "@/components/app-layout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Check, X, Loader2, RefreshCw } from 'lucide-react';
+import { ReviewRequestDialog } from '@/components/review-request-dialog';
+import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { type ChangeRequest } from '@/lib/data/requests-data';
+import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow';
+
 
 export default function RequestsPage() {
-  async function handleTest() {
-    try {
-      console.log('CLIENT: Calling server action...');
-      const result = await testBatchAction();
-      
-      if (result.success) {
-        console.log('CLIENT: Success!', result.data);
-        alert(`Success: ${JSON.stringify(result.data)}`);
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('CLIENT: Error!', error);
-      alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
+    const { profile, isProfileLoaded } = useSponsorProfile();
+    const { toast } = useToast();
+    const [requests, setRequests] = useState<ChangeRequest[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [filter, setFilter] = useState('Pending');
+    const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
+    const [isProcessing, setIsProcessing] = useState(false);
 
-  return (
-    <div style={{ padding: '20px' }}>
-      <h1>Server Action Test</h1>
-      <button 
-        onClick={handleTest}
-        style={{ 
-          padding: '10px 20px', 
-          fontSize: '16px',
-          backgroundColor: '#007bff',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer'
-        }}
-      >
-        Test Server Action
-      </button>
-    </div>
-  );
+    const [selectedRequest, setSelectedRequest] = useState<ChangeRequest | null>(null);
+    const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+    
+    const loadRequests = useCallback(async () => {
+        if (!db || !profile) return;
+        setIsLoading(true);
+
+        try {
+            let q = collection(db, 'requests');
+            let queries: any[] = [orderBy('submitted', 'desc'), limit(200)];
+            
+            // Non-organizers only see their own requests
+            if (profile.role !== 'organizer') {
+                queries.unshift(where('submittedBy', '==', `${profile.firstName} ${profile.lastName}`));
+            }
+
+            const requestSnapshot = await getDocs(query(q, ...queries));
+            const requestList = requestSnapshot.docs.map(doc => doc.data() as ChangeRequest);
+            setRequests(requestList);
+        } catch (error) {
+            console.error("Error loading change requests:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch change requests.' });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [profile, toast]);
+
+    useEffect(() => {
+        if (isProfileLoaded) {
+            loadRequests();
+        }
+    }, [isProfileLoaded, loadRequests]);
+    
+    const filteredRequests = useMemo(() => {
+        if (filter === 'All') return requests;
+        return requests.filter(r => r.status === filter);
+    }, [requests, filter]);
+
+    const handleSelectRequest = (requestId: string) => {
+        setSelectedRequestIds(prev =>
+            prev.includes(requestId)
+                ? prev.filter(id => id !== requestId)
+                : [...prev, requestId]
+        );
+    };
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedRequestIds(filteredRequests.map(r => r.id));
+        } else {
+            setSelectedRequestIds([]);
+        }
+    };
+    
+    const handleBatchAction = async (decision: 'Approved' | 'Denied') => {
+        if (selectedRequestIds.length === 0) {
+            toast({ title: 'No Requests Selected', description: 'Please select one or more requests to process.'});
+            return;
+        }
+        
+        if (!profile) {
+            toast({ variant: 'destructive', title: 'Error', description: 'User profile not available.'});
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            const result = await processBatchedRequests({
+                requestIds: selectedRequestIds,
+                decision,
+                processingUser: {
+                    uid: profile.uid,
+                    firstName: profile.firstName,
+                    lastName: profile.lastName,
+                    email: profile.email
+                },
+                waiveFees: false, // Defaulting, could be an option later
+            });
+
+            if (result.failedCount > 0) {
+                 toast({ variant: 'destructive', title: `Batch process partially failed`, description: `${result.failedCount} request(s) could not be processed. ${result.errors?.[0] || ''}` });
+            } else {
+                 toast({ title: 'Batch Process Successful', description: `${result.processedCount} request(s) have been ${decision.toLowerCase()}.` });
+            }
+
+            setSelectedRequestIds([]);
+            loadRequests(); // Refresh the list
+        } catch (error) {
+            console.error("Batch action failed:", error);
+            toast({ variant: 'destructive', title: 'Batch Action Failed', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleReviewRequest = (request: ChangeRequest) => {
+        setSelectedRequest(request);
+        setIsReviewDialogOpen(true);
+    };
+    
+    const isOrganizer = profile?.role === 'organizer';
+
+    return (
+        <>
+            <AppLayout>
+                <div className="space-y-8">
+                    <div>
+                        <h1 className="text-3xl font-bold font-headline">Change Requests</h1>
+                        <p className="text-muted-foreground">
+                            {isOrganizer ? "Review and process change requests submitted by sponsors." : "Track the status of your submitted change requests."}
+                        </p>
+                    </div>
+
+                    <Card>
+                        <CardHeader>
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <CardTitle>Requests</CardTitle>
+                                    <CardDescription>
+                                        {isOrganizer ? `Showing ${filteredRequests.length} of ${requests.length} total requests.` : `Your submitted requests.`}
+                                    </CardDescription>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <Select value={filter} onValueChange={setFilter}>
+                                        <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Pending">Pending</SelectItem>
+                                            <SelectItem value="Approved">Approved</SelectItem>
+                                            <SelectItem value="Denied">Denied</SelectItem>
+                                            <SelectItem value="All">All</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Button variant="outline" onClick={loadRequests} disabled={isLoading}>
+                                        <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </div>
+                            </div>
+                            {isOrganizer && (
+                                <div className="flex items-center gap-2 mt-4 border-t pt-4">
+                                    <Button size="sm" onClick={() => handleBatchAction('Approved')} disabled={selectedRequestIds.length === 0 || isProcessing}>
+                                        {isProcessing && <Loader2 className="h-4 w-4 animate-spin mr-2"/>}
+                                        <Check className="h-4 w-4 mr-2"/> Approve Selected
+                                    </Button>
+                                    <Button size="sm" variant="destructive" onClick={() => handleBatchAction('Denied')} disabled={selectedRequestIds.length === 0 || isProcessing}>
+                                        {isProcessing && <Loader2 className="h-4 w-4 animate-spin mr-2"/>}
+                                        <X className="h-4 w-4 mr-2"/> Deny Selected
+                                    </Button>
+                                </div>
+                            )}
+                        </CardHeader>
+                        <CardContent>
+                            <div className="border rounded-md">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            {isOrganizer && (
+                                                <TableHead className="w-12">
+                                                    <Checkbox
+                                                      onCheckedChange={handleSelectAll}
+                                                      checked={selectedRequestIds.length === filteredRequests.length && filteredRequests.length > 0}
+                                                      aria-label="Select all"
+                                                    />
+                                                </TableHead>
+                                            )}
+                                            <TableHead>Event</TableHead>
+                                            <TableHead>Player</TableHead>
+                                            <TableHead>Request Type</TableHead>
+                                            <TableHead>Submitted</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            {isOrganizer && <TableHead>Action</TableHead>}
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {isLoading ? (
+                                            <TableRow><TableCell colSpan={isOrganizer ? 7 : 6} className="h-24 text-center">Loading requests...</TableCell></TableRow>
+                                        ) : filteredRequests.length === 0 ? (
+                                            <TableRow><TableCell colSpan={isOrganizer ? 7 : 6} className="h-24 text-center">No requests found matching your filter.</TableCell></TableRow>
+                                        ) : (
+                                            filteredRequests.map(req => (
+                                                <TableRow key={req.id}>
+                                                    {isOrganizer && (
+                                                        <TableCell>
+                                                            <Checkbox
+                                                                checked={selectedRequestIds.includes(req.id)}
+                                                                onCheckedChange={() => handleSelectRequest(req.id)}
+                                                                aria-label={`Select request ${req.id}`}
+                                                            />
+                                                        </TableCell>
+                                                    )}
+                                                    <TableCell>{req.event}</TableCell>
+                                                    <TableCell>{req.player}</TableCell>
+                                                    <TableCell>{req.type}</TableCell>
+                                                    <TableCell>{format(new Date(req.submitted), 'PPP')}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant={req.status === 'Approved' ? 'default' : req.status === 'Denied' ? 'destructive' : 'secondary'} className={req.status === 'Approved' ? 'bg-green-600' : ''}>
+                                                            {req.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    {isOrganizer && (
+                                                        <TableCell>
+                                                            <Button variant="outline" size="sm" onClick={() => handleReviewRequest(req)}>
+                                                                Review
+                                                            </Button>
+                                                        </TableCell>
+                                                    )}
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </AppLayout>
+            
+            {profile && selectedRequest && (
+                <ReviewRequestDialog 
+                    isOpen={isReviewDialogOpen}
+                    onOpenChange={setIsReviewDialogOpen}
+                    request={selectedRequest}
+                    profile={profile}
+                    onRequestUpdated={loadRequests}
+                />
+            )}
+        </>
+    );
 }
