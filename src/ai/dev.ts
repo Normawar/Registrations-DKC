@@ -16,3 +16,4 @@ import '@/ai/flows/recreate-organizer-invoice-flow.ts';
 import '@/ai/flows/record-payment-flow.ts';
 import '@/ai/flows/create-psja-split-invoice-flow.ts';
 import '@/ai/flows/process-batched-requests-flow.ts';
+import '@/ai/flows/extract-invoice-data-flow.ts';
