@@ -11,29 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-
-const correctedData = [
-  { "invoiceNumber": "4307", "date": "2025-09-09", "customer": "Sponsor PSJA", "school": "ZEFERINO FARIAS EL", "district": "PHARR-SAN JUAN-ALAMO ISD", "email": "test1@email.com", "phone": "(956)354-2760", "bookkeeper": "normaguerra@yahoo.com", "gtCoordinator": "normaguerra@yahoo.com", "studentName": "[System ID]", "uscfId": "1000000", "studentType": "IND", "regFee": 20, "uscfFee": 0, "total": 20, "status": "UNKNOWN" },
-  { "invoiceNumber": "4307", "date": "2025-09-09", "customer": "Sponsor PSJA", "school": "ZEFERINO FARIAS EL", "district": "PHARR-SAN JUAN-ALAMO ISD", "email": "test1@email.com", "phone": "(956)354-2760", "bookkeeper": "normaguerra@yahoo.com", "gtCoordinator": "normaguerra@yahoo.com", "studentName": "[System ID]", "uscfId": "1300000", "studentType": "IND", "regFee": 20, "uscfFee": 0, "total": 20, "status": "UNKNOWN" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Joel Gonzalez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Elijah Martinez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Sebastian Salinas", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Aaliyah Rodriguez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Devin Valdez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Jorge Garcia", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Juan Marines", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Emely Gonzalez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Matthew Gonzalez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Alyssa Cavazos", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Julian Cantu", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Elias Garcia", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Victoria Garcia", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Jacob Gonzalez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Hector Lopez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Yolotzin Martinez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Diego Hernandez", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" },
-  { "invoiceNumber": "PSJA-UNNAMED", "school": "PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS", "district": "PHARR-SAN JUAN-ALAMO ISD", "studentName": "Alyssa Puga", "studentType": "IND", "regFee": 20, "uscfFee": 24, "total": 44, "status": "UNPAID" }
-];
+import { correctedData } from '@/lib/data/migration-data';
 
 
 export default function DataMigrationPage() {

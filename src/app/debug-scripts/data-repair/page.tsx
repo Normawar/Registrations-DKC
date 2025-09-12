@@ -25,7 +25,7 @@ import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow
 import { randomUUID } from 'crypto';
 import { getSquareClient } from '@/lib/square-client';
 import { ApiError } from 'square';
-import { correctedData as migrationDataSource } from './data-migration/page';
+import { correctedData as migrationDataSource } from '@/lib/data/migration-data';
 
 
 interface LogEntry {
