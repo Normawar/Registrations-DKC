@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { collection, getDocs, query, where, orderBy, limit, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +55,14 @@ export default function RequestsPage() {
             const enrichedRequests: EnrichedChangeRequest[] = await Promise.all(
                 requestList.map(async (req) => {
                     if (!req.confirmationId) return req;
+
+                    // Add validation to prevent crashes from invalid IDs
+                    const isValidId = req.confirmationId && !req.confirmationId.includes(':');
+                    if (!isValidId) {
+                        console.warn(`Skipping invalid confirmationId: "${req.confirmationId}" for request ${req.id}`);
+                        return req;
+                    }
+
                     try {
                         const invoiceDoc = await getDoc(doc(db, 'invoices', req.confirmationId));
                         if (invoiceDoc.exists()) {
@@ -66,7 +74,7 @@ export default function RequestsPage() {
                             };
                         }
                     } catch (e) {
-                        console.error(`Could not fetch invoice ${req.confirmationId} for request ${req.id}`);
+                        console.error(`Could not fetch invoice ${req.confirmationId} for request ${req.id}`, e);
                     }
                     return req;
                 })
@@ -230,9 +238,9 @@ export default function RequestsPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {isLoading ? (
-                                            <TableRow><TableCell colSpan={isOrganizer ? 8 : 7} className="h-24 text-center">Loading requests...</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={isOrganizer ? 9 : 8} className="h-24 text-center">Loading requests...</TableCell></TableRow>
                                         ) : filteredRequests.length === 0 ? (
-                                            <TableRow><TableCell colSpan={isOrganizer ? 8 : 7} className="h-24 text-center">No requests found matching your filter.</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={isOrganizer ? 9 : 8} className="h-24 text-center">No requests found matching your filter.</TableCell></TableRow>
                                         ) : (
                                             filteredRequests.map(req => (
                                                 <TableRow key={req.id}>
