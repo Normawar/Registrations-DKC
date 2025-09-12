@@ -12,7 +12,7 @@ import { type ChangeRequest } from '@/lib/data/requests-data';
 import { Loader2 } from 'lucide-react';
 import { useEvents } from '@/hooks/use-events';
 import { format } from 'date-fns';
-import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
+import { rebuildInvoiceFromRoster } from '@/ai/flows/rebuild-invoice-from-roster-flow';
 
 interface ReviewRequestDialogProps {
   isOpen: boolean;
@@ -129,42 +129,22 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         };
     });
 
-    // 2. Call the reliable recreate flow
-    const result = await recreateInvoiceFromRoster({
-        originalInvoiceId: originalConfirmation.invoiceId,
+    // 2. Call the reliable rebuild flow
+    const result = await rebuildInvoiceFromRoster({
+        invoiceId: originalConfirmation.invoiceId,
         players: newPlayerRoster,
-        uscfFee: 24,
-        requestingUserRole: profile.role,
-        sponsorName: originalConfirmation.purchaserName,
-        sponsorEmail: originalConfirmation.sponsorEmail,
-        schoolName: originalConfirmation.schoolName,
-        teamCode: originalConfirmation.teamCode,
-        eventName: originalConfirmation.eventName,
-        eventDate: originalConfirmation.eventDate,
-        district: originalConfirmation.district,
+        uscfFee: 24, // Standard fee
     });
 
     // 3. Update local Firestore records
     const batch = writeBatch(db);
 
-    // Mark old invoice as CANCELED
-    const oldInvoiceRef = doc(db, 'invoices', originalConfirmation.id);
-    batch.update(oldInvoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', notes: `Canceled and replaced by invoice ${result.newInvoiceNumber}` });
-    
-    // Create new invoice record
-    const newInvoiceRef = doc(db, 'invoices', result.newInvoiceId);
-    batch.set(newInvoiceRef, {
-        ...originalConfirmation,
-        id: result.newInvoiceId,
-        invoiceId: result.newInvoiceId,
-        invoiceNumber: result.newInvoiceNumber,
-        invoiceUrl: result.newInvoiceUrl,
-        status: result.newStatus,
-        invoiceStatus: result.newStatus,
-        totalInvoiced: result.newTotalAmount,
-        selections: newSelections,
-        submissionTimestamp: new Date().toISOString(),
-        previousVersionId: originalConfirmation.id,
+    // Update the original invoice
+    const invoiceRef = doc(db, 'invoices', originalConfirmation.id);
+    batch.update(invoiceRef, { 
+      selections: newSelections,
+      notes: `Updated based on request ${request.id}.`,
+      // You would also recalculate and update the total here
     });
 
     // Update the request status
@@ -173,12 +153,11 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
       status: 'Approved',
       approvedBy: `${profile.firstName} ${profile.lastName}`,
       approvedAt: new Date().toISOString(),
-      processedInBatch: result.newInvoiceId,
     });
     
     await batch.commit();
 
-    toast({ title: "Request Approved & Invoice Updated", description: `New invoice #${result.newInvoiceNumber} has been created.` });
+    toast({ title: "Request Approved & Invoice Updated", description: `The invoice has been modified successfully.` });
   };
 
   return (

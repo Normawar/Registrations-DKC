@@ -158,7 +158,7 @@ export default function PreviousEventsPage() {
                   setShowInvoiceModal(false);
                   setSelectedInvoice(null);
                 }}
-                confirmationId={selectedInvoice.id}
+                confirmation={selectedInvoice}
               />
             )}
         </>
