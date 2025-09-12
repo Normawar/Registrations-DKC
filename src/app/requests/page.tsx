@@ -26,20 +26,28 @@ import type { ChangeRequest } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import Link from 'next/link';
-import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle, Eye } from 'lucide-react';
+import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle, Eye, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { ChangeRequestDialog } from '@/components/change-request-dialog';
 import { ReviewRequestDialog } from '@/components/review-request-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
+
 
 type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy' | 'eventDate' | 'action' | 'invoiceNumber';
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<ChangeRequest[]>([]);
   const { profile } = useSponsorProfile();
+  const { toast } = useToast();
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'submitted', direction: 'descending' });
   const [confirmationsMap, setConfirmationsMap] = useState<Map<string, any>>(new Map());
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [reviewingRequest, setReviewingRequest] = useState<ChangeRequest | null>(null);
+  const [selectedRequests, setSelectedRequests] = useState<Set<string>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!db || !profile) return;
@@ -139,6 +147,62 @@ export default function RequestsPage() {
     loadData();
   };
 
+  const toggleRequestSelection = (requestId: string) => {
+    setSelectedRequests(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(requestId)) {
+            newSet.delete(requestId);
+        } else {
+            newSet.add(requestId);
+        }
+        return newSet;
+    });
+  };
+
+  const toggleAllPending = () => {
+    const pendingRequestIds = sortedRequests.filter(r => r.status === 'Pending').map(r => r.id);
+    if (selectedRequests.size === pendingRequestIds.length) {
+        setSelectedRequests(new Set());
+    } else {
+        setSelectedRequests(new Set(pendingRequestIds));
+    }
+  };
+
+  const handleBulkProcess = async (decision: 'Approved' | 'Denied') => {
+    if (selectedRequests.size === 0 || !profile) return;
+    setIsBulkProcessing(true);
+    try {
+        const result = await processBatchedRequests({
+            requestIds: Array.from(selectedRequests),
+            decision,
+            processingUser: {
+                uid: profile.uid,
+                firstName: profile.firstName,
+                lastName: profile.lastName,
+                email: profile.email
+            },
+        });
+        
+        toast({
+            title: 'Bulk Processing Complete',
+            description: `${result.processedCount} requests processed, ${result.failedCount} failed.`
+        });
+        
+        if (result.errors && result.errors.length > 0) {
+            console.error('Bulk processing errors:', result.errors);
+        }
+
+        setSelectedRequests(new Set());
+        loadData();
+
+    } catch(error) {
+        toast({ variant: 'destructive', title: 'Bulk Processing Error', description: error instanceof Error ? error.message : 'An unknown error occurred.' });
+    } finally {
+        setIsBulkProcessing(false);
+    }
+  };
+
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -149,11 +213,23 @@ export default function RequestsPage() {
                     View and manage player-submitted change requests.
                 </p>
             </div>
-            {(profile?.role === 'sponsor' || profile?.role === 'organizer') && (
+            <div className="flex gap-2">
+                {profile?.role === 'organizer' && selectedRequests.size > 0 && (
+                    <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={() => handleBulkProcess('Approved')} disabled={isBulkProcessing}>
+                            {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <Check className="h-4 w-4" />}
+                            Approve ({selectedRequests.size})
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleBulkProcess('Denied')} disabled={isBulkProcessing}>
+                             {isBulkProcessing ? <Loader2 className="h-4 w-4 animate-spin"/> : <X className="h-4 w-4" />}
+                            Deny ({selectedRequests.size})
+                        </Button>
+                    </div>
+                )}
                 <Button onClick={() => setIsRequestDialogOpen(true)}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Make A Change Request
                 </Button>
-            )}
+            </div>
         </div>
 
         <Card>
@@ -172,6 +248,14 @@ export default function RequestsPage() {
                 <Table>
                 <TableHeader>
                     <TableRow>
+                        <TableHead className="w-8">
+                          {profile?.role === 'organizer' && (
+                            <Checkbox 
+                                onCheckedChange={toggleAllPending} 
+                                checked={sortedRequests.filter(r => r.status === 'Pending').length > 0 && sortedRequests.filter(r => r.status === 'Pending').every(r => selectedRequests.has(r.id))}
+                            />
+                          )}
+                        </TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('player')} className="w-full justify-start px-4">Player {getSortIcon('player')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('event')} className="w-full justify-start px-4">Event {getSortIcon('event')}</Button></TableHead>
                         <TableHead className="p-0"><Button variant="ghost" onClick={() => requestSort('eventDate')} className="w-full justify-start px-4">Event Date {getSortIcon('eventDate')}</Button></TableHead>
@@ -187,8 +271,17 @@ export default function RequestsPage() {
                 <TableBody>
                     {sortedRequests.map((request, index) => {
                         const confirmation = confirmationsMap.get(request.confirmationId);
+                        const isPending = request.status === 'Pending';
                         return (
-                            <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`}>
+                            <TableRow key={request.id || `${request.player}-${request.submitted}-${index}`} data-state={selectedRequests.has(request.id) ? 'selected' : ''}>
+                                <TableCell>
+                                    {isPending && profile?.role === 'organizer' && (
+                                        <Checkbox 
+                                            checked={selectedRequests.has(request.id)} 
+                                            onCheckedChange={() => toggleRequestSelection(request.id)} 
+                                        />
+                                    )}
+                                </TableCell>
                                 <TableCell className="font-medium">{request.player}</TableCell>
                                 <TableCell>{request.event}</TableCell>
                                 <TableCell>{request.eventDate ? format(new Date(request.eventDate), 'PPP') : 'N/A'}</TableCell>
@@ -202,7 +295,7 @@ export default function RequestsPage() {
                                     variant={
                                     request.status === "Pending" ? "secondary" :
                                     request.status === "Approved" ? "default" :
-                                    request.status === "Denied" ? "destructive" : "secondary"
+                                    request.status === "Denied" || request.status === "Failed" ? "destructive" : "secondary"
                                     }
                                     className={request.status === 'Approved' ? 'bg-green-600 text-white' : ''}
                                 >
@@ -257,4 +350,3 @@ export default function RequestsPage() {
     </AppLayout>
   );
 }
-
