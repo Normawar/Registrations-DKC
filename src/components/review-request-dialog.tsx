@@ -2,20 +2,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { type SponsorProfile } from "@/hooks/use-sponsor-profile";
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { Loader2 } from 'lucide-react';
-import { recreateInvoiceFromRoster } from '@/ai/flows/recreate-invoice-from-roster-flow';
 import { useEvents } from '@/hooks/use-events';
 import { format } from 'date-fns';
+import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow';
 
 interface ReviewRequestDialogProps {
   isOpen: boolean;
@@ -31,7 +29,6 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
   const [originalConfirmation, setOriginalConfirmation] = useState<any>(null);
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
-
 
   useEffect(() => {
     const fetchConfirmation = async () => {
@@ -50,19 +47,17 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     setIsSubmitting(true);
     try {
       if (decision === 'Approved' && originalConfirmation) {
-        if (request.type === 'Substitution' || request.type === 'Withdrawal') {
-            await handleRecreateInvoice();
-        }
+        await handleProcessRequest();
+      } else {
+        const requestRef = doc(db, 'requests', request.id);
+        await updateDoc(requestRef, {
+          status: decision,
+          approvedBy: `${profile.firstName} ${profile.lastName}`,
+          approvedAt: new Date().toISOString(),
+        });
+        toast({ title: `Request ${decision}`, description: `The change request has been ${decision.toLowerCase()}.` });
       }
       
-      const requestRef = doc(db, 'requests', request.id);
-      await updateDoc(requestRef, {
-        status: decision,
-        approvedBy: `${profile.firstName} ${profile.lastName}`,
-        approvedAt: new Date().toISOString(),
-      });
-      
-      toast({ title: `Request ${decision}`, description: `The change request has been ${decision.toLowerCase()}.` });
       onRequestUpdated();
       onOpenChange(false);
 
@@ -74,96 +69,50 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     }
   };
   
-  const handleRecreateInvoice = async () => {
-    const originalEvent = events.find(e => e.id === originalConfirmation.eventId);
-    if (!originalEvent) {
-      throw new Error('Original event not found for recreation.');
-    }
-  
-    const fullPlayerDetails = Object.keys(originalConfirmation.selections).map(id => {
-        const player = allPlayers.find(p => p.id === id);
-        return {
-            ...player,
-            ...originalConfirmation.selections[id],
-            id: id,
-        } as MasterPlayer & { uscfStatus: string; section: string; status: 'active' | 'withdrawn' };
-    }).filter(p => p.status !== 'withdrawn');
-
-    let newPlayerList = [...fullPlayerDetails];
-  
-    if (request.type === 'Withdrawal') {
-      const playerNameToRemove = request.player.toLowerCase().trim();
-      newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() !== playerNameToRemove);
-    }
+  const handleProcessRequest = async () => {
+    const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
+    if (!eventDetails) throw new Error('Original event not found.');
     
+    let playerToAdd;
     if (request.type === 'Substitution') {
-      const playerNameToRemove = request.player.toLowerCase().trim();
-      newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() !== playerNameToRemove);
-
       const detailsMatch = request.details?.match(/with (.*)/);
       const newPlayerName = detailsMatch ? detailsMatch[1].trim() : null;
-
-      if(newPlayerName) {
+      if (newPlayerName) {
         const newPlayer = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === newPlayerName.toLowerCase());
         if (newPlayer) {
-            newPlayerList.push({ ...newPlayer, uscfStatus: 'current', section: newPlayer.section || 'High School K-12', status: 'active' });
-        } else {
-            throw new Error(`New player for substitution '${newPlayerName}' not found in database.`);
+          playerToAdd = {
+            id: newPlayer.id,
+            firstName: newPlayer.firstName,
+            lastName: newPlayer.lastName,
+            uscfId: newPlayer.uscfId,
+            section: newPlayer.section || 'High School K-12',
+            uscfStatus: 'current',
+            studentType: newPlayer.studentType,
+          };
         }
-      } else {
-        throw new Error('Could not identify new player from request details.');
       }
     }
-    
-    const recreationResult = await recreateInvoiceFromRoster({
-        originalInvoiceId: originalConfirmation.invoiceId,
-        players: newPlayerList.map(p => ({
-            playerName: `${p.firstName} ${p.lastName}`,
-            uscfId: p.uscfId,
-            baseRegistrationFee: originalEvent.regularFee,
-            lateFee: (originalConfirmation.totalInvoiced / Object.keys(originalConfirmation.selections).length) - originalEvent.regularFee,
-            uscfAction: p.uscfStatus !== 'current',
-            isGtPlayer: p.studentType === 'gt',
-            section: p.section,
-        })),
+
+    const result = await processBatchedRequests({
+      confirmationId: originalConfirmation.id,
+      requests: [{
+        requestId: request.id,
+        type: request.type as 'Withdrawal' | 'Substitution',
+        playerNameToRemove: request.player,
+        playerToAdd: playerToAdd
+      }],
+      event: {
+        regularFee: eventDetails.regularFee,
+        lateFee: eventDetails.lateFee,
         uscfFee: 24,
-        sponsorName: originalConfirmation.sponsorName || originalConfirmation.purchaserName,
-        sponsorEmail: originalConfirmation.sponsorEmail || originalConfirmation.purchaserEmail,
-        schoolName: originalConfirmation.schoolName,
-        district: originalConfirmation.district,
-        teamCode: originalConfirmation.teamCode,
-        eventName: originalConfirmation.eventName,
-        eventDate: originalConfirmation.eventDate,
-        requestingUserRole: 'organizer',
-        revisionMessage: `Invoice revised on ${format(new Date(), 'PPP')} to reflect: ${request.type} of ${request.player}.`,
-        revisionNumber: (originalConfirmation.invoiceNumber?.match(/-rev\.(\d+)$/) ? parseInt(originalConfirmation.invoiceNumber.match(/-rev\.(\d+)$/)![1]) : 1) + 1,
+      }
     });
 
-    const newConfirmationRecord = {
-        id: recreationResult.newInvoiceId, 
-        invoiceId: recreationResult.newInvoiceId,
-        eventId: originalConfirmation.eventId,
-        eventName: originalConfirmation.eventName,
-        eventDate: originalConfirmation.eventDate,
-        submissionTimestamp: new Date().toISOString(),
-        invoiceNumber: recreationResult.newInvoiceNumber,
-        invoiceUrl: recreationResult.newInvoiceUrl,
-        invoiceStatus: recreationResult.newStatus,
-        status: recreationResult.newStatus,
-        totalInvoiced: recreationResult.newTotalAmount,
-        selections: newPlayerList.reduce((acc, p) => ({ ...acc, [p.id]: { uscfStatus: p.uscfStatus, section: p.section, status: 'active' } }), {}),
-        previousVersionId: originalConfirmation.id, 
-        teamCode: originalConfirmation.teamCode,
-        schoolName: originalConfirmation.schoolName,
-        district: originalConfirmation.district,
-        sponsorName: originalConfirmation.sponsorName,
-        sponsorEmail: originalConfirmation.sponsorEmail,
-    };
-
-    await setDoc(doc(db, 'invoices', recreationResult.newInvoiceId), newConfirmationRecord);
-    await setDoc(doc(db, 'invoices', originalConfirmation.id), { status: 'CANCELED', invoiceStatus: 'CANCELED' }, { merge: true });
-
-    toast({ title: "Invoice Successfully Revised", description: `New invoice #${recreationResult.newInvoiceNumber} has been created.`});
+    if (result.success) {
+      toast({ title: "Request Approved & Invoice Updated", description: result.message });
+    } else {
+      throw new Error(result.message);
+    }
   };
 
   return (
