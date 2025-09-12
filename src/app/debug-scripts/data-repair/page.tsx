@@ -5,6 +5,7 @@ import { useState, useCallback } from 'react';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, FileText, Sparkles, AlertTriangle } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
@@ -52,8 +53,8 @@ export default function AutomatedInvoiceUploaderPage() {
 
       if (result.success) {
         toast({
-          title: 'Invoice Processed Successfully!',
-          description: `Created invoice #${result.invoiceNumber} for ${result.playersAdded} players.`,
+          title: `Invoice ${result.action === 'updated' ? 'Updated' : 'Created'} Successfully!`,
+          description: `Invoice #${result.invoiceNumber} processed for ${result.playersAdded} players.`,
         });
       } else {
         throw new Error(result.error || 'Failed to process the invoice.');
@@ -72,7 +73,7 @@ export default function AutomatedInvoiceUploaderPage() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Automated Invoice Uploader</h1>
           <p className="text-muted-foreground mt-2">
-            Upload an image or PDF of an invoice, and the AI will automatically create the necessary player and invoice records.
+            Upload an image or PDF of an invoice. The AI will extract the data, check for an existing invoice number, and either create a new invoice or override an existing one.
           </p>
         </div>
 
@@ -117,7 +118,7 @@ export default function AutomatedInvoiceUploaderPage() {
         <Card>
           <CardHeader>
             <CardTitle>2. Process Invoice</CardTitle>
-            <CardDescription>Once a file is uploaded, click the button below to let the AI extract the data and create the records.</CardDescription>
+            <CardDescription>Once a file is uploaded, click the button below to let the AI extract the data and create or update the records.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button onClick={handleExtractAndCreate} disabled={!file || isProcessing}>
@@ -126,7 +127,7 @@ export default function AutomatedInvoiceUploaderPage() {
               ) : (
                 <Sparkles className="mr-2 h-4 w-4" />
               )}
-              {isProcessing ? 'Processing Invoice...' : 'Extract & Create Invoice'}
+              {isProcessing ? 'Processing Invoice...' : 'Extract & Process Invoice'}
             </Button>
           </CardContent>
         </Card>
@@ -135,16 +136,17 @@ export default function AutomatedInvoiceUploaderPage() {
           <Card>
             <CardHeader>
                 <CardTitle className={extractedData.success ? "text-green-600" : "text-red-600"}>
-                    {extractedData.success ? "Processing Complete" : "Processing Failed"}
+                    {extractedData.success ? `Processing Complete: Invoice ${extractedData.action}` : "Processing Failed"}
                 </CardTitle>
             </CardHeader>
             <CardContent className="font-mono text-xs space-y-2 bg-muted p-4 rounded-lg">
                 <p><strong>Success:</strong> {String(extractedData.success)}</p>
                 {extractedData.success ? (
                     <>
+                        <p><strong>Action:</strong> {extractedData.action}</p>
                         <p><strong>New Invoice ID:</strong> {extractedData.invoiceId}</p>
                         <p><strong>Invoice Number:</strong> {extractedData.invoiceNumber}</p>
-                        <p><strong>Players Added:</strong> {extractedData.playersAdded}</p>
+                        <p><strong>Players Processed:</strong> {extractedData.playersAdded}</p>
                     </>
                 ) : (
                     <p><strong>Error:</strong> {extractedData.error}</p>

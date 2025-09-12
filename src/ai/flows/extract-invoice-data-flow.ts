@@ -2,14 +2,15 @@
 'use server';
 /**
  * @fileOverview An AI flow to extract structured data from an invoice image/PDF
- * and create the corresponding player and invoice records in Firestore.
+ * and create or update the corresponding player and invoice records in Firestore.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { createInvoice } from './create-invoice-flow';
+import { recreateInvoiceFromRoster } from './recreate-invoice-from-roster-flow';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 
@@ -31,6 +32,7 @@ const PlayerSchema = z.object({
 });
 
 const ExtractedInvoiceSchema = z.object({
+  invoiceNumber: z.string().optional().describe('The invoice number, if present on the document.'),
   sponsorName: z.string().describe('The name of the sponsor or person to be invoiced.'),
   sponsorEmail: z.string().email().describe("The sponsor's email address."),
   schoolName: z.string().describe('The name of the school or organization.'),
@@ -45,6 +47,7 @@ const ExtractInvoiceDataOutputSchema = z.object({
   invoiceId: z.string().optional(),
   invoiceNumber: z.string().optional(),
   playersAdded: z.number().optional(),
+  action: z.enum(['created', 'updated', 'error']),
   error: z.string().optional(),
 });
 export type ExtractInvoiceDataOutput = z.infer<
@@ -62,6 +65,7 @@ const extractPrompt = ai.definePrompt({
     Document: {{media url=fileDataUri}}
 
     Pay close attention to the following fields:
+    - The invoice number (if present).
     - The name of the person or sponsor who should be invoiced.
     - Their email address.
     - The school and district they represent.
@@ -98,16 +102,23 @@ const extractInvoiceDataFlow = ai.defineFlow(
       }
       
       const extracted = output;
+      const uscfFee = 24; // Standard USCF fee
 
-      // Step 2: Create new player records in Firestore for players who don't exist
+      // Step 2: Prepare player data and find existing invoice if possible
+      let existingInvoice: any = null;
+      if (extracted.invoiceNumber) {
+        const q = query(collection(db, 'invoices'), where('invoiceNumber', '==', extracted.invoiceNumber), limit(1));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          existingInvoice = { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() };
+        }
+      }
+      
       const playersToInvoice = [];
-      const uscfFee = 24;
-
       for (const player of extracted.players) {
         const [firstName, ...lastNameParts] = player.playerName.split(' ');
         const lastName = lastNameParts.join(' ') || 'Unknown';
         
-        // Assume a base registration fee and calculate if USCF fee was included
         const baseRegistrationFee = player.fee > uscfFee ? player.fee - uscfFee : player.fee;
         const uscfAction = player.fee > baseRegistrationFee;
 
@@ -142,10 +153,17 @@ const extractInvoiceDataFlow = ai.defineFlow(
         });
       }
 
-      // Step 3: Create the invoice using the existing createInvoice flow
+      // Step 3: Create or update the invoice
       const teamCode = generateTeamCode({ schoolName: extracted.schoolName, district: extracted.district });
       
-      const invoiceResult = await createInvoice({
+      let invoiceResult;
+      let action: 'created' | 'updated' = 'created';
+
+      if (existingInvoice) {
+        // Invoice exists, so we update it by recreating it.
+        action = 'updated';
+        const recreateInput = {
+          originalInvoiceId: existingInvoice.invoiceId,
           sponsorName: extracted.sponsorName,
           sponsorEmail: extracted.sponsorEmail,
           schoolName: extracted.schoolName,
@@ -155,7 +173,31 @@ const extractInvoiceDataFlow = ai.defineFlow(
           eventDate: extracted.eventDate,
           uscfFee: uscfFee,
           players: playersToInvoice,
-      });
+          requestingUserRole: 'organizer'
+        };
+        const recreationResult = await recreateInvoiceFromRoster(recreateInput);
+        invoiceResult = {
+          invoiceId: recreationResult.newInvoiceId,
+          invoiceNumber: recreationResult.newInvoiceNumber,
+          status: recreationResult.newStatus,
+          invoiceUrl: recreationResult.newInvoiceUrl,
+        };
+      } else {
+        // No invoice found, create a new one.
+        action = 'created';
+        invoiceResult = await createInvoice({
+            invoiceNumber: extracted.invoiceNumber,
+            sponsorName: extracted.sponsorName,
+            sponsorEmail: extracted.sponsorEmail,
+            schoolName: extracted.schoolName,
+            district: extracted.district,
+            teamCode: teamCode,
+            eventName: extracted.eventName,
+            eventDate: extracted.eventDate,
+            uscfFee: uscfFee,
+            players: playersToInvoice,
+        });
+      }
 
       // Step 4: Return a success response
       return {
@@ -163,6 +205,7 @@ const extractInvoiceDataFlow = ai.defineFlow(
         invoiceId: invoiceResult.invoiceId,
         invoiceNumber: invoiceResult.invoiceNumber,
         playersAdded: playersToInvoice.length,
+        action: action,
       };
 
     } catch (error) {
@@ -171,6 +214,7 @@ const extractInvoiceDataFlow = ai.defineFlow(
       return {
         success: false,
         error: errorMessage,
+        action: 'error',
       };
     }
   }
