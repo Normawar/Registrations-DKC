@@ -7,6 +7,7 @@ import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle, XCircle, Info, RefreshCw, FilePenLine, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
