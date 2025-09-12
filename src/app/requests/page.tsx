@@ -8,10 +8,10 @@ export default function RequestsPage() {
       console.log('CLIENT: Testing server action...');
       const result = await processBatchedRequests();
       console.log('CLIENT: Success!', result);
-      alert(`Success: ${result}`);
+      alert(`Success: ${JSON.stringify(result)}`);
     } catch (error) {
       console.error('CLIENT: Error!', error);
-      alert(`Error: ${error}`);
+      alert(`Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
