@@ -12,7 +12,25 @@ import { db } from '@/lib/services/firestore-service';
 import { recreateInvoiceFromRoster } from './recreate-invoice-from-roster-flow';
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
-import { type Event } from '@/hooks/use-events';
+
+// Define the Event type directly in the server-side flow to avoid client-side imports.
+type Event = {
+    id: string;
+    name: string;
+    date: string;
+    location: string;
+    rounds: number;
+    regularFee: number;
+    lateFee: number;
+    veryLateFee: number;
+    dayOfFee: number;
+    imageUrl?: string;
+    imageName?: string;
+    pdfUrl?: string;
+    pdfName?: string;
+    isClosed?: boolean;
+    isPsjaOnly?: boolean;
+};
 
 
 const BatchedRequestInputSchema = z.object({
