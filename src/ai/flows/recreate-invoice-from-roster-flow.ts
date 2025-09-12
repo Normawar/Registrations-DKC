@@ -1,38 +1,130 @@
-
 'use server';
 /**
- * @fileOverview DEPRECATED. Use `process-batched-requests-flow.ts` instead.
- * This flow incorrectly handles invoice updates by recreating them, which can lead
- * to invoice number collisions and other data integrity issues. The new batch
- * update flow correctly modifies the existing invoice.
+ * @fileOverview Recreates an invoice with an updated player roster.
+ * This flow cancels the original invoice and creates a new one with the updated details.
+ * It's the standard, reliable way to handle changes to existing registrations.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { ApiError } from 'square';
+import { getSquareClient } from '@/lib/square-client';
+import { createInvoice } from './create-invoice-flow';
+import { cancelInvoice } from './cancel-invoice-flow';
 
-const DeprecatedInputSchema = z.object({
-  originalInvoiceId: z.string(),
+const PlayerToInvoiceSchema = z.object({
+    playerName: z.string(),
+    uscfId: z.string(),
+    baseRegistrationFee: z.number(),
+    lateFee: z.number().nullable(),
+    uscfAction: z.boolean(),
+    isGtPlayer: z.boolean().optional(),
+    section: z.string().optional(),
+    waiveLateFee: z.boolean().optional(),
 });
-export type DeprecatedInput = z.infer<typeof DeprecatedInputSchema>;
 
-const DeprecatedOutputSchema = z.object({
-  error: z.string(),
+export const RecreateInvoiceInputSchema = z.object({
+    originalInvoiceId: z.string().describe('The ID of the invoice to cancel and replace.'),
+    players: z.array(PlayerToInvoiceSchema).describe('The new, updated list of players for the invoice.'),
+    uscfFee: z.number(),
+    requestingUserRole: z.string().describe('Role of the user initiating the recreation.'),
+    // All original sponsor/event details needed to create the new invoice
+    sponsorName: z.string(),
+    sponsorEmail: z.string().email(),
+    bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
+    gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
+    schoolName: z.string(),
+    schoolAddress: z.string().optional(),
+    schoolPhone: z.string().optional(),
+    district: z.string().optional(),
+    teamCode: z.string(),
+    eventName: z.string(),
+    eventDate: z.string(),
+    revisionMessage: z.string().optional(),
 });
-export type DeprecatedOutput = z.infer<typeof DeprecatedOutputSchema>;
+export type RecreateInvoiceInput = z.infer<typeof RecreateInvoiceInputSchema>;
 
-export async function recreateInvoiceFromRoster(input: DeprecatedInput): Promise<DeprecatedOutput> {
-  return flow(input);
+export const RecreateInvoiceOutputSchema = z.object({
+  oldInvoiceId: z.string(),
+  newInvoiceId: z.string(),
+  newInvoiceNumber: z.string().optional(),
+  newStatus: z.string(),
+  newInvoiceUrl: z.string().url(),
+  newTotalAmount: z.number(),
+});
+export type RecreateInvoiceOutput = z.infer<typeof RecreateInvoiceOutputSchema>;
+
+export async function recreateInvoiceFromRoster(input: RecreateInvoiceInput): Promise<RecreateInvoiceOutput> {
+  return recreateInvoiceFromRosterFlow(input);
 }
 
-const flow = ai.defineFlow(
+const recreateInvoiceFromRosterFlow = ai.defineFlow(
   {
-    name: 'recreateInvoiceFlow_DEPRECATED',
-    inputSchema: DeprecatedInputSchema,
-    outputSchema: DeprecatedOutputSchema,
+    name: 'recreateInvoiceFromRosterFlow',
+    inputSchema: RecreateInvoiceInputSchema,
+    outputSchema: RecreateInvoiceOutputSchema,
   },
-  async () => {
-    const errorMsg = "This flow is deprecated. Use `process-batched-requests-flow` instead. The Square API should be used to update existing invoices, not recreate them.";
-    console.error(errorMsg);
-    throw new Error(errorMsg);
+  async (input) => {
+    if (input.requestingUserRole !== 'organizer') {
+        throw new Error('Only organizers can modify existing invoices.');
+    }
+    
+    const squareClient = await getSquareClient();
+
+    try {
+      // Step 1: Get original invoice details to construct the revised invoice number
+      const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(input.originalInvoiceId);
+
+      // Step 2: Cancel the original invoice.
+      console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
+      await cancelInvoice({ invoiceId: input.originalInvoiceId, requestingUserRole: 'organizer' });
+      console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
+
+      // Step 3: Create a new invoice with the updated details.
+      const revisionNumber = (originalInvoice?.title?.match(/rev\.(\d+)/)?.[1] || '1') + 1;
+      const baseInvoiceNumber = originalInvoice?.invoiceNumber?.split('-rev.')[0];
+      const newInvoiceNumber = baseInvoiceNumber ? `${baseInvoiceNumber}-rev.${revisionNumber}` : undefined;
+      const revisionMessage = `Revised based on your request. Original Invoice: #${originalInvoice?.invoiceNumber}. This invoice replaces the original.`;
+      
+      const newInvoiceInput = {
+        ...input,
+        invoiceNumber: newInvoiceNumber,
+        revisionMessage: revisionMessage,
+      };
+      
+      const { invoiceId, invoiceNumber, status, invoiceUrl } = await createInvoice(newInvoiceInput);
+
+      // We need to fetch the final amount of the new invoice
+      const { result: { invoice: newSquareInvoice } } = await squareClient.invoicesApi.getInvoice(invoiceId);
+      const newTotalAmount = newSquareInvoice?.paymentRequests?.[0]?.computedAmountMoney?.amount 
+        ? Number(newSquareInvoice.paymentRequests[0].computedAmountMoney.amount) / 100 
+        : 0;
+
+      console.log("Successfully created new revised invoice:", newInvoiceInput);
+
+      return {
+        oldInvoiceId: input.originalInvoiceId,
+        newInvoiceId: invoiceId,
+        newInvoiceNumber: invoiceNumber,
+        newStatus: status,
+        newInvoiceUrl: invoiceUrl,
+        newTotalAmount: newTotalAmount,
+      };
+
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const errorResult = error.result || {};
+        const errors = Array.isArray(errorResult.errors) ? errorResult.errors : [];
+        console.error('Square API Error in recreateInvoiceFlow:', JSON.stringify(errorResult, null, 2));
+        const errorMessage = errors.map((e: any) => `[${e.category}/${e.code}]: ${e.detail}`).join(', ');
+        throw new Error(`Square Error: ${errorMessage}`);
+      } else {
+        console.error('An unexpected error occurred during invoice recreation:', error);
+        if (error instanceof Error) {
+            throw new Error(`${error.message}`);
+        }
+        throw new Error('An unexpected error occurred during invoice recreation.');
+      }
+    }
   }
 );
