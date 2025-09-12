@@ -30,8 +30,8 @@ const RecreateOrganizerInvoiceInputSchema = z.object({
     schoolPhone: z.string().optional().describe('The phone number of the school.'),
     district: z.string().optional().describe('The school district.'),
     invoiceTitle: z.string().describe('The main title for the invoice.'),
-    invoiceNumber: z.string().optional().describe('The new invoice number, including revision.'),
     lineItems: z.array(LineItemSchema).min(1).describe('An array of items to be included in the invoice.'),
+    revisionNumber: z.number().optional().describe('The revision number for this invoice'),
 });
 export type RecreateOrganizerInvoiceInput = z.infer<typeof RecreateOrganizerInvoiceInputSchema>;
 
@@ -58,16 +58,23 @@ const recreateOrganizerInvoiceFlow = ai.defineFlow(
     const squareClient = await getSquareClient();
 
     try {
+      const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(input.originalInvoiceId);
+
       // Step 1: Cancel the original invoice.
       console.log(`Canceling original invoice: ${input.originalInvoiceId}`);
       await cancelInvoice({ invoiceId: input.originalInvoiceId, requestingUserRole: 'organizer' });
       console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
 
-      // Step 2: Create a new invoice with the updated details and revised title.
+      // Step 2: Create a new invoice with the updated details and revised title/number.
       console.log(`Creating new organizer invoice.`);
       
+      const revisionSuffix = `-rev.${input.revisionNumber || 2}`;
+      const baseInvoiceNumber = originalInvoice?.invoiceNumber?.split('-rev.')[0];
+      const newInvoiceNumber = baseInvoiceNumber ? `${baseInvoiceNumber}${revisionSuffix}` : undefined;
+
       const newInvoiceResult = await createOrganizerInvoice({
           ...input,
+          invoiceNumber: newInvoiceNumber,
       });
 
       console.log("Successfully created new revised invoice:", newInvoiceResult);

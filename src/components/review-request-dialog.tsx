@@ -50,13 +50,11 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     setIsSubmitting(true);
     try {
       if (decision === 'Approved' && originalConfirmation) {
-        // If applicable, trigger invoice recreation
         if (request.type === 'Substitution' || request.type === 'Withdrawal') {
             await handleRecreateInvoice();
         }
       }
       
-      // Update the request status
       const requestRef = doc(db, 'requests', request.id);
       await updateDoc(requestRef, {
         status: decision,
@@ -70,7 +68,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
 
     } catch (error) {
       console.error('Error processing request:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to process the request.' });
+      toast({ variant: 'destructive', title: 'Error', description: error instanceof Error ? error.message : 'Failed to process the request.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -86,10 +84,10 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         const player = allPlayers.find(p => p.id === id);
         return {
             ...player,
-            ...originalConfirmation.selections[id], // Add section, uscfStatus, etc.
+            ...originalConfirmation.selections[id],
             id: id,
-        } as MasterPlayer & { uscfStatus: string; section: string };
-    });
+        } as MasterPlayer & { uscfStatus: string; section: string; status: 'active' | 'withdrawn' };
+    }).filter(p => p.status !== 'withdrawn');
 
     let newPlayerList = [...fullPlayerDetails];
   
@@ -99,18 +97,22 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     }
     
     if (request.type === 'Substitution') {
-        const playerNameToRemove = request.player.toLowerCase().trim();
-        
-        // This detail must come from the request form, which needs to be updated to provide the new player's ID
-        const newPlayerId = request.details?.split('with ')[1]; 
-        const newPlayer = allPlayers.find(p => p.id === newPlayerId);
+      const playerNameToRemove = request.player.toLowerCase().trim();
+      newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() !== playerNameToRemove);
 
+      const detailsMatch = request.details?.match(/with (.*)/);
+      const newPlayerName = detailsMatch ? detailsMatch[1].trim() : null;
+
+      if(newPlayerName) {
+        const newPlayer = allPlayers.find(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() === newPlayerName.toLowerCase());
         if (newPlayer) {
-            newPlayerList = fullPlayerDetails.filter(p => `${p.firstName} ${p.lastName}`.trim().toLowerCase() !== playerNameToRemove);
-            newPlayerList.push({ ...newPlayer, uscfStatus: 'current', section: newPlayer.section || 'High School K-12' });
+            newPlayerList.push({ ...newPlayer, uscfStatus: 'current', section: newPlayer.section || 'High School K-12', status: 'active' });
         } else {
-            throw new Error('New player for substitution not found in database.');
+            throw new Error(`New player for substitution '${newPlayerName}' not found in database.`);
         }
+      } else {
+        throw new Error('Could not identify new player from request details.');
+      }
     }
     
     const recreationResult = await recreateInvoiceFromRoster({
@@ -121,9 +123,10 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
             baseRegistrationFee: originalEvent.regularFee,
             lateFee: (originalConfirmation.totalInvoiced / Object.keys(originalConfirmation.selections).length) - originalEvent.regularFee,
             uscfAction: p.uscfStatus !== 'current',
-            isGtPlayer: p.studentType === 'gt'
+            isGtPlayer: p.studentType === 'gt',
+            section: p.section,
         })),
-        uscfFee: 24, // Standard USCF fee
+        uscfFee: 24,
         sponsorName: originalConfirmation.sponsorName || originalConfirmation.purchaserName,
         sponsorEmail: originalConfirmation.sponsorEmail || originalConfirmation.purchaserEmail,
         schoolName: originalConfirmation.schoolName,
@@ -133,6 +136,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         eventDate: originalConfirmation.eventDate,
         requestingUserRole: 'organizer',
         revisionMessage: `Invoice revised on ${format(new Date(), 'PPP')} to reflect: ${request.type} of ${request.player}.`,
+        revisionNumber: (originalConfirmation.invoiceNumber?.match(/-rev\.(\d+)$/) ? parseInt(originalConfirmation.invoiceNumber.match(/-rev\.(\d+)$/)![1]) : 1) + 1,
     });
 
     const newConfirmationRecord = {
@@ -145,6 +149,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         invoiceNumber: recreationResult.newInvoiceNumber,
         invoiceUrl: recreationResult.newInvoiceUrl,
         invoiceStatus: recreationResult.newStatus,
+        status: recreationResult.newStatus,
         totalInvoiced: recreationResult.newTotalAmount,
         selections: newPlayerList.reduce((acc, p) => ({ ...acc, [p.id]: { uscfStatus: p.uscfStatus, section: p.section, status: 'active' } }), {}),
         previousVersionId: originalConfirmation.id, 

@@ -58,6 +58,7 @@ const RecreateInvoiceInputSchema = z.object({
     eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
     requestingUserRole: z.string().describe('Role of user requesting the recreation'),
     revisionMessage: z.string().optional().describe('Message explaining why invoice was recreated'),
+    revisionNumber: z.number().optional().describe('The revision number for this invoice'),
     eventConfig: EventConfigSchema.optional(),
 });
 export type RecreateInvoiceInput = z.infer<typeof RecreateInvoiceInputSchema>;
@@ -95,17 +96,11 @@ export async function recreateInvoiceFromRoster(input: RecreateInvoiceInput): Pr
 const recreateInvoiceFlow = ai.defineFlow(
   {
     name: 'recreateInvoiceFlow',
-    // REMOVE THE INPUT SCHEMA TO BYPASS VALIDATION
-    // inputSchema: RecreateInvoiceInputSchema,
+    inputSchema: RecreateInvoiceInputSchema,
     outputSchema: RecreateInvoiceOutputSchema,
   },
-  async (input: any) => { // Use 'any' type to bypass all validation
-    console.log('🔧 Bypassing schema validation and applying transformations...');
-
-    // Manual validation and transformation
-    if (!input || typeof input !== 'object') {
-      throw new Error('Invalid input data');
-    }
+  async (input: any) => { 
+    console.log('🔧 Starting recreation flow with manual validation...');
 
     if (input.requestingUserRole !== 'organizer') {
       throw new Error('Only organizers can recreate invoices.');
@@ -115,77 +110,43 @@ const recreateInvoiceFlow = ai.defineFlow(
       throw new Error('No players array found');
     }
 
-    // Transform and validate the data manually
     const transformedInput = {
-      originalInvoiceId: String(input.originalInvoiceId || ''),
-      players: input.players.map((player: any, index: number) => {
-        // Ensure required fields exist
-        if (typeof player !== 'object') {
-          throw new Error(`Invalid player data at index ${index}`);
-        }
-
-        return {
-          playerName: (!player.playerName || player.playerName === 'undefined undefined') 
-            ? `Student_${index + 1}_${player.isGtPlayer ? 'GT' : 'REG'}_${player.uscfAction ? 'USCF' : 'EXISTING'}`
-            : String(player.playerName),
-          uscfId: String(player.uscfId || "NEW"),
-          baseRegistrationFee: Number(player.baseRegistrationFee || 20),
-          lateFee: 0, // Always convert to 0 - will be recalculated
-          uscfAction: Boolean(player.uscfAction),
-          isGtPlayer: Boolean(player.isGtPlayer),
-          isNew: Boolean(player.isNew),
-          isSubstitution: Boolean(player.isSubstitution),
-          waiveLateFee: Boolean(player.waiveLateFee),
-          lateFeeOverride: player.lateFeeOverride ? Number(player.lateFeeOverride) : undefined,
-          registrationDate: String(player.registrationDate || new Date().toISOString()),
-          section: player.section || 'High School K-12',
-        };
-      }),
-      uscfFee: Number(input.uscfFee || 24),
-      sponsorName: String(input.sponsorName || ''),
-      sponsorEmail: String(input.sponsorEmail || ''),
-      bookkeeperEmail: input.bookkeeperEmail ? String(input.bookkeeperEmail) : undefined,
-      gtCoordinatorEmail: input.gtCoordinatorEmail ? String(input.gtCoordinatorEmail) : undefined,
-      schoolName: String(input.schoolName || ''),
-      schoolAddress: input.schoolAddress ? String(input.schoolAddress) : undefined,
-      schoolPhone: input.schoolPhone ? String(input.schoolPhone) : undefined,
-      district: input.district ? String(input.district) : undefined,
-      teamCode: String(input.teamCode || ''),
-      eventName: String(input.eventName || ''),
-      eventDate: String(input.eventDate || ''),
-      requestingUserRole: String(input.requestingUserRole || ''),
-      revisionMessage: input.revisionMessage ? String(input.revisionMessage) : undefined,
-      eventConfig: input.eventConfig || { eventDate: input.eventDate }
+      ...input,
+      players: input.players.map((player: any, index: number) => ({
+        playerName: (!player.playerName || player.playerName === 'undefined undefined') 
+          ? `Student_${index + 1}`
+          : String(player.playerName),
+        uscfId: String(player.uscfId || "NEW"),
+        baseRegistrationFee: Number(player.baseRegistrationFee || 20),
+        lateFee: 0, 
+        uscfAction: Boolean(player.uscfAction),
+        isGtPlayer: Boolean(player.isGtPlayer),
+        isNew: Boolean(player.isNew),
+        isSubstitution: Boolean(player.isSubstitution),
+        waiveLateFee: Boolean(player.waiveLateFee),
+        lateFeeOverride: player.lateFeeOverride ? Number(player.lateFeeOverride) : undefined,
+        registrationDate: String(player.registrationDate || new Date().toISOString()),
+        section: player.section || 'High School K-12', // Ensure section has a default
+      })),
     };
 
-    console.log(`✅ Successfully processed ${transformedInput.players.length} players with manual validation`);
-
-    // Log player summary
-    const validNames = transformedInput.players.filter(p => !p.playerName.startsWith('Student_')).length;
-    const generatedNames = transformedInput.players.length - validNames;
-    console.log(`📊 Player summary: ${validNames} valid names, ${generatedNames} generated placeholders`);
-
-    // Continue with your existing business logic
     const SUBSTITUTION_FEE = 2.0;
     let totalSubstitutionFee = 0;
-    const eventConfig = transformedInput.eventConfig;
+    const eventConfig = transformedInput.eventConfig || { eventDate: transformedInput.eventDate };
 
-    const sanitizedPlayers = transformedInput.players.map(p => {
+    const sanitizedPlayers = transformedInput.players.map((p: any) => {
       let lateFee = 0;
-      
-      if (p.waiveLateFee) {
-        lateFee = 0;
-      } else if (typeof p.lateFeeOverride === 'number') {
-        lateFee = p.lateFeeOverride;
-      } else {
-        lateFee = calculateLateFee(p, eventConfig);
+      if (!p.waiveLateFee) {
+        if (typeof p.lateFeeOverride === 'number') {
+          lateFee = p.lateFeeOverride;
+        } else {
+          lateFee = calculateLateFee(p, eventConfig);
+        }
       }
-
       if (p.isSubstitution) {
         totalSubstitutionFee += SUBSTITUTION_FEE;
         return { ...p, lateFee: 0 };
       }
-      
       return { ...p, lateFee };
     });
 
@@ -194,9 +155,6 @@ const recreateInvoiceFlow = ai.defineFlow(
       players: sanitizedPlayers,
       eventName: transformedInput.eventName.replace(/\(PSJA students only\)/i, '').trim(),
     };
-
-    // Rest of your existing flow logic (Square API calls, etc.)
-    // Keep everything else exactly the same...
 
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
@@ -211,7 +169,6 @@ const recreateInvoiceFlow = ai.defineFlow(
       };
     }
 
-    // Continue with your existing Square logic...
     const squareClient = await getSquareClient();
 
     try {
@@ -219,7 +176,10 @@ const recreateInvoiceFlow = ai.defineFlow(
       if (!originalInvoice) throw new Error(`Could not find original invoice with ID: ${sanitizedInput.originalInvoiceId}`);
 
       await cancelInvoice({ invoiceId: sanitizedInput.originalInvoiceId, requestingUserRole: 'organizer' });
-      const newInvoiceNumber = originalInvoice.invoiceNumber || undefined;
+      
+      const revisionSuffix = `-rev.${input.revisionNumber || 2}`;
+      const baseInvoiceNumber = originalInvoice.invoiceNumber?.split('-rev.')[0];
+      const newInvoiceNumber = baseInvoiceNumber ? `${baseInvoiceNumber}${revisionSuffix}` : undefined;
 
       const newInvoiceResult = await createInvoice({
         ...sanitizedInput,

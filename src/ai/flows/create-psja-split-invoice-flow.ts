@@ -14,7 +14,7 @@ const PlayerToInvoiceSchema = z.object({
   playerName: z.string(),
   uscfId: z.string(),
   baseRegistrationFee: z.number(),
-  lateFee: z.number(),
+  lateFee: z.number().nullable(),
   uscfAction: z.boolean(),
   isGtPlayer: z.boolean().optional(),
 });
@@ -69,12 +69,14 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
     const output: CreatePsjaSplitInvoiceOutput = {};
 
     const revisionSuffix = input.revisionNumber ? `-rev.${input.revisionNumber}` : '';
-    const gtInvoiceNumber = input.originalInvoiceNumber ? 
-        `${input.originalInvoiceNumber}-GT${revisionSuffix}` : 
-        undefined;
-    const indInvoiceNumber = input.originalInvoiceNumber ? 
-        `${input.originalInvoiceNumber}-IND${revisionSuffix}` : 
-        undefined;
+    const baseInvoiceNumber = input.originalInvoiceNumber?.split('-rev.')[0];
+    
+    const gtInvoiceNumber = baseInvoiceNumber
+        ? `${baseInvoiceNumber}-GT${revisionSuffix}`
+        : undefined;
+    const indInvoiceNumber = baseInvoiceNumber
+        ? `${baseInvoiceNumber}-IND${revisionSuffix}`
+        : undefined;
     
     // 1. Create invoice for GT players if any exist
     if (gtPlayers.length > 0) {
@@ -82,7 +84,7 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
       
       const gtInvoiceInput: CreateInvoiceInput = {
         ...input,
-        players: gtPlayers,
+        players: gtPlayers.map(p => ({ ...p, lateFee: p.lateFee ?? 0 })), // Ensure lateFee is not null
         // Send to GT coordinator, not bookkeeper
         gtCoordinatorEmail: input.gtCoordinatorEmail,
         bookkeeperEmail: '', // Ensure bookkeeper is not CC'd on the GT invoice
@@ -100,7 +102,7 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
       
       const independentInvoiceInput: CreateInvoiceInput = {
         ...input,
-        players: independentPlayers,
+        players: independentPlayers.map(p => ({ ...p, lateFee: p.lateFee ?? 0 })), // Ensure lateFee is not null
         // Send to bookkeeper, not GT coordinator
         bookkeeperEmail: input.bookkeeperEmail,
         gtCoordinatorEmail: '', // Ensure GT coordinator is not CC'd on the independent invoice
