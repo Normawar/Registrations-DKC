@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from "@/components/app-layout";
 import {
@@ -26,7 +26,7 @@ import type { ChangeRequest } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import Link from 'next/link';
-import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle, Eye, Check, X } from 'lucide-react';
+import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle, Eye, Check, X, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { ChangeRequestDialog } from '@/components/change-request-dialog';
 import { ReviewRequestDialog } from '@/components/review-request-dialog';
@@ -34,6 +34,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 type SortableColumnKey = 'player' | 'event' | 'type' | 'submitted' | 'status' | 'submittedBy' | 'eventDate' | 'action' | 'invoiceNumber';
@@ -48,6 +49,8 @@ export default function RequestsPage() {
   const [reviewingRequest, setReviewingRequest] = useState<ChangeRequest | null>(null);
   const [selectedRequests, setSelectedRequests] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [requestToRevert, setRequestToRevert] = useState<ChangeRequest | null>(null);
+  const [isReverting, setIsReverting] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!db || !profile) return;
@@ -202,6 +205,31 @@ export default function RequestsPage() {
     }
   };
 
+  const handleRevertClick = (request: ChangeRequest) => {
+    setRequestToRevert(request);
+  };
+
+  const confirmRevert = async () => {
+    if (!requestToRevert || !db) return;
+    setIsReverting(true);
+    try {
+        const requestRef = doc(db, "requests", requestToRevert.id);
+        await updateDoc(requestRef, {
+            status: 'Pending',
+            approvedBy: null,
+            approvedAt: null,
+        });
+        toast({ title: "Status Reverted", description: `Request for ${requestToRevert.player} is now pending.` });
+        await loadData();
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: "Failed to revert request status." });
+        console.error("Failed to revert status:", error);
+    } finally {
+        setIsReverting(false);
+        setRequestToRevert(null);
+    }
+  };
+
 
   return (
     <AppLayout>
@@ -305,9 +333,16 @@ export default function RequestsPage() {
                                 <TableCell>
                                     <div className="flex items-center gap-2">
                                         {profile?.role === 'organizer' && (
+                                          <>
                                             <Button variant="outline" size="sm" onClick={() => setReviewingRequest(request)}>
                                                 {request.status === 'Pending' ? 'Review' : <Eye className="h-4 w-4" />}
                                             </Button>
+                                            {request.status !== 'Pending' && (
+                                                <Button variant="outline" size="sm" onClick={() => handleRevertClick(request)}>
+                                                    <RefreshCw className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                          </>
                                         )}
                                         {request.status !== 'Pending' && (
                                             <div className="text-xs text-muted-foreground">
@@ -346,6 +381,26 @@ export default function RequestsPage() {
           profile={profile}
           onRequestUpdated={handleRequestCreatedOrUpdated}
         />
+      )}
+
+      {requestToRevert && (
+        <AlertDialog open={!!requestToRevert} onOpenChange={() => setRequestToRevert(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Revert Request Status?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will change the status of the request for "{requestToRevert.player}" back to "Pending". This allows you to re-process it. Are you sure?
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmRevert} disabled={isReverting}>
+                        {isReverting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Yes, Revert to Pending
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       )}
     </AppLayout>
   );
