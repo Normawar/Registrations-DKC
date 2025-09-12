@@ -7,7 +7,6 @@ import { AppLayout } from "@/components/app-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,7 +16,7 @@ import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-prof
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { type ChangeRequest } from '@/lib/data/requests-data';
-import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow';
+import { processBatchedRequests } from './actions';
 
 
 export default function RequestsPage() {

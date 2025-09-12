@@ -1,5 +1,3 @@
-
-'use server';
 /**
  * @fileOverview Recreates an invoice with an updated player roster.
  * This flow cancels the original invoice and creates a new one with the updated details.
@@ -12,48 +10,13 @@ import { ApiError } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
+import {
+  RecreateInvoiceInputSchema,
+  RecreateInvoiceInput,
+  RecreateInvoiceOutputSchema,
+  RecreateInvoiceOutput,
+} from './schemas';
 
-const PlayerToInvoiceSchema = z.object({
-    playerName: z.string(),
-    uscfId: z.string(),
-    baseRegistrationFee: z.number(),
-    lateFee: z.number().nullable(),
-    uscfAction: z.boolean(),
-    isGtPlayer: z.boolean().optional(),
-    section: z.string().optional(),
-    waiveLateFee: z.boolean().optional(),
-});
-
-export const RecreateInvoiceInputSchema = z.object({
-    originalInvoiceId: z.string().describe('The ID of the invoice to cancel and replace.'),
-    players: z.array(PlayerToInvoiceSchema).describe('The new, updated list of players for the invoice.'),
-    uscfFee: z.number(),
-    requestingUserRole: z.string().describe('Role of the user initiating the recreation.'),
-    // All original sponsor/event details needed to create the new invoice
-    sponsorName: z.string(),
-    sponsorEmail: z.string().email(),
-    bookkeeperEmail: z.string().email().or(z.literal('')).optional(),
-    gtCoordinatorEmail: z.string().email().or(z.literal('')).optional(),
-    schoolName: z.string(),
-    schoolAddress: z.string().optional(),
-    schoolPhone: z.string().optional(),
-    district: z.string().optional(),
-    teamCode: z.string(),
-    eventName: z.string(),
-    eventDate: z.string(),
-    revisionMessage: z.string().optional(),
-});
-export type RecreateInvoiceInput = z.infer<typeof RecreateInvoiceInputSchema>;
-
-export const RecreateInvoiceOutputSchema = z.object({
-  oldInvoiceId: z.string(),
-  newInvoiceId: z.string(),
-  newInvoiceNumber: z.string().optional(),
-  newStatus: z.string(),
-  newInvoiceUrl: z.string().url(),
-  newTotalAmount: z.number(),
-});
-export type RecreateInvoiceOutput = z.infer<typeof RecreateInvoiceOutputSchema>;
 
 export async function recreateInvoiceFromRoster(input: RecreateInvoiceInput): Promise<RecreateInvoiceOutput> {
   return recreateInvoiceFromRosterFlow(input);

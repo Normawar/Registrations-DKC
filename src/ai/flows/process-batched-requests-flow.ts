@@ -1,15 +1,19 @@
-'use server';
 /**
  * @fileOverview Processes a batch of change requests (approve or deny).
  * This flow is designed for organizers to handle multiple requests at once.
  */
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
 import { doc, getDoc, writeBatch, getDocs, collection } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { recreateInvoiceFromRoster } from './recreate-invoice-from-roster-flow';
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
+import {
+  BatchedRequestInputSchema,
+  ProcessBatchInput,
+  ProcessBatchOutputSchema,
+  ProcessBatchOutput,
+} from './schemas';
 
 // Define the Event type directly in the server-side flow to avoid client-side imports.
 type Event = {
@@ -30,37 +34,15 @@ type Event = {
   isPsjaOnly?: boolean;
 };
 
-const BatchedRequestInputSchema = z.object({
-  requestIds: z.array(z.string()).describe('An array of request IDs to process.'),
-  decision: z.enum(['Approved', 'Denied']).describe('The decision to apply to all requests.'),
-  waiveFees: z.boolean().optional().describe('Whether to waive any additional fees for approved requests.'),
-  processingUser: z.object({
-    uid: z.string(),
-    firstName: z.string(),
-    lastName: z.string(),
-    email: z.string(),
-  }).describe('The organizer processing the requests.'),
-});
-export type ProcessBatchInput = z.infer<typeof BatchedRequestInputSchema>;
-
-const ProcessBatchOutputSchema = z.object({
-  processedCount: z.number().describe('The number of requests successfully processed.'),
-  failedCount: z.number().describe('The number of requests that failed to process.'),
-  errors: z.array(z.string()).optional().describe('A list of error messages for failed requests.'),
-});
-export type ProcessBatchOutput = z.infer<typeof ProcessBatchOutputSchema>;
-
-export async function processBatchedRequests(input: ProcessBatchInput): Promise<ProcessBatchOutput> {
-  return processBatchedRequestsFlow(input);
-}
-
-const processBatchedRequestsFlow = ai.defineFlow(
+// This is the Genkit flow function, not a server action.
+// It is called by the server action defined in a separate file.
+export const processBatchedRequestsFlow = ai.defineFlow(
   {
     name: 'processBatchedRequestsFlow',
     inputSchema: BatchedRequestInputSchema,
     outputSchema: ProcessBatchOutputSchema,
   },
-  async ({ requestIds, decision, waiveFees, processingUser }) => {
+  async ({ requestIds, decision, waiveFees, processingUser }): Promise<ProcessBatchOutput> => {
     console.log('Starting batch processing with:', { requestIds, decision, waiveFees });
 
     if (!db) {
@@ -142,7 +124,6 @@ const processBatchedRequestsFlow = ai.defineFlow(
             if (request.type === 'Substitution') {
               console.log('Processing substitution request');
               
-              // Find player to remove with better error handling
               const playerToRemoveId = Object.keys(newSelections).find(id => {
                   const player = allPlayers.find(p => p.id === id);
                   if (!player) {
@@ -154,7 +135,6 @@ const processBatchedRequestsFlow = ai.defineFlow(
                   return playerFullName === requestPlayerName;
               });
               
-              // Extract new player name from details with better parsing
               const detailsMatch = request.details?.match(/with\s+(.+?)(?:\s*\.|$)/i);
               const newPlayerName = detailsMatch ? detailsMatch[1].trim() : null;
       
@@ -257,7 +237,6 @@ const processBatchedRequestsFlow = ai.defineFlow(
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             errors.push(`Request ${requestId}: ${errorMessage}`);
             
-            // Update the request with error status
             try {
               const requestRef = doc(db, 'requests', requestId);
               batch.update(requestRef, { 
