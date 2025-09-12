@@ -2,13 +2,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { doc, getDoc, writeBatch, collection, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, collection, getDocs, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, CheckCircle, XCircle, Info } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, Info, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,10 @@ import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flo
 import { cancelInvoice } from '@/ai/flows/cancel-invoice-flow';
 import { useMasterDb } from '@/context/master-db-context';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { processBatchedRequests } from '@/ai/flows/process-batched-requests-flow';
+import { randomUUID } from 'crypto';
+import { getSquareClient } from '@/lib/square-client';
+import { ApiError } from 'square';
 
 
 interface LogEntry {
@@ -28,73 +32,265 @@ interface LogEntry {
   message: string;
 }
 
-// Temporary debug export - remove after use
-if (typeof window !== 'undefined') {
-  (window as any).debugDB = { db, getDocs, collection };
-  // Get all invoices with just basic info first
-  (window as any).debugDB.getDocs(window.debugDB.collection(window.debugDB.db, 'invoices')).then((snapshot: any) => {
-    const invoices: any[] = [];
-    snapshot.forEach((doc: any) => {
-      const data = doc.data();
-      invoices.push({
-        id: doc.id,
-        invoiceNumber: data.invoiceNumber || 'Unknown',
-        schoolName: data.schoolName || 'Unknown',
-        status: data.status || data.invoiceStatus || 'Unknown',
-        playerCount: data.selections ? Object.keys(data.selections).length : 0,
-        hasPlayerNames: data.selections ? Object.keys(data.selections).some((key: string) => key.includes('_') || isNaN(parseInt(key))) : false
+// --- New Orphaned Approval Cleanup Utility ---
+
+interface OrphanedApproval {
+  requestId: string;
+  id: string;
+  confirmationId: string;
+  playerName: string;
+  type: 'Withdrawal' | 'Substitution';
+  approvedAt: string;
+  status: 'Approved';
+}
+
+async function findAndFixOrphanedApprovals(allPlayers: MasterPlayer[]) {
+  console.log('🔍 Scanning for approved requests that were never processed...');
+  
+  // 1. Find all approved requests
+  const requestsSnapshot = await getDocs(
+    query(collection(db, 'requests'), where('status', '==', 'Approved'))
+  );
+  
+  const approvedRequests = requestsSnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  })) as OrphanedApproval[];
+
+  console.log(`Found ${approvedRequests.length} approved requests to verify`);
+
+  const orphanedApprovals: OrphanedApproval[] = [];
+
+  // 2. Check each approved request against actual invoice state
+  for (const request of approvedRequests) {
+    const confirmationDoc = await getDoc(doc(db, 'invoices', request.confirmationId));
+    
+    if (!confirmationDoc.exists()) {
+      console.log(`⚠️ Confirmation ${request.confirmationId} not found for request ${request.id}`);
+      continue;
+    }
+
+    const confirmationData = confirmationDoc.data();
+    
+    // Check if player is still in selections (meaning withdrawal wasn't processed)
+    if (request.type === 'Withdrawal') {
+      const playerStillExists = Object.keys(confirmationData.selections || {}).some(playerId => {
+        const player = allPlayers.find(p => p.id === playerId);
+        if (!player) return false;
+        
+        const playerFullName = `${player.firstName} ${player.lastName}`.toLowerCase();
+        return playerFullName === request.playerName.toLowerCase();
       });
+
+      if (playerStillExists) {
+        orphanedApprovals.push(request);
+        console.log(`❌ ORPHANED: ${request.playerName} withdrawal was approved but player still on invoice`);
+      }
+    }
+  }
+
+  console.log(`🎯 Found ${orphanedApprovals.length} orphaned approvals that need processing`);
+  return orphanedApprovals;
+}
+
+async function processOrphanedApprovals(orphanedApprovals: OrphanedApproval[], allPlayers: MasterPlayer[]) {
+  console.log('🔧 Processing orphaned approvals...');
+  
+  // Group by confirmation ID for batch processing
+  const groupedByConfirmation = orphanedApprovals.reduce((acc, request) => {
+    if (!acc[request.confirmationId]) {
+      acc[request.confirmationId] = [];
+    }
+    acc[request.confirmationId].push(request);
+    return acc;
+  }, {} as Record<string, OrphanedApproval[]>);
+
+  const results = [];
+
+  for (const [confirmationId, requests] of Object.entries(groupedByConfirmation)) {
+    console.log(`Processing ${requests.length} orphaned requests for confirmation ${confirmationId}`);
+    
+    try {
+      const result = await processOrphanedBatch(confirmationId, requests, allPlayers);
+      results.push(result);
+    } catch (error: any) {
+      console.error(`Failed to process orphaned batch for ${confirmationId}:`, error);
+      results.push({
+        confirmationId,
+        success: false,
+        error: error.message,
+        requests: requests.map(r => r.id)
+      });
+    }
+  }
+
+  return results;
+}
+
+async function updateSquareInvoiceForOrphaned(invoiceId: string, changesSummary: string[]) {
+  const squareClient = await getSquareClient();
+  
+  try {
+    const { result: { invoice } } = await squareClient.invoicesApi.getInvoice(invoiceId);
+    
+    if (!invoice || !invoice.version) {
+      throw new Error('Invoice not found in Square or has no version.');
+    }
+
+    // For any invoice status, we can at least update the description
+    const updatedDescription = `${invoice.description || ''}\n\nCORRECTION: ${changesSummary.join(', ')}`;
+    
+    await squareClient.invoicesApi.updateInvoice(invoiceId, {
+      invoice: {
+        version: invoice.version,
+        description: updatedDescription
+      },
+      idempotencyKey: randomUUID()
     });
-    console.log('=== INVOICE SUMMARY ===');
-    invoices.forEach((inv: any) => {
-      console.log(`#${inv.invoiceNumber} | ${inv.schoolName} | Players: ${inv.playerCount} | Names: ${inv.hasPlayerNames ? 'YES' : 'NO'} | Status: ${inv.status}`);
-    });
-    console.log(`\nTotal invoices: ${invoices.length}`);
+
+    console.log(`✅ Updated Square invoice ${invoiceId} description with correction note`);
+    
+  } catch (error: any) {
+    console.error(`Failed to update Square invoice ${invoiceId}:`, error);
+    throw error;
+  }
+}
+
+async function processOrphanedBatch(confirmationId: string, requests: OrphanedApproval[], allPlayers: MasterPlayer[]) {
+  // Get current confirmation data
+  const confirmationDoc = await getDoc(doc(db, 'invoices', confirmationId));
+  const currentData = confirmationDoc.data();
+  
+  if (!currentData) {
+    throw new Error(`Confirmation ${confirmationId} not found`);
+  }
+
+  console.log(`Processing orphaned batch for ${currentData.schoolName}`);
+
+  // Apply the approved changes that never got processed
+  let updatedSelections = { ...currentData.selections };
+  const changesSummary: string[] = [];
+
+  for (const request of requests) {
+    if (request.type === 'Withdrawal') {
+      // Find and remove the player
+      const playerToRemove = Object.keys(updatedSelections).find(playerId => {
+        const player = allPlayers.find(p => p.id === playerId);
+        if (!player) return false;
+        
+        const playerFullName = `${player.firstName} ${player.lastName}`.toLowerCase();
+        return playerFullName === request.playerName.toLowerCase();
+      });
+
+      if (playerToRemove) {
+        delete updatedSelections[playerToRemove];
+        changesSummary.push(`Processed orphaned withdrawal: ${request.playerName}`);
+        console.log(`✅ Removed ${request.playerName} from invoice ${confirmationId}`);
+      } else {
+        console.log(`⚠️ Could not find ${request.playerName} to remove from ${confirmationId}`);
+      }
+    }
+  }
+
+  if (changesSummary.length === 0) {
+    console.log('No changes needed - requests may have been processed already');
+    return {
+      confirmationId,
+      success: true,
+      message: 'No changes needed',
+      requests: requests.map(r => r.id)
+    };
+  }
+
+  // Update the confirmation record with corrected selections
+  await updateDoc(doc(db, 'invoices', confirmationId), {
+    selections: updatedSelections,
+    lastModified: new Date().toISOString(),
+    changeHistory: [
+      ...(currentData.changeHistory || []),
+      {
+        timestamp: new Date().toISOString(),
+        changes: changesSummary,
+        type: 'orphaned_approval_processing',
+        requestIds: requests.map(r => r.id)
+      }
+    ]
   });
+
+  // Try to update the actual Square invoice if possible
+  try {
+    if(currentData.invoiceId) {
+      await updateSquareInvoiceForOrphaned(currentData.invoiceId, changesSummary);
+    }
+  } catch (error: any) {
+    console.warn(`Could not update Square invoice ${currentData.invoiceId}:`, error.message);
+    // Continue anyway - the important thing is our data is consistent
+  }
+
+  // Mark requests as actually processed
+  const batch = writeBatch(db);
+  requests.forEach(request => {
+    const requestRef = doc(db, 'requests', request.id);
+    batch.update(requestRef, {
+      status: 'Approved',
+      actuallyProcessed: true,
+      processedAt: new Date().toISOString(),
+      processedAsOrphan: true
+    });
+  });
+  await batch.commit();
+
+  return {
+    confirmationId,
+    success: true,
+    changesApplied: changesSummary,
+    playersRemaining: Object.keys(updatedSelections).length,
+    requests: requests.map(r => r.id)
+  };
 }
 
-// School mapping based on the team codes in the raw data
-const SCHOOL_MAPPINGS = {
-  'PHPCOHPROF': 'PSJA COLLEGIATE SCHOOL OF HEALTH PROFESSIONS',
-  'PHKENN': 'KENNEDY MIDDLE',
-  'PHASORE': 'ALFRED SORENSEN EL',
-  'PHJMCKE': 'JOHN MCKEEVER EL',
-  'PHGPALM': 'GERALDINE PALMER EL',
-  'PHDWLONG': 'DR WILLIAM LONG EL',
-  'PHACESCO': 'AIDA C ESCOBAR EL',
-  'PHGGARC': 'GRACIELA GARCIA EL',
-  'PHAMURP': 'AUDIE MURPHY MIDDLE',
-  'PHAUST': 'AUSTIN MIDDLE',
-  'PHAGARZ': 'AMANDA GARZA-PENA EL',
-  'PHPTJTECOLL': 'PSJA THOMAS JEFFERSON T-STEM EARLY COLLEGE H S',
-  'PHACANT': 'ARNOLDO CANTU SR EL'
-};
+// Utility to run the full cleanup process
+export async function runJosueCleanup(allPlayers: MasterPlayer[]) {
+  console.log('🚀 Starting Josue cleanup process...');
+  
+  try {
+    // 1. Find all orphaned approvals
+    const orphanedApprovals = await findAndFixOrphanedApprovals(allPlayers);
+    
+    if (orphanedApprovals.length === 0) {
+      console.log('✅ No orphaned approvals found. Data is consistent.');
+      return { success: true, message: 'No cleanup needed' };
+    }
 
-const DISTRICT_NAME = 'PHARR-SAN JUAN-ALAMO ISD';
-
-// Add this component to your data repair page.tsx
-
-interface UpdateStats {
-  totalInvoices: number;
-  updatedInvoices: number;
-  updatedSelections: number;
-  totalPlayers: number;
+    // 2. Process them
+    const results = await processOrphanedApprovals(orphanedApprovals, allPlayers);
+    
+    console.log('🎉 Cleanup complete!');
+    console.log('Results:', results);
+    
+    return {
+      success: true,
+      orphanedCount: orphanedApprovals.length,
+      results
+    };
+    
+  } catch (error: any) {
+    console.error('❌ Cleanup failed:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 }
 
-interface VerificationStats {
-  gt: number;
-  independent: number;
-  regular: number;
-  missing: number;
-  totalSelections: number;
-}
-
+// StudentTypeUpdater Component (existing)
+// ... [rest of the StudentTypeUpdater component is unchanged] ...
 
 export function StudentTypeUpdater() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateLog, setUpdateLog] = useState<string[]>([]);
-  const [stats, setStats] = useState<UpdateStats | null>(null);
-  const [verificationStats, setVerificationStats] = useState<VerificationStats | null>(null);
+  const [stats, setStats] = useState<any | null>(null);
+  const [verificationStats, setVerificationStats] = useState<any | null>(null);
   const { database: allPlayers } = useMasterDb();
 
   const addLog = (message: string) => {
@@ -191,7 +387,7 @@ export function StudentTypeUpdater() {
       addLog(`\n🔄 Updating ${updatedInvoices} invoices with studentType data...`);
       await Promise.all(updatePromises);
       
-      const finalStats: UpdateStats = {
+      const finalStats: any = {
         totalInvoices: invoiceCount,
         updatedInvoices,
         updatedSelections: updatedSelectionsCount,
@@ -222,7 +418,7 @@ export function StudentTypeUpdater() {
       
       const snapshot = await getDocs(collection(db, 'invoices'));
       
-      const verifyStats: VerificationStats = {
+      const verifyStats: any = {
         gt: 0,
         independent: 0,
         regular: 0,
@@ -368,25 +564,78 @@ export function StudentTypeUpdater() {
 }
 
 
+function OrphanedApprovalFixer() {
+    const { toast } = useToast();
+    const { database: allPlayers } = useMasterDb();
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [logs, setLogs] = useState<string[]>([]);
+    const [foundOrphans, setFoundOrphans] = useState<OrphanedApproval[]>([]);
+
+    const handleRunCleanup = async () => {
+        setIsProcessing(true);
+        setLogs([]);
+        setFoundOrphans([]);
+        const addLog = (message: string) => setLogs(prev => [...prev, message]);
+        
+        try {
+            addLog('🚀 Starting cleanup process...');
+            const orphans = await findAndFixOrphanedApprovals(allPlayers);
+            setFoundOrphans(orphans);
+
+            if (orphans.length === 0) {
+                addLog('✅ No orphaned approvals found. Data is consistent.');
+                toast({ title: 'Cleanup Complete', description: 'No orphaned approvals found.' });
+            } else {
+                addLog(`🎯 Found ${orphans.length} orphaned approvals. Now processing...`);
+                const results = await processOrphanedApprovals(orphans, allPlayers);
+                addLog('🎉 Cleanup processing finished!');
+                results.forEach(result => {
+                    if(result.success) {
+                        addLog(`✅ Conf ID ${result.confirmationId}: ${result.message || 'Successfully processed.'}`);
+                    } else {
+                         addLog(`❌ Conf ID ${result.confirmationId}: FAILED - ${result.error}`);
+                    }
+                });
+                toast({ title: 'Cleanup Complete', description: `Processed ${orphans.length} orphaned approvals.` });
+            }
+        } catch(error: any) {
+            addLog(`❌ FATAL ERROR during cleanup: ${error.message}`);
+            toast({ variant: 'destructive', title: 'Cleanup Failed', description: error.message });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Fix Orphaned Approvals</CardTitle>
+                <CardDescription>This tool finds "Approved" change requests that were never actually processed and corrects the corresponding invoices.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={handleRunCleanup} disabled={isProcessing}>
+                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isProcessing ? 'Scanning & Fixing...' : 'Run Cleanup Now'}
+                </Button>
+            </CardContent>
+            {logs.length > 0 && (
+                <CardFooter>
+                     <div className="w-full bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+                        <h4 className="font-semibold text-gray-900 mb-2">Cleanup Log</h4>
+                        <div className="bg-black text-green-400 p-3 rounded text-xs font-mono max-h-60 overflow-y-auto">
+                            {logs.map((line, index) => (
+                            <div key={index}>{line}</div>
+                            ))}
+                        </div>
+                    </div>
+                </CardFooter>
+            )}
+        </Card>
+    );
+}
+
 export default function DataRepairPage() {
-  const [inputText, setInputText] = useState('');
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const { toast } = useToast();
-  const [isEventIdRepairing, setIsEventIdRepairing] = useState(false);
-  const { events } = useEvents();
   const { profile } = useSponsorProfile();
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).debugDB) {
-      // Your debug script can be added here inside useEffect
-      // to ensure it runs only on the client side.
-    }
-  }, []);
-
-  const addLog = (type: LogEntry['type'], message: string) => {
-    setLogs(prev => [...prev, { type, message }]);
-  };
   
   if (profile?.role !== 'organizer') {
     return (
@@ -410,6 +659,7 @@ export default function DataRepairPage() {
         </div>
         
         <StudentTypeUpdater />
+        <OrphanedApprovalFixer />
         
       </div>
     </AppLayout>
