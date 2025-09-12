@@ -114,9 +114,11 @@ export default function UnifiedInvoiceRegistrations() {
         // For organizers, no role-based filter is applied, fetching all invoices.
         
         const invoiceSnapshot = await getDocs(invoicesQuery);
-        const invoicesArray = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const invoicesArray = invoiceSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .filter(invoice => invoice.status !== 'CANCELED'); // Filter out canceled invoices
 
-        console.log(`✅ Found ${invoicesArray.length} documents for role '${profile.role}'.`);
+        console.log(`✅ Found ${invoicesArray.length} active documents for role '${profile.role}'.`);
 
         const mapped = invoicesArray.map((item: any) => ({
             ...item,
