@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -25,7 +26,7 @@ import type { ChangeRequest } from "@/lib/data/requests-data";
 import { Button } from '@/components/ui/button';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import Link from 'next/link';
-import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle } from 'lucide-react';
+import { ClipboardList, ArrowUpDown, ArrowUp, ArrowDown, PlusCircle, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { ChangeRequestDialog } from '@/components/change-request-dialog';
 import { ReviewRequestDialog } from '@/components/review-request-dialog';
@@ -209,16 +210,19 @@ export default function RequestsPage() {
                                 </Badge>
                                 </TableCell>
                                 <TableCell>
-                                    {request.status === 'Pending' && profile?.role === 'organizer' ? (
-                                        <Button variant="outline" size="sm" onClick={() => setReviewingRequest(request)}>
-                                          Review Request
-                                        </Button>
-                                    ) : request.status !== 'Pending' ? (
-                                        <div className="text-xs text-muted-foreground">
-                                            <p>By {request.approvedBy || 'N/A'}</p>
-                                            <p>{request.approvedAt ? format(new Date(request.approvedAt), 'MM/dd/yy, p') : ''}</p>
-                                        </div>
-                                    ) : null}
+                                    <div className="flex items-center gap-2">
+                                        {profile?.role === 'organizer' && (
+                                            <Button variant="outline" size="sm" onClick={() => setReviewingRequest(request)}>
+                                                {request.status === 'Pending' ? 'Review' : <Eye className="h-4 w-4" />}
+                                            </Button>
+                                        )}
+                                        {request.status !== 'Pending' && (
+                                            <div className="text-xs text-muted-foreground">
+                                                <p>By {request.approvedBy || 'N/A'}</p>
+                                                {request.approvedAt && <p>{format(new Date(request.approvedAt), 'MM/dd/yy')}</p>}
+                                            </div>
+                                        )}
+                                    </div>
                                 </TableCell>
                             </TableRow>
                         );
@@ -253,3 +257,4 @@ export default function RequestsPage() {
     </AppLayout>
   );
 }
+
