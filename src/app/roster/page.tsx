@@ -1350,44 +1350,47 @@ function DistrictRosterView() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {sortedSchoolRoster.map((player) => (
-                                        <TableRow key={player.id}>
-                                            <TableCell>
-                                              <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                                            </TableCell>
-                                            <TableCell>{generateTeamCode({ schoolName: player.school, district: player.district, studentType: player.studentType })}</TableCell>
-                                            <TableCell>{player.uscfId}</TableCell>
-                                            <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
-                                            <TableCell>{player.grade}</TableCell>
-                                            <TableCell>{player.section}</TableCell>
-                                            {showGtColumn && (
-                                                <TableCell>
-                                                    {player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
-                                                </TableCell>
-                                            )}
-                                            <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                            <span className="sr-only">Toggle menu</span>
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem onSelect={() => handleEditPlayer(player)}>
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            Edit Player
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={() => handleDeletePlayer(player)} className="text-destructive">
-                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                            Delete Player
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
-                                        </TableRow>
-                                        ))}
+                                        {sortedSchoolRoster.map((player) => {
+                                            const displayName = (player.firstName && player.lastName) ? `${player.lastName}, ${player.firstName}` : 'Invalid Player Record';
+                                            return (
+                                                <TableRow key={player.id}>
+                                                    <TableCell>
+                                                      <div className="font-medium">{displayName}</div>
+                                                    </TableCell>
+                                                    <TableCell>{generateTeamCode({ schoolName: player.school, district: player.district, studentType: player.studentType })}</TableCell>
+                                                    <TableCell>{player.uscfId}</TableCell>
+                                                    <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
+                                                    <TableCell>{player.grade}</TableCell>
+                                                    <TableCell>{player.section}</TableCell>
+                                                    {showGtColumn && (
+                                                        <TableCell>
+                                                            {player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
+                                                        </TableCell>
+                                                    )}
+                                                    <TableCell className="text-right">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button aria-haspopup="true" size="icon" variant="ghost">
+                                                                    <MoreHorizontal className="h-4 w-4" />
+                                                                    <span className="sr-only">Toggle menu</span>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                                <DropdownMenuItem onSelect={() => handleEditPlayer(player)}>
+                                                                    <Edit className="mr-2 h-4 w-4" />
+                                                                    Edit Player
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => handleDeletePlayer(player)} className="text-destructive">
+                                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                                    Delete Player
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             </ScrollArea>
@@ -1479,5 +1482,6 @@ export default function RosterPage() {
     
 
     
+
 
 
