@@ -36,4 +36,5 @@ export async function processBatchedRequests(input: ProcessBatchInput): Promise<
   };
 }
 
-console.log('Module loaded successfully');
+console.log('=== MODULE LOADED SUCCESSFULLY ===');
+console.log('Function exported at:', new Date().toISOString());
