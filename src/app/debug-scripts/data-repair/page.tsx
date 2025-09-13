@@ -184,7 +184,7 @@ export default function DataRepairPage() {
             const masterPlayer = playerMap.get(playerId);
             
             // Step 1: Clean up corrupted duplicates and invalid players
-            if (!masterPlayer || masterPlayer.firstName === 'undefined') {
+            if (!masterPlayer || !masterPlayer.firstName || masterPlayer.firstName === 'undefined') {
               setLibertyLog(prev => [...prev, `  - Removing corrupted/invalid player ID ${playerId} from invoice #${invoice.invoiceNumber}`]);
               invoiceNeedsUpdate = true;
               continue; // Skip this player and don't add to newSelections
@@ -197,11 +197,13 @@ export default function DataRepairPage() {
             if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
               changes.push(`Grade: '${registrationPlayer.grade || 'MISSING'}' -> '${masterPlayer.grade}'`);
               registrationPlayer.grade = masterPlayer.grade;
+              invoiceNeedsUpdate = true;
             }
             
             if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
               changes.push(`Section: '${registrationPlayer.section || 'MISSING'}' -> '${masterPlayer.section}'`);
               registrationPlayer.section = masterPlayer.section;
+              invoiceNeedsUpdate = true;
             }
             
             newSelections[playerId] = registrationPlayer;
@@ -221,7 +223,7 @@ export default function DataRepairPage() {
             batch.update(invoiceDoc.ref, { 
               selections: newSelections,
               lastSynced: new Date().toISOString(),
-              syncedBy: 'Liberty MS Fix Script v3 (Cleanup)'
+              syncedBy: 'Liberty MS Fix Script v4 (Cleanup)'
             });
           }
         }
