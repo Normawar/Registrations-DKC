@@ -1,11 +1,11 @@
 /**
  * @fileOverview Processes a batch of change requests (approve or deny).
  * This flow is designed for organizers to handle multiple requests at once.
+ * Updated to only modify Firestore records, not create new Square invoices.
  */
 import { ai } from '@/ai/genkit';
-import { doc, getDoc, writeBatch, getDocs, collection } from 'firebase/firestore';
+import { doc, getDoc, writeBatch, getDocs, collection, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
-import { recreateInvoiceFromRoster } from './recreate-invoice-from-roster-flow';
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import {
@@ -188,38 +188,19 @@ export const processBatchedRequestsFlow = ai.defineFlow(
 
             console.log('New selections:', Object.keys(newSelections));
 
-            const newPlayerRoster = Object.keys(newSelections).map(playerId => {
-                const player = allPlayers.find(p => p.id === playerId);
-                if (!player) {
-                  throw new Error(`Player ${playerId} not found in master database`);
-                }
-                return {
-                    playerName: `${player.firstName || ''} ${player.lastName || ''}`.trim(),
-                    uscfId: player.uscfId || '',
-                    baseRegistrationFee: eventDetails.regularFee || 0,
-                    lateFee: 0,
-                    uscfAction: newSelections[playerId].uscfStatus !== 'current',
-                    isGtPlayer: player.studentType === 'gt',
-                    waiveLateFee: waiveFees || false,
-                    section: newSelections[playerId].section || player.section || ''
-                };
-            });
-            
-            console.log(`Creating roster with ${newPlayerRoster.length} players`);
+            // Update the Firestore invoice directly instead of recreating Square invoice
+            const invoiceRef = doc(db, 'invoices', request.confirmationId);
+            const updateData = {
+              selections: newSelections,
+              lastModified: new Date().toISOString(),
+              modifiedBy: `${processingUser.firstName} ${processingUser.lastName}`,
+              changeLog: `Request #${request.id} processed: ${request.type} for ${request.player}`,
+              // Update any other relevant fields
+              updatedAt: new Date().toISOString(),
+            };
 
-            await recreateInvoiceFromRoster({
-                originalInvoiceId: originalConfirmation.invoiceId,
-                players: newPlayerRoster,
-                uscfFee: 24,
-                requestingUserRole: 'organizer',
-                sponsorName: originalConfirmation.sponsorName || '',
-                sponsorEmail: originalConfirmation.sponsorEmail || '',
-                schoolName: originalConfirmation.schoolName || '',
-                teamCode: originalConfirmation.teamCode || '',
-                eventName: originalConfirmation.eventName || eventDetails.name,
-                eventDate: originalConfirmation.eventDate || eventDetails.date,
-                revisionMessage: `Request #${request.id} processed: ${request.type} for ${request.player}`
-            });
+            // Use updateDoc instead of batch for the invoice update to handle it separately
+            await updateDoc(invoiceRef, updateData);
 
             batch.update(requestRef, {
                 status: 'Approved',
@@ -227,8 +208,7 @@ export const processBatchedRequestsFlow = ai.defineFlow(
                 approvedAt: new Date().toISOString(),
             });
             processedCount++;
-            console.log(`Request ${requestId} approved successfully`);
-
+            console.log(`Request ${requestId} approved and invoice updated successfully`);
           }
         } catch (error) {
             console.error(`Error processing request ${requestId}:`, error);
