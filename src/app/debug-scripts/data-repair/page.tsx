@@ -157,111 +157,88 @@ export default function DataRepairPage() {
       toast({ variant: 'destructive', title: 'Database not ready', description: 'Please wait for the player database to finish loading.' });
       return;
     }
-
+  
     setIsLibertyProcessing(true);
     setLibertyLog(['Starting Liberty MS tournament data fix...']);
     setLibertyStats({ invoicesScanned: 0, playersUpdated: 0, playersSkipped: 0 });
-
+  
     try {
-        const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-        const batch = writeBatch(db);
-        const playerMap = new Map(allPlayers.map(p => [p.id, p]));
-        let invoicesScanned = 0;
-        let playersUpdated = 0;
-        let playersSkipped = 0;
-
-        for (const invoiceDoc of invoicesSnapshot.docs) {
-            const invoice = invoiceDoc.data();
-            
-            if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
-                invoicesScanned++;
-                if (!invoice.selections) continue;
-
-                let invoiceNeedsUpdate = false;
-                const newSelections = { ...invoice.selections };
-
-                for (const playerId in newSelections) {
-                    const masterPlayer = playerMap.get(playerId);
-                    const registrationPlayer = newSelections[playerId];
-
-                    // Debug: Show the actual lookup
-                    console.log(`\n--- Processing Player ID: ${playerId} ---`);
-                    console.log(`Found in master DB: ${!!masterPlayer}`);
-
-                    if (masterPlayer) {
-                        console.log(`Master: ${masterPlayer.firstName} ${masterPlayer.lastName}`);
-                        console.log(`Master grade: "${masterPlayer.grade || 'NONE'}"`);
-                        console.log(`Master section: "${masterPlayer.section || 'NONE'}"`);
-                        console.log(`Invoice grade: "${registrationPlayer.grade || 'NONE'}"`);
-                        console.log(`Invoice section: "${registrationPlayer.section || 'NONE'}"`);
-
-                        // Check if Isabella Requena specifically
-                        if (masterPlayer.firstName === 'Isabella' && masterPlayer.lastName === 'Requena') {
-                            console.log(`🎯 FOUND ISABELLA REQUENA!`);
-                            console.log(`Her master data: Grade="${masterPlayer.grade}", Section="${masterPlayer.section}"`);
-                            console.log(`Her invoice data: Grade="${registrationPlayer.grade}", Section="${registrationPlayer.section}"`);
-                        }
-                        
-                        const changes: string[] = [];
-
-                        // ALWAYS sync grade from master database if master has one
-                        if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
-                            const oldGrade = registrationPlayer.grade || 'MISSING';
-                            registrationPlayer.grade = masterPlayer.grade;
-                            changes.push(`Grade: '${oldGrade}' -> '${masterPlayer.grade}'`);
-                        }
-                        
-                        // ALWAYS sync section from master database if master has one  
-                        if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
-                            const oldSection = registrationPlayer.section || 'MISSING';
-                            registrationPlayer.section = masterPlayer.section;
-                             changes.push(`Section: '${oldSection}' -> '${masterPlayer.section}'`);
-                        }
-
-                        if (changes.length > 0) {
-                            invoiceNeedsUpdate = true;
-                            playersUpdated++;
-                            setLibertyLog(prev => [...prev, `  - Updating ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
-                        } else {
-                            setLibertyLog(prev => [...prev, `  - ${masterPlayer.firstName} ${masterPlayer.lastName}: Already up-to-date`]);
-                        }
-                    } else {
-                        playersSkipped++;
-                        setLibertyLog(prev => [...prev, `  - Player ID ${playerId}: Not found in master database`]);
-                        console.log(`❌ Player ID ${playerId} NOT FOUND in master database`);
-                        // Let's see if we can find them by name
-                        const possibleMatches = allPlayers.filter(p => 
-                            p.firstName?.toLowerCase().includes('isabella') || 
-                            p.lastName?.toLowerCase().includes('requena')
-                        );
-                        if (possibleMatches.length > 0) {
-                            console.log(`Possible name matches:`, possibleMatches.map(p => `${p.firstName} ${p.lastName} (ID: ${p.id})`));
-                        }
-                    }
-                }
-
-                if (invoiceNeedsUpdate) {
-                    batch.update(invoiceDoc.ref, { 
-                        selections: newSelections,
-                        lastSynced: new Date().toISOString(),
-                        syncedBy: 'Liberty MS Fix Script v2'
-                    });
-                }
-            }
-        }
+      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+      const batch = writeBatch(db);
+      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+      let invoicesScanned = 0;
+      let playersUpdated = 0;
+      let playersSkipped = 0;
+  
+      for (const invoiceDoc of invoicesSnapshot.docs) {
+        const invoice = invoiceDoc.data();
         
-        if (playersUpdated > 0) {
-            await batch.commit();
-            toast({ title: "Liberty MS Data Synced!", description: `Updated ${playersUpdated} player records to match master database.` });
-            setLibertyLog(prev => [...prev, `✅ Successfully synced ${playersUpdated} players with master database.`]);
-        } else {
-            toast({ title: "Sync Complete", description: "All player data for Liberty MS tournament is already synchronized with master database." });
-            setLibertyLog(prev => [...prev, `✅ All players already synchronized - no changes needed.`]);
+        if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
+          invoicesScanned++;
+          if (!invoice.selections) continue;
+  
+          let invoiceNeedsUpdate = false;
+          const newSelections: { [key: string]: any } = {};
+  
+          for (const playerId in invoice.selections) {
+            const masterPlayer = playerMap.get(playerId);
+            
+            // Step 1: Clean up corrupted duplicates and invalid players
+            if (!masterPlayer || masterPlayer.firstName === 'undefined') {
+              setLibertyLog(prev => [...prev, `  - Removing corrupted/invalid player ID ${playerId} from invoice #${invoice.invoiceNumber}`]);
+              invoiceNeedsUpdate = true;
+              continue; // Skip this player and don't add to newSelections
+            }
+  
+            const registrationPlayer = invoice.selections[playerId];
+            const changes: string[] = [];
+  
+            // Step 2: Update the real players with master database data (force overwrite)
+            if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
+              changes.push(`Grade: '${registrationPlayer.grade || 'MISSING'}' -> '${masterPlayer.grade}'`);
+              registrationPlayer.grade = masterPlayer.grade;
+            }
+            
+            if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
+              changes.push(`Section: '${registrationPlayer.section || 'MISSING'}' -> '${masterPlayer.section}'`);
+              registrationPlayer.section = masterPlayer.section;
+            }
+            
+            newSelections[playerId] = registrationPlayer;
+  
+            if (changes.length > 0) {
+              playersUpdated++;
+              setLibertyLog(prev => [...prev, `  - Syncing ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
+            }
+          }
+          
+          // Check if the number of selections changed (due to removals)
+          if (Object.keys(newSelections).length !== Object.keys(invoice.selections).length) {
+              invoiceNeedsUpdate = true;
+          }
+
+          if (invoiceNeedsUpdate) {
+            batch.update(invoiceDoc.ref, { 
+              selections: newSelections,
+              lastSynced: new Date().toISOString(),
+              syncedBy: 'Liberty MS Fix Script v3 (Cleanup)'
+            });
+          }
         }
-
-        setLibertyStats({ invoicesScanned, playersUpdated, playersSkipped });
-        setLibertyLog(prev => [...prev, '...Liberty MS sync script finished.']);
-
+      }
+      
+      if (playersUpdated > 0 || invoicesScanned > 0) {
+        await batch.commit();
+        toast({ title: "Liberty MS Data Synced!", description: `Updated ${playersUpdated} player records and cleaned invoices.` });
+        setLibertyLog(prev => [...prev, `✅ Successfully synced ${playersUpdated} players with master database.`]);
+      } else {
+        toast({ title: "Sync Complete", description: "No Liberty MS invoices found to process." });
+        setLibertyLog(prev => [...prev, `✅ No Liberty MS invoices found.`]);
+      }
+  
+      setLibertyStats({ invoicesScanned, playersUpdated, playersSkipped });
+      setLibertyLog(prev => [...prev, '...Liberty MS sync script finished.']);
+  
     } catch (error) {
       console.error('Liberty MS sync failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
