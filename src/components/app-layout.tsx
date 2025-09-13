@@ -85,7 +85,6 @@ const organizerMenuStructure = {
   "Backend": [
     { href: "/users", icon: Users, label: "User Management" },
     { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
-    { href: "/debug-api", icon: TestTube2, label: "API Tester" },
     { href: "/debug-scripts/import-from-square", icon: Wrench, label: "Square Importer" },
     { href: "/debug-scripts/data-repair", icon: Wrench, label: "Player Data Repair" },
     { href: "/debug-scripts/import-uscf-top-players", icon: Wrench, label: "Import Missing State Players" },
