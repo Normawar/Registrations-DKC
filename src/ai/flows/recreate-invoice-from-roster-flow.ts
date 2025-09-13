@@ -47,11 +47,16 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
         console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
       }
 
-      // Step 3: Create a new invoice with the updated details.
+      // Step 3: Create a new invoice with the updated details and a unique revision number.
       const existingRevision = originalInvoice?.invoiceNumber?.match(/-rev\.(\d+)/);
       const nextRevisionNumber = existingRevision ? parseInt(existingRevision[1], 10) + 1 : 2;
       const baseInvoiceNumber = originalInvoice?.invoiceNumber?.split('-rev.')[0];
-      const newInvoiceNumber = baseInvoiceNumber ? `${baseInvoiceNumber}-rev.${nextRevisionNumber}` : undefined;
+      // Append a timestamp to ensure uniqueness, even if run in quick succession.
+      const uniqueTimestamp = Date.now().toString().slice(-5);
+      const newInvoiceNumber = baseInvoiceNumber 
+          ? `${baseInvoiceNumber}-rev.${nextRevisionNumber}-${uniqueTimestamp}` 
+          : `INV-${uniqueTimestamp}`; // Fallback if no base number
+
       const revisionMessage = `Revised based on your request. Original Invoice: #${originalInvoice?.invoiceNumber}. This invoice replaces the original.`;
       
       const newInvoiceInput = {
