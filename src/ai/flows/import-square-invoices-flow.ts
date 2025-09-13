@@ -10,7 +10,7 @@ import { z } from 'genkit';
 import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
-import { type Invoice } from 'square';
+import { type Invoice, ApiError } from 'square';
 import { generateTeamCode } from '@/lib/school-utils';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 
@@ -39,6 +39,14 @@ const importSquareInvoicesFlow = ai.defineFlow(
   },
   async ({ startInvoiceNumber }) => {
     
+    console.log('Environment check:', {
+      hasAccessToken: !!process.env.SQUARE_ACCESS_TOKEN,
+      hasAppId: !!process.env.SQUARE_APPLICATION_ID,
+      hasLocationId: !!process.env.SQUARE_LOCATION_ID,
+      environment: process.env.SQUARE_ENVIRONMENT,
+      tokenStart: process.env.SQUARE_ACCESS_TOKEN?.substring(0, 6) + '...'
+    });
+    
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       throw new Error('Square API is not configured. Please set credentials in your .env file.');
@@ -56,6 +64,10 @@ const importSquareInvoicesFlow = ai.defineFlow(
     console.log(`Starting import from Square for invoices >= #${startInvoiceNumber}...`);
 
     try {
+        console.log('Testing basic Square API connectivity...');
+        const locationsTest = await squareClient.locationsApi.listLocations();
+        console.log('✅ Locations API test passed', locationsTest.result.locations?.[0]?.name);
+
         do {
             const { result } = await squareClient.invoicesApi.listInvoices({
                 locationId: locationId,
@@ -68,7 +80,17 @@ const importSquareInvoicesFlow = ai.defineFlow(
             cursor = result.cursor;
             console.log(`Fetched ${invoices.length} invoices, total so far: ${allInvoices.length}. More available: ${!!cursor}`);
         } while (cursor);
-    } catch (error) {
+    } catch (error: any) {
+        if (error instanceof ApiError) {
+             console.error('Full Square API Error:', {
+                name: error.name,
+                message: error.message,
+                statusCode: error.statusCode,
+                errors: error.errors,
+                body: error.body
+            });
+            throw new Error(`Square API Error: ${error.message} (Status: ${error.statusCode || 'unknown'})`);
+        }
         console.error('Failed to fetch invoices from Square API:', error);
         throw new Error('Could not fetch data from Square. Check API credentials and permissions.');
     }

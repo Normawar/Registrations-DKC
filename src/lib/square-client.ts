@@ -6,12 +6,16 @@ import { Client, Environment } from 'square';
 function checkSquareCredentials() {
   const accessToken = process.env.SQUARE_ACCESS_TOKEN;
   const locationId = process.env.SQUARE_LOCATION_ID;
+  const applicationId = process.env.SQUARE_APPLICATION_ID;
+  const environment = process.env.SQUARE_ENVIRONMENT;
 
-  if (!accessToken || accessToken.startsWith('YOUR_') || !locationId || locationId.startsWith('YOUR_')) {
-    const missingVars: string[] = [];
-    if (!accessToken || accessToken.startsWith('YOUR_')) missingVars.push('SQUARE_ACCESS_TOKEN');
-    if (!locationId || locationId.startsWith('YOUR_')) missingVars.push('SQUARE_LOCATION_ID');
-    
+  const missingVars: string[] = [];
+  if (!accessToken || accessToken.startsWith('YOUR_')) missingVars.push('SQUARE_ACCESS_TOKEN');
+  if (!locationId || locationId.startsWith('YOUR_')) missingVars.push('SQUARE_LOCATION_ID');
+  if (!applicationId) missingVars.push('SQUARE_APPLICATION_ID');
+  if (!environment) missingVars.push('SQUARE_ENVIRONMENT');
+  
+  if (missingVars.length > 0) {
     const errorMessage = `Square configuration is incomplete. Please set: ${missingVars.join(
         ', '
       )} in your .env file. You can find these credentials in your Square Developer Dashboard.`;
@@ -28,9 +32,16 @@ function checkSquareCredentials() {
  */
 export async function getSquareClient(): Promise<Client> {
   checkSquareCredentials();
+  
+  const environment = process.env.SQUARE_ENVIRONMENT === 'production' 
+    ? Environment.Production 
+    : Environment.Sandbox;
+
+  console.log('Square client configured with environment:', environment);
+
   return new Client({
     accessToken: process.env.SQUARE_ACCESS_TOKEN,
-    environment: Environment.Production,
+    environment: environment,
   });
 }
 
