@@ -182,9 +182,26 @@ export default function DataRepairPage() {
 
                 for (const playerId in newSelections) {
                     const masterPlayer = playerMap.get(playerId);
-                    
+                    const registrationPlayer = newSelections[playerId];
+
+                    // Debug: Show the actual lookup
+                    console.log(`\n--- Processing Player ID: ${playerId} ---`);
+                    console.log(`Found in master DB: ${!!masterPlayer}`);
+
                     if (masterPlayer) {
-                        const registrationPlayer = newSelections[playerId];
+                        console.log(`Master: ${masterPlayer.firstName} ${masterPlayer.lastName}`);
+                        console.log(`Master grade: "${masterPlayer.grade || 'NONE'}"`);
+                        console.log(`Master section: "${masterPlayer.section || 'NONE'}"`);
+                        console.log(`Invoice grade: "${registrationPlayer.grade || 'NONE'}"`);
+                        console.log(`Invoice section: "${registrationPlayer.section || 'NONE'}"`);
+
+                        // Check if Isabella Requena specifically
+                        if (masterPlayer.firstName === 'Isabella' && masterPlayer.lastName === 'Requena') {
+                            console.log(`🎯 FOUND ISABELLA REQUENA!`);
+                            console.log(`Her master data: Grade="${masterPlayer.grade}", Section="${masterPlayer.section}"`);
+                            console.log(`Her invoice data: Grade="${registrationPlayer.grade}", Section="${registrationPlayer.section}"`);
+                        }
+                        
                         const changes: string[] = [];
 
                         // ALWAYS sync grade from master database if master has one
@@ -211,6 +228,15 @@ export default function DataRepairPage() {
                     } else {
                         playersSkipped++;
                         setLibertyLog(prev => [...prev, `  - Player ID ${playerId}: Not found in master database`]);
+                        console.log(`❌ Player ID ${playerId} NOT FOUND in master database`);
+                        // Let's see if we can find them by name
+                        const possibleMatches = allPlayers.filter(p => 
+                            p.firstName?.toLowerCase().includes('isabella') || 
+                            p.lastName?.toLowerCase().includes('requena')
+                        );
+                        if (possibleMatches.length > 0) {
+                            console.log(`Possible name matches:`, possibleMatches.map(p => `${p.firstName} ${p.lastName} (ID: ${p.id})`));
+                        }
                     }
                 }
 
