@@ -169,32 +169,54 @@ export async function simpleSignIn(email: string, password: string) {
     console.log('✅ User signed in with UID:', user.uid);
 
     const profileDocRef = doc(db, 'users', user.uid);
-    const profileDoc = await getDoc(profileDocRef);
+    let profileDoc = await getDoc(profileDocRef);
 
-    if (profileDoc.exists()) {
-      console.log('✅ User profile loaded successfully');
-      return { success: true, user, profile: profileDoc.data() as SponsorProfile };
+    if (!profileDoc.exists()) {
+      console.warn('⚠️ User profile not found under UID, checking for legacy doc using email...');
+      const legacyDoc = await getDoc(doc(db, 'users', email.toLowerCase()));
+      
+      if (legacyDoc.exists()) {
+        console.log('📦 Found legacy profile, migrating...');
+        const legacyData = legacyDoc.data();
+        const profileToSave: SponsorProfile = {
+          ...(legacyData as Omit<SponsorProfile, 'uid' | 'email'>),
+          email: email.toLowerCase(),
+          uid: user.uid,
+          migratedAt: new Date().toISOString(),
+          forceProfileUpdate: true, // Force user to review their profile
+        };
+        
+        // Create the new document with the UID
+        await setDoc(profileDocRef, profileToSave);
+        console.log('✅ Legacy profile migrated successfully.');
+
+        // Re-fetch the profile to ensure consistency
+        profileDoc = await getDoc(profileDocRef);
+
+      } else {
+        // If no legacy doc, this is an orphaned auth user. Force profile creation.
+        console.error("❌ No profile found under UID or legacy email. Forcing profile update.");
+        const forcedProfile: SponsorProfile = {
+            uid: user.uid,
+            email: user.email!,
+            firstName: user.displayName || 'New',
+            lastName: 'User',
+            role: 'individual',
+            district: 'None',
+            school: 'Homeschool',
+            phone: '',
+            avatarType: 'icon',
+            avatarValue: 'PawnIcon',
+            forceProfileUpdate: true,
+        };
+        await setDoc(profileDocRef, forcedProfile);
+        profileDoc = await getDoc(profileDocRef);
+      }
     }
+    
+    console.log('✅ User profile loaded successfully');
+    return { success: true, user, profile: profileDoc.data() as SponsorProfile };
 
-    console.warn('⚠️ User profile not found in Firestore for UID, checking for legacy doc...');
-    const legacyDoc = await getDoc(doc(db, 'users', email.toLowerCase()));
-
-    if (legacyDoc.exists()) {
-      console.log('📦 Found legacy profile, migrating...');
-      const legacyData = legacyDoc.data();
-      const profileToSave: SponsorProfile = {
-        ...(legacyData as Omit<SponsorProfile, 'uid' | 'email'>),
-        email: email.toLowerCase(),
-        uid: user.uid,
-        migratedAt: new Date().toISOString(),
-        forceProfileUpdate: true, // Force user to review their profile
-      };
-      await setDoc(profileDocRef, profileToSave);
-      console.log('✅ Legacy profile migrated successfully.');
-      return { success: true, user, profile: profileToSave };
-    }
-
-    throw new Error('Your account needs to be updated. Please try signing up again to restore your profile.');
   } catch (error: any) {
     console.error('❌ Signin failed:', error);
     let userFriendlyMessage = 'An error occurred during login.';
