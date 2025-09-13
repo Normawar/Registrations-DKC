@@ -2,128 +2,173 @@
 'use client';
 
 import { useState } from 'react';
-import { AppLayout } from "@/components/app-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, DownloadCloud } from 'lucide-react';
-import { importSquareInvoices } from '@/ai/flows/import-square-invoices-flow';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
+import { AppLayout } from '@/components/app-layout';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, Wrench, CheckCircle, FileWarning } from 'lucide-react';
+import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 
-export default function ImportFromSquarePage() {
+export default function DataRepairPage() {
   const { toast } = useToast();
-  const [startInvoiceNumber, setStartInvoiceNumber] = useState('');
+  const { database: allPlayers, refreshDatabase, isDbLoaded } = useMasterDb();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<{ created: number; updated: number; failed: number; errors: string[] } | null>(null);
+  const [log, setLog] = useState<string[]>([]);
+  const [stats, setStats] = useState({ scanned: 0, updated: 0, noAction: 0 });
 
-  const handleImport = async () => {
-    if (!startInvoiceNumber.trim()) {
-      toast({ variant: 'destructive', title: 'Invalid Number', description: 'Please enter a valid starting invoice number.' });
+  const runRepairScript = async () => {
+    if (!db || !isDbLoaded) {
+      toast({ variant: 'destructive', title: 'Database not ready', description: 'Please wait for the player database to finish loading.' });
       return;
     }
 
     setIsProcessing(true);
-    setResults(null);
+    setLog(['Starting data repair process...']);
+    setStats({ scanned: 0, updated: 0, noAction: 0 });
+    let localUpdatedCount = 0;
 
     try {
-      const result = await importSquareInvoices({ startInvoiceNumber: parseInt(startInvoiceNumber, 10) });
-      setResults(result);
+      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+      const batch = writeBatch(db);
+      const playerUpdates = new Map<string, Partial<MasterPlayer>>();
 
-      if (result.failed > 0) {
-        toast({
-          variant: 'destructive',
-          title: `Import Partially Failed`,
-          description: `Created: ${result.created}, Updated: ${result.updated}, Failed: ${result.failed}. Check results for details.`,
-          duration: 10000,
+      setLog(prev => [...prev, `Found ${invoicesSnapshot.size} invoices to scan.`]);
+
+      for (const invoiceDoc of invoicesSnapshot.docs) {
+        const invoice = invoiceDoc.data();
+        if (!invoice.selections) continue;
+
+        for (const playerId in invoice.selections) {
+          const player = allPlayers.find(p => p.id === playerId);
+          if (!player) continue;
+
+          const selectionDetails = invoice.selections[playerId];
+          let needsUpdate = false;
+          let playerUpdate: Partial<MasterPlayer> = playerUpdates.get(playerId) || {};
+
+          // Check and update grade if missing
+          if (!player.grade && selectionDetails.grade) {
+            playerUpdate.grade = selectionDetails.grade;
+            needsUpdate = true;
+          }
+
+          // Check and update section if missing
+          if (!player.section && selectionDetails.section) {
+            playerUpdate.section = selectionDetails.section;
+            needsUpdate = true;
+          }
+
+          if (needsUpdate) {
+            playerUpdates.set(playerId, playerUpdate);
+          }
+        }
+      }
+
+      if (playerUpdates.size > 0) {
+        setLog(prev => [...prev, `Found ${playerUpdates.size} players with missing data to update.`]);
+        playerUpdates.forEach((update, playerId) => {
+          const playerRef = doc(db, 'players', playerId);
+          batch.update(playerRef, update);
+          localUpdatedCount++;
+          const player = allPlayers.find(p => p.id === playerId);
+          setLog(prev => [
+            ...prev,
+            `  - Updating ${player?.firstName} ${player?.lastName}: ${Object.keys(update).join(', ')}`
+          ]);
         });
+
+        await batch.commit();
+        toast({
+          title: "Data Repair Complete!",
+          description: `Successfully updated ${localUpdatedCount} player records.`,
+        });
+        refreshDatabase(); // Refresh the local context data
       } else {
         toast({
-          title: "Import Complete!",
-          description: `Successfully created ${result.created} and updated ${result.updated} invoices from Square.`,
+          title: "No Updates Needed",
+          description: "All player records with associated invoices appear to have complete data.",
         });
       }
+
+      setStats({
+        scanned: invoicesSnapshot.size,
+        updated: localUpdatedCount,
+        noAction: allPlayers.length - localUpdatedCount,
+      });
+
+      setLog(prev => [...prev, '...Data repair process finished.']);
+
     } catch (error) {
+      console.error('Data repair failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast({ variant: 'destructive', title: 'Import Failed', description: errorMessage });
+      toast({ variant: 'destructive', title: 'Data Repair Failed', description: errorMessage });
+      setLog(prev => [...prev, `ERROR: ${errorMessage}`]);
     } finally {
       setIsProcessing(false);
     }
   };
 
+
   return (
     <AppLayout>
-      <div className="space-y-8 max-w-2xl mx-auto">
+      <div className="space-y-8 max-w-4xl mx-auto">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Direct Square Invoice Importer</h1>
+          <h1 className="text-3xl font-bold font-headline">Player Data Repair Tool</h1>
           <p className="text-muted-foreground mt-2">
-            Fetch and process invoices directly from the Square API starting from a specific invoice number.
+            Automatically fix missing player information (like Grade or Section) using data from past invoices.
           </p>
         </div>
-        
-        <Alert>
-          <AlertTitle>Important Note</AlertTitle>
-          <AlertDescription>
-            This tool directly interacts with the Square API. It's powerful but should be used with caution. Ensure your Square credentials in the `.env` file are correct before starting.
-          </AlertDescription>
-        </Alert>
 
         <Card>
           <CardHeader>
-            <CardTitle>1. Set Starting Point</CardTitle>
-            <CardDescription>Enter the first invoice number you want to start importing from. The tool will fetch all invoices with that number and higher.</CardDescription>
+            <CardTitle>Run Repair Script</CardTitle>
+            <CardDescription>
+              This tool will scan all invoices and update player profiles in the master database if it finds missing information that exists on a registration record. This process is safe to run multiple times.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-             <div className="grid w-full max-w-sm items-center gap-1.5">
-                <Label htmlFor="invoice-number">Starting Invoice Number</Label>
-                <Input
-                    id="invoice-number"
-                    type="number"
-                    placeholder="e.g., 4299"
-                    value={startInvoiceNumber}
-                    onChange={(e) => setStartInvoiceNumber(e.target.value)}
-                    disabled={isProcessing}
-                />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button onClick={handleImport} disabled={isProcessing || !startInvoiceNumber}>
-              <DownloadCloud className="mr-2 h-4 w-4" />
-              {isProcessing ? 'Importing from Square...' : 'Start Import'}
+            <Button onClick={runRepairScript} disabled={isProcessing || !isDbLoaded}>
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Wrench className="mr-2 h-4 w-4" />
+              )}
+              {isProcessing ? 'Repairing Data...' : 'Start Player Data Repair'}
             </Button>
-          </CardFooter>
+            {!isDbLoaded && <p className="text-sm text-muted-foreground mt-2">Waiting for player database to load...</p>}
+          </CardContent>
         </Card>
 
-        {isProcessing && !results && (
-            <Card className="flex items-center justify-center p-8">
-                <Loader2 className="mr-4 h-8 w-8 animate-spin" />
-                <p className="text-lg">Fetching and processing invoices... This may take several minutes.</p>
-            </Card>
-        )}
-
-        {results && (
+        {(isProcessing || log.length > 1) && (
           <Card>
             <CardHeader>
-                <CardTitle className={results.failed > 0 ? "text-destructive" : "text-green-600"}>
-                    Import Finished
-                </CardTitle>
-                <CardDescription>Summary of the import operation.</CardDescription>
+              <CardTitle>Repair Log & Results</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="p-2 border rounded-md"><p className="text-2xl font-bold">{results.created}</p><p className="text-sm text-muted-foreground">Created</p></div>
-                  <div className="p-2 border rounded-md"><p className="text-2xl font-bold">{results.updated}</p><p className="text-sm text-muted-foreground">Updated</p></div>
-                  <div className="p-2 border rounded-md"><p className="text-2xl font-bold text-destructive">{results.failed}</p><p className="text-sm text-muted-foreground">Failed</p></div>
-              </div>
-              {results.errors.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-destructive">Error Details:</h4>
-                  <pre className="mt-2 text-xs bg-muted p-4 rounded-md max-h-48 overflow-y-auto">
-                    {results.errors.join('\n')}
-                  </pre>
+                <div className="p-4 border rounded-lg">
+                  <FileWarning className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-2xl font-bold">{stats.scanned}</p>
+                  <p className="text-sm text-muted-foreground">Invoices Scanned</p>
                 </div>
-              )}
+                <div className="p-4 border rounded-lg">
+                  <CheckCircle className="h-6 w-6 mx-auto mb-2 text-green-600" />
+                  <p className="text-2xl font-bold text-green-600">{stats.updated}</p>
+                  <p className="text-sm text-muted-foreground">Players Updated</p>
+                </div>
+                 <div className="p-4 border rounded-lg">
+                  <p className="text-2xl font-bold">{stats.noAction}</p>
+                  <p className="text-sm text-muted-foreground">Players with No Action</p>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Detailed Log:</h4>
+                <pre className="bg-muted p-4 rounded-md text-xs max-h-60 overflow-y-auto">
+                  {log.join('\n')}
+                </pre>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -131,3 +176,4 @@ export default function ImportFromSquarePage() {
     </AppLayout>
   );
 }
+
