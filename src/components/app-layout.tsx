@@ -86,8 +86,8 @@ const organizerMenuStructure = {
     { href: "/users", icon: Users, label: "User Management" },
     { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
     { href: "/debug-api", icon: TestTube2, label: "API Tester" },
-    { href: "/debug-scripts/revert-request-status", icon: Wrench, label: "Revert Request Status" },
     { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
+    { href: "/debug-scripts/import-uscf-top-players", icon: Wrench, label: "Import Top Players" },
   ]
 };
 
