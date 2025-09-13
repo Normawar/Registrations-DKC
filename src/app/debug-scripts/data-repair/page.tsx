@@ -154,100 +154,101 @@ export default function DataRepairPage() {
 
   const runLibertyFixScript = async () => {
     if (!db || !isDbLoaded) {
-      toast({ variant: 'destructive', title: 'Database not ready', description: 'Please wait for the player database to finish loading.' });
-      return;
+        toast({ variant: 'destructive', title: 'Database not ready', description: 'Please wait for the player database to finish loading.' });
+        return;
     }
   
     setIsLibertyProcessing(true);
-    setLibertyLog(['Starting Liberty MS tournament data fix...']);
+    setLibertyLog(['Starting Liberty MS tournament data fix v5 (Cleanup & Overwrite)...']);
     setLibertyStats({ invoicesScanned: 0, playersUpdated: 0, playersSkipped: 0 });
   
     try {
-      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-      const batch = writeBatch(db);
-      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
-      let invoicesScanned = 0;
-      let playersUpdated = 0;
-      let playersSkipped = 0;
+        const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+        const batch = writeBatch(db);
+        const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+        let invoicesScanned = 0;
+        let playersUpdated = 0;
+        let playersSkipped = 0;
   
-      for (const invoiceDoc of invoicesSnapshot.docs) {
-        const invoice = invoiceDoc.data();
-        
-        if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
-          invoicesScanned++;
-          if (!invoice.selections) continue;
-  
-          let invoiceNeedsUpdate = false;
-          const newSelections: { [key: string]: any } = {};
-  
-          for (const playerId in invoice.selections) {
-            const masterPlayer = playerMap.get(playerId);
+        for (const invoiceDoc of invoicesSnapshot.docs) {
+            const invoice = invoiceDoc.data();
             
-            // Step 1: Clean up corrupted duplicates and invalid players
-            if (!masterPlayer || !masterPlayer.firstName || masterPlayer.firstName === 'undefined') {
-              setLibertyLog(prev => [...prev, `  - Removing corrupted/invalid player ID ${playerId} from invoice #${invoice.invoiceNumber}`]);
-              invoiceNeedsUpdate = true;
-              continue; // Skip this player and don't add to newSelections
-            }
-  
-            const registrationPlayer = invoice.selections[playerId];
-            const changes: string[] = [];
-  
-            // Step 2: Update the real players with master database data (force overwrite)
-            if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
-              changes.push(`Grade: '${registrationPlayer.grade || 'MISSING'}' -> '${masterPlayer.grade}'`);
-              registrationPlayer.grade = masterPlayer.grade;
-              invoiceNeedsUpdate = true;
-            }
-            
-            if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
-              changes.push(`Section: '${registrationPlayer.section || 'MISSING'}' -> '${masterPlayer.section}'`);
-              registrationPlayer.section = masterPlayer.section;
-              invoiceNeedsUpdate = true;
-            }
-            
-            newSelections[playerId] = registrationPlayer;
-  
-            if (changes.length > 0) {
-              playersUpdated++;
-              setLibertyLog(prev => [...prev, `  - Syncing ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
-            }
-          }
-          
-          // Check if the number of selections changed (due to removals)
-          if (Object.keys(newSelections).length !== Object.keys(invoice.selections).length) {
-              invoiceNeedsUpdate = true;
-          }
+            if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
+                invoicesScanned++;
+                if (!invoice.selections) continue;
 
-          if (invoiceNeedsUpdate) {
-            batch.update(invoiceDoc.ref, { 
-              selections: newSelections,
-              lastSynced: new Date().toISOString(),
-              syncedBy: 'Liberty MS Fix Script v4 (Cleanup)'
-            });
-          }
+                let invoiceNeedsUpdate = false;
+                const newSelections: { [key: string]: any } = {};
+
+                // Step 1: Filter out corrupted entries and build the new selections object
+                for (const playerId in invoice.selections) {
+                    const masterPlayer = playerMap.get(playerId);
+                    
+                    if (masterPlayer && masterPlayer.firstName && masterPlayer.firstName !== 'undefined') {
+                        // This is a valid player, keep them for processing
+                        newSelections[playerId] = { ...invoice.selections[playerId] };
+                    } else {
+                        // This is a corrupted or unmatchable player, log and discard
+                        setLibertyLog(prev => [...prev, `  - 🗑️ Removing corrupted/invalid player ID ${playerId} from invoice #${invoice.invoiceNumber}`]);
+                        invoiceNeedsUpdate = true; // Mark for update because we are removing an entry
+                    }
+                }
+
+                // Step 2: Iterate over the CLEANED selections and force-update data
+                for (const playerId in newSelections) {
+                    const masterPlayer = playerMap.get(playerId)!; // We know this exists from Step 1
+                    const registrationPlayer = newSelections[playerId];
+                    let changesMade = false;
+
+                    // Force-overwrite grade from master database
+                    if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
+                        registrationPlayer.grade = masterPlayer.grade;
+                        changesMade = true;
+                    }
+                    
+                    // Force-overwrite section from master database
+                    if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
+                        registrationPlayer.section = masterPlayer.section;
+                        changesMade = true;
+                    }
+
+                    if (changesMade) {
+                        playersUpdated++;
+                        setLibertyLog(prev => [...prev, `  - ✅ Syncing ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}`]);
+                    }
+                }
+                
+                // An update is needed if we removed corrupted players OR if we synced data
+                if (invoiceNeedsUpdate || playersUpdated > 0) {
+                    batch.update(invoiceDoc.ref, { 
+                        selections: newSelections,
+                        lastSynced: new Date().toISOString(),
+                        syncedBy: 'Liberty MS Fix Script v5 (Cleanup & Overwrite)'
+                    });
+                }
+            }
         }
-      }
-      
-      if (playersUpdated > 0 || invoicesScanned > 0) {
+        
         await batch.commit();
-        toast({ title: "Liberty MS Data Synced!", description: `Updated ${playersUpdated} player records and cleaned invoices.` });
-        setLibertyLog(prev => [...prev, `✅ Successfully synced ${playersUpdated} players with master database.`]);
-      } else {
-        toast({ title: "Sync Complete", description: "No Liberty MS invoices found to process." });
-        setLibertyLog(prev => [...prev, `✅ No Liberty MS invoices found.`]);
-      }
+
+        if (playersUpdated > 0 || invoicesScanned > 0) {
+            toast({ title: "Liberty MS Data Synced!", description: `Updated ${playersUpdated} player records and cleaned invoices.` });
+            setLibertyLog(prev => [...prev, `✅ Successfully synced ${playersUpdated} players with master database.`]);
+        } else {
+            toast({ title: "Sync Complete", description: "No Liberty MS invoices found to process." });
+            setLibertyLog(prev => [...prev, `✅ No Liberty MS invoices found.`]);
+        }
   
-      setLibertyStats({ invoicesScanned, playersUpdated, playersSkipped });
-      setLibertyLog(prev => [...prev, '...Liberty MS sync script finished.']);
+        setLibertyStats({ invoicesScanned, playersUpdated, playersSkipped });
+        setLibertyLog(prev => [...prev, '...Liberty MS sync script finished.']);
   
     } catch (error) {
-      console.error('Liberty MS sync failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast({ variant: 'destructive', title: 'Sync Script Failed', description: errorMessage });
-      setLibertyLog(prev => [...prev, `ERROR: ${errorMessage}`]);
+        console.error('Liberty MS sync failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+        toast({ variant: 'destructive', title: 'Sync Script Failed', description: errorMessage });
+        setLibertyLog(prev => [...prev, `ERROR: ${errorMessage}`]);
     } finally {
-      setIsLibertyProcessing(false);
+        setIsLibertyProcessing(false);
     }
   };
 
