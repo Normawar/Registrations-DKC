@@ -159,7 +159,7 @@ export default function DataRepairPage() {
     }
   
     setIsLibertyProcessing(true);
-    setLibertyLog(['Starting Liberty MS tournament data fix v5 (Cleanup & Overwrite)...']);
+    setLibertyLog(['Starting Liberty MS tournament data fix...']);
     setLibertyStats({ invoicesScanned: 0, playersUpdated: 0, playersSkipped: 0 });
   
     try {
@@ -169,6 +169,7 @@ export default function DataRepairPage() {
         let invoicesScanned = 0;
         let playersUpdated = 0;
         let playersSkipped = 0;
+        let corruptedRemoved = 0;
   
         for (const invoiceDoc of invoicesSnapshot.docs) {
             const invoice = invoiceDoc.data();
@@ -180,50 +181,48 @@ export default function DataRepairPage() {
                 let invoiceNeedsUpdate = false;
                 const newSelections: { [key: string]: any } = {};
 
-                // Step 1: Filter out corrupted entries and build the new selections object
+                // Step 1: Clean selections: keep only valid players
                 for (const playerId in invoice.selections) {
                     const masterPlayer = playerMap.get(playerId);
-                    
-                    if (masterPlayer && masterPlayer.firstName && masterPlayer.firstName !== 'undefined') {
-                        // This is a valid player, keep them for processing
+                    if (masterPlayer && masterPlayer.firstName !== 'undefined' && masterPlayer.lastName !== 'undefined') {
                         newSelections[playerId] = { ...invoice.selections[playerId] };
                     } else {
-                        // This is a corrupted or unmatchable player, log and discard
-                        setLibertyLog(prev => [...prev, `  - 🗑️ Removing corrupted/invalid player ID ${playerId} from invoice #${invoice.invoiceNumber}`]);
                         invoiceNeedsUpdate = true; // Mark for update because we are removing an entry
+                        corruptedRemoved++;
+                        setLibertyLog(prev => [...prev, `  - 🗑️ Removing corrupted/invalid player ID ${playerId} from invoice #${invoice.invoiceNumber}`]);
                     }
                 }
 
-                // Step 2: Iterate over the CLEANED selections and force-update data
+                // Step 2: Sync data for the remaining valid players
                 for (const playerId in newSelections) {
                     const masterPlayer = playerMap.get(playerId)!; // We know this exists from Step 1
                     const registrationPlayer = newSelections[playerId];
                     let changesMade = false;
 
-                    // Force-overwrite grade from master database
+                    // Force-overwrite grade from master database if it's missing or different
                     if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
                         registrationPlayer.grade = masterPlayer.grade;
                         changesMade = true;
                     }
                     
-                    // Force-overwrite section from master database
+                    // Force-overwrite section from master database if it's missing or different
                     if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
                         registrationPlayer.section = masterPlayer.section;
                         changesMade = true;
                     }
 
                     if (changesMade) {
+                        if (!invoiceNeedsUpdate) invoiceNeedsUpdate = true;
                         playersUpdated++;
                         setLibertyLog(prev => [...prev, `  - ✅ Syncing ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}`]);
                     }
                 }
                 
-                // An update is needed if we removed corrupted players OR if we synced data
-                if (invoiceNeedsUpdate || playersUpdated > 0) {
+                if (invoiceNeedsUpdate) {
                     batch.update(invoiceDoc.ref, { 
                         selections: newSelections,
                         lastSynced: new Date().toISOString(),
-                        syncedBy: 'Liberty MS Fix Script v5 (Cleanup & Overwrite)'
+                        syncedBy: 'Liberty MS Fix Script v6 (Clean & Sync)'
                     });
                 }
             }
@@ -231,12 +230,12 @@ export default function DataRepairPage() {
         
         await batch.commit();
 
-        if (playersUpdated > 0 || invoicesScanned > 0) {
-            toast({ title: "Liberty MS Data Synced!", description: `Updated ${playersUpdated} player records and cleaned invoices.` });
-            setLibertyLog(prev => [...prev, `✅ Successfully synced ${playersUpdated} players with master database.`]);
+        if (playersUpdated > 0 || corruptedRemoved > 0) {
+            toast({ title: "Liberty MS Data Synced!", description: `Updated ${playersUpdated} player records and removed ${corruptedRemoved} corrupted entries.` });
+            setLibertyLog(prev => [...prev, `✅ Successfully synced ${playersUpdated} players and cleaned ${corruptedRemoved} entries.`]);
         } else {
-            toast({ title: "Sync Complete", description: "No Liberty MS invoices found to process." });
-            setLibertyLog(prev => [...prev, `✅ No Liberty MS invoices found.`]);
+            toast({ title: "Sync Complete", description: "No changes were needed for the Liberty MS tournament data." });
+            setLibertyLog(prev => [...prev, `✅ No changes needed.`]);
         }
   
         setLibertyStats({ invoicesScanned, playersUpdated, playersSkipped });
