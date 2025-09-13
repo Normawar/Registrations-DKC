@@ -71,7 +71,7 @@ async function correctOrganizerAccountData(email: string, password: string) {
       const userDocRef = doc(db, 'users', uid);
       const correctedProfile: Partial<SponsorProfile> & {correctedAt?: string} = {
         role: 'organizer',
-        isDistrictCoordinator: true,
+        isDistrictCoordinator: false, // Organizers are not district coordinators
         district: 'All Districts', // Organizers can manage all districts
         school: 'Dark Knight Chess', // Organization name
         updatedAt: new Date().toISOString(),
@@ -381,7 +381,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         // Always redirect to profile on first signup
         router.push('/profile');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Signup error:', error);
       
       toast({

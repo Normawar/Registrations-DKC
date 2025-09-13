@@ -194,7 +194,7 @@ export async function simpleSignIn(email: string, password: string) {
       return { success: true, user, profile: profileToSave };
     }
 
-    throw new Error('User profile not found. Please sign up to create a profile.');
+    throw new Error('Your account needs to be updated. Please try signing up again to restore your profile.');
   } catch (error: any) {
     console.error('❌ Signin failed:', error);
     let userFriendlyMessage = 'An error occurred during login.';

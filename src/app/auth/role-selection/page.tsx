@@ -32,9 +32,15 @@ export default function RoleSelectionPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Only redirect if the profile is loaded and it's confirmed to be null
-    if (isProfileLoaded && !profile) {
-      router.push('/');
+    // Redirect if profile is not loaded or user doesn't have a choice
+    if (isProfileLoaded) {
+        if (!profile) {
+            router.push('/');
+        } else if (profile.role !== 'organizer' && !profile.isDistrictCoordinator) {
+            // Not a multi-role user, send to their dashboard
+            const dashboardPath = profile.role === 'sponsor' ? '/dashboard' : '/individual-dashboard';
+            router.push(dashboardPath);
+        }
     }
   }, [isProfileLoaded, profile, router]);
 
@@ -117,8 +123,9 @@ export default function RoleSelectionPage() {
     setView('role-select');
   };
 
-  const isOrganizer = profile.role === 'organizer' || profile.email?.toLowerCase() === 'norma@dkchess.com';
+  const isOrganizer = profile.role === 'organizer';
   const isImpersonating = profile.isImpersonating;
+  const isDistrictCoordinator = profile.isDistrictCoordinator;
 
   // Filter users based on search and role
   const filteredUsers = users.filter(user => {
@@ -207,6 +214,27 @@ export default function RoleSelectionPage() {
 
   // Main role selection view
   const availableRoles = [];
+  
+  if (isDistrictCoordinator && !isOrganizer) {
+    availableRoles.push(
+      {
+        key: 'district_coordinator',
+        path: '/district-dashboard',
+        icon: <Building className="h-10 w-10 text-green-500" />,
+        title: 'District Coordinator',
+        description: 'Manage all schools in your district',
+        details: 'View district-wide registrations, generate reports, and manage all sponsored activities for your district.'
+      },
+      {
+        key: 'sponsor',
+        path: '/dashboard',
+        icon: <User className="h-10 w-10 text-blue-500" />,
+        title: 'Sponsor',
+        description: 'Manage your individual school',
+        details: 'Access your specific school roster, register students for events, and manage invoices for your school.'
+      }
+    );
+  }
 
   if (isOrganizer) {
     availableRoles.push(

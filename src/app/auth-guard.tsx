@@ -22,20 +22,22 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       return; // Wait until loading is complete
     }
 
+    // If no profile, user is not authenticated, redirect to login
     if (!profile) {
-      // User is not authenticated, redirect to login
       router.push(redirectTo);
       return;
     }
     
-    // PRIORITY 1: Handle forced profile update
+    // PRIORITY 1: Handle forced profile update. This must happen before any other role-based logic.
     if (profile.forceProfileUpdate && pathname !== '/profile') {
       router.push('/profile');
       return;
     }
     
-    // PRIORITY 2: Handle multi-role for non-organizers only
-    if (profile.role !== 'organizer' && profile.isDistrictCoordinator) {
+    // PRIORITY 2: Handle multi-role for district coordinators
+    // This should only apply to users who are district coordinators but NOT organizers.
+    if (profile.role === 'district_coordinator' && profile.isDistrictCoordinator) {
+      // If they are on any page that is NOT the role selection, redirect them there.
       if (pathname !== '/auth/role-selection') {
         router.push('/auth/role-selection');
         return;
@@ -48,6 +50,9 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       const isRequired = profile.role === requiredRole;
       const isCoordinatorAccessingSponsorPage = profile.role === 'district_coordinator' && requiredRole === 'sponsor';
 
+      // An organizer can access any page.
+      // A user can access a page if they have the required role.
+      // A district coordinator can also access sponsor pages.
       const hasRequiredRole = isOrganizer || isRequired || isCoordinatorAccessingSponsorPage;
       
       if (!hasRequiredRole) {
@@ -86,7 +91,7 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     );
   }
   
-  // Final check to prevent rendering children if a redirect is imminent
+  // Prevent rendering children if a redirect is imminent.
   if (!profile || profile.forceProfileUpdate) {
     return null;
   }
