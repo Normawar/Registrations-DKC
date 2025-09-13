@@ -1,6 +1,6 @@
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { sendPasswordResetEmail, type User } from 'firebase/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
@@ -173,7 +173,8 @@ export async function simpleSignIn(email: string, password: string) {
 
     if (!profileDoc.exists()) {
       console.warn('⚠️ User profile not found under UID, checking for legacy doc using email...');
-      const legacyDoc = await getDoc(doc(db, 'users', email.toLowerCase()));
+      const legacyDocRef = doc(db, 'users', email.toLowerCase());
+      const legacyDoc = await getDoc(legacyDocRef);
       
       if (legacyDoc.exists()) {
         console.log('📦 Found legacy profile, migrating...');
@@ -186,8 +187,12 @@ export async function simpleSignIn(email: string, password: string) {
           forceProfileUpdate: true, // Force user to review their profile
         };
         
-        // Create the new document with the UID
-        await setDoc(profileDocRef, profileToSave);
+        // Create the new document with the UID and delete the old one
+        const batch = writeBatch(db);
+        batch.set(profileDocRef, profileToSave);
+        batch.delete(legacyDocRef);
+        await batch.commit();
+
         console.log('✅ Legacy profile migrated successfully.');
 
         // Re-fetch the profile to ensure consistency

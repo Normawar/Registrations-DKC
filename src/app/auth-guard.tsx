@@ -92,7 +92,7 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
   }
   
   // Prevent rendering children if a redirect is imminent.
-  if (!profile || profile.forceProfileUpdate) {
+  if (!profile || (profile.forceProfileUpdate && pathname !== '/profile')) {
     return null;
   }
 
