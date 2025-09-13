@@ -134,7 +134,6 @@ export default function DataRepairPage() {
       for (const invoiceDoc of invoicesSnapshot.docs) {
         const invoice = invoiceDoc.data();
         
-        // Target specific tournament
         if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
             invoicesScanned++;
             let invoiceNeedsUpdate = false;
@@ -145,18 +144,18 @@ export default function DataRepairPage() {
                 const registrationPlayer = newSelections[playerId];
 
                 if (masterPlayer) {
-                    const gradeChanged = masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade;
-                    const sectionChanged = masterPlayer.section && registrationPlayer.section !== masterPlayer.section;
+                    const gradeChanged = (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade);
+                    const sectionChanged = (masterPlayer.section && registrationPlayer.section !== masterPlayer.section);
 
                     if (gradeChanged || sectionChanged) {
                         invoiceNeedsUpdate = true;
                         const changes: string[] = [];
                         if (gradeChanged) {
-                            changes.push(`Grade: ${registrationPlayer.grade} -> ${masterPlayer.grade}`);
+                            changes.push(`Grade: ${registrationPlayer.grade || 'none'} -> ${masterPlayer.grade}`);
                             registrationPlayer.grade = masterPlayer.grade;
                         }
                         if (sectionChanged) {
-                            changes.push(`Section: ${registrationPlayer.section} -> ${masterPlayer.section}`);
+                            changes.push(`Section: ${registrationPlayer.section || 'none'} -> ${masterPlayer.section}`);
                             registrationPlayer.section = masterPlayer.section;
                         }
                         setLibertyLog(prev => [...prev, `  - Updating ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
@@ -177,7 +176,7 @@ export default function DataRepairPage() {
       
       if (playersUpdated > 0) {
         await batch.commit();
-        toast({ title: "Liberty MS Data Fixed!", description: `Updated ${playersUpdated} player records across ${invoicesScanned} invoices.` });
+        toast({ title: "Liberty MS Data Fixed!", description: `Updated ${playersUpdated} player records across relevant invoices.` });
       } else {
         toast({ title: "No Updates Needed", description: "All player data for the Liberty MS tournament appears to be up-to-date." });
       }
