@@ -39,12 +39,15 @@ const importSquareInvoicesFlow = ai.defineFlow(
   },
   async ({ startInvoiceNumber }) => {
     
-    console.log('Environment check:', {
+    console.log('Debug: Environment variables check:', {
       hasAccessToken: !!process.env.SQUARE_ACCESS_TOKEN,
+      tokenLength: process.env.SQUARE_ACCESS_TOKEN?.length,
+      tokenStart: process.env.SQUARE_ACCESS_TOKEN?.substring(0, 10) + '...',
       hasAppId: !!process.env.SQUARE_APPLICATION_ID,
-      hasLocationId: !!process.env.SQUARE_LOCATION_ID,
+      appId: process.env.SQUARE_APPLICATION_ID,
       environment: process.env.SQUARE_ENVIRONMENT,
-      tokenStart: process.env.SQUARE_ACCESS_TOKEN?.substring(0, 6) + '...'
+      hasLocationId: !!process.env.SQUARE_LOCATION_ID,
+      locationId: process.env.SQUARE_LOCATION_ID
     });
     
     const { isConfigured } = await checkSquareConfig();
@@ -56,21 +59,43 @@ const importSquareInvoicesFlow = ai.defineFlow(
       throw new Error('Firestore database is not initialized.');
     }
 
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
+    let squareClient;
+    try {
+        squareClient = await getSquareClient();
+        console.log('Square client created successfully');
+
+        // Test the most basic API call first
+        console.log('Testing locations API...');
+        const locationsResponse = await squareClient.locationsApi.listLocations();
+        console.log('Locations response:', locationsResponse.result);
+
+        // Then test invoice listing
+        console.log('Testing invoices API...');
+        const invoicesResponse = await squareClient.invoicesApi.listInvoices({
+            locationId: process.env.SQUARE_LOCATION_ID!,
+            limit: 1
+        });
+        console.log('Invoices test successful, count:', invoicesResponse.result.invoices?.length || 0);
+
+    } catch (error: any) {
+        console.error('Detailed error info:', {
+            name: error.name,
+            message: error.message,
+            statusCode: error.statusCode,
+            stack: error.stack
+        });
+        throw error;
+    }
+
     let cursor: string | undefined;
     const allInvoices: Invoice[] = [];
 
     console.log(`Starting import from Square for invoices >= #${startInvoiceNumber}...`);
 
     try {
-        console.log('Testing basic Square API connectivity...');
-        const locationsTest = await squareClient.locationsApi.listLocations();
-        console.log('✅ Locations API test passed', locationsTest.result.locations?.[0]?.name);
-
         do {
             const { result } = await squareClient.invoicesApi.listInvoices({
-                locationId: locationId,
+                locationId: process.env.SQUARE_LOCATION_ID!,
                 limit: 200,
                 cursor,
             });
