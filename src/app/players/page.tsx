@@ -3,11 +3,12 @@
 // Updated src/app/players/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
@@ -82,12 +83,14 @@ const playerFormSchema = z.object({
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
 function PlayersPageContent() {
-  const { addPlayer, updatePlayer } = useMasterDb();
+  const { addPlayer, updatePlayer, database } = useMasterDb();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
   const { toast } = useToast();
   const { profile } = useSponsorProfile();
+  const searchParams = useSearchParams();
+  const router = useRouter();
 
   const playerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -123,6 +126,26 @@ function PlayersPageContent() {
     });
     setIsEditOpen(true);
   };
+  
+  // Effect to handle opening the dialog via URL parameter
+  useEffect(() => {
+    const editId = searchParams.get('edit');
+    if (editId && database.length > 0) {
+      const playerToEdit = database.find(p => p.id === editId);
+      if (playerToEdit) {
+        handlePlayerSelected(playerToEdit);
+        // Clean the URL
+        router.replace('/players', { scroll: false });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Player Not Found',
+          description: `Could not find a player with ID: ${editId}`,
+        });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, database, router]);
 
   const handlePlayerFormSubmit = async (values: PlayerFormValues) => {
     if (!editingPlayer) return;
@@ -155,8 +178,6 @@ function PlayersPageContent() {
     setIsEditOpen(false);
     setEditingPlayer(null);
   };
-  
-  const { database } = useMasterDb();
   
   const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
     if (!player?.changeHistory || player.changeHistory.length === 0) {
@@ -307,6 +328,9 @@ function PlayersPageContent() {
                                 <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={playerForm.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                             </div>
                         </form>
                     </Form>
                   </div>
@@ -326,10 +350,15 @@ function PlayersPageContent() {
   );
 }
 
-export default function PlayersPage() {
-    return (
-        <OrganizerGuard>
-            <PlayersPageContent />
-        </OrganizerGuard>
-    )
+
+function PlayersPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OrganizerGuard>
+        <PlayersPageContent />
+      </OrganizerGuard>
+    </Suspense>
+  )
 }
+
+export default PlayersPage;

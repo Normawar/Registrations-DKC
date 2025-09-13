@@ -9,12 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, Search, Printer, MapPin } from 'lucide-react';
+import { Download, Search, Printer, MapPin, Edit } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Papa from 'papaparse';
 import { format } from 'date-fns';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import Link from 'next/link';
 
 type FilterType = 'all' | 'missing' | 'non-tx';
 
@@ -145,13 +146,14 @@ function MissingStateReportPageContent() {
                   <TableHead>School</TableHead>
                   <TableHead>District</TableHead>
                   <TableHead>Current State</TableHead>
+                  <TableHead className="no-print">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!isDbLoaded ? (
-                  <TableRow><TableCell colSpan={5} className="text-center">Loading player data...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center">Loading player data...</TableCell></TableRow>
                 ) : filteredPlayers.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center">No players found matching your criteria.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center">No players found matching your criteria.</TableCell></TableRow>
                 ) : (
                   filteredPlayers.map(player => (
                     <TableRow key={player.id}>
@@ -165,6 +167,13 @@ function MissingStateReportPageContent() {
                         ) : (
                             <span className="text-red-600 italic">EMPTY</span>
                         )}
+                      </TableCell>
+                      <TableCell className="no-print">
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={`/players?edit=${player.id}`}>
+                                <Edit className="h-3 w-3 mr-2" /> Edit
+                            </Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
