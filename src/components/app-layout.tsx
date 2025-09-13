@@ -225,12 +225,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
                 <div className="flex flex-col overflow-hidden group-data-[collapsible=icon]:hidden">
                     <p className="font-headline text-base font-bold text-sidebar-foreground truncate">
-                        {profile ? `${profile.firstName} ${profile.lastName}` : 'User Name'}
+                        {profile ? `${''}${profile.firstName} ${''}${profile.lastName}` : 'User Name'}
                     </p>
                     {profile?.role === 'sponsor' && (
                       <>
                         <p className="text-xs text-sidebar-foreground/80 truncate">
-                            {profile.isDistrictCoordinator ? `${profile.district} Coordinator` : profile.school || 'School Name'}
+                            {profile.isDistrictCoordinator ? `${''}${profile.district} Coordinator` : profile.school || 'School Name'}
                         </p>
                         {teamCode && !profile.isDistrictCoordinator && (
                           <p className="text-xs font-bold text-sidebar-primary truncate font-mono">
@@ -320,7 +320,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <AvatarFallback>{profile ? profile.firstName.charAt(0) : 'U'}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden group-data-[collapsible=icon]:hidden">
-                <p className="font-semibold text-sm truncate">{profile ? `${profile.firstName} ${profile.lastName}` : 'User'}</p>
+                <p className="font-semibold text-sm truncate">{profile ? `${''}${profile.firstName} ${''}${profile.lastName}` : 'User'}</p>
                 <p className="text-xs text-sidebar-foreground/70 truncate">
                   {profile ? profile.email : 'user@chessmate.com'}
                 </p>
