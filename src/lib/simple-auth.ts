@@ -1,4 +1,3 @@
-
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -157,108 +156,71 @@ export async function simpleSignIn(email: string, password: string) {
   console.log('🚀 Starting signin process...');
   
   try {
-    // Check if Firebase is initialized
-    if (!auth) {
-      console.error('❌ Firebase Auth not initialized');
-      throw new Error('Authentication service not available. Please check your internet connection.');
-    }
+    if (!auth || !db) throw new Error('Firebase services not available.');
     
-    if (!db) {
-      console.error('❌ Firestore not initialized');
-      throw new Error('Database service not available. Please check your internet connection.');
-    }
-
     console.log('✅ Firebase services available');
     console.log('📧 Signing in with email:', email);
 
-    // Import Firebase functions dynamically
-    const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
     const { doc, getDoc, setDoc } = await import('firebase/firestore');
 
-    // Sign in the user
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    console.log('✅ User signed in with UID:', userCredential.user.uid);
+    const user = userCredential.user;
+    console.log('✅ User signed in with UID:', user.uid);
 
-    // Get user profile from Firestore
-    console.log('📖 Loading user profile from Firestore...');
-    const profileDocRef = doc(db, 'users', userCredential.user.uid);
+    const profileDocRef = doc(db, 'users', user.uid);
     const profileDoc = await getDoc(profileDocRef);
 
-    if (!profileDoc.exists()) {
-      console.warn('⚠️ User profile not found in Firestore for UID, checking for legacy doc...');
-      const legacyDoc = await getDoc(doc(db, 'users', email.toLowerCase()));
-      if (legacyDoc.exists()) {
-        console.log('📦 Found legacy profile, migrating...');
-        const legacyData = legacyDoc.data();
-        const profileToSave: SponsorProfile = {
-          ...(legacyData as Omit<SponsorProfile, 'uid' | 'email'>), // Cast to ensure base properties
-          email: email.toLowerCase(), // Ensure email is included
-          uid: userCredential.user.uid,
-          migratedAt: new Date().toISOString(),
-          forceProfileUpdate: true, // Force user to review and save their profile
-        };
-        await setDoc(profileDocRef, profileToSave);
-        return {
-          success: true,
-          user: userCredential.user,
-          profile: profileToSave
-        };
-      } else {
-        throw new Error('User profile not found. Please sign up to create a profile.');
-      }
+    if (profileDoc.exists()) {
+      console.log('✅ User profile loaded successfully');
+      return { success: true, user, profile: profileDoc.data() as SponsorProfile };
     }
 
-    const profile = profileDoc.data() as SponsorProfile;
-    console.log('✅ User profile loaded successfully');
+    console.warn('⚠️ User profile not found in Firestore for UID, checking for legacy doc...');
+    const legacyDoc = await getDoc(doc(db, 'users', email.toLowerCase()));
 
-    return {
-      success: true,
-      user: userCredential.user,
-      profile: profile
-    };
+    if (legacyDoc.exists()) {
+      console.log('📦 Found legacy profile, migrating...');
+      const legacyData = legacyDoc.data();
+      const profileToSave: SponsorProfile = {
+        ...(legacyData as Omit<SponsorProfile, 'uid' | 'email'>),
+        email: email.toLowerCase(),
+        uid: user.uid,
+        migratedAt: new Date().toISOString(),
+        forceProfileUpdate: true, // Force user to review their profile
+      };
+      await setDoc(profileDocRef, profileToSave);
+      console.log('✅ Legacy profile migrated successfully.');
+      return { success: true, user, profile: profileToSave };
+    }
 
+    throw new Error('User profile not found. Please sign up to create a profile.');
   } catch (error: any) {
     console.error('❌ Signin failed:', error);
-    
     let userFriendlyMessage = 'An error occurred during login.';
     
-    // If sign-in fails, check for a legacy profile and prompt user to sign up
-    // to complete the migration.
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        if (db) {
-            const legacyDocRef = doc(db, 'users', email.toLowerCase());
-            const legacyDoc = await getDoc(legacyDocRef);
-            
-            if (legacyDoc.exists()) {
-                 // The old logic was to show an error message. Now we will try to fix it.
-                 // This error is caught, and we should just re-throw a clear message for the UI.
-                 // The new logic in the signup flow will handle the actual migration.
-                 userFriendlyMessage = "We found an old account record. Please go to the 'Sign Up' tab and re-enter your information to update your account.";
-            } else {
-                 userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
-            }
-        } else {
-             userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
+    switch (error.code) {
+      case 'auth/invalid-credential':
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+        userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
+        break;
+      case 'auth/invalid-email':
+        userFriendlyMessage = 'Please enter a valid email address.';
+        break;
+      case 'auth/user-disabled':
+        userFriendlyMessage = 'This account has been disabled. Please contact support.';
+        break;
+      case 'auth/too-many-requests':
+        userFriendlyMessage = 'Too many failed login attempts. Please try again later.';
+        break;
+      case 'auth/network-request-failed':
+        userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
+        break;
+      default:
+        if (error.message) {
+          userFriendlyMessage = error.message;
         }
-    } else {
-      switch (error.code) {
-        case 'auth/invalid-email':
-          userFriendlyMessage = 'Please enter a valid email address.';
-          break;
-        case 'auth/user-disabled':
-          userFriendlyMessage = 'This account has been disabled. Please contact support.';
-          break;
-        case 'auth/too-many-requests':
-          userFriendlyMessage = 'Too many failed login attempts. Please try again later.';
-          break;
-        case 'auth/network-request-failed':
-          userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
-          break;
-        default:
-          if (error.message) {
-            userFriendlyMessage = error.message;
-          }
-      }
     }
 
     throw new Error(userFriendlyMessage);
