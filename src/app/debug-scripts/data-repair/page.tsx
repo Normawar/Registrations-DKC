@@ -136,31 +136,31 @@ export default function DataRepairPage() {
             
             if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
                 invoicesScanned++;
+                if (!invoice.selections) continue;
+
                 let invoiceNeedsUpdate = false;
                 const newSelections = { ...invoice.selections };
 
-                if (!newSelections) continue;
-
                 for (const playerId in newSelections) {
                     const masterPlayer = playerMap.get(playerId);
-                    const registrationPlayer = newSelections[playerId];
-
+                    
                     if (masterPlayer && (masterPlayer.grade || masterPlayer.section)) {
-                        let playerNeedsUpdate = false;
+                        const registrationPlayer = newSelections[playerId];
                         const changes: string[] = [];
 
+                        // Always overwrite grade if master has one
                         if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
                             changes.push(`Grade: '${registrationPlayer.grade || 'none'}' -> '${masterPlayer.grade}'`);
                             registrationPlayer.grade = masterPlayer.grade;
-                            playerNeedsUpdate = true;
                         }
+                        
+                        // Always overwrite section if master has one
                         if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
                              changes.push(`Section: '${registrationPlayer.section || 'none'}' -> '${masterPlayer.section}'`);
                             registrationPlayer.section = masterPlayer.section;
-                            playerNeedsUpdate = true;
                         }
 
-                        if(playerNeedsUpdate) {
+                        if(changes.length > 0) {
                             invoiceNeedsUpdate = true;
                             playersUpdated++;
                             setLibertyLog(prev => [...prev, `  - Updating ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
@@ -303,5 +303,3 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
-
-    
