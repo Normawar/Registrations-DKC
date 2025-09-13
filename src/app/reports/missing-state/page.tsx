@@ -13,12 +13,17 @@ import { Download, Search, Printer, MapPin } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Papa from 'papaparse';
 import { format } from 'date-fns';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
+type FilterType = 'all' | 'missing' | 'non-tx';
 
 function MissingStateReportPageContent() {
   const { database: allPlayers, dbDistricts, dbSchools, isDbLoaded } = useMasterDb();
   const [districtFilter, setDistrictFilter] = useState('all');
   const [schoolFilter, setSchoolFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<FilterType>('all');
 
   const schoolsForDistrict = useMemo(() => {
     if (districtFilter === 'all') return dbSchools;
@@ -29,12 +34,22 @@ function MissingStateReportPageContent() {
       .sort();
   }, [districtFilter, allPlayers, dbSchools]);
 
-  const playersWithMissingData = useMemo(() => {
-    return allPlayers.filter(player => !player.state || player.state.trim() === '');
-  }, [allPlayers]);
+  const playersToReview = useMemo(() => {
+    return allPlayers.filter(player => {
+        const state = player.state?.trim().toUpperCase();
+        if (filterType === 'missing') {
+            return !state;
+        }
+        if (filterType === 'non-tx') {
+            return state && state !== 'TX';
+        }
+        // 'all' case
+        return !state || state !== 'TX';
+    });
+  }, [allPlayers, filterType]);
 
   const filteredPlayers = useMemo(() => {
-    return playersWithMissingData.filter(player => {
+    return playersToReview.filter(player => {
       const lowerSearchTerm = searchTerm.toLowerCase();
       const nameMatch = `${player.firstName} ${player.lastName}`.toLowerCase().includes(lowerSearchTerm);
       const schoolMatch = player.school?.toLowerCase().includes(lowerSearchTerm);
@@ -44,7 +59,7 @@ function MissingStateReportPageContent() {
              (schoolFilter === 'all' || player.school === schoolFilter) &&
              (searchTerm === '' || nameMatch || schoolMatch || districtMatch);
     });
-  }, [playersWithMissingData, districtFilter, schoolFilter, searchTerm]);
+  }, [playersToReview, districtFilter, schoolFilter, searchTerm]);
 
   const handleExport = () => {
     const dataToExport = filteredPlayers.map(p => ({
@@ -53,13 +68,14 @@ function MissingStateReportPageContent() {
       'USCF ID': p.uscfId,
       'School': p.school,
       'District': p.district,
+      'Current State': p.state || 'EMPTY',
     }));
 
     const csv = Papa.unparse(dataToExport);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `missing_state_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.setAttribute('download', `players_without_tx_state_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -73,9 +89,9 @@ function MissingStateReportPageContent() {
     <div className="space-y-8 printable-invoice">
       <div className="flex justify-between items-center no-print">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Missing State Report</h1>
+          <h1 className="text-3xl font-bold font-headline">Player State Verification Report</h1>
           <p className="text-muted-foreground">
-            Players who do not have a state assigned to their profile.
+            Find players who may require a state correction.
           </p>
         </div>
         <div className="flex gap-2">
@@ -110,6 +126,14 @@ function MissingStateReportPageContent() {
               </SelectContent>
             </Select>
           </div>
+           <div className="pt-4">
+              <Label>View Options</Label>
+              <RadioGroup value={filterType} onValueChange={(v) => setFilterType(v as FilterType)} className="flex items-center space-x-4 pt-2">
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="all" id="all" /><Label htmlFor="all">All (Missing & Non-TX)</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="missing" id="missing" /><Label htmlFor="missing">Missing State Only</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="non-tx" id="non-tx" /><Label htmlFor="non-tx">Non-TX State Only</Label></div>
+              </RadioGroup>
+            </div>
         </CardHeader>
         <CardContent>
           <div className="border rounded-md">
@@ -120,13 +144,14 @@ function MissingStateReportPageContent() {
                   <TableHead>USCF ID</TableHead>
                   <TableHead>School</TableHead>
                   <TableHead>District</TableHead>
+                  <TableHead>Current State</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!isDbLoaded ? (
-                  <TableRow><TableCell colSpan={4} className="text-center">Loading player data...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center">Loading player data...</TableCell></TableRow>
                 ) : filteredPlayers.length === 0 ? (
-                  <TableRow><TableCell colSpan={4} className="text-center">No players found with missing state information.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center">No players found matching your criteria.</TableCell></TableRow>
                 ) : (
                   filteredPlayers.map(player => (
                     <TableRow key={player.id}>
@@ -134,6 +159,13 @@ function MissingStateReportPageContent() {
                       <TableCell>{player.uscfId}</TableCell>
                       <TableCell>{player.school}</TableCell>
                       <TableCell>{player.district}</TableCell>
+                      <TableCell>
+                        {player.state ? (
+                            <span className="font-mono text-red-600">{player.state}</span>
+                        ) : (
+                            <span className="text-red-600 italic">EMPTY</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
