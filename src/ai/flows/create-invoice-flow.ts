@@ -245,7 +245,7 @@ const createInvoiceFlow = ai.defineFlow(
       const baseDescription = 'Thank you for your registration.';
       const description = input.description ? `${input.description}${revisionNote}\n\n${baseDescription}` : `${baseDescription}${revisionNote}`;
 
-      const createInvoiceResponse = await invoicesApi.createInvoice({
+      const invoicePayload = {
         idempotencyKey: randomUUID(),
         invoice: {
           orderId,
@@ -258,7 +258,9 @@ const createInvoiceFlow = ai.defineFlow(
           title: `${input.teamCode} @ ${formattedEventDate} ${input.eventName}`,
           description,
         },
-      });
+      };
+
+      const createInvoiceResponse = await invoicesApi.createInvoice(invoicePayload);
 
       const draftInvoice = createInvoiceResponse.result.invoice!;
       await invoicesApi.publishInvoice(draftInvoice.id!, { version: draftInvoice.version!, idempotencyKey: randomUUID() });
