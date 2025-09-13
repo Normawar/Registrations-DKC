@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck } from 'lucide-react';
+import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin } from 'lucide-react';
 import Link from 'next/link';
 
 function ReportsPageContent() {
@@ -18,7 +18,7 @@ function ReportsPageContent() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card>
           <CardHeader>
             <div className="flex items-center gap-4">
@@ -134,6 +134,30 @@ function ReportsPageContent() {
             <Button asChild>
               <Link href="/reports/psja-student-type">
                 View PSJA Report <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-gray-100 p-3 rounded-full">
+                <MapPin className="h-6 w-6 text-gray-600" />
+              </div>
+              <div>
+                <CardTitle>Missing State Report</CardTitle>
+                <CardDescription>Find players who do not have a state assigned to their profile.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              This report helps ensure all player records have a state, which is important for USCF reporting and general data quality.
+            </p>
+            <Button asChild>
+              <Link href="/reports/missing-state">
+                View State Report <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardContent>
