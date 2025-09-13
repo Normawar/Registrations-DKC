@@ -194,36 +194,29 @@ const SponsorSignUpForm = () => {
         return;
       }
 
-      // Special handling for organizer account correction
+      // Special handling for the main organizer account.
       if (values.email.toLowerCase() === 'norma@dkchess.com') {
-        console.log('🔧 Detected organizer account, attempting data correction...');
-        
-        try {
-          const correctionResult = await correctOrganizerAccountData(values.email, values.password);
-          
-          if (correctionResult.success) {
-            await updateProfile(correctionResult.profile as SponsorProfile);
-            
-            toast({
-              title: "Account Corrected!",
-              description: "Your organizer account has been updated with the correct permissions.",
-            });
-            
-            setTimeout(() => {
-              router.push('/manage-events');
-            }, 100);
-            return;
+          console.log('🔧 Detected main organizer account, attempting data correction/login...');
+          try {
+              const correctionResult = await correctOrganizerAccountData(values.email, values.password);
+              if (correctionResult.success) {
+                  await updateProfile(correctionResult.profile as SponsorProfile);
+                  toast({
+                      title: "Welcome Back, Norma!",
+                      description: "Your organizer account has been logged in and verified.",
+                  });
+                  router.push('/manage-events');
+                  return; // Stop execution here
+              }
+          } catch (correctionError) {
+              console.warn('Organizer account login failed. Proceeding with regular signup flow for potential initial setup.');
           }
-        } catch (correctionError) {
-          console.log('Data correction failed, proceeding with normal signup flow...');
-          // If correction fails, continue with normal signup process
-        }
       }
 
       const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
       let role: SponsorProfile['role'] = isCoordinator ? 'district_coordinator' : 'sponsor';
 
-      // Special override for organizer account
+      // Assign 'organizer' role only to a specific, predefined email.
       if (values.email.toLowerCase() === 'norma@dkchess.com') {
           role = 'organizer';
       }
@@ -239,6 +232,7 @@ const SponsorSignUpForm = () => {
         schoolAddress: schoolInfo?.streetAddress || '',
         schoolPhone: schoolInfo?.phone || '',
         isDistrictCoordinator: isCoordinator || role === 'organizer', // Organizers are also coordinators
+        forceProfileUpdate: true,
       };
       
       const result = await simpleSignUp(email, password, profileData);
@@ -248,18 +242,11 @@ const SponsorSignUpForm = () => {
         
         toast({
             title: "Account Ready!",
-            description: `Your ${role} account has been configured.`,
+            description: `Your ${role} account has been created. Please complete your profile.`,
         });
         
-        // Redirect based on role
-        let redirectPath = '/profile';
-        if (role === 'organizer') redirectPath = '/manage-events';
-        else if (role === 'district_coordinator') redirectPath = '/district-dashboard';
-        else redirectPath = '/dashboard';
-        
-        setTimeout(() => {
-          router.push(redirectPath);
-        }, 100);
+        // Always redirect to profile on first signup
+        router.push('/profile');
       }
     } catch (error) {
       console.error('Signup error:', error);
@@ -338,48 +325,38 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         return;
       }
 
-      // Special handling for organizer account correction
+      // Special handling for the main organizer account
       if (role === 'organizer' && values.email.toLowerCase() === 'norma@dkchess.com') {
-        console.log('🔧 Detected organizer account in individual form, attempting data correction...');
-        
+        console.log('🔧 Detected main organizer account, attempting data correction/login...');
         try {
-          const correctionResult = await correctOrganizerAccountData(values.email, values.password);
-          
-          if (correctionResult.success) {
-            await updateProfile(correctionResult.profile as SponsorProfile);
-            
-            toast({
-              title: "Account Corrected!",
-              description: "Your organizer account has been updated with the correct permissions.",
-            });
-            
-            setTimeout(() => {
-              router.push('/manage-events');
-            }, 100);
-            return;
-          }
+            const correctionResult = await correctOrganizerAccountData(values.email, values.password);
+            if (correctionResult.success) {
+                await updateProfile(correctionResult.profile as SponsorProfile);
+                toast({
+                    title: "Welcome Back, Norma!",
+                    description: "Your organizer account has been logged in and verified.",
+                });
+                router.push('/manage-events');
+                return;
+            }
         } catch (correctionError) {
-          console.log('Data correction failed, proceeding with normal signup flow...');
-          // If correction fails, continue with normal signup process
+            console.warn('Organizer account login failed. Proceeding with initial setup.');
         }
       }
 
-      const { password, email, ...profileValues } = values;
       let userRole: SponsorProfile['role'] = role;
 
-      if (role === 'organizer') {
-        if (email.toLowerCase() === 'norma@dkchess.com') {
-          userRole = 'organizer';
-        } else if (!email.toLowerCase().endsWith('@dkchess.com')) {
+      if (role === 'organizer' && values.email.toLowerCase() !== 'norma@dkchess.com') {
           form.setError('email', {
             type: 'manual',
-            message: 'Only @dkchess.com emails can register as organizers.',
+            message: 'Only the primary organizer can sign up through this form.',
           });
           setIsLoading(false);
           return;
-        }
       }
 
+      const { password, email, ...profileValues } = values;
+      
       const profileData: Omit<SponsorProfile, 'uid' | 'email'> = {
           ...profileValues,
           phone: '',
@@ -392,28 +369,22 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
           role: userRole,
           avatarType: 'icon',
           avatarValue: userRole === 'organizer' ? 'KingIcon' : 'PawnIcon',
-          isDistrictCoordinator: userRole === 'organizer', // Organizers are also coordinators
+          isDistrictCoordinator: userRole === 'organizer',
+          forceProfileUpdate: true,
       };
       
       const result = await simpleSignUp(email, password, profileData);
       
       if (result.success) {
-        // Since simpleSignUp now returns the profile, we can use it directly
-        const finalProfile = { ...result.profile, role: userRole, isDistrictCoordinator: userRole === 'organizer' };
-        await updateProfile(finalProfile as SponsorProfile);
+        await updateProfile(result.profile as SponsorProfile);
         
         toast({
             title: "Account Ready!",
-            description: `Your new ${userRole} account has been successfully created or restored.`,
+            description: `Your new ${userRole} account has been created. Please complete your profile.`,
         });
 
-        let path = '/dashboard';
-        if (userRole === 'individual') path = '/individual-dashboard';
-        else if (userRole === 'organizer') path = '/manage-events';
-        
-        setTimeout(() => {
-          router.push(path);
-        }, 100);
+        // Always redirect to profile on first signup
+        router.push('/profile');
       }
     } catch (error) {
       console.error('Signup error:', error);
