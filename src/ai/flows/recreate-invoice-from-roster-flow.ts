@@ -57,6 +57,14 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
           ? `${baseInvoiceNumber}-rev.${nextRevisionNumber}-${uniqueTimestamp}` 
           : `INV-${uniqueTimestamp}`; // Fallback if no base number
 
+      console.log('Generated invoice number:', {
+        baseInvoiceNumber,
+        existingRevision,
+        nextRevisionNumber,
+        uniqueTimestamp,
+        newInvoiceNumber
+      });
+
       const revisionMessage = `Revised based on your request. Original Invoice: #${originalInvoice?.invoiceNumber}. This invoice replaces the original.`;
       
       const newInvoiceInput = {
@@ -64,6 +72,8 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
         invoiceNumber: newInvoiceNumber,
         revisionMessage: revisionMessage,
       };
+
+      console.log('Passing to createInvoice:', { invoiceNumber: newInvoiceInput.invoiceNumber });
       
       const { invoiceId, invoiceNumber, status, invoiceUrl } = await createInvoice(newInvoiceInput);
 
