@@ -128,9 +128,10 @@ const importSquareInvoicesFlow = ai.defineFlow(
             }
 
             const { result: { order } } = await squareClient.ordersApi.retrieveOrder(orderId);
-            const lineItems = order.lineItems || [];
-
+            
             const totalAmount = Number(invoice.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
+            const totalPaid = Number(invoice.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount || 0) / 100;
+            
             const schoolName = customer?.companyName?.split(' / ')[0] || customer?.companyName || 'Unknown School';
             const district = customer?.companyName?.split(' / ')[1] || 'Unknown District';
             const teamCode = generateTeamCode({ schoolName, district });
@@ -147,7 +148,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
                 updatedAt: invoice.updatedAt,
                 totalInvoiced: totalAmount,
                 totalAmount,
-                totalPaid: (totalAmount - (Number(invoice.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount || 0) / 100)),
+                totalPaid: totalPaid,
                 purchaserName: `${customer?.givenName || ''} ${customer?.familyName || ''}`.trim(),
                 sponsorEmail: customer?.emailAddress,
                 schoolName,
