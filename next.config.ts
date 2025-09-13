@@ -54,6 +54,9 @@ const nextConfig: NextConfig = {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
+        net: false,
+        tls: false,
+        http2: false,
       };
       
       // These modules are server-side only
