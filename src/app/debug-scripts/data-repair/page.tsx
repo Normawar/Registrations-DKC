@@ -124,68 +124,69 @@ export default function DataRepairPage() {
     setLibertyStats({ invoicesScanned: 0, playersUpdated: 0, playersSkipped: 0 });
 
     try {
-      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-      const batch = writeBatch(db);
-      const playerMap = new Map(allPlayers.map(p => [p.id, p]));
-      let invoicesScanned = 0;
-      let playersUpdated = 0;
-      let playersSkipped = 0;
+        const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+        const batch = writeBatch(db);
+        const playerMap = new Map(allPlayers.map(p => [p.id, p]));
+        let invoicesScanned = 0;
+        let playersUpdated = 0;
+        let playersSkipped = 0;
 
-      for (const invoiceDoc of invoicesSnapshot.docs) {
-        const invoice = invoiceDoc.data();
-        
-        if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
-            invoicesScanned++;
-            let invoiceNeedsUpdate = false;
-            const newSelections = { ...invoice.selections };
+        for (const invoiceDoc of invoicesSnapshot.docs) {
+            const invoice = invoiceDoc.data();
+            
+            if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
+                invoicesScanned++;
+                let invoiceNeedsUpdate = false;
+                const newSelections = { ...invoice.selections };
 
-            if (!newSelections) continue;
+                if (!newSelections) continue;
 
-            for (const playerId in newSelections) {
-                const masterPlayer = playerMap.get(playerId);
-                const registrationPlayer = newSelections[playerId];
+                for (const playerId in newSelections) {
+                    const masterPlayer = playerMap.get(playerId);
+                    const registrationPlayer = newSelections[playerId];
 
-                if (masterPlayer) {
-                    // Overwrite invoice grade/section with master data if it exists on master
-                    const gradeChanged = masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade;
-                    const sectionChanged = masterPlayer.section && registrationPlayer.section !== masterPlayer.section;
-
-                    if (gradeChanged || sectionChanged) {
-                        invoiceNeedsUpdate = true;
+                    if (masterPlayer && (masterPlayer.grade || masterPlayer.section)) {
+                        let playerNeedsUpdate = false;
                         const changes: string[] = [];
-                        if (gradeChanged) {
+
+                        if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
                             changes.push(`Grade: '${registrationPlayer.grade || 'none'}' -> '${masterPlayer.grade}'`);
                             registrationPlayer.grade = masterPlayer.grade;
+                            playerNeedsUpdate = true;
                         }
-                        if (sectionChanged) {
-                            changes.push(`Section: '${registrationPlayer.section || 'none'}' -> '${masterPlayer.section}'`);
+                        if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
+                             changes.push(`Section: '${registrationPlayer.section || 'none'}' -> '${masterPlayer.section}'`);
                             registrationPlayer.section = masterPlayer.section;
+                            playerNeedsUpdate = true;
                         }
-                        setLibertyLog(prev => [...prev, `  - Updating ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
-                        playersUpdated++;
+
+                        if(playerNeedsUpdate) {
+                            invoiceNeedsUpdate = true;
+                            playersUpdated++;
+                            setLibertyLog(prev => [...prev, `  - Updating ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
+                        } else {
+                            playersSkipped++;
+                        }
                     } else {
                         playersSkipped++;
                     }
-                } else {
-                    playersSkipped++;
+                }
+
+                if (invoiceNeedsUpdate) {
+                    batch.update(invoiceDoc.ref, { selections: newSelections });
                 }
             }
-
-            if (invoiceNeedsUpdate) {
-                batch.update(invoiceDoc.ref, { selections: newSelections });
-            }
         }
-      }
-      
-      if (playersUpdated > 0) {
-        await batch.commit();
-        toast({ title: "Liberty MS Data Fixed!", description: `Updated ${playersUpdated} player records across relevant invoices.` });
-      } else {
-        toast({ title: "No Updates Needed", description: "All player data for the Liberty MS tournament appears to be up-to-date." });
-      }
+        
+        if (playersUpdated > 0) {
+            await batch.commit();
+            toast({ title: "Liberty MS Data Fixed!", description: `Updated ${playersUpdated} player records across relevant invoices.` });
+        } else {
+            toast({ title: "No Updates Needed", description: "All player data for the Liberty MS tournament appears to be up-to-date." });
+        }
 
-      setLibertyStats({ invoicesScanned, playersUpdated, playersSkipped });
-      setLibertyLog(prev => [...prev, '...Liberty MS fix script finished.']);
+        setLibertyStats({ invoicesScanned, playersUpdated, playersSkipped });
+        setLibertyLog(prev => [...prev, '...Liberty MS fix script finished.']);
 
     } catch (error) {
       console.error('Liberty MS fix failed:', error);
@@ -302,3 +303,5 @@ export default function DataRepairPage() {
     </AppLayout>
   );
 }
+
+    
