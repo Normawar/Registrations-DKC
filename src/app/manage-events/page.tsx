@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } f
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, isValid, parse, isSameDay, parseISO } from 'date-fns';
+import { format, isValid, parse, isSameDay, parseISO, startOfDay } from 'date-fns';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
@@ -191,7 +191,9 @@ function ManageEventsContent() {
   
   const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
     if (event.isClosed) return "Closed";
-    return new Date(event.date) < new Date() ? "Completed" : "Open";
+    const today = startOfDay(new Date());
+    const eventDay = startOfDay(new Date(event.date));
+    return eventDay < today ? "Completed" : "Open";
   };
 
   const sortedEvents = useMemo(() => {
