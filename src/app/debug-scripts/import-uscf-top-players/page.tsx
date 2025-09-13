@@ -39,7 +39,7 @@ const allTopPlayersData: Omit<MasterPlayer, 'id'>[] = [
   { uscfId: '30690965', firstName: 'GERGANA', lastName: 'PEYCHEVA', state: '', regularRating: 2324, uscfExpiration: '2026-08-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
 ];
 
-const playersToImport = allTopPlayersData.filter(p => !p.state || p.state.length > 2);
+const playersToImport = allTopPlayersData.filter(p => !p.state || p.state.length !== 2);
 
 export default function ImportMissingStatePlayersPage() {
   const { addBulkPlayers, toast } = useMasterDb();
