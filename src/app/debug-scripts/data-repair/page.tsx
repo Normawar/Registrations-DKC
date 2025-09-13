@@ -8,7 +8,7 @@ import { AppLayout } from '@/components/app-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Wrench, CheckCircle, FileWarning } from 'lucide-react';
+import { Loader2, Wrench, CheckCircle, FileWarning, Search } from 'lucide-react';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 
 export default function DataRepairPage() {
@@ -20,6 +20,45 @@ export default function DataRepairPage() {
   const [isLibertyProcessing, setIsLibertyProcessing] = useState(false);
   const [libertyLog, setLibertyLog] = useState<string[]>([]);
   const [libertyStats, setLibertyStats] = useState({ invoicesScanned: 0, playersUpdated: 0, playersSkipped: 0 });
+  const [isInspecting, setIsInspecting] = useState(false);
+
+  const inspectLibertyData = async () => {
+    if (!db || !isDbLoaded) {
+      toast({ variant: 'destructive', title: 'Database not ready', description: 'Please wait for the player database to finish loading.' });
+      return;
+    }
+    setIsInspecting(true);
+    toast({ title: "Starting Inspection", description: "Check the browser's developer console for output." });
+    console.log("--- Starting Liberty MS Data Inspection ---");
+
+    const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+    
+    for (const invoiceDoc of invoicesSnapshot.docs) {
+      const invoice = invoiceDoc.data();
+      
+      if (invoice.eventName && invoice.eventName.toLowerCase().includes('liberty ms')) {
+        console.log(`\n=== Invoice ${invoice.invoiceNumber || invoice.id} ===`);
+        
+        if (invoice.selections) {
+          Object.entries(invoice.selections).forEach(([playerId, selection]: [string, any]) => {
+            const masterPlayer = allPlayers.find(p => p.id === playerId);
+            console.log(`Player: ${masterPlayer?.firstName} ${masterPlayer?.lastName} (ID: ${playerId})`);
+            console.log(`  Invoice has: grade="${selection.grade || 'MISSING'}", section="${selection.section || 'MISSING'}"`);
+            console.log(`  Master has:  grade="${masterPlayer?.grade || 'MISSING'}", section="${masterPlayer?.section || 'MISSING'}"`);
+            const gradeMatch = selection.grade === masterPlayer?.grade;
+            const sectionMatch = selection.section === masterPlayer?.section;
+            console.log(`  Match: ${gradeMatch && sectionMatch ? 'YES' : 'NO'}`);
+          });
+        } else {
+            console.log("  No 'selections' object found on this invoice.");
+        }
+      }
+    }
+    console.log("--- Inspection Complete ---");
+    toast({ title: "Inspection Complete", description: "Results have been printed to the developer console." });
+    setIsInspecting(false);
+  };
+
 
   const runRepairScript = async () => {
     if (!db || !isDbLoaded) {
@@ -149,21 +188,17 @@ export default function DataRepairPage() {
                         const changes: string[] = [];
 
                         // ALWAYS sync grade from master database if master has one
-                        if (masterPlayer.grade) {
-                            const oldGrade = registrationPlayer.grade || 'none';
+                        if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
+                            const oldGrade = registrationPlayer.grade || 'MISSING';
                             registrationPlayer.grade = masterPlayer.grade;
-                            if (oldGrade !== masterPlayer.grade) {
-                                changes.push(`Grade: '${oldGrade}' -> '${masterPlayer.grade}'`);
-                            }
+                            changes.push(`Grade: '${oldGrade}' -> '${masterPlayer.grade}'`);
                         }
                         
                         // ALWAYS sync section from master database if master has one  
-                        if (masterPlayer.section) {
-                            const oldSection = registrationPlayer.section || 'none';
+                        if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
+                            const oldSection = registrationPlayer.section || 'MISSING';
                             registrationPlayer.section = masterPlayer.section;
-                            if (oldSection !== masterPlayer.section) {
-                                changes.push(`Section: '${oldSection}' -> '${masterPlayer.section}'`);
-                            }
+                             changes.push(`Section: '${oldSection}' -> '${masterPlayer.section}'`);
                         }
 
                         if (changes.length > 0) {
@@ -171,7 +206,6 @@ export default function DataRepairPage() {
                             playersUpdated++;
                             setLibertyLog(prev => [...prev, `  - Updating ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
                         } else {
-                            // Still count as processed, just no visible changes
                             setLibertyLog(prev => [...prev, `  - ${masterPlayer.firstName} ${masterPlayer.lastName}: Already up-to-date`]);
                         }
                     } else {
@@ -184,7 +218,7 @@ export default function DataRepairPage() {
                     batch.update(invoiceDoc.ref, { 
                         selections: newSelections,
                         lastSynced: new Date().toISOString(),
-                        syncedBy: 'Liberty MS Fix Script'
+                        syncedBy: 'Liberty MS Fix Script v2'
                     });
                 }
             }
@@ -227,10 +261,18 @@ export default function DataRepairPage() {
           <CardHeader>
             <CardTitle>Fix Liberty MS Tournament Data</CardTitle>
             <CardDescription>
-              This tool will find all registrations for the "Liberty MS" tournament and update each player's Grade and Section to match the data in the master player database.
+              Use the inspection tool to diagnose data mismatches. Then, run the fix script to update each player's Grade and Section to match the data in the master player database.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex items-center gap-4">
+            <Button onClick={inspectLibertyData} disabled={isInspecting || !isDbLoaded} variant="outline">
+              {isInspecting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="mr-2 h-4 w-4" />
+              )}
+              {isInspecting ? 'Inspecting...' : 'Inspect Data'}
+            </Button>
             <Button onClick={runLibertyFixScript} disabled={isLibertyProcessing || !isDbLoaded}>
               {isLibertyProcessing ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
