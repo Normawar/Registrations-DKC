@@ -87,7 +87,7 @@ const organizerMenuStructure = {
     { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
     { href: "/debug-api", icon: TestTube2, label: "API Tester" },
     { href: "/debug-scripts/data-repair", icon: Wrench, label: "Data Repair Tool" },
-    { href: "/debug-scripts/import-uscf-top-players", icon: Wrench, label: "Import Top Players" },
+    { href: "/debug-scripts/import-uscf-top-players", icon: Wrench, label: "Import Missing State Players" },
   ]
 };
 
@@ -349,3 +349,5 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    

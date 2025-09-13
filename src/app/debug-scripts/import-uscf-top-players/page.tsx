@@ -10,7 +10,7 @@ import { Loader2, Upload } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
-const topPlayersData: Omit<MasterPlayer, 'id'>[] = [
+const allTopPlayersData: Omit<MasterPlayer, 'id'>[] = [
   { uscfId: '13999045', firstName: 'AWONDER', lastName: 'LIANG', state: 'WI', regularRating: 2762, uscfExpiration: '2099-12-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
   { uscfId: '17084025', firstName: 'GRIGORIY', lastName: 'OPARIN', state: 'MO', regularRating: 2727, uscfExpiration: '2099-12-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
   { uscfId: '16863605', firstName: 'ARAM', lastName: 'HAKOBYAN', state: 'ARM', regularRating: 2710, uscfExpiration: '2023-11-30T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
@@ -31,20 +31,27 @@ const topPlayersData: Omit<MasterPlayer, 'id'>[] = [
   { uscfId: '30695417', firstName: 'GERGELY', lastName: 'KANTOR', state: 'HUN', regularRating: 2610, uscfExpiration: '2023-11-30T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
   { uscfId: '16863611', firstName: 'ROBBY', lastName: 'KEVLISHVILI', state: 'NED', regularRating: 2606, uscfExpiration: '2025-06-30T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
   { uscfId: '30176249', firstName: 'VIKTOR', lastName: 'MATVIISHEN', state: 'TX', regularRating: 2602, uscfExpiration: '2023-12-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
-  // ... All other players from the list would be included here
+  { uscfId: '30682963', firstName: 'KOUSTAV', lastName: 'CHATTERJEE', state: '', regularRating: 2554, uscfExpiration: '2026-08-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
+  { uscfId: '16110091', firstName: 'RAHUL', lastName: 'SRIVATSHAV P', state: '', regularRating: 2537, uscfExpiration: '2026-08-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
+  { uscfId: '14867716', firstName: 'SHAWN', lastName: 'RODRIGUE-LEMIEUX', state: '', regularRating: 2529, uscfExpiration: '2023-02-28T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
+  { uscfId: '30265182', firstName: 'IVAN', lastName: 'SCHITCO', state: '', regularRating: 2516, uscfExpiration: '2025-08-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
+  { uscfId: '30690953', firstName: 'KAROLIS', lastName: 'JUKSTA', state: '', regularRating: 2471, uscfExpiration: '2026-08-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
+  { uscfId: '30690965', firstName: 'GERGANA', lastName: 'PEYCHEVA', state: '', regularRating: 2324, uscfExpiration: '2026-08-31T00:00:00.000Z', grade: '', section: '', email: '', school: '', district: '', events: 1, eventIds: [] },
 ];
 
-export default function ImportUscfTopPlayersPage() {
+const playersToImport = allTopPlayersData.filter(p => !p.state || p.state.length > 2);
+
+export default function ImportMissingStatePlayersPage() {
   const { addBulkPlayers, toast } = useMasterDb();
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, message: '' });
 
   const handleImport = async () => {
     setIsImporting(true);
-    setProgress({ current: 0, total: topPlayersData.length, message: 'Starting import...' });
+    setProgress({ current: 0, total: playersToImport.length, message: 'Starting import...' });
 
     try {
-        const playersToUpload = topPlayersData.map(p => ({
+        const playersToUpload = playersToImport.map(p => ({
             ...p,
             id: p.uscfId,
         }));
@@ -59,7 +66,7 @@ export default function ImportUscfTopPlayersPage() {
 
         toast({
             title: 'Import Complete!',
-            description: `${topPlayersData.length} top players have been added or updated in the master database.`,
+            description: `${playersToImport.length} players have been added or updated in the master database.`,
         });
 
     } catch (error) {
@@ -75,9 +82,9 @@ export default function ImportUscfTopPlayersPage() {
       <div className="space-y-8 max-w-4xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Import USCF Top 100 Players</CardTitle>
+            <CardTitle>Import Players with Missing/Foreign State</CardTitle>
             <CardDescription>
-              This tool will add or update the players from the provided USCF top player list into your master database.
+              This tool will add or update players from the provided list who do not have a standard US state abbreviation.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -88,14 +95,16 @@ export default function ImportUscfTopPlayersPage() {
                             <TableHead>Name</TableHead>
                             <TableHead>USCF ID</TableHead>
                             <TableHead>Rating</TableHead>
+                            <TableHead>State</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {topPlayersData.map(p => (
+                        {playersToImport.map(p => (
                             <TableRow key={p.uscfId}>
                                 <TableCell>{p.firstName} {p.lastName}</TableCell>
                                 <TableCell>{p.uscfId}</TableCell>
                                 <TableCell>{p.regularRating}</TableCell>
+                                <TableCell className="font-mono text-red-500">{p.state || 'EMPTY'}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -105,7 +114,7 @@ export default function ImportUscfTopPlayersPage() {
           <CardFooter>
             <Button onClick={handleImport} disabled={isImporting}>
               <Upload className="mr-2 h-4 w-4" />
-              {isImporting ? `Importing... (${progress.current}/${progress.total})` : `Import ${topPlayersData.length} Players`}
+              {isImporting ? `Importing... (${progress.current}/${progress.total})` : `Import ${playersToImport.length} Players`}
             </Button>
           </CardFooter>
         </Card>
@@ -120,3 +129,5 @@ export default function ImportUscfTopPlayersPage() {
     </AppLayout>
   );
 }
+
+    
