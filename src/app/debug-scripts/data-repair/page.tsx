@@ -144,54 +144,68 @@ export default function DataRepairPage() {
                 for (const playerId in newSelections) {
                     const masterPlayer = playerMap.get(playerId);
                     
-                    if (masterPlayer && (masterPlayer.grade || masterPlayer.section)) {
+                    if (masterPlayer) {
                         const registrationPlayer = newSelections[playerId];
                         const changes: string[] = [];
 
-                        // Always overwrite grade if master has one
-                        if (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade) {
-                            changes.push(`Grade: '${registrationPlayer.grade || 'none'}' -> '${masterPlayer.grade}'`);
+                        // ALWAYS sync grade from master database if master has one
+                        if (masterPlayer.grade) {
+                            const oldGrade = registrationPlayer.grade || 'none';
                             registrationPlayer.grade = masterPlayer.grade;
+                            if (oldGrade !== masterPlayer.grade) {
+                                changes.push(`Grade: '${oldGrade}' -> '${masterPlayer.grade}'`);
+                            }
                         }
                         
-                        // Always overwrite section if master has one
-                        if (masterPlayer.section && registrationPlayer.section !== masterPlayer.section) {
-                             changes.push(`Section: '${registrationPlayer.section || 'none'}' -> '${masterPlayer.section}'`);
+                        // ALWAYS sync section from master database if master has one  
+                        if (masterPlayer.section) {
+                            const oldSection = registrationPlayer.section || 'none';
                             registrationPlayer.section = masterPlayer.section;
+                            if (oldSection !== masterPlayer.section) {
+                                changes.push(`Section: '${oldSection}' -> '${masterPlayer.section}'`);
+                            }
                         }
 
-                        if(changes.length > 0) {
+                        if (changes.length > 0) {
                             invoiceNeedsUpdate = true;
                             playersUpdated++;
                             setLibertyLog(prev => [...prev, `  - Updating ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
                         } else {
-                            playersSkipped++;
+                            // Still count as processed, just no visible changes
+                            setLibertyLog(prev => [...prev, `  - ${masterPlayer.firstName} ${masterPlayer.lastName}: Already up-to-date`]);
                         }
                     } else {
                         playersSkipped++;
+                        setLibertyLog(prev => [...prev, `  - Player ID ${playerId}: Not found in master database`]);
                     }
                 }
 
                 if (invoiceNeedsUpdate) {
-                    batch.update(invoiceDoc.ref, { selections: newSelections });
+                    batch.update(invoiceDoc.ref, { 
+                        selections: newSelections,
+                        lastSynced: new Date().toISOString(),
+                        syncedBy: 'Liberty MS Fix Script'
+                    });
                 }
             }
         }
         
         if (playersUpdated > 0) {
             await batch.commit();
-            toast({ title: "Liberty MS Data Fixed!", description: `Updated ${playersUpdated} player records across relevant invoices.` });
+            toast({ title: "Liberty MS Data Synced!", description: `Updated ${playersUpdated} player records to match master database.` });
+            setLibertyLog(prev => [...prev, `✅ Successfully synced ${playersUpdated} players with master database.`]);
         } else {
-            toast({ title: "No Updates Needed", description: "All player data for the Liberty MS tournament appears to be up-to-date." });
+            toast({ title: "Sync Complete", description: "All player data for Liberty MS tournament is already synchronized with master database." });
+            setLibertyLog(prev => [...prev, `✅ All players already synchronized - no changes needed.`]);
         }
 
         setLibertyStats({ invoicesScanned, playersUpdated, playersSkipped });
-        setLibertyLog(prev => [...prev, '...Liberty MS fix script finished.']);
+        setLibertyLog(prev => [...prev, '...Liberty MS sync script finished.']);
 
     } catch (error) {
-      console.error('Liberty MS fix failed:', error);
+      console.error('Liberty MS sync failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast({ variant: 'destructive', title: 'Fix Script Failed', description: errorMessage });
+      toast({ variant: 'destructive', title: 'Sync Script Failed', description: errorMessage });
       setLibertyLog(prev => [...prev, `ERROR: ${errorMessage}`]);
     } finally {
       setIsLibertyProcessing(false);
