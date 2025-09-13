@@ -139,23 +139,26 @@ export default function DataRepairPage() {
             let invoiceNeedsUpdate = false;
             const newSelections = { ...invoice.selections };
 
+            if (!newSelections) continue;
+
             for (const playerId in newSelections) {
                 const masterPlayer = playerMap.get(playerId);
                 const registrationPlayer = newSelections[playerId];
 
                 if (masterPlayer) {
-                    const gradeChanged = (masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade);
-                    const sectionChanged = (masterPlayer.section && registrationPlayer.section !== masterPlayer.section);
+                    // Overwrite invoice grade/section with master data if it exists on master
+                    const gradeChanged = masterPlayer.grade && registrationPlayer.grade !== masterPlayer.grade;
+                    const sectionChanged = masterPlayer.section && registrationPlayer.section !== masterPlayer.section;
 
                     if (gradeChanged || sectionChanged) {
                         invoiceNeedsUpdate = true;
                         const changes: string[] = [];
                         if (gradeChanged) {
-                            changes.push(`Grade: ${registrationPlayer.grade || 'none'} -> ${masterPlayer.grade}`);
+                            changes.push(`Grade: '${registrationPlayer.grade || 'none'}' -> '${masterPlayer.grade}'`);
                             registrationPlayer.grade = masterPlayer.grade;
                         }
                         if (sectionChanged) {
-                            changes.push(`Section: ${registrationPlayer.section || 'none'} -> ${masterPlayer.section}`);
+                            changes.push(`Section: '${registrationPlayer.section || 'none'}' -> '${masterPlayer.section}'`);
                             registrationPlayer.section = masterPlayer.section;
                         }
                         setLibertyLog(prev => [...prev, `  - Updating ${masterPlayer.firstName} ${masterPlayer.lastName} on invoice #${invoice.invoiceNumber}: ${changes.join(', ')}`]);
