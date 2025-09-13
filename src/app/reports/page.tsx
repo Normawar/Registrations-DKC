@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin } from 'lucide-react';
+import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code } from 'lucide-react';
 import Link from 'next/link';
 
 function ReportsPageContent() {
@@ -158,6 +158,30 @@ function ReportsPageContent() {
             <Button asChild>
               <Link href="/reports/missing-state">
                 View State Report <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-teal-100 p-3 rounded-full">
+                <Code className="h-6 w-6 text-teal-600" />
+              </div>
+              <div>
+                <CardTitle>Specific Team Code Report</CardTitle>
+                <CardDescription>View players belonging to a specific list of team codes.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Generates a report for a predefined list of team codes, useful for targeted analysis of specific schools or groups.
+            </p>
+            <Button asChild>
+              <Link href="/reports/team-code-report">
+                View Team Code Report <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardContent>
