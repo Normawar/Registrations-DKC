@@ -1,13 +1,12 @@
-
 'use client';
 
 import { useState } from 'react';
-import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, writeBatch, doc, query, where, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from "@/components/app-layout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2, Wrench } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -28,10 +27,17 @@ export default function FixRequestIdsPage() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [invalidRequests, setInvalidRequests] = useState<any[]>([]);
 
-  const findInvalidRequests = async () => {
+  // Mapping from the invalid confirmationId to the correct user-facing invoiceNumber
+  const invalidIdToInvoiceNumberMap: Record<string, string> = {
+    'inv:0-ChDxVsUuK-JVya_ZzZUpon1gEJ8I': '4301',
+    // The rest are for canceled invoices and will be deleted
+    'inv:0-ChBMhCueCIThav0cbt_OhdfvEJ8I': 'CANCELED',
+    'inv:0-ChBNQswPcqy73RC1UKsvtOzjEJ8I': 'CANCELED',
+  };
+
+  const runFixScript = async () => {
     setIsProcessing(true);
-    setLog(['Starting scan for invalid requests...']);
-    setInvalidRequests([]);
+    setLog(['Starting targeted data fix...']);
 
     if (!db) {
       const errorMsg = 'Error: Firestore is not initialized.';
@@ -42,28 +48,51 @@ export default function FixRequestIdsPage() {
     }
 
     try {
-      setLog(prev => [...prev, 'Fetching all requests...']);
+      setLog(prev => [...prev, 'Fetching all requests and invoices...']);
       const requestsRef = collection(db, 'requests');
-      const requestsSnapshot = await getDocs(requestsRef);
+      const invoicesRef = collection(db, 'invoices');
+      const [requestsSnapshot, invoicesSnapshot] = await Promise.all([getDocs(requestsRef), getDocs(invoicesRef)]);
       
       const allRequests = requestsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-      setLog(prev => [...prev, `Found ${allRequests.length} total requests.`]);
+      const invoiceNumberToIdMap = new Map(invoicesSnapshot.docs.map(d => [d.data().invoiceNumber, d.id]));
 
-      const invalid = allRequests.filter(req => 
-        !req.confirmationId || req.confirmationId.startsWith('inv:0-')
-      );
-      
-      setInvalidRequests(invalid);
+      setLog(prev => [...prev, `Found ${allRequests.length} requests and ${invoicesSnapshot.size} invoices.`]);
 
-      if (invalid.length > 0) {
-        setLog(prev => [...prev, `[FOUND] ${invalid.length} invalid requests that should be deleted.`]);
-        invalid.forEach(req => {
-            setLog(prev => [...prev, `  - Request ID: ${req.id}, Invalid confirmationId: ${req.confirmationId}`]);
-        });
-        toast({ title: `${invalid.length} invalid requests found`, description: 'Proceed to delete them.' });
+      const batch = writeBatch(db);
+      let fixesMade = 0;
+      let deletionsMade = 0;
+
+      for (const req of allRequests) {
+        if (req.confirmationId && req.confirmationId.startsWith('inv:0-')) {
+          const targetInvoiceNumber = invalidIdToInvoiceNumberMap[req.confirmationId];
+
+          if (targetInvoiceNumber && targetInvoiceNumber !== 'CANCELED') {
+            const correctInvoiceId = invoiceNumberToIdMap.get(targetInvoiceNumber);
+            if (correctInvoiceId) {
+              const requestRef = doc(db, 'requests', req.id);
+              batch.update(requestRef, { confirmationId: correctInvoiceId });
+              fixesMade++;
+              setLog(prev => [...prev, `✅ [FIXED] Request ${req.id} confirmationId updated to ${correctInvoiceId} (for Invoice #${targetInvoiceNumber})`]);
+            } else {
+              setLog(prev => [...prev, `❌ [ERROR] Request ${req.id} targets Invoice #${targetInvoiceNumber}, but that invoice was not found.`]);
+            }
+          } else {
+            // This is an invalid request for a canceled invoice, so we delete it.
+            const requestRef = doc(db, 'requests', req.id);
+            batch.delete(requestRef);
+            deletionsMade++;
+            setLog(prev => [...prev, `🗑️ [DELETED] Invalid request ${req.id} for a canceled invoice.`]);
+          }
+        }
+      }
+
+      if (fixesMade > 0 || deletionsMade > 0) {
+        await batch.commit();
+        setLog(prev => [...prev, `\n🚀 Batch committed. ${fixesMade} request(s) fixed and ${deletionsMade} request(s) deleted.`]);
+        toast({ title: 'Success', description: `Data fix complete. ${fixesMade} fixed, ${deletionsMade} deleted.` });
       } else {
-        setLog(prev => [...prev, '✅ No invalid requests found. Your data is clean!']);
-        toast({ title: 'Scan Complete', description: 'No invalid requests were found.' });
+        setLog(prev => [...prev, '✅ No invalid requests found that match the repair map. Your data is clean!']);
+        toast({ title: 'Scan Complete', description: 'No matching invalid requests were found.' });
       }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
@@ -74,70 +103,31 @@ export default function FixRequestIdsPage() {
     }
   };
 
-  const confirmDelete = async () => {
-    setIsAlertOpen(false);
-    if (invalidRequests.length === 0) {
-        toast({ title: 'No action taken', description: 'No invalid requests to delete.' });
-        return;
-    }
-
-    setIsProcessing(true);
-    setLog(prev => [...prev, 'Deleting invalid requests...']);
-
-    try {
-        const batch = writeBatch(db);
-        invalidRequests.forEach(req => {
-            const requestRef = doc(db, 'requests', req.id);
-            batch.delete(requestRef);
-            setLog(prev => [...prev, `  - Marked ${req.id} for deletion.`]);
-        });
-
-        await batch.commit();
-
-        setLog(prev => [...prev, `✅ Successfully deleted ${invalidRequests.length} requests.`]);
-        toast({ title: 'Success', description: `${invalidRequests.length} invalid requests have been deleted.` });
-        setInvalidRequests([]); // Clear the list after deletion
-    } catch(error) {
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-        setLog(prev => [...prev, `❌ DELETION FAILED: ${errorMessage}`]);
-        toast({ variant: 'destructive', title: 'Deletion Failed', description: errorMessage });
-    } finally {
-        setIsProcessing(false);
-    }
-  };
-
-
   return (
     <AppLayout>
       <div className="space-y-8 max-w-4xl mx-auto">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Data Repair: Clean Invalid Requests</h1>
+          <h1 className="text-3xl font-bold font-headline">Data Repair: Targeted Request Fix</h1>
           <p className="text-muted-foreground mt-2">
-            A one-time tool to find and permanently delete change requests with corrupted `confirmationId` values.
+            A one-time tool to fix specific change requests with corrupted `confirmationId` values.
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Scan & Delete Invalid Requests</CardTitle>
+            <CardTitle>Run Targeted Fix</CardTitle>
             <CardDescription>
-              First, scan the database to identify corrupted requests. If any are found, you will have the option to delete them. This action cannot be undone.
+              This script will attempt to repair one specific request by mapping it to Invoice #4301 and delete other known invalid requests. This action cannot be undone.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex items-center gap-4">
-            <Button onClick={findInvalidRequests} disabled={isProcessing}>
+            <Button onClick={runFixScript} disabled={isProcessing}>
               {isProcessing ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning...</>
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
               ) : (
-                '1. Scan for Invalid Requests'
+                <><Wrench className="mr-2 h-4 w-4" /> Run Fix Script</>
               )}
             </Button>
-            {invalidRequests.length > 0 && (
-                <Button variant="destructive" onClick={() => setIsAlertOpen(true)} disabled={isProcessing}>
-                    <Trash2 className="mr-2 h-4 w-4"/>
-                    2. Delete {invalidRequests.length} Invalid Request(s)
-                </Button>
-            )}
           </CardContent>
         </Card>
 
@@ -148,26 +138,12 @@ export default function FixRequestIdsPage() {
           <CardContent>
             <ScrollArea className="h-96 w-full rounded-md border">
                 <pre className="p-4 text-xs whitespace-pre-wrap break-words">
-                  {log.length > 1 ? log.join('\n') : 'No actions taken yet. Click the button to start.'}
+                  {log.length > 0 ? log.join('\n') : 'No actions taken yet. Click the button to start.'}
                 </pre>
             </ScrollArea>
           </CardContent>
         </Card>
       </div>
-      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-                This will permanently delete {invalidRequests.length} change request(s) from the database. This action cannot be undone. These requests will need to be re-submitted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Yes, Delete Them</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </AppLayout>
   );
 }
