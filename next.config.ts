@@ -44,6 +44,12 @@ const nextConfig: NextConfig = {
       'react-native-fetch-blob': 'commonjs react-native-fetch-blob',
     });
 
+    if (isServer) {
+        config.externals.push({
+            'handlebars': 'commonjs handlebars',
+        });
+    }
+
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
