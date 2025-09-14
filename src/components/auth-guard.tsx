@@ -48,14 +48,14 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     }
     
     // PRIORITY 2: Handle multi-role for district coordinators
-    // Only redirect to role selection if they have district coordinator capabilities
-    // but their role is NOT set to district_coordinator AND they're not an organizer
+    // Only redirect to role selection if they have DC capabilities but haven't made a valid role choice yet
     if (profile.isDistrictCoordinator && 
         profile.role !== 'organizer' && 
         profile.role !== 'district_coordinator' &&
+        profile.role !== 'sponsor' && // Allow user to act as a sponsor
         pathname !== '/auth/role-selection') {
       
-      console.log('🔄 District coordinator with non-DC role, redirecting to role selection');
+      console.log('🔄 District coordinator with non-DC/non-Sponsor role, redirecting to role selection');
       router.push('/auth/role-selection');
       return;
     }
