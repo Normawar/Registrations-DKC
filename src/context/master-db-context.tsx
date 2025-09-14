@@ -513,24 +513,23 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     try {
         let results: MasterPlayer[];
 
-        if (criteria.uscfId) {
-            // Prioritize USCF ID for exact match
-            const docRef = doc(db, 'players', criteria.uscfId);
-            const docSnap = await getDoc(docRef);
-            results = docSnap.exists() ? [docSnap.data() as MasterPlayer] : [];
+        // Use startsWith for USCF ID if it's the only or primary search term
+        if (criteria.uscfId && Object.keys(criteria).length <= 2) { // 2 to account for pageSize
+            results = database.filter(player => player.uscfId?.startsWith(criteria.uscfId!));
         } else {
-            // Fallback to client-side filtering for other criteria
+            // Fallback to broader client-side filtering for other criteria
             results = database.filter(player => {
-                const criteriaMet =
+                return (
                     (!criteria.firstName || player.firstName?.toLowerCase().includes(criteria.firstName.toLowerCase())) &&
                     (!criteria.lastName || player.lastName?.toLowerCase().includes(criteria.lastName.toLowerCase())) &&
                     (!criteria.middleName || player.middleName?.toLowerCase().includes(criteria.middleName.toLowerCase())) &&
+                    (!criteria.uscfId || player.uscfId?.toLowerCase().includes(criteria.uscfId.toLowerCase())) &&
                     (!criteria.state || player.state === criteria.state) &&
                     (!criteria.school || player.school?.toLowerCase().includes(criteria.school.toLowerCase())) &&
                     (!criteria.district || player.district?.toLowerCase().includes(criteria.district.toLowerCase())) &&
                     (!criteria.minRating || (player.regularRating || 0) >= criteria.minRating) &&
-                    (!criteria.maxRating || (player.regularRating || 0) <= criteria.maxRating);
-                return criteriaMet;
+                    (!criteria.maxRating || (player.regularRating || 0) <= criteria.maxRating)
+                );
             });
         }
         
