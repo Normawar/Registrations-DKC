@@ -490,3 +490,30 @@ export async function directFirebaseSignIn(email: string, password: string) {
     throw error;
   }
 }
+// Add this function to test account creation and login
+export async function createAndTestAccount() {
+  console.log('🧪 Creating and testing account...');
+  
+  const testEmail = 'testds@test.com';
+  const testPassword = 'testpassword';
+  
+  try {
+    await simpleSignUp(testEmail, testPassword, {
+      firstName: 'Test',
+      lastName: 'DS', 
+      role: 'sponsor',
+      district: 'Test',
+      school: 'Test',
+      phone: '555-555-5555',
+      avatarType: 'icon',
+      avatarValue: 'QueenIcon'
+    });
+    console.log('✅ Account created or restored.');
+    
+    const result = await simpleSignIn(testEmail, testPassword);
+    console.log('✅ Sign-in successful:', result.profile);
+    
+  } catch (error) {
+    console.error('❌ Create and test failed:', error);
+  }
+}
