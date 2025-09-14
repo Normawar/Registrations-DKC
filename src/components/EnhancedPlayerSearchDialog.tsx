@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -295,7 +294,7 @@ export function EnhancedPlayerSearchDialog({
               <p className="text-sm text-green-700">
                 {dynamicSearchDisabled 
                   ? 'Dynamic search was disabled due to a missing database index. Use "Manual Search" or "Clear All" to re-enable.'
-                  : 'Search updates automatically as you type in any field. For example: typing "9" in USCF ID shows all IDs starting with 9.'
+                  : 'Search updates automatically as you type in any field. For example: typing "9" in USCF ID shows all IDs starting with 9, typing "John" in First Name shows all first names starting with John, etc.'
                 }
               </p>
             </div>
