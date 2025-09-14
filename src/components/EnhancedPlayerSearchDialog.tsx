@@ -111,12 +111,16 @@ export function EnhancedPlayerSearchDialog({
         ...searchCriteria,
         pageSize: 100
       });
+      setDynamicSearchDisabled(false); // Re-enable dynamic search on successful manual search
       setSearchResult(result);
-      setDynamicSearchDisabled(false); // Re-enable dynamic search on success
-    } catch (error) {
+    } catch (error: any) {
       console.error('Database search failed:', error);
-      alert('Search failed. Please try again.');
-      setDynamicSearchDisabled(true); // Disable on error
+      if (error.message && error.message.includes('requires an index')) {
+          setDynamicSearchDisabled(true);
+          alert('This search query requires a specific database index that has not been created. Dynamic search has been temporarily disabled. Please try a simpler search.');
+      } else {
+          alert('Search failed. Please try again.');
+      }
     } finally {
       setIsSearching(false);
     }
@@ -125,7 +129,7 @@ export function EnhancedPlayerSearchDialog({
   const handleClearDatabaseSearch = () => {
     setSearchCriteria({});
     setSearchResult(null);
-    setDynamicSearchDisabled(false);
+    setDynamicSearchDisabled(false); // Re-enable dynamic search on clear
   };
 
   // USCF lookup functions
@@ -290,8 +294,8 @@ export function EnhancedPlayerSearchDialog({
               </h3>
               <p className="text-sm text-green-700">
                 {dynamicSearchDisabled 
-                  ? 'Dynamic search was disabled due to missing database index. Use "Manual Search" or "Clear All" to re-enable.'
-                  : 'Search updates automatically as you type in any field. For example: typing "9" in USCF ID shows all IDs starting with 9, typing "John" in First Name shows all first names starting with John, etc.'
+                  ? 'Dynamic search was disabled due to a missing database index. Use "Manual Search" or "Clear All" to re-enable.'
+                  : 'Search updates automatically as you type in any field. For example: typing "9" in USCF ID shows all IDs starting with 9.'
                 }
               </p>
             </div>
@@ -331,22 +335,6 @@ export function EnhancedPlayerSearchDialog({
               
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Middle Name
-                  {isSearching && searchCriteria.middleName && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  value={searchCriteria.middleName || ''}
-                  onChange={(e) => updateSearchCriteria('middleName', e.target.value)}
-                  placeholder="Michael"
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
                   Last Name
                   {isSearching && searchCriteria.lastName && (
                     <span className="ml-2 text-xs text-blue-600">Searching...</span>
@@ -357,76 +345,6 @@ export function EnhancedPlayerSearchDialog({
                   value={searchCriteria.lastName || ''}
                   onChange={(e) => updateSearchCriteria('lastName', e.target.value)}
                   placeholder="Doe"
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">State</label>
-                <select
-                  value={searchCriteria.state || ''}
-                  onChange={(e) => updateSearchCriteria('state', e.target.value)}
-                  className="w-full border rounded px-3 py-2"
-                >
-                  <option value="">All States</option>
-                  <option value="TX">Texas</option>
-                  <option value="CA">California</option>
-                  <option value="NY">New York</option>
-                  <option value="FL">Florida</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  School (Exact)
-                  {isSearching && searchCriteria.school && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  value={searchCriteria.school || ''}
-                  onChange={(e) => updateSearchCriteria('school', e.target.value)}
-                  placeholder="Lincoln Elementary"
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  District (Exact)
-                  {isSearching && searchCriteria.district && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  value={searchCriteria.district || ''}
-                  onChange={(e) => updateSearchCriteria('district', e.target.value)}
-                  placeholder="Austin ISD"
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Min Rating</label>
-                <input
-                  type="number"
-                  value={searchCriteria.minRating || ''}
-                  onChange={(e) => updateSearchCriteria('minRating', e.target.value ? parseInt(e.target.value) : undefined)}
-                  placeholder="1000"
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Max Rating</label>
-                <input
-                  type="number"
-                  value={searchCriteria.maxRating || ''}
-                  onChange={(e) => updateSearchCriteria('maxRating', e.target.value ? parseInt(e.target.value) : undefined)}
-                  placeholder="2000"
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
