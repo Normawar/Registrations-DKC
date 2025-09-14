@@ -85,12 +85,9 @@ export default function RoleSelectionPage() {
   }
 
   const handleRoleSelection = (path: string, role: 'sponsor' | 'district_coordinator' | 'organizer') => {
-    console.log('🎯 ROLE SELECTION CLICKED:', { path, role });
     if (profile) {
-      console.log('📝 UPDATING PROFILE ROLE TO:', role);
       updateProfile({ ...profile, role });
     }
-    console.log('🚀 NAVIGATING TO:', path);
     router.push(path);
   };
 
@@ -326,9 +323,6 @@ export default function RoleSelectionPage() {
         </div>
         
         <div className="text-center space-y-2">
-          <p className="text-sm text-muted-foreground">
-            💡 Tip: Use impersonation to test the exact user experience
-          </p>
           <Button variant="link" onClick={() => router.push('/')}>Log out</Button>
         </div>
       </div>
