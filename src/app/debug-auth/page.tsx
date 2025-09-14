@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { debugFirebaseConfig, debugSignUp, debugSignIn } from '@/lib/auth-debug';
+import { createAndTestAccount } from '@/lib/simple-auth';
 
 export default function DebugAuthPage() {
   const [email, setEmail] = useState('test@example.com');
@@ -65,6 +66,18 @@ export default function DebugAuthPage() {
     setLoading(false);
   };
 
+  const handleCreateAndTest = async () => {
+    setLoading(true);
+    logResult('=== Running Create and Test Account Script ===');
+    try {
+      await createAndTestAccount();
+      logResult('✅ Script finished. Check console for detailed logs.');
+    } catch (error) {
+      logResult(`❌ Script failed: ${error}`);
+    }
+    setLoading(false);
+  };
+
   const clearResults = () => {
     setResults('');
   };
@@ -114,6 +127,13 @@ export default function DebugAuthPage() {
               className="bg-blue-600 hover:bg-blue-700"
             >
               {loading ? 'Testing...' : 'Test Sign In'}
+            </Button>
+            <Button 
+              onClick={handleCreateAndTest} 
+              disabled={loading}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {loading ? 'Testing...' : 'Create & Test DS Account'}
             </Button>
             <Button onClick={clearResults} variant="destructive">
               Clear Results
