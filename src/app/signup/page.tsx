@@ -1,3 +1,4 @@
+
 // src/app/signup/page.tsx - Updated with Data Correction for Organizer Account
 'use client';
 
@@ -430,6 +431,7 @@ export default function SignUpPage() {
             height={80}
             alt="Dark Knight Chess Logo"
             className="mb-4"
+            priority
           />
           <CardTitle className="text-3xl font-bold font-headline">
             Create an Account

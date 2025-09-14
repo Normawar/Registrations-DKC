@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -267,6 +268,7 @@ export default function RoleSelectionPage() {
             height={80}
             alt="Dark Knight Chess Logo"
             className="mx-auto mb-4"
+            priority
            />
           <h1 className="text-3xl font-bold font-headline">
             Welcome, {profile.firstName}!

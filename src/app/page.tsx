@@ -210,6 +210,7 @@ export default function LoginPage() {
                     height={80}
                     alt="Dark Knight Chess Logo"
                     className="mb-4"
+                    priority
                 />
                 <CardTitle className="text-3xl font-bold font-headline">
                     Welcome Back
