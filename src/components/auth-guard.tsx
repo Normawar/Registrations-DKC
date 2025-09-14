@@ -1,4 +1,4 @@
-// src/components/auth-guard.tsx - Route protection component with fixed organizer logic
+// src/components/auth-guard.tsx - Fixed route protection component
 'use client';
 
 import { useEffect } from 'react';
@@ -18,62 +18,79 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
   const pathname = usePathname();
 
   useEffect(() => {
+    console.log('🔍 AuthGuard useEffect triggered');
+    console.log('🔍 AuthGuard Debug:', {
+      loading,
+      profileRole: profile?.role,
+      isDistrictCoordinator: profile?.isDistrictCoordinator,
+      forceProfileUpdate: profile?.forceProfileUpdate,
+      requiredRole,
+      pathname
+    });
+
     if (loading) {
+      console.log('⏳ Still loading, waiting...');
       return; // Wait until loading is complete
     }
 
+    // If no profile, user is not authenticated, redirect to login
     if (!profile) {
-      // User is not authenticated, redirect to login
+      console.log('❌ No profile, redirecting to:', redirectTo);
       router.push(redirectTo);
       return;
     }
     
-    // Check if profile completion is required
+    // PRIORITY 1: Handle forced profile update. This must happen before any other role-based logic.
     if (profile.forceProfileUpdate && pathname !== '/profile') {
+      console.log('📝 Force profile update required, redirecting to /profile');
       router.push('/profile');
       return;
     }
     
-    // PRIORITY 1: Handle organizers first - they should NEVER go to role selection
-    // Organizers have ultimate permissions and should go directly to their dashboard
-    if (profile.role === 'organizer') {
-      // If organizer is not on an organizer page and no specific role is required, send to manage-events
-      if (!requiredRole && pathname !== '/manage-events' && !pathname.startsWith('/manage-events')) {
-        router.push('/manage-events');
-        return;
-      }
-      // If a role is required and it's not organizer, organizers can access anything
-      // So we let them through (no redirect needed)
-    }
-    
-    // PRIORITY 2: Handle multi-role for non-organizers only
-    // This logic should only apply to district coordinators who are NOT organizers
-    else if (profile.isDistrictCoordinator && profile.role === 'district_coordinator') {
-      if (pathname !== '/auth/role-selection') {
-        router.push('/auth/role-selection');
-        return;
-      }
+    // PRIORITY 2: Handle multi-role for district coordinators
+    // Only redirect to role selection if they have district coordinator capabilities
+    // but their role is NOT set to district_coordinator AND they're not an organizer
+    if (profile.isDistrictCoordinator && 
+        profile.role !== 'organizer' && 
+        profile.role !== 'district_coordinator' &&
+        pathname !== '/auth/role-selection') {
+      
+      console.log('🔄 District coordinator with non-DC role, redirecting to role selection');
+      router.push('/auth/role-selection');
+      return;
     }
 
-    // PRIORITY 3: Handle role-based access control
+    // PRIORITY 3: Handle role-based access control for pages with specific requirements
     if (requiredRole) {
       const isOrganizer = profile.role === 'organizer';
       const isRequired = profile.role === requiredRole;
       const isCoordinatorAccessingSponsorPage = profile.role === 'district_coordinator' && requiredRole === 'sponsor';
 
+      console.log('🛡️ Role check:', {
+        isOrganizer,
+        isRequired,
+        isCoordinatorAccessingSponsorPage,
+        userRole: profile.role,
+        requiredRole
+      });
+
+      // An organizer can access any page.
+      // A user can access a page if they have the required role.
+      // A district coordinator can also access sponsor pages.
       const hasRequiredRole = isOrganizer || isRequired || isCoordinatorAccessingSponsorPage;
       
       if (!hasRequiredRole) {
-        // User doesn't have required role, redirect to their primary dashboard
+        console.log('❌ Insufficient role, redirecting based on user role:', profile.role);
+        // User doesn't have the required role, redirect to their primary dashboard
         switch (profile.role) {
           case 'organizer':
             router.push('/manage-events');
             break;
           case 'district_coordinator':
-             router.push('/district-dashboard');
+            router.push('/district-dashboard');
             break;
           case 'sponsor':
-              router.push('/dashboard');
+            router.push('/dashboard');
             break;
           case 'individual':
             router.push('/individual-dashboard');
@@ -82,12 +99,17 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
             router.push('/');
         }
         return;
+      } else {
+        console.log('✅ Role check passed, allowing access');
       }
+    } else {
+      console.log('🔓 No role requirement, allowing access');
     }
   }, [profile, loading, requiredRole, router, redirectTo, pathname]);
 
   // Show loading state while checking authentication
   if (loading) {
+    console.log('🔄 Rendering loading skeleton');
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="space-y-4">
@@ -99,17 +121,13 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     );
   }
   
-  const hasRequiredRoleCheck = !requiredRole || (profile && (
-    profile.role === 'organizer' ||
-    profile.role === requiredRole ||
-    (requiredRole === 'sponsor' && profile.role === 'district_coordinator')
-  ));
-
-  // Don't render children if user is not authenticated or doesn't have the role yet
-  if (!profile || !hasRequiredRoleCheck || profile.forceProfileUpdate) {
+  // Prevent rendering children if a redirect is imminent.
+  if (!profile || (profile.forceProfileUpdate && pathname !== '/profile')) {
+    console.log('🚫 Preventing render due to missing profile or force update');
     return null;
   }
 
+  console.log('✅ Rendering protected content');
   // If we reach here, user is authenticated and has required role
   return <>{children}</>;
 }
