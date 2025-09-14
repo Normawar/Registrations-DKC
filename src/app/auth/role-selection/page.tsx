@@ -85,9 +85,12 @@ export default function RoleSelectionPage() {
   }
 
   const handleRoleSelection = (path: string, role: 'sponsor' | 'district_coordinator' | 'organizer') => {
+    console.log('🎯 ROLE SELECTION CLICKED:', { path, role });
     if (profile) {
+      console.log('📝 UPDATING PROFILE ROLE TO:', role);
       updateProfile({ ...profile, role });
     }
+    console.log('🚀 NAVIGATING TO:', path);
     router.push(path);
   };
 

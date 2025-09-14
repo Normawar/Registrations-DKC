@@ -32,6 +32,7 @@ import { MasterPlayer } from '@/lib/data/full-master-player-data';
 
 
 function DistrictDashboardContent() {
+  console.log('🏢 DISTRICT DASHBOARD CONTENT LOADED');
   const { profile } = useSponsorProfile();
   const [clientReady, setClientReady] = useState(false);
   const [districtPlayers, setDistrictPlayers] = useState<MasterPlayer[]>([]);
@@ -137,6 +138,7 @@ function DistrictDashboardContent() {
 }
 
 export default function DistrictDashboardPage() {
+    console.log('🏢 DISTRICT DASHBOARD PAGE COMPONENT LOADED');
     return (
         <DistrictCoordinatorGuard>
             <DistrictDashboardContent />
