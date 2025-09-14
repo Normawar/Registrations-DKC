@@ -24,13 +24,14 @@ export async function simpleSignUp(email: string, password: string, userData: Om
 
     console.log('✅ Firebase services available');
     
-    // Handle special test user cases
-    if (email.toLowerCase().startsWith('test')) {
-        const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
-        const { doc, setDoc } = await import('firebase/firestore');
-        const authInstance = getAuth();
-        let user: User;
+    const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+    const { doc, setDoc } = await import('firebase/firestore');
+    const authInstance = getAuth();
+    let user: User;
 
+    // Handle special test user cases
+    const lowerCaseEmail = email.toLowerCase();
+    if (lowerCaseEmail.startsWith('test')) {
         try {
             const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
             user = userCredential.user;
@@ -41,13 +42,13 @@ export async function simpleSignUp(email: string, password: string, userData: Om
                 user = userCredential.user;
                 console.log(`✅ Test user ${email} created successfully.`);
             } else {
-                throw error;
+                throw error; // Re-throw other sign-in errors
             }
         }
         
         let testProfile: SponsorProfile;
 
-        switch (email.toLowerCase()) {
+        switch (lowerCaseEmail) {
             case 'test@test.com':
                 testProfile = {
                     uid: user.uid, email: 'test@test.com', firstName: 'Test', lastName: 'Sponsor',
@@ -82,10 +83,6 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     }
     
     console.log('📧 Creating user with email:', email);
-
-    // Import Firebase functions dynamically to avoid SSR issues
-    const { createUserWithEmailAndPassword, signInWithEmailAndPassword } = await import('firebase/auth');
-    const { doc, setDoc } = await import('firebase/firestore');
 
     let userCredential;
     let isExistingUser = false;
