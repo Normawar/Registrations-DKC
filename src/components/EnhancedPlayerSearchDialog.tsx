@@ -44,6 +44,7 @@ export function EnhancedPlayerSearchDialog({
   const [uscfResults, setUSCFResults] = useState<USCFPlayer[]>([]);
   const [isUSCFSearching, setIsUSCFSearching] = useState(false);
   const [uscfError, setUSCFError] = useState<string>('');
+  const [dynamicSearchDisabled, setDynamicSearchDisabled] = useState(false);
 
   // Debounced search function
   const performDynamicSearch = useCallback(async (criteria: Partial<SearchCriteria>) => {
@@ -66,7 +67,9 @@ export function EnhancedPlayerSearchDialog({
       setSearchResult(result);
     } catch (error) {
       console.error('Dynamic search failed:', error);
-      // Don't show alert for dynamic searches, just log the error
+      if (error instanceof Error && error.message.includes("requires an index")) {
+        setDynamicSearchDisabled(true);
+      }
     } finally {
       setIsSearching(false);
     }
@@ -74,7 +77,7 @@ export function EnhancedPlayerSearchDialog({
 
   // Effect to handle dynamic searching with debouncing
   useEffect(() => {
-    if (activeTab !== 'database') return;
+    if (activeTab !== 'database' || dynamicSearchDisabled) return;
 
     // Clear existing timeout
     if (searchTimeout) {
@@ -94,7 +97,7 @@ export function EnhancedPlayerSearchDialog({
         clearTimeout(timeout);
       }
     };
-  }, [searchCriteria, activeTab, performDynamicSearch]);
+  }, [searchCriteria, activeTab, performDynamicSearch, dynamicSearchDisabled]);
 
   // Update search criteria with dynamic search
   const updateSearchCriteria = (field: keyof SearchCriteria, value: any) => {
@@ -103,7 +106,6 @@ export function EnhancedPlayerSearchDialog({
 
   // Database search functions
   const handleDatabaseSearch = async () => {
-    // Manual search - same as before but without debouncing
     setIsSearching(true);
     try {
       const result = await searchPlayers({
@@ -111,6 +113,9 @@ export function EnhancedPlayerSearchDialog({
         pageSize: 100
       });
       setSearchResult(result);
+      if (dynamicSearchDisabled) {
+        setDynamicSearchDisabled(false);
+      }
     } catch (error) {
       console.error('Database search failed:', error);
       alert('Search failed. Please try again.');
@@ -122,6 +127,7 @@ export function EnhancedPlayerSearchDialog({
   const handleClearDatabaseSearch = () => {
     setSearchCriteria({});
     setSearchResult(null);
+    setDynamicSearchDisabled(false);
   };
 
   // USCF lookup functions
@@ -281,9 +287,14 @@ export function EnhancedPlayerSearchDialog({
         {activeTab === 'database' && (
           <div>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-              <h3 className="text-sm font-medium text-green-800 mb-2">Dynamic Search</h3>
+              <h3 className="text-sm font-medium text-green-800 mb-2">
+                {dynamicSearchDisabled ? 'Dynamic Search Disabled' : 'Dynamic Search'}
+              </h3>
               <p className="text-sm text-green-700">
-                Search updates automatically as you type. For example, typing "9" in USCF ID will show all players with USCF IDs starting with 9.
+                {dynamicSearchDisabled 
+                  ? 'Dynamic search was disabled due to missing database index. Use "Manual Search" or "Clear All" to re-enable.'
+                  : 'Search updates automatically as you type in any field. For example: typing "9" in USCF ID shows all IDs starting with 9, typing "John" in First Name shows all first names starting with John, etc.'
+                }
               </p>
             </div>
             
