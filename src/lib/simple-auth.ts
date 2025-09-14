@@ -206,8 +206,7 @@ export async function createUserByOrganizer(email: string, password: string, use
     }
 }
 
-
-// Simple signin function with detailed error logging
+// Enhanced simpleSignIn function with better debugging and input validation
 export async function simpleSignIn(email: string, password: string) {
   console.log('🚀 Starting signin process...');
   
@@ -215,21 +214,47 @@ export async function simpleSignIn(email: string, password: string) {
     if (!auth || !db) throw new Error('Firebase services not available.');
     
     console.log('✅ Firebase services available');
-    console.log('📧 Signing in with email:', email);
+    
+    // Clean and validate inputs
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+    
+    console.log('🔍 Debug info:');
+    console.log('  - Original email:', `"${email}"`);
+    console.log('  - Cleaned email:', `"${cleanEmail}"`);
+    console.log('  - Email length:', cleanEmail.length);
+    console.log('  - Password length:', cleanPassword.length);
+    console.log('  - Has whitespace in original email:', email !== email.trim());
+    console.log('  - Email format looks valid:', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail));
+    
+    // Basic validation
+    if (!cleanEmail) {
+      throw new Error('Email is required');
+    }
+    if (!cleanPassword) {
+      throw new Error('Password is required');
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      throw new Error('Please enter a valid email address');
+    }
+
+    console.log('📧 Attempting to sign in with:', cleanEmail);
 
     const { signInWithEmailAndPassword } = await import('firebase/auth');
     const { doc, getDoc, setDoc, writeBatch } = await import('firebase/firestore');
 
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    // Attempt sign in with cleaned credentials
+    const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
     const user = userCredential.user;
     console.log('✅ User signed in with UID:', user.uid);
+    console.log('✅ User email from auth:', user.email);
 
     const profileDocRef = doc(db, 'users', user.uid);
     let profileDoc = await getDoc(profileDocRef);
 
     if (!profileDoc.exists()) {
       console.warn('⚠️ User profile not found under UID, checking for legacy doc using email...');
-      const legacyDocRef = doc(db, 'users', email.toLowerCase());
+      const legacyDocRef = doc(db, 'users', cleanEmail);
       const legacyDoc = await getDoc(legacyDocRef);
       
       if (legacyDoc.exists()) {
@@ -237,7 +262,7 @@ export async function simpleSignIn(email: string, password: string) {
         const legacyData = legacyDoc.data();
         const profileToSave: SponsorProfile = {
           ...(legacyData as Omit<SponsorProfile, 'uid' | 'email'>),
-          email: email.toLowerCase(),
+          email: cleanEmail,
           uid: user.uid,
           migratedAt: new Date().toISOString(),
           forceProfileUpdate: true, // Force user to review their profile
@@ -256,12 +281,12 @@ export async function simpleSignIn(email: string, password: string) {
 
       } else {
         // If no legacy doc, this is an orphaned auth user. Force profile creation.
-        console.error("❌ No profile found under UID or legacy email. Forcing profile update.");
+        console.error("❌ No profile found under UID or legacy email. Creating minimal profile.");
         const forcedProfile: SponsorProfile = {
             uid: user.uid,
-            email: user.email!,
-            firstName: user.displayName || 'New',
-            lastName: 'User',
+            email: user.email || cleanEmail,
+            firstName: user.displayName?.split(' ')[0] || 'New',
+            lastName: user.displayName?.split(' ')[1] || 'User',
             role: 'individual',
             district: 'None',
             school: 'Homeschool',
@@ -269,24 +294,43 @@ export async function simpleSignIn(email: string, password: string) {
             avatarType: 'icon',
             avatarValue: 'PawnIcon',
             forceProfileUpdate: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
         };
         await setDoc(profileDocRef, forcedProfile);
         profileDoc = await getDoc(profileDocRef);
+        console.log('✅ Created minimal profile for orphaned auth user');
       }
     }
     
     console.log('✅ User profile loaded successfully');
-    return { success: true, user, profile: profileDoc.data() as SponsorProfile };
+    const profileData = profileDoc.data() as SponsorProfile;
+    
+    // Update the last login timestamp
+    await setDoc(profileDocRef, {
+      ...profileData,
+      lastLoginAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+    
+    return { success: true, user, profile: profileData };
 
   } catch (error: any) {
     console.error('❌ Signin failed:', error);
+    console.error('❌ Error code:', error.code);
+    console.error('❌ Error message:', error.message);
+    
     let userFriendlyMessage = 'An error occurred during login.';
     
     switch (error.code) {
       case 'auth/invalid-credential':
-      case 'auth/user-not-found':
-      case 'auth/wrong-password':
         userFriendlyMessage = 'Invalid email or password. Please check your credentials and try again.';
+        break;
+      case 'auth/user-not-found':
+        userFriendlyMessage = 'No account found with this email address. Please check your email or sign up for a new account.';
+        break;
+      case 'auth/wrong-password':
+        userFriendlyMessage = 'Incorrect password. Please try again or use the "Forgot Password" link.';
         break;
       case 'auth/invalid-email':
         userFriendlyMessage = 'Please enter a valid email address.';
@@ -295,15 +339,20 @@ export async function simpleSignIn(email: string, password: string) {
         userFriendlyMessage = 'This account has been disabled. Please contact support.';
         break;
       case 'auth/too-many-requests':
-        userFriendlyMessage = 'Too many failed login attempts. Please try again later.';
+        userFriendlyMessage = 'Too many failed login attempts. Please try again later or reset your password.';
         break;
       case 'auth/network-request-failed':
         userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
         break;
+      case 'auth/popup-closed-by-user':
+        userFriendlyMessage = 'Sign-in was cancelled. Please try again.';
+        break;
+      case 'auth/cancelled-popup-request':
+        userFriendlyMessage = 'Another sign-in popup is already open.';
+        break;
       default:
-        if (error.message) {
-          userFriendlyMessage = error.message;
-        }
+        // For debugging: include the original error code and message
+        userFriendlyMessage = error.message || `Authentication failed (${error.code || 'unknown'})`;
     }
 
     throw new Error(userFriendlyMessage);
