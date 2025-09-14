@@ -30,17 +30,19 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     let user: User;
 
     // Handle special test user cases
-    const lowerCaseEmail = email.toLowerCase();
+    const lowerCaseEmail = email.toLowerCase().trim(); // Also trim here
     if (lowerCaseEmail.startsWith('test')) {
         try {
-            const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
+            // Use cleaned email consistently
+            const userCredential = await signInWithEmailAndPassword(authInstance, lowerCaseEmail, password.trim());
             user = userCredential.user;
-            console.log(`✅ Test user ${email} already exists, signed in.`);
+            console.log(`✅ Test user ${lowerCaseEmail} already exists, signed in.`);
         } catch (error: any) {
             if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
+                // Use cleaned email consistently
+                const userCredential = await createUserWithEmailAndPassword(authInstance, lowerCaseEmail, password.trim());
                 user = userCredential.user;
-                console.log(`✅ Test user ${email} created successfully.`);
+                console.log(`✅ Test user ${lowerCaseEmail} created successfully.`);
             } else {
                 throw error; // Re-throw other sign-in errors
             }
