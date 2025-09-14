@@ -1,3 +1,4 @@
+
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
@@ -23,48 +24,60 @@ export async function simpleSignUp(email: string, password: string, userData: Om
 
     console.log('✅ Firebase services available');
     
-    // Handle special test user case
-    if (email.toLowerCase() === 'test@test.com' && password === '1Tester') {
+    // Handle special test user cases
+    if (email.toLowerCase().startsWith('test')) {
         const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
         const { doc, setDoc } = await import('firebase/firestore');
         const authInstance = getAuth();
         let user: User;
 
         try {
-            // Try to sign in first, in case the account already exists
             const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
             user = userCredential.user;
-            console.log('✅ Test user already exists, signed in.');
+            console.log(`✅ Test user ${email} already exists, signed in.`);
         } catch (error: any) {
             if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                // If user doesn't exist, create it
                 const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
                 user = userCredential.user;
-                console.log('✅ Test user created successfully.');
+                console.log(`✅ Test user ${email} created successfully.`);
             } else {
-                // Re-throw other errors
                 throw error;
             }
         }
         
-        const testProfile: SponsorProfile = {
-            uid: user.uid,
-            email: 'test@test.com',
-            firstName: 'Test',
-            lastName: 'User',
-            role: 'sponsor',
-            district: 'Test',
-            school: 'Test',
-            phone: '555-555-5555',
-            avatarType: 'icon',
-            avatarValue: 'RookIcon',
-            forceProfileUpdate: false,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-        };
+        let testProfile: SponsorProfile;
+
+        switch (email.toLowerCase()) {
+            case 'test@test.com':
+                testProfile = {
+                    uid: user.uid, email: 'test@test.com', firstName: 'Test', lastName: 'Sponsor',
+                    role: 'sponsor', district: 'Test', school: 'Test', phone: '555-555-5555',
+                    avatarType: 'icon', avatarValue: 'RookIcon', forceProfileUpdate: false,
+                    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+                };
+                break;
+            case 'testds@test.com':
+                testProfile = {
+                    uid: user.uid, email: 'testds@test.com', firstName: 'Test', lastName: 'DS',
+                    role: 'sponsor', district: 'Test', school: 'Test', phone: '555-555-5555',
+                    isDistrictCoordinator: true, avatarType: 'icon', avatarValue: 'QueenIcon',
+                    forceProfileUpdate: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+                };
+                break;
+            case 'testdist@test.com':
+                 testProfile = {
+                    uid: user.uid, email: 'testdist@test.com', firstName: 'Test', lastName: 'District',
+                    role: 'district_coordinator', district: 'Test', school: 'All Schools', phone: '555-555-5555',
+                    isDistrictCoordinator: true, avatarType: 'icon', avatarValue: 'KingIcon',
+                    forceProfileUpdate: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+                };
+                break;
+            default:
+                throw new Error("Unknown test user email");
+        }
 
         await setDoc(doc(db, 'users', user.uid), testProfile, { merge: true });
-        console.log('✅ Test user profile created/updated.');
+        console.log(`✅ Test user profile for ${email} created/updated.`);
         return { success: true, user, profile: testProfile };
     }
     
