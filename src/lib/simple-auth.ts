@@ -394,3 +394,97 @@ export const resetPassword = async (email: string): Promise<void> => {
     throw error;
   }
 };
+
+// Add this temporary debugging function to your simple-auth.ts file
+export async function debugAuthIssue(email: string, password: string) {
+  console.log('🔍 DEBUG: Starting authentication debug...');
+  
+  // Log all the inputs
+  console.log('📝 Input Analysis:');
+  console.log('  Email (raw):', JSON.stringify(email));
+  console.log('  Email length:', email.length);
+  console.log('  Email has spaces:', email.includes(' '));
+  console.log('  Email trimmed:', JSON.stringify(email.trim()));
+  console.log('  Email lowercase:', JSON.stringify(email.trim().toLowerCase()));
+  console.log('  Password length:', password.length);
+  console.log('  Password has spaces at start/end:', password !== password.trim());
+  
+  // Check Firebase config
+  console.log('🔧 Firebase Config Check:');
+  console.log('  Auth instance:', !!auth);
+  console.log('  DB instance:', !!db);
+  console.log('  Project ID:', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+  console.log('  Auth Domain:', process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN);
+  
+  // Test with Firebase directly
+  try {
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
+    
+    console.log('🧪 Testing Firebase Auth directly...');
+    console.log('  Using email:', cleanEmail);
+    console.log('  Using password length:', cleanPassword.length);
+    
+    const result = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+    console.log('✅ Firebase Auth SUCCESS:', result.user.uid);
+    return { success: true, uid: result.user.uid };
+    
+  } catch (error: any) {
+    console.error('❌ Firebase Auth FAILED:', error.code, error.message);
+    
+    // Try to get more details about the error
+    if (error.code === 'auth/invalid-credential') {
+      console.log('🔍 Invalid credential details:');
+      console.log('  This usually means:');
+      console.log('  1. Wrong email/password combination');
+      console.log('  2. Account doesn\'t exist');
+      console.log('  3. Account was disabled');
+      console.log('  4. Password was changed elsewhere');
+      
+      // Try to check if the user exists (this will also fail but might give different error)
+      try {
+        const { fetchSignInMethodsForEmail } = await import('firebase/auth');
+        const methods = await fetchSignInMethodsForEmail(auth, email.trim().toLowerCase());
+        console.log('📧 Sign-in methods for this email:', methods);
+      } catch (methodError: any) {
+        console.log('📧 Could not fetch sign-in methods:', methodError.code);
+      }
+    }
+    
+    return { success: false, error: error.code, message: error.message };
+  }
+}
+
+// Quick test function for your test accounts
+export async function testKnownAccounts() {
+  console.log('🧪 Testing known test accounts...');
+  
+  const testAccounts = [
+    { email: 'test@test.com', password: 'testpassword' },
+    { email: 'testds@test.com', password: 'testpassword' },
+    { email: 'testdist@test.com', password: 'testpassword' }
+  ];
+  
+  for (const account of testAccounts) {
+    console.log(`\n🔍 Testing ${account.email}...`);
+    try {
+      const result = await debugAuthIssue(account.email, account.password);
+      console.log(`✅ ${account.email}:`, result.success ? 'SUCCESS' : 'FAILED');
+    } catch (error) {
+      console.log(`❌ ${account.email}: ERROR -`, error);
+    }
+  }
+}
+
+// Alternative sign-in function that bypasses your custom logic
+export async function directFirebaseSignIn(email: string, password: string) {
+  try {
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
+    const userCredential = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password.trim());
+    return { success: true, user: userCredential.user };
+  } catch (error: any) {
+    console.error('Direct Firebase sign-in failed:', error);
+    throw error;
+  }
+}
