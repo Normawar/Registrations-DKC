@@ -1,5 +1,4 @@
-
-// src/components/auth-guard.tsx - Fixed route protection component
+// src/components/auth-guard.tsx - Route protection component with fixed organizer logic
 'use client';
 
 import { useEffect } from 'react';
@@ -17,6 +16,8 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
   const { profile, loading } = useSponsorProfile();
   const router = useRouter();
   const pathname = usePathname();
+  console.log('AUTH GUARD CALLED WITH:', { requiredRole, pathname: pathname });
+
 
   useEffect(() => {
     // Add detailed logging for debugging
