@@ -67,9 +67,7 @@ export function EnhancedPlayerSearchDialog({
       setSearchResult(result);
     } catch (error) {
       console.error('Dynamic search failed:', error);
-      if (error instanceof Error && error.message.includes("requires an index")) {
-        setDynamicSearchDisabled(true);
-      }
+      // Don't show alert for dynamic searches, just log the error
     } finally {
       setIsSearching(false);
     }
@@ -106,6 +104,7 @@ export function EnhancedPlayerSearchDialog({
 
   // Database search functions
   const handleDatabaseSearch = async () => {
+    // Manual search - same as before but without debouncing
     setIsSearching(true);
     try {
       const result = await searchPlayers({
@@ -113,12 +112,11 @@ export function EnhancedPlayerSearchDialog({
         pageSize: 100
       });
       setSearchResult(result);
-      if (dynamicSearchDisabled) {
-        setDynamicSearchDisabled(false);
-      }
+      setDynamicSearchDisabled(false); // Re-enable dynamic search on success
     } catch (error) {
       console.error('Database search failed:', error);
       alert('Search failed. Please try again.');
+      setDynamicSearchDisabled(true); // Disable on error
     } finally {
       setIsSearching(false);
     }
