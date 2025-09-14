@@ -35,9 +35,9 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     }
     
     // PRIORITY 2: Handle multi-role for district coordinators
-    // This should only apply to users who are district coordinators but NOT organizers.
-    if (profile.isDistrictCoordinator && profile.role !== 'organizer') {
-      // If they are on any page that is NOT the role selection, redirect them there.
+    // If a user *can* be a district coordinator but their role isn't currently set to that,
+    // and they aren't an organizer, send them to role selection.
+    if (profile.isDistrictCoordinator && profile.role !== 'organizer' && profile.role !== 'district_coordinator') {
       if (pathname !== '/auth/role-selection') {
         router.push('/auth/role-selection');
         return;
