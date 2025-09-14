@@ -448,7 +448,7 @@ export async function testKnownAccounts() {
   const testAccounts = [
     { email: 'test@test.com', password: 'testpassword' },
     { email: 'testds@test.com', password: 'testpassword' },
-    { email: 'testdist@test.com', password: 'testpassword' }
+    { email: 'testdist@test.com', password: '1Disttester' }
   ];
   
   for (const account of testAccounts) {
@@ -500,3 +500,5 @@ export async function createAndTestAccount() {
     console.error('❌ Create and test failed:', error);
   }
 }
+
+    
