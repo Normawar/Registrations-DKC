@@ -1,9 +1,12 @@
-// src/app/district-dashboard/page.tsx
 'use client';
 
 import { DistrictCoordinatorGuard } from "@/components/auth-guard";
 
 export default function DistrictDashboardPage() {
-    console.log('IMPORT TEST - PAGE LOADED');
-    return <div>Import test</div>;
+    console.log('MINIMAL AUTH GUARD TEST');
+    return (
+        <DistrictCoordinatorGuard>
+            <div>Minimal auth guard test</div>
+        </DistrictCoordinatorGuard>
+    );
 }
