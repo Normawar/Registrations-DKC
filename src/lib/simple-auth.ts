@@ -1,78 +1,121 @@
 
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
+
 import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { sendPasswordResetEmail, type User } from 'firebase/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
+// src/lib/email-utils.ts - Utility functions for case-insensitive email handling
+export function normalizeEmail(email: string): string {
+  if (!email) return '';
+  return email.trim().toLowerCase();
+}
 
-// Simple signup function with detailed error logging
+export function validateEmail(email: string): boolean {
+  if (!email) return false;
+  const normalized = normalizeEmail(email);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+}
+
+// Updated authentication functions with consistent case-insensitive handling
+
+// Enhanced simpleSignUp with case-insensitive email handling
 export async function simpleSignUp(email: string, password: string, userData: Omit<SponsorProfile, 'uid' | 'email'>) {
   console.log('🚀 Starting signup process...');
   
   try {
-    // Check if Firebase is initialized
-    if (!auth) {
-      console.error('❌ Firebase Auth not initialized');
-      throw new Error('Authentication service not available. Please check your internet connection.');
-    }
-    
-    if (!db) {
-      console.error('❌ Firestore not initialized');
-      throw new Error('Database service not available. Please check your internet connection.');
+    if (!auth || !db) {
+      throw new Error('Firebase services not available.');
     }
 
-    console.log('✅ Firebase services available');
+    // ALWAYS normalize email first
+    const normalizedEmail = normalizeEmail(email);
+    const trimmedPassword = password.trim();
     
+    console.log(`Original email: "${email}"`);
+    console.log(`Normalized email: "${normalizedEmail}"`);
+    
+    if (!validateEmail(email)) {
+      throw new Error('Please enter a valid email address.');
+    }
+
     const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
     const { doc, setDoc } = await import('firebase/firestore');
     const authInstance = getAuth();
     let user: User;
 
-    // Handle special test user cases
-    const lowerCaseEmail = email.toLowerCase().trim(); // Also trim here
-    if (lowerCaseEmail.startsWith('test')) {
+    // Handle special test user cases with normalized email
+    if (normalizedEmail.startsWith('test')) {
         try {
-            // Use cleaned email consistently
-            const userCredential = await signInWithEmailAndPassword(authInstance, lowerCaseEmail, password.trim());
+            // Use normalized email consistently
+            const userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
             user = userCredential.user;
-            console.log(`✅ Test user ${lowerCaseEmail} already exists, signed in.`);
+            console.log(`✅ Test user ${normalizedEmail} already exists, signed in.`);
         } catch (error: any) {
             if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                // Use cleaned email consistently
-                const userCredential = await createUserWithEmailAndPassword(authInstance, lowerCaseEmail, password.trim());
+                const userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
                 user = userCredential.user;
-                console.log(`✅ Test user ${lowerCaseEmail} created successfully.`);
+                console.log(`✅ Test user ${normalizedEmail} created successfully.`);
             } else {
-                throw error; // Re-throw other sign-in errors
+                throw error;
             }
         }
         
         let testProfile: SponsorProfile;
 
-        switch (lowerCaseEmail) {
+        switch (normalizedEmail) {
             case 'test@test.com':
                 testProfile = {
-                    uid: user.uid, email: 'test@test.com', firstName: 'Test', lastName: 'Sponsor',
-                    role: 'sponsor', district: 'Test', school: 'Test', phone: '555-555-5555',
-                    avatarType: 'icon', avatarValue: 'RookIcon', forceProfileUpdate: false,
-                    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+                    uid: user.uid, 
+                    email: normalizedEmail, // Use normalized email
+                    firstName: 'Test', 
+                    lastName: 'Sponsor',
+                    role: 'sponsor', 
+                    district: 'Test', 
+                    school: 'Test', 
+                    phone: '555-555-5555',
+                    avatarType: 'icon', 
+                    avatarValue: 'RookIcon', 
+                    forceProfileUpdate: false,
+                    createdAt: new Date().toISOString(), 
+                    updatedAt: new Date().toISOString(),
                 };
                 break;
             case 'testds@test.com':
                 testProfile = {
-                    uid: user.uid, email: 'testds@test.com', firstName: 'Test', lastName: 'DS',
-                    role: 'sponsor', district: 'Test', school: 'Test', phone: '555-555-5555',
-                    isDistrictCoordinator: true, avatarType: 'icon', avatarValue: 'QueenIcon',
-                    forceProfileUpdate: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+                    uid: user.uid, 
+                    email: normalizedEmail, // Use normalized email
+                    firstName: 'Test', 
+                    lastName: 'DS',
+                    role: 'sponsor', 
+                    district: 'Test', 
+                    school: 'Test', 
+                    phone: '555-555-5555',
+                    isDistrictCoordinator: true, 
+                    avatarType: 'icon', 
+                    avatarValue: 'QueenIcon',
+                    forceProfileUpdate: false, 
+                    createdAt: new Date().toISOString(), 
+                    updatedAt: new Date().toISOString(),
                 };
                 break;
             case 'testdist@test.com':
                  testProfile = {
-                    uid: user.uid, email: 'testdist@test.com', firstName: 'Test', lastName: 'District',
-                    role: 'district_coordinator', district: 'Test', school: 'All Schools', phone: '555-555-5555',
-                    isDistrictCoordinator: true, avatarType: 'icon', avatarValue: 'KingIcon',
-                    forceProfileUpdate: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+                    uid: user.uid, 
+                    email: normalizedEmail, // Use normalized email
+                    firstName: 'Test', 
+                    lastName: 'District',
+                    role: 'district_coordinator', 
+                    district: 'Test', 
+                    school: 'All Schools', 
+                    phone: '555-555-5555',
+                    isDistrictCoordinator: true, 
+                    avatarType: 'icon', 
+                    avatarValue: 'KingIcon',
+                    forceProfileUpdate: false, 
+                    createdAt: new Date().toISOString(), 
+                    updatedAt: new Date().toISOString(),
                 };
                 break;
             default:
@@ -80,41 +123,39 @@ export async function simpleSignUp(email: string, password: string, userData: Om
         }
 
         await setDoc(doc(db, 'users', user.uid), testProfile, { merge: true });
-        console.log(`✅ Test user profile for ${email} created/updated.`);
+        console.log(`✅ Test user profile for ${normalizedEmail} created/updated.`);
         return { success: true, user, profile: testProfile };
     }
     
-    console.log('📧 Creating user with email:', email);
+    console.log('📧 Creating user with email:', normalizedEmail);
 
     let userCredential;
     let isExistingUser = false;
     try {
-      // Create the user
-      userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      // Create the user with normalized email
+      userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
       console.log('✅ User created with UID:', userCredential.user.uid);
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         isExistingUser = true;
         console.log('⚠️ Auth user already exists, attempting to sign in to restore profile.');
-        userCredential = await signInWithEmailAndPassword(auth, email, password);
+        userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
         console.log('✅ Existing user signed in with UID:', userCredential.user.uid);
       } else {
-        throw error; // Re-throw other auth errors
+        throw error;
       }
     }
 
-    // Save user profile to Firestore
+    // Save user profile to Firestore with normalized email
     const userProfile: SponsorProfile = {
       ...userData,
-      email: email.toLowerCase(),
+      email: normalizedEmail, // Always use normalized email
       uid: userCredential.user.uid,
-      // Only set createdAt timestamp if it's a truly new user
       ...(isExistingUser ? {} : { createdAt: new Date().toISOString() }),
-      updatedAt: new Date().toISOString(), // Always update timestamp
+      updatedAt: new Date().toISOString(),
     };
 
     console.log('💾 Saving user profile to Firestore...');
-    // Use setDoc with merge:true to create or overwrite/update the profile
     await setDoc(doc(db, 'users', userCredential.user.uid), userProfile, { merge: true });
     console.log('✅ User profile saved successfully');
 
@@ -127,12 +168,10 @@ export async function simpleSignUp(email: string, password: string, userData: Om
   } catch (error: any) {
     console.error('❌ Signup failed:', error);
     
-    // Handle specific Firebase Auth errors
     let userFriendlyMessage = 'An error occurred while creating your account.';
     
     switch (error.code) {
       case 'auth/email-already-in-use':
-        // This case is now handled above, but as a fallback:
         userFriendlyMessage = 'An account with this email already exists. Please sign in or try to sign up again to restore your profile.';
         break;
       case 'auth/wrong-password':
@@ -160,93 +199,40 @@ export async function simpleSignUp(email: string, password: string, userData: Om
   }
 }
 
-// Function for organizers to create new users
-export async function createUserByOrganizer(email: string, password: string, userData: any) {
-    console.log('🚀 Starting user creation by organizer...');
-    
-    if (!auth || !db) {
-        throw new Error('Firebase services are not available.');
-    }
-
-    try {
-        const { createUserWithEmailAndPassword } = await import('firebase/auth');
-        const { doc, setDoc } = await import('firebase/firestore');
-
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        const userProfile = {
-            ...userData,
-            email: email.toLowerCase(),
-            uid: user.uid,
-            createdAt: new Date().toISOString(),
-            forceProfileUpdate: true, // Flag to force profile completion
-        };
-        
-        await setDoc(doc(db, 'users', user.uid), userProfile);
-        
-        console.log(`✅ User ${email} created successfully by an organizer.`);
-        return { success: true, user, profile: userProfile };
-
-    } catch (error: any) {
-        console.error('❌ User creation by organizer failed:', error);
-        let userFriendlyMessage = 'Failed to create user.';
-        switch (error.code) {
-            case 'auth/email-already-in-use':
-                userFriendlyMessage = 'An account with this email already exists.';
-                break;
-            case 'auth/weak-password':
-                userFriendlyMessage = 'The temporary password is too weak. Please use at least 6 characters.';
-                break;
-            case 'auth/invalid-email':
-                userFriendlyMessage = 'Please enter a valid email address for the new user.';
-                break;
-            default:
-                if (error.message) userFriendlyMessage = error.message;
-        }
-        throw new Error(userFriendlyMessage);
-    }
-}
-
-// Enhanced simpleSignIn function with better debugging and input validation
+// Enhanced simpleSignIn with case-insensitive email handling
 export async function simpleSignIn(email: string, password: string) {
   console.log('🚀 Starting signin process...');
   
   try {
     if (!auth || !db) throw new Error('Firebase services not available.');
     
-    console.log('✅ Firebase services available');
-    
-    // Clean and validate inputs
-    const cleanEmail = email.trim().toLowerCase();
-    const cleanPassword = password.trim();
+    // ALWAYS normalize email first
+    const normalizedEmail = normalizeEmail(email);
+    const trimmedPassword = password.trim();
     
     console.log('🔍 Debug info:');
     console.log('  - Original email:', `"${email}"`);
-    console.log('  - Cleaned email:', `"${cleanEmail}"`);
-    console.log('  - Email length:', cleanEmail.length);
-    console.log('  - Password length:', cleanPassword.length);
-    console.log('  - Has whitespace in original email:', email !== email.trim());
-    console.log('  - Email format looks valid:', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail));
+    console.log('  - Normalized email:', `"${normalizedEmail}"`);
+    console.log('  - Email length:', normalizedEmail.length);
+    console.log('  - Password length:', trimmedPassword.length);
     
-    // Basic validation
-    if (!cleanEmail) {
+    if (!normalizedEmail) {
       throw new Error('Email is required');
     }
-    if (!cleanPassword) {
+    if (!trimmedPassword) {
       throw new Error('Password is required');
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+    if (!validateEmail(email)) {
       throw new Error('Please enter a valid email address');
     }
 
-    console.log('📧 Attempting to sign in with:', cleanEmail);
+    console.log('📧 Attempting to sign in with:', normalizedEmail);
 
     const { signInWithEmailAndPassword } = await import('firebase/auth');
     const { doc, getDoc, setDoc, writeBatch } = await import('firebase/firestore');
 
-    // Attempt sign in with cleaned credentials
-    const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+    // Attempt sign in with normalized credentials
+    const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
     const user = userCredential.user;
     console.log('✅ User signed in with UID:', user.uid);
     console.log('✅ User email from auth:', user.email);
@@ -256,7 +242,7 @@ export async function simpleSignIn(email: string, password: string) {
 
     if (!profileDoc.exists()) {
       console.warn('⚠️ User profile not found under UID, checking for legacy doc using email...');
-      const legacyDocRef = doc(db, 'users', cleanEmail);
+      const legacyDocRef = doc(db, 'users', normalizedEmail);
       const legacyDoc = await getDoc(legacyDocRef);
       
       if (legacyDoc.exists()) {
@@ -264,29 +250,25 @@ export async function simpleSignIn(email: string, password: string) {
         const legacyData = legacyDoc.data();
         const profileToSave: SponsorProfile = {
           ...(legacyData as Omit<SponsorProfile, 'uid' | 'email'>),
-          email: cleanEmail,
+          email: normalizedEmail, // Ensure normalized email
           uid: user.uid,
           migratedAt: new Date().toISOString(),
-          forceProfileUpdate: true, // Force user to review their profile
+          forceProfileUpdate: true,
         };
         
-        // Create the new document with the UID and delete the old one
         const batch = writeBatch(db);
         batch.set(profileDocRef, profileToSave);
         batch.delete(legacyDocRef);
         await batch.commit();
 
         console.log('✅ Legacy profile migrated successfully.');
-
-        // Re-fetch the profile to ensure consistency
         profileDoc = await getDoc(profileDocRef);
 
       } else {
-        // If no legacy doc, this is an orphaned auth user. Force profile creation.
         console.error("❌ No profile found under UID or legacy email. Creating minimal profile.");
         const forcedProfile: SponsorProfile = {
             uid: user.uid,
-            email: user.email || cleanEmail,
+            email: user.email || normalizedEmail, // Use normalized email
             firstName: user.displayName?.split(' ')[0] || 'New',
             lastName: user.displayName?.split(' ')[1] || 'User',
             role: 'individual',
@@ -308,9 +290,16 @@ export async function simpleSignIn(email: string, password: string) {
     console.log('✅ User profile loaded successfully');
     const profileData = profileDoc.data() as SponsorProfile;
     
+    // Ensure the profile email is normalized
+    if (profileData.email !== normalizedEmail) {
+      console.log('🔄 Updating profile email to normalized version');
+      profileData.email = normalizedEmail;
+    }
+    
     // Update the last login timestamp
     await setDoc(profileDocRef, {
       ...profileData,
+      email: normalizedEmail, // Ensure normalized email is saved
       lastLoginAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }, { merge: true });
@@ -346,20 +335,14 @@ export async function simpleSignIn(email: string, password: string) {
       case 'auth/network-request-failed':
         userFriendlyMessage = 'Network error. Please check your internet connection and try again.';
         break;
-      case 'auth/popup-closed-by-user':
-        userFriendlyMessage = 'Sign-in was cancelled. Please try again.';
-        break;
-      case 'auth/cancelled-popup-request':
-        userFriendlyMessage = 'Another sign-in popup is already open.';
-        break;
       default:
-        // For debugging: include the original error code and message
         userFriendlyMessage = error.message || `Authentication failed (${error.code || 'unknown'})`;
     }
 
     throw new Error(userFriendlyMessage);
   }
 }
+
 
 // Check Firebase configuration
 export function checkFirebaseConfig() {
