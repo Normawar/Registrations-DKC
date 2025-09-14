@@ -33,17 +33,21 @@ export default function RoleSelectionPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Redirect if profile is not loaded or user doesn't have a choice
+    // This effect now only handles initial redirection if the user doesn't belong on this page.
+    // It no longer causes a loop after a role is selected.
     if (isProfileLoaded) {
         if (!profile) {
+            // Not logged in, send to home.
             router.push('/');
         } else if (profile.role !== 'organizer' && !profile.isDistrictCoordinator) {
-            // Not a multi-role user, send to their dashboard
+            // User has a single, non-selectable role, send them to their dashboard.
             const dashboardPath = profile.role === 'sponsor' ? '/dashboard' : '/individual-dashboard';
             router.push(dashboardPath);
         }
+        // If the user is an organizer or a district coordinator, they are allowed to be on this page.
     }
   }, [isProfileLoaded, profile, router]);
+
 
   // Load users from Firestore (replace mock data)
   useEffect(() => {
