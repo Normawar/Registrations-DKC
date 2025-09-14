@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -170,6 +169,8 @@ export function EnhancedPlayerSearchDialog({
     }
     return name;
   };
+  
+  const dynamicSearchEnabled = false; // Intentionally disabled
 
   if (!isOpen) return null;
 
@@ -225,7 +226,12 @@ export function EnhancedPlayerSearchDialog({
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium mb-1">USCF ID</label>
+                <label className="block text-sm font-medium mb-1">
+                  USCF ID
+                  {dynamicSearchEnabled && isSearching && searchCriteria.uscfId && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.uscfId || ''}
@@ -236,7 +242,12 @@ export function EnhancedPlayerSearchDialog({
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">First Name</label>
+                <label className="block text-sm font-medium mb-1">
+                  First Name
+                  {dynamicSearchEnabled && isSearching && searchCriteria.firstName && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.firstName || ''}
@@ -247,7 +258,12 @@ export function EnhancedPlayerSearchDialog({
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">Middle Name</label>
+                <label className="block text-sm font-medium mb-1">
+                  Middle Name
+                  {dynamicSearchEnabled && isSearching && searchCriteria.middleName && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.middleName || ''}
@@ -258,7 +274,12 @@ export function EnhancedPlayerSearchDialog({
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Last Name</label>
+                <label className="block text-sm font-medium mb-1">
+                  Last Name
+                  {dynamicSearchEnabled && isSearching && searchCriteria.lastName && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.lastName || ''}
@@ -559,35 +580,4 @@ export function EnhancedPlayerSearchDialog({
       </div>
     </div>
   );
-}
-
-// Type assertion for SearchResult to include optional message
-type SearchResultWithMessage = SearchResult & { message?: string };
-
-// Utility to handle search and potential Firestore indexing issues
-async function performSearchWithFallback(
-  searchPlayers: (criteria: Partial<SearchCriteria>) => Promise<SearchResult>,
-  criteria: Partial<SearchCriteria>
-): Promise<SearchResultWithMessage> {
-  try {
-    return await searchPlayers(criteria);
-  } catch (error: any) {
-    if (error.message && error.message.includes("requires an index")) {
-      const simplifiedCriteria = {
-        firstName: criteria.firstName,
-        lastName: criteria.lastName
-      };
-      
-      try {
-        const simplifiedResult = await searchPlayers(simplifiedCriteria);
-        return {
-          ...simplifiedResult,
-          message: "Your original search was too complex. Showing results for First and Last Name only."
-        };
-      } catch (innerError) {
-        throw innerError;
-      }
-    }
-    throw error;
-  }
 }
