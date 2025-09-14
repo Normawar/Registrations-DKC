@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -169,8 +170,6 @@ export function EnhancedPlayerSearchDialog({
     }
     return name;
   };
-  
-  const dynamicSearchEnabled = false; // Intentionally disabled
 
   if (!isOpen) return null;
 
@@ -228,9 +227,6 @@ export function EnhancedPlayerSearchDialog({
               <div>
                 <label className="block text-sm font-medium mb-1">
                   USCF ID
-                  {dynamicSearchEnabled && isSearching && searchCriteria.uscfId && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
                 </label>
                 <input
                   type="text"
@@ -244,9 +240,6 @@ export function EnhancedPlayerSearchDialog({
               <div>
                 <label className="block text-sm font-medium mb-1">
                   First Name
-                  {dynamicSearchEnabled && isSearching && searchCriteria.firstName && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
                 </label>
                 <input
                   type="text"
@@ -260,9 +253,6 @@ export function EnhancedPlayerSearchDialog({
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Middle Name
-                  {dynamicSearchEnabled && isSearching && searchCriteria.middleName && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
                 </label>
                 <input
                   type="text"
@@ -276,9 +266,6 @@ export function EnhancedPlayerSearchDialog({
               <div>
                 <label className="block text-sm font-medium mb-1">
                   Last Name
-                  {dynamicSearchEnabled && isSearching && searchCriteria.lastName && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
                 </label>
                 <input
                   type="text"
