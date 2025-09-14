@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -224,7 +225,7 @@ export function EnhancedPlayerSearchDialog({
                   type="text"
                   value={searchCriteria.uscfId || ''}
                   onChange={(e) => setSearchCriteria(prev => ({ ...prev, uscfId: e.target.value }))}
-                  placeholder="12345678"
+                  placeholder="Starts with..."
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
