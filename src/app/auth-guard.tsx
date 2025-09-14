@@ -20,14 +20,11 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
 
 
   useEffect(() => {
-    // Add detailed logging for debugging
+    console.log('🔍 AuthGuard useEffect triggered');
     console.log('🔍 AuthGuard Debug:', {
       loading,
-      profile: profile ? {
-        role: profile.role,
-        isDistrictCoordinator: profile.isDistrictCoordinator,
-        forceProfileUpdate: profile.forceProfileUpdate
-      } : null,
+      profileRole: profile?.role,
+      isDistrictCoordinator: profile?.isDistrictCoordinator,
       requiredRole,
       pathname
     });
