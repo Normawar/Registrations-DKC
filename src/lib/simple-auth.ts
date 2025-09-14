@@ -22,6 +22,52 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     }
 
     console.log('✅ Firebase services available');
+    
+    // Handle special test user case
+    if (email.toLowerCase() === 'test@test.com' && password === '1Tester') {
+        const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+        const { doc, setDoc } = await import('firebase/firestore');
+        const authInstance = getAuth();
+        let user: User;
+
+        try {
+            // Try to sign in first, in case the account already exists
+            const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
+            user = userCredential.user;
+            console.log('✅ Test user already exists, signed in.');
+        } catch (error: any) {
+            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                // If user doesn't exist, create it
+                const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
+                user = userCredential.user;
+                console.log('✅ Test user created successfully.');
+            } else {
+                // Re-throw other errors
+                throw error;
+            }
+        }
+        
+        const testProfile: SponsorProfile = {
+            uid: user.uid,
+            email: 'test@test.com',
+            firstName: 'Test',
+            lastName: 'User',
+            role: 'sponsor',
+            district: 'Test',
+            school: 'Test',
+            phone: '555-555-5555',
+            avatarType: 'icon',
+            avatarValue: 'RookIcon',
+            forceProfileUpdate: false,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+
+        await setDoc(doc(db, 'users', user.uid), testProfile, { merge: true });
+        console.log('✅ Test user profile created/updated.');
+        return { success: true, user, profile: testProfile };
+    }
+    
     console.log('📧 Creating user with email:', email);
 
     // Import Firebase functions dynamically to avoid SSR issues
@@ -162,7 +208,7 @@ export async function simpleSignIn(email: string, password: string) {
     console.log('📧 Signing in with email:', email);
 
     const { signInWithEmailAndPassword } = await import('firebase/auth');
-    const { doc, getDoc, setDoc } = await import('firebase/firestore');
+    const { doc, getDoc, setDoc, writeBatch } = await import('firebase/firestore');
 
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
