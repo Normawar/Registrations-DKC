@@ -34,6 +34,7 @@ export function EnhancedPlayerSearchDialog({
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [dynamicSearchDisabled, setDynamicSearchDisabled] = useState(false);
   
   // USCF lookup state
   const [uscfLookup, setUSCFLookup] = useState({
@@ -44,7 +45,6 @@ export function EnhancedPlayerSearchDialog({
   const [uscfResults, setUSCFResults] = useState<USCFPlayer[]>([]);
   const [isUSCFSearching, setIsUSCFSearching] = useState(false);
   const [uscfError, setUSCFError] = useState<string>('');
-  const [dynamicSearchDisabled, setDynamicSearchDisabled] = useState(false);
 
   // Debounced search function
   const performDynamicSearch = useCallback(async (criteria: Partial<SearchCriteria>) => {
