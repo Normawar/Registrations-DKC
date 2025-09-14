@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
 
 interface USCFPlayer {
@@ -29,12 +29,10 @@ export function EnhancedPlayerSearchDialog({
   const { searchPlayers } = useMasterDb();
   const [activeTab, setActiveTab] = useState<'database' | 'uscf'>('database');
   
-  // STATE WITH OPTIONAL DYNAMIC SEARCH
+  // SIMPLIFIED STATE - NO DYNAMIC SEARCH
   const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [dynamicSearchEnabled, setDynamicSearchEnabled] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   
   // USCF lookup state
   const [uscfLookup, setUSCFLookup] = useState({
@@ -46,73 +44,7 @@ export function EnhancedPlayerSearchDialog({
   const [isUSCFSearching, setIsUSCFSearching] = useState(false);
   const [uscfError, setUSCFError] = useState<string>('');
 
-  // DYNAMIC SEARCH WITH SAFEGUARDS
-  const performDynamicSearch = useCallback(async (criteria: Partial<SearchCriteria>) => {
-    if (!dynamicSearchEnabled) return;
-
-    const hasSearchCriteria = Object.values(criteria).some(value => 
-      value !== undefined && value !== null && value !== ''
-    );
-
-    if (!hasSearchCriteria) {
-      setSearchResult(null);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const result = await searchPlayers({
-        ...criteria,
-        pageSize: 100
-      });
-      setSearchResult(result);
-    } catch (error: any) {
-      console.error('Dynamic search failed:', error);
-      const errorMessage = error?.message || String(error);
-      
-      if (errorMessage.includes('requires an index')) {
-        setDynamicSearchEnabled(false); // Auto-disable on index error
-        setSearchResult({
-          players: [],
-          hasMore: false,
-          totalFound: 0,
-          message: 'Database index required. Dynamic search has been disabled. Please create the required Firestore index or use manual search.'
-        });
-      } else {
-        setSearchResult({
-          players: [],
-          hasMore: false,
-          totalFound: 0,
-          message: 'Search failed. Please try again or use manual search.'
-        });
-      }
-    } finally {
-      setIsSearching(false);
-    }
-  }, [searchPlayers, dynamicSearchEnabled]);
-
-  // DYNAMIC SEARCH EFFECT - ONLY RUNS WHEN ENABLED
-  useEffect(() => {
-    if (!dynamicSearchEnabled || activeTab !== 'database') return;
-
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-
-    const timeout = setTimeout(() => {
-      performDynamicSearch(searchCriteria);
-    }, 300);
-
-    setSearchTimeout(timeout);
-
-    return () => {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-    };
-  }, [searchCriteria, activeTab, performDynamicSearch, dynamicSearchEnabled]);
-
-  // MANUAL SEARCH
+  // MANUAL SEARCH ONLY - No dynamic search, no useEffect, no automatic triggers
   const handleManualSearch = async () => {
     setIsSearching(true);
     try {
@@ -134,13 +66,12 @@ export function EnhancedPlayerSearchDialog({
     setSearchResult(null);
   };
 
-  // Field update - triggers dynamic search when enabled
+  // Simple field update - NO AUTOMATIC SEARCH
   const updateField = (field: keyof SearchCriteria, value: any) => {
     setSearchCriteria(prev => ({ ...prev, [field]: value }));
-    // Dynamic search will trigger automatically via useEffect when enabled
   };
 
-  // USCF lookup functions
+  // USCF lookup functions (unchanged)
   const handleUSCFLookupById = async () => {
     if (!uscfLookup.uscfId.trim()) {
       setUSCFError('Please enter a USCF ID');
@@ -285,38 +216,16 @@ export function EnhancedPlayerSearchDialog({
         {/* Database Search Tab */}
         {activeTab === 'database' && (
           <div>
-            <div className={`border rounded-lg p-4 mb-4 ${dynamicSearchEnabled ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className={`text-sm font-medium ${dynamicSearchEnabled ? 'text-green-800' : 'text-blue-800'}`}>
-                  {dynamicSearchEnabled ? 'Dynamic Search Enabled' : 'Manual Search Mode'}
-                </h3>
-                <button
-                  onClick={() => setDynamicSearchEnabled(!dynamicSearchEnabled)}
-                  className={`px-3 py-1 rounded text-xs font-medium ${
-                    dynamicSearchEnabled 
-                      ? 'bg-red-600 text-white hover:bg-red-700' 
-                      : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
-                >
-                  {dynamicSearchEnabled ? 'Disable Dynamic' : 'Enable Dynamic'}
-                </button>
-              </div>
-              <p className={`text-sm ${dynamicSearchEnabled ? 'text-green-700' : 'text-blue-700'}`}>
-                {dynamicSearchEnabled 
-                  ? 'Search updates automatically as you type. If you get Firebase index errors, dynamic search will auto-disable.'
-                  : 'Fill in your search criteria and click "Search Database" to find players. Click "Enable Dynamic" for real-time search.'
-                }
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h3 className="text-sm font-medium text-blue-800 mb-2">Manual Search Only</h3>
+              <p className="text-sm text-blue-700">
+                Fill in your search criteria and click "Search Database" to find players. Dynamic search has been disabled to prevent database issues.
               </p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  USCF ID
-                  {dynamicSearchEnabled && isSearching && searchCriteria.uscfId && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
-                </label>
+                <label className="block text-sm font-medium mb-1">USCF ID</label>
                 <input
                   type="text"
                   value={searchCriteria.uscfId || ''}
@@ -327,12 +236,7 @@ export function EnhancedPlayerSearchDialog({
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  First Name
-                  {dynamicSearchEnabled && isSearching && searchCriteria.firstName && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
-                </label>
+                <label className="block text-sm font-medium mb-1">First Name</label>
                 <input
                   type="text"
                   value={searchCriteria.firstName || ''}
@@ -343,12 +247,7 @@ export function EnhancedPlayerSearchDialog({
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Middle Name
-                  {dynamicSearchEnabled && isSearching && searchCriteria.middleName && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
-                </label>
+                <label className="block text-sm font-medium mb-1">Middle Name</label>
                 <input
                   type="text"
                   value={searchCriteria.middleName || ''}
@@ -359,12 +258,7 @@ export function EnhancedPlayerSearchDialog({
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Last Name
-                  {dynamicSearchEnabled && isSearching && searchCriteria.lastName && (
-                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
-                  )}
-                </label>
+                <label className="block text-sm font-medium mb-1">Last Name</label>
                 <input
                   type="text"
                   value={searchCriteria.lastName || ''}
@@ -461,11 +355,6 @@ export function EnhancedPlayerSearchDialog({
                 {searchResult.message && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
                     <p className="text-sm text-yellow-800">{searchResult.message}</p>
-                    {searchResult.message.includes('index') && (
-                      <p className="text-xs text-yellow-700 mt-2">
-                        Tip: Use the "Search Database" button or create the required Firestore index using the link in the console error.
-                      </p>
-                    )}
                   </div>
                 )}
                 
@@ -671,3 +560,5 @@ export function EnhancedPlayerSearchDialog({
     </div>
   );
 }
+
+    
