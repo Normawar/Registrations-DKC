@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
 
 interface USCFPlayer {
@@ -33,6 +33,7 @@ export function EnhancedPlayerSearchDialog({
   const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
   
   // USCF lookup state
   const [uscfLookup, setUSCFLookup] = useState({
@@ -44,8 +45,65 @@ export function EnhancedPlayerSearchDialog({
   const [isUSCFSearching, setIsUSCFSearching] = useState(false);
   const [uscfError, setUSCFError] = useState<string>('');
 
+  // Debounced search function
+  const performDynamicSearch = useCallback(async (criteria: Partial<SearchCriteria>) => {
+    // Only search if there's at least one meaningful criteria
+    const hasSearchCriteria = Object.values(criteria).some(value => 
+      value !== undefined && value !== null && value !== ''
+    );
+
+    if (!hasSearchCriteria) {
+      setSearchResult(null);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const result = await searchPlayers({
+        ...criteria,
+        pageSize: 100
+      });
+      setSearchResult(result);
+    } catch (error) {
+      console.error('Dynamic search failed:', error);
+      // Don't show alert for dynamic searches, just log the error
+    } finally {
+      setIsSearching(false);
+    }
+  }, [searchPlayers]);
+
+  // Effect to handle dynamic searching with debouncing
+  useEffect(() => {
+    if (activeTab !== 'database') return;
+
+    // Clear existing timeout
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+
+    // Set new timeout for debounced search
+    const timeout = setTimeout(() => {
+      performDynamicSearch(searchCriteria);
+    }, 300); // 300ms delay
+
+    setSearchTimeout(timeout);
+
+    // Cleanup
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [searchCriteria, activeTab, performDynamicSearch]);
+
+  // Update search criteria with dynamic search
+  const updateSearchCriteria = (field: keyof SearchCriteria, value: any) => {
+    setSearchCriteria(prev => ({ ...prev, [field]: value }));
+  };
+
   // Database search functions
   const handleDatabaseSearch = async () => {
+    // Manual search - same as before but without debouncing
     setIsSearching(true);
     try {
       const result = await searchPlayers({
@@ -168,6 +226,14 @@ export function EnhancedPlayerSearchDialog({
     return name;
   };
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+    };
+  }, [searchTimeout]);
 
   if (!isOpen) return null;
 
@@ -214,50 +280,73 @@ export function EnhancedPlayerSearchDialog({
         {/* Database Search Tab */}
         {activeTab === 'database' && (
           <div>
-            <p className="text-sm text-gray-600 mb-4">
-              Use specific filters for faster results. Avoid broad searches with large datasets.
-            </p>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <h3 className="text-sm font-medium text-green-800 mb-2">Dynamic Search</h3>
+              <p className="text-sm text-green-700">
+                Search updates automatically as you type. For example, typing "9" in USCF ID will show all players with USCF IDs starting with 9.
+              </p>
+            </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium mb-1">USCF ID</label>
+                <label className="block text-sm font-medium mb-1">
+                  USCF ID
+                  {isSearching && searchCriteria.uscfId && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.uscfId || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, uscfId: e.target.value }))}
-                  placeholder="Starts with..."
+                  onChange={(e) => updateSearchCriteria('uscfId', e.target.value)}
+                  placeholder="e.g., 9 (shows all IDs starting with 9)"
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">First Name</label>
+                <label className="block text-sm font-medium mb-1">
+                  First Name
+                  {isSearching && searchCriteria.firstName && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.firstName || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, firstName: e.target.value }))}
+                  onChange={(e) => updateSearchCriteria('firstName', e.target.value)}
                   placeholder="John"
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">Middle Name</label>
+                <label className="block text-sm font-medium mb-1">
+                  Middle Name
+                  {isSearching && searchCriteria.middleName && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.middleName || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, middleName: e.target.value }))}
+                  onChange={(e) => updateSearchCriteria('middleName', e.target.value)}
                   placeholder="Michael"
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Last Name</label>
+                <label className="block text-sm font-medium mb-1">
+                  Last Name
+                  {isSearching && searchCriteria.lastName && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.lastName || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, lastName: e.target.value }))}
+                  onChange={(e) => updateSearchCriteria('lastName', e.target.value)}
                   placeholder="Doe"
                   className="w-full border rounded px-3 py-2"
                 />
@@ -267,7 +356,7 @@ export function EnhancedPlayerSearchDialog({
                 <label className="block text-sm font-medium mb-1">State</label>
                 <select
                   value={searchCriteria.state || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, state: e.target.value }))}
+                  onChange={(e) => updateSearchCriteria('state', e.target.value)}
                   className="w-full border rounded px-3 py-2"
                 >
                   <option value="">All States</option>
@@ -279,22 +368,32 @@ export function EnhancedPlayerSearchDialog({
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">School (Exact)</label>
+                <label className="block text-sm font-medium mb-1">
+                  School (Exact)
+                  {isSearching && searchCriteria.school && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.school || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, school: e.target.value }))}
+                  onChange={(e) => updateSearchCriteria('school', e.target.value)}
                   placeholder="Lincoln Elementary"
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-1">District (Exact)</label>
+                <label className="block text-sm font-medium mb-1">
+                  District (Exact)
+                  {isSearching && searchCriteria.district && (
+                    <span className="ml-2 text-xs text-blue-600">Searching...</span>
+                  )}
+                </label>
                 <input
                   type="text"
                   value={searchCriteria.district || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, district: e.target.value }))}
+                  onChange={(e) => updateSearchCriteria('district', e.target.value)}
                   placeholder="Austin ISD"
                   className="w-full border rounded px-3 py-2"
                 />
@@ -307,10 +406,7 @@ export function EnhancedPlayerSearchDialog({
                 <input
                   type="number"
                   value={searchCriteria.minRating || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ 
-                    ...prev, 
-                    minRating: e.target.value ? parseInt(e.target.value) : undefined 
-                  }))}
+                  onChange={(e) => updateSearchCriteria('minRating', e.target.value ? parseInt(e.target.value) : undefined)}
                   placeholder="1000"
                   className="w-full border rounded px-3 py-2"
                 />
@@ -320,10 +416,7 @@ export function EnhancedPlayerSearchDialog({
                 <input
                   type="number"
                   value={searchCriteria.maxRating || ''}
-                  onChange={(e) => setSearchCriteria(prev => ({ 
-                    ...prev, 
-                    maxRating: e.target.value ? parseInt(e.target.value) : undefined 
-                  }))}
+                  onChange={(e) => updateSearchCriteria('maxRating', e.target.value ? parseInt(e.target.value) : undefined)}
                   placeholder="2000"
                   className="w-full border rounded px-3 py-2"
                 />
@@ -336,14 +429,14 @@ export function EnhancedPlayerSearchDialog({
                 disabled={isSearching}
                 className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {isSearching ? 'Searching...' : 'Search Database'}
+                {isSearching ? 'Searching...' : 'Manual Search'}
               </button>
               
               <button
                 onClick={handleClearDatabaseSearch}
                 className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700"
               >
-                Clear
+                Clear All
               </button>
             </div>
 
@@ -351,6 +444,7 @@ export function EnhancedPlayerSearchDialog({
               <div className="border-t pt-4">
                 <h3 className="text-lg font-semibold mb-2">
                   Database Results ({searchResult.players?.length || 0} found)
+                  {isSearching && <span className="ml-2 text-sm text-blue-600">Updating...</span>}
                 </h3>
                 
                 {searchResult.players?.length === 0 ? (
