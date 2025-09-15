@@ -408,17 +408,7 @@ export function EnhancedPlayerSearchDialog({
                             <td className="border border-gray-300 px-4 py-2">{player.school}</td>
                             <td className="border border-gray-300 px-4 py-2">{player.regularRating}</td>
                             <td className="border border-gray-300 px-4 py-2">
-                              <button 
-                                onClick={() => handleSelectPlayer(player)}
-                                disabled={excludeIds?.includes(player.id)}
-                                className={`px-2 py-1 rounded text-xs ${
-                                  excludeIds?.includes(player.id)
-                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : 'bg-green-500 text-white hover:bg-green-600'
-                                }`}
-                              >
-                                {excludeIds?.includes(player.id) ? 'Already Added' : 'Select'}
-                              </button>
+                                <button onClick={() => handleSelectPlayer(player)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Select</button>
                             </td>
                           </tr>
                         ))}
