@@ -67,11 +67,26 @@ export default function DataRepairPage() {
             
             const updates = sampleData[player.uscfId];
             if (updates) {
-                batch.update(playerDoc.ref, {
+                // Ensure no undefined values are written to Firestore
+                const updateData = {
                     ...updates,
                     school: "", // Ensure unassigned
                     district: "", // Ensure unassigned
-                });
+                    // Provide default values for any other potentially undefined fields
+                    middleName: player.middleName || '',
+                    state: player.state || 'TX',
+                    uscfExpiration: player.uscfExpiration || null,
+                    regularRating: player.regularRating || null,
+                    quickRating: player.quickRating || '',
+                    dob: player.dob || null,
+                    email: player.email || '',
+                    phone: player.phone || '',
+                    zipCode: player.zipCode || '',
+                    studentType: player.studentType || 'independent',
+                    events: player.events || 0,
+                    eventIds: player.eventIds || [],
+                };
+                batch.update(playerDoc.ref, updateData);
                 localUpdatedCount++;
                 setLog(prev => [...prev, `  - Staged update for ${player.firstName} ${player.lastName} (ID: ${player.uscfId})`]);
             }
