@@ -2,7 +2,7 @@
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, writeBatch, updateDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail, type User } from 'firebase/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
@@ -325,7 +325,7 @@ export async function simpleSignIn(email: string, password: string) {
     
     // **FORCEFUL CORRECTION BLOCK FOR TESTMCALLEN**
     // If the user is a known test user and their profile data is incorrect, overwrite it.
-    if (normalizedEmail === 'testmcallen@test.com' && (!profileData || profileData.firstName === 'Norma' || profileData.role !== 'sponsor' || profileData.school !== 'TestMcAllen')) {
+    if (normalizedEmail === 'testmcallen@test.com' && (!profileData || profileData.school !== 'TestMcAllen')) {
         console.warn('⚠️ DETECTED INCORRECT PROFILE FOR testmcallen@test.com. FORCIBLY CORRECTING.');
         const correctedProfile: SponsorProfile = {
             uid: user.uid, 
@@ -343,7 +343,7 @@ export async function simpleSignIn(email: string, password: string) {
             createdAt: profileData?.createdAt || new Date().toISOString(), 
             updatedAt: new Date().toISOString(),
         };
-        await setDoc(profileDocRef, correctedProfile);
+        await setDoc(profileDocRef, correctedProfile, { merge: true });
         profileData = correctedProfile;
         console.log('✅ Forcibly corrected profile for testmcallen@test.com.');
     }

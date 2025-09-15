@@ -111,23 +111,42 @@ export default function SchoolsPage() {
     const schoolsCol = collection(db, 'schools');
     const schoolSnapshot = await getDocs(schoolsCol);
 
+    let schoolList = schoolSnapshot.docs.map(doc => doc.data() as SchoolWithTeamCode);
+
+    // Seed data if the database is empty
     if (schoolSnapshot.empty) {
         console.log("No schools in Firestore, seeding from initial data.");
         const batch = writeBatch(db);
+        const seededSchools: SchoolWithTeamCode[] = [];
         initialSchoolData.forEach((school, index) => {
             const id = `school-${index}-${Date.now()}`;
-            const schoolWithId = { ...school, id, teamCode: generateTeamCode(school), notes: [] };
+            const schoolWithId: SchoolWithTeamCode = { ...school, id, teamCode: generateTeamCode(school), notes: [] };
             const docRef = doc(db, 'schools', id);
             batch.set(docRef, schoolWithId);
+            seededSchools.push(schoolWithId);
         });
         await batch.commit();
-        setSchools(initialSchoolData.map((s, i) => ({ ...s, id: `school-${i}-${Date.now()}`, teamCode: generateTeamCode(s), notes: [] })));
+        schoolList = seededSchools;
     } else {
-        const schoolList = schoolSnapshot.docs.map(doc => doc.data() as SchoolWithTeamCode);
-        setSchools(schoolList);
+        // Ensure "TestMcAllen" exists
+        const testSchoolExists = schoolList.some(s => s.district === 'TestMcAllen');
+        if (!testSchoolExists) {
+            console.log("TestMcAllen school not found, seeding it now.");
+            const testSchoolData = initialSchoolData.find(s => s.district === 'TestMcAllen');
+            if (testSchoolData) {
+                const id = `school-test-${Date.now()}`;
+                const testSchoolWithId: SchoolWithTeamCode = { ...testSchoolData, id, teamCode: generateTeamCode(testSchoolData), notes: [] };
+                const docRef = doc(db, 'schools', id);
+                await setDoc(docRef, testSchoolWithId);
+                schoolList.push(testSchoolWithId); // Add to the current list
+            }
+        }
     }
+
+    setSchools(schoolList);
     setIsDataLoaded(true);
-  }, []);
+}, [toast]);
+
 
   useEffect(() => {
     loadSchools();
