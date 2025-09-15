@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -280,44 +279,79 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [dbSchools, setDbSchools] = useState<string[]>([]);
   const [dbDistricts, setDbDistricts] = useState<string[]>([]);
 
-  const loadSummaryData = useCallback(async () => {
-    if (!db) return;
+  const loadDatabase = useCallback(async () => {
+    console.log('🔍 Master DB Context - Loading database...');
+    console.log('  Firestore DB instance:', !!db);
+    
+    if (!db) {
+      console.log('❌ No Firestore database instance');
+      return;
+    }
+  
     setIsDbLoaded(false);
+    
     try {
-      const schoolsSnapshot = await getDocs(collection(db, 'schools'));
-      const allDistricts = new Set<string>();
-      const allSchools = new Set<string>();
+      console.log('📊 Querying players collection...');
+      const playersRef = collection(db, 'players');
+      const playersSnapshot = await getDocs(playersRef);
       
-      schoolsSnapshot.forEach(doc => {
-        const school = doc.data();
-        if (school.district) allDistricts.add(school.district);
-        if (school.schoolName) allSchools.add(school.schoolName);
+      console.log('📊 Query results:');
+      console.log('  Snapshot size:', playersSnapshot.size);
+      console.log('  Snapshot empty:', playersSnapshot.empty);
+      console.log('  Snapshot docs length:', playersSnapshot.docs.length);
+      
+      const players: MasterPlayer[] = [];
+      playersSnapshot.forEach((doc, index) => {
+        const playerData = { id: doc.id, ...doc.data() } as MasterPlayer;
+        players.push(playerData);
+        
+        if (index < 3) { // Log first 3 players
+          console.log(`  Player ${index + 1}:`, {
+            id: doc.id,
+            name: `${playerData.firstName} ${playerData.lastName}`,
+            district: playerData.district,
+            school: playerData.school,
+            uscfId: playerData.uscfId
+          });
+        }
       });
-  
-      setDbDistricts(Array.from(allDistricts).sort());
-      setDbSchools(Array.from(allSchools).sort());
       
-      const statesSnapshot = await getDocs(collection(db, 'summary', 'states', 'items'));
-      setDbStates(statesSnapshot.docs.map(d => d.id).sort());
-  
-      const countDoc = await getDoc(doc(db, 'summary', 'playerCount'));
-      setPlayerCount(countDoc.exists() ? countDoc.data().count : 0);
-  
-    } catch (error) {
-      console.error("Failed to load summary data:", error);
-      setIsDbError(true);
-    } finally {
+      console.log(`✅ Loaded ${players.length} players from Firestore`);
+      console.log('  Districts found:', [...new Set(players.map(p => p.district))]);
+      console.log('  Schools found:', [...new Set(players.map(p => p.school))]);
+      
+      setDatabase(players);
       setIsDbLoaded(true);
+      
+    } catch (error: any) {
+      console.error('❌ Failed to load players database:', error);
+      console.error('  Error details:', {
+        name: error?.name,
+        message: error?.message,
+        code: error?.code
+      });
+      setIsDbLoaded(false);
     }
   }, []);
 
   useEffect(() => {
-    loadSummaryData();
-  }, [loadSummaryData]);
+    console.log('🚀 Master DB Context mounting...');
+    console.log('  DB available:', !!db);
+    loadDatabase();
+  }, [loadDatabase]);
+
+  useEffect(() => {
+    console.log('📈 Master DB State Update:');
+    console.log('  Database length:', database.length);
+    console.log('  Is loaded:', isDbLoaded);
+    if (database.length > 0) {
+      console.log('  Sample players:', database.slice(0, 2).map(p => `${p.firstName} ${p.lastName} (${p.district})`));
+    }
+  }, [database, isDbLoaded]);
 
   const refreshDatabase = async () => {
-    await loadSummaryData();
-    toast({ title: 'Database Refreshed', description: 'Fetched the latest summary data from the server.' });
+    await loadDatabase();
+    toast({ title: 'Database Refreshed', description: 'Fetched the latest player data from the server.' });
   };
 
   const addPlayer = async (player: MasterPlayer) => {
@@ -335,6 +369,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         await setDoc(playerRef, cleanedPlayer, { merge: true });
         
         console.log("Player successfully written to Firebase");
+        await loadDatabase(); // Refresh data
 
     } catch (error) {
         console.error("Error adding player:", error);
@@ -384,11 +419,13 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     const cleanedPlayer = removeUndefined(finalPlayer);
     await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
+    await loadDatabase(); // Refresh data
   };
 
   const deletePlayer = async (playerId: string) => {
     if (!db) return;
     await deleteDoc(doc(db, 'players', playerId));
+    await loadDatabase(); // Refresh data
   };
   
   const searchPlayers = async (criteria: Partial<SearchCriteria>): Promise<SearchResult> => {
@@ -439,7 +476,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const value = {
-    database: [], // This is now mostly deprecated for reads, but kept for compatibility
+    database,
     addPlayer,
     updatePlayer,
     deletePlayer,
