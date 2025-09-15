@@ -562,12 +562,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
 
   useEffect(() => {
     if (!isOpen) return;
-    
-    // Reset state when dialog opens with new confirmation
-    setConfirmation(initialConfirmation);
-    const savedMethods = initialConfirmation.selectedPaymentMethods || [];
-    setSelectedPaymentMethods(savedMethods);
-    setInitialPaymentValuesSet(false); // Force re-initialization
+  
+    // Add guard clause to ensure initialConfirmation is not null
+    if (initialConfirmation) {
+      setConfirmation(initialConfirmation);
+      const savedMethods = initialConfirmation.selectedPaymentMethods || [];
+      setSelectedPaymentMethods(savedMethods);
+      setInitialPaymentValuesSet(false); // Force re-initialization
+    } else {
+      // Handle the case where there is no confirmation data
+      setConfirmation(null);
+      setSelectedPaymentMethods([]);
+      setInitialPaymentValuesSet(false);
+    }
   
     if (!auth || !storage) {
         setAuthError("Firebase is not configured, so file uploads are disabled.");
