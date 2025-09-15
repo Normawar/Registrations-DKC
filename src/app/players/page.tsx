@@ -252,6 +252,8 @@ function PlayersPageContent() {
           onOpenChange={setIsSearchOpen}
           onPlayerSelected={handlePlayerSelected}
           title="Search and Add Players"
+          userProfile={profile}
+          preFilterByUserProfile={true}
         />
 
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
