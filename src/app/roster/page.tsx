@@ -1,8 +1,7 @@
 
-
 'use client';
 
-import { useState, useMemo, Suspense, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -891,7 +890,7 @@ function SponsorRosterView() {
                                       onChange={(e) => {
                                         const dateValue = e.target.value;
                                         if (dateValue) {
-                                          const parsedDate = new Date(dateValue + 'T00:00:00');
+                                          const parsedDate = new Date(dateValue + 'T0:00:00');
                                           if (!isNaN(parsedDate.getTime())) {
                                             field.onChange(parsedDate);
                                           }
@@ -1455,33 +1454,19 @@ function DistrictRosterView() {
     );
 }
 
-function RosterPageContent() {
-    const { profile, isProfileLoaded } = useSponsorProfile();
-    const { isDbLoaded } = useMasterDb();
-
-    if (!isProfileLoaded || !isDbLoaded) {
-        return <AppLayout><Skeleton className="h-[60vh] w-full" /></AppLayout>;
-    }
-
-    if (profile?.role === 'district_coordinator' || profile?.role === 'organizer') {
-        return <DistrictRosterView />;
-    }
-
-    return <SponsorRosterView />;
-}
-
 export default function RosterPage() {
-  return (
-    <AppLayout>
-      <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-        <RosterPageContent />
-      </Suspense>
-    </AppLayout>
-  );
+  const { profile, isProfileLoaded } = useSponsorProfile();
+  const { isDbLoaded } = useMasterDb();
+  
+  if (!isProfileLoaded || !isDbLoaded) {
+      return <AppLayout><Skeleton className="h-[60vh] w-full" /></AppLayout>;
+  }
+  
+  if (profile?.role === 'district_coordinator' || profile?.role === 'organizer') {
+      return <AppLayout><DistrictRosterView /></AppLayout>;
+  }
+
+  return <AppLayout><SponsorRosterView /></AppLayout>;
 }
-    
 
     
-
-
-
