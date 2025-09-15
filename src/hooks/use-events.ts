@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, doc, writeBatch, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/services/firestore-service';
 
 export type Event = {
   id: string;

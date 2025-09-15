@@ -11,6 +11,8 @@ import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, School, User } from 'lucide-react';
 import { format } from 'date-fns';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 interface ParentRegistrationProps {
   parentProfile: {
@@ -38,24 +40,22 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [events]);
 
-  // Load existing registrations from localStorage
+  // Load existing registrations from Firestore
   useEffect(() => {
-    const loadRegistrations = () => {
+    const loadRegistrations = async () => {
+      if (!db || !parentProfile?.email) return;
       try {
-        const storedConfirmations = localStorage.getItem('confirmations');
-        const allConfirmations = storedConfirmations ? JSON.parse(storedConfirmations) : [];
-        setRegistrations(allConfirmations);
+        const q = query(collection(db, 'invoices'), where('parentEmail', '==', parentProfile.email));
+        const querySnapshot = await getDocs(q);
+        const userRegistrations = querySnapshot.docs.map(doc => doc.data());
+        setRegistrations(userRegistrations);
       } catch (error) {
         console.error('Failed to load registrations:', error);
       }
     };
 
     loadRegistrations();
-    window.addEventListener('storage', loadRegistrations);
-    return () => {
-      window.removeEventListener('storage', loadRegistrations);
-    }
-  }, []);
+  }, [parentProfile?.email]);
 
   // Load parent's students
   useEffect(() => {
