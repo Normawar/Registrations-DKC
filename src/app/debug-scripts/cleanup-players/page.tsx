@@ -5,7 +5,7 @@ import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ShieldAlert, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +31,7 @@ function CleanupPlayersPage() {
     setIsLoading(true);
     try {
       const playersSnapshot = await getDocs(collection(db, 'players'));
-      const allPlayers = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+      const allPlayers = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
       const toDelete = allPlayers.filter(player => !playersToKeep.has(player.id));
       setPlayersToDelete(toDelete);
     } catch (error) {
@@ -82,7 +82,7 @@ function CleanupPlayersPage() {
           <CardHeader>
             <CardTitle>Database Cleanup Tool</CardTitle>
             <CardDescription>
-              This tool will permanently delete all player records from your Firestore database except for the 10 essential test records (IDs 90000001-90000010).
+              This tool will permanently delete all player records from your Firestore database except for the 10 essential test records (IDs 90000001-90000010). This is useful after running a large import.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -90,7 +90,7 @@ function CleanupPlayersPage() {
               <ShieldAlert className="h-4 w-4" />
               <AlertTitle>Warning: Destructive Action</AlertTitle>
               <AlertDescription>
-                This action cannot be undone. Please ensure you have backed up any important data before proceeding.
+                This action cannot be undone. Please ensure you have backed up any important data before proceeding. This will remove all players from Firestore except the 10 base test accounts.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -98,8 +98,8 @@ function CleanupPlayersPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Players Targeted for Deletion ({playersToDelete.length})</CardTitle>
-            <CardDescription>The following players will be removed from the database.</CardDescription>
+            <CardTitle>Players Targeted for Deletion ({isLoading ? '...' : playersToDelete.length})</CardTitle>
+            <CardDescription>The following players will be removed from the database when you click the button below.</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -112,11 +112,14 @@ function CleanupPlayersPage() {
               </div>
             ) : (
               <ul className="text-sm space-y-1 list-disc list-inside max-h-60 overflow-y-auto">
-                {playersToDelete.map(p => (
+                {playersToDelete.slice(0, 100).map(p => (
                   <li key={p.id}>
                     {p.firstName} {p.lastName} (ID: {p.id})
                   </li>
                 ))}
+                {playersToDelete.length > 100 && (
+                  <li className="font-bold">... and {playersToDelete.length - 100} more.</li>
+                )}
               </ul>
             )}
           </CardContent>
@@ -131,7 +134,7 @@ function CleanupPlayersPage() {
               ) : (
                 <Trash2 className="mr-2 h-4 w-4" />
               )}
-              Delete {playersToDelete.length} Player(s)
+              Permanently Delete {playersToDelete.length} Player(s)
             </Button>
           </CardFooter>
         </Card>
