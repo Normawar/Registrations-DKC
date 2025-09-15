@@ -130,6 +130,23 @@ function SponsorRosterView() {
   const playerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
   });
+  
+  const [editFormSchoolsForDistrict, setEditFormSchoolsForDistrict] = useState<string[]>([]);
+  const selectedEditDistrict = playerForm.watch('district');
+
+  useEffect(() => {
+    if (selectedEditDistrict) {
+      if (selectedEditDistrict === 'all' || selectedEditDistrict === 'None') {
+        setEditFormSchoolsForDistrict(dbSchools);
+      } else {
+        const filteredSchools = schoolData
+          .filter((school) => school.district === selectedEditDistrict)
+          .map((school) => school.schoolName)
+          .sort();
+        setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
+      }
+    }
+  }, [selectedEditDistrict, dbSchools]);
 
   const createPlayerForm = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserFormSchema),
@@ -187,8 +204,6 @@ function SponsorRosterView() {
         lastName: '',
         email: '',
         phone: '',
-        zipCode: '',
-        uscfId: '',
         school: profile.school || '',
         district: profile.district || 'all',
         grade: '',
@@ -256,6 +271,22 @@ function SponsorRosterView() {
         uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
         studentType: player.studentType || 'independent',
     });
+    
+    // Initialize schools for the player's district
+    if (player.district) {
+      if (player.district === 'all' || player.district === 'None') {
+        setEditFormSchoolsForDistrict(dbSchools);
+      } else {
+        const filteredSchools = schoolData
+          .filter((school) => school.district === player.district)
+          .map((school) => school.schoolName)
+          .sort();
+        setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
+      }
+    } else {
+      setEditFormSchoolsForDistrict(dbSchools);
+    }
+    
     setIsEditPlayerDialogOpen(true);
   };
   
@@ -279,8 +310,26 @@ function SponsorRosterView() {
       events: 0,
       eventIds: [],
     };
+    
     setPendingPlayer(playerToEdit);
     setEditingPlayer(playerToEdit);
+    
+    // Initialize schools for the player's district
+    const playerDistrict = playerToEdit.district;
+    if (playerDistrict) {
+      if (playerDistrict === 'all' || playerDistrict === 'None') {
+        setEditFormSchoolsForDistrict(dbSchools);
+      } else {
+        const filteredSchools = schoolData
+          .filter((school) => school.district === playerDistrict)
+          .map((school) => school.schoolName)
+          .sort();
+        setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
+      }
+    } else {
+      setEditFormSchoolsForDistrict(dbSchools);
+    }
+    
     playerForm.reset({
       ...playerToEdit,
       dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
@@ -351,8 +400,6 @@ function SponsorRosterView() {
         lastName: '',
         email: '',
         phone: '',
-        zipCode: '',
-        uscfId: '',
         school: profile.school || '',
         district: profile.district || 'None',
         grade: '',
@@ -370,7 +417,7 @@ function SponsorRosterView() {
     setIsCreatePlayerDialogOpen(true);
   };
 
-  const handleCreatePlayerSubmit = async (values: CreateUserFormValues) => {
+  const handleCreatePlayerSubmit = async (values: any) => {
     if (!profile) return;
 
     const { uscfExpiration, dob, ...restOfValues } = values;
@@ -667,15 +714,76 @@ function SponsorRosterView() {
                   <div className='flex-1 overflow-y-auto p-6'>
                     <Form {...playerForm}>
                         <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
-                            {/* Form fields here */}
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                              <FormField 
+                                control={playerForm.control} 
+                                name="district" 
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>District</FormLabel>
+                                    <Select 
+                                      onValueChange={(value) => {
+                                        field.onChange(value);
+                                        playerForm.setValue('school', '');
+                                      }} 
+                                      value={field.value || ''}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select a district" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {dbDistricts.map(district => (
+                                          <SelectItem key={district} value={district}>
+                                            {district}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )} 
+                              />
+                              
+                              <FormField 
+                                control={playerForm.control} 
+                                name="school" 
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>School</FormLabel>
+                                    <Select 
+                                      onValueChange={field.onChange} 
+                                      value={field.value || ''}
+                                      disabled={!selectedEditDistrict || editFormSchoolsForDistrict.length === 0}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select a school" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        {editFormSchoolsForDistrict.map(school => (
+                                          <SelectItem key={school} value={school}>
+                                            {school}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                    {selectedEditDistrict && editFormSchoolsForDistrict.length === 0 && (
+                                      <FormDescription className="text-amber-600">
+                                        No schools found for this district. You may need to add schools to this district first.
+                                      </FormDescription>
+                                    )}
+                                  </FormItem>
+                                )} 
+                              />
                             </div>
                                {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
                                 <FormField
@@ -933,10 +1041,26 @@ function DistrictRosterView() {
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
+    const [editFormSchoolsForDistrict, setEditFormSchoolsForDistrict] = useState<string[]>([]);
 
     const playerForm = useForm<PlayerFormValues>({
         resolver: zodResolver(playerFormSchema),
     });
+    
+    const selectedEditDistrict = playerForm.watch('district');
+    useEffect(() => {
+        if (selectedEditDistrict) {
+            if (selectedEditDistrict === 'all' || selectedEditDistrict === 'None') {
+                setEditFormSchoolsForDistrict(dbSchools);
+            } else {
+                const filteredSchools = schoolData
+                    .filter((school) => school.district === selectedEditDistrict)
+                    .map((school) => school.schoolName)
+                    .sort();
+                setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
+            }
+        }
+    }, [selectedEditDistrict, dbSchools]);
 
     useEffect(() => {
         if (profile?.role === 'district_coordinator' && profile.district) {
@@ -1168,6 +1292,21 @@ function DistrictRosterView() {
             dob: player.dob ? new Date(player.dob) : undefined,
             uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
         });
+        
+        if (player.district) {
+          if (player.district === 'all' || player.district === 'None') {
+            setEditFormSchoolsForDistrict(dbSchools);
+          } else {
+            const filteredSchools = schoolData
+              .filter((school) => school.district === player.district)
+              .map((school) => school.schoolName)
+              .sort();
+            setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
+          }
+        } else {
+          setEditFormSchoolsForDistrict(dbSchools);
+        }
+
         setIsEditPlayerDialogOpen(true);
     };
 
@@ -1375,8 +1514,70 @@ function DistrictRosterView() {
                                 <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField 
+                                    control={playerForm.control} 
+                                    name="district" 
+                                    render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>District</FormLabel>
+                                        <Select 
+                                        onValueChange={(value) => {
+                                            field.onChange(value);
+                                            playerForm.setValue('school', '');
+                                        }} 
+                                        value={field.value || ''}
+                                        >
+                                        <FormControl>
+                                            <SelectTrigger>
+                                            <SelectValue placeholder="Select a district" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {dbDistricts.map(district => (
+                                            <SelectItem key={district} value={district}>
+                                                {district}
+                                            </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                    )} 
+                                />
+                                
+                                <FormField 
+                                    control={playerForm.control} 
+                                    name="school" 
+                                    render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>School</FormLabel>
+                                        <Select 
+                                        onValueChange={field.onChange} 
+                                        value={field.value || ''}
+                                        disabled={!selectedEditDistrict || editFormSchoolsForDistrict.length === 0}
+                                        >
+                                        <FormControl>
+                                            <SelectTrigger>
+                                            <SelectValue placeholder="Select a school" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {editFormSchoolsForDistrict.map(school => (
+                                            <SelectItem key={school} value={school}>
+                                                {school}
+                                            </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                        {selectedEditDistrict && editFormSchoolsForDistrict.length === 0 && (
+                                        <FormDescription className="text-amber-600">
+                                            No schools found for this district. You may need to add schools to this district first.
+                                        </FormDescription>
+                                        )}
+                                    </FormItem>
+                                    )} 
+                                />
                             </div>
                             <FormField control={playerForm.control} name="studentType" render={({ field }) => (
                                 <FormItem className="space-y-3">
