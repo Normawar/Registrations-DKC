@@ -1040,14 +1040,12 @@ function DistrictRosterView() {
 
     const handleEditPlayer = (player: MasterPlayer) => {
         setEditingPlayer(player);
+        setEditFormSchoolsForDistrict(getSchoolsForDistrict(player.district || 'all'));
         playerForm.reset({
             ...player,
             dob: player.dob ? new Date(player.dob) : undefined,
             uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
         });
-        
-        setEditFormSchoolsForDistrict(getSchoolsForDistrict(player.district || 'all'));
-
         setIsEditPlayerDialogOpen(true);
     };
 
@@ -1243,12 +1241,10 @@ function DistrictRosterView() {
             })}
              <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
                 <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-                    {/* The same edit player dialog as in SponsorRosterView will be used */}
                     <DialogHeader className="p-6 pb-4 border-b shrink-0"><DialogTitle>Edit Player</DialogTitle></DialogHeader>
                     <div className='flex-1 overflow-y-auto p-6'>
                     <Form {...playerForm}>
                         <form id="edit-player-form-district" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
-                            {/* Form fields here, same as sponsor view */}
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                 <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
@@ -1372,3 +1368,4 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
+
