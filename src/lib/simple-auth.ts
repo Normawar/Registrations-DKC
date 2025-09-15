@@ -50,20 +50,20 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     if (normalizedEmail.startsWith('test')) {
         let userCredential;
         try {
-            // Attempt to create the user first. This is safer.
-            userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+            // Attempt to sign in first to check if the auth user exists.
+            userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
             user = userCredential.user;
-            console.log(`✅ Test user ${normalizedEmail} created successfully.`);
+            console.log(`✅ Test user ${normalizedEmail} already exists, signed in.`);
+            isExistingAuthUser = true;
         } catch (error: any) {
-            // If the user already exists, sign them in to get the UID.
-            if (error.code === 'auth/email-already-in-use') {
-                isExistingAuthUser = true;
-                console.log(`⚠️ Test user ${normalizedEmail} already exists, signing in...`);
-                userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+            // If user does not exist, create them.
+            if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+                console.log(`⚠️ Test user ${normalizedEmail} does not exist, creating...`);
+                userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
                 user = userCredential.user;
-                console.log(`✅ Test user ${normalizedEmail} signed in.`);
+                console.log(`✅ Test user ${normalizedEmail} created successfully.`);
             } else {
-                // For other errors (weak password, etc.), re-throw.
+                // For other errors (wrong password, etc.), re-throw.
                 throw error;
             }
         }
@@ -289,25 +289,48 @@ export async function simpleSignIn(email: string, password: string) {
         profileDoc = await getDoc(profileDocRef);
 
       } else {
-        console.error("❌ No profile found under UID or legacy email. Creating minimal profile.");
-        const forcedProfile: SponsorProfile = {
-            uid: user.uid,
-            email: user.email || normalizedEmail, // Use normalized email
-            firstName: user.displayName?.split(' ')[0] || 'New',
-            lastName: user.displayName?.split(' ')[1] || 'User',
-            role: 'individual',
-            district: 'None',
-            school: 'Homeschool',
-            phone: '',
-            avatarType: 'icon',
-            avatarValue: 'PawnIcon',
-            forceProfileUpdate: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-        };
+        console.error("❌ No profile found under UID or legacy email. Creating profile based on email.");
+        let forcedProfile: SponsorProfile;
+        
+        if (normalizedEmail === 'testmcallen@test.com') {
+          console.log('🔧 Creating specific profile for TestMcAllen...');
+          forcedProfile = {
+              uid: user.uid,
+              email: normalizedEmail,
+              firstName: 'Test', 
+              lastName: 'McAllen',
+              role: 'sponsor', 
+              district: 'TestMcallen', 
+              school: 'TestMcallen', 
+              phone: '555-555-5555',
+              avatarType: 'icon', 
+              avatarValue: 'PawnIcon',
+              forceProfileUpdate: false, 
+              createdAt: new Date().toISOString(), 
+              updatedAt: new Date().toISOString(),
+          };
+        } else {
+          // Fallback minimal profile for any other orphaned account
+          forcedProfile = {
+              uid: user.uid,
+              email: user.email || normalizedEmail,
+              firstName: user.displayName?.split(' ')[0] || 'New',
+              lastName: user.displayName?.split(' ')[1] || 'User',
+              role: 'individual',
+              district: 'None',
+              school: 'Homeschool',
+              phone: '',
+              avatarType: 'icon',
+              avatarValue: 'PawnIcon',
+              forceProfileUpdate: true,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+          };
+        }
+
         await setDoc(profileDocRef, forcedProfile);
         profileDoc = await getDoc(profileDocRef);
-        console.log('✅ Created minimal profile for orphaned auth user');
+        console.log(`✅ Created profile for orphaned auth user (${forcedProfile.role})`);
       }
     }
     
