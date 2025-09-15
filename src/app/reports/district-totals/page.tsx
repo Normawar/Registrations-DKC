@@ -121,7 +121,7 @@ export default function DistrictTotalsReport() {
   return (
     <OrganizerGuard>
       <AppLayout>
-        <DistrictTotalsReportPageContent />
+        <DistrictTotalsReportContent />
       </AppLayout>
     </OrganizerGuard>
   );
