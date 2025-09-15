@@ -19,7 +19,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -95,6 +95,22 @@ const playerFormSchema = z.object({
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
 
+const createUserFormSchema = z.object({
+  email: z.string().email(),
+  role: z.enum(['sponsor', 'organizer', 'individual', 'district_coordinator']),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  school: z.string().optional(),
+  district: z.string().optional(),
+  isDistrictCoordinator: z.boolean().optional(),
+  phone: z.string().optional(),
+  bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+  gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+  password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
+});
+
+type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
+
 function SponsorRosterView() {
   const { toast } = useToast();
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
@@ -169,7 +185,6 @@ function SponsorRosterView() {
       createPlayerForm.reset({
         firstName: '',
         lastName: '',
-        middleName: '',
         email: '',
         phone: '',
         zipCode: '',
@@ -178,13 +193,13 @@ function SponsorRosterView() {
         district: profile.district || 'all',
         grade: '',
         section: '',
-        state: '',
+        state: 'TX',
         studentType: profile.district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'independent' : '',
       });
       // Trigger initial school list update
       if (profile.district) {
           const initialSchools = dbSchools.filter(school => schoolData.find(s => s.schoolName === school)?.district === profile.district);
-          setSchoolsForDistrict([...initialSchools]);
+          setSchoolsForDistrict(initialSchools.length > 0 ? initialSchools : [profile.school || '']);
       } else {
           setSchoolsForDistrict([...dbSchools]);
       }
@@ -334,7 +349,6 @@ function SponsorRosterView() {
     createPlayerForm.reset({
         firstName: '',
         lastName: '',
-        middleName: '',
         email: '',
         phone: '',
         zipCode: '',
@@ -754,7 +768,7 @@ function SponsorRosterView() {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={playerForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" {...field} value={field.value || ''} placeholder="Enter phone number" /></FormControl><FormMessage /></FormItem> )} />
                               </div>
-                          </form>
+                        </form>
                     </Form>
                   </div>
                 </TabsContent>
