@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -234,16 +235,15 @@ function SponsorRosterView() {
 
   const handleEditPlayer = (player: MasterPlayer) => {
     setEditingPlayer(player);
-    playerForm.reset({
-        ...player,
-        dob: player.dob ? new Date(player.dob) : undefined,
-        uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
-        studentType: player.studentType || 'independent',
-    });
-    
-    // Initialize schools for the player's district
+    // Initialize schools for the player's district first
     setEditFormSchoolsForDistrict(getSchoolsForDistrict(player.district || 'all'));
-    
+    // Then reset the form
+    playerForm.reset({
+      ...player,
+      dob: player.dob ? new Date(player.dob) : undefined,
+      uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+      studentType: player.studentType || 'independent',
+    });
     setIsEditPlayerDialogOpen(true);
   };
   
