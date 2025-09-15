@@ -1,3 +1,4 @@
+
 // This file is no longer used for data fetching in the main application flow.
 // The EnhancedPlayerSearchDialog now fetches district data directly from the client.
 // This route can be kept for debugging or removed.
@@ -9,8 +10,9 @@ export async function GET() {
   try {
     console.log('Fetching districts from admin SDK...');
     
-    const playersRef = db.collection('players');
-    const snapshot = await playersRef.get();
+    // This now queries the 'schools' collection for a more accurate district list
+    const schoolsRef = db.collection('schools');
+    const snapshot = await schoolsRef.get();
     
     const districts = new Set<string>();
     
@@ -23,7 +25,7 @@ export async function GET() {
     
     const sortedDistricts = [...districts].sort();
     
-    console.log(`Found ${sortedDistricts.length} unique districts`);
+    console.log(`Found ${sortedDistricts.length} unique districts from schools collection`);
     
     return NextResponse.json(sortedDistricts);
   } catch (error) {

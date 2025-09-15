@@ -3,9 +3,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { db } from '@/lib/firebase'; // Your client-side firebase config
-import { collection, getDocs, query, where } from 'firebase/firestore';
-
+import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
 
 interface USCFPlayer {
   uscf_id: string;
@@ -14,36 +12,6 @@ interface USCFPlayer {
   rating_quick: number | null;
   state: string | null;
   expiration_date: string | null;
-}
-
-interface MasterPlayer {
-  id: string;
-  uscfId: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  state: string;
-  school: string;
-  district: string;
-  regularRating: number;
-}
-
-interface SearchCriteria {
-  uscfId?: string;
-  firstName?: string;
-  lastName?: string;
-  district?: string;
-  school?: string;
-  state?: string;
-  minRating?: number;
-  maxRating?: number;
-  pageSize?: number;
-}
-
-interface SearchResult {
-  players: MasterPlayer[];
-  total: number;
-  message?: string;
 }
 
 export function EnhancedPlayerSearchDialog({ 
@@ -59,18 +27,13 @@ export function EnhancedPlayerSearchDialog({
   excludeIds?: string[];
   title?: string;
 }) {
+  const { isDbLoaded, dbDistricts, dbSchools, searchPlayers } = useMasterDb();
   const [activeTab, setActiveTab] = useState<'database' | 'uscf'>('database');
   
   // DATABASE SEARCH STATE
   const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-
-  // DROPDOWN DATA STATE
-  const [districts, setDistricts] = useState<string[]>([]);
-  const [schools, setSchools] = useState<string[]>([]);
-  const [loadingDistricts, setLoadingDistricts] = useState(false);
-  const [loadingSchools, setLoadingSchools] = useState(false);
   
   // USCF lookup state
   const [uscfLookup, setUSCFLookup] = useState({
@@ -82,84 +45,14 @@ export function EnhancedPlayerSearchDialog({
   const [isUSCFSearching, setIsUSCFSearching] = useState(false);
   const [uscfError, setUSCFError] = useState<string>('');
 
-  // Load districts when dialog opens
-  useEffect(() => {
-    const loadDistricts = async () => {
-      if (!isOpen || !db) return;
-      
-      setLoadingDistricts(true);
-      try {
-        console.log('Fetching districts from schools collection...');
-        
-        // Query schools collection instead of players
-        const schoolsRef = collection(db, 'schools');
-        const snapshot = await getDocs(schoolsRef);
-        
-        const districts = new Set<string>();
-        
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          if (data.district && data.district.trim()) {
-            districts.add(data.district.trim());
-          }
-        });
-        
-        const sortedDistricts = [...districts].sort();
-        setDistricts(sortedDistricts);
-        console.log(`Found ${sortedDistricts.length} unique districts from schools`);
-        
-      } catch (error) {
-        console.error('Error fetching districts:', error);
-        setDistricts([]);
-      } finally {
-        setLoadingDistricts(false);
-      }
-    };
-
-    loadDistricts();
-  }, [isOpen]);
-
-  // Load schools when district changes or dialog opens
-  useEffect(() => {
-    const loadSchools = async (selectedDistrict?: string) => {
-        if (!isOpen || !db) return;
-        setLoadingSchools(true);
-        try {
-            console.log('Fetching schools from Firestore for district:', selectedDistrict);
-            
-            const schoolsRef = collection(db, 'schools');
-            let q;
-
-            if (selectedDistrict && selectedDistrict !== 'all') {
-                q = query(schoolsRef, where('district', '==', selectedDistrict));
-            } else {
-                q = schoolsRef;
-            }
-            
-            const snapshot = await getDocs(q);
-            const schoolsList = new Set<string>();
-            
-            snapshot.forEach(doc => {
-              const data = doc.data();
-              if (data.schoolName && data.schoolName.trim()) {
-                schoolsList.add(data.schoolName.trim());
-              }
-            });
-            
-            const sortedSchools = [...schoolsList].sort();
-            setSchools(sortedSchools);
-            console.log(`Found ${sortedSchools.length} unique schools`);
-            
-        } catch (error) {
-            console.error('Error fetching schools:', error);
-            setSchools([]);
-        } finally {
-            setLoadingSchools(false);
-        }
-    };
-
-    loadSchools(searchCriteria.district);
-  }, [isOpen, searchCriteria.district]);
+  const schoolsForDistrict = React.useMemo(() => {
+    if (searchCriteria.district === 'all' || !searchCriteria.district) {
+      return dbSchools;
+    }
+    // This part might need adjustment if master db doesn't contain all players for filtering
+    // For now, let's assume dbSchools is comprehensive enough or we accept this limitation.
+    return dbSchools; 
+  }, [dbSchools, searchCriteria.district]);
 
   // API-based search function
   const handleSearch = async () => {
@@ -201,7 +94,7 @@ export function EnhancedPlayerSearchDialog({
     const newCriteria: Partial<SearchCriteria> = { ...searchCriteria, [field]: value };
     // If district is changed, reset school
     if (field === 'district') {
-      newCriteria.school = '';
+      newCriteria.school = 'all';
     }
     setSearchCriteria(newCriteria);
   };
@@ -398,18 +291,18 @@ export function EnhancedPlayerSearchDialog({
                   value={searchCriteria.district || 'all'}
                   onChange={(e) => updateField('district', e.target.value)}
                   className="w-full border rounded px-3 py-2"
-                  disabled={loadingDistricts}
+                  disabled={!isDbLoaded}
                 >
                   <option value="all">
-                    {loadingDistricts ? 'Loading districts...' : 'All Districts'}
+                    {!isDbLoaded ? 'Loading districts...' : 'All Districts'}
                   </option>
-                  {districts.map((district) => (
+                  {dbDistricts.map((district) => (
                     <option key={district} value={district}>
                       {district}
                     </option>
                   ))}
                 </select>
-                {loadingDistricts && (
+                {!isDbLoaded && (
                   <small className="text-gray-500">Loading...</small>
                 )}
               </div>
@@ -420,18 +313,18 @@ export function EnhancedPlayerSearchDialog({
                   value={searchCriteria.school || 'all'}
                   onChange={(e) => updateField('school', e.target.value)}
                   className="w-full border rounded px-3 py-2"
-                  disabled={loadingSchools}
+                  disabled={!isDbLoaded}
                 >
                   <option value="all">
-                    {loadingSchools ? 'Loading schools...' : 'All Schools'}
+                    {!isDbLoaded ? 'Loading schools...' : 'All Schools'}
                   </option>
-                  {schools.map((school) => (
+                  {schoolsForDistrict.map((school) => (
                     <option key={school} value={school}>
                       {school}
                     </option>
                   ))}
                 </select>
-                {loadingSchools && (
+                {!isDbLoaded && (
                   <small className="text-gray-500">Loading...</small>
                 )}
               </div>

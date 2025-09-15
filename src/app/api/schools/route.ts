@@ -1,3 +1,4 @@
+
 // This file is no longer used for data fetching in the main application flow.
 // The EnhancedPlayerSearchDialog now fetches school data directly from the client.
 // This route can be kept for debugging or removed.
@@ -18,19 +19,20 @@ export async function GET(request: NextRequest) {
     
     console.log('Fetching schools for district from admin SDK:', district);
     
-    let playersRef: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection('players');
+    // Now queries the 'schools' collection for better performance and accuracy
+    let schoolsRef: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection('schools');
     
     if (district && district !== 'all') {
-      playersRef = playersRef.where('district', '==', district);
+      schoolsRef = schoolsRef.where('district', '==', district);
     }
     
-    const snapshot = await playersRef.get();
+    const snapshot = await schoolsRef.get();
     const schools = new Set<string>();
     
     snapshot.forEach(doc => {
       const data = doc.data();
-      if (data.school && data.school.trim()) {
-        schools.add(data.school.trim());
+      if (data.schoolName && data.schoolName.trim()) {
+        schools.add(data.schoolName.trim());
       }
     });
     
