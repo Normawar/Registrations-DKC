@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
@@ -79,6 +80,7 @@ const schoolFormSchema = z.object({
   phone: z.string().min(10, "A valid phone number is required."),
   county: z.string().min(1, "County is required."),
   state: z.string().optional(),
+  teamCode: z.string().optional(),
 });
 
 type SchoolFormValues = z.infer<typeof schoolFormSchema>;
@@ -149,7 +151,7 @@ export default function SchoolsPage() {
 
   const form = useForm<SchoolFormValues>({
     resolver: zodResolver(schoolFormSchema),
-    defaultValues: { schoolName: '', district: '', streetAddress: '', city: '', zip: '', phone: '', county: '', state: 'TX' },
+    defaultValues: { schoolName: '', district: '', streetAddress: '', city: '', zip: '', phone: '', county: '', state: 'TX', teamCode: '' },
   });
 
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
@@ -245,7 +247,7 @@ export default function SchoolsPage() {
 
   const handleAddSchool = () => {
     setEditingSchool(null);
-    form.reset({ schoolName: '', district: '', streetAddress: '', city: '', zip: '', phone: '', county: '', state: 'TX' });
+    form.reset({ schoolName: '', district: '', streetAddress: '', city: '', zip: '', phone: '', county: '', state: 'TX', teamCode: '' });
     setIsDialogOpen(true);
   };
 
@@ -272,7 +274,7 @@ export default function SchoolsPage() {
 
   async function onSubmit(values: SchoolFormValues) {
     if (!db) return;
-    const teamCode = generateTeamCode(values);
+    const teamCode = values.teamCode || generateTeamCode(values);
     let schoolToSave: SchoolWithTeamCode;
 
     if (editingSchool) {
@@ -475,6 +477,7 @@ export default function SchoolsPage() {
               <Form {...form}>
                 <form id="school-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
                     <FormField control={form.control} name="schoolName" render={({ field }) => ( <FormItem><FormLabel>School Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="teamCode" render={({ field }) => ( <FormItem><FormLabel>Team Code (Optional)</FormLabel><FormControl><Input {...field} placeholder="Auto-generated if blank" /></FormControl><FormDescription>Manually override the team code. If left blank, one will be generated.</FormDescription><FormMessage /></FormItem> )} />
                     <FormField control={form.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                     <FormField control={form.control} name="streetAddress" render={({ field }) => ( <FormItem><FormLabel>Street Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

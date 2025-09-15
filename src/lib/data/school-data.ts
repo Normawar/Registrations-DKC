@@ -23,6 +23,7 @@ export type School = {
   state: string;
   county: string;
   notes?: SchoolNote[];
+  teamCode?: string;
 };
 
 export const schoolData: School[] = [
@@ -32,7 +33,7 @@ export const schoolData: School[] = [
   { "district": "DONNA ISD", "schoolName": "A P SOLIS MIDDLE", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "2799", "phone": "(956)464-1650", "charter": "No", "students": "631", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "C STAINKE EL", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "2799", "phone": "(956)464-1940", "charter": "No", "students": "513", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "CAPT D SALINAS II EL", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "2799", "phone": "(956)783-1332", "charter": "No", "students": "477", "state": "TX", "county": "Hidalgo County" },
-  { "district": "DONNA ISD", "schoolName": "DANIEL SINGLETERRY SR", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "", "phone": "(956)464-1845", "charter": "No", "students": "510", "state": "TX", "county": "Hidalgo County" },
+  { "district": "DONNA ISD", "schoolName": "DANIEL SINGLETERRY SR", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "", "phone": "(956)461-4010", "charter": "No", "students": "510", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "DONNA ALTERNATIVE EDUCATION PROGRAM", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "", "phone": "(956)464-1954", "charter": "No", "students": "0", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "DONNA H S", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "2799", "phone": "(956)464-1700", "charter": "No", "students": "2075", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "DONNA NORTH H S", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "", "phone": "(956)464-4190", "charter": "No", "students": "1996", "state": "TX", "county": "Hidalgo County" },
