@@ -48,15 +48,43 @@ export function SponsorRegistrationDialog({
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
 
-  // Load sponsor's roster players
+  // Load sponsor's roster players - ADD DEBUG LOGS HERE
   useEffect(() => {
+    console.log('🔍 Event Registration Debug:');
+    console.log('  Dialog isOpen:', isOpen);
+    console.log('  Profile loaded:', !!profile);
+    console.log('  Profile district:', profile?.district);
+    console.log('  Profile school:', profile?.school);
+    console.log('  Database length:', database.length);
+    console.log('  Database sample player:', database[0]);
+    
     if (profile && database.length > 0 && isOpen) {
-      const sponsorPlayers = database.filter(p => 
-        p.district === profile.district && p.school === profile.school
-      );
+      console.log('  Filtering players...');
+      
+      const sponsorPlayers = database.filter(p => {
+        const matches = p.district === profile.district && p.school === profile.school;
+        console.log(`    Player ${p.firstName} ${p.lastName}: district="${p.district}" school="${p.school}" matches=${matches}`);
+        return matches;
+      });
+      
+      console.log('  Filtered result:', sponsorPlayers.length, 'players found');
+      console.log('  Players:', sponsorPlayers.map(p => `${p.firstName} ${p.lastName} (${p.district}/${p.school})`));
+      
       setRosterPlayers(sponsorPlayers);
+    } else {
+      console.log('  Conditions not met for filtering:');
+      console.log('    - Profile exists:', !!profile);
+      console.log('    - Database has players:', database.length > 0);
+      console.log('    - Dialog is open:', isOpen);
     }
   }, [profile, database, isOpen]);
+
+  // Also add this debug section right after the useEffect
+  useEffect(() => {
+    console.log('📊 Registration State Update:');
+    console.log('  Roster players found:', rosterPlayers.length);
+    console.log('  Players:', rosterPlayers.map(p => `${p.firstName} ${p.lastName}`));
+  }, [rosterPlayers]);
   
   // Load existing registrations
   useEffect(() => {
