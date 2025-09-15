@@ -493,68 +493,68 @@ export default function SchoolsPage() {
                 </form>
               </Form>
             </div>
-            {/* Right side: Notes section */}
-            <div className="space-y-4 border-l pl-6">
-                <h3 className="text-lg font-semibold">Organizer Notes</h3>
-                {/* Add/Edit Note Form */}
-                <Card className="bg-muted/50">
-                    <CardHeader>
-                        <CardTitle className="text-base">{editingNote ? 'Edit Note' : 'Add New Note'}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <Select value={noteType} onValueChange={(v) => setNoteType(v as 'lesson' | 'general')} disabled={!!editingNote}>
-                            <SelectTrigger><SelectValue placeholder="Select note type..." /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="general">General Note</SelectItem>
-                                <SelectItem value="lesson">Lesson/Training Note</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Input placeholder="Note Title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} />
-                        <Textarea placeholder="Note content..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} />
-                        {noteType === 'lesson' && (
-                            <div>
-                                <Label htmlFor="po-file">PO Document (PDF)</Label>
-                                <Input id="po-file" type="file" accept=".pdf" onChange={(e) => setPoFile(e.target.files?.[0] || null)} />
-                            </div>
-                        )}
-                        <div className="flex gap-2">
-                          <Button size="sm" onClick={handleNoteSave} disabled={!noteTitle || !noteContent}>{editingNote ? 'Update Note' : 'Save Note'}</Button>
-                          {editingNote && <Button size="sm" variant="ghost" onClick={handleCancelEditNote}>Cancel Edit</Button>}
-                        </div>
-                    </CardContent>
-                </Card>
+            {/* Right side: Notes section - ONLY SHOWN ON EDIT */}
+            {editingSchool && (
+              <div className="space-y-4 border-l pl-6">
+                  <h3 className="text-lg font-semibold">Organizer Notes</h3>
+                  <Card className="bg-muted/50">
+                      <CardHeader>
+                          <CardTitle className="text-base">{editingNote ? 'Edit Note' : 'Add New Note'}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                          <Select value={noteType} onValueChange={(v) => setNoteType(v as 'lesson' | 'general')} disabled={!!editingNote}>
+                              <SelectTrigger><SelectValue placeholder="Select note type..." /></SelectTrigger>
+                              <SelectContent>
+                                  <SelectItem value="general">General Note</SelectItem>
+                                  <SelectItem value="lesson">Lesson/Training Note</SelectItem>
+                              </SelectContent>
+                          </Select>
+                          <Input placeholder="Note Title" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} />
+                          <Textarea placeholder="Note content..." value={noteContent} onChange={(e) => setNoteContent(e.target.value)} />
+                          {noteType === 'lesson' && (
+                              <div>
+                                  <Label htmlFor="po-file">PO Document (PDF)</Label>
+                                  <Input id="po-file" type="file" accept=".pdf" onChange={(e) => setPoFile(e.target.files?.[0] || null)} />
+                              </div>
+                          )}
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleNoteSave} disabled={!noteTitle || !noteContent}>{editingNote ? 'Update Note' : 'Save Note'}</Button>
+                            {editingNote && <Button size="sm" variant="ghost" onClick={handleCancelEditNote}>Cancel Edit</Button>}
+                          </div>
+                      </CardContent>
+                  </Card>
 
-                {/* Existing Notes List */}
-                <div className="space-y-2">
-                    <h4 className="font-semibold text-sm">Previous Notes</h4>
-                    <ScrollArea className="h-64 border rounded-md p-2">
-                        {(editingSchool?.notes || []).length > 0 ? (
-                           [...(editingSchool?.notes || [])].reverse().map(note => (
-                                <div key={note.id} className="p-2 border-b last:border-b-0">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="font-medium">{note.title} <Badge variant="secondary" className="ml-2">{note.type}</Badge></p>
-                                            <p className="text-xs text-muted-foreground">{format(new Date(note.timestamp), 'PPP')}</p>
-                                            <p className="text-sm mt-1">{note.content}</p>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <Button variant="ghost" size="sm" onClick={() => handleEditNote(note)}>Edit</Button>
-                                            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteNote(note.id)}>Delete</Button>
-                                        </div>
-                                    </div>
-                                    {note.poFileUrl && (
-                                        <Button asChild variant="link" size="sm" className="p-0 h-auto">
-                                            <a href={note.poFileUrl} target="_blank" rel="noopener noreferrer"><Download className="mr-1 h-3 w-3" />{note.poFileName}</a>
-                                        </Button>
-                                    )}
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-center text-muted-foreground py-4">No notes for this school yet.</p>
-                        )}
-                    </ScrollArea>
-                </div>
-            </div>
+                  <div className="space-y-2">
+                      <h4 className="font-semibold text-sm">Previous Notes</h4>
+                      <ScrollArea className="h-64 border rounded-md p-2">
+                          {(editingSchool?.notes || []).length > 0 ? (
+                            [...(editingSchool?.notes || [])].reverse().map(note => (
+                                  <div key={note.id} className="p-2 border-b last:border-b-0">
+                                      <div className="flex justify-between items-start">
+                                          <div>
+                                              <p className="font-medium">{note.title} <Badge variant="secondary" className="ml-2">{note.type}</Badge></p>
+                                              <p className="text-xs text-muted-foreground">{format(new Date(note.timestamp), 'PPP')}</p>
+                                              <p className="text-sm mt-1">{note.content}</p>
+                                          </div>
+                                          <div className="flex gap-1">
+                                              <Button variant="ghost" size="sm" onClick={() => handleEditNote(note)}>Edit</Button>
+                                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteNote(note.id)}>Delete</Button>
+                                          </div>
+                                      </div>
+                                      {note.poFileUrl && (
+                                          <Button asChild variant="link" size="sm" className="p-0 h-auto">
+                                              <a href={note.poFileUrl} target="_blank" rel="noopener noreferrer"><Download className="mr-1 h-3 w-3" />{note.poFileName}</a>
+                                          </Button>
+                                      )}
+                                  </div>
+                              ))
+                          ) : (
+                              <p className="text-sm text-center text-muted-foreground py-4">No notes for this school yet.</p>
+                          )}
+                      </ScrollArea>
+                  </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <DialogClose asChild><Button type="button" variant="outline">Close</Button></DialogClose>
