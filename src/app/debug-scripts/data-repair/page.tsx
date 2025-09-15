@@ -67,30 +67,29 @@ export default function DataRepairPage() {
             
             const updates = sampleData[player.uscfId];
             if (updates) {
-                const fullPlayerData = { ...player, ...updates, school: "", district: "" };
-
-                const updateData: Partial<MasterPlayer> = {
-                    firstName: fullPlayerData.firstName || 'Unknown',
-                    lastName: fullPlayerData.lastName || 'Unknown',
-                    middleName: fullPlayerData.middleName || '',
-                    state: fullPlayerData.state || 'TX',
-                    uscfExpiration: fullPlayerData.uscfExpiration || null,
-                    regularRating: fullPlayerData.regularRating || null,
-                    quickRating: fullPlayerData.quickRating || '',
-                    dob: fullPlayerData.dob || null,
-                    email: fullPlayerData.email || '',
-                    phone: fullPlayerData.phone || '',
-                    zipCode: fullPlayerData.zipCode || '',
-                    grade: fullPlayerData.grade || '',
-                    section: fullPlayerData.section || '',
-                    studentType: fullPlayerData.studentType || 'independent',
-                    events: fullPlayerData.events || 0,
-                    eventIds: fullPlayerData.eventIds || [],
+                // This ensures all existing fields are preserved, and new ones are added
+                const fullPlayerData: Partial<MasterPlayer> = {
+                    ...player, // Carry over existing data
+                    ...updates, // Apply new grade/section
                     school: "", // Explicitly unassign
                     district: "", // Explicitly unassign
+                    
+                    // Provide default values for all optional fields to prevent 'undefined' errors
+                    middleName: player.middleName || '',
+                    state: player.state || 'TX',
+                    uscfExpiration: player.uscfExpiration || null,
+                    regularRating: player.regularRating || null,
+                    quickRating: player.quickRating || '',
+                    dob: player.dob || null,
+                    email: player.email || '',
+                    phone: player.phone || '',
+                    zipCode: player.zipCode || '',
+                    studentType: player.studentType || 'independent',
+                    events: player.events || 0,
+                    eventIds: player.eventIds || [],
                 };
-
-                batch.update(playerDoc.ref, updateData);
+                
+                batch.update(playerDoc.ref, fullPlayerData);
                 localUpdatedCount++;
                 setLog(prev => [...prev, `  - Staged update for ${player.firstName} ${player.lastName} (ID: ${player.uscfId})`]);
             }
@@ -136,7 +135,7 @@ export default function DataRepairPage() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Test Player Data Setup</h1>
           <p className="text-muted-foreground mt-2">
-            Populate test players (90000001-90000010) with sample data.
+            This is a developer utility to populate test players (90000001-90000010) with sample data.
           </p>
         </div>
 
@@ -144,7 +143,7 @@ export default function DataRepairPage() {
           <CardHeader>
             <CardTitle>Run Setup Script</CardTitle>
             <CardDescription>
-              This tool will find players with USCF IDs from 90000001 to 90000010 and update them with sample Grade and Section data, ensuring they are unassigned to any school or district.
+              This tool will find players with USCF IDs from 90000001 to 90000010 and update them with sample Grade and Section data, ensuring they are unassigned to any school or district. It is not part of the normal registration or invoicing flow.
             </CardDescription>
           </CardHeader>
           <CardContent>
