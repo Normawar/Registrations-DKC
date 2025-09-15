@@ -27,7 +27,7 @@ export function EnhancedPlayerSearchDialog({
   excludeIds?: string[];
   title?: string;
 }) {
-  const { isDbLoaded, dbDistricts, dbSchools, searchPlayers } = useMasterDb();
+  const { isDbLoaded, dbDistricts, dbSchools } = useMasterDb();
   const [activeTab, setActiveTab] = useState<'database' | 'uscf'>('database');
   
   // DATABASE SEARCH STATE

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase-admin';
+import { db } from '@/lib/services/firestore-service';
 
 export async function POST(request: Request) {
   if (!db) {
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const criteria = await request.json();
     console.log('Searching players with criteria:', criteria);
     
-    const playersRef = db.collection('players');
+    const playersRef = collection(db, 'players');
     const constraints = [];
 
     if (criteria.uscfId) {
