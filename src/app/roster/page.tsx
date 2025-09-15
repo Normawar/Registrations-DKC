@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -624,12 +625,14 @@ function SponsorRosterView() {
         </CardContent>
       </Card>
 
-      <EnhancedPlayerSearchDialog 
-          isOpen={isSearchDialogOpen}
-          onOpenChange={setIsSearchDialogOpen}
-          onPlayerSelected={handlePlayerSelectedForEdit}
-          excludeIds={rosterPlayerIds}
-          title="Add Player to Roster"
+      <EnhancedPlayerSearchDialog
+        isOpen={isSearchDialogOpen}
+        onOpenChange={setIsSearchDialogOpen}
+        onPlayerSelected={handlePlayerSelectedForEdit}
+        excludeIds={rosterPlayerIds}
+        title="Add Player to Roster"
+        userProfile={profile}
+        preFilterByUserProfile={true}
       />
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
@@ -1468,5 +1471,3 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
-
-    

@@ -42,6 +42,7 @@ export type SearchResult = {
   hasMore: boolean;
   lastDoc?: DocumentSnapshot;
   totalFound: number;
+  message?: string;
 };
 
 interface MasterDbContextType {
@@ -279,43 +280,42 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [dbSchools, setDbSchools] = useState<string[]>([]);
   const [dbDistricts, setDbDistricts] = useState<string[]>([]);
 
-  // Simple in-memory cache for search results
-  const searchCache = useMemo(() => new Map<string, SearchResult>(), []);
-
   const loadSummaryData = useCallback(async () => {
     if (!db) return;
     setIsDbLoaded(false);
     try {
-      // Load districts
-      const districtsSnapshot = await getDocs(collection(db, 'summary', 'districts', 'items'));
-      setDbDistricts(districtsSnapshot.docs.map(d => d.id).sort());
+      const schoolsSnapshot = await getDocs(collection(db, 'schools'));
+      const allDistricts = new Set<string>();
+      const allSchools = new Set<string>();
       
-      // Load schools
-      const schoolsSnapshot = await getDocs(collection(db, 'summary', 'schools', 'items'));
-      setDbSchools(schoolsSnapshot.docs.map(d => d.id).sort());
+      schoolsSnapshot.forEach(doc => {
+        const school = doc.data();
+        if (school.district) allDistricts.add(school.district);
+        if (school.schoolName) allSchools.add(school.schoolName);
+      });
+  
+      setDbDistricts(Array.from(allDistricts).sort());
+      setDbSchools(Array.from(allSchools).sort());
       
-      // Load states
       const statesSnapshot = await getDocs(collection(db, 'summary', 'states', 'items'));
       setDbStates(statesSnapshot.docs.map(d => d.id).sort());
-
-      // Load total player count
+  
       const countDoc = await getDoc(doc(db, 'summary', 'playerCount'));
       setPlayerCount(countDoc.exists() ? countDoc.data().count : 0);
-
+  
     } catch (error) {
       console.error("Failed to load summary data:", error);
       setIsDbError(true);
     } finally {
-      setIsDbLoaded(true); // Mark as loaded even if summary fails, so app can proceed
+      setIsDbLoaded(true);
     }
   }, []);
-  
+
   useEffect(() => {
     loadSummaryData();
   }, [loadSummaryData]);
 
   const refreshDatabase = async () => {
-    searchCache.clear(); // Clear cache on refresh
     await loadSummaryData();
     toast({ title: 'Database Refreshed', description: 'Fetched the latest summary data from the server.' });
   };
@@ -335,8 +335,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
         await setDoc(playerRef, cleanedPlayer, { merge: true });
         
         console.log("Player successfully written to Firebase");
-        // Don't add to local state; let search re-fetch
-        searchCache.clear();
 
     } catch (error) {
         console.error("Error adding player:", error);
@@ -386,97 +384,56 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     const cleanedPlayer = removeUndefined(finalPlayer);
     await setDoc(doc(db, 'players', finalPlayer.id), cleanedPlayer, { merge: true });
-    searchCache.clear();
   };
 
   const deletePlayer = async (playerId: string) => {
     if (!db) return;
     await deleteDoc(doc(db, 'players', playerId));
-    searchCache.clear();
   };
   
   const searchPlayers = async (criteria: Partial<SearchCriteria>): Promise<SearchResult> => {
-    if (!db) return { players: [], hasMore: false, totalFound: 0 };
-    
-    const cacheKey = JSON.stringify(criteria);
-    if (searchCache.has(cacheKey)) {
-        return searchCache.get(cacheKey)!;
-    }
+    if (!db) return { players: [], hasMore: false, totalFound: 0, message: 'Database not initialized.' };
 
     try {
-        const playersRef = collection(db, 'players');
-        const constraints: QueryConstraint[] = [];
+        const response = await fetch('/api/search-players', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(criteria),
+        });
 
-        // Build query constraints based on criteria
-        if (criteria.uscfId) {
-            constraints.push(where('uscfId', '==', criteria.uscfId));
-        }
-        if (criteria.firstName) {
-            constraints.push(where('firstName', '==', criteria.firstName));
-        }
-        if (criteria.lastName) {
-            constraints.push(where('lastName', '==', criteria.lastName));
-        }
-        // Add other criteria as needed, ensuring they are supported by Firestore indexes
-
-        constraints.push(orderBy('lastName'));
-        constraints.push(limit(criteria.pageSize || 25));
-
-        if (criteria.lastDoc) {
-            constraints.push(startAfter(criteria.lastDoc));
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'API search failed');
         }
 
-        const q = query(playersRef, ...constraints);
-        const querySnapshot = await getDocs(q);
-
-        const players = querySnapshot.docs.map(doc => doc.data() as MasterPlayer);
-        const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1];
-
-        const result: SearchResult = {
-            players,
-            lastDoc: lastVisible,
-            hasMore: !querySnapshot.empty && players.length === (criteria.pageSize || 25),
-            totalFound: players.length, // Simplified for this implementation
-        };
-
-        searchCache.set(cacheKey, result);
+        const result = await response.json();
         return result;
 
     } catch (error) {
-        console.error('Firestore search failed:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Search Error',
-            description: 'Could not perform search. The filter combination might not be supported. Try a simpler search.'
-        });
-        return { players: [], hasMore: false, totalFound: 0 };
+        console.error('API search failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+        return { players: [], hasMore: false, totalFound: 0, message: errorMessage };
     }
   };
 
 
-  // bulkUploadCSV and other methods that modify data would need to clear the cache
-  // Example:
   const bulkUploadCSV = async (
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
   ): Promise<{ uploaded: number; errors: string[]; }> => {
-    searchCache.clear();
     // ... rest of the implementation
     return { uploaded: 0, errors: [] }; // Placeholder
   };
   
   const addBulkPlayers = async(players: MasterPlayer[]) => {
-      searchCache.clear();
       // ...
   };
 
   const clearDatabase = async() => {
-    searchCache.clear();
     //...
   };
   
   const updatePlayerFromUscfData = async (uscfData: Partial<MasterPlayer>[]) => {
-      searchCache.clear();
       // ...
       return { updated: 0, created: 0 };
   };
@@ -516,4 +473,3 @@ export const useMasterDb = () => {
   }
   return context;
 };
-
