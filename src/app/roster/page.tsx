@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -1039,11 +1038,14 @@ function DistrictRosterView() {
 
     const handleEditPlayer = (player: MasterPlayer) => {
         setEditingPlayer(player);
-        setEditFormSchoolsForDistrict(getSchoolsForDistrict(player.district || 'all'));
+        const district = player.district || 'all';
+        setEditFormSchoolsForDistrict(getSchoolsForDistrict(district));
         playerForm.reset({
             ...player,
             dob: player.dob ? new Date(player.dob) : undefined,
             uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
+            district,
+            school: getSchoolsForDistrict(district).includes(player.school) ? player.school : '',
         });
         setIsEditPlayerDialogOpen(true);
     };
@@ -1363,3 +1365,5 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
+
+    
