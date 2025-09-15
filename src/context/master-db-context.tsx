@@ -342,11 +342,17 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const changedFields: { field: string; oldValue: any; newValue: any }[] = [];
     (Object.keys(updatedPlayer) as Array<keyof MasterPlayer>).forEach(key => {
         if (updatedPlayer[key] !== oldPlayer[key]) {
-            changedFields.push({
-                field: key,
-                oldValue: oldPlayer[key],
-                newValue: updatedPlayer[key],
-            });
+            // Replace undefined with null for Firestore compatibility
+            const oldValue = oldPlayer[key] === undefined ? null : oldPlayer[key];
+            const newValue = updatedPlayer[key] === undefined ? null : updatedPlayer[key];
+            
+            if (oldValue !== newValue) {
+                changedFields.push({
+                    field: key,
+                    oldValue,
+                    newValue,
+                });
+            }
         }
     });
 
@@ -549,6 +555,3 @@ export const useMasterDb = () => {
   }
   return context;
 };
-
-    
-    
