@@ -81,6 +81,8 @@ const createInvoiceFlow = ai.defineFlow(
       uscfAction: p.uscfAction ?? false,
       isGtPlayer: p.isGtPlayer ?? false,
       waiveLateFee: p.waiveLateFee ?? false,
+      // FIXED: Ensure section is never undefined
+      section: p.section && p.section.trim() !== '' ? p.section.trim() : 'High School K-12',
     }));
 
     // Step 1: Save/Update player data in Firestore
@@ -94,17 +96,26 @@ const createInvoiceFlow = ai.defineFlow(
         const [firstName, ...lastNameParts] = player.playerName.split(' ');
         const lastName = lastNameParts.join(' ');
 
+        // FIXED: Validate all fields before saving to Firestore
         const playerData = {
           id: playerId,
           uscfId: player.uscfId,
-          firstName,
-          lastName,
-          school: input.schoolName,
-          district: input.district,
+          firstName: firstName || 'Unknown',
+          lastName: lastName || 'Unknown',
+          school: input.schoolName || 'Unknown School',
+          district: input.district || 'Unknown District',
           studentType: player.isGtPlayer ? 'gt' : 'independent',
-          section: player.section,
+          section: player.section, // Now guaranteed to be a valid string
           updatedAt: new Date().toISOString(),
         };
+
+        // Additional validation to ensure no undefined values
+        Object.keys(playerData).forEach(key => {
+          if (playerData[key as keyof typeof playerData] === undefined) {
+            console.error(`Undefined value found for key ${key} in player data:`, playerData);
+            throw new Error(`Invalid player data: ${key} is undefined`);
+          }
+        });
 
         if (playerDoc.exists()) {
           await setDoc(playerRef, playerData, { merge: true });
