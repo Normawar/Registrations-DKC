@@ -30,7 +30,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [originalConfirmation, setOriginalConfirmation] = useState<any>(null);
   const { events } = useEvents();
-  const { database: allPlayers } = useMasterDb();
+  const { database: allPlayers, isDbLoaded } = useMasterDb();
   const [chargeSummary, setChargeSummary] = useState<{ credit: number; newCharges: number; netChange: number } | null>(null);
   const [waiveFees, setWaiveFees] = useState(false);
 
@@ -147,7 +147,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
     if (!eventDetails) throw new Error('Original event not found.');
     
-    if (!allPlayers || allPlayers.length === 0) {
+    if (!isDbLoaded) {
       throw new Error("Master player database is not loaded yet. Please try again.");
     }
 
@@ -295,9 +295,9 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
           {request.status === 'Pending' && (
             <>
               <Button variant="destructive" onClick={() => handleDecision('Denied')} disabled={isSubmitting}>Deny</Button>
-              <Button onClick={() => handleDecision('Approved')} disabled={isSubmitting}>
+              <Button onClick={() => handleDecision('Approved')} disabled={isSubmitting || !isDbLoaded}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Confirm & Process Change
+                {isDbLoaded ? 'Confirm & Process Change' : 'Loading Players...'}
               </Button>
             </>
           )}
