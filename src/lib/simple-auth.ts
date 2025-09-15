@@ -167,8 +167,8 @@ export async function simpleSignUp(email: string, password: string, userData: Om
                     firstName: 'Test', 
                     lastName: 'McAllen',
                     role: 'sponsor', 
-                    district: 'TestMcallen', 
-                    school: 'TestMcallen', 
+                    district: 'TestMcAllen', 
+                    school: 'TestMcAllen', 
                     phone: '555-555-5555',
                     isDistrictCoordinator: false, 
                     avatarType: 'icon', 
@@ -325,7 +325,7 @@ export async function simpleSignIn(email: string, password: string) {
     
     // **FORCEFUL CORRECTION BLOCK FOR TESTMCALLEN**
     // If the user is a known test user and their profile data is incorrect, overwrite it.
-    if (normalizedEmail === 'testmcallen@test.com' && (!profileData || profileData.firstName === 'Norma' || profileData.role !== 'sponsor')) {
+    if (normalizedEmail === 'testmcallen@test.com' && (!profileData || profileData.firstName === 'Norma' || profileData.role !== 'sponsor' || profileData.school !== 'TestMcAllen')) {
         console.warn('⚠️ DETECTED INCORRECT PROFILE FOR testmcallen@test.com. FORCIBLY CORRECTING.');
         const correctedProfile: SponsorProfile = {
             uid: user.uid, 
@@ -333,8 +333,8 @@ export async function simpleSignIn(email: string, password: string) {
             firstName: 'Test', 
             lastName: 'McAllen',
             role: 'sponsor', 
-            district: 'TestMcallen', 
-            school: 'TestMcallen', 
+            district: 'TestMcAllen', 
+            school: 'TestMcAllen', 
             phone: '555-555-5555',
             isDistrictCoordinator: false, 
             avatarType: 'icon', 
