@@ -134,7 +134,7 @@ const createInvoiceFlow = ai.defineFlow(
         invoiceId: mockInvoiceId,
         invoiceNumber: input.invoiceNumber || mockInvoiceId.substring(0, 8),
         status: 'DRAFT',
-        invoiceUrl: `/#mock-invoice/${mockInvoiceId}`,
+        invoiceUrl: `https://mock-invoice.local/#mock-invoice/${mockInvoiceId}`,
       };
     }
 

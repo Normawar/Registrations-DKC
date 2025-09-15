@@ -72,7 +72,7 @@ const createMembershipInvoiceFlow = ai.defineFlow(
             invoiceId: mockInvoiceId,
             invoiceNumber: mockInvoiceId.substring(0, 8),
             status: 'DRAFT',
-            invoiceUrl: `/#mock-invoice/${mockInvoiceId}`,
+            invoiceUrl: `https://mock-invoice.local/#mock-invoice/${mockInvoiceId}`,
         };
     }
 
@@ -263,3 +263,5 @@ const createMembershipInvoiceFlow = ai.defineFlow(
     }
   }
 );
+
+    
