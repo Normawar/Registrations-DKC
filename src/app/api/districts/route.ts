@@ -1,12 +1,18 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/services/firestore-service';
 
 export async function GET() {
+  if (!db) {
+    console.error('Firestore not initialized');
+    return NextResponse.json({ error: 'Firestore is not configured' }, { status: 500 });
+  }
+
   try {
-    console.log('Fetching districts...');
+    console.log('Fetching districts from client SDK...');
     
-    const playersRef = db.collection('players');
-    const snapshot = await playersRef.get();
+    const playersRef = collection(db, 'players');
+    const snapshot = await getDocs(playersRef);
     
     const districts = new Set<string>();
     
