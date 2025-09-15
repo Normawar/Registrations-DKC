@@ -6,7 +6,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { collection, getDocs, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, setDoc, query, where } from 'firebase/firestore';
 import Papa from 'papaparse';
 
 import { AppLayout } from "@/components/app-layout";
@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/services/firestore-service';
-import { createUserByOrganizer } from '@/lib/auth-debug';
+import { createUserByOrganizer } from '@/app/users/actions';
 import { Loader2 } from 'lucide-react';
 
 
