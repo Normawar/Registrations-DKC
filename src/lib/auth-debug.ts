@@ -1,7 +1,7 @@
 
 // src/lib/auth-debug.ts - Debug Firebase Auth issues
 import { auth, db } from '@/lib/firebase';
-import { simpleSignUp, simpleSignIn } from './simple-auth';
+import { simpleSignUp, simpleSignIn, testKnownAccounts as testAccounts } from './simple-auth';
 
 export function debugFirebaseConfig() {
   console.log('=== Firebase Configuration Debug ===');
@@ -155,3 +155,6 @@ export async function createAndTestAccount() {
     console.error('❌ Create and test failed:', error);
   }
 }
+
+// Renaming the imported testKnownAccounts to avoid conflicts
+export { testAccounts as testKnownAccounts };

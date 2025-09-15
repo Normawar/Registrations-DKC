@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { debugFirebaseConfig, debugSignUp, debugSignIn, createAndTestAccount } from '@/lib/auth-debug';
+import { debugFirebaseConfig, debugSignUp, debugSignIn, createAndTestAccount, testKnownAccounts } from '@/lib/auth-debug';
 
 export default function DebugAuthPage() {
   const [email, setEmail] = useState('test@example.com');
@@ -78,6 +78,19 @@ export default function DebugAuthPage() {
     setLoading(false);
   };
 
+  const handleTestAllAccounts = async () => {
+    setLoading(true);
+    logResult('=== Running Test on All Known Accounts ===');
+    try {
+        // This will now log directly to the console inside simple-auth.
+        await testKnownAccounts();
+        logResult('✅ All tests finished. Check console for detailed logs for each account.');
+    } catch (error) {
+        logResult(`❌ Test script failed: ${error}`);
+    }
+    setLoading(false);
+  };
+
   const clearResults = () => {
     setResults('');
   };
@@ -133,7 +146,14 @@ export default function DebugAuthPage() {
               disabled={loading}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              {loading ? 'Testing...' : 'Create & Test DS Account'}
+              {loading ? 'Testing...' : 'Create & Test DS Acct'}
+            </Button>
+             <Button 
+              onClick={handleTestAllAccounts} 
+              disabled={loading}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {loading ? 'Testing...' : 'Test All Known Accts'}
             </Button>
             <Button onClick={clearResults} variant="destructive">
               Clear Results

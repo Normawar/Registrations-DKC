@@ -470,7 +470,8 @@ export async function testKnownAccounts() {
   const testAccounts = [
     { email: 'test@test.com', password: 'testpassword' },
     { email: 'testds@test.com', password: 'testpassword' },
-    { email: 'testdist@test.com', password: '1Disttester' }
+    { email: 'testdist@test.com', password: '1Disttester' },
+    { email: 'testmcallen@test.com', password: 'testpassword' }
   ];
   
   for (const account of testAccounts) {
