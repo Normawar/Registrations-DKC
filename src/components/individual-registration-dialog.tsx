@@ -387,9 +387,12 @@ export function IndividualRegistrationDialog({
                                 <SelectValue placeholder="Select section" />
                               </SelectTrigger>
                               <SelectContent>
+                                <SelectItem value="Kinder-1st">Kinder-1st</SelectItem>
+                                <SelectItem value="Primary K-3">Primary K-3</SelectItem>
                                 <SelectItem value="Elementary K-5">Elementary K-5</SelectItem>
                                 <SelectItem value="Middle School K-8">Middle School K-8</SelectItem>
                                 <SelectItem value="High School K-12">High School K-12</SelectItem>
+                                <SelectItem value="Championship">Championship</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
