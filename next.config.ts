@@ -61,11 +61,16 @@ const nextConfig: NextConfig = {
       
       // These modules are server-side only
       config.externals.push({
-        'exceljs': 'commonjs exceljs',
         'file-saver': 'commonjs file-saver',
         'alasql': 'commonjs alasql',
       });
     }
+
+    // Correctly handle exceljs for both server and client
+    config.externals.push({
+      'exceljs': 'commonjs exceljs',
+    });
+
 
     return config;
   },
