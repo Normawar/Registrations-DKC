@@ -1,4 +1,4 @@
-
+// src/components/EnhancedPlayerSearchDialog.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -92,7 +92,8 @@ export function EnhancedPlayerSearchDialog({
           console.log('Districts loaded:', data);
           setDistricts(data);
         } else {
-          console.error('Failed to load districts:', response.statusText);
+          const errorData = await response.json();
+          console.error('Failed to load districts:', errorData.error || response.statusText);
         }
       } catch (error) {
         console.error('Failed to load districts:', error);
@@ -123,7 +124,8 @@ export function EnhancedPlayerSearchDialog({
           console.log('Schools loaded:', data);
           setSchools(data);
         } else {
-          console.error('Failed to load schools:', response.statusText);
+          const errorData = await response.json();
+          console.error('Failed to load schools:', errorData.error || response.statusText);
         }
       } catch (error) {
         console.error('Failed to load schools:', error);

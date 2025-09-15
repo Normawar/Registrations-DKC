@@ -1,6 +1,6 @@
-
+// File: app/api/search-players/route.js
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { db } from '@/lib/firebase-admin'; // Adjust import path as needed
 import { NextRequest } from 'next/server';
 
 export async function POST(request: NextRequest) {
@@ -89,4 +89,9 @@ export async function POST(request: NextRequest) {
     
   } catch (error: any) {
     console.error('Search error:', error);
-    return NextResponse.
+    return NextResponse.json(
+      { error: 'Search failed', details: error.message }, 
+      { status: 500 }
+    );
+  }
+}
