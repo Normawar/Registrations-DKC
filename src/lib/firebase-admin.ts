@@ -26,3 +26,4 @@ if (!getApps().length) {
 
 // Export the firestore instance. If initialization failed, this will throw an error when used.
 export const db = getFirestore();
+
