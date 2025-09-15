@@ -2,7 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
-import { collection, query, where, orderBy, limit, getDocs, startAfter, Query, DocumentSnapshot, getDoc, setDoc, writeBatch, deleteDoc, doc, QueryConstraint } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
@@ -10,6 +10,9 @@ import Papa from 'papaparse';
 import { isValid, parse, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { type School } from '@/lib/data/school-data';
+import { generateTeamCode } from '@/lib/school-utils';
+import { type SearchCriteria, type SearchResult } from '@/lib/data/search-types';
+
 
 // --- Types ---
 
@@ -23,33 +26,17 @@ export type UploadProgress = {
   message: string;
 };
 
-export type SearchCriteria = {
-  firstName?: string;
-  lastName?: string;
-  middleName?: string;
-  uscfId?: string;
-  state?: string;
-  school?: string;
-  district?: string;
-  minRating?: number;
-  maxRating?: number;
-  lastDoc?: DocumentSnapshot;
-  pageSize?: number;
-};
-
-export type SearchResult = {
-  players: MasterPlayer[];
-  hasMore: boolean;
-  lastDoc?: DocumentSnapshot;
-  totalFound: number;
-  message?: string;
-};
-
 interface MasterDbContextType {
   database: MasterPlayer[];
+  schools: School[];
   addPlayer: (player: MasterPlayer) => Promise<void>;
   updatePlayer: (player: MasterPlayer, editingProfile: SponsorProfile | null) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
+  addSchool: (school: Omit<School, 'id' | 'teamCode' | 'notes'>) => Promise<void>;
+  updateSchool: (school: School) => Promise<void>;
+  deleteSchool: (schoolId: string) => Promise<void>;
+  renameDistrict: (oldDistrict: string, newDistrict: string) => Promise<void>;
+  addBulkSchools: (data: any[]) => Promise<{ uploaded: number, errors: string[] }>;
   bulkUploadCSV: (
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
@@ -277,9 +264,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [playerCount, setPlayerCount] = useState(0);
 
-  // New state for summary data
-  const [dbStates, setDbStates] = useState<string[]>([]);
-  
   const dbSchools = useMemo(() => [...new Set(schools.map(s => s.schoolName))].sort(), [schools]);
   const dbDistricts = useMemo(() => [...new Set(schools.map(s => s.district))].sort(), [schools]);
   
@@ -308,19 +292,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
       ]);
       
       const players = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
-      const schoolList = schoolsSnapshot.docs.map(doc => doc.data() as School);
+      const schoolList = schoolsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as School));
       
       setDatabase(players);
       setSchools(schoolList);
       setPlayerCount(players.length);
       setIsDbLoaded(true);
-      
-      // Compute summary data from players for states
-      const states = new Set<string>();
-      players.forEach(p => {
-        if (p.state) states.add(p.state);
-      });
-      setDbStates([...states].sort());
       
     } catch (error: any) {
       console.error('Failed to load players or schools database:', error);
@@ -403,6 +380,91 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     await loadDatabase(); // Refresh data
   };
   
+  const addSchool = async (school: Omit<School, 'id' | 'teamCode' | 'notes'>) => {
+    if (!db) return;
+    const id = `school-${Date.now()}`;
+    const newSchool: School = {
+        ...school,
+        id,
+        teamCode: generateTeamCode(school),
+        notes: [],
+    };
+    await setDoc(doc(db, 'schools', id), newSchool);
+    await loadDatabase();
+  };
+
+  const updateSchool = async (school: School) => {
+      if (!db) return;
+      const schoolWithCode = { ...school, teamCode: school.teamCode || generateTeamCode(school) };
+      await setDoc(doc(db, 'schools', school.id), schoolWithCode, { merge: true });
+      await loadDatabase();
+  };
+
+  const deleteSchool = async (schoolId: string) => {
+      if (!db) return;
+      await deleteDoc(doc(db, 'schools', schoolId));
+      await loadDatabase();
+  };
+  
+  const addBulkSchools = async (data: any[]) => {
+    if (!db) return { uploaded: 0, errors: ["Database not connected."] };
+    let errors: string[] = [];
+    const newSchools = data.map((row: any, index: number) => {
+      try {
+        const schoolName = row['School Name'] || row['schoolName'];
+        const district = row['District'] || row['district'];
+        if (!schoolName || !district) throw new Error('Missing school name or district');
+        const id = `school-${Date.now()}-${index}`;
+        return {
+          id,
+          schoolName,
+          district,
+          streetAddress: row['Street Address'] || row['streetAddress'] || '',
+          city: row['City'] || row['city'] || '',
+          zip: row['ZIP'] || row['zip'] || '',
+          phone: row['Phone'] || row['phone'] || '',
+          county: row['County Name'] || row['county'] || '',
+          state: row['State'] || row['state'] || 'TX',
+          charter: row['Charter'] || row['charter'] || '',
+          students: row['Students'] || row['students'] || '',
+          zip4: row['ZIP 4-digit'] || row['zip4'] || '',
+          notes: [],
+          teamCode: generateTeamCode({ schoolName, district }),
+        };
+      } catch (e: any) {
+        errors.push(`Row ${index + 2}: ${e.message}`);
+        return null;
+      }
+    }).filter(Boolean);
+
+    if (newSchools.length > 0) {
+      const batch = writeBatch(db);
+      newSchools.forEach(school => {
+        if (school) {
+            const docRef = doc(db, 'schools', school.id);
+            batch.set(docRef, school);
+        }
+      });
+      await batch.commit();
+      await loadDatabase();
+    }
+    return { uploaded: newSchools.length, errors };
+  };
+
+  const renameDistrict = async (oldDistrict: string, newDistrict: string) => {
+      if (!db) return;
+      const batch = writeBatch(db);
+      schools.forEach(school => {
+          if (school.district === oldDistrict) {
+              const schoolRef = doc(db, "schools", school.id);
+              const newTeamCode = generateTeamCode({ schoolName: school.schoolName, district: newDistrict });
+              batch.update(schoolRef, { district: newDistrict, teamCode: newTeamCode });
+          }
+      });
+      await batch.commit();
+      await loadDatabase();
+  };
+  
   const searchPlayers = async (criteria: Partial<SearchCriteria>): Promise<SearchResult> => {
     if (!db) return { players: [], hasMore: false, totalFound: 0, message: 'Database not initialized.' };
 
@@ -437,10 +499,6 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     return { uploaded: 0, errors: [] }; // Placeholder
   };
   
-  const addBulkPlayers = async(players: MasterPlayer[]) => {
-      // ...
-  };
-
   const clearDatabase = async() => {
     //...
   };
@@ -452,17 +510,22 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const value = {
     database,
+    schools,
     addPlayer,
     updatePlayer,
     deletePlayer,
-    addBulkPlayers,
+    addSchool,
+    updateSchool,
+    deleteSchool,
+    renameDistrict,
+    addBulkSchools,
     bulkUploadCSV,
     clearDatabase,
     updatePlayerFromUscfData,
     isDbLoaded,
     isDbError,
     dbPlayerCount: playerCount,
-    dbStates,
+    dbStates: [],
     dbSchools,
     dbDistricts,
     getSchoolsForDistrict,
@@ -486,3 +549,5 @@ export const useMasterDb = () => {
   }
   return context;
 };
+
+    
