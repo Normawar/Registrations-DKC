@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -12,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import { OrganizerGuard } from '@/components/auth-guard';
 
+// This is the set of essential test players to always keep.
 const playersToKeep = new Set([
   "90000001", "90000002", "90000003", "90000004", "90000005",
   "90000006", "90000007", "90000008", "90000009", "90000010"
@@ -26,17 +28,59 @@ function CleanupPlayersPage() {
   const findPlayersToDelete = useCallback(async () => {
     if (!db) {
       toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not initialized.' });
+      setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
+      // 1. Get all player IDs from existing invoices
+      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
+      const playersOnInvoices = new Set<string>();
+      invoicesSnapshot.forEach(invoiceDoc => {
+        const selections = invoiceDoc.data().selections;
+        if (selections && typeof selections === 'object') {
+          Object.keys(selections).forEach(playerId => playersOnInvoices.add(playerId));
+        }
+      });
+      console.log(`Found ${playersOnInvoices.size} unique players on invoices.`);
+
+      // 2. Fetch all players
       const playersSnapshot = await getDocs(collection(db, 'players'));
       const allPlayers = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
-      const toDelete = allPlayers.filter(player => !playersToKeep.has(player.id));
+      console.log(`Total players in database: ${allPlayers.length}`);
+
+      // 3. Determine which players to delete based on the new, more specific rules
+      const toDelete = allPlayers.filter(player => {
+        // Rule 1: Always keep the essential test players
+        if (playersToKeep.has(player.id)) {
+          return false;
+        }
+
+        // Rule 2: Keep all players from the PSJA district
+        if (player.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+          return false;
+        }
+        
+        // Rule 3: Keep players who are on an invoice
+        if (playersOnInvoices.has(player.id)) {
+          return false;
+        }
+
+        // Rule 4: Keep players who are on a roster (have a school and district assigned)
+        if (player.school && player.district && player.school.trim() !== '' && player.district.trim() !== '') {
+          return false;
+        }
+
+        // If none of the above conditions are met, the player should be deleted.
+        return true;
+      });
+
+      console.log(`Identified ${toDelete.length} players to delete.`);
       setPlayersToDelete(toDelete);
+
     } catch (error) {
-      console.error("Error fetching players:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch players from the database.' });
+      console.error("Error fetching players for cleanup:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch data from the database to determine cleanup targets.' });
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +126,7 @@ function CleanupPlayersPage() {
           <CardHeader>
             <CardTitle>Database Cleanup Tool</CardTitle>
             <CardDescription>
-              This tool will permanently delete all player records from your Firestore database except for the 10 essential test records (IDs 90000001-90000010). This is useful after running a large import.
+              This tool will permanently delete players who are **not** on any roster, **not** on any invoice, and **not** from the PSJA district. It will always preserve the 10 core test accounts.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -90,7 +134,7 @@ function CleanupPlayersPage() {
               <ShieldAlert className="h-4 w-4" />
               <AlertTitle>Warning: Destructive Action</AlertTitle>
               <AlertDescription>
-                This action cannot be undone. Please ensure you have backed up any important data before proceeding. This will remove all players from Firestore except the 10 base test accounts.
+                This action cannot be undone. Please review the list of players to be deleted carefully. It is recommended to back up your data before proceeding.
               </AlertDescription>
             </Alert>
           </CardContent>
@@ -99,22 +143,23 @@ function CleanupPlayersPage() {
         <Card>
           <CardHeader>
             <CardTitle>Players Targeted for Deletion ({isLoading ? '...' : playersToDelete.length})</CardTitle>
-            <CardDescription>The following players will be removed from the database when you click the button below.</CardDescription>
+            <CardDescription>The following players will be permanently removed from the database when you click the button below.</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="flex items-center justify-center h-24">
                 <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="ml-2">Analyzing database...</span>
               </div>
             ) : playersToDelete.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
-                <p>No players to delete. Your database is already clean!</p>
+                <p>No unrostered or un-invoiced players found to delete. Your database is clean according to the rules!</p>
               </div>
             ) : (
               <ul className="text-sm space-y-1 list-disc list-inside max-h-60 overflow-y-auto">
                 {playersToDelete.slice(0, 100).map(p => (
                   <li key={p.id}>
-                    {p.firstName} {p.lastName} (ID: {p.id})
+                    {p.firstName} {p.lastName} (ID: {p.id}) - School: {p.school || 'N/A'}, District: {p.district || 'N/A'}
                   </li>
                 ))}
                 {playersToDelete.length > 100 && (
