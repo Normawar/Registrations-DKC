@@ -27,6 +27,7 @@ export type School = {
 };
 
 export const schoolData: School[] = [
+  { "district": "TestMcAllen", "schoolName": "TestMcAllen", "streetAddress": "123 Test St", "city": "McAllen", "zip": "78501", "zip4": "", "phone": "(555)555-5555", "charter": "No", "students": "0", "state": "TX", "county": "Test" },
   { "district": "BRILLANTE ACADEMY", "schoolName": "BRILLANTE ACADEMY", "streetAddress": "706 N LOS EBANOS RD", "city": "MISSION", "zip": "78572", "zip4": "", "phone": "(713)303-6447", "charter": "Yes", "students": "196", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "A M OCHOA EL", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "2799", "phone": "(956)464-1900", "charter": "No", "students": "603", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "A P SOLIS MIDDLE", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "2799", "phone": "(956)464-1650", "charter": "No", "students": "631", "state": "TX", "county": "Hidalgo County" },
