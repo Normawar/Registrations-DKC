@@ -81,7 +81,7 @@ export function SponsorRegistrationDialog({
       console.log('  Filtering players from database...');
       const sponsorPlayers = database.filter(p => {
         const matches = p.district === profile.district && p.school === profile.school;
-        console.log(`    ${p.firstName} ${p.lastName}: ${p.district}/${p.school} = ${matches}`);
+        console.log(`    Player ${p.firstName} ${p.lastName}: district="${p.district}" school="${p.school}" matches=${matches}`);
         return matches;
       });
       
@@ -485,13 +485,7 @@ export function SponsorRegistrationDialog({
 
   return (
     <>
-      <Dialog open={isOpen && !showConfirmation} onOpenChange={(open) => {
-        if (!open) {
-          setShowConfirmation(false);
-          setSelectedStudents({});
-        }
-        onOpenChange(open);
-      }}>
+      <Dialog open={isOpen && !showConfirmation} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle>Register Students for {event.name}</DialogTitle>
@@ -685,7 +679,103 @@ export function SponsorRegistrationDialog({
         </DialogContent>
       </Dialog>
       
-      {/* Your confirmation dialog and invoice modal remain the same */}
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Confirm Registration & Charges</DialogTitle>
+            <DialogDescription className="sr-only">A dialog to confirm student selections and total charges before creating an invoice.</DialogDescription>
+            <p className="text-sm text-muted-foreground">
+              Review the total charges for {event.name} before creating your invoice.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Selected Students Summary */}
+            <div>
+              <h3 className="font-semibold mb-3">Selected Students ({Object.keys(selectedStudents).length})</h3>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {Object.entries(selectedStudents).map(([playerId, details]) => {
+                  const student = rosterPlayers.find(p => p.id === playerId);
+                  return (
+                    <div key={playerId} className="flex justify-between items-center text-sm bg-muted/50 rounded p-2">
+                      <span>{student?.firstName} {student?.lastName}</span>
+                      <div className="flex gap-2">
+                        <Badge variant="outline" className="text-xs">{details.section}</Badge>
+                        {details.uscfStatus !== 'current' && (
+                          <Badge variant="secondary" className="text-xs">USCF {details.uscfStatus}</Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Fee Breakdown */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <h3 className="font-semibold">Charge Breakdown</h3>
+              
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Registration Fees ({Object.keys(selectedStudents).length} × ${event.regularFee})</span>
+                  <span>${feeBreakdown.registrationFees.toFixed(2)}</span>
+                </div>
+                
+                {feeBreakdown.lateFees > 0 && (
+                  <div className="flex justify-between text-amber-600">
+                    <span>{feeBreakdown.feeType} ({Object.keys(selectedStudents).length} × ${(feeBreakdown.lateFees / Object.keys(selectedStudents).length).toFixed(2)})</span>
+                    <span>${feeBreakdown.lateFees.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                {feeBreakdown.uscfFees > 0 && (
+                  <div className="flex justify-between">
+                    <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current' && !rosterPlayers.find(p => p.id === Object.keys(selectedStudents)[Object.values(selectedStudents).indexOf(s)])?.studentType?.includes('gt')).length} × $24)</span>
+                    <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
+                  </div>
+                )}
+                
+                <div className="border-t pt-2 flex justify-between font-semibold">
+                  <span>Total Amount</span>
+                  <span>${feeBreakdown.total.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            {feeBreakdown.lateFees > 0 && (
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-800">Late Registration Notice</p>
+                  <p className="text-amber-700">
+                    {feeBreakdown.feeType} fees have been applied due to the proximity to the event date.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleBackToSelection}>
+              Back to Selection
+            </Button>
+            <Button onClick={handleCreateInvoice} disabled={isSubmitting}>
+              {isSubmitting ? 'Creating Invoice...' : `Create Invoice ($${feeBreakdown.total.toFixed(2)})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {showInvoiceModal && createdInvoiceId && (
+        <InvoiceDetailsDialog
+          isOpen={showInvoiceModal}
+          onClose={() => {
+            setShowInvoiceModal(false);
+            setCreatedInvoiceId(null);
+          }}
+          confirmationId={createdInvoiceId}
+        />
+      )}
     </>
   );
 }
