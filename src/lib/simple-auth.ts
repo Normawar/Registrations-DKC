@@ -118,6 +118,24 @@ export async function simpleSignUp(email: string, password: string, userData: Om
                     updatedAt: new Date().toISOString(),
                 };
                 break;
+            case 'testmcallen@test.com':
+                 testProfile = {
+                    uid: user.uid, 
+                    email: normalizedEmail,
+                    firstName: 'Test', 
+                    lastName: 'McAllen',
+                    role: 'sponsor', 
+                    district: 'TestMcallen', 
+                    school: 'TestMcallen', 
+                    phone: '555-555-5555',
+                    isDistrictCoordinator: false, 
+                    avatarType: 'icon', 
+                    avatarValue: 'PawnIcon',
+                    forceProfileUpdate: false, 
+                    createdAt: new Date().toISOString(), 
+                    updatedAt: new Date().toISOString(),
+                };
+                break;
             default:
                 throw new Error("Unknown test user email");
         }
@@ -501,4 +519,45 @@ export async function createAndTestAccount() {
   }
 }
 
+// Helper function to correct organizer account data
+export async function correctOrganizerAccountData(email: string, password: string) {
+  console.log('🔧 Attempting to correct organizer account data for:', email);
+  
+  try {
+    // First, try to sign in to get the user's UID
+    const signInResult = await simpleSignIn(email, password);
     
+    if (signInResult.success && signInResult.user) {
+      const uid = signInResult.user.uid;
+      console.log('✅ Successfully signed in, UID:', uid);
+      
+      // Now update the user's profile in Firestore with correct organizer data
+      const userDocRef = doc(db, 'users', uid);
+      const correctedProfile: Partial<SponsorProfile> & {correctedAt?: string} = {
+        role: 'organizer',
+        isDistrictCoordinator: false, // Organizers are not district coordinators
+        district: 'All Districts', // Organizers can manage all districts
+        school: 'Dark Knight Chess', // Organization name
+        updatedAt: new Date().toISOString(),
+        correctedAt: new Date().toISOString(), // Mark when this correction happened
+      };
+      
+      await setDoc(userDocRef, correctedProfile, { merge: true });
+      console.log('✅ Profile corrected successfully');
+      
+      // Return the corrected profile
+      const updatedProfile = { ...signInResult.profile, ...correctedProfile };
+      return {
+        success: true,
+        user: signInResult.user,
+        profile: updatedProfile
+      };
+    }
+    
+    throw new Error('Failed to sign in for data correction');
+    
+  } catch (error) {
+    console.error('❌ Data correction failed:', error);
+    throw error;
+  }
+}
