@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; // Using client-side SDK
+import { db } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   if (!db) {
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const criteria = await request.json();
     console.log('Searching players with criteria:', criteria);
     
-    const playersRef = collection(db, 'players');
+    const playersRef = db.collection('players');
     const constraints = [];
 
     if (criteria.uscfId) {
@@ -48,8 +48,8 @@ export async function POST(request: Request) {
     constraints.push(orderBy('lastName'));
     constraints.push(limit(criteria.pageSize || 25));
 
-    const q = query(playersRef, ...constraints);
-    const snapshot = await getDocs(q);
+    const q = query(playersRef, ...constraints as any);
+    const snapshot = await q.get();
     
     const players: any[] = [];
     snapshot.forEach(doc => {

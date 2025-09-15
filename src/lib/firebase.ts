@@ -18,7 +18,7 @@ let auth: Auth;
 let storage: FirebaseStorage;
 let db: Firestore;
 
-const isConfigValid = firebaseConfig.apiKey && firebaseConfig.apiKey !== 'YOUR_API_KEY';
+const isConfigValid = firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith('YOUR_');
 
 if (isConfigValid) {
     try {
@@ -36,7 +36,7 @@ if (isConfigValid) {
     }
 } else {
     if (typeof window !== 'undefined') {
-        console.warn("Firebase configuration is missing or incomplete. Please add your credentials to the .env file and restart the server. Firebase features will be disabled.");
+        console.warn("Firebase configuration is missing or incomplete. Please add your credentials to the .env file. Client-side Firebase features will be disabled.");
     }
     app = null as any;
     auth = null as any;
@@ -46,4 +46,3 @@ if (isConfigValid) {
 
 
 export { app, auth, storage, db };
-
