@@ -195,25 +195,6 @@ const SponsorSignUpForm = () => {
         return;
       }
 
-      // Special handling for the main organizer account.
-      if (values.email.toLowerCase() === 'norma@dkchess.com') {
-          console.log('🔧 Detected main organizer account, attempting data correction/login...');
-          try {
-              const correctionResult = await correctOrganizerAccountData(values.email, values.password);
-              if (correctionResult.success) {
-                  await updateProfile(correctionResult.profile as SponsorProfile);
-                  toast({
-                      title: "Welcome Back, Norma!",
-                      description: "Your organizer account has been logged in and verified.",
-                  });
-                  router.push('/manage-events');
-                  return; // Stop execution here
-              }
-          } catch (correctionError) {
-              console.warn('Organizer account login failed. Proceeding with regular signup flow for potential initial setup.');
-          }
-      }
-
       const isCoordinator = values.school === 'All Schools' && values.district !== 'None';
       const role: SponsorProfile['role'] = isCoordinator ? 'district_coordinator' : 'sponsor';
 
