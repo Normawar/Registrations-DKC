@@ -1,21 +1,28 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase-admin';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Using client-side SDK
 import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
+  if (!db) {
+    return NextResponse.json(
+      { error: 'Firestore is not initialized' },
+      { status: 500 }
+    );
+  }
   try {
     const { searchParams } = new URL(request.url);
     const district = searchParams.get('district');
     
     console.log('Fetching schools for district:', district);
     
-    let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection('players');
-    
+    const constraints = [];
     if (district && district !== 'all') {
-      query = query.where('district', '==', district);
+      constraints.push(where('district', '==', district));
     }
     
-    const snapshot = await query.get();
+    const q = query(collection(db, 'players'), ...constraints);
+    const snapshot = await getDocs(q);
     const schools = new Set<string>();
     
     snapshot.forEach(doc => {
@@ -32,8 +39,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(sortedSchools);
   } catch (error) {
     console.error('Error fetching schools:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch schools';
     return NextResponse.json(
-      { error: 'Failed to fetch schools' }, 
+      { error: errorMessage },
       { status: 500 }
     );
   }
