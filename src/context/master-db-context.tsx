@@ -2,7 +2,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
-import { collection, getDocs, doc, setDoc, writeBatch, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, writeBatch, deleteDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { SponsorProfile } from '@/hooks/use-sponsor-profile';
@@ -550,4 +550,5 @@ export const useMasterDb = () => {
   return context;
 };
 
+    
     
