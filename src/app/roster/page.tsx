@@ -20,7 +20,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -235,15 +235,19 @@ function SponsorRosterView() {
 
   const handleEditPlayer = (player: MasterPlayer) => {
     setEditingPlayer(player);
-    // Initialize schools for the player's district first
-    setEditFormSchoolsForDistrict(getSchoolsForDistrict(player.district || 'all'));
-    // Then reset the form
+    const district = player.district || 'all';
+    const schools = getSchoolsForDistrict(district);
+    setEditFormSchoolsForDistrict(schools);
+  
     playerForm.reset({
       ...player,
       dob: player.dob ? new Date(player.dob) : undefined,
       uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
       studentType: player.studentType || 'independent',
+      district: district, // Ensure district is set
+      school: schools.includes(player.school) ? player.school : '', // Ensure school is valid for district
     });
+  
     setIsEditPlayerDialogOpen(true);
   };
   
@@ -269,18 +273,7 @@ function SponsorRosterView() {
     };
     
     setPendingPlayer(playerToEdit);
-    setEditingPlayer(playerToEdit);
-    
-    // Initialize schools for the player's district
-    setEditFormSchoolsForDistrict(getSchoolsForDistrict(playerToEdit.district || 'all'));
-    
-    playerForm.reset({
-      ...playerToEdit,
-      dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
-      uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
-      studentType: playerToEdit.studentType || 'independent',
-    });
-    setIsEditPlayerDialogOpen(true);
+    handleEditPlayer(playerToEdit); // Use the same centralized edit handler
   };
   
   const handleRemoveFromRoster = (player: MasterPlayer) => {
@@ -1368,4 +1361,5 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
+
 
