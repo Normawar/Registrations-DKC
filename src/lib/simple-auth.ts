@@ -286,9 +286,46 @@ export async function simpleSignIn(email: string, password: string) {
     let profileDoc = await getDoc(profileDocRef);
     let profileData = profileDoc.exists() ? profileDoc.data() as SponsorProfile : null;
 
-    // **FORCEFUL CORRECTION BLOCK**
+    // **FORCEFUL CORRECTION BLOCK FOR ORGANIZER**
+    // If the user is the main organizer, ensure their profile is always correct.
+    if (normalizedEmail === 'norma@dkchess.com') {
+      console.log('👑 Organizer login detected. Verifying profile...');
+      const correctOrganizerProfile: SponsorProfile = {
+        uid: user.uid, 
+        email: normalizedEmail,
+        firstName: 'Norma', 
+        lastName: 'Guerra-Stueber',
+        role: 'organizer', 
+        district: 'All Districts', 
+        school: 'Dark Knight Chess', 
+        phone: '956-393-8875',
+        isDistrictCoordinator: true,
+        avatarType: 'icon', 
+        avatarValue: 'KingIcon',
+        forceProfileUpdate: false,
+        createdAt: profileData?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Check if the current profile is incorrect and needs to be overwritten.
+      const isIncorrect = !profileData || 
+                            profileData.firstName !== 'Norma' || 
+                            profileData.role !== 'organizer' ||
+                            profileData.school !== 'Dark Knight Chess';
+      
+      if (isIncorrect) {
+        console.warn('⚠️ DETECTED INCORRECT PROFILE FOR ORGANIZER. FORCIBLY CORRECTING.');
+        await setDoc(profileDocRef, correctOrganizerProfile, { merge: true });
+        profileData = correctOrganizerProfile;
+        console.log('✅ Forcibly corrected profile for norma@dkchess.com.');
+      } else {
+        console.log('✅ Organizer profile is correct.');
+      }
+    }
+    
+    // **FORCEFUL CORRECTION BLOCK FOR TESTMCALLEN**
     // If the user is a known test user and their profile data is incorrect, overwrite it.
-    if (normalizedEmail === 'testmcallen@test.com' && (!profileData || profileData.firstName === 'Norma')) {
+    if (normalizedEmail === 'testmcallen@test.com' && (!profileData || profileData.firstName === 'Norma' || profileData.role !== 'sponsor')) {
         console.warn('⚠️ DETECTED INCORRECT PROFILE FOR testmcallen@test.com. FORCIBLY CORRECTING.');
         const correctedProfile: SponsorProfile = {
             uid: user.uid, 
@@ -566,5 +603,3 @@ export async function correctOrganizerAccountData(email: string, password: strin
     throw error;
   }
 }
-
-    
