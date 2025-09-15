@@ -30,7 +30,7 @@ import {
   Wrench,
 } from "@/components/icons/chess-icons";
 import { Button } from "@/components/ui/button";
-import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart, FileQuestion, TestTube2 } from "lucide-react";
+import { User, LogOut, ClipboardCheck, Receipt, FolderKanban, School, PlusCircle, History, Users, ShieldCheck, LayoutDashboard, BookOpen, UserCheck, FileText, Code, Building, Repeat, FileBarChart, FileQuestion, TestTube2, Trash2 } from "lucide-react";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { generateTeamCode } from "@/lib/school-utils";
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -83,8 +83,9 @@ const organizerMenuStructure = {
     { href: "/users", icon: Users, label: "User Management" },
     { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
     { href: "/debug-scripts/import-from-square", icon: Wrench, label: "Square Importer" },
-    { href: "/debug-scripts/import-test-players", icon: Wrench, label: "Import Test Players" },
     { href: "/debug-scripts/import-uscf-top-players", icon: Wrench, label: "Import USCF Top Players" },
+    { href: "/debug-scripts/cleanup-players", icon: Trash2, label: "Cleanup Players DB" },
+    { href: "/debug-scripts/import-test-players", icon: Wrench, label: "Import Test Players" },
     { href: "/debug-scripts/dynamic-uscf-test", icon: TestTube2, label: "Dynamic USCF Test" },
   ]
 };
