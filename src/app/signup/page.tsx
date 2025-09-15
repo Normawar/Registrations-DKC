@@ -120,6 +120,9 @@ const SponsorSignUpForm = () => {
       if (!districts.includes('None')) {
         districts.unshift('None');
       }
+      if (!districts.includes('Test')) {
+        districts.unshift('Test');
+      }
       setUniqueDistricts(districts);
       setIsInitialized(true);
     }
