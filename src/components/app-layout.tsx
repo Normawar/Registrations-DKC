@@ -47,7 +47,6 @@ const sponsorMenuItems = [
   { href: "/invoices", icon: Receipt, label: "Invoices & Payments" },
   { href: "/requests", icon: KnightIcon, label: "Change Requests" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
-  { href: "/team-codes", icon: Code, label: "Team Codes"},
   { href: "/previous-events", icon: History, label: "Previous Events" },
   { href: "/quick-start-guide", icon: BookOpen, label: "Quick Start Guide" },
 ];
@@ -60,7 +59,6 @@ const districtCoordinatorMenuItems = [
     { href: "/invoices", icon: Receipt, label: "District Invoices" },
     { href: "/requests", icon: KnightIcon, label: "District Requests" },
     { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
-    { href: "/team-codes", icon: Code, label: "Team Codes"},
     { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
@@ -73,7 +71,6 @@ const organizerMenuStructure = {
     { href: "/players", icon: PawnIcon, label: "Master Player Database" },
     { href: "/roster", icon: Users, label: "District Rosters" },
     { href: "/schools", icon: School, label: "Schools & Districts" },
-    { href: "/team-codes", icon: Code, label: "Team Codes" },
     { href: "/previous-events", icon: History, label: "Previous Events" },
   ],
   "Accounting": [
@@ -98,7 +95,6 @@ const individualMenuItems = [
   { href: "/events", icon: RookIcon, label: "Register for event" },
   { href: "/invoices", icon: Receipt, label: "Invoices & Payments" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
-  { href: "/team-codes", icon: Code, label: "Team Codes"},
   { href: "/previous-events", icon: History, label: "Previous Events" },
 ];
 
@@ -350,5 +346,3 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    

@@ -170,6 +170,30 @@ function ReportsPageContent() {
                 <Code className="h-6 w-6 text-teal-600" />
               </div>
               <div>
+                <CardTitle>Team Code Directory</CardTitle>
+                <CardDescription>Search for schools and districts to find their official team codes.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              A searchable directory of all schools and their official team codes. Useful for verifying codes or finding codes for schools outside your district.
+            </p>
+            <Button asChild>
+              <Link href="/team-codes">
+                View Team Codes <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-teal-100 p-3 rounded-full">
+                <Code className="h-6 w-6 text-teal-600" />
+              </div>
+              <div>
                 <CardTitle>Specific Team Code Report</CardTitle>
                 <CardDescription>View players belonging to a specific list of team codes.</CardDescription>
               </div>
