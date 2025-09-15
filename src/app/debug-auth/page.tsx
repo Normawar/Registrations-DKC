@@ -1,3 +1,4 @@
+
 // src/app/debug-auth/page.tsx - Debug authentication page
 'use client';
 
@@ -5,8 +6,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { debugFirebaseConfig, debugSignUp, debugSignIn } from '@/lib/auth-debug';
-import { createAndTestAccount } from '@/lib/simple-auth';
+import { debugFirebaseConfig, debugSignUp, debugSignIn, createAndTestAccount } from '@/lib/auth-debug';
 
 export default function DebugAuthPage() {
   const [email, setEmail] = useState('test@example.com');
