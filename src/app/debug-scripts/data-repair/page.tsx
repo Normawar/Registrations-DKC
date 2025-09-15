@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from '@/components/app-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -11,12 +11,32 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Wrench, CheckCircle, FileWarning } from 'lucide-react';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 
+const testPlayerIds = [
+    '90000001', '90000002', '90000003', '90000004', '90000005',
+    '90000006', '90000007', '90000008', '90000009', '90000010'
+];
+
+// Sample data to be applied
+const sampleData: { [key: string]: { grade: string, section: string } } = {
+  '90000001': { grade: 'Kindergarten', section: 'Kinder-1st' },
+  '90000002': { grade: '1st Grade', section: 'Kinder-1st' },
+  '90000003': { grade: '2nd Grade', section: 'Primary K-3' },
+  '90000004': { grade: '3rd Grade', section: 'Primary K-3' },
+  '90000005': { grade: '4th Grade', section: 'Elementary K-5' },
+  '90000006': { grade: '5th Grade', section: 'Elementary K-5' },
+  '90000007': { grade: '6th Grade', section: 'Middle School K-8' },
+  '90000008': { grade: '7th Grade', section: 'Middle School K-8' },
+  '90000009': { grade: '8th Grade', section: 'Middle School K-8' },
+  '90000010': { grade: '9th Grade', section: 'High School K-12' },
+};
+
+
 export default function DataRepairPage() {
   const { toast } = useToast();
-  const { database: allPlayers, refreshDatabase, isDbLoaded } = useMasterDb();
+  const { isDbLoaded, refreshDatabase } = useMasterDb();
   const [isProcessing, setIsProcessing] = useState(false);
   const [log, setLog] = useState<string[]>([]);
-  const [stats, setStats] = useState({ scanned: 0, updated: 0, noAction: 0 });
+  const [stats, setStats] = useState({ scanned: 0, updated: 0, noAction: 0, failed: 0 });
 
   const runRepairScript = async () => {
     if (!db || !isDbLoaded) {
@@ -25,88 +45,69 @@ export default function DataRepairPage() {
     }
 
     setIsProcessing(true);
-    setLog(['Starting data repair process...']);
-    setStats({ scanned: 0, updated: 0, noAction: 0 });
+    setLog(['Starting test player data repair process...']);
+    setStats({ scanned: 0, updated: 0, noAction: 0, failed: 0 });
     let localUpdatedCount = 0;
 
     try {
-      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-      const batch = writeBatch(db);
-      const playerUpdates = new Map<string, Partial<MasterPlayer>>();
+        const playersRef = collection(db, 'players');
+        const q = query(playersRef, where('uscfId', 'in', testPlayerIds));
+        
+        const querySnapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        
+        const foundPlayerIds = new Set<string>();
 
-      setLog(prev => [...prev, `Found ${invoicesSnapshot.size} invoices to scan.`]);
+        setLog(prev => [...prev, `Found ${querySnapshot.size} test players in the database.`]);
+        setStats(prev => ({ ...prev, scanned: querySnapshot.size }));
+        
+        querySnapshot.forEach((playerDoc) => {
+            const player = playerDoc.data() as MasterPlayer;
+            foundPlayerIds.add(player.uscfId);
+            
+            const updates = sampleData[player.uscfId];
+            if (updates) {
+                batch.update(playerDoc.ref, {
+                    ...updates,
+                    school: "", // Ensure unassigned
+                    district: "", // Ensure unassigned
+                });
+                localUpdatedCount++;
+                setLog(prev => [...prev, `  - Staged update for ${player.firstName} ${player.lastName} (ID: ${player.uscfId})`]);
+            }
+        });
 
-      for (const invoiceDoc of invoicesSnapshot.docs) {
-        const invoice = invoiceDoc.data();
-        if (!invoice.selections) continue;
-
-        for (const playerId in invoice.selections) {
-          const player = allPlayers.find(p => p.id === playerId);
-          if (!player) continue;
-
-          const selectionDetails = invoice.selections[playerId];
-          let needsUpdate = false;
-          let playerUpdate: Partial<MasterPlayer> = playerUpdates.get(playerId) || {};
-
-          // Check and update grade if missing
-          if (!player.grade && selectionDetails.grade) {
-            playerUpdate.grade = selectionDetails.grade;
-            needsUpdate = true;
-          }
-
-          // Check and update section if missing
-          if (!player.section && selectionDetails.section) {
-            playerUpdate.section = selectionDetails.section;
-            needsUpdate = true;
-          }
-
-          if (needsUpdate) {
-            playerUpdates.set(playerId, playerUpdate);
-          }
+        const notFoundIds = testPlayerIds.filter(id => !foundPlayerIds.has(id));
+        if (notFoundIds.length > 0) {
+            setLog(prev => [...prev, `Warning: ${notFoundIds.length} test player(s) not found in the database: ${notFoundIds.join(', ')}`]);
+            setLog(prev => [...prev, 'Please run the "Import Test Players" tool first.']);
+            setStats(prev => ({ ...prev, failed: notFoundIds.length }));
         }
-      }
 
-      if (playerUpdates.size > 0) {
-        setLog(prev => [...prev, `Found ${playerUpdates.size} players with missing data to update.`]);
-        playerUpdates.forEach((update, playerId) => {
-          const playerRef = doc(db, 'players', playerId);
-          batch.update(playerRef, update);
-          localUpdatedCount++;
-          const player = allPlayers.find(p => p.id === playerId);
-          setLog(prev => [
-            ...prev,
-            `  - Updating ${player?.firstName} ${player?.lastName}: ${Object.keys(update).join(', ')}`
-          ]);
-        });
+        if (localUpdatedCount > 0) {
+            await batch.commit();
+            toast({
+              title: "Test Player Data Repaired!",
+              description: `Successfully updated ${localUpdatedCount} test player records.`,
+            });
+            refreshDatabase(); // Refresh local data context
+        } else {
+            toast({
+              title: "No Updates Needed",
+              description: "The found test players already seem to have data.",
+            });
+        }
 
-        await batch.commit();
-        toast({
-          title: "Data Repair Complete!",
-          description: `Successfully updated ${localUpdatedCount} player records.`,
-        });
-        refreshDatabase(); // Refresh the local context data
-      } else {
-        toast({
-          title: "No Updates Needed",
-          description: "All player records with associated invoices appear to have complete data.",
-        });
-      }
-
-      setStats({
-        scanned: invoicesSnapshot.size,
-        updated: localUpdatedCount,
-        noAction: allPlayers.length - localUpdatedCount,
-      });
-
-      setLog(prev => [...prev, '...Data repair process finished.']);
+        setStats(prev => ({ ...prev, updated: localUpdatedCount, noAction: prev.scanned - localUpdatedCount }));
+        setLog(prev => [...prev, '...Data repair process finished.']);
 
     } catch (error) {
-      console.error('Data repair failed:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast({ variant: 'destructive', title: 'Data Repair Failed', description: errorMessage });
-      setLog(prev => [...prev, `ERROR: ${errorMessage}`]);
+        console.error('Data repair failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+        toast({ variant: 'destructive', title: 'Data Repair Failed', description: errorMessage });
+        setLog(prev => [...prev, `ERROR: ${errorMessage}`]);
     } finally {
-      setIsProcessing(false);
+        setIsProcessing(false);
     }
   };
 
@@ -114,17 +115,17 @@ export default function DataRepairPage() {
     <AppLayout>
       <div className="space-y-8 max-w-2xl mx-auto">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Player Data Repair Tool</h1>
+          <h1 className="text-3xl font-bold font-headline">Test Player Data Setup</h1>
           <p className="text-muted-foreground mt-2">
-            Automatically fix missing player information by scanning registration history.
+            Populate test players (90000001-90000010) with sample data.
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Run Data Repair</CardTitle>
+            <CardTitle>Run Setup Script</CardTitle>
             <CardDescription>
-              This tool scans all invoices and updates player profiles in the master database if it finds missing information (like grade or section) that exists on a registration record. This process is safe to run multiple times.
+              This tool will find players with USCF IDs from 90000001 to 90000010 and update them with sample Grade and Section data, ensuring they are unassigned to any school or district.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -134,7 +135,7 @@ export default function DataRepairPage() {
               ) : (
                 <Wrench className="mr-2 h-4 w-4" />
               )}
-              {isProcessing ? 'Repairing Data...' : 'Start Data Repair'}
+              {isProcessing ? 'Updating Test Players...' : 'Update Test Players'}
             </Button>
             {!isDbLoaded && <p className="text-sm text-muted-foreground mt-2">Waiting for player database to load...</p>}
           </CardContent>
@@ -150,16 +151,16 @@ export default function DataRepairPage() {
                 <div className="p-4 border rounded-lg">
                   <FileWarning className="h-6 w-6 mx-auto mb-2 text-muted-foreground" />
                   <p className="text-2xl font-bold">{stats.scanned}</p>
-                  <p className="text-sm text-muted-foreground">Invoices Scanned</p>
+                  <p className="text-sm text-muted-foreground">Players Found</p>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <CheckCircle className="h-6 w-6 mx-auto mb-2 text-green-600" />
                   <p className="text-2xl font-bold text-green-600">{stats.updated}</p>
-                  <p className="text-sm text-muted-foreground">Players Updated in DB</p>
+                  <p className="text-sm text-muted-foreground">Players Updated</p>
                 </div>
                  <div className="p-4 border rounded-lg">
-                  <p className="text-2xl font-bold">{stats.noAction}</p>
-                  <p className="text-sm text-muted-foreground">Players with No Action</p>
+                  <p className="text-2xl font-bold text-red-600">{stats.failed}</p>
+                  <p className="text-sm text-muted-foreground">Players Not Found</p>
                 </div>
               </div>
               <div>
