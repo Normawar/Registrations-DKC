@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
@@ -17,14 +18,13 @@ export async function POST(request: Request) {
     const playersRef = collection(db, 'players');
     const constraints: any[] = [];
 
-    // Build query constraints based on criteria priority
-    // This approach uses the indexes we created
-    
+    // Prioritize USCF ID search above all else
     if (criteria.uscfId?.trim()) {
-      // Exact USCF ID match - highest priority
       constraints.push(where('uscfId', '==', criteria.uscfId.trim()));
+      // When searching by USCF ID, we should ignore all other filters
+      // as USCF ID is a unique identifier.
     } else {
-      // Build constraints for indexed fields
+      // Build constraints for other fields only if no USCF ID is provided
       
       // District filter
       if (criteria.district && criteria.district !== 'all') {
@@ -35,25 +35,23 @@ export async function POST(request: Request) {
         }
       }
       
-      // School filter (only if district is also specified or district is 'all')
-      if (criteria.school && criteria.school !== 'all' && 
-          (criteria.district === 'all' || !criteria.district || constraints.length === 0)) {
+      // School filter
+      if (criteria.school && criteria.school !== 'all') {
         if (criteria.school === 'Unassigned') {
-          constraints.push(where('school', 'in', ['', 'Unassigned', 'None', null]));
+           constraints.push(where('school', 'in', ['', 'Unassigned', 'None', null]));
         } else {
           constraints.push(where('school', '==', criteria.school));
         }
       }
       
-      // Name filters - use range queries for partial matching
+      // Name filters
       if (criteria.lastName?.trim()) {
         const lastName = criteria.lastName.trim();
         constraints.push(where('lastName', '>=', lastName));
         constraints.push(where('lastName', '<=', lastName + '\uf8ff'));
       }
       
-      // First name filter (only if lastName is not specified to avoid conflicts)
-      if (criteria.firstName?.trim() && !criteria.lastName?.trim()) {
+      if (criteria.firstName?.trim()) {
         const firstName = criteria.firstName.trim();
         constraints.push(where('firstName', '>=', firstName));
         constraints.push(where('firstName', '<=', firstName + '\uf8ff'));
@@ -66,27 +64,22 @@ export async function POST(request: Request) {
       
       // Rating filters
       if (criteria.minRating) {
-        constraints.push(where('regularRating', '>=', criteria.minRating));
+        constraints.push(where('regularRating', '>=', Number(criteria.minRating)));
       }
       if (criteria.maxRating) {
-        constraints.push(where('regularRating', '<=', criteria.maxRating));
+        constraints.push(where('regularRating', '<=', Number(criteria.maxRating)));
       }
     }
     
-    // Add ordering - this must match our index
-    if (criteria.uscfId) {
-      // For USCF ID searches, no additional ordering needed
-    } else if (criteria.lastName?.trim()) {
+    // Add ordering
+    if (constraints.length === 0) {
+      // If no filters, just order and limit
       constraints.push(orderBy('lastName'));
-    } else if (criteria.firstName?.trim() && !criteria.lastName) {
-      constraints.push(orderBy('firstName'));
-    } else if (criteria.minRating || criteria.maxRating) {
-      constraints.push(orderBy('regularRating'));
-      constraints.push(orderBy('lastName')); // Secondary sort
-    } else {
+    } else if (!criteria.uscfId?.trim()) {
+      // Add ordering for non-USCF ID searches to ensure consistency
       constraints.push(orderBy('lastName'));
     }
-    
+
     // Add limit
     constraints.push(limit(criteria.pageSize || 25));
 
@@ -101,61 +94,35 @@ export async function POST(request: Request) {
       players.push({ id: doc.id, ...doc.data() });
     });
     
-    // Apply any remaining client-side filters that couldn't be done in the query
-    let filteredPlayers = players.filter(player => {
-      // First name filter (if lastName was the primary search)
-      if (criteria.firstName?.trim() && criteria.lastName?.trim()) {
-        const firstName = (player.firstName || '').toLowerCase();
-        const searchFirst = criteria.firstName.toLowerCase().trim();
-        if (!firstName.includes(searchFirst)) {
-          return false;
-        }
-      }
-      
-      // School filter (if district was the primary filter)
-      if (criteria.school && criteria.school !== 'all' && criteria.district && criteria.district !== 'all') {
-        if (criteria.school === 'Unassigned') {
-          const school = player.school || '';
-          if (school && school !== '' && school !== 'Unassigned' && school !== 'None') {
-            return false;
-          }
-        } else if (player.school !== criteria.school) {
-          return false;
-        }
-      }
-      
-      return true;
-    });
-    
     // Generate helpful message
     let message = '';
     let searchStrategy = '';
     
     if (criteria.uscfId) {
       searchStrategy = 'uscfId';
-      message = filteredPlayers.length > 0 ? 
+      message = players.length > 0 ? 
         `Found player with USCF ID: ${criteria.uscfId}` : 
         'No player found with that USCF ID';
     } else if (criteria.district === 'Unassigned' || criteria.school === 'Unassigned') {
       searchStrategy = 'unassigned';
-      message = `Found ${filteredPlayers.length} unassigned players`;
+      message = `Found ${players.length} unassigned players`;
     } else if (criteria.lastName || criteria.firstName) {
       searchStrategy = 'name';
-      message = `Found ${filteredPlayers.length} players matching name criteria`;
+      message = `Found ${players.length} players matching name criteria`;
     } else if (criteria.district || criteria.school) {
       searchStrategy = 'location';
-      message = `Found ${filteredPlayers.length} players in specified district/school`;
+      message = `Found ${players.length} players in specified district/school`;
     } else {
       searchStrategy = 'general';
-      message = `Found ${filteredPlayers.length} players`;
+      message = `Found ${players.length} players`;
     }
     
-    console.log(`Search completed: ${filteredPlayers.length} results using ${searchStrategy} strategy`);
+    console.log(`Search completed: ${players.length} results using ${searchStrategy} strategy`);
     
     return NextResponse.json({
-      players: filteredPlayers,
-      total: filteredPlayers.length,
-      hasMore: filteredPlayers.length === (criteria.pageSize || 25),
+      players,
+      total: players.length,
+      hasMore: players.length === (criteria.pageSize || 25),
       searchStrategy,
       message
     });
@@ -163,7 +130,6 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Search error:', error);
     
-    // Handle specific Firestore errors
     let errorMessage = `Search failed: ${error.message}`;
     
     if (error.message.includes('requires an index')) {
