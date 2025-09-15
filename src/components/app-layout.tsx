@@ -84,7 +84,7 @@ const organizerMenuStructure = {
     { href: "/debug-auth", icon: Wrench, label: "Auth Debugger" },
     { href: "/debug-scripts/import-from-square", icon: Wrench, label: "Square Importer" },
     { href: "/debug-scripts/import-test-players", icon: Wrench, label: "Import Test Players" },
-    { href: "/debug-scripts/import-uscf-top-players", icon: Wrench, label: "Import Missing State Players" },
+    { href: "/debug-scripts/import-uscf-top-players", icon: Wrench, label: "Import USCF Top Players" },
     { href: "/debug-scripts/dynamic-uscf-test", icon: TestTube2, label: "Dynamic USCF Test" },
   ]
 };
