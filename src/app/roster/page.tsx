@@ -31,7 +31,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
-import { schoolData } from '@/lib/data/school-data';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -123,7 +122,7 @@ function SponsorRosterView() {
   const [pendingPlayer, setPendingPlayer] = useState<MasterPlayer | null>(null);
 
   const { profile, isProfileLoaded } = useSponsorProfile();
-  const { database, addPlayer, updatePlayer, isDbLoaded, generatePlayerId, dbDistricts, dbSchools } = useMasterDb();
+  const { database, addPlayer, updatePlayer, isDbLoaded, generatePlayerId, dbDistricts, dbSchools, getSchoolsForDistrict } = useMasterDb();
   
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
@@ -136,17 +135,9 @@ function SponsorRosterView() {
 
   useEffect(() => {
     if (selectedEditDistrict) {
-      if (selectedEditDistrict === 'all' || selectedEditDistrict === 'None') {
-        setEditFormSchoolsForDistrict(dbSchools);
-      } else {
-        const filteredSchools = schoolData
-          .filter((school) => school.district === selectedEditDistrict)
-          .map((school) => school.schoolName)
-          .sort();
-        setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
-      }
+        setEditFormSchoolsForDistrict(getSchoolsForDistrict(selectedEditDistrict));
     }
-  }, [selectedEditDistrict, dbSchools]);
+  }, [selectedEditDistrict, getSchoolsForDistrict]);
 
   const createPlayerForm = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema),
@@ -155,24 +146,16 @@ function SponsorRosterView() {
     }
   });
   
-  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>(dbSchools);
+  const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   
   const handleDistrictChange = (district: string, formInstance: any, resetSchool: boolean = true) => {
     formInstance.setValue('district', district);
+    setSchoolsForDistrict(getSchoolsForDistrict(district));
     if (resetSchool) {
         formInstance.setValue('school', '');
-    }
-    if (district === 'all' || district === 'None') {
-        setSchoolsForDistrict(dbSchools);
-        if (resetSchool) {
+        if (district === 'None') {
             formInstance.setValue('school', 'Homeschool');
         }
-    } else {
-        const filteredSchools = schoolData
-            .filter((school) => school.district === district)
-            .map((school) => school.schoolName)
-            .sort();
-        setSchoolsForDistrict([...new Set(filteredSchools)]);
     }
   };
 
@@ -184,7 +167,7 @@ function SponsorRosterView() {
         handleDistrictChange(selectedDistrictInCreate, createPlayerForm, true);
       }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDistrictInCreate, dbSchools]);
+  }, [selectedDistrictInCreate]);
 
   // Update form defaults when profile loads
   useEffect(() => {
@@ -203,14 +186,9 @@ function SponsorRosterView() {
         uscfId: '',
       });
       // Trigger initial school list update
-      if (profile.district) {
-          const initialSchools = dbSchools.filter(school => schoolData.find(s => s.schoolName === school)?.district === profile.district);
-          setSchoolsForDistrict(initialSchools.length > 0 ? initialSchools : [profile.school || '']);
-      } else {
-          setSchoolsForDistrict([...dbSchools]);
-      }
+      setSchoolsForDistrict(getSchoolsForDistrict(profile.district || 'None'));
     }
-  }, [profile, createPlayerForm, dbSchools]);
+  }, [profile, createPlayerForm, getSchoolsForDistrict]);
 
   const rosterPlayers = useMemo(() => {
     if (!isProfileLoaded || !isDbLoaded || !profile) return [];
@@ -264,19 +242,7 @@ function SponsorRosterView() {
     });
     
     // Initialize schools for the player's district
-    if (player.district) {
-      if (player.district === 'all' || player.district === 'None') {
-        setEditFormSchoolsForDistrict(dbSchools);
-      } else {
-        const filteredSchools = schoolData
-          .filter((school) => school.district === player.district)
-          .map((school) => school.schoolName)
-          .sort();
-        setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
-      }
-    } else {
-      setEditFormSchoolsForDistrict(dbSchools);
-    }
+    setEditFormSchoolsForDistrict(getSchoolsForDistrict(player.district || 'all'));
     
     setIsEditPlayerDialogOpen(true);
   };
@@ -306,20 +272,7 @@ function SponsorRosterView() {
     setEditingPlayer(playerToEdit);
     
     // Initialize schools for the player's district
-    const playerDistrict = playerToEdit.district;
-    if (playerDistrict) {
-      if (playerDistrict === 'all' || playerDistrict === 'None') {
-        setEditFormSchoolsForDistrict(dbSchools);
-      } else {
-        const filteredSchools = schoolData
-          .filter((school) => school.district === playerDistrict)
-          .map((school) => school.schoolName)
-          .sort();
-        setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
-      }
-    } else {
-      setEditFormSchoolsForDistrict(dbSchools);
-    }
+    setEditFormSchoolsForDistrict(getSchoolsForDistrict(playerToEdit.district || 'all'));
     
     playerForm.reset({
       ...playerToEdit,
@@ -400,12 +353,7 @@ function SponsorRosterView() {
         uscfId: '',
     });
     // Trigger initial school list update
-    if (profile.district) {
-        const initialSchools = dbSchools.filter(school => schoolData.find(s => s.schoolName === school)?.district === profile.district);
-        setSchoolsForDistrict(initialSchools.length > 0 ? initialSchools : [profile.school || '']);
-    } else {
-        setSchoolsForDistrict([...dbSchools]);
-    }
+    setSchoolsForDistrict(getSchoolsForDistrict(profile.district || 'None'));
     setIsCreatePlayerDialogOpen(true);
   };
 
@@ -846,7 +794,7 @@ function SponsorRosterView() {
 
 function DistrictRosterView() {
     const { profile } = useSponsorProfile();
-    const { database: allPlayers, isDbLoaded, dbDistricts, toast, updatePlayer, deletePlayer } = useMasterDb();
+    const { database: allPlayers, isDbLoaded, dbDistricts, toast, updatePlayer, deletePlayer, getSchoolsForDistrict } = useMasterDb();
     const [selectedSchool, setSelectedSchool] = useState('all');
     const [selectedDistrict, setSelectedDistrict] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: DistrictSortableColumnKey; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
@@ -857,27 +805,25 @@ function DistrictRosterView() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
     const [editFormSchoolsForDistrict, setEditFormSchoolsForDistrict] = useState<string[]>([]);
+    const [availableSchools, setAvailableSchools] = useState<string[]>([]);
+
 
     const playerForm = useForm<PlayerFormValues>({
         resolver: zodResolver(playerFormSchema),
     });
     
     const selectedEditDistrict = playerForm.watch('district');
-    const dbSchools = useMemo(() => [...new Set(allPlayers.map(p => p.school).filter(Boolean))].sort(), [allPlayers]);
 
     useEffect(() => {
         if (selectedEditDistrict) {
-            if (selectedEditDistrict === 'all' || selectedEditDistrict === 'None') {
-                setEditFormSchoolsForDistrict(dbSchools);
-            } else {
-                const filteredSchools = schoolData
-                  .filter((school) => school.district === selectedEditDistrict)
-                  .map((school) => school.schoolName)
-                  .sort();
-                setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
-            }
+            setEditFormSchoolsForDistrict(getSchoolsForDistrict(selectedEditDistrict));
         }
-    }, [selectedEditDistrict, dbSchools]);
+    }, [selectedEditDistrict, getSchoolsForDistrict]);
+    
+    useEffect(() => {
+      setAvailableSchools(getSchoolsForDistrict(selectedDistrict));
+      setSelectedSchool('all');
+    }, [selectedDistrict, getSchoolsForDistrict]);
 
     useEffect(() => {
         if (profile?.role === 'district_coordinator' && profile.district) {
@@ -892,19 +838,9 @@ function DistrictRosterView() {
         }
         return allPlayers.filter(p => p.district === selectedDistrict);
     }, [allPlayers, isDbLoaded, profile, selectedDistrict]);
-
-    const districtSchools = useMemo(() => {
-        if (selectedDistrict === 'all') {
-             return [...new Set(allPlayers.map(p => p.school).filter(Boolean))].sort();
-        }
-        return schoolData
-            .filter(school => school.district === selectedDistrict)
-            .map(school => school.schoolName)
-            .sort();
-    }, [allPlayers, selectedDistrict]);
     
     const displayedSchools = useMemo(() => {
-        let schoolsToDisplay = districtSchools;
+        let schoolsToDisplay = availableSchools;
         if (selectedSchool !== 'all') {
             schoolsToDisplay = schoolsToDisplay.filter(school => school === selectedSchool);
         }
@@ -913,7 +849,7 @@ function DistrictRosterView() {
             schoolsToDisplay = schoolsToDisplay.filter(school => activeSchools.has(school));
         }
         return schoolsToDisplay;
-    }, [selectedSchool, districtSchools, showActiveOnly, districtPlayers]);
+    }, [selectedSchool, availableSchools, showActiveOnly, districtPlayers]);
 
     const requestSort = (key: DistrictSortableColumnKey) => {
         let direction: 'ascending' | 'descending' = 'ascending';
@@ -1110,19 +1046,7 @@ function DistrictRosterView() {
             uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
         });
         
-        if (player.district) {
-          if (player.district === 'all' || player.district === 'None') {
-            setEditFormSchoolsForDistrict(dbSchools);
-          } else {
-            const filteredSchools = schoolData
-              .filter((school) => school.district === player.district)
-              .map((school) => school.schoolName)
-              .sort();
-            setEditFormSchoolsForDistrict([...new Set(filteredSchools)]);
-          }
-        } else {
-          setEditFormSchoolsForDistrict(dbSchools);
-        }
+        setEditFormSchoolsForDistrict(getSchoolsForDistrict(player.district || 'all'));
 
         setIsEditPlayerDialogOpen(true);
     };
@@ -1193,7 +1117,7 @@ function DistrictRosterView() {
                         <SelectTrigger id="school-filter"><SelectValue placeholder="Select a school" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Schools</SelectItem>
-                            {districtSchools.map(school => (
+                            {availableSchools.map(school => (
                                 <SelectItem key={school} value={school}>{school}</SelectItem>
                             ))}
                         </SelectContent>
@@ -1448,5 +1372,3 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
-
-    

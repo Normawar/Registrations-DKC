@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -8,6 +9,7 @@ import { SponsorProfile } from '@/hooks/use-sponsor-profile';
 import Papa from 'papaparse';
 import { isValid, parse, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { type School } from '@/lib/data/school-data';
 
 // --- Types ---
 
@@ -59,6 +61,7 @@ interface MasterDbContextType {
   dbStates: string[];
   dbSchools: string[];
   dbDistricts: string[];
+  getSchoolsForDistrict: (district: string) => string[];
   searchPlayers: (criteria: Partial<SearchCriteria>) => Promise<SearchResult>;
   refreshDatabase: () => void;
   generatePlayerId: (uscfId: string) => string;
@@ -268,6 +271,7 @@ const flagPotentialMatches = (uscfPlayers: any[], tempPlayers: MasterPlayer[]) =
 
 export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [database, setDatabase] = useState<MasterPlayer[]>([]);
+  const [schools, setSchools] = useState<School[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState(false);
   const [isDbError, setIsDbError] = useState(false);
   const { toast } = useToast();
@@ -275,8 +279,19 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   // New state for summary data
   const [dbStates, setDbStates] = useState<string[]>([]);
-  const [dbSchools, setDbSchools] = useState<string[]>([]);
-  const [dbDistricts, setDbDistricts] = useState<string[]>([]);
+  
+  const dbSchools = useMemo(() => [...new Set(schools.map(s => s.schoolName))].sort(), [schools]);
+  const dbDistricts = useMemo(() => [...new Set(schools.map(s => s.district))].sort(), [schools]);
+  
+  const getSchoolsForDistrict = useCallback((district: string): string[] => {
+    if (district === 'all' || !district) {
+      return dbSchools;
+    }
+    return schools
+      .filter(s => s.district === district)
+      .map(s => s.schoolName)
+      .sort();
+  }, [schools, dbSchools]);
 
   const loadDatabase = useCallback(async () => {
     if (!db) return;
@@ -285,31 +300,30 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       const playersRef = collection(db, 'players');
-      const playersSnapshot = await getDocs(playersRef);
+      const schoolsRef = collection(db, 'schools');
+
+      const [playersSnapshot, schoolsSnapshot] = await Promise.all([
+        getDocs(playersRef),
+        getDocs(schoolsRef),
+      ]);
       
       const players = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
+      const schoolList = schoolsSnapshot.docs.map(doc => doc.data() as School);
       
       setDatabase(players);
+      setSchools(schoolList);
       setPlayerCount(players.length);
       setIsDbLoaded(true);
       
-      // Compute summary data
+      // Compute summary data from players for states
       const states = new Set<string>();
-      const schools = new Set<string>();
-      const districts = new Set<string>();
-      
       players.forEach(p => {
         if (p.state) states.add(p.state);
-        if (p.school) schools.add(p.school);
-        if (p.district) districts.add(p.district);
       });
-      
       setDbStates([...states].sort());
-      setDbSchools([...schools].sort());
-      setDbDistricts([...districts].sort());
       
     } catch (error: any) {
-      console.error('Failed to load players database:', error);
+      console.error('Failed to load players or schools database:', error);
       setIsDbLoaded(false);
       setIsDbError(true);
     }
@@ -322,7 +336,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshDatabase = async () => {
     await loadDatabase();
-    toast({ title: 'Database Refreshed', description: 'Fetched the latest player data from the server.' });
+    toast({ title: 'Database Refreshed', description: 'Fetched the latest player and school data from the server.' });
   };
 
   const addPlayer = async (player: MasterPlayer) => {
@@ -451,6 +465,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     dbStates,
     dbSchools,
     dbDistricts,
+    getSchoolsForDistrict,
     searchPlayers,
     refreshDatabase,
     generatePlayerId,

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -31,12 +32,13 @@ export function EnhancedPlayerSearchDialog({
   userProfile?: SponsorProfile | null;
   preFilterByUserProfile?: boolean;
 }) {
-  const { isDbLoaded, dbDistricts, dbSchools, searchPlayers } = useMasterDb();
+  const { isDbLoaded, dbDistricts, getSchoolsForDistrict, searchPlayers } = useMasterDb();
   
   // DATABASE SEARCH STATE
   const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [availableSchools, setAvailableSchools] = useState<string[]>([]);
   
   const availableDistricts = React.useMemo(() => {
     if (!preFilterByUserProfile || !userProfile || userProfile.role === 'organizer' || userProfile.isDistrictCoordinator) {
@@ -47,21 +49,14 @@ export function EnhancedPlayerSearchDialog({
     }
     return dbDistricts;
   }, [dbDistricts, userProfile, preFilterByUserProfile]);
-  
-  const availableSchools = React.useMemo(() => {
-    const district = searchCriteria.district;
-    if (!district || district === 'all') {
-      return dbSchools;
+
+  // Update available schools when district changes
+  useEffect(() => {
+    if (isDbLoaded) {
+      const schools = getSchoolsForDistrict(searchCriteria.district || 'all');
+      setAvailableSchools(schools);
     }
-    // Filter schools based on the selected district.
-    return dbSchools.filter(school => {
-        // This is a simplified check. A better implementation would use the full school data.
-        // For now, we assume school names are unique enough or we can derive district.
-        // This part might need to be improved if school names are not unique across districts.
-        // The master DB context would need to expose the full school objects.
-        return true; // Re-evaluating this, as dbSchools is just strings.
-    });
-  }, [dbSchools, searchCriteria.district]);
+  }, [searchCriteria.district, isDbLoaded, getSchoolsForDistrict]);
 
   // Initialize search criteria based on user profile
   useEffect(() => {
@@ -164,7 +159,7 @@ export function EnhancedPlayerSearchDialog({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">School</label>
-              <select value={searchCriteria.school || 'all'} onChange={(e) => updateField('school', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded || !searchCriteria.district}>
+              <select value={searchCriteria.school || 'all'} onChange={(e) => updateField('school', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded}>
                 <option value="all">{!isDbLoaded ? 'Loading schools...' : 'All Available Schools'}</option>
                  <option value="Unassigned">Unassigned Players</option>
                 {availableSchools.filter(s => s && s !== 'all').map((school) => (<option key={school} value={school}>{school}</option>))}
