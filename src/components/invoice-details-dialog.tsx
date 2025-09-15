@@ -153,8 +153,9 @@ const SponsorPaymentComponent = () => {
     setCheckNumber('');
     setPayByCheckAtTournament(false);
     setUploadedFiles([]);
+    
     setFileUrls(prev => {
-      prev.forEach(url => URL.createObjectURL(url));
+      prev.forEach(url => URL.revokeObjectURL(url));
       return [];
     });
   };
@@ -480,9 +481,10 @@ interface InvoiceDetailsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   confirmation: any;
+  confirmationId?: string;
 }
 
-export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialConfirmation }: InvoiceDetailsDialogProps) {
+export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialConfirmation, confirmationId }: InvoiceDetailsDialogProps) {
   const { toast } = useToast();
   const { profile } = useSponsorProfile();
   const { database: masterDatabase } = useMasterDb();
@@ -562,7 +564,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
 
   useEffect(() => {
     if (!isOpen) return;
-
+  
     if (initialConfirmation) {
         setConfirmation(initialConfirmation);
         const savedMethods = initialConfirmation.selectedPaymentMethods || [];
@@ -714,7 +716,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     return <Badge variant={variants[displayStatus] || 'secondary'} className={className}>{displayStatus.replace(/_/g, ' ')}</Badge>;
   };
   
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [fileUrls, setFileUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -728,10 +729,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     });
   
     if (validFiles.length > 0) {
-      setUploadedFiles(prev => [...prev, ...validFiles]);
-      
-      const newUrls = validFiles.map(file => URL.createObjectURL(file));
-      setFileUrls(prev => [...prev, ...newUrls]);
+      setFileToUpload(validFiles[0]);
+      setFileUrls(validFiles.map(file => URL.createObjectURL(file)));
     }
   
     if (fileInputRef.current) {
@@ -740,7 +739,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
   };
 
   const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setFileToUpload(null);
     setFileUrls(prev => {
       URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
