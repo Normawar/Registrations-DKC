@@ -27,7 +27,7 @@ export type School = {
 };
 
 export const schoolData: School[] = [
-  { "district": "Test", "schoolName": "Test", "streetAddress": "123 Test St", "city": "Testville", "zip": "12345", "zip4": "", "phone": "(555)555-5555", "charter": "No", "students": "10", "state": "TX", "county": "Test County" },
+  { "district": "Test", "schoolName": "Test", "streetAddress": "123 Test St", "city": "Testville", "zip": "12345", "zip4": "", "phone": "(555)555-5555", "charter": "No", "students": "10", "state": "TX", "county": "Test" },
   { "district": "BRILLANTE ACADEMY", "schoolName": "BRILLANTE ACADEMY", "streetAddress": "706 N LOS EBANOS RD", "city": "MISSION", "zip": "78572", "zip4": "", "phone": "(713)303-6447", "charter": "Yes", "students": "196", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "A M OCHOA EL", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "2799", "phone": "(956)464-1900", "charter": "No", "students": "603", "state": "TX", "county": "Hidalgo County" },
   { "district": "DONNA ISD", "schoolName": "A P SOLIS MIDDLE", "streetAddress": "116 N 10TH ST", "city": "DONNA", "zip": "78537", "zip4": "2799", "phone": "(956)464-1650", "charter": "No", "students": "631", "state": "TX", "county": "Hidalgo County" },
@@ -69,7 +69,7 @@ export const schoolData: School[] = [
   { "district": "EDINBURG CISD", "schoolName": "CANO-GONZALEZ EL", "streetAddress": "P O BOX 990", "city": "EDINBURG", "zip": "78540", "zip4": "990", "phone": "(956)289-2380", "charter": "No", "students": "388", "state": "TX", "county": "Hidalgo County" },
   { "district": "EDINBURG CISD", "schoolName": "Canterbury Elementary", "streetAddress": "P O BOX 990", "city": "EDINBURG", "zip": "78540", "zip4": "990", "phone": "(956)289-2374", "charter": "No", "students": "715", "state": "TX", "county": "Hidalgo County" },
   { "district": "EDINBURG CISD", "schoolName": "CARMEN V AVILA EL", "streetAddress": "P O BOX 990", "city": "EDINBURG", "zip": "78540", "zip4": "990", "phone": "(956)289-2307", "charter": "No", "students": "636", "state": "TX", "county": "Hidalgo County" },
-  { "district": "EDINBURG CISD", "schoolName": "CAVAZOS EL", "streetAddress": "P O BOX 990", "city": "EDINBURG", "zip": "78540", "zip4": "990", "phone": "(956)289-2535", "charter": "No", "students": "433", "state": "TX", "county": "Hidalgo County" },
+  { "district": "EDINBURG CISD", "schoolName": "CAVAZOS EL", "streetAddress": "P O BOX 990", "city": "EDINBURG", "zip": "78540", "zip4": "90", "phone": "(956)289-2535", "charter": "No", "students": "433", "state": "TX", "county": "Hidalgo County" },
   { "district": "EDINBURG CISD", "schoolName": "DE LA VINA EL", "streetAddress": "P O BOX 990", "city": "EDINBURG", "zip": "78504", "zip4": "990", "phone": "(956)289-2366", "charter": "No", "students": "629", "state": "TX", "county": "Hidalgo County" },
   { "district": "EDINBURG CISD", "schoolName": "Crawford Elementary", "streetAddress": "P O BOX 990", "city": "EDINBURG", "zip": "78540", "zip4": "990", "phone": "(956)289-2410", "charter": "No", "students": "613", "state": "TX", "county": "Hidalgo County" },
   { "district": "EDINBURG CISD", "schoolName": "Esparza", "streetAddress": "P O BOX 990", "city": "EDINBURG", "zip": "78539", "zip4": "9599", "phone": "(956)289-2308", "charter": "No", "students": "520", "state": "TX", "county": "Hidalgo County" },

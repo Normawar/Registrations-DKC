@@ -1,4 +1,5 @@
 
+
 // src/app/signup/page.tsx - Updated with Data Correction for Organizer Account
 'use client';
 
@@ -118,9 +119,6 @@ const SponsorSignUpForm = () => {
       const districts = [...new Set(data.map((s: School) => s.district))].sort();
       if (!districts.includes('None')) {
         districts.unshift('None');
-      }
-      if (!districts.includes('Test')) {
-        districts.unshift('Test');
       }
       setUniqueDistricts(districts);
       setIsInitialized(true);
