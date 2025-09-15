@@ -40,7 +40,7 @@ const CreateInvoiceInputSchema = z.object({
     schoolAddress: z.string().optional().describe('The street address of the school.'),
     schoolPhone: z.string().optional().describe('The phone number of the school.'),
     district: z.string().optional().describe('The school district.'),
-    teamCode: z.string().describe('The team code of the sponsor.'),
+    teamCode: z.string().optional().describe('An optional team code. If provided, it will be used. If not, it will be generated.'),
     eventName: z.string().describe('The name of the event.'),
     eventDate: z.string().describe('The date of the event in ISO 8601 format.'),
     uscfFee: z.number().describe('The fee for a new or renewing USCF membership.'),
@@ -140,6 +140,7 @@ const createInvoiceFlow = ai.defineFlow(
       });
 
       const companyName = input.district ? `${input.schoolName} / ${input.district}` : input.schoolName;
+      const finalTeamCode = input.teamCode || generateTeamCode({ schoolName: input.schoolName, district: input.district });
 
       let customerId: string;
       if (searchCustomersResponse.result.customers?.length) {
@@ -160,7 +161,7 @@ const createInvoiceFlow = ai.defineFlow(
           companyName,
           phoneNumber: input.schoolPhone,
           address: { addressLine1: input.schoolAddress },
-          note: `Team Code: ${input.teamCode}`,
+          note: `Team Code: ${finalTeamCode}`,
         });
         customerId = createCustomerResponse.result.customer!.id!;
       }
@@ -255,7 +256,7 @@ const createInvoiceFlow = ai.defineFlow(
           deliveryMethod: 'EMAIL',
           acceptedPaymentMethods: { card: true, squareGiftCard: true, bankAccount: true },
           invoiceNumber: input.invoiceNumber,
-          title: `${input.teamCode} @ ${formattedEventDate} ${input.eventName}`,
+          title: `${finalTeamCode} @ ${formattedEventDate} ${input.eventName}`,
           description,
         },
       };
@@ -281,3 +282,5 @@ const createInvoiceFlow = ai.defineFlow(
     }
   }
 );
+
+    

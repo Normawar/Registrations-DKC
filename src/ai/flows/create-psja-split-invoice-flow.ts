@@ -29,7 +29,7 @@ const CreatePsjaSplitInvoiceInputSchema = z.object({
   schoolAddress: z.string().optional(),
   schoolPhone: z.string().optional(),
   district: z.literal('PHARR-SAN JUAN-ALAMO ISD'),
-  teamCode: z.string(),
+  teamCode: z.string().optional(),
   eventName: z.string(),
   eventDate: z.string(),
   uscfFee: z.number(),
@@ -117,3 +117,5 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
     return output;
   }
 );
+
+    

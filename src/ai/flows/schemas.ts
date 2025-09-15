@@ -54,7 +54,7 @@ export const RecreateInvoiceInputSchema = z.object({
     schoolAddress: z.string().optional(),
     schoolPhone: z.string().optional(),
     district: z.string().optional(),
-    teamCode: z.string(),
+    teamCode: z.string().optional(),
     eventName: z.string(),
     eventDate: z.string(),
     revisionMessage: z.string().optional(),
@@ -70,3 +70,5 @@ export const RecreateInvoiceOutputSchema = z.object({
   newTotalAmount: z.number(),
 });
 export type RecreateInvoiceOutput = z.infer<typeof RecreateInvoiceOutputSchema>;
+
+    

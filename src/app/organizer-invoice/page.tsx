@@ -42,6 +42,7 @@ const invoiceFormSchema = z.object({
   sponsorName: z.string().min(1, 'Sponsor name is required.'),
   sponsorEmail: z.string().email('Please enter a valid email.'),
   invoiceTitle: z.string().min(3, 'Invoice title is required.'),
+  teamCode: z.string().optional(),
   lineItems: z.array(lineItemSchema).min(1, 'At least one line item is required.'),
 });
 
@@ -66,6 +67,7 @@ function OrganizerInvoiceContent() {
       sponsorName: '',
       sponsorEmail: '',
       invoiceTitle: '',
+      teamCode: '',
       lineItems: [{ name: '', amount: 0, note: '', isUscf: false }],
     },
   });
@@ -122,6 +124,7 @@ function OrganizerInvoiceContent() {
             sponsorName: invoiceToEdit.purchaserName || invoiceToEdit.sponsorName || '',
             sponsorEmail: invoiceToEdit.sponsorEmail || '',
             invoiceTitle: existingTitle || autoTitle,
+            teamCode: invoiceToEdit.teamCode || '',
             lineItems: lineItems.length > 0 ? lineItems.map(item => ({
               ...item,
               id: item.id || '',
@@ -190,9 +193,6 @@ function OrganizerInvoiceContent() {
         };
     });
 
-    const schoolInfo = schoolData.find(s => s.schoolName === values.schoolName);
-    const teamCode = generateTeamCode({ schoolName: values.schoolName, district: schoolInfo?.district });
-
     const result = await recreateInvoiceFromRoster({
         originalInvoiceId: originalInvoice.invoiceId,
         players: playersToInvoice,
@@ -200,7 +200,7 @@ function OrganizerInvoiceContent() {
         sponsorName: values.sponsorName,
         sponsorEmail: values.sponsorEmail,
         schoolName: values.schoolName,
-        teamCode: teamCode,
+        teamCode: values.teamCode,
         eventName: values.invoiceTitle,
         eventDate: eventDetails.date,
         bookkeeperEmail: originalInvoice.bookkeeperEmail,
@@ -231,7 +231,7 @@ function OrganizerInvoiceContent() {
             return acc;
         }, {} as any),
         previousVersionId: originalInvoice.id, 
-        teamCode: teamCode,
+        teamCode: values.teamCode,
         schoolName: values.schoolName,
         district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
         sponsorName: values.sponsorName,
@@ -312,7 +312,7 @@ function OrganizerInvoiceContent() {
       invoiceStatus: result.status,
       schoolName: values.schoolName,
       district: schoolInfo?.district || '',
-      teamCode: generateTeamCode({ schoolName: values.schoolName, district: schoolInfo?.district }),
+      teamCode: values.teamCode || generateTeamCode({ schoolName: values.schoolName, district: schoolInfo?.district }),
       lineItems: values.lineItems,
     };
   };
@@ -409,6 +409,19 @@ function OrganizerInvoiceContent() {
                         </FormItem>
                     )}
                     />
+                </div>
+                 <div className="grid md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="teamCode"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Team Code (Optional)</FormLabel>
+                            <FormControl><Input placeholder="e.g., LIHS" {...field} /></FormControl>
+                             <FormMessage />
+                            </FormItem>
+                        )}
+                        />
                 </div>
               </CardContent>
             </Card>
@@ -535,3 +548,5 @@ export default function OrganizerInvoicePage() {
         </Suspense>
     );
 }
+
+    
