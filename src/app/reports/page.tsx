@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code } from 'lucide-react';
+import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code, Building } from 'lucide-react';
 import Link from 'next/link';
 
 function ReportsPageContent() {
@@ -62,6 +62,30 @@ function ReportsPageContent() {
             <Button asChild>
               <Link href="/reports/tournaments">
                 View Tournament Report <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-sky-100 p-3 rounded-full">
+                <Building className="h-6 w-6 text-sky-600" />
+              </div>
+              <div>
+                <CardTitle>District Totals Report</CardTitle>
+                <CardDescription>Aggregate summary of players and schools per district.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              View a high-level report that shows total player counts, school counts, and GT/Independent breakdowns for each district in the system.
+            </p>
+            <Button asChild>
+              <Link href="/reports/district-totals">
+                View District Report <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardContent>
