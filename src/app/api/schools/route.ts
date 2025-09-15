@@ -1,3 +1,7 @@
+// This file is no longer used for data fetching in the main application flow.
+// The EnhancedPlayerSearchDialog now fetches school data directly from the client.
+// This route can be kept for debugging or removed.
+
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/firebase-admin';

@@ -2,6 +2,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { db } from '@/lib/firebase'; // Your client-side firebase config
+import { collection, getDocs, query, where } from 'firebase/firestore';
+
 
 interface USCFPlayer {
   uscf_id: string;
@@ -81,22 +84,31 @@ export function EnhancedPlayerSearchDialog({
   // Load districts when dialog opens
   useEffect(() => {
     const loadDistricts = async () => {
-      if (!isOpen) return;
+      if (!isOpen || !db) return;
       
       setLoadingDistricts(true);
       try {
-        console.log('Loading districts...');
-        const response = await fetch('/api/districts');
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Districts loaded:', data);
-          setDistricts(data);
-        } else {
-          const errorData = await response.json();
-          console.error('Failed to load districts:', errorData.error || response.statusText);
-        }
+        console.log('Fetching districts from Firestore...');
+        
+        const playersRef = collection(db, 'players');
+        const snapshot = await getDocs(playersRef);
+        
+        const districts = new Set<string>();
+        
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          if (data.district && data.district.trim()) {
+            districts.add(data.district.trim());
+          }
+        });
+        
+        const sortedDistricts = [...districts].sort();
+        setDistricts(sortedDistricts);
+        console.log(`Found ${sortedDistricts.length} unique districts`);
+        
       } catch (error) {
-        console.error('Failed to load districts:', error);
+        console.error('Error fetching districts:', error);
+        setDistricts([]);
       } finally {
         setLoadingDistricts(false);
       }
@@ -107,34 +119,44 @@ export function EnhancedPlayerSearchDialog({
 
   // Load schools when district changes or dialog opens
   useEffect(() => {
-    const loadSchools = async () => {
-      if (!isOpen) return;
-      
-      setLoadingSchools(true);
-      try {
-        console.log('Loading schools for district:', searchCriteria.district || 'all');
-        const params = new URLSearchParams();
-        if (searchCriteria.district && searchCriteria.district !== 'all') {
-          params.append('district', searchCriteria.district);
+    const loadSchools = async (selectedDistrict?: string) => {
+        if (!isOpen || !db) return;
+        setLoadingSchools(true);
+        try {
+            console.log('Fetching schools from Firestore for district:', selectedDistrict);
+            
+            const playersRef = collection(db, 'players');
+            let queryRef;
+            
+            if (selectedDistrict && selectedDistrict !== 'all') {
+            queryRef = query(playersRef, where('district', '==', selectedDistrict));
+            } else {
+            queryRef = playersRef;
+            }
+            
+            const snapshot = await getDocs(queryRef);
+            const schools = new Set<string>();
+            
+            snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.school && data.school.trim()) {
+                schools.add(data.school.trim());
+            }
+            });
+            
+            const sortedSchools = [...schools].sort();
+            setSchools(sortedSchools);
+            console.log(`Found ${sortedSchools.length} unique schools`);
+            
+        } catch (error) {
+            console.error('Error fetching schools:', error);
+            setSchools([]);
+        } finally {
+            setLoadingSchools(false);
         }
-        
-        const response = await fetch(`/api/schools?${params}`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Schools loaded:', data);
-          setSchools(data);
-        } else {
-          const errorData = await response.json();
-          console.error('Failed to load schools:', errorData.error || response.statusText);
-        }
-      } catch (error) {
-        console.error('Failed to load schools:', error);
-      } finally {
-        setLoadingSchools(false);
-      }
     };
 
-    loadSchools();
+    loadSchools(searchCriteria.district);
   }, [isOpen, searchCriteria.district]);
 
   // API-based search function
