@@ -1,4 +1,5 @@
 
+
 // src/lib/auth-debug.ts - Debug Firebase Auth issues
 import { auth, db } from '@/lib/firebase';
 import { simpleSignUp, simpleSignIn, testKnownAccounts as testAccounts } from './simple-auth';
@@ -155,6 +156,22 @@ export async function createAndTestAccount() {
     console.error('❌ Create and test failed:', error);
   }
 }
+
+export async function createUserByOrganizer(email: string, password: string, profileData: any) {
+    console.log(`🔑 Creating user ${email} via organizer flow...`);
+    try {
+        const { simpleSignUp: adminSignUp } = await import('./simple-auth');
+        const result = await adminSignUp(email, password, {
+            ...profileData,
+            forceProfileUpdate: true, // New users should complete their profile
+        });
+        return result;
+    } catch (error) {
+        console.error('❌ Organizer user creation failed:', error);
+        throw error;
+    }
+}
+
 
 // Renaming the imported testKnownAccounts to avoid conflicts
 export { testAccounts as testKnownAccounts };

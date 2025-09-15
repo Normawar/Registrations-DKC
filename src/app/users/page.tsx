@@ -25,7 +25,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/services/firestore-service';
-import { createUserByOrganizer } from '@/lib/simple-auth';
+import { createUserByOrganizer } from '@/lib/auth-debug';
 import { Loader2 } from 'lucide-react';
 
 
@@ -223,6 +223,8 @@ export default function UsersPage() {
         if (!userToDelete || !db) return;
 
         try {
+            // NOTE: This only deletes from Firestore, not Firebase Auth.
+            // For a full implementation, you'd need a server-side function to delete from Auth.
             await deleteDoc(doc(db, "users", userToDelete.email));
             loadUsers(); 
             toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
@@ -237,8 +239,16 @@ export default function UsersPage() {
     const onSubmit = async (values: UserFormValues) => {
         if (!editingUser || !db) return;
 
+        // Find the user's document ID, which might not be their email if migrated
+        const userSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', editingUser.email)));
+        if(userSnapshot.empty) {
+            toast({ variant: 'destructive', title: "Update Failed", description: "Could not find the user to update." });
+            return;
+        }
+        const userDocId = userSnapshot.docs[0].id;
+
         try {
-            const userRef = doc(db, "users", values.email);
+            const userRef = doc(db, "users", userDocId);
             await setDoc(userRef, values, { merge: true });
             
             loadUsers();
@@ -570,7 +580,7 @@ export default function UsersPage() {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>This action cannot be undone. This will permanently delete the user account for {userToDelete?.email}.</AlertDialogDescription>
+                        <AlertDialogDescription>This will permanently delete the user account for {userToDelete?.email}. This action cannot be undone.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
