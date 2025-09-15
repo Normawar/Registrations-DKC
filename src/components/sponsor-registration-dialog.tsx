@@ -143,7 +143,14 @@ export function SponsorRegistrationDialog({
     });
   };
 
+  // FIXED: Add validation to prevent undefined values
   const updateStudentSelection = (studentId: string, field: 'section' | 'uscfStatus', value: string) => {
+    // Validate that value is not undefined or empty
+    if (!value || value.trim() === '') {
+      console.warn(`Invalid value for ${field}:`, value);
+      return;
+    }
+
     setSelectedStudents(prev => ({
       ...prev,
       [studentId]: {
@@ -370,10 +377,40 @@ export function SponsorRegistrationDialog({
       );
   };
   
+  // FIXED: Add validation before saving to Firestore
   const saveConfirmation = async (invoiceId: string, result: any, players: any[], total: number) => {
     if(!profile || !event || !db) return;
     
     const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
+    
+    // FIXED: Validate selections data before saving
+    const validatedSelections = Object.fromEntries(
+      Object.entries(selectedStudents)
+        .filter(([playerId, details]) => {
+          // Ensure both section and uscfStatus are defined and not empty
+          if (!details.section || details.section.trim() === '') {
+            console.error(`Invalid section for player ${playerId}:`, details.section);
+            return false;
+          }
+          if (!details.uscfStatus || details.uscfStatus.trim() === '') {
+            console.error(`Invalid uscfStatus for player ${playerId}:`, details.uscfStatus);
+            return false;
+          }
+          return true;
+        })
+        .map(([playerId, details]) => [
+          playerId, { 
+            section: details.section.trim(),
+            uscfStatus: details.uscfStatus.trim(),
+            status: 'active' 
+          }
+        ])
+    );
+
+    // Additional safety check
+    if (Object.keys(validatedSelections).length === 0 && players.length > 0) {
+      throw new Error('No valid player selections to save after validation. Please check player sections.');
+    }
     
     const newConfirmation = {
       id: invoiceId,
@@ -387,22 +424,21 @@ export function SponsorRegistrationDialog({
       district: profile.district,
       teamCode: teamCode,
       invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
-      selections: Object.fromEntries(
-        Object.entries(selectedStudents).map(([playerId, details]) => [
-          playerId, { ...details, status: 'active' }
-        ])
-      ),
+      selections: validatedSelections,
       totalInvoiced: total,
       totalAmount: total,
       invoiceStatus: result.status,
       status: result.status,
       invoiceUrl: result.invoiceUrl,
       purchaserName: `${profile.firstName} ${profile.lastName}`,
-      sponsorEmail: profile.email,
-      sponsorPhone: profile.phone,
-      contactEmail: profile.email,
-      purchaserEmail: profile.email,
+      sponsorEmail: profile.email || '',
+      sponsorPhone: profile.phone || '',
+      contactEmail: profile.email || '',
+      purchaserEmail: profile.email || '',
     };
+    
+    // Log the data being saved for debugging
+    console.log('Saving confirmation to Firestore:', newConfirmation);
     
     const invoiceDocRef = doc(db, 'invoices', invoiceId);
     await setDoc(invoiceDocRef, newConfirmation);
@@ -485,7 +521,14 @@ export function SponsorRegistrationDialog({
 
   return (
     <>
-      <Dialog open={isOpen && !showConfirmation} onOpenChange={onOpenChange}>
+      {/* Main Registration Dialog */}
+      <Dialog open={isOpen && !showConfirmation} onOpenChange={(open) => {
+        if (!open) {
+          setShowConfirmation(false);
+          setSelectedStudents({});
+        }
+        onOpenChange(open);
+      }}>
         <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
           <DialogHeader className="shrink-0">
             <DialogTitle>Register Students for {event.name}</DialogTitle>
@@ -665,11 +708,7 @@ export function SponsorRegistrationDialog({
           )}
 
           <DialogFooter className="shrink-0">
-            <Button variant="outline" onClick={() => {
-                setShowConfirmation(false);
-                setSelectedStudents({});
-                onOpenChange(false);
-            }}>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button 
