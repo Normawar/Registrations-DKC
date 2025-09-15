@@ -44,6 +44,7 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     const { doc, setDoc } = await import('firebase/firestore');
     const authInstance = getAuth();
     let user: User;
+    let isExistingAuthUser = false;
 
     // Handle special test user cases with normalized email
     if (normalizedEmail.startsWith('test')) {
@@ -56,6 +57,7 @@ export async function simpleSignUp(email: string, password: string, userData: Om
         } catch (error: any) {
             // If the user already exists, sign them in to get the UID.
             if (error.code === 'auth/email-already-in-use') {
+                isExistingAuthUser = true;
                 console.log(`⚠️ Test user ${normalizedEmail} already exists, signing in...`);
                 userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
                 user = userCredential.user;
