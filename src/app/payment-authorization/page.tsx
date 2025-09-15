@@ -41,6 +41,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
+import { OrganizerGuard } from '@/components/auth-guard';
 
 
 type Confirmation = {
@@ -64,7 +65,7 @@ type Confirmation = {
   invoiceUrl?: string;
 };
 
-export default function PaymentAuthorizationPage() {
+function PaymentAuthorizationPageContent() {
   const { toast } = useToast();
   const [pendingPayments, setPendingPayments] = useState<Confirmation[]>([]);
   const [isApproving, setIsApproving] = useState(false);
@@ -126,6 +127,7 @@ export default function PaymentAuthorizationPage() {
         amount: parseFloat(paymentAmount),
         note: paymentNote,
         paymentDate: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : undefined,
+        requestingUserRole: 'organizer' // Assuming this page is for organizers
       });
 
       const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
@@ -303,4 +305,12 @@ export default function PaymentAuthorizationPage() {
       </Dialog>
     </>
   );
+}
+
+export default function GuardedPaymentAuthorizationPage() {
+    return (
+        <OrganizerGuard>
+            <PaymentAuthorizationPageContent />
+        </OrganizerGuard>
+    )
 }
