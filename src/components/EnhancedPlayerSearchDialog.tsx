@@ -88,10 +88,11 @@ export function EnhancedPlayerSearchDialog({
       
       setLoadingDistricts(true);
       try {
-        console.log('Fetching districts from Firestore...');
+        console.log('Fetching districts from schools collection...');
         
-        const playersRef = collection(db, 'players');
-        const snapshot = await getDocs(playersRef);
+        // Query schools collection instead of players
+        const schoolsRef = collection(db, 'schools');
+        const snapshot = await getDocs(schoolsRef);
         
         const districts = new Set<string>();
         
@@ -104,7 +105,7 @@ export function EnhancedPlayerSearchDialog({
         
         const sortedDistricts = [...districts].sort();
         setDistricts(sortedDistricts);
-        console.log(`Found ${sortedDistricts.length} unique districts`);
+        console.log(`Found ${sortedDistricts.length} unique districts from schools`);
         
       } catch (error) {
         console.error('Error fetching districts:', error);
