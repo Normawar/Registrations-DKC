@@ -67,14 +67,11 @@ export default function DataRepairPage() {
             
             const updates = sampleData[player.uscfId];
             if (updates) {
-                // Ensure no undefined values are written to Firestore by merging with existing data and providing defaults
-                const fullPlayerData = { ...player, ...updates };
+                const fullPlayerData = { ...player, ...updates, school: "", district: "" };
 
-                const updateData = {
-                    ...fullPlayerData,
-                    school: "", // Ensure unassigned
-                    district: "", // Ensure unassigned
-                    // Provide default values for any other potentially undefined fields
+                const updateData: Partial<MasterPlayer> = {
+                    firstName: fullPlayerData.firstName || 'Unknown',
+                    lastName: fullPlayerData.lastName || 'Unknown',
                     middleName: fullPlayerData.middleName || '',
                     state: fullPlayerData.state || 'TX',
                     uscfExpiration: fullPlayerData.uscfExpiration || null,
@@ -89,6 +86,8 @@ export default function DataRepairPage() {
                     studentType: fullPlayerData.studentType || 'independent',
                     events: fullPlayerData.events || 0,
                     eventIds: fullPlayerData.eventIds || [],
+                    school: "", // Explicitly unassign
+                    district: "", // Explicitly unassign
                 };
 
                 batch.update(playerDoc.ref, updateData);
