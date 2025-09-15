@@ -2,13 +2,11 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
-// WARNING: Using NEXT_PUBLIC_ variables for admin credentials is not secure for production.
-// This is a temporary solution for this development environment.
-// In a real production environment, use non-prefixed variables set on your hosting platform.
+// These variables should be set in your Vercel/hosting environment, not prefixed with NEXT_PUBLIC_
 const firebaseAdminConfig = {
   credential: cert({
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL, // This might still fail if not set correctly in the environment
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID, // Project ID is safe to be public
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
     privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
   }),
 };
