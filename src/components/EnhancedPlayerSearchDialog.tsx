@@ -1,8 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
+import React, { useState, useEffect } from 'react';
 
 interface USCFPlayer {
   uscf_id: string;
@@ -11,6 +10,36 @@ interface USCFPlayer {
   rating_quick: number | null;
   state: string | null;
   expiration_date: string | null;
+}
+
+interface MasterPlayer {
+  id: string;
+  uscfId: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  state: string;
+  school: string;
+  district: string;
+  regularRating: number;
+}
+
+interface SearchCriteria {
+  uscfId?: string;
+  firstName?: string;
+  lastName?: string;
+  district?: string;
+  school?: string;
+  state?: string;
+  minRating?: number;
+  maxRating?: number;
+  pageSize?: number;
+}
+
+interface SearchResult {
+  players: MasterPlayer[];
+  total: number;
+  message?: string;
 }
 
 export function EnhancedPlayerSearchDialog({ 
@@ -26,7 +55,6 @@ export function EnhancedPlayerSearchDialog({
   excludeIds?: string[];
   title?: string;
 }) {
-  const { searchPlayers, dbDistricts, dbSchools, isDbLoaded } = useMasterDb();
   const [activeTab, setActiveTab] = useState<'database' | 'uscf'>('database');
   
   // DATABASE SEARCH STATE
@@ -34,19 +62,11 @@ export function EnhancedPlayerSearchDialog({
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
-  const schoolsForDistrict = useMemo(() => {
-    if (!searchCriteria.district || searchCriteria.district === 'all') {
-      return dbSchools;
-    }
-    // This part assumes you have a way to relate schools to districts.
-    // A more robust way would be to have this logic in the context itself.
-    // For now, filtering based on the allPlayers list is a fallback.
-    const { database } = useMasterDb();
-    const schools = database
-      .filter(p => p.district === searchCriteria.district)
-      .map(p => p.school);
-    return [...new Set(schools)].sort();
-  }, [searchCriteria.district, dbSchools]);
+  // DROPDOWN DATA STATE
+  const [districts, setDistricts] = useState<string[]>([]);
+  const [schools, setSchools] = useState<string[]>([]);
+  const [loadingDistricts, setLoadingDistricts] = useState(false);
+  const [loadingSchools, setLoadingSchools] = useState(false);
   
   // USCF lookup state
   const [uscfLookup, setUSCFLookup] = useState({
@@ -58,6 +78,109 @@ export function EnhancedPlayerSearchDialog({
   const [isUSCFSearching, setIsUSCFSearching] = useState(false);
   const [uscfError, setUSCFError] = useState<string>('');
 
+  // Load districts when dialog opens
+  useEffect(() => {
+    const loadDistricts = async () => {
+      if (!isOpen) return;
+      
+      setLoadingDistricts(true);
+      try {
+        console.log('Loading districts...');
+        const response = await fetch('/api/districts');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Districts loaded:', data);
+          setDistricts(data);
+        } else {
+          console.error('Failed to load districts:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Failed to load districts:', error);
+      } finally {
+        setLoadingDistricts(false);
+      }
+    };
+
+    loadDistricts();
+  }, [isOpen]);
+
+  // Load schools when district changes or dialog opens
+  useEffect(() => {
+    const loadSchools = async () => {
+      if (!isOpen) return;
+      
+      setLoadingSchools(true);
+      try {
+        console.log('Loading schools for district:', searchCriteria.district || 'all');
+        const params = new URLSearchParams();
+        if (searchCriteria.district && searchCriteria.district !== 'all') {
+          params.append('district', searchCriteria.district);
+        }
+        
+        const response = await fetch(`/api/schools?${params}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Schools loaded:', data);
+          setSchools(data);
+        } else {
+          console.error('Failed to load schools:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Failed to load schools:', error);
+      } finally {
+        setLoadingSchools(false);
+      }
+    };
+
+    loadSchools();
+  }, [isOpen, searchCriteria.district]);
+
+  // API-based search function
+  const handleSearch = async () => {
+    setIsSearching(true);
+    try {
+      console.log('Searching with criteria:', searchCriteria);
+      const response = await fetch('/api/search-players', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...searchCriteria,
+          pageSize: 100
+        }),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Search result:', result);
+        setSearchResult(result);
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Search failed');
+      }
+    } catch (error: any) {
+      console.error('Search failed:', error);
+      alert(`Search failed: ${error.message}`);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchCriteria({});
+    setSearchResult(null);
+  };
+
+  // Field updates
+  const updateField = (field: keyof SearchCriteria, value: any) => {
+    const newCriteria: Partial<SearchCriteria> = { ...searchCriteria, [field]: value };
+    // If district is changed, reset school
+    if (field === 'district') {
+      newCriteria.school = '';
+    }
+    setSearchCriteria(newCriteria);
+  };
+
+  // USCF lookup functions (unchanged)
   const handleUSCFLookupById = async () => {
     if (!uscfLookup.uscfId.trim()) {
       setUSCFError('Please enter a USCF ID');
@@ -136,45 +259,12 @@ export function EnhancedPlayerSearchDialog({
     setUSCFError('');
   };
 
-
-  // MANUAL SEARCH ONLY
-  const handleSearch = async () => {
-    setIsSearching(true);
-    try {
-      const result = await searchPlayers({
-        ...searchCriteria,
-        pageSize: 100
-      });
-      setSearchResult(result);
-    } catch (error) {
-      console.error('Search failed:', error);
-      alert('Search failed. Please try again.');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const clearSearch = () => {
-    setSearchCriteria({});
-    setSearchResult(null);
-  };
-
-  // Field updates
-  const updateField = (field: keyof SearchCriteria, value: any) => {
-    const newCriteria = { ...searchCriteria, [field]: value };
-    // If district is changed, reset school
-    if (field === 'district') {
-      newCriteria.school = '';
-    }
-    setSearchCriteria(newCriteria);
-  };
-
   const handleSelectPlayer = (player: MasterPlayer | USCFPlayer) => {
     onPlayerSelected(player);
     onOpenChange(false);
   };
   
-    const formatUSCFPlayerName = (name: string) => {
+  const formatUSCFPlayerName = (name: string) => {
     const parts = name.split(', ');
     if (parts.length >= 2) {
       const lastName = parts[0];
@@ -276,43 +366,49 @@ export function EnhancedPlayerSearchDialog({
                 />
               </div>
               
-                <div>
-                    <label className="block text-sm font-medium mb-1">District</label>
-                    <select
-                    value={searchCriteria.district || 'all'}
-                    onChange={(e) => updateField('district', e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    disabled={!isDbLoaded}
-                    >
-                    <option value="all">
-                        {isDbLoaded ? 'All Districts' : 'Loading...'}
+              <div>
+                <label className="block text-sm font-medium mb-1">District</label>
+                <select
+                  value={searchCriteria.district || 'all'}
+                  onChange={(e) => updateField('district', e.target.value)}
+                  className="w-full border rounded px-3 py-2"
+                  disabled={loadingDistricts}
+                >
+                  <option value="all">
+                    {loadingDistricts ? 'Loading districts...' : 'All Districts'}
+                  </option>
+                  {districts.map((district) => (
+                    <option key={district} value={district}>
+                      {district}
                     </option>
-                    {dbDistricts.map((district) => (
-                        <option key={district} value={district}>
-                        {district}
-                        </option>
-                    ))}
-                    </select>
-                </div>
+                  ))}
+                </select>
+                {loadingDistricts && (
+                  <small className="text-gray-500">Loading...</small>
+                )}
+              </div>
 
-                <div>
-                    <label className="block text-sm font-medium mb-1">School</label>
-                    <select
-                    value={searchCriteria.school || 'all'}
-                    onChange={(e) => updateField('school', e.target.value)}
-                    className="w-full border rounded px-3 py-2"
-                    disabled={!isDbLoaded || !schoolsForDistrict.length}
-                    >
-                    <option value="all">
-                        {isDbLoaded ? 'All Schools' : 'Loading...'}
+              <div>
+                <label className="block text-sm font-medium mb-1">School</label>
+                <select
+                  value={searchCriteria.school || 'all'}
+                  onChange={(e) => updateField('school', e.target.value)}
+                  className="w-full border rounded px-3 py-2"
+                  disabled={loadingSchools}
+                >
+                  <option value="all">
+                    {loadingSchools ? 'Loading schools...' : 'All Schools'}
+                  </option>
+                  {schools.map((school) => (
+                    <option key={school} value={school}>
+                      {school}
                     </option>
-                    {schoolsForDistrict.map((school) => (
-                        <option key={school} value={school}>
-                        {school}
-                        </option>
-                    ))}
-                    </select>
-                </div>
+                  ))}
+                </select>
+                {loadingSchools && (
+                  <small className="text-gray-500">Loading...</small>
+                )}
+              </div>
               
               <div>
                 <label className="block text-sm font-medium mb-1">State</label>
@@ -382,7 +478,7 @@ export function EnhancedPlayerSearchDialog({
                   </div>
                 )}
                 
-                {searchResult.players?.length === 0 && !searchResult.message ? (
+                {searchResult.players?.length === 0 ? (
                   <p className="text-gray-500">No players found in database.</p>
                 ) : searchResult.players?.length > 0 ? (
                   <div className="overflow-x-auto">
@@ -421,7 +517,7 @@ export function EnhancedPlayerSearchDialog({
           </div>
         )}
 
-        {/* USCF Lookup Tab */}
+        {/* USCF Lookup Tab - unchanged from your original */}
         {activeTab === 'uscf' && (
           <div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
