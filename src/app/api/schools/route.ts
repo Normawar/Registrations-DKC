@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
+import { db } from '@/lib/firebase-admin';
 
 export async function GET(request: NextRequest) {
   if (!db) {
-    console.error('Firestore not initialized');
+    console.error('Firestore admin not initialized');
     return NextResponse.json({ error: 'Firestore is not configured' }, { status: 500 });
   }
 
@@ -13,17 +12,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const district = searchParams.get('district');
     
-    console.log('Fetching schools for district:', district);
+    console.log('Fetching schools for district from admin SDK:', district);
     
-    const constraints = [];
+    let playersRef: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection('players');
+    
     if (district && district !== 'all') {
-      constraints.push(where('district', '==', district));
+      playersRef = playersRef.where('district', '==', district);
     }
     
-    const playersRef = collection(db, 'players');
-    const q = query(playersRef, ...constraints);
-    
-    const snapshot = await getDocs(q);
+    const snapshot = await playersRef.get();
     const schools = new Set<string>();
     
     snapshot.forEach(doc => {
