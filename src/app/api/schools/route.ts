@@ -34,4 +34,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(sortedSchools);
   } catch (error) {
     console.error('Error fetching schools:', error);
-    return
+    return NextResponse.json(
+      { error: 'Failed to fetch schools' }, 
+      { status: 500 }
+    );
+  }
+}
