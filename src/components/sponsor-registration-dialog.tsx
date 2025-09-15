@@ -494,15 +494,14 @@ export function SponsorRegistrationDialog({
               {format(new Date(event.date), 'PPP')} • {event.location}
             </p>
           </DialogHeader>
-
-          {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
-            <Alert>
-              <AlertTitle>PSJA District Notice</AlertTitle>
-              <AlertDescription>
-                USCF membership fees for students identified as GT will not be charged on this invoice. The district will handle these memberships separately.
-              </AlertDescription>
-            </Alert>
-          )}
+           {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+              <Alert>
+                  <AlertTitle>PSJA District Notice</AlertTitle>
+                  <AlertDescription>
+                      USCF membership fees for students identified as GT will not be charged on this invoice. The district will handle these memberships separately.
+                  </AlertDescription>
+              </Alert>
+            )}
 
           <div className="space-y-4 flex-1 overflow-y-auto pr-6 -mr-6">
             {isLoadingPlayers ? (
@@ -666,7 +665,11 @@ export function SponsorRegistrationDialog({
           )}
 
           <DialogFooter className="shrink-0">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
+            <Button variant="outline" onClick={() => {
+                setShowConfirmation(false);
+                setSelectedStudents({});
+                onOpenChange(false);
+            }}>
               Cancel
             </Button>
             <Button 
