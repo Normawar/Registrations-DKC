@@ -44,8 +44,45 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     const { doc, setDoc } = await import('firebase/firestore');
     const authInstance = getAuth();
     let user: User;
-    let isExistingAuthUser = false;
 
+    // Special handling for the main organizer account
+    if (normalizedEmail === 'norma@dkchess.com') {
+      try {
+        const userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+        user = userCredential.user;
+        console.log(`✅ Main organizer ${normalizedEmail} already exists, signed in.`);
+      } catch (error: any) {
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+          const userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+          user = userCredential.user;
+          console.log(`✅ Main organizer ${normalizedEmail} created successfully.`);
+        } else {
+          throw error;
+        }
+      }
+      
+      const organizerProfile: SponsorProfile = {
+        uid: user.uid, 
+        email: normalizedEmail,
+        firstName: 'Norma', 
+        lastName: 'Guerra-Stueber',
+        role: 'organizer', 
+        district: 'All Districts', 
+        school: 'Dark Knight Chess', 
+        phone: '956-393-8875',
+        isDistrictCoordinator: true,
+        avatarType: 'icon', 
+        avatarValue: 'KingIcon',
+        forceProfileUpdate: false, 
+        createdAt: new Date().toISOString(), 
+        updatedAt: new Date().toISOString(),
+      };
+      
+      await setDoc(doc(db, 'users', user.uid), organizerProfile, { merge: true });
+      console.log(`✅ Main organizer profile for ${normalizedEmail} created/updated.`);
+      return { success: true, user, profile: organizerProfile };
+    }
+    
     // Handle special test user cases with normalized email
     if (normalizedEmail.startsWith('test')) {
         let userCredential;
@@ -54,7 +91,6 @@ export async function simpleSignUp(email: string, password: string, userData: Om
             userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
             user = userCredential.user;
             console.log(`✅ Test user ${normalizedEmail} already exists, signed in.`);
-            isExistingAuthUser = true;
         } catch (error: any) {
             // If user does not exist, create them.
             if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
@@ -289,44 +325,24 @@ export async function simpleSignIn(email: string, password: string) {
         profileDoc = await getDoc(profileDocRef);
 
       } else {
-        console.error("❌ No profile found under UID or legacy email. Creating profile based on email.");
-        let forcedProfile: SponsorProfile;
+        console.error("❌ No profile found under UID or legacy email. Creating minimal profile.");
         
-        if (normalizedEmail === 'testmcallen@test.com') {
-          console.log('🔧 Creating specific profile for TestMcAllen...');
-          forcedProfile = {
-              uid: user.uid,
-              email: normalizedEmail,
-              firstName: 'Test', 
-              lastName: 'McAllen',
-              role: 'sponsor', 
-              district: 'TestMcallen', 
-              school: 'TestMcallen', 
-              phone: '555-555-5555',
-              avatarType: 'icon', 
-              avatarValue: 'PawnIcon',
-              forceProfileUpdate: false, 
-              createdAt: new Date().toISOString(), 
-              updatedAt: new Date().toISOString(),
-          };
-        } else {
-          // Fallback minimal profile for any other orphaned account
-          forcedProfile = {
-              uid: user.uid,
-              email: user.email || normalizedEmail,
-              firstName: user.displayName?.split(' ')[0] || 'New',
-              lastName: user.displayName?.split(' ')[1] || 'User',
-              role: 'individual',
-              district: 'None',
-              school: 'Homeschool',
-              phone: '',
-              avatarType: 'icon',
-              avatarValue: 'PawnIcon',
-              forceProfileUpdate: true,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-          };
-        }
+        // This is a fallback and should ideally not be hit if signup is working correctly
+        const forcedProfile: SponsorProfile = {
+            uid: user.uid,
+            email: user.email || normalizedEmail,
+            firstName: user.displayName?.split(' ')[0] || 'New',
+            lastName: user.displayName?.split(' ')[1] || 'User',
+            role: 'individual',
+            district: 'None',
+            school: 'Homeschool',
+            phone: '',
+            avatarType: 'icon',
+            avatarValue: 'PawnIcon',
+            forceProfileUpdate: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
 
         await setDoc(profileDocRef, forcedProfile);
         profileDoc = await getDoc(profileDocRef);
@@ -427,6 +443,28 @@ export const resetPassword = async (email: string): Promise<void> => {
   }
 };
 
+// Quick test function for your test accounts
+export async function testKnownAccounts() {
+  console.log('🧪 Testing known test accounts...');
+  
+  const testAccounts = [
+    { email: 'test@test.com', password: 'testpassword' },
+    { email: 'testds@test.com', password: 'testpassword' },
+    { email: 'testdist@test.com', password: '1Disttester' },
+    { email: 'testmcallen@test.com', password: 'testpassword' }
+  ];
+  
+  for (const account of testAccounts) {
+    console.log(`\n🔍 Testing ${account.email}...`);
+    try {
+      const result = await debugAuthIssue(account.email, account.password);
+      console.log(`✅ ${account.email}:`, result.success ? 'SUCCESS' : 'FAILED');
+    } catch (error) {
+      console.log(`❌ ${account.email}: ERROR -`, error);
+    }
+  }
+}
+
 // Add this temporary debugging function to your simple-auth.ts file
 export async function debugAuthIssue(email: string, password: string) {
   console.log('🔍 DEBUG: Starting authentication debug...');
@@ -485,28 +523,6 @@ export async function debugAuthIssue(email: string, password: string) {
     }
     
     return { success: false, error: error.code, message: error.message };
-  }
-}
-
-// Quick test function for your test accounts
-export async function testKnownAccounts() {
-  console.log('🧪 Testing known test accounts...');
-  
-  const testAccounts = [
-    { email: 'test@test.com', password: 'testpassword' },
-    { email: 'testds@test.com', password: 'testpassword' },
-    { email: 'testdist@test.com', password: '1Disttester' },
-    { email: 'testmcallen@test.com', password: 'testpassword' }
-  ];
-  
-  for (const account of testAccounts) {
-    console.log(`\n🔍 Testing ${account.email}...`);
-    try {
-      const result = await debugAuthIssue(account.email, account.password);
-      console.log(`✅ ${account.email}:`, result.success ? 'SUCCESS' : 'FAILED');
-    } catch (error) {
-      console.log(`❌ ${account.email}: ERROR -`, error);
-    }
   }
 }
 
