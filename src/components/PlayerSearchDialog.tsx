@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -11,7 +12,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPla
     excludeIds?: string[];
     portalType: 'sponsor' | 'organizer' | 'individual';
 }) {
-  const { searchPlayers } = useMasterDb();
+  const { searchPlayers, isDbLoaded, dbDistricts, dbSchools } = useMasterDb();
   const [searchCriteria, setSearchCriteria] = useState<Partial<SearchCriteria>>({});
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -122,75 +123,44 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPla
               />
             </div>
             
-            {/* State */}
-            <div>
-              <label className="block text-sm font-medium mb-1">State</label>
-              <select
-                value={searchCriteria.state || ''}
-                onChange={(e) => setSearchCriteria(prev => ({ ...prev, state: e.target.value }))}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="">All States</option>
-                <option value="TX">Texas</option>
-                <option value="CA">California</option>
-                <option value="NY">New York</option>
-                <option value="FL">Florida</option>
-                {/* Add more states as needed */}
-              </select>
+            {/* District */}
+             <div>
+                <label className="block text-sm font-medium mb-1">District</label>
+                <select
+                  value={searchCriteria.district || 'all'}
+                  onChange={(e) => setSearchCriteria(prev => ({...prev, district: e.target.value, school: 'all'}))}
+                  className="w-full border rounded px-3 py-2"
+                  disabled={!isDbLoaded}
+                >
+                  <option value="all">
+                    {!isDbLoaded ? 'Loading...' : 'All Districts'}
+                  </option>
+                  {dbDistricts.map((district) => (
+                    <option key={district} value={district}>
+                      {district}
+                    </option>
+                  ))}
+                </select>
             </div>
             
             {/* School */}
             <div>
-              <label className="block text-sm font-medium mb-1">School (Exact)</label>
-              <input
-                type="text"
-                value={searchCriteria.school || ''}
-                onChange={(e) => setSearchCriteria(prev => ({ ...prev, school: e.target.value }))}
-                placeholder="Lincoln Elementary"
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            
-            {/* District */}
-            <div>
-              <label className="block text-sm font-medium mb-1">District (Exact)</label>
-              <input
-                type="text"
-                value={searchCriteria.district || ''}
-                onChange={(e) => setSearchCriteria(prev => ({ ...prev, district: e.target.value }))}
-                placeholder="Austin ISD"
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-          </div>
-          
-          {/* Rating Range */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Min Rating</label>
-              <input
-                type="number"
-                value={searchCriteria.minRating || ''}
-                onChange={(e) => setSearchCriteria(prev => ({ 
-                  ...prev, 
-                  minRating: e.target.value ? parseInt(e.target.value) : undefined 
-                }))}
-                placeholder="1000"
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Max Rating</label>
-              <input
-                type="number"
-                value={searchCriteria.maxRating || ''}
-                onChange={(e) => setSearchCriteria(prev => ({ 
-                  ...prev, 
-                  maxRating: e.target.value ? parseInt(e.target.value) : undefined 
-                }))}
-                placeholder="2000"
-                className="w-full border rounded px-3 py-2"
-              />
+                <label className="block text-sm font-medium mb-1">School</label>
+                <select
+                  value={searchCriteria.school || 'all'}
+                  onChange={(e) => setSearchCriteria(prev => ({ ...prev, school: e.target.value }))}
+                  className="w-full border rounded px-3 py-2"
+                  disabled={!isDbLoaded}
+                >
+                  <option value="all">
+                    {!isDbLoaded ? 'Loading...' : 'All Schools'}
+                  </option>
+                  {dbSchools.map((school) => (
+                    <option key={school} value={school}>
+                      {school}
+                    </option>
+                  ))}
+                </select>
             </div>
           </div>
           

@@ -1,3 +1,4 @@
+
 // src/components/EnhancedPlayerSearchDialog.tsx
 'use client';
 
@@ -126,26 +127,26 @@ export function EnhancedPlayerSearchDialog({
         try {
             console.log('Fetching schools from Firestore for district:', selectedDistrict);
             
-            const playersRef = collection(db, 'players');
-            let queryRef;
-            
+            const schoolsRef = collection(db, 'schools');
+            let q;
+
             if (selectedDistrict && selectedDistrict !== 'all') {
-            queryRef = query(playersRef, where('district', '==', selectedDistrict));
+                q = query(schoolsRef, where('district', '==', selectedDistrict));
             } else {
-            queryRef = playersRef;
+                q = schoolsRef;
             }
             
-            const snapshot = await getDocs(queryRef);
-            const schools = new Set<string>();
+            const snapshot = await getDocs(q);
+            const schoolsList = new Set<string>();
             
             snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.school && data.school.trim()) {
-                schools.add(data.school.trim());
-            }
+              const data = doc.data();
+              if (data.schoolName && data.schoolName.trim()) {
+                schoolsList.add(data.schoolName.trim());
+              }
             });
             
-            const sortedSchools = [...schools].sort();
+            const sortedSchools = [...schoolsList].sort();
             setSchools(sortedSchools);
             console.log(`Found ${sortedSchools.length} unique schools`);
             
