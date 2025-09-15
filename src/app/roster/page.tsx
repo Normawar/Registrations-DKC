@@ -20,7 +20,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -236,16 +236,22 @@ function SponsorRosterView() {
   const handleEditPlayer = (player: MasterPlayer) => {
     setEditingPlayer(player);
     const district = player.district || 'all';
-    const schools = getSchoolsForDistrict(district);
-    setEditFormSchoolsForDistrict(schools);
-  
+    
+    // Set district first
+    playerForm.setValue('district', district);
+    
+    // Then get schools for that district and set the school value
+    const schoolsForPlayerDistrict = getSchoolsForDistrict(district);
+    setEditFormSchoolsForDistrict(schoolsForPlayerDistrict);
+    const schoolExists = schoolsForPlayerDistrict.includes(player.school);
+    
     playerForm.reset({
       ...player,
       dob: player.dob ? new Date(player.dob) : undefined,
       uscfExpiration: player.uscfExpiration ? new Date(player.uscfExpiration) : undefined,
       studentType: player.studentType || 'independent',
-      district: district, // Ensure district is set
-      school: schools.includes(player.school) ? player.school : '', // Ensure school is valid for district
+      district: district,
+      school: schoolExists ? player.school : '',
     });
   
     setIsEditPlayerDialogOpen(true);
@@ -1264,9 +1270,7 @@ function DistrictRosterView() {
                                         </FormControl>
                                         <SelectContent>
                                             {dbDistricts.map(district => (
-                                            <SelectItem key={district} value={district}>
-                                                {district}
-                                            </SelectItem>
+                                            <SelectItem key={district} value={district}>{district}</SelectItem>
                                             ))}
                                         </SelectContent>
                                         </Select>
@@ -1293,9 +1297,7 @@ function DistrictRosterView() {
                                         </FormControl>
                                         <SelectContent>
                                             {editFormSchoolsForDistrict.map(school => (
-                                            <SelectItem key={school} value={school}>
-                                                {school}
-                                            </SelectItem>
+                                            <SelectItem key={school} value={school}>{school}</SelectItem>
                                             ))}
                                         </SelectContent>
                                         </Select>
@@ -1361,5 +1363,3 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
-
-
