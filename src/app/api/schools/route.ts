@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
     
     let query: FirebaseFirestore.Query<FirebaseFirestore.DocumentData> = db.collection('players');
     
-    // Filter by district if provided and not 'all'
     if (district && district !== 'all') {
       query = query.where('district', '==', district);
     }
