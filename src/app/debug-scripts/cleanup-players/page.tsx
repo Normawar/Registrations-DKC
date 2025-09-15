@@ -95,25 +95,54 @@ function CleanupPlayersPage() {
       toast({ title: 'No players to delete.' });
       return;
     }
-
+  
     setIsDeleting(true);
     try {
-      const batch = writeBatch(db);
-      playersToDelete.forEach(player => {
-        const playerRef = doc(db, 'players', player.id);
-        batch.delete(playerRef);
-      });
-      await batch.commit();
-
+      const BATCH_SIZE = 450; // Stay safely under Firebase's 500 operation limit
+      const totalPlayers = playersToDelete.length;
+      let deletedCount = 0;
+  
+      // Process players in batches
+      for (let i = 0; i < totalPlayers; i += BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const currentBatch = playersToDelete.slice(i, i + BATCH_SIZE);
+        
+        currentBatch.forEach(player => {
+          const playerRef = doc(db, 'players', player.id);
+          batch.delete(playerRef);
+        });
+  
+        await batch.commit();
+        deletedCount += currentBatch.length;
+        
+        // Update progress
+        toast({
+          title: `Progress: ${deletedCount}/${totalPlayers} deleted`,
+          description: `Batch ${Math.ceil(deletedCount / BATCH_SIZE)} of ${Math.ceil(totalPlayers / BATCH_SIZE)} complete`,
+        });
+  
+        // Small delay between batches to avoid rate limiting
+        if (i + BATCH_SIZE < totalPlayers) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+  
       toast({
         title: 'Cleanup Complete!',
-        description: `${playersToDelete.length} player records have been deleted from Firestore.`,
+        description: `${deletedCount} player records have been deleted from Firestore.`,
+        variant: 'default'
       });
+      
       // Refresh the list after deletion
       await findPlayersToDelete();
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('Error deleting players:', error);
-      toast({ variant: 'destructive', title: 'Cleanup Failed', description: 'Could not delete players.' });
+      toast({ 
+        variant: 'destructive', 
+        title: 'Cleanup Failed', 
+        description: `Error: ${error.message}` 
+      });
     } finally {
       setIsDeleting(false);
     }
