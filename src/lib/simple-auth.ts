@@ -47,17 +47,21 @@ export async function simpleSignUp(email: string, password: string, userData: Om
 
     // Handle special test user cases with normalized email
     if (normalizedEmail.startsWith('test')) {
+        let userCredential;
         try {
-            // Use normalized email consistently
-            const userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+            // Attempt to create the user first. This is safer.
+            userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
             user = userCredential.user;
-            console.log(`✅ Test user ${normalizedEmail} already exists, signed in.`);
+            console.log(`✅ Test user ${normalizedEmail} created successfully.`);
         } catch (error: any) {
-            if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-                const userCredential = await createUserWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
+            // If the user already exists, sign them in to get the UID.
+            if (error.code === 'auth/email-already-in-use') {
+                console.log(`⚠️ Test user ${normalizedEmail} already exists, signing in...`);
+                userCredential = await signInWithEmailAndPassword(authInstance, normalizedEmail, trimmedPassword);
                 user = userCredential.user;
-                console.log(`✅ Test user ${normalizedEmail} created successfully.`);
+                console.log(`✅ Test user ${normalizedEmail} signed in.`);
             } else {
+                // For other errors (weak password, etc.), re-throw.
                 throw error;
             }
         }
