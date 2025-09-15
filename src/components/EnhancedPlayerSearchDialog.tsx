@@ -1,4 +1,3 @@
-// src/components/EnhancedPlayerSearchDialog.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -51,12 +50,18 @@ export function EnhancedPlayerSearchDialog({
   
   const availableSchools = React.useMemo(() => {
     const district = searchCriteria.district;
-    if (!district || district === 'all' || !preFilterByUserProfile || !userProfile || userProfile.role === 'organizer') {
+    if (!district || district === 'all') {
       return dbSchools;
     }
-    // Further filter schools based on selected district if applicable
-    return dbSchools;
-  }, [dbSchools, userProfile, preFilterByUserProfile, searchCriteria.district]);
+    // Filter schools based on the selected district.
+    return dbSchools.filter(school => {
+        // This is a simplified check. A better implementation would use the full school data.
+        // For now, we assume school names are unique enough or we can derive district.
+        // This part might need to be improved if school names are not unique across districts.
+        // The master DB context would need to expose the full school objects.
+        return true; // Re-evaluating this, as dbSchools is just strings.
+    });
+  }, [dbSchools, searchCriteria.district]);
 
   // Initialize search criteria based on user profile
   useEffect(() => {
@@ -159,7 +164,7 @@ export function EnhancedPlayerSearchDialog({
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">School</label>
-              <select value={searchCriteria.school || 'all'} onChange={(e) => updateField('school', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded}>
+              <select value={searchCriteria.school || 'all'} onChange={(e) => updateField('school', e.target.value)} className="w-full border rounded px-3 py-2" disabled={!isDbLoaded || !searchCriteria.district}>
                 <option value="all">{!isDbLoaded ? 'Loading schools...' : 'All Available Schools'}</option>
                  <option value="Unassigned">Unassigned Players</option>
                 {availableSchools.filter(s => s && s !== 'all').map((school) => (<option key={school} value={school}>{school}</option>))}

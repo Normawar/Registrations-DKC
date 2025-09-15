@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -52,7 +51,7 @@ interface MasterDbContextType {
   bulkUploadCSV: (
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
-  ) => Promise<{ uploaded: number; errors: string[] }>;
+  ) => Promise<{ uploaded: number; errors: string[]; }>;
   clearDatabase: () => Promise<void>;
   isDbLoaded: boolean;
   isDbError: boolean;
@@ -280,74 +279,46 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [dbDistricts, setDbDistricts] = useState<string[]>([]);
 
   const loadDatabase = useCallback(async () => {
-    console.log('🔍 Master DB Context - Loading database...');
-    console.log('  Firestore DB instance:', !!db);
-    
-    if (!db) {
-      console.log('❌ No Firestore database instance');
-      return;
-    }
+    if (!db) return;
   
     setIsDbLoaded(false);
     
     try {
-      console.log('📊 Querying players collection...');
       const playersRef = collection(db, 'players');
       const playersSnapshot = await getDocs(playersRef);
       
-      console.log('📊 Query results:');
-      console.log('  Snapshot size:', playersSnapshot.size);
-      console.log('  Snapshot empty:', playersSnapshot.empty);
-      console.log('  Snapshot docs length:', playersSnapshot.docs.length);
-      
-      const players: MasterPlayer[] = [];
-      playersSnapshot.forEach((doc, index) => {
-        const playerData = { id: doc.id, ...doc.data() } as MasterPlayer;
-        players.push(playerData);
-        
-        if (index < 3) { // Log first 3 players
-          console.log(`  Player ${index + 1}:`, {
-            id: doc.id,
-            name: `${playerData.firstName} ${playerData.lastName}`,
-            district: playerData.district,
-            school: playerData.school,
-            uscfId: playerData.uscfId
-          });
-        }
-      });
-      
-      console.log(`✅ Loaded ${players.length} players from Firestore`);
-      console.log('  Districts found:', [...new Set(players.map(p => p.district))]);
-      console.log('  Schools found:', [...new Set(players.map(p => p.school))]);
+      const players = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
       
       setDatabase(players);
+      setPlayerCount(players.length);
       setIsDbLoaded(true);
       
-    } catch (error: any) {
-      console.error('❌ Failed to load players database:', error);
-      console.error('  Error details:', {
-        name: error?.name,
-        message: error?.message,
-        code: error?.code
+      // Compute summary data
+      const states = new Set<string>();
+      const schools = new Set<string>();
+      const districts = new Set<string>();
+      
+      players.forEach(p => {
+        if (p.state) states.add(p.state);
+        if (p.school) schools.add(p.school);
+        if (p.district) districts.add(p.district);
       });
+      
+      setDbStates([...states].sort());
+      setDbSchools([...schools].sort());
+      setDbDistricts([...districts].sort());
+      
+    } catch (error: any) {
+      console.error('Failed to load players database:', error);
       setIsDbLoaded(false);
+      setIsDbError(true);
     }
   }, []);
 
   useEffect(() => {
-    console.log('🚀 Master DB Context mounting...');
-    console.log('  DB available:', !!db);
     loadDatabase();
   }, [loadDatabase]);
 
-  useEffect(() => {
-    console.log('📈 Master DB State Update:');
-    console.log('  Database length:', database.length);
-    console.log('  Is loaded:', isDbLoaded);
-    if (database.length > 0) {
-      console.log('  Sample players:', database.slice(0, 2).map(p => `${p.firstName} ${p.lastName} (${p.district})`));
-    }
-  }, [database, isDbLoaded]);
 
   const refreshDatabase = async () => {
     await loadDatabase();
@@ -355,22 +326,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addPlayer = async (player: MasterPlayer) => {
-    if (!db) {
-        console.error("Database not initialized");
-        return;
-    }
-    
+    if (!db) return;
     try {
-        console.log("Attempting to add player:", player);
         const cleanedPlayer = removeUndefined(player);
-        console.log("Cleaned player data:", cleanedPlayer);
-
         const playerRef = doc(db, 'players', cleanedPlayer.id);
         await setDoc(playerRef, cleanedPlayer, { merge: true });
-        
-        console.log("Player successfully written to Firebase");
-        await loadDatabase(); // Refresh data
-
+        await loadDatabase();
     } catch (error) {
         console.error("Error adding player:", error);
         throw error;
