@@ -1,4 +1,3 @@
-
 // lib/firebase-admin.ts
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
@@ -21,4 +20,4 @@ if (!getApps().length) {
 
 const db: Firestore = getFirestore(app);
 
-export { db
+export { db };
