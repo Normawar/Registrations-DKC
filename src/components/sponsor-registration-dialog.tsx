@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -50,42 +49,19 @@ export function SponsorRegistrationDialog({
 
   // Enhanced loading effect with better error handling
   useEffect(() => {
-    console.log('🔍 Database Loading Check:');
-    console.log('  Dialog isOpen:', isOpen);
-    console.log('  isDbLoaded:', isDbLoaded);
-    console.log('  Database length:', database.length);
-    console.log('  Profile:', profile?.district, '/', profile?.school);
-
     if (!isOpen) {
       setIsLoadingPlayers(false);
       return;
     }
 
-    if (!profile) {
-      console.log('  Profile not loaded yet');
+    if (!profile || !isDbLoaded) {
       setIsLoadingPlayers(true);
       return;
     }
 
-    if (!isDbLoaded) {
-      console.log('  Database not loaded yet');
-      setIsLoadingPlayers(true);
-      return;
-    }
-
-    // Database is loaded, now filter players
     setIsLoadingPlayers(true);
-    
-    // Add a small delay to ensure all data is synchronized
     const timer = setTimeout(() => {
-      console.log('  Filtering players from database...');
-      const sponsorPlayers = database.filter(p => {
-        const matches = p.district === profile.district && p.school === profile.school;
-        console.log(`    Player ${p.firstName} ${p.lastName}: district="${p.district}" school="${p.school}" matches=${matches}`);
-        return matches;
-      });
-      
-      console.log(`  Found ${sponsorPlayers.length} players for ${profile.district}/${profile.school}`);
+      const sponsorPlayers = database.filter(p => p.district === profile.district && p.school === profile.school);
       setRosterPlayers(sponsorPlayers);
       setIsLoadingPlayers(false);
     }, 100);
@@ -93,23 +69,24 @@ export function SponsorRegistrationDialog({
     return () => clearTimeout(timer);
   }, [profile, database, isDbLoaded, isOpen]);
   
-  // Load existing registrations
+  // Load existing registrations from Firestore
   useEffect(() => {
-    const loadRegistrations = () => {
-      const storedConfirmations = localStorage.getItem('confirmations');
-      if (storedConfirmations) {
-        setRegistrations(JSON.parse(storedConfirmations));
+    const loadRegistrations = async () => {
+      if (isOpen && db) {
+        const invoicesCol = collection(db, 'invoices');
+        const q = query(invoicesCol, where('eventId', '==', event?.id));
+        const invoiceSnapshot = await getDocs(q);
+        const eventRegistrations = invoiceSnapshot.docs.map(doc => doc.data());
+        setRegistrations(eventRegistrations);
       }
     };
     loadRegistrations();
-  }, [isOpen]);
+  }, [isOpen, event?.id]);
 
   // Check which students are already registered
   const getStudentRegistrationStatus = (student: MasterPlayer) => {
     const existingReg = registrations.find((confirmation: any) => 
-      confirmation.eventId === event?.id && 
-      confirmation.selections && 
-      confirmation.selections[student.id]
+      confirmation.selections && confirmation.selections[student.id] && confirmation.status !== 'CANCELED'
     );
     
     if (existingReg) {
@@ -136,21 +113,15 @@ export function SponsorRegistrationDialog({
           ...prev,
           [student.id]: {
             section: student.section || 'High School K-12',
-            uscfStatus: student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
+            uscfStatus: !student.uscfId || student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
           }
         };
       }
     });
   };
 
-  // FIXED: Add validation to prevent undefined values
   const updateStudentSelection = (studentId: string, field: 'section' | 'uscfStatus', value: string) => {
-    // Validate that value is not undefined or empty
-    if (!value || value.trim() === '') {
-      console.warn(`Invalid value for ${field}:`, value);
-      return;
-    }
-
+    if (!value || value.trim() === '') return;
     setSelectedStudents(prev => ({
       ...prev,
       [studentId]: {
@@ -244,13 +215,11 @@ export function SponsorRegistrationDialog({
     const hasGt = allSelectedPlayers.some(p => p.player?.studentType === 'gt');
     const hasIndependent = allSelectedPlayers.some(p => p.player?.studentType !== 'gt');
 
-    // If PSJA and a mix of player types, use the split invoice flow
     if (isPsjaDistrict && hasGt && hasIndependent) {
         await handlePsjaSplitInvoice();
         return;
     }
 
-    // Otherwise, use the standard single invoice flow
     await handleStandardInvoice();
   };
 
@@ -268,12 +237,10 @@ export function SponsorRegistrationDialog({
         baseRegistrationFee: event.regularFee,
         lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
         uscfAction: details.uscfStatus !== 'current',
-        isGtPlayer: student?.studentType === 'gt'
+        isGtPlayer: student?.studentType === 'gt',
+        section: details.section,
       };
     });
-
-    const uscfFee = 24;
-    const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
 
     try {
       const result = await createInvoice({
@@ -281,10 +248,10 @@ export function SponsorRegistrationDialog({
           sponsorEmail: profile.email || '',
           sponsorPhone: profile.phone || '',
           schoolName: profile.school,
-          teamCode: teamCode,
+          teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
           eventName: event.name,
           eventDate: event.date,
-          uscfFee,
+          uscfFee: 24,
           players: playersToInvoice,
           bookkeeperEmail: profile.bookkeeperEmail,
           gtCoordinatorEmail: profile.gtCoordinatorEmail,
@@ -293,7 +260,7 @@ export function SponsorRegistrationDialog({
           district: profile.district,
       });
 
-      await saveConfirmation(result.invoiceId, result, stagedPlayersForConfirmation(playersToInvoice.map(p => p.playerName)), feeBreakdown.total);
+      await saveConfirmation(result.invoiceId, result, playersToInvoice, feeBreakdown.total);
       
     } catch (error) {
         handleInvoiceError(error, "Invoice Creation Failed");
@@ -342,18 +309,18 @@ export function SponsorRegistrationDialog({
 
       if (result.gtInvoice) {
         const gtPlayers = playersToInvoice.filter(p => p.isGtPlayer);
-        await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0); // Simplified total for now
+        await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0); // Total will be recalculated
         gtInvoiceId = result.gtInvoice.invoiceId;
       }
 
       if (result.independentInvoice) {
         const indPlayers = playersToInvoice.filter(p => !p.isGtPlayer);
-        await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, 0); // Simplified total
+        await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, 0); // Total will be recalculated
         indInvoiceId = result.independentInvoice.invoiceId;
       }
       
       toast({ title: "Split Invoices Created Successfully!", description: "Separate invoices for GT and Independent players have been created."});
-      setCreatedInvoiceId(indInvoiceId || gtInvoiceId); // Show the first available invoice
+      setCreatedInvoiceId(indInvoiceId || gtInvoiceId);
       setShowInvoiceModal(true);
       resetState();
       
@@ -364,53 +331,30 @@ export function SponsorRegistrationDialog({
     }
   };
 
-  const stagedPlayersForConfirmation = (playerNames: string[]) => {
-    return Object.fromEntries(
-        Object.entries(selectedStudents)
-          .filter(([playerId]) => {
-              const student = rosterPlayers.find(p => p.id === playerId);
-              return playerNames.includes(`${student?.firstName} ${student?.lastName}`);
-          })
-          .map(([playerId, details]) => [
-              playerId, { ...details, status: 'active' }
-          ])
-      );
-  };
-  
-  // FIXED: Add validation before saving to Firestore
-  const saveConfirmation = async (invoiceId: string, result: any, players: any[], total: number) => {
+  const saveConfirmation = async (invoiceId: string, result: any, playersInInvoice: any[], total: number) => {
     if(!profile || !event || !db) return;
     
     const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
     
-    // FIXED: Validate selections data before saving
     const validatedSelections = Object.fromEntries(
       Object.entries(selectedStudents)
-        .filter(([playerId, details]) => {
-          // Ensure both section and uscfStatus are defined and not empty
-          if (!details.section || details.section.trim() === '') {
-            console.error(`Invalid section for player ${playerId}:`, details.section);
-            return false;
-          }
-          if (!details.uscfStatus || details.uscfStatus.trim() === '') {
-            console.error(`Invalid uscfStatus for player ${playerId}:`, details.uscfStatus);
-            return false;
-          }
-          return true;
+        .filter(([playerId]) => {
+          const student = rosterPlayers.find(p => p.id === playerId);
+          return playersInInvoice.some(p => p.playerName === `${student?.firstName} ${student?.lastName}`);
         })
-        .map(([playerId, details]) => [
-          playerId, { 
-            section: details.section.trim(),
-            uscfStatus: details.uscfStatus.trim(),
-            status: 'active' 
+        .map(([playerId, details]) => {
+          if (!details.section || !details.uscfStatus) {
+            throw new Error(`Missing details for player ${playerId}`);
           }
-        ])
+          return [
+            playerId, { 
+              section: details.section.trim(),
+              uscfStatus: details.uscfStatus.trim(),
+              status: 'active' 
+            }
+          ];
+        })
     );
-
-    // Additional safety check
-    if (Object.keys(validatedSelections).length === 0 && players.length > 0) {
-      throw new Error('No valid player selections to save after validation. Please check player sections.');
-    }
     
     const newConfirmation = {
       id: invoiceId,
@@ -425,8 +369,8 @@ export function SponsorRegistrationDialog({
       teamCode: teamCode,
       invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
       selections: validatedSelections,
-      totalInvoiced: total,
-      totalAmount: total,
+      totalInvoiced: result.newTotalAmount || total,
+      totalAmount: result.newTotalAmount || total,
       invoiceStatus: result.status,
       status: result.status,
       invoiceUrl: result.invoiceUrl,
@@ -436,9 +380,6 @@ export function SponsorRegistrationDialog({
       contactEmail: profile.email || '',
       purchaserEmail: profile.email || '',
     };
-    
-    // Log the data being saved for debugging
-    console.log('Saving confirmation to Firestore:', newConfirmation);
     
     const invoiceDocRef = doc(db, 'invoices', invoiceId);
     await setDoc(invoiceDocRef, newConfirmation);
@@ -463,8 +404,6 @@ export function SponsorRegistrationDialog({
     setSelectedStudents({});
     setShowConfirmation(false);
     onOpenChange(false);
-    // Dispatch events to notify other components of data change
-    window.dispatchEvent(new Event('storage'));
   };
 
   const handleBackToSelection = () => {
@@ -479,7 +418,7 @@ export function SponsorRegistrationDialog({
           const isExpired = !student.uscfExpiration || new Date(student.uscfExpiration) < new Date(event?.date);
           acc[student.id] = {
             section: student.section || 'High School K-12',
-            uscfStatus: student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
+            uscfStatus: !student.uscfId || student.uscfId.toUpperCase() === 'NEW' ? 'new' : isExpired ? 'renewing' : 'current'
           };
           return acc;
         }, {} as Record<string, { section: string; uscfStatus: string }>);
@@ -521,7 +460,6 @@ export function SponsorRegistrationDialog({
 
   return (
     <>
-      {/* Main Registration Dialog */}
       <Dialog open={isOpen && !showConfirmation} onOpenChange={(open) => {
         if (!open) {
           setShowConfirmation(false);
@@ -548,33 +486,17 @@ export function SponsorRegistrationDialog({
 
           <div className="space-y-4 flex-1 overflow-y-auto pr-6 -mr-6">
             {isLoadingPlayers ? (
-              // Loading state
               <div className="text-center p-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                 <p className="text-muted-foreground">Loading your students...</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Database loaded: {isDbLoaded ? 'Yes' : 'No'} | 
-                  Players in DB: {database.length} | 
-                  Profile: {profile?.district}/{profile?.school}
-                </p>
               </div>
             ) : rosterPlayers.length === 0 ? (
-              // No students found
               <div className="text-center p-8 text-muted-foreground">
                 <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">No Students Found</p>
                 <p>No students found for {profile?.district}/{profile?.school}</p>
-                <p className="text-sm mt-2">
-                  Total players in database: {database.length}
-                  {database.length > 0 && (
-                    <span className="block mt-1">
-                      Districts available: {[...new Set(database.map(p => p.district))].join(', ')}
-                    </span>
-                  )}
-                </p>
               </div>
             ) : (
-              // Students loaded successfully
               <div className="grid gap-4">
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Select Students to Register</h3>
@@ -721,7 +643,6 @@ export function SponsorRegistrationDialog({
         </DialogContent>
       </Dialog>
       
-      {/* Confirmation Dialog */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -733,7 +654,6 @@ export function SponsorRegistrationDialog({
           </DialogHeader>
 
           <div className="space-y-6">
-            {/* Selected Students Summary */}
             <div>
               <h3 className="font-semibold mb-3">Selected Students ({Object.keys(selectedStudents).length})</h3>
               <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -754,7 +674,6 @@ export function SponsorRegistrationDialog({
               </div>
             </div>
 
-            {/* Fee Breakdown */}
             <div className="border rounded-lg p-4 space-y-3">
               <h3 className="font-semibold">Charge Breakdown</h3>
               
