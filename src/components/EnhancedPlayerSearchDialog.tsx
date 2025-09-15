@@ -39,14 +39,14 @@ export function EnhancedPlayerSearchDialog({
       return dbSchools;
     }
     // This part assumes you have a way to relate schools to districts.
-    // For now, this is a simplified example. In a real app, you might have
-    // a more complex data structure or a dedicated function in your context.
-    return dbSchools.filter(school => {
-      // A more robust solution would be needed if school names are not unique across districts
-      const playerInSchool = searchPlayers({ school: school, pageSize: 1 }).players[0];
-      return playerInSchool?.district === searchCriteria.district;
-    });
-  }, [searchCriteria.district, dbSchools, searchPlayers]);
+    // A more robust way would be to have this logic in the context itself.
+    // For now, filtering based on the allPlayers list is a fallback.
+    const { database } = useMasterDb();
+    const schools = database
+      .filter(p => p.district === searchCriteria.district)
+      .map(p => p.school);
+    return [...new Set(schools)].sort();
+  }, [searchCriteria.district, dbSchools]);
   
   // USCF lookup state
   const [uscfLookup, setUSCFLookup] = useState({
@@ -173,8 +173,8 @@ export function EnhancedPlayerSearchDialog({
     onPlayerSelected(player);
     onOpenChange(false);
   };
-
-  const formatUSCFPlayerName = (name: string) => {
+  
+    const formatUSCFPlayerName = (name: string) => {
     const parts = name.split(', ');
     if (parts.length >= 2) {
       const lastName = parts[0];
@@ -264,7 +264,7 @@ export function EnhancedPlayerSearchDialog({
                   className="w-full border rounded px-3 py-2"
                 />
               </div>
-              
+                            
               <div>
                 <label className="block text-sm font-medium mb-1">Last Name</label>
                 <input
@@ -276,43 +276,43 @@ export function EnhancedPlayerSearchDialog({
                 />
               </div>
               
-              <div>
-                <label className="block text-sm font-medium mb-1">District</label>
-                <select
-                  value={searchCriteria.district || 'all'}
-                  onChange={(e) => updateField('district', e.target.value)}
-                  className="w-full border rounded px-3 py-2"
-                  disabled={!isDbLoaded}
-                >
-                  <option value="all">
-                    {isDbLoaded ? 'All Districts' : 'Loading...'}
-                  </option>
-                  {dbDistricts.map((district) => (
-                    <option key={district} value={district}>
-                      {district}
+                <div>
+                    <label className="block text-sm font-medium mb-1">District</label>
+                    <select
+                    value={searchCriteria.district || 'all'}
+                    onChange={(e) => updateField('district', e.target.value)}
+                    className="w-full border rounded px-3 py-2"
+                    disabled={!isDbLoaded}
+                    >
+                    <option value="all">
+                        {isDbLoaded ? 'All Districts' : 'Loading...'}
                     </option>
-                  ))}
-                </select>
-              </div>
+                    {dbDistricts.map((district) => (
+                        <option key={district} value={district}>
+                        {district}
+                        </option>
+                    ))}
+                    </select>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">School</label>
-                <select
-                  value={searchCriteria.school || 'all'}
-                  onChange={(e) => updateField('school', e.target.value)}
-                  className="w-full border rounded px-3 py-2"
-                  disabled={!isDbLoaded}
-                >
-                  <option value="all">
-                    {isDbLoaded ? 'All Schools' : 'Loading...'}
-                  </option>
-                  {schoolsForDistrict.map((school) => (
-                    <option key={school} value={school}>
-                      {school}
+                <div>
+                    <label className="block text-sm font-medium mb-1">School</label>
+                    <select
+                    value={searchCriteria.school || 'all'}
+                    onChange={(e) => updateField('school', e.target.value)}
+                    className="w-full border rounded px-3 py-2"
+                    disabled={!isDbLoaded || !schoolsForDistrict.length}
+                    >
+                    <option value="all">
+                        {isDbLoaded ? 'All Schools' : 'Loading...'}
                     </option>
-                  ))}
-                </select>
-              </div>
+                    {schoolsForDistrict.map((school) => (
+                        <option key={school} value={school}>
+                        {school}
+                        </option>
+                    ))}
+                    </select>
+                </div>
               
               <div>
                 <label className="block text-sm font-medium mb-1">State</label>
@@ -410,14 +410,14 @@ export function EnhancedPlayerSearchDialog({
                             <td className="border border-gray-300 px-4 py-2">
                               <button 
                                 onClick={() => handleSelectPlayer(player)}
-                                disabled={excludeIds.includes(player.uscfId)}
+                                disabled={excludeIds?.includes(player.id)}
                                 className={`px-2 py-1 rounded text-xs ${
-                                  excludeIds.includes(player.uscfId)
+                                  excludeIds?.includes(player.id)
                                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                     : 'bg-green-500 text-white hover:bg-green-600'
                                 }`}
                               >
-                                {excludeIds.includes(player.uscfId) ? 'Already Added' : 'Select'}
+                                {excludeIds?.includes(player.id) ? 'Already Added' : 'Select'}
                               </button>
                             </td>
                           </tr>
