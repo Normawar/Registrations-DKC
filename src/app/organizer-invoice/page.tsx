@@ -26,6 +26,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Skeleton } from '@/components/ui/skeleton';
+import { generateTeamCode } from '@/lib/school-utils';
 
 const lineItemSchema = z.object({
   id: z.string().optional(), // Hold player ID if applicable
@@ -189,6 +190,9 @@ function OrganizerInvoiceContent() {
         };
     });
 
+    const schoolInfo = schoolData.find(s => s.schoolName === values.schoolName);
+    const teamCode = generateTeamCode({ schoolName: values.schoolName, district: schoolInfo?.district });
+
     const result = await recreateInvoiceFromRoster({
         originalInvoiceId: originalInvoice.invoiceId,
         players: playersToInvoice,
@@ -196,7 +200,7 @@ function OrganizerInvoiceContent() {
         sponsorName: values.sponsorName,
         sponsorEmail: values.sponsorEmail,
         schoolName: values.schoolName,
-        teamCode: originalInvoice.teamCode,
+        teamCode: teamCode,
         eventName: values.invoiceTitle,
         eventDate: eventDetails.date,
         bookkeeperEmail: originalInvoice.bookkeeperEmail,
@@ -227,7 +231,7 @@ function OrganizerInvoiceContent() {
             return acc;
         }, {} as any),
         previousVersionId: originalInvoice.id, 
-        teamCode: originalInvoice.teamCode,
+        teamCode: teamCode,
         schoolName: values.schoolName,
         district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
         sponsorName: values.sponsorName,
@@ -291,7 +295,9 @@ function OrganizerInvoiceContent() {
       router.push('/invoices');
   }
 
-  const createOrganizerInvoiceRecord = (values: InvoiceFormValues, result: any) => ({
+  const createOrganizerInvoiceRecord = (values: InvoiceFormValues, result: any) => {
+    const schoolInfo = schoolData.find(s => s.schoolName === values.schoolName);
+    return {
       id: result.newInvoiceId || result.invoiceId,
       invoiceId: result.newInvoiceId || result.invoiceId,
       type: 'organizer',
@@ -305,9 +311,11 @@ function OrganizerInvoiceContent() {
       sponsorEmail: values.sponsorEmail,
       invoiceStatus: result.status,
       schoolName: values.schoolName,
-      district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
+      district: schoolInfo?.district || '',
+      teamCode: generateTeamCode({ schoolName: values.schoolName, district: schoolInfo?.district }),
       lineItems: values.lineItems,
-  });
+    };
+  };
   
   const toastSuccess = (result: any, isUpdate: boolean) => {
       toast({
