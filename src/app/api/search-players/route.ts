@@ -15,174 +15,149 @@ export async function POST(request: Request) {
     console.log('Searching players with criteria:', criteria);
     
     const playersRef = collection(db, 'players');
-    let q;
-    
-    // Strategy: Use single-field queries to avoid complex composite indexes
-    // Priority order: uscfId (exact match) > lastName (text search) > district/school (filters)
-    
-    if (criteria.uscfId) {
-      // Most specific search - USCF ID exact match
-      q = query(
-        playersRef,
-        where('uscfId', '==', criteria.uscfId),
-        limit(criteria.pageSize || 25)
-      );
-    } else if (criteria.lastName) {
-      // Text search on lastName with optional additional filters
-      const constraints = [
-        where('lastName', '>=', criteria.lastName),
-        where('lastName', '<=', criteria.lastName + '\uf8ff'),
-        orderBy('lastName'),
-        limit(criteria.pageSize || 25)
-      ];
-      q = query(playersRef, ...constraints as any);
-    } else if (criteria.firstName) {
-      // Text search on firstName with optional additional filters
-      const constraints = [
-        where('firstName', '>=', criteria.firstName),
-        where('firstName', '<=', criteria.firstName + '\uf8ff'),
-        orderBy('firstName'),
-        limit(criteria.pageSize || 25)
-      ];
-      q = query(playersRef, ...constraints as any);
-    } else if (criteria.district && criteria.district !== 'all') {
-      // District-based search
-      if (criteria.district === 'Unassigned') {
-        // Search for unassigned players - need to handle this carefully
-        q = query(
-          playersRef,
-          where('district', 'in', ['', 'Unassigned', 'None']),
-          orderBy('lastName'),
-          limit(criteria.pageSize || 25)
-        );
-      } else {
-        q = query(
-          playersRef,
-          where('district', '==', criteria.district),
-          orderBy('lastName'),
-          limit(criteria.pageSize || 25)
-        );
-      }
-    } else if (criteria.school && criteria.school !== 'all') {
-      // School-based search
-      if (criteria.school === 'Unassigned') {
-        q = query(
-          playersRef,
-          where('school', 'in', ['', 'Unassigned', 'None']),
-          orderBy('lastName'),
-          limit(criteria.pageSize || 25)
-        );
-      } else {
-        q = query(
-          playersRef,
-          where('school', '==', criteria.school),
-          orderBy('lastName'),
-          limit(criteria.pageSize || 25)
-        );
-      }
-    } else if (criteria.state) {
-      // State-based search
-      q = query(
-        playersRef,
-        where('state', '==', criteria.state),
-        orderBy('lastName'),
-        limit(criteria.pageSize || 25)
-      );
-    } else {
-      // No specific criteria - get all players (with limits)
-      q = query(
-        playersRef,
-        orderBy('lastName'),
-        limit(criteria.pageSize || 25)
-      );
-    }
+    const constraints: any[] = [];
 
-    // Execute the query
+    // Build query constraints based on criteria priority
+    // This approach uses the indexes we created
+    
+    if (criteria.uscfId?.trim()) {
+      // Exact USCF ID match - highest priority
+      constraints.push(where('uscfId', '==', criteria.uscfId.trim()));
+    } else {
+      // Build constraints for indexed fields
+      
+      // District filter
+      if (criteria.district && criteria.district !== 'all') {
+        if (criteria.district === 'Unassigned') {
+          constraints.push(where('district', 'in', ['', 'Unassigned', 'None', null]));
+        } else {
+          constraints.push(where('district', '==', criteria.district));
+        }
+      }
+      
+      // School filter (only if district is also specified or district is 'all')
+      if (criteria.school && criteria.school !== 'all' && 
+          (criteria.district === 'all' || !criteria.district || constraints.length === 0)) {
+        if (criteria.school === 'Unassigned') {
+          constraints.push(where('school', 'in', ['', 'Unassigned', 'None', null]));
+        } else {
+          constraints.push(where('school', '==', criteria.school));
+        }
+      }
+      
+      // Name filters - use range queries for partial matching
+      if (criteria.lastName?.trim()) {
+        const lastName = criteria.lastName.trim();
+        constraints.push(where('lastName', '>=', lastName));
+        constraints.push(where('lastName', '<=', lastName + '\uf8ff'));
+      }
+      
+      // First name filter (only if lastName is not specified to avoid conflicts)
+      if (criteria.firstName?.trim() && !criteria.lastName?.trim()) {
+        const firstName = criteria.firstName.trim();
+        constraints.push(where('firstName', '>=', firstName));
+        constraints.push(where('firstName', '<=', firstName + '\uf8ff'));
+      }
+      
+      // State filter
+      if (criteria.state?.trim()) {
+        constraints.push(where('state', '==', criteria.state.trim()));
+      }
+      
+      // Rating filters
+      if (criteria.minRating) {
+        constraints.push(where('regularRating', '>=', criteria.minRating));
+      }
+      if (criteria.maxRating) {
+        constraints.push(where('regularRating', '<=', criteria.maxRating));
+      }
+    }
+    
+    // Add ordering - this must match our index
+    if (criteria.uscfId) {
+      // For USCF ID searches, no additional ordering needed
+    } else if (criteria.lastName?.trim()) {
+      constraints.push(orderBy('lastName'));
+    } else if (criteria.firstName?.trim() && !criteria.lastName) {
+      constraints.push(orderBy('firstName'));
+    } else if (criteria.minRating || criteria.maxRating) {
+      constraints.push(orderBy('regularRating'));
+      constraints.push(orderBy('lastName')); // Secondary sort
+    } else {
+      constraints.push(orderBy('lastName'));
+    }
+    
+    // Add limit
+    constraints.push(limit(criteria.pageSize || 25));
+
+    // Create and execute the query
+    const q = query(playersRef, ...constraints);
+    console.log('Executing indexed query with', constraints.length, 'constraints');
+    
     const snapshot = await getDocs(q);
     
-    let players: any[] = [];
+    const players: any[] = [];
     snapshot.forEach(doc => {
       players.push({ id: doc.id, ...doc.data() });
     });
     
-    // Apply client-side filtering for additional criteria that couldn't be done in the query
-    // This is less efficient but avoids complex indexing requirements
-    if (players.length > 0) {
-      // Filter by multiple criteria client-side if needed
-      players = players.filter(player => {
-        // Apply secondary filters
-        if (criteria.firstName && !criteria.lastName && !player.firstName?.toLowerCase().includes(criteria.firstName.toLowerCase())) {
+    // Apply any remaining client-side filters that couldn't be done in the query
+    let filteredPlayers = players.filter(player => {
+      // First name filter (if lastName was the primary search)
+      if (criteria.firstName?.trim() && criteria.lastName?.trim()) {
+        const firstName = (player.firstName || '').toLowerCase();
+        const searchFirst = criteria.firstName.toLowerCase().trim();
+        if (!firstName.includes(searchFirst)) {
           return false;
         }
-        if (criteria.lastName && !criteria.firstName && !player.lastName?.toLowerCase().includes(criteria.lastName.toLowerCase())) {
-          return false;
-        }
-        
-        // School filter (if not primary search criteria)
-        if (criteria.school && criteria.school !== 'all' && criteria.district) {
-          if (criteria.school === 'Unassigned') {
-            if (player.school && player.school !== '' && player.school !== 'Unassigned' && player.school !== 'None') {
-              return false;
-            }
-          } else if (player.school !== criteria.school) {
+      }
+      
+      // School filter (if district was the primary filter)
+      if (criteria.school && criteria.school !== 'all' && criteria.district && criteria.district !== 'all') {
+        if (criteria.school === 'Unassigned') {
+          const school = player.school || '';
+          if (school && school !== '' && school !== 'Unassigned' && school !== 'None') {
             return false;
           }
-        }
-        
-        // District filter (if not primary search criteria)
-        if (criteria.district && criteria.district !== 'all' && criteria.school) {
-          if (criteria.district === 'Unassigned') {
-            if (player.district && player.district !== '' && player.district !== 'Unassigned' && player.district !== 'None') {
-              return false;
-            }
-          } else if (player.district !== criteria.district) {
-            return false;
-          }
-        }
-        
-        // Rating filters
-        if (criteria.minRating && (!player.regularRating || player.regularRating < criteria.minRating)) {
+        } else if (player.school !== criteria.school) {
           return false;
         }
-        if (criteria.maxRating && (!player.regularRating || player.regularRating > criteria.maxRating)) {
-          return false;
-        }
-        
-        return true;
-      });
+      }
+      
+      return true;
+    });
+    
+    // Generate helpful message
+    let message = '';
+    let searchStrategy = '';
+    
+    if (criteria.uscfId) {
+      searchStrategy = 'uscfId';
+      message = filteredPlayers.length > 0 ? 
+        `Found player with USCF ID: ${criteria.uscfId}` : 
+        'No player found with that USCF ID';
+    } else if (criteria.district === 'Unassigned' || criteria.school === 'Unassigned') {
+      searchStrategy = 'unassigned';
+      message = `Found ${filteredPlayers.length} unassigned players`;
+    } else if (criteria.lastName || criteria.firstName) {
+      searchStrategy = 'name';
+      message = `Found ${filteredPlayers.length} players matching name criteria`;
+    } else if (criteria.district || criteria.school) {
+      searchStrategy = 'location';
+      message = `Found ${filteredPlayers.length} players in specified district/school`;
+    } else {
+      searchStrategy = 'general';
+      message = `Found ${filteredPlayers.length} players`;
     }
     
-    // Handle null districts/schools for unassigned search
-    if ((criteria.district === 'Unassigned' || criteria.school === 'Unassigned') && players.length < 10) {
-      // Also search for null values - requires a separate query
-      try {
-        const nullField = criteria.district === 'Unassigned' ? 'district' : 'school';
-        const nullQuery = query(
-          playersRef,
-          where(nullField, '==', null),
-          orderBy('lastName'),
-          limit(10)
-        );
-        const nullSnapshot = await getDocs(nullQuery);
-        
-        nullSnapshot.forEach(doc => {
-          const playerData = { id: doc.id, ...doc.data() };
-          // Avoid duplicates
-          if (!players.find(p => p.id === playerData.id)) {
-            players.push(playerData);
-          }
-        });
-      } catch (nullError) {
-        // Ignore null query errors - some databases don't support null queries
-        console.log('Null query not supported, skipping...');
-      }
-    }
+    console.log(`Search completed: ${filteredPlayers.length} results using ${searchStrategy} strategy`);
     
     return NextResponse.json({
-      players: players.slice(0, criteria.pageSize || 25), // Ensure we don't exceed page size
-      total: players.length,
-      hasMore: players.length === (criteria.pageSize || 25),
-      searchStrategy: criteria.uscfId ? 'uscfId' : criteria.lastName ? 'lastName' : criteria.firstName ? 'firstName' : criteria.district ? 'district' : criteria.school ? 'school' : 'all'
+      players: filteredPlayers,
+      total: filteredPlayers.length,
+      hasMore: filteredPlayers.length === (criteria.pageSize || 25),
+      searchStrategy,
+      message
     });
 
   } catch (error: any) {
@@ -192,9 +167,9 @@ export async function POST(request: Request) {
     let errorMessage = `Search failed: ${error.message}`;
     
     if (error.message.includes('requires an index')) {
-      errorMessage = `Search temporarily unavailable: Database index required. Try searching with fewer criteria or contact administrator.`;
+      errorMessage = `Database index still being created. Please wait a few minutes and try again. Complex searches require database optimization.`;
     } else if (error.message.includes('inequality filter')) {
-      errorMessage = `Search too complex: Try using fewer search criteria at once.`;
+      errorMessage = `Search criteria too complex. Try fewer filters or search by name/USCF ID only.`;
     }
 
     return NextResponse.json(
