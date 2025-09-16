@@ -44,7 +44,7 @@ type User = {
 
 type SortableColumn = 'email' | 'lastName' | 'role' | 'school';
 
-const userFormSchema = z.object({
+const baseUserFormSchema = z.object({
   email: z.string().email(),
   role: z.enum(['sponsor', 'organizer', 'individual', 'district_coordinator']),
   isSponsor: z.boolean().default(false),
@@ -56,15 +56,20 @@ const userFormSchema = z.object({
   phone: z.string().optional(),
   bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+});
+
+const userFormSchema = baseUserFormSchema.refine(data => data.isSponsor || data.isDistrictCoordinator || data.role === 'organizer' || data.role === 'individual', {
+    message: "A user must have at least one role (Sponsor or District Coordinator).",
+    path: ["isSponsor"],
+});
+
+const createUserFormSchema = baseUserFormSchema.extend({
+    password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
 }).refine(data => data.isSponsor || data.isDistrictCoordinator || data.role === 'organizer' || data.role === 'individual', {
     message: "A user must have at least one role (Sponsor or District Coordinator).",
     path: ["isSponsor"],
 });
 
-
-const createUserFormSchema = userFormSchema.extend({
-    password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
-});
 
 type UserFormValues = z.infer<typeof userFormSchema>;
 type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
