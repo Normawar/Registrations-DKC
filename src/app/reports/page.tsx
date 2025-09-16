@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code, Building, FileText } from 'lucide-react';
+import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code, Building, FileText, Binary } from 'lucide-react';
 import Link from 'next/link';
 
 function ReportsPageContent() {
@@ -206,6 +206,30 @@ function ReportsPageContent() {
             <Button asChild>
               <Link href="/team-codes">
                 View Team Codes <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-pink-100 p-3 rounded-full">
+                <Binary className="h-6 w-6 text-pink-600" />
+              </div>
+              <div>
+                <CardTitle>Player ID Range Report</CardTitle>
+                <CardDescription>Pull a list of players within a specific USCF ID number range.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Generates a report for a specific range of USCF IDs, useful for targeted analysis or data verification.
+            </p>
+            <Button asChild>
+              <Link href="/reports/player-id-range">
+                View ID Range Report <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </CardContent>
