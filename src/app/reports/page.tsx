@@ -5,7 +5,7 @@ import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code, Building } from 'lucide-react';
+import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code, Building, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 function ReportsPageContent() {
@@ -235,6 +235,29 @@ function ReportsPageContent() {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-indigo-100 p-3 rounded-full">
+                <FileText className="h-6 w-6 text-indigo-600" />
+              </div>
+              <div>
+                <CardTitle>USCF Data Parser</CardTitle>
+                <CardDescription>Convert USCF affiliate or tournament data into clean CSV format.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Parse data copied from USCF affiliate reports or upload text files to generate clean CSV exports with player information, ratings, and titles.
+            </p>
+            <Button asChild>
+              <Link href="/reports/uscf-parser">
+                Parse USCF Data <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
