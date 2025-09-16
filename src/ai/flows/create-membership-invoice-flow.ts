@@ -66,14 +66,7 @@ const createMembershipInvoiceFlow = ai.defineFlow(
     
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
-        console.log("Square not configured. Returning mock invoice for createMembershipInvoiceFlow.");
-        const mockInvoiceId = `MOCK_MEMBERSHIP_${randomUUID()}`;
-        return {
-            invoiceId: mockInvoiceId,
-            invoiceNumber: mockInvoiceId.substring(0, 8),
-            status: 'DRAFT',
-            invoiceUrl: `https://mock-invoice.local/#mock-invoice/${mockInvoiceId}`,
-        };
+        throw new Error("Square is not configured. Please provide credentials in your environment variables.");
     }
 
     const squareClient = await getSquareClient();

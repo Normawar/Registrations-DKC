@@ -49,13 +49,7 @@ const recordPaymentFlow = ai.defineFlow(
 
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
-      console.log(`Square not configured. Mock-recording payment for invoice ${input.invoiceId}.`);
-      return {
-        paymentId: `MOCK_PAY_${randomUUID()}`,
-        status: 'PAID',
-        totalPaid: input.amount,
-        totalInvoiced: input.amount,
-      };
+      throw new Error("Square is not configured. Please provide credentials in your environment variables.");
     }
     
     const squareClient = await getSquareClient();
@@ -120,3 +114,4 @@ const recordPaymentFlow = ai.defineFlow(
     }
   }
 );
+

@@ -61,15 +61,7 @@ export const getInvoiceStatusWithPayments = ai.defineFlow(
     const { isConfigured } = await checkSquareConfig();
     
     if (!isConfigured) {
-      console.log(`Square not configured. Mocking status for invoice ${input.invoiceId}.`);
-      return {
-        invoiceId: input.invoiceId,
-        status: 'UNPAID',
-        totalAmount: 0,
-        totalPaid: 0,
-        paymentHistory: [],
-        lastUpdated: new Date().toISOString(),
-      };
+      throw new Error("Square is not configured. Please provide credentials in your environment variables.");
     }
 
     const squareClient = await getSquareClient();

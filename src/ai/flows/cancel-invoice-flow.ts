@@ -43,11 +43,7 @@ const cancelInvoiceFlow = ai.defineFlow(
     
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
-      console.log(`Square not configured. Mock-cancelling invoice ${input.invoiceId}.`);
-      return {
-        invoiceId: input.invoiceId,
-        status: 'CANCELED',
-      };
+      throw new Error("Square is not configured. Please provide credentials in your environment variables.");
     }
 
     const squareClient = await getSquareClient();
