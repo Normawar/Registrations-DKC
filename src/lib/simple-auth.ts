@@ -1,4 +1,5 @@
 
+
 // src/lib/simple-auth.ts - Simplified authentication with better error handling
 
 import { auth, db } from '@/lib/firebase';
@@ -173,6 +174,24 @@ export async function simpleSignUp(email: string, password: string, userData: Om
                     isDistrictCoordinator: false, 
                     avatarType: 'icon', 
                     avatarValue: 'PawnIcon',
+                    forceProfileUpdate: false, 
+                    createdAt: new Date().toISOString(), 
+                    updatedAt: new Date().toISOString(),
+                };
+                break;
+            case 'testecisd@test.com':
+                 testProfile = {
+                    uid: user.uid, 
+                    email: normalizedEmail,
+                    firstName: 'Test', 
+                    lastName: 'ECISD',
+                    role: 'district_coordinator', 
+                    district: 'TestECISD', 
+                    school: 'All Schools', 
+                    phone: '555-555-5555',
+                    isDistrictCoordinator: true, 
+                    avatarType: 'icon', 
+                    avatarValue: 'KingIcon',
                     forceProfileUpdate: false, 
                     createdAt: new Date().toISOString(), 
                     updatedAt: new Date().toISOString(),
