@@ -27,6 +27,8 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { useEvents } from '@/hooks/use-events';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import Image from 'next/image';
 
 
 const safeString = (value: any): string => {
@@ -166,60 +168,63 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         </p>
       </div>
 
-      <div className="space-y-3">
-        <h4 className="font-medium">Select Payment Method</h4>
-        
-        {/* Purchase Order Option */}
-        <div 
-          className={`border rounded-lg p-4 cursor-pointer transition-colors ${selectedPaymentMethod === 'PO' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
-          onClick={() => setSelectedPaymentMethod('PO')}
-        >
-          <div className="flex items-center">
-            <input type="radio" checked={selectedPaymentMethod === 'PO'} onChange={() => setSelectedPaymentMethod('PO')} className="mr-3" />
-            <div>
-              <h5 className="font-medium">Purchase Order (PO)</h5>
+      <Accordion type="single" collapsible value={selectedPaymentMethod || undefined} onValueChange={setSelectedPaymentMethod}>
+        <AccordionItem value="PO">
+          <AccordionTrigger>Purchase Order (PO)</AccordionTrigger>
+          <AccordionContent className="space-y-3">
               <p className="text-sm text-gray-600">Submit a purchase order through your school's accounting department</p>
-            </div>
-          </div>
-          
-          {selectedPaymentMethod === 'PO' && (
-            <div className="mt-3 pl-8 space-y-3">
               <div><Label htmlFor="po-amount">Payment Amount ($)</Label><Input id="po-amount" type="number" placeholder="0.00" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} step="0.01" min="0" /></div>
               <div><Label htmlFor="po-number">PO Number</Label><Input id="po-number" type="text" placeholder="Enter PO number" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} /></div>
-            </div>
-          )}
-        </div>
-
-        {/* Check Option */}
-        <div 
-          className={`border rounded-lg p-4 cursor-pointer transition-colors ${selectedPaymentMethod === 'Check' ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
-          onClick={() => setSelectedPaymentMethod('Check')}
-        >
-          <div className="flex items-center">
-            <input type="radio" checked={selectedPaymentMethod === 'Check'} onChange={() => setSelectedPaymentMethod('Check')} className="mr-3" />
-            <div>
-              <h5 className="font-medium">Pay by Check</h5>
-              <p className="text-sm text-gray-600">Submit payment information for check processing</p>
-            </div>
-          </div>
-          
-          {selectedPaymentMethod === 'Check' && (
-            <div className="mt-3 pl-8 space-y-3">
-              <div className="flex items-center space-x-2"><input type="checkbox" id="pay-at-tournament" checked={payByCheckAtTournament} onChange={(e) => setPayByCheckAtTournament(e.target.checked)} className="rounded" /><Label htmlFor="pay-at-tournament" className="text-sm">Pay by check at tournament</Label></div>
-              <div><Label htmlFor="check-amount">Check Amount ($)</Label><Input id="check-amount" type="number" placeholder="0.00" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} step="0.01" min="0" /></div>
-              {!payByCheckAtTournament && (<div><Label htmlFor="check-number">Check Number</Label><Input id="check-number" type="text" placeholder="Enter check number" value={checkNumber} onChange={(e) => setCheckNumber(e.target.value)} /></div>)}
-            </div>
-          )}
-        </div>
-      </div>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="Check">
+          <AccordionTrigger>Pay by Check</AccordionTrigger>
+          <AccordionContent className="space-y-3">
+            <p className="text-sm text-gray-600">Submit payment information for check processing</p>
+            <div className="flex items-center space-x-2"><Checkbox id="pay-at-tournament" checked={payByCheckAtTournament} onCheckedChange={(checked) => setPayByCheckAtTournament(!!checked)} /><Label htmlFor="pay-at-tournament" className="text-sm">Pay by check at tournament</Label></div>
+            <div><Label htmlFor="check-amount">Check Amount ($)</Label><Input id="check-amount" type="number" placeholder="0.00" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} step="0.01" min="0" /></div>
+            {!payByCheckAtTournament && (<div><Label htmlFor="check-number">Check Number</Label><Input id="check-number" type="text" placeholder="Enter check number" value={checkNumber} onChange={(e) => setCheckNumber(e.target.value)} /></div>)}
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="CashApp">
+            <AccordionTrigger>Cash App</AccordionTrigger>
+            <AccordionContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                    <div>
+                        <p className="text-sm text-gray-600">Scan the QR code and enter the total amount due. Upload a screenshot of the confirmation.</p>
+                        <p className="font-bold text-lg mt-1">$DKChess</p>
+                    </div>
+                    <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer">
+                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
+                    </a>
+                </div>
+                <div><Label htmlFor="cashapp-amount">Payment Amount ($)</Label><Input id="cashapp-amount" type="number" placeholder="0.00" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} step="0.01" min="0" /></div>
+            </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="Zelle">
+            <AccordionTrigger>Zelle</AccordionTrigger>
+            <AccordionContent className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                    <div>
+                        <p className="text-sm text-gray-600">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p>
+                        <p className="font-bold text-lg mt-1">956-393-8875</p>
+                    </div>
+                     <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer">
+                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
+                    </a>
+                </div>
+                <div><Label htmlFor="zelle-amount">Payment Amount ($)</Label><Input id="zelle-amount" type="number" placeholder="0.00" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} step="0.01" min="0" /></div>
+            </AccordionContent>
+        </AccordionItem>
+      </Accordion>
 
       {selectedPaymentMethod && (
         <div className="space-y-3">
           <h4 className="font-medium">Upload Proof of Payment</h4>
-          <p className="text-sm text-gray-600">{selectedPaymentMethod === 'PO' ? 'Upload a copy of your purchase order or confirmation' : selectedPaymentMethod === 'Check' && payByCheckAtTournament ? 'No upload required for pay at tournament option' : 'Upload a photo of your check or bank confirmation'}</p>
+          <p className="text-sm text-gray-600">{selectedPaymentMethod === 'PO' ? 'Upload a copy of your purchase order or confirmation' : selectedPaymentMethod === 'Check' && payByCheckAtTournament ? 'No upload required for pay at tournament option' : 'Upload a photo or screenshot of your payment confirmation'}</p>
           
           {!(selectedPaymentMethod === 'Check' && payByCheckAtTournament) && (
-            <><input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,application/pdf" multiple className="hidden" /><Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full"><Upload className="w-4 h-4 mr-2" />{selectedPaymentMethod === 'PO' ? 'Upload PO Copy' : 'Upload Screenshot'}</Button></>
+            <><input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*,application/pdf" multiple className="hidden" /><Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full"><Upload className="w-4 h-4 mr-2" />{selectedPaymentMethod === 'PO' ? 'Upload PO Copy' : 'Upload Proof'}</Button></>
           )}
 
           {fileUrls.length > 0 && (
@@ -517,3 +522,4 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
+
