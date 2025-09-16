@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { zodResolver } from 'zod-resolver';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { AppLayout } from "@/components/app-layout";
