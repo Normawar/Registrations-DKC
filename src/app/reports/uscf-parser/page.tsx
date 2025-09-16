@@ -6,17 +6,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Upload, Download, ClipboardCheck, FileText, AlertCircle } from 'lucide-react';
+import { Upload, Download, ClipboardCheck, FileText, AlertCircle, Database } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
+import { useMasterDb } from '@/context/master-db-context';
+import { useToast } from '@/hooks/use-toast';
 
 export default function USCFDataParserPage() {
   const [inputData, setInputData] = useState('');
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { updatePlayerFromUscfData } = useMasterDb();
+  const { toast } = useToast();
 
   const parseUSCFData = (text: string) => {
     try {
@@ -287,6 +292,47 @@ export default function USCFDataParserPage() {
       setIsLoading(false);
     }
   };
+  
+  const handleUploadToDb = async () => {
+    if (parsedData.length === 0) {
+      toast({ variant: 'destructive', title: 'No Data', description: 'Please parse some data first before uploading.' });
+      return;
+    }
+  
+    setIsUploading(true);
+    try {
+      const formattedForDb = parsedData.map(player => {
+        const nameParts = player.name.split(' ');
+        const lastName = nameParts.pop() || '';
+        const firstName = nameParts.join(' ');
+        
+        return {
+          uscfId: player.memberID,
+          firstName,
+          lastName,
+          regularRating: player.rating ? parseInt(player.rating, 10) : undefined,
+          state: player.state,
+          uscfExpiration: player.expirationDate ? new Date(player.expirationDate).toISOString() : undefined
+        };
+      });
+  
+      const { updated, created } = await updatePlayerFromUscfData(formattedForDb);
+  
+      toast({
+        title: 'Database Update Complete',
+        description: `Successfully updated ${updated} and created ${created} new player records.`
+      });
+  
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Database Upload Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -414,7 +460,7 @@ export default function USCFDataParserPage() {
                     </CardTitle>
                     <CardDescription>
                       {parsedData.length > 0 
-                        ? `Found ${parsedData.length} players. Download as CSV below.`
+                        ? `Found ${parsedData.length} players. Download as CSV or upload to the database.`
                         : 'No data parsed yet.'
                       }
                     </CardDescription>
@@ -446,10 +492,17 @@ export default function USCFDataParserPage() {
                           </div>
                         </div>
                         
-                        <Button onClick={downloadCSV} className="w-full">
-                          <Download className="h-4 w-4 mr-2" />
-                          Download CSV ({parsedData.length} players)
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button onClick={downloadCSV} className="flex-1">
+                                <Download className="h-4 w-4 mr-2" />
+                                Download CSV ({parsedData.length})
+                            </Button>
+                            <Button onClick={handleUploadToDb} variant="secondary" className="flex-1" disabled={isUploading}>
+                                {isUploading ? <div className="animate-spin h-4 w-4 mr-2" /> : <Database className="h-4 w-4 mr-2" />}
+                                {isUploading ? 'Uploading...' : 'Upload to DB'}
+                            </Button>
+                        </div>
+
                       </div>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
@@ -486,3 +539,4 @@ export default function USCFDataParserPage() {
     </OrganizerGuard>
   );
 }
+

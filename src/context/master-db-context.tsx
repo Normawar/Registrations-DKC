@@ -510,8 +510,50 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const updatePlayerFromUscfData = async (uscfData: Partial<MasterPlayer>[]) => {
-      // ...
-      return { updated: 0, created: 0 };
+    if (!db) return { updated: 0, created: 0 };
+    
+    const batch = writeBatch(db);
+    let updated = 0;
+    let created = 0;
+  
+    for (const uscfPlayer of uscfData) {
+      if (!uscfPlayer.uscfId) continue;
+      
+      const playerRef = doc(db, 'players', uscfPlayer.uscfId);
+      const playerDoc = await getDoc(playerRef);
+      
+      if (playerDoc.exists()) {
+        // Player exists, update their info
+        batch.update(playerRef, uscfPlayer);
+        updated++;
+      } else {
+        // Player doesn't exist, create a new record
+        const newPlayer: MasterPlayer = {
+          id: uscfPlayer.uscfId,
+          uscfId: uscfPlayer.uscfId,
+          firstName: uscfPlayer.firstName || 'Unknown',
+          lastName: uscfPlayer.lastName || 'Unknown',
+          regularRating: uscfPlayer.regularRating,
+          state: uscfPlayer.state,
+          uscfExpiration: uscfPlayer.uscfExpiration,
+          // Fill in required fields with defaults
+          grade: '',
+          section: '',
+          email: '',
+          school: '',
+          district: '',
+          events: 0,
+          eventIds: [],
+        };
+        batch.set(playerRef, newPlayer);
+        created++;
+      }
+    }
+    
+    await batch.commit();
+    await loadDatabase(); // Refresh local state
+    
+    return { updated, created };
   };
 
   const value = {
@@ -555,3 +597,4 @@ export const useMasterDb = () => {
   }
   return context;
 };
+
