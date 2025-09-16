@@ -53,7 +53,7 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
       // Step 3: Determine invoice numbering for revision
       const existingRevisionMatch = originalInvoice?.invoiceNumber?.match(/-rev\.(\d+)/);
       const nextRevisionNumber = existingRevisionMatch ? parseInt(existingRevisionMatch[1], 10) + 1 : 2;
-      const baseInvoiceNumber = originalInvoice?.invoiceNumber?.split('-rev.')[0];
+      const baseInvoiceNumber = originalInvoice?.invoiceNumber?.split('-rev.')[0] || originalInvoice?.invoiceNumber;
       const revisionMessage = `Revised based on your request. Original Invoice: #${originalInvoice?.invoiceNumber}. This invoice replaces the original.`;
       
       let newInvoiceResult;
@@ -76,11 +76,14 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
       } else {
         // Step 4b: Handle Standard Invoice Recreation
         console.log('Recreating as Standard Invoice');
+        
+        // Construct the new invoice number with a unique suffix to avoid collisions
         const uniqueTimestamp = Date.now().toString().slice(-5);
         const newInvoiceNumber = baseInvoiceNumber 
             ? `${baseInvoiceNumber}-rev.${nextRevisionNumber}-${uniqueTimestamp}` 
             : `INV-${uniqueTimestamp}`;
 
+        // Ensure all required fields from the input are passed to createInvoice
         const newInvoiceInput = {
           ...input,
           invoiceNumber: newInvoiceNumber,
