@@ -233,7 +233,13 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     });
 
     if (!actionResult.success) {
-      throw new Error(actionResult.error);
+      toast({
+        variant: 'destructive',
+        title: 'Invoice Recreation Failed',
+        description: actionResult.error,
+        duration: 10000,
+      });
+      return;
     }
 
     const { newInvoiceNumber } = actionResult.data;
