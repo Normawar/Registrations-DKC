@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -19,7 +20,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -675,8 +676,8 @@ function SponsorRosterView() {
                                       <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter USCF ID or 'NEW'" onChange={(e) => field.onChange(e.target.value)} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
                                       <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                      <FormField control={playerForm.control} name="dob" render={({ field }) => {
-    const [displayValue, setDisplayValue] = useState(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+                                        <FormField control={playerForm.control} name="dob" render={({ field }) => {
+    const [displayValue, setDisplayValue] = useState('');
     
     useEffect(() => {
         setDisplayValue(field.value ? format(field.value, 'MM/dd/yyyy') : '');
@@ -693,6 +694,11 @@ function SponsorRosterView() {
                     onChange={(e) => { 
                         const inputValue = e.target.value;
                         setDisplayValue(inputValue);
+                        
+                        if (inputValue === '') {
+                            field.onChange(undefined);
+                            return;
+                        }
                         
                         // Only try to parse when we have a complete date format
                         const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
@@ -711,8 +717,6 @@ function SponsorRosterView() {
                                     field.onChange(parsedDate);
                                 }
                             }
-                        } else if (inputValue === '') {
-                            field.onChange(undefined);
                         }
                     }} 
                 />
@@ -722,7 +726,7 @@ function SponsorRosterView() {
     );
 }} />
                                         <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => {
-    const [displayValue, setDisplayValue] = useState(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    const [displayValue, setDisplayValue] = useState('');
     
     useEffect(() => {
         setDisplayValue(field.value ? format(field.value, 'MM/dd/yyyy') : '');
@@ -739,6 +743,11 @@ function SponsorRosterView() {
                     onChange={(e) => { 
                         const inputValue = e.target.value;
                         setDisplayValue(inputValue);
+                        
+                        if (inputValue === '') {
+                            field.onChange(undefined);
+                            return;
+                        }
                         
                         // Only try to parse when we have a complete date format
                         const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
@@ -757,8 +766,6 @@ function SponsorRosterView() {
                                     field.onChange(parsedDate);
                                 }
                             }
-                        } else if (inputValue === '') {
-                            field.onChange(undefined);
                         }
                     }} 
                 />
@@ -838,7 +845,7 @@ function SponsorRosterView() {
                               <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <FormField control={createPlayerForm.control} name="dob" render={({ field }) => {
-    const [displayValue, setDisplayValue] = useState(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    const [displayValue, setDisplayValue] = useState('');
     
     useEffect(() => {
         setDisplayValue(field.value ? format(field.value, 'MM/dd/yyyy') : '');
@@ -855,6 +862,11 @@ function SponsorRosterView() {
                     onChange={(e) => { 
                         const inputValue = e.target.value;
                         setDisplayValue(inputValue);
+                        
+                        if (inputValue === '') {
+                            field.onChange(undefined);
+                            return;
+                        }
                         
                         // Only try to parse when we have a complete date format
                         const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
@@ -873,8 +885,6 @@ function SponsorRosterView() {
                                     field.onChange(parsedDate);
                                 }
                             }
-                        } else if (inputValue === '') {
-                            field.onChange(undefined);
                         }
                     }} 
                 />
@@ -884,7 +894,7 @@ function SponsorRosterView() {
     );
 }} />
                                 <FormField control={createPlayerForm.control} name="uscfExpiration" render={({ field }) => {
-    const [displayValue, setDisplayValue] = useState(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    const [displayValue, setDisplayValue] = useState('');
     
     useEffect(() => {
         setDisplayValue(field.value ? format(field.value, 'MM/dd/yyyy') : '');
@@ -901,6 +911,11 @@ function SponsorRosterView() {
                     onChange={(e) => { 
                         const inputValue = e.target.value;
                         setDisplayValue(inputValue);
+                        
+                        if (inputValue === '') {
+                            field.onChange(undefined);
+                            return;
+                        }
                         
                         // Only try to parse when we have a complete date format
                         const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
@@ -919,8 +934,6 @@ function SponsorRosterView() {
                                     field.onChange(parsedDate);
                                 }
                             }
-                        } else if (inputValue === '') {
-                            field.onChange(undefined);
                         }
                     }} 
                 />
@@ -1545,5 +1558,3 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
-
-    
