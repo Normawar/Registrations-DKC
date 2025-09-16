@@ -117,13 +117,16 @@ const SponsorSignUpForm = () => {
       const data = storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData;
       setSchoolData(data);
       const districts = [...new Set(data.map((s: School) => s.district))].sort();
-      if (!districts.includes('None')) {
-        districts.unshift('None');
-      }
-      if (!districts.includes('Test')) {
-        districts.unshift('Test');
-      }
-      setUniqueDistricts(districts);
+      
+      // Ensure all required districts are present
+      const requiredDistricts = ['None', 'Test', 'TestECISD', 'TestShary', 'TestMcAllen'];
+      requiredDistricts.forEach(d => {
+        if (!districts.includes(d)) {
+          districts.unshift(d);
+        }
+      });
+
+      setUniqueDistricts(districts.sort());
       setIsInitialized(true);
     }
   }, [isInitialized]);
