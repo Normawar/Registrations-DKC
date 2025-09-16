@@ -432,7 +432,6 @@ export default function UsersPage() {
                                                 <SelectItem value="sponsor">Sponsor</SelectItem>
                                                 <SelectItem value="organizer">Organizer</SelectItem>
                                                 <SelectItem value="individual">Individual</SelectItem>
-                                                <SelectItem value="district_coordinator">District Coordinator</SelectItem>
                                             </SelectContent>
                                         </Select><FormMessage />
                                         </FormItem>
