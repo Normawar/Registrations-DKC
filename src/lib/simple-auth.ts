@@ -197,6 +197,24 @@ export async function simpleSignUp(email: string, password: string, userData: Om
                     updatedAt: new Date().toISOString(),
                 };
                 break;
+            case 'testshary@test.com':
+                testProfile = {
+                   uid: user.uid, 
+                   email: normalizedEmail,
+                   firstName: 'Test', 
+                   lastName: 'Shary',
+                   role: 'district_coordinator', 
+                   district: 'TestShary', 
+                   school: 'All Schools', 
+                   phone: '555-555-5555',
+                   isDistrictCoordinator: true, 
+                   avatarType: 'icon', 
+                   avatarValue: 'KingIcon',
+                   forceProfileUpdate: false, 
+                   createdAt: new Date().toISOString(), 
+                   updatedAt: new Date().toISOString(),
+               };
+               break;
             default:
                 throw new Error("Unknown test user email");
         }
