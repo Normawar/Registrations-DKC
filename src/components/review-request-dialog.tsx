@@ -141,9 +141,10 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
   };
   
   const handleProcessRequest = async () => {
-    if (!originalConfirmation || !request || !profile) {
+    if (!originalConfirmation || !request || !profile || !db) {
       throw new Error("Missing required data to process the request.");
     }
+
     const eventDetails = events.find(e => e.id === originalConfirmation.eventId);
     if (!eventDetails) throw new Error('Original event not found.');
     
@@ -156,12 +157,12 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
     
     if (request.type === 'Substitution') {
       const playerToRemoveId = Object.keys(newSelections).find(id => {
-          const player = allPlayers.find(p => p.id === id);
-          if (!player) {
-              console.warn(`Player with ID ${id} not found, skipping.`);
-              return false;
-          }
-          return `${player.firstName} ${player.lastName}`.trim().toLowerCase() === playerNameToRemove.toLowerCase();
+        const player = allPlayers.find(p => p.id === id);
+        if (!player) {
+          console.warn(`Player with ID ${id} not found, skipping.`);
+          return false;
+        }
+        return `${player.firstName} ${player.lastName}`.trim().toLowerCase() === playerNameToRemove.toLowerCase();
       });
       
       const detailsMatch = request.details?.match(/with (.*)/);
@@ -189,8 +190,8 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
       const playerToRemoveId = Object.keys(newSelections).find(id => {
         const player = allPlayers.find(p => p.id === id);
         if (!player) {
-            console.warn(`Player with ID ${id} not found, skipping.`);
-            return false;
+          console.warn(`Player with ID ${id} not found, skipping.`);
+          return false;
         }
         return `${player.firstName} ${player.lastName}`.trim().toLowerCase() === playerNameToRemove.toLowerCase();
       });
@@ -200,50 +201,20 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         throw new Error(`Could not find player "${playerNameToRemove}" in original invoice to withdraw.`);
       }
     }
+    
+    // Update the Firestore invoice directly, instead of recreating it.
+    const invoiceRef = doc(db, 'invoices', request.confirmationId);
+    const updateData = {
+        selections: newSelections,
+        lastModified: new Date().toISOString(),
+        modifiedBy: `${profile.firstName} ${profile.lastName}`,
+        changeLog: `Request #${request.id} processed: ${request.type} for ${request.player}`,
+        updatedAt: new Date().toISOString(),
+    };
 
-    const newPlayerRoster = Object.keys(newSelections).map(playerId => {
-        const player = allPlayers.find(p => p.id === playerId);
-        if (!player) {
-            throw new Error(`Player with ID ${playerId} not found in master database`);
-        }
-        return {
-            playerName: `${player.firstName} ${player.lastName}`,
-            uscfId: player.uscfId,
-            baseRegistrationFee: eventDetails.regularFee,
-            lateFee: 0,
-            uscfAction: newSelections[playerId].uscfStatus !== 'current',
-            isGtPlayer: player.studentType === 'gt',
-            waiveLateFee: waiveFees, // Pass the waiver flag
-            section: newSelections[playerId].section
-        };
-    });
+    await updateDoc(invoiceRef, updateData);
 
-    const actionResult = await recreateInvoiceAction({
-        originalInvoiceId: originalConfirmation.invoiceId,
-        players: newPlayerRoster,
-        uscfFee: 24,
-        requestingUserRole: 'organizer',
-        sponsorName: request.submittedBy,
-        sponsorEmail: originalConfirmation.sponsorEmail,
-        schoolName: originalConfirmation.schoolName,
-        teamCode: originalConfirmation.teamCode,
-        eventName: originalConfirmation.eventName,
-        eventDate: originalConfirmation.eventDate,
-        revisionMessage: `Request #${request.id} processed: ${request.type} for ${request.player}`
-    });
-
-    if (!actionResult.success) {
-      toast({
-        variant: 'destructive',
-        title: 'Invoice Recreation Failed',
-        description: actionResult.error,
-        duration: 10000,
-      });
-      return;
-    }
-
-    const { newInvoiceNumber } = actionResult.data;
-
+    // Update the status of the request itself.
     const requestRef = doc(db, 'requests', request.id);
     await updateDoc(requestRef, { 
       status: 'Approved',
@@ -251,7 +222,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
       approvedAt: new Date().toISOString(),
     });
 
-    toast({ title: "Request Approved & Invoice Recreated", description: `New invoice ${newInvoiceNumber} has replaced the old one.` });
+    toast({ title: "Request Approved", description: `The invoice has been updated directly.` });
   };
 
   return (
