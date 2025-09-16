@@ -1365,5 +1365,3 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
-
-    
