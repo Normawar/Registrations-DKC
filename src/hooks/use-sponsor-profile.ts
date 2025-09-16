@@ -46,8 +46,9 @@ export function useSponsorProfile() {
   }, []);
 
 
-  const updateProfile = useCallback(async (newProfileData: Partial<SponsorProfile> | null) => {
-    if (!user) {
+  const updateProfile = useCallback(async (newProfileData: Partial<SponsorProfile> | null, authUser?: User | null) => {
+    const userToUpdate = authUser || user;
+    if (!userToUpdate) {
         console.error("Cannot update profile: no user logged in.");
         return;
     }
@@ -59,21 +60,21 @@ export function useSponsorProfile() {
     if (newProfileData === null) {
       setProfile(null);
       // Also clear from local storage
-      localStorage.removeItem(`user_profile_${user.uid}`);
+      localStorage.removeItem(`user_profile_${userToUpdate.uid}`);
       return;
     }
 
     // Merge new data with existing profile
-    const updatedProfile = { ...(profile || {}), ...newProfileData, email: user.email, uid: user.uid } as SponsorProfile;
+    const updatedProfile = { ...(profile || {}), ...newProfileData, email: userToUpdate.email, uid: userToUpdate.uid } as SponsorProfile;
 
     try {
         // Update Firestore
-        const docRef = doc(db, "users", user.uid);
+        const docRef = doc(db, "users", userToUpdate.uid);
         await setDoc(docRef, updatedProfile, { merge: true });
         
         // Update local state and localStorage
         setProfile(updatedProfile);
-        localStorage.setItem(`user_profile_${user.uid}`, JSON.stringify(updatedProfile));
+        localStorage.setItem(`user_profile_${userToUpdate.uid}`, JSON.stringify(updatedProfile));
 
     } catch (error) {
         console.error("Failed to save sponsor profile to Firestore", error);

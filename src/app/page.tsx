@@ -50,7 +50,7 @@ export default function LoginPage() {
       const { user, profile } = await simpleSignIn(email, password);
       
       if (user && profile) {
-        await updateProfile(profile as SponsorProfile);
+        await updateProfile(profile as SponsorProfile, user);
         
         toast({
           title: "Login Successful",

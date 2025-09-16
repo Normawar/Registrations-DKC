@@ -218,7 +218,7 @@ const SponsorSignUpForm = () => {
       const result = await simpleSignUp(email, password, profileData);
       
       if (result.success) {
-        await updateProfile(result.profile as SponsorProfile);
+        await updateProfile(result.profile as SponsorProfile, result.user);
         
         toast({
             title: "Account Ready!",
@@ -321,7 +321,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
         try {
           const correctionResult = await correctOrganizerAccountData(values.email, values.password);
           if (correctionResult.success) {
-              await updateProfile(correctionResult.profile as SponsorProfile);
+              await updateProfile(correctionResult.profile as SponsorProfile, correctionResult.user);
               toast({
                   title: "Welcome Back, Norma!",
                   description: "Your organizer account has been logged in and verified.",
@@ -357,7 +357,7 @@ const IndividualSignUpForm = ({ role }: { role: 'individual' | 'organizer' }) =>
       const result = await simpleSignUp(email, password, profileData);
       
       if (result.success) {
-        await updateProfile(result.profile as SponsorProfile);
+        await updateProfile(result.profile as SponsorProfile, result.user);
         
         toast({
             title: "Account Ready!",
