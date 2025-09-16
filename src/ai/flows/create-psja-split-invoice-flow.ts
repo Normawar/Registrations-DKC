@@ -84,13 +84,14 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
       
       const gtInvoiceInput: CreateInvoiceInput = {
         ...input,
+        sponsorName: input.sponsorName,
+        sponsorEmail: input.gtCoordinatorEmail || input.sponsorEmail,
         players: gtPlayers.map(p => ({ ...p, lateFee: p.lateFee ?? 0 })), // Ensure lateFee is not null
-        // Send to GT coordinator, not bookkeeper
         gtCoordinatorEmail: input.gtCoordinatorEmail,
         bookkeeperEmail: '', // Ensure bookkeeper is not CC'd on the GT invoice
         invoiceNumber: gtInvoiceNumber,
         revisionMessage: input.revisionMessage,
-        teamCode: input.teamCode, // Ensure teamCode is passed
+        teamCode: input.teamCode, 
       };
       output.gtInvoice = await createInvoice(gtInvoiceInput);
       console.log(`GT Invoice created:`, output.gtInvoice);
@@ -102,13 +103,14 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
       
       const independentInvoiceInput: CreateInvoiceInput = {
         ...input,
+        sponsorName: input.sponsorName,
+        sponsorEmail: input.sponsorEmail,
         players: independentPlayers.map(p => ({ ...p, lateFee: p.lateFee ?? 0 })), // Ensure lateFee is not null
-        // Send to bookkeeper, not GT coordinator
         bookkeeperEmail: input.bookkeeperEmail,
         gtCoordinatorEmail: '', // Ensure GT coordinator is not CC'd on the independent invoice
         invoiceNumber: indInvoiceNumber,
         revisionMessage: input.revisionMessage,
-        teamCode: input.teamCode, // Ensure teamCode is passed
+        teamCode: input.teamCode,
       };
       output.independentInvoice = await createInvoice(independentInvoiceInput);
       console.log(`Independent Invoice created:`, output.independentInvoice);
@@ -117,5 +119,3 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
     return output;
   }
 );
-
-    

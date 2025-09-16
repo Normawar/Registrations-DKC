@@ -1,7 +1,7 @@
 /**
  * @fileOverview Recreates an invoice with an updated player roster.
  * This flow cancels the original invoice and creates a new one with the updated details.
- * It's the standard, reliable way to handle changes to existing registrations.
+ * It now properly handles PSJA split invoices.
  */
 
 import {ai} from '@/ai/genkit';
@@ -9,6 +9,7 @@ import { ApiError } from 'square';
 import { getSquareClient } from '@/lib/square-client';
 import { createInvoice } from './create-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
+import { createPsjaSplitInvoice } from './create-psja-split-invoice-flow';
 import {
   RecreateInvoiceInputSchema,
   type RecreateInvoiceInput,
@@ -46,51 +47,63 @@ const recreateInvoiceFromRosterFlow = ai.defineFlow(
         await cancelInvoice({ invoiceId: input.originalInvoiceId, requestingUserRole: 'organizer' });
         console.log(`Successfully canceled original invoice: ${input.originalInvoiceId}`);
       }
-
-      // Step 3: Create a new invoice with the updated details and a unique revision number.
-      const existingRevision = originalInvoice?.invoiceNumber?.match(/-rev\.(\d+)/);
-      const nextRevisionNumber = existingRevision ? parseInt(existingRevision[1], 10) + 1 : 2;
+      
+      const isPsjaDistrict = input.district === 'PHARR-SAN JUAN-ALAMO ISD';
+      
+      // Step 3: Determine invoice numbering for revision
+      const existingRevisionMatch = originalInvoice?.invoiceNumber?.match(/-rev\.(\d+)/);
+      const nextRevisionNumber = existingRevisionMatch ? parseInt(existingRevisionMatch[1], 10) + 1 : 2;
       const baseInvoiceNumber = originalInvoice?.invoiceNumber?.split('-rev.')[0];
-      // Append a timestamp to ensure uniqueness, even if run in quick succession.
-      const uniqueTimestamp = Date.now().toString().slice(-5);
-      const newInvoiceNumber = baseInvoiceNumber 
-          ? `${baseInvoiceNumber}-rev.${nextRevisionNumber}-${uniqueTimestamp}` 
-          : `INV-${uniqueTimestamp}`; // Fallback if no base number
-
-      console.log('Generated invoice number:', {
-        baseInvoiceNumber,
-        existingRevision,
-        nextRevisionNumber,
-        uniqueTimestamp,
-        newInvoiceNumber
-      });
-
       const revisionMessage = `Revised based on your request. Original Invoice: #${originalInvoice?.invoiceNumber}. This invoice replaces the original.`;
       
-      const newInvoiceInput = {
-        ...input,
-        invoiceNumber: newInvoiceNumber,
-        revisionMessage: revisionMessage,
-      };
+      let newInvoiceResult;
 
-      console.log('Passing to createInvoice:', { invoiceNumber: newInvoiceInput.invoiceNumber });
-      
-      const { invoiceId, invoiceNumber, status, invoiceUrl } = await createInvoice(newInvoiceInput);
+      if (isPsjaDistrict) {
+        // Step 4a: Handle PSJA Split Invoice Recreation
+        console.log('Recreating as PSJA Split Invoice');
+        const splitResult = await createPsjaSplitInvoice({
+          ...input,
+          revisionNumber: nextRevisionNumber,
+          originalInvoiceNumber: baseInvoiceNumber,
+          revisionMessage: revisionMessage,
+        });
 
-      // We need to fetch the final amount of the new invoice
-      const { result: { invoice: newSquareInvoice } } = await squareClient.invoicesApi.getInvoice(invoiceId);
+        // For the output, we'll return the info for one of the created invoices,
+        // prioritizing the independent one as that's usually the primary sponsor's responsibility.
+        newInvoiceResult = splitResult.independentInvoice || splitResult.gtInvoice;
+        if (!newInvoiceResult) throw new Error('Failed to create any new invoices for PSJA split.');
+
+      } else {
+        // Step 4b: Handle Standard Invoice Recreation
+        console.log('Recreating as Standard Invoice');
+        const uniqueTimestamp = Date.now().toString().slice(-5);
+        const newInvoiceNumber = baseInvoiceNumber 
+            ? `${baseInvoiceNumber}-rev.${nextRevisionNumber}-${uniqueTimestamp}` 
+            : `INV-${uniqueTimestamp}`;
+
+        const newInvoiceInput = {
+          ...input,
+          invoiceNumber: newInvoiceNumber,
+          revisionMessage: revisionMessage,
+        };
+
+        newInvoiceResult = await createInvoice(newInvoiceInput);
+      }
+
+      // Step 5: Fetch the final amount of the new primary invoice
+      const { result: { invoice: newSquareInvoice } } = await squareClient.invoicesApi.getInvoice(newInvoiceResult.invoiceId);
       const newTotalAmount = newSquareInvoice?.paymentRequests?.[0]?.computedAmountMoney?.amount 
         ? Number(newSquareInvoice.paymentRequests[0].computedAmountMoney.amount) / 100 
         : 0;
 
-      console.log("Successfully created new revised invoice:", newInvoiceInput);
+      console.log("Successfully created new revised invoice(s).");
 
       return {
         oldInvoiceId: input.originalInvoiceId,
-        newInvoiceId: invoiceId,
-        newInvoiceNumber: invoiceNumber,
-        newStatus: status,
-        newInvoiceUrl: invoiceUrl,
+        newInvoiceId: newInvoiceResult.invoiceId,
+        newInvoiceNumber: newInvoiceResult.invoiceNumber,
+        newStatus: newInvoiceResult.status,
+        newInvoiceUrl: newInvoiceResult.invoiceUrl,
         newTotalAmount: newTotalAmount,
       };
 
