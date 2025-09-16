@@ -197,10 +197,15 @@ function ManageEventsContent() {
   };
 
   const sortedEvents = useMemo(() => {
-    let filteredEvents = [...events];
+    let filteredEvents = [...events].map(event => {
+        if (getDistrictForLocation(event.location).startsWith("Test")) {
+            return {...event, name: `Test ${event.name}`}
+        }
+        return event;
+    });
 
     if (districtFilter !== 'all') {
-      filteredEvents = events.filter(event => {
+      filteredEvents = filteredEvents.filter(event => {
         const district = getDistrictForLocation(event.location);
         return district === districtFilter;
       });
@@ -1013,3 +1018,4 @@ export default function ManageEventsPage() {
     </OrganizerGuard>
   );
 }
+
