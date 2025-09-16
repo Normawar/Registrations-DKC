@@ -18,7 +18,7 @@ import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, D
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -37,6 +37,7 @@ type User = {
     school?: string;
     district?: string;
     isDistrictCoordinator?: boolean;
+    isOrganizer?: boolean;
     phone?: string;
     bookkeeperEmail?: string;
     gtCoordinatorEmail?: string;
@@ -46,9 +47,9 @@ type SortableColumn = 'email' | 'lastName' | 'role' | 'school';
 
 const baseUserFormSchema = z.object({
   email: z.string().email(),
-  role: z.enum(['sponsor', 'organizer', 'individual', 'district_coordinator']),
   isSponsor: z.boolean().default(false),
   isDistrictCoordinator: z.boolean().default(false),
+  isOrganizer: z.boolean().default(false),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   school: z.string().optional(),
@@ -58,20 +59,20 @@ const baseUserFormSchema = z.object({
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 });
 
-const userFormSchema = baseUserFormSchema.refine(data => data.isSponsor || data.isDistrictCoordinator || data.role === 'organizer' || data.role === 'individual', {
-    message: "A user must have at least one role (Sponsor or District Coordinator).",
+const refinedUserSchema = baseUserFormSchema.refine(data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer, {
+    message: "A user must have at least one role.",
     path: ["isSponsor"],
 });
 
 const createUserFormSchema = baseUserFormSchema.extend({
     password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
-}).refine(data => data.isSponsor || data.isDistrictCoordinator || data.role === 'organizer' || data.role === 'individual', {
-    message: "A user must have at least one role (Sponsor or District Coordinator).",
+}).refine(data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer, {
+    message: "A user must have at least one role.",
     path: ["isSponsor"],
 });
 
 
-type UserFormValues = z.infer<typeof userFormSchema>;
+type UserFormValues = z.infer<typeof refinedUserSchema>;
 type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 export default function UsersPage() {
@@ -161,16 +162,16 @@ export default function UsersPage() {
     };
 
     const form = useForm<UserFormValues>({
-        resolver: zodResolver(userFormSchema),
+        resolver: zodResolver(refinedUserSchema),
     });
     
     const createForm = useForm<CreateUserFormValues>({
         resolver: zodResolver(createUserFormSchema),
         defaultValues: {
             email: '',
-            role: 'sponsor',
             isSponsor: true,
             isDistrictCoordinator: false,
+            isOrganizer: false,
             firstName: '',
             lastName: '',
             school: '',
@@ -206,9 +207,9 @@ export default function UsersPage() {
         const initialDistrict = editingUser.district || 'None';
         form.reset({
             email: editingUser.email || '',
-            role: editingUser.role || 'sponsor',
             isSponsor: editingUser.role === 'sponsor' || editingUser.role === 'district_coordinator',
             isDistrictCoordinator: editingUser.isDistrictCoordinator || editingUser.role === 'district_coordinator',
+            isOrganizer: editingUser.role === 'organizer',
             firstName: editingUser.firstName || '',
             lastName: editingUser.lastName || '',
             school: editingUser.school || '',
@@ -266,13 +267,15 @@ export default function UsersPage() {
         try {
             const userRef = doc(db, "users", userDocId);
             
-            let finalRole: User['role'] = 'individual';
-            if (values.isDistrictCoordinator && values.isSponsor) {
-              finalRole = 'district_coordinator'; // A DC is also a sponsor
+            let finalRole: User['role'];
+            if (values.isOrganizer) {
+              finalRole = 'organizer';
             } else if (values.isDistrictCoordinator) {
               finalRole = 'district_coordinator';
             } else if (values.isSponsor) {
               finalRole = 'sponsor';
+            } else {
+              finalRole = 'individual';
             }
 
             const dataToSave = { ...values, role: finalRole };
@@ -293,13 +296,17 @@ export default function UsersPage() {
     const handleCreateUser = async (values: CreateUserFormValues) => {
         setIsCreatingUser(true);
         try {
-            const { password, isSponsor, ...profileData } = values;
+            const { password, isSponsor, isOrganizer, ...profileData } = values;
 
-            let finalRole: User['role'] = 'individual';
-            if (values.isDistrictCoordinator) {
-                finalRole = 'district_coordinator';
-            } else if (values.isSponsor) {
-                finalRole = 'sponsor';
+            let finalRole: User['role'];
+            if (isOrganizer) {
+              finalRole = 'organizer';
+            } else if (values.isDistrictCoordinator) {
+              finalRole = 'district_coordinator';
+            } else if (isSponsor) {
+              finalRole = 'sponsor';
+            } else {
+              finalRole = 'individual';
             }
 
             await createUserByOrganizer(values.email, password, { ...profileData, role: finalRole });
@@ -361,9 +368,6 @@ export default function UsersPage() {
             description: `${psjaUsers.length} PSJA users have been exported.`,
         });
     };
-
-    const selectedRoleInEdit = form.watch('role');
-    const selectedRoleInCreate = createForm.watch('role');
 
     return (
         <AppLayout>
@@ -473,6 +477,9 @@ export default function UsersPage() {
                                             <FormField control={form.control} name="isDistrictCoordinator" render={({ field }) => (
                                                 <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>District Coordinator</FormLabel></FormItem>
                                             )} />
+                                            <FormField control={form.control} name="isOrganizer" render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Organizer</FormLabel></FormItem>
+                                            )} />
                                         </div>
                                         <FormMessage />
                                     </FormItem>
@@ -538,6 +545,9 @@ export default function UsersPage() {
                                             )} />
                                             <FormField control={createForm.control} name="isDistrictCoordinator" render={({ field }) => (
                                                 <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>District Coordinator</FormLabel></FormItem>
+                                            )} />
+                                            <FormField control={createForm.control} name="isOrganizer" render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Organizer</FormLabel></FormItem>
                                             )} />
                                         </div>
                                         <FormMessage />
