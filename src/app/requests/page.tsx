@@ -11,13 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Check, X, Loader2, RefreshCw } from 'lucide-react';
+import { Check, X, Loader2, RefreshCw, PlusCircle } from 'lucide-react';
 import { ReviewRequestDialog } from '@/components/review-request-dialog';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { processBatchedRequests } from './actions';
+import { ChangeRequestDialog } from '@/components/change-request-dialog';
 
 type EnrichedChangeRequest = ChangeRequest & {
     schoolName?: string;
@@ -35,6 +36,7 @@ export default function RequestsPage() {
 
     const [selectedRequest, setSelectedRequest] = useState<EnrichedChangeRequest | null>(null);
     const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     
     const loadRequests = useCallback(async () => {
         if (!db || !profile) return;
@@ -168,11 +170,17 @@ export default function RequestsPage() {
         <>
             <AppLayout>
                 <div className="space-y-8">
-                    <div>
+                    <div className="flex justify-between items-center">
+                      <div>
                         <h1 className="text-3xl font-bold font-headline">Change Requests</h1>
                         <p className="text-muted-foreground">
                             {isOrganizer ? "Review and process change requests submitted by sponsors." : "Track the status of your submitted change requests."}
                         </p>
+                      </div>
+                      <Button onClick={() => setIsCreateDialogOpen(true)}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Make A Change Request
+                      </Button>
                     </div>
 
                     <Card>
@@ -282,6 +290,15 @@ export default function RequestsPage() {
                 </div>
             </AppLayout>
             
+            {profile && (
+              <ChangeRequestDialog
+                isOpen={isCreateDialogOpen}
+                onOpenChange={setIsCreateDialogOpen}
+                profile={profile}
+                onRequestCreated={loadRequests}
+              />
+            )}
+
             {profile && selectedRequest && (
                 <ReviewRequestDialog 
                     isOpen={isReviewDialogOpen}

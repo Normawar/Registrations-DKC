@@ -236,10 +236,9 @@ export function ChangeRequestDialog({ isOpen, onOpenChange, profile, onRequestCr
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Make a Change Request</DialogTitle>
-          <DialogDescription className="sr-only">
-            Dialog for submitting a change request for a registered event.
+          <DialogDescription>
+            Select a registration and describe the change you need. This will be sent to an organizer for approval.
           </DialogDescription>
-          <p className="text-sm text-muted-foreground">Select a registration and describe the change you need. This will be sent to an organizer for approval.</p>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
