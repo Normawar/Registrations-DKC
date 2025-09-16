@@ -223,7 +223,7 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
         players: newPlayerRoster,
         uscfFee: 24,
         requestingUserRole: 'organizer',
-        sponsorName: originalConfirmation.sponsorName,
+        sponsorName: request.submittedBy,
         sponsorEmail: originalConfirmation.sponsorEmail,
         schoolName: originalConfirmation.schoolName,
         teamCode: originalConfirmation.teamCode,
