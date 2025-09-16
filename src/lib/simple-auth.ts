@@ -308,7 +308,7 @@ export async function simpleSignIn(email: string, password: string) {
     
     console.log(`Normalized email for sign-in: "${normalizedEmail}"`);
     
-    if (!validateEmail(email)) {
+    if (!validateEmail(normalizedEmail)) {
       throw new Error('Please enter a valid email address');
     }
 
