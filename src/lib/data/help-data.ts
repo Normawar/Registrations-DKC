@@ -74,7 +74,7 @@ export const helpTopics: HelpTopic[] = [
       ### Adding a Player
       1. Click the **Add from Database** button.
       2. In the search dialog, enter the player's name or USCF ID. The system will search the master database of all players.
-      3. From the search results, find the correct player and click **Add & Complete**.
+      3. From the search results, find the correct player and click **Select** or **Add & Complete**.
       4. A dialog will appear, pre-filled with the player's information. You **must** fill in any missing required fields, such as Grade, Section, Email, and Zip Code.
       5. Click **Save Player**. The student is now on your school's roster.
 
@@ -207,5 +207,3 @@ export const helpTopics: HelpTopic[] = [
     `
   },
 ];
-
-    

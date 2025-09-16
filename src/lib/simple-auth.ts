@@ -85,7 +85,7 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     }
     
     // Handle special test user cases with normalized email
-    if (normalizedEmail.startsWith('test')) {
+    if (normalizedEmail.startsWith('test') || normalizedEmail === 'sandra.ojeda@psjaisd.us') {
         let userCredential;
         try {
             // Attempt to sign in first to check if the auth user exists.
@@ -108,6 +108,24 @@ export async function simpleSignUp(email: string, password: string, userData: Om
         let testProfile: SponsorProfile;
 
         switch (normalizedEmail) {
+            case 'sandra.ojeda@psjaisd.us':
+                 testProfile = {
+                    uid: user.uid, 
+                    email: normalizedEmail,
+                    firstName: 'Sandra', 
+                    lastName: 'Ojeda',
+                    role: 'district_coordinator', 
+                    district: 'PHARR-SAN JUAN-ALAMO ISD', 
+                    school: 'All Schools', 
+                    phone: '555-555-5555',
+                    isDistrictCoordinator: true, 
+                    avatarType: 'icon', 
+                    avatarValue: 'KingIcon',
+                    forceProfileUpdate: false, 
+                    createdAt: new Date().toISOString(), 
+                    updatedAt: new Date().toISOString(),
+                };
+               break;
             case 'test@test.com':
                 testProfile = {
                     uid: user.uid, 
@@ -320,7 +338,7 @@ export async function simpleSignIn(email: string, password: string) {
         userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
     } catch (error: any) {
         // If it's a known test email with an invalid credential error, try to create it.
-        const isTestAccount = normalizedEmail.startsWith('test') && normalizedEmail.endsWith('@test.com');
+        const isTestAccount = normalizedEmail.startsWith('test') || normalizedEmail === 'sandra.ojeda@psjaisd.us';
         if (isTestAccount && error.code === 'auth/invalid-credential') {
             console.warn(`⚠️ Sign-in failed for test account ${normalizedEmail}. Attempting to create/reset...`);
             try {
@@ -507,7 +525,8 @@ export async function testKnownAccounts() {
     { email: 'testdist@test.com', password: '1Disttester' },
     { email: 'testmcallen@test.com', password: 'testpassword' },
     { email: 'testecisd@test.com', password: 'testpassword' },
-    { email: 'testshary@test.com', password: 'testpassword' }
+    { email: 'testshary@test.com', password: 'testpassword' },
+    { email: 'sandra.ojeda@psjaisd.us', password: 'password' },
   ];
   
   for (const account of testAccounts) {

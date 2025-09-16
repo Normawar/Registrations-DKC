@@ -45,11 +45,11 @@ export default function QuickStartGuidePage() {
                 <CardContent className="space-y-4">
                   <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar.</p>
                   <p className="text-sm">2. Click the <strong>Add from Database</strong> button. This will open a search dialog.</p>
-                  <p className="text-sm">3. Use the filters to search for players by name, USCF ID, school, or district. You can also look up players directly from the USCF database using the 'USCF Lookup' tab.</p>
+                  <p className="text-sm">3. Use the filters to search for players by name, USCF ID, school, or district.</p>
                   <div className="border rounded-lg p-4 bg-muted/50">
                      <Image src="https://picsum.photos/seed/qs1/600/400" alt="A screenshot of the player search dialog showing filters for name and school." width={600} height={400} className="rounded-md" data-ai-hint="player search dialog" />
                   </div>
-                  <p className="text-sm">4. Once you find your student, click <strong>Select</strong> or <strong>Add & Complete</strong>. If their profile is missing information (like Grade, Section, DOB), you will be prompted to fill it in. The player will then be added to your school's roster.</p>
+                  <p className="text-sm">4. Once you find your student, click <strong>Select</strong>. You will be prompted to fill in any missing required information (like Grade or Section). The player will then be added to your school's roster.</p>
                 </CardContent>
               </Card>
             </AccordionContent>
@@ -72,7 +72,7 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">1. Go to the <Link href="/dashboard" className="font-medium underline">Dashboard</Link> or <Link href="/events" className="font-medium underline">Register for Event</Link> page.</p>
                   <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
                   <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                     <Image src="https://picsum.photos/seed/qs2/600/350" alt="A screenshot showing the event list with the register button highlighted." width={600} height={350} className="rounded-md" data-ai-hint="event registration list" />
+                     <Image src="https://picsum.photos/seed/qs2/600/350" alt="A screenshot showing the event list with the register button highlighted." width={600} height={350} className="rounded-md" data-ai-hint="event registration" />
                      <Image src="https://picsum.photos/seed/qs3/600/450" alt="A screenshot of the registration dialog where players from a roster can be selected." width={600} height={450} className="rounded-md" data-ai-hint="registration dialog" />
                   </div>
                   <p className="text-sm">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
