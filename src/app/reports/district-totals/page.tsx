@@ -2,13 +2,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Download, Printer, ChevronDown, ChevronRight } from 'lucide-react';
+import { Download, Printer, ChevronDown, ChevronRight, Edit } from 'lucide-react';
 import Papa from 'papaparse';
 import { format } from 'date-fns';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -214,6 +215,7 @@ function DistrictTotalsReportContent() {
                                                                             <TableHead>Player Name</TableHead>
                                                                             <TableHead>USCF ID</TableHead>
                                                                             <TableHead>Rating</TableHead>
+                                                                            <TableHead className="text-right no-print">Action</TableHead>
                                                                         </TableRow>
                                                                     </TableHeader>
                                                                     <TableBody>
@@ -222,6 +224,13 @@ function DistrictTotalsReportContent() {
                                                                                 <TableCell>{player.firstName} {player.lastName}</TableCell>
                                                                                 <TableCell>{player.uscfId}</TableCell>
                                                                                 <TableCell>{player.regularRating || 'UNR'}</TableCell>
+                                                                                <TableCell className="text-right no-print">
+                                                                                    <Button asChild variant="outline" size="sm">
+                                                                                        <Link href={`/players?edit=${player.id}`}>
+                                                                                            <Edit className="h-3 w-3 mr-2" /> Edit
+                                                                                        </Link>
+                                                                                    </Button>
+                                                                                </TableCell>
                                                                             </TableRow>
                                                                         ))}
                                                                     </TableBody>
