@@ -207,7 +207,7 @@ function SponsorRosterView() {
         
         if (key === 'teamCode' && profile) {
           aVal = generateTeamCode({ schoolName: a.school, district: a.district, studentType: a.studentType });
-          bVal = generateTeamCode({ schoolName: b.school, district: b.district, studentType: b.studentType });
+          bVal = generateTeamCode({ schoolName: b.school, district: a.district, studentType: b.studentType });
         } else if (typeof aVal === 'string' && typeof bVal === 'string') {
           return sortConfig.direction === 'ascending' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
         }
@@ -675,88 +675,98 @@ function SponsorRosterView() {
                                       <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter USCF ID or 'NEW'" onChange={(e) => field.onChange(e.target.value)} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
                                       <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                          <FormField control={playerForm.control} name="dob" render={({ field }) => ( 
-                                              <FormItem>
-                                                  <FormLabel>Date of Birth</FormLabel>
-                                                  <FormControl>
-                                                      <Input 
-                                                          type="text" 
-                                                          placeholder="MM/DD/YYYY (e.g., 11/01/1986)"
-                                                          value={field.value ? format(field.value, 'MM/dd/yyyy') : ''} 
-                                                          onChange={(e) => { 
-                                                              const dateValue = e.target.value.trim(); 
-                                                              if (dateValue === '') {
-                                                                  field.onChange(undefined);
-                                                                  return;
-                                                              }
-                                                              
-                                                              // Parse MM/DD/YYYY format
-                                                              const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-                                                              const match = dateValue.match(dateRegex);
-                                                              
-                                                              if (match) {
-                                                                  const [, monthStr, dayStr, yearStr] = match;
-                                                                  const month = parseInt(monthStr, 10);
-                                                                  const day = parseInt(dayStr, 10);
-                                                                  const year = parseInt(yearStr, 10);
-                                                                  
-                                                                  // Basic validation
-                                                                  if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= new Date().getFullYear()) {
-                                                                      const parsedDate = new Date(year, month - 1, day); // month is 0-indexed
-                                                                      
-                                                                      // Verify the date is valid (handles invalid dates like 02/30/1986)
-                                                                      if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
-                                                                          field.onChange(parsedDate);
-                                                                      }
-                                                                  }
-                                                              }
-                                                          }} 
-                                                      />
-                                                  </FormControl>
-                                                  <FormMessage />
-                                              </FormItem> 
-                                          )} />
-                                          <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( 
-                                              <FormItem>
-                                                  <FormLabel>USCF Expiration</FormLabel>
-                                                  <FormControl>
-                                                      <Input 
-                                                          type="text" 
-                                                          placeholder="MM/DD/YYYY (e.g., 12/31/2025)"
-                                                          value={field.value ? format(field.value, 'MM/dd/yyyy') : ''} 
-                                                          onChange={(e) => { 
-                                                              const dateValue = e.target.value.trim(); 
-                                                              if (dateValue === '') {
-                                                                  field.onChange(undefined);
-                                                                  return;
-                                                              }
-                                                              
-                                                              // Parse MM/DD/YYYY format
-                                                              const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-                                                              const match = dateValue.match(dateRegex);
-                                                              
-                                                              if (match) {
-                                                                  const [, monthStr, dayStr, yearStr] = match;
-                                                                  const month = parseInt(monthStr, 10);
-                                                                  const day = parseInt(dayStr, 10);
-                                                                  const year = parseInt(yearStr, 10);
-                                                                  
-                                                                  // Basic validation (expiration can be in the future)
-                                                                  if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900) {
-                                                                      const parsedDate = new Date(year, month - 1, day); // month is 0-indexed
-                                                                      
-                                                                      // Verify the date is valid (handles invalid dates like 02/30/2025)
-                                                                      if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
-                                                                          field.onChange(parsedDate);
-                                                                      }
-                                                                  }
-                                                              }
-                                                          }} 
-                                                      />
-                                                  </FormControl>
-                                                  <FormMessage />
-                                              </FormItem>
-                                          )} />
+                                      <FormField control={playerForm.control} name="dob" render={({ field }) => {
+    const [displayValue, setDisplayValue] = useState(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    
+    useEffect(() => {
+        setDisplayValue(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    }, [field.value]);
+    
+    return (
+        <FormItem>
+            <FormLabel>Date of Birth</FormLabel>
+            <FormControl>
+                <Input 
+                    type="text" 
+                    placeholder="MM/DD/YYYY (e.g., 11/01/1986)"
+                    value={displayValue}
+                    onChange={(e) => { 
+                        const inputValue = e.target.value;
+                        setDisplayValue(inputValue);
+                        
+                        // Only try to parse when we have a complete date format
+                        const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+                        const match = inputValue.match(dateRegex);
+                        
+                        if (match) {
+                            const [, monthStr, dayStr, yearStr] = match;
+                            const month = parseInt(monthStr, 10);
+                            const day = parseInt(dayStr, 10);
+                            const year = parseInt(yearStr, 10);
+                            
+                            if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= new Date().getFullYear()) {
+                                const parsedDate = new Date(year, month - 1, day);
+                                
+                                if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
+                                    field.onChange(parsedDate);
+                                }
+                            }
+                        } else if (inputValue === '') {
+                            field.onChange(undefined);
+                        }
+                    }} 
+                />
+            </FormControl>
+            <FormMessage />
+        </FormItem> 
+    );
+}} />
+                                        <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => {
+    const [displayValue, setDisplayValue] = useState(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    
+    useEffect(() => {
+        setDisplayValue(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    }, [field.value]);
+    
+    return (
+        <FormItem>
+            <FormLabel>USCF Expiration</FormLabel>
+            <FormControl>
+                <Input 
+                    type="text" 
+                    placeholder="MM/DD/YYYY (e.g., 12/31/2025)"
+                    value={displayValue}
+                    onChange={(e) => { 
+                        const inputValue = e.target.value;
+                        setDisplayValue(inputValue);
+                        
+                        // Only try to parse when we have a complete date format
+                        const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+                        const match = inputValue.match(dateRegex);
+                        
+                        if (match) {
+                            const [, monthStr, dayStr, yearStr] = match;
+                            const month = parseInt(monthStr, 10);
+                            const day = parseInt(dayStr, 10);
+                            const year = parseInt(yearStr, 10);
+                            
+                            if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900) {
+                                const parsedDate = new Date(year, month - 1, day);
+                                
+                                if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
+                                    field.onChange(parsedDate);
+                                }
+                            }
+                        } else if (inputValue === '') {
+                            field.onChange(undefined);
+                        }
+                    }} 
+                />
+            </FormControl>
+            <FormMessage />
+        </FormItem> 
+    );
+}} />
                                       </div>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                           <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
@@ -827,88 +837,98 @@ function SponsorRosterView() {
                               <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} value={field.value || ''} placeholder="Enter USCF ID or 'NEW'" onChange={(e) => field.onChange(e.target.value)} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
                               <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={createPlayerForm.control} name="dob" render={({ field }) => ( 
-                                    <FormItem>
-                                        <FormLabel>Date of Birth</FormLabel>
-                                        <FormControl>
-                                            <Input 
-                                                type="text" 
-                                                placeholder="MM/DD/YYYY (e.g., 11/01/1986)"
-                                                value={field.value ? format(field.value, 'MM/dd/yyyy') : ''} 
-                                                onChange={(e) => { 
-                                                    const dateValue = e.target.value.trim(); 
-                                                    if (dateValue === '') {
-                                                        field.onChange(undefined);
-                                                        return;
-                                                    }
-                                                    
-                                                    // Parse MM/DD/YYYY format
-                                                    const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-                                                    const match = dateValue.match(dateRegex);
-                                                    
-                                                    if (match) {
-                                                        const [, monthStr, dayStr, yearStr] = match;
-                                                        const month = parseInt(monthStr, 10);
-                                                        const day = parseInt(dayStr, 10);
-                                                        const year = parseInt(yearStr, 10);
-                                                        
-                                                        // Basic validation
-                                                        if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= new Date().getFullYear()) {
-                                                            const parsedDate = new Date(year, month - 1, day); // month is 0-indexed
-                                                            
-                                                            // Verify the date is valid (handles invalid dates like 02/30/1986)
-                                                            if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
-                                                                field.onChange(parsedDate);
-                                                            }
-                                                        }
-                                                    }
-                                                }} 
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                                <FormField control={createPlayerForm.control} name="uscfExpiration" render={({ field }) => ( 
-                                    <FormItem>
-                                        <FormLabel>USCF Expiration</FormLabel>
-                                        <FormControl>
-                                            <Input 
-                                                type="text" 
-                                                placeholder="MM/DD/YYYY (e.g., 12/31/2025)"
-                                                value={field.value ? format(field.value, 'MM/dd/yyyy') : ''} 
-                                                onChange={(e) => { 
-                                                    const dateValue = e.target.value.trim(); 
-                                                    if (dateValue === '') {
-                                                        field.onChange(undefined);
-                                                        return;
-                                                    }
-                                                    
-                                                    // Parse MM/DD/YYYY format
-                                                    const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
-                                                    const match = dateValue.match(dateRegex);
-                                                    
-                                                    if (match) {
-                                                        const [, monthStr, dayStr, yearStr] = match;
-                                                        const month = parseInt(monthStr, 10);
-                                                        const day = parseInt(dayStr, 10);
-                                                        const year = parseInt(yearStr, 10);
-                                                        
-                                                        // Basic validation (expiration can be in the future)
-                                                        if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900) {
-                                                            const parsedDate = new Date(year, month - 1, day); // month is 0-indexed
-                                                            
-                                                            // Verify the date is valid (handles invalid dates like 02/30/2025)
-                                                            if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
-                                                                field.onChange(parsedDate);
-                                                            }
-                                                        }
-                                                    }
-                                                }} 
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
+                                <FormField control={createPlayerForm.control} name="dob" render={({ field }) => {
+    const [displayValue, setDisplayValue] = useState(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    
+    useEffect(() => {
+        setDisplayValue(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    }, [field.value]);
+    
+    return (
+        <FormItem>
+            <FormLabel>Date of Birth</FormLabel>
+            <FormControl>
+                <Input 
+                    type="text" 
+                    placeholder="MM/DD/YYYY (e.g., 11/01/1986)"
+                    value={displayValue}
+                    onChange={(e) => { 
+                        const inputValue = e.target.value;
+                        setDisplayValue(inputValue);
+                        
+                        // Only try to parse when we have a complete date format
+                        const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+                        const match = inputValue.match(dateRegex);
+                        
+                        if (match) {
+                            const [, monthStr, dayStr, yearStr] = match;
+                            const month = parseInt(monthStr, 10);
+                            const day = parseInt(dayStr, 10);
+                            const year = parseInt(yearStr, 10);
+                            
+                            if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= new Date().getFullYear()) {
+                                const parsedDate = new Date(year, month - 1, day);
+                                
+                                if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
+                                    field.onChange(parsedDate);
+                                }
+                            }
+                        } else if (inputValue === '') {
+                            field.onChange(undefined);
+                        }
+                    }} 
+                />
+            </FormControl>
+            <FormMessage />
+        </FormItem> 
+    );
+}} />
+                                <FormField control={createPlayerForm.control} name="uscfExpiration" render={({ field }) => {
+    const [displayValue, setDisplayValue] = useState(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    
+    useEffect(() => {
+        setDisplayValue(field.value ? format(field.value, 'MM/dd/yyyy') : '');
+    }, [field.value]);
+    
+    return (
+        <FormItem>
+            <FormLabel>USCF Expiration</FormLabel>
+            <FormControl>
+                <Input 
+                    type="text" 
+                    placeholder="MM/DD/YYYY (e.g., 12/31/2025)"
+                    value={displayValue}
+                    onChange={(e) => { 
+                        const inputValue = e.target.value;
+                        setDisplayValue(inputValue);
+                        
+                        // Only try to parse when we have a complete date format
+                        const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+                        const match = inputValue.match(dateRegex);
+                        
+                        if (match) {
+                            const [, monthStr, dayStr, yearStr] = match;
+                            const month = parseInt(monthStr, 10);
+                            const day = parseInt(dayStr, 10);
+                            const year = parseInt(yearStr, 10);
+                            
+                            if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900) {
+                                const parsedDate = new Date(year, month - 1, day);
+                                
+                                if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
+                                    field.onChange(parsedDate);
+                                }
+                            }
+                        } else if (inputValue === '') {
+                            field.onChange(undefined);
+                        }
+                    }} 
+                />
+            </FormControl>
+            <FormMessage />
+        </FormItem> 
+    );
+}} />
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                   <FormField control={createPlayerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
