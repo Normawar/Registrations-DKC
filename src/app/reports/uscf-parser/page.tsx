@@ -20,61 +20,248 @@ export default function USCFDataParserPage() {
 
   const parseUSCFData = (text: string) => {
     try {
-      const lines = text.trim().split('\n');
-      const parsed: any[] = [];
+      // Clean up the text and split into tokens
+      const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const allTokens = cleanText.split(/[\t\n]/).map(token => token.trim()).filter(token => token.length > 0);
       
-      for (const line of lines) {
-        if (!line.trim()) continue;
+      const parsed: any[] = [];
+      let currentPlayer: any = {};
+      let expectingRank = true;
+      
+      // Define regex patterns for different data types
+      const patterns = {
+        rank: /^\d+$/,
+        uscfId: /^\d{8,9}$/,
+        expirationDate: /^\d{4}-\d{2}-\d{2}$|^20\d{2}-\d{2}-\d{2}$/,
+        name: /^(GM|IM|FM|WGM|WIM|WFM|CM|WCM|NM|WNM|MR\.|MS\.|MRS\.)?[\s]*[A-Z][A-Z\s\.\-']+$/i,
+        state: /^[A-Z]{2,3}$|^(TX|CA|NY|FL|WI|MO|ARM|HUN|NED|IND|MGL|SRB|VA|ON|QC|TAM|NLE|CAN)$/,
+        rating: /^\d{3,4}$/,
+        datePublished: /^20\d{2}-\d{2}-\d{2}$/,
+        events: /^[1-9]\d*$/,
+        tournamentId: /^\d{12}$/
+      };
+      
+      let i = 0;
+      
+      // Skip header section
+      while (i < allTokens.length && 
+             (allTokens[i].includes('Rank') || 
+              allTokens[i].includes('USCF') || 
+              allTokens[i].includes('Name') || 
+              allTokens[i].includes('State') || 
+              allTokens[i].includes('Rating') || 
+              allTokens[i].includes('Date') || 
+              allTokens[i].includes('Published') || 
+              allTokens[i].includes('Events') || 
+              allTokens[i].includes('Last') || 
+              allTokens[i].includes('Event') ||
+              allTokens[i].includes('Exp'))) {
+        i++;
+      }
+      
+      // Process tokens sequentially
+      while (i < allTokens.length) {
+        const token = allTokens[i];
         
-        // Split by tab characters (common in USCF data exports)
-        const columns = line.split('\t').map(col => col.trim());
+        // Skip obvious non-data
+        if (token.includes('DUMMY ID') || token.length > 100) {
+          i++;
+          continue;
+        }
         
-        // Skip header row if it exists
-        if (columns[0] === 'Rank' || columns[0] === 'rank') continue;
-        
-        // Extract data based on typical USCF format
-        if (columns.length >= 6) {
-          const player = {
-            rank: columns[0] || '',
-            memberID: columns[1] || '',
-            expirationDate: columns[2] || '',
-            name: columns[3] || '',
-            state: columns[4] || '',
-            rating: columns[5] || '',
-            datePublished: columns[6] || '',
-            events: columns[7] || '',
-            lastEvent: columns[8] || ''
-          };
-          
-          // Clean up name to extract title
-          let cleanName = player.name;
-          let title = '';
-          
-          // Extract chess titles (GM, IM, FM, etc.)
-          const titleMatch = cleanName.match(/^(GM|IM|FM|WGM|WIM|WFM|CM|WCM|NM|WNM)\s+(.+)/);
-          if (titleMatch) {
-            title = titleMatch[1];
-            cleanName = titleMatch[2];
+        // Look for rank (start of new player record)
+        if (patterns.rank.test(token) && expectingRank) {
+          // Save previous player if complete
+          if (currentPlayer.rank && currentPlayer.name && currentPlayer.memberID) {
+            parsed.push({...currentPlayer});
           }
           
-          // Remove "MR." or "MS." prefixes
-          cleanName = cleanName.replace(/^(MR\.|MS\.|MRS\.)\s+/i, '');
+          // Start new player
+          currentPlayer = { rank: parseInt(token) };
+          expectingRank = false;
+          i++;
+          continue;
+        }
+        
+        // Look for USCF ID
+        if (patterns.uscfId.test(token) && currentPlayer.rank && !currentPlayer.memberID) {
+          currentPlayer.memberID = token;
+          i++;
+          continue;
+        }
+        
+        // Look for expiration date
+        if (patterns.expirationDate.test(token) && currentPlayer.memberID && !currentPlayer.expirationDate) {
+          currentPlayer.expirationDate = token;
+          i++;
+          continue;
+        }
+        
+        // Look for name (with potential title)
+        if (patterns.name.test(token) && currentPlayer.memberID && !currentPlayer.name) {
+          let fullName = token;
+          let title = '';
           
-          parsed.push({
-            name: cleanName,
-            memberID: player.memberID,
-            rating: player.rating,
-            state: player.state,
-            title: title,
-            expirationDate: player.expirationDate,
-            lastEvent: player.lastEvent
-          });
+          // Extract chess titles
+          const titleMatch = fullName.match(/^(GM|IM|FM|WGM|WIM|WFM|CM|WCM|NM|WNM)\s+(.+)/i);
+          if (titleMatch) {
+            title = titleMatch[1].toUpperCase();
+            fullName = titleMatch[2];
+          }
+          
+          // Remove honorifics
+          fullName = fullName.replace(/^(MR\.|MS\.|MRS\.)\s+/i, '');
+          
+          currentPlayer.name = fullName.trim();
+          if (title) currentPlayer.title = title;
+          i++;
+          continue;
+        }
+        
+        // Look for state
+        if (patterns.state.test(token) && currentPlayer.name && !currentPlayer.state) {
+          currentPlayer.state = token;
+          i++;
+          continue;
+        }
+        
+        // Look for rating
+        if (patterns.rating.test(token) && currentPlayer.name && !currentPlayer.rating) {
+          currentPlayer.rating = parseInt(token);
+          i++;
+          continue;
+        }
+        
+        // Look for date published
+        if (patterns.datePublished.test(token) && currentPlayer.rating && !currentPlayer.datePublished) {
+          currentPlayer.datePublished = token;
+          i++;
+          continue;
+        }
+        
+        // Look for events count
+        if (patterns.events.test(token) && currentPlayer.datePublished && !currentPlayer.events) {
+          currentPlayer.events = parseInt(token);
+          i++;
+          continue;
+        }
+        
+        // Look for tournament ID
+        if (patterns.tournamentId.test(token) && currentPlayer.events && !currentPlayer.lastEvent) {
+          currentPlayer.lastEvent = token;
+          expectingRank = true; // Ready for next player
+          i++;
+          continue;
+        }
+        
+        // If we can't categorize this token, move on
+        i++;
+      }
+      
+      // Don't forget the last player
+      if (currentPlayer.rank && currentPlayer.name && currentPlayer.memberID) {
+        parsed.push({...currentPlayer});
+      }
+      
+      // Clean up and format results
+      return parsed.map(player => ({
+        name: player.name || '',
+        memberID: player.memberID || '',
+        rating: player.rating || '',
+        state: player.state || '',
+        title: player.title || '',
+        expirationDate: player.expirationDate || '',
+        lastEvent: player.lastEvent || ''
+      }));
+      
+    } catch (err) {
+      console.error('Parse error:', err);
+      throw new Error('Failed to parse data. The format may be too complex for automatic parsing.');
+    }
+  };
+
+  const parseUSCFDataSimple = (text: string) => {
+    try {
+      // Split into lines and look for patterns
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line);
+      const parsed: any[] = [];
+      
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        
+        // Look for lines that start with rank number followed by tab and USCF ID
+        const rankMatch = line.match(/^(\d+)\s+(\d{8,9})\s*(.*)/);
+        if (rankMatch) {
+          const [, rank, memberID, rest] = rankMatch;
+          
+          // Try to extract other fields from the rest of the line and subsequent lines
+          let name = '';
+          let state = '';
+          let rating = '';
+          let title = '';
+          
+          // Look in current line and next few lines for additional data
+          const searchLines = [rest, ...lines.slice(i + 1, i + 8)].filter(Boolean);
+          
+          for (const searchLine of searchLines) {
+            // Look for name with title
+            const nameMatch = searchLine.match(/(GM|IM|FM|WGM|WIM|WFM|CM|WCM)?\s*([A-Z][A-Z\s\.\-']+)/);
+            if (nameMatch && !name) {
+              title = nameMatch[1] || '';
+              name = nameMatch[2].replace(/^(MR\.|MS\.|MRS\.)\s+/i, '').trim();
+            }
+            
+            // Look for state
+            const stateMatch = searchLine.match(/\b([A-Z]{2,3})\b/);
+            if (stateMatch && !state && stateMatch[1].length <= 3) {
+              state = stateMatch[1];
+            }
+            
+            // Look for rating
+            const ratingMatch = searchLine.match(/\b(\d{3,4})\b/);
+            if (ratingMatch && !rating) {
+              const potentialRating = parseInt(ratingMatch[1]);
+              if (potentialRating >= 100 && potentialRating <= 3000) {
+                rating = potentialRating.toString();
+              }
+            }
+          }
+          
+          if (name && memberID) {
+            parsed.push({
+              name,
+              memberID,
+              rating,
+              state,
+              title,
+              expirationDate: '',
+              lastEvent: ''
+            });
+          }
         }
       }
       
       return parsed;
     } catch (err) {
-      throw new Error('Failed to parse data. Please check the format.');
+      throw new Error('Failed to parse data with simple parser.');
+    }
+  };
+
+  const parseUSCFDataWithFallback = (text: string) => {
+    try {
+      const result = parseUSCFData(text);
+      if (result.length > 0) {
+        return result;
+      }
+      // If main parser found nothing, try simple parser
+      return parseUSCFDataSimple(text);
+    } catch (err) {
+      // If main parser fails, try simple parser
+      try {
+        return parseUSCFDataSimple(text);
+      } catch (simpleErr) {
+        throw new Error('Could not parse data with either parser method.');
+      }
     }
   };
 
@@ -88,7 +275,7 @@ export default function USCFDataParserPage() {
     setError('');
     
     try {
-      const parsed = parseUSCFData(inputData);
+      const parsed = parseUSCFDataWithFallback(inputData); // Use the new parser
       if (parsed.length === 0) {
         setError('No valid player data found. Please check the format.');
       } else {
