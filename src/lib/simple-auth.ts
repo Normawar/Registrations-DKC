@@ -37,7 +37,7 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     console.log(`Original email: "${email}"`);
     console.log(`Normalized email: "${normalizedEmail}"`);
     
-    if (!validateEmail(email)) {
+    if (!validateEmail(normalizedEmail)) {
       throw new Error('Please enter a valid email address.');
     }
 
@@ -186,7 +186,7 @@ export async function simpleSignUp(email: string, password: string, userData: Om
                     firstName: 'Test', 
                     lastName: 'ECISD',
                     role: 'district_coordinator', 
-                    district: 'TestECISD', 
+                    district: 'EDINBURG CISD', 
                     school: 'All Schools', 
                     phone: '555-555-5555',
                     isDistrictCoordinator: true, 
@@ -196,7 +196,7 @@ export async function simpleSignUp(email: string, password: string, userData: Om
                     createdAt: new Date().toISOString(), 
                     updatedAt: new Date().toISOString(),
                 };
-                break;
+               break;
             case 'testshary@test.com':
                 testProfile = {
                    uid: user.uid, 
@@ -312,10 +312,31 @@ export async function simpleSignIn(email: string, password: string) {
       throw new Error('Please enter a valid email address.');
     }
 
-    const { signInWithEmailAndPassword } = await import('firebase/auth');
+    const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
     const { doc, getDoc, setDoc, writeBatch } = await import('firebase/firestore');
 
-    const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
+    let userCredential;
+    try {
+        userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
+    } catch (error: any) {
+        // If it's a known test email with an invalid credential error, try to create it.
+        const isTestAccount = normalizedEmail.startsWith('test') && normalizedEmail.endsWith('@test.com');
+        if (isTestAccount && error.code === 'auth/invalid-credential') {
+            console.warn(`⚠️ Sign-in failed for test account ${normalizedEmail}. Attempting to create/reset...`);
+            try {
+                // This will create the user with the correct password if they don't exist.
+                await simpleSignUp(email, password, {});
+                // Now, retry the sign-in.
+                userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
+            } catch (createError) {
+                console.error(`❌ Failed to create/reset test account ${normalizedEmail}.`, createError);
+                throw error; // Re-throw the original error if reset fails.
+            }
+        } else {
+            throw error; // Re-throw other errors
+        }
+    }
+
     const user = userCredential.user;
     console.log('✅ User signed in with UID:', user.uid);
 
