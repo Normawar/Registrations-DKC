@@ -18,20 +18,23 @@ function DistrictTotalsReportContent() {
   const districtData = useMemo(() => {
     if (!isDbLoaded) return [];
 
-    return dbDistricts.map(district => {
-      const playersInDistrict = allPlayers.filter(p => p.district === district);
-      const schoolsInDistrict = new Set(playersInDistrict.map(p => p.school));
-      const gtPlayers = playersInDistrict.filter(p => p.studentType === 'gt').length;
-      const independentPlayers = playersInDistrict.filter(p => p.studentType !== 'gt').length;
+    return dbDistricts
+      .map(district => {
+        const playersInDistrict = allPlayers.filter(p => p.district === district);
+        const schoolsInDistrict = new Set(playersInDistrict.map(p => p.school));
+        const gtPlayers = playersInDistrict.filter(p => p.studentType === 'gt').length;
+        const independentPlayers = playersInDistrict.filter(p => p.studentType !== 'gt').length;
 
-      return {
-        name: district,
-        playerCount: playersInDistrict.length,
-        schoolCount: schoolsInDistrict.size,
-        gtCount: gtPlayers,
-        indCount: independentPlayers,
-      };
-    }).sort((a, b) => b.playerCount - a.playerCount);
+        return {
+          name: district,
+          playerCount: playersInDistrict.length,
+          schoolCount: schoolsInDistrict.size,
+          gtCount: gtPlayers,
+          indCount: independentPlayers,
+        };
+      })
+      .filter(district => district.playerCount > 0) // Exclude districts with 0 players
+      .sort((a, b) => b.playerCount - a.playerCount);
 
   }, [isDbLoaded, dbDistricts, allPlayers]);
   
