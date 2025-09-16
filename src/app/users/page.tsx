@@ -6,7 +6,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { collection, getDocs, doc, deleteDoc, setDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, deleteDoc, setDoc, query, where, writeBatch } from 'firebase/firestore';
 import Papa from 'papaparse';
 
 import { AppLayout } from "@/components/app-layout";
@@ -27,6 +27,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/services/firestore-service';
 import { createUserByOrganizer } from '@/app/users/actions';
 import { Loader2 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 
 type User = {
@@ -81,12 +82,16 @@ export default function UsersPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
-    const [isAlertOpen, setIsAlertOpen] = useState(false);
-    const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumn; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
     const [isCreatingUser, setIsCreatingUser] = useState(false);
+    
+    // State for force delete
+    const [emailsToDelete, setEmailsToDelete] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteResults, setDeleteResults] = useState<string[]>([]);
+    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     
     const uniqueDistricts = useMemo(() => {
         const districts = new Set(schoolData.map(s => s.district));
@@ -227,33 +232,6 @@ export default function UsersPage() {
         setIsDialogOpen(true);
     };
 
-    const handleDeleteUser = (user: User) => {
-        setUserToDelete(user);
-        setIsAlertOpen(true);
-    };
-
-    const confirmDelete = async () => {
-        if (!userToDelete || !db) return;
-
-        try {
-            const userSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', userToDelete.email)));
-            if (userSnapshot.empty) {
-                toast({ variant: 'destructive', title: "Deletion Failed", description: "Could not find the user to delete." });
-                return;
-            }
-            const userDocId = userSnapshot.docs[0].id;
-            await deleteDoc(doc(db, "users", userDocId));
-            
-            loadUsers(); 
-            toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
-        } catch (error) {
-            console.error("Error deleting user:", error);
-            toast({ variant: 'destructive', title: "Deletion Failed", description: "Could not remove user from the database." });
-        }
-        
-        setIsAlertOpen(false);
-    };
-
     const onSubmit = async (values: UserFormValues) => {
         if (!editingUser || !db) return;
 
@@ -329,6 +307,75 @@ export default function UsersPage() {
             setIsCreatingUser(false);
         }
     };
+    
+    const handleForceDelete = async () => {
+        const emails = emailsToDelete.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+        if (emails.length === 0) {
+          toast({ variant: 'destructive', title: 'No Emails Provided', description: 'Please enter at least one email to delete.' });
+          return;
+        }
+
+        setIsDeleting(true);
+        setDeleteResults([]);
+        const log = (message: string) => setDeleteResults(prev => [...prev, message]);
+
+        if (!db) {
+            log('❌ Error: Firestore is not available.');
+            setIsDeleting(false);
+            return;
+        }
+
+        log(`Starting deletion for ${emails.length} user(s)...`);
+
+        try {
+            const usersRef = collection(db, 'users');
+            // Firestore 'in' queries are limited to 30 items. We need to batch this.
+            const BATCH_SIZE = 30;
+            let successfullyDeletedCount = 0;
+            const allFoundEmails = new Set<string>();
+
+            for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+                const emailBatch = emails.slice(i, i + BATCH_SIZE);
+                log(`Processing batch ${i / BATCH_SIZE + 1}...`);
+                
+                const q = query(usersRef, where('email', 'in', emailBatch));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    emailBatch.forEach(email => log(`⚠️ Warning: No Firestore record found for ${email}.`));
+                    continue;
+                }
+
+                const firestoreBatch = writeBatch(db);
+                querySnapshot.forEach(doc => {
+                    const userData = doc.data();
+                    log(`🔥 Deleting Firestore record for ${userData.email} (ID: ${doc.id})`);
+                    firestoreBatch.delete(doc.ref);
+                    allFoundEmails.add(userData.email.toLowerCase());
+                    successfullyDeletedCount++;
+                });
+                await firestoreBatch.commit();
+            }
+
+            emails.forEach(email => {
+                if (!allFoundEmails.has(email)) {
+                    log(`⚠️ Warning: No Firestore record found for ${email}. You may need to delete their auth record manually in the Firebase console.`);
+                }
+            });
+          
+            log(`✅ Successfully deleted ${successfullyDeletedCount} user records from Firestore.`);
+            toast({ title: 'Deletion Complete', description: 'Check the log for details. Note: Auth records must be deleted from the Firebase Console manually.' });
+            loadUsers(); // Refresh user list
+            setEmailsToDelete('');
+
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+            log(`❌ Error during Firestore deletion: ${message}`);
+            toast({ variant: 'destructive', title: 'Error', description: message });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
 
     const handleExportPsjaUsers = () => {
         const psjaUsers = users.filter(user => user.email.toLowerCase().endsWith('@psjaisd.us'));
@@ -381,6 +428,36 @@ export default function UsersPage() {
                         <UserPlus className="mr-2 h-4 w-4" /> Create New User
                     </Button>
                 </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Force Delete Users</CardTitle>
+                    <CardDescription>
+                      Permanently delete user accounts from the database. Enter a list of emails separated by commas, spaces, or new lines. This tool only removes Firestore records, not authentication records.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Textarea
+                      placeholder="test1@example.com, test2@example.com"
+                      value={emailsToDelete}
+                      onChange={(e) => setEmailsToDelete(e.target.value)}
+                      rows={4}
+                      disabled={isDeleting}
+                    />
+                    <Button onClick={() => setIsDeleteAlertOpen(true)} disabled={isDeleting || !emailsToDelete} variant="destructive">
+                      {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                      Permanently Delete {emailsToDelete.split(/[\n,;]+/).filter(Boolean).length} User(s)
+                    </Button>
+                    {deleteResults.length > 0 && (
+                        <div className="pt-4">
+                            <h4 className="font-semibold text-sm">Deletion Log:</h4>
+                            <pre className="bg-muted mt-2 p-4 rounded-md text-xs overflow-auto max-h-48 whitespace-pre-wrap">
+                                {deleteResults.join('\n')}
+                            </pre>
+                        </div>
+                    )}
+                  </CardContent>
+                </Card>
 
                 <Card>
                     <CardHeader>
@@ -441,7 +518,6 @@ export default function UsersPage() {
                                                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                 <DropdownMenuContent>
                                                     <DropdownMenuItem onClick={() => handleEditUser(user)}><FilePenLine className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleDeleteUser(user)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
                                         </TableCell>
@@ -604,19 +680,22 @@ export default function UsersPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+            
+            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>This will permanently delete the user account for {userToDelete?.email}. This action cannot be undone.</AlertDialogDescription>
+                        <AlertDialogDescription>
+                            This will attempt to permanently delete all users with the entered emails. This action cannot be undone.
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                        <AlertDialogAction onClick={handleForceDelete} className="bg-destructive hover:bg-destructive/90">Yes, Delete Users</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </AppLayout>
     );
 }
+

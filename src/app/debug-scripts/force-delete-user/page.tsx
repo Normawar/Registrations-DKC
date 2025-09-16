@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState } from 'react';
@@ -11,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Loader2, Trash2 } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import Link from 'next/link';
 
 function ForceDeleteUserPage() {
   const { toast } = useToast();
@@ -80,9 +83,15 @@ function ForceDeleteUserPage() {
   return (
     <AppLayout>
       <div className="space-y-8 max-w-2xl mx-auto">
+        <Alert variant="destructive">
+            <AlertTitle>This tool has been moved!</AlertTitle>
+            <AlertDescription>
+                The user deletion tool is now integrated directly into the <Link href="/users" className="font-bold underline">User Management</Link> page for easier access. This debug page can be removed.
+            </AlertDescription>
+        </Alert>
         <Card>
           <CardHeader>
-            <CardTitle>Force Delete Users</CardTitle>
+            <CardTitle>Force Delete Users (Legacy)</CardTitle>
             <CardDescription>
               Permanently delete user accounts from the database. Enter a list of emails separated by commas, spaces, or new lines. This tool only removes the Firestore record, not the authentication record.
             </CardDescription>
@@ -126,3 +135,4 @@ export default function GuardedForceDeleteUserPage() {
         </OrganizerGuard>
     )
 }
+
