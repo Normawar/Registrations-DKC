@@ -309,7 +309,7 @@ export async function simpleSignIn(email: string, password: string) {
     console.log(`Normalized email for sign-in: "${normalizedEmail}"`);
     
     if (!validateEmail(normalizedEmail)) {
-      throw new Error('Please enter a valid email address');
+      throw new Error('Please enter a valid email address.');
     }
 
     const { signInWithEmailAndPassword } = await import('firebase/auth');
@@ -484,7 +484,9 @@ export async function testKnownAccounts() {
     { email: 'test@test.com', password: 'testpassword' },
     { email: 'testds@test.com', password: 'testpassword' },
     { email: 'testdist@test.com', password: '1Disttester' },
-    { email: 'testmcallen@test.com', password: 'testpassword' }
+    { email: 'testmcallen@test.com', password: 'testpassword' },
+    { email: 'testecisd@test.com', password: 'testpassword' },
+    { email: 'testshary@test.com', password: 'testpassword' }
   ];
   
   for (const account of testAccounts) {
