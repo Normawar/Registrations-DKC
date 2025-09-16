@@ -32,7 +32,8 @@ type DistrictStats = {
 
 function DistrictTotalsReportContent() {
   const { isDbLoaded, dbDistricts, database: allPlayers } = useMasterDb();
-  const [openStates, setOpenStates] = useState<Record<string, boolean>>({});
+  const [openDistricts, setOpenDistricts] = useState<Record<string, boolean>>({});
+  const [openSchools, setOpenSchools] = useState<Record<string, boolean>>({});
 
   const districtData: DistrictStats[] = useMemo(() => {
     if (!isDbLoaded) return [];
@@ -79,20 +80,26 @@ function DistrictTotalsReportContent() {
   
   const handleExport = () => {
     const dataToExport = districtData.flatMap(d => 
-      d.schools.map(s => ({
-        'District': d.name,
-        'School': s.name,
-        'Total Players': s.playerCount,
-        'GT Players': s.gtCount,
-        'Independent Players': s.indCount,
-      }))
+      d.schools.flatMap(s => {
+        const schoolPlayers = allPlayers.filter(p => p.district === d.name && p.school === s.name);
+        return schoolPlayers.map(p => ({
+            'District': d.name,
+            'School': s.name,
+            'Player First Name': p.firstName,
+            'Player Last Name': p.lastName,
+            'USCF ID': p.uscfId,
+            'Grade': p.grade,
+            'Rating': p.regularRating || 'UNR',
+            'Player Type': p.studentType || 'regular',
+        }));
+      })
     );
 
     const csv = Papa.unparse(dataToExport);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `district_school_totals_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    link.setAttribute('download', `district_full_roster_report_${format(new Date(), 'yyyy-MM-dd')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -102,8 +109,12 @@ function DistrictTotalsReportContent() {
     window.print();
   };
 
-  const toggleOpen = (districtName: string) => {
-    setOpenStates(prev => ({ ...prev, [districtName]: !prev[districtName] }));
+  const toggleDistrict = (districtName: string) => {
+    setOpenDistricts(prev => ({ ...prev, [districtName]: !prev[districtName] }));
+  };
+  
+  const toggleSchool = (schoolIdentifier: string) => {
+    setOpenSchools(prev => ({ ...prev, [schoolIdentifier]: !prev[schoolIdentifier] }));
   };
 
   return (
@@ -125,7 +136,7 @@ function DistrictTotalsReportContent() {
         <CardHeader>
           <CardTitle>District Summary</CardTitle>
           <CardDescription>
-            Showing aggregate data for all {districtData.length} districts in the database. Click on a row to see school details.
+            Showing aggregate data for all {districtData.length} districts in the database. Click on a row to see school and player details.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -150,12 +161,12 @@ function DistrictTotalsReportContent() {
                   </TableBody>
                 ) : (
                   districtData.map(district => (
-                    <Collapsible asChild key={district.name} open={openStates[district.name]} onOpenChange={() => toggleOpen(district.name)}>
+                    <Collapsible asChild key={district.name} open={openDistricts[district.name]} onOpenChange={() => toggleDistrict(district.name)}>
                       <TableBody>
                         <CollapsibleTrigger asChild>
                           <TableRow className="cursor-pointer hover:bg-muted/50">
                             <TableCell className="font-medium flex items-center">
-                              {openStates[district.name] ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                              {openDistricts[district.name] ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
                               {district.name}
                             </TableCell>
                             <TableCell className="text-right">{district.schoolCount}</TableCell>
@@ -177,16 +188,52 @@ function DistrictTotalsReportContent() {
                                       <TableHead className="text-right">Independent Players</TableHead>
                                     </TableRow>
                                   </TableHeader>
-                                  <TableBody>
-                                    {district.schools.map(school => (
-                                      <TableRow key={school.name}>
-                                        <TableCell className="pl-10">{school.name}</TableCell>
-                                        <TableCell className="text-right font-medium">{school.playerCount}</TableCell>
-                                        <TableCell className="text-right">{school.gtCount}</TableCell>
-                                        <TableCell className="text-right">{school.indCount}</TableCell>
-                                      </TableRow>
-                                    ))}
-                                  </TableBody>
+                                  {district.schools.map(school => {
+                                      const schoolIdentifier = `${district.name}-${school.name}`;
+                                      return (
+                                          <Collapsible asChild key={schoolIdentifier} open={openSchools[schoolIdentifier]} onOpenChange={() => toggleSchool(schoolIdentifier)}>
+                                            <TableBody>
+                                                <CollapsibleTrigger asChild>
+                                                    <TableRow className="cursor-pointer hover:bg-background/50">
+                                                        <TableCell className="pl-10 font-medium flex items-center">
+                                                           {openSchools[schoolIdentifier] ? <ChevronDown className="h-4 w-4 mr-2" /> : <ChevronRight className="h-4 w-4 mr-2" />}
+                                                            {school.name}
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-medium">{school.playerCount}</TableCell>
+                                                        <TableCell className="text-right">{school.gtCount}</TableCell>
+                                                        <TableCell className="text-right">{school.indCount}</TableCell>
+                                                    </TableRow>
+                                                </CollapsibleTrigger>
+                                                <CollapsibleContent asChild>
+                                                    <tr>
+                                                        <td colSpan={4} className="p-0">
+                                                            <div className="py-2 px-16 bg-white">
+                                                                <Table>
+                                                                    <TableHeader>
+                                                                        <TableRow>
+                                                                            <TableHead>Player Name</TableHead>
+                                                                            <TableHead>USCF ID</TableHead>
+                                                                            <TableHead>Rating</TableHead>
+                                                                        </TableRow>
+                                                                    </TableHeader>
+                                                                    <TableBody>
+                                                                        {allPlayers.filter(p => p.district === district.name && p.school === school.name).map(player => (
+                                                                            <TableRow key={player.id}>
+                                                                                <TableCell>{player.firstName} {player.lastName}</TableCell>
+                                                                                <TableCell>{player.uscfId}</TableCell>
+                                                                                <TableCell>{player.regularRating || 'UNR'}</TableCell>
+                                                                            </TableRow>
+                                                                        ))}
+                                                                    </TableBody>
+                                                                </Table>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                </CollapsibleContent>
+                                            </TableBody>
+                                          </Collapsible>
+                                      );
+                                  })}
                                 </Table>
                               </div>
                             </td>
