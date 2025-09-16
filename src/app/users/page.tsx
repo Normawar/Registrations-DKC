@@ -47,15 +47,20 @@ type SortableColumn = 'email' | 'lastName' | 'role' | 'school';
 const userFormSchema = z.object({
   email: z.string().email(),
   role: z.enum(['sponsor', 'organizer', 'individual', 'district_coordinator']),
+  isSponsor: z.boolean().default(false),
+  isDistrictCoordinator: z.boolean().default(false),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   school: z.string().optional(),
   district: z.string().optional(),
-  isDistrictCoordinator: z.boolean().optional(),
   phone: z.string().optional(),
   bookkeeperEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
+}).refine(data => data.isSponsor || data.isDistrictCoordinator || data.role === 'organizer' || data.role === 'individual', {
+    message: "A user must have at least one role (Sponsor or District Coordinator).",
+    path: ["isSponsor"],
 });
+
 
 const createUserFormSchema = userFormSchema.extend({
     password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
@@ -159,11 +164,12 @@ export default function UsersPage() {
         defaultValues: {
             email: '',
             role: 'sponsor',
+            isSponsor: true,
+            isDistrictCoordinator: false,
             firstName: '',
             lastName: '',
             school: '',
             district: 'None',
-            isDistrictCoordinator: false,
             phone: '',
             bookkeeperEmail: '',
             gtCoordinatorEmail: '',
@@ -196,18 +202,19 @@ export default function UsersPage() {
         form.reset({
             email: editingUser.email || '',
             role: editingUser.role || 'sponsor',
+            isSponsor: editingUser.role === 'sponsor' || editingUser.role === 'district_coordinator',
+            isDistrictCoordinator: editingUser.isDistrictCoordinator || editingUser.role === 'district_coordinator',
             firstName: editingUser.firstName || '',
             lastName: editingUser.lastName || '',
             school: editingUser.school || '',
             district: initialDistrict,
-            isDistrictCoordinator: editingUser.isDistrictCoordinator || false,
             phone: editingUser.phone || '',
             bookkeeperEmail: editingUser.bookkeeperEmail || '',
             gtCoordinatorEmail: editingUser.gtCoordinatorEmail || '',
         });
         handleDistrictChange(initialDistrict, form, false);
       }
-    }, [isDialogOpen, editingUser, form]);
+    }, [isDialogOpen, editingUser, form, allSchoolNames]);
 
     const handleEditUser = (user: User) => {
         setEditingUser(user);
@@ -223,9 +230,14 @@ export default function UsersPage() {
         if (!userToDelete || !db) return;
 
         try {
-            // NOTE: This only deletes from Firestore, not Firebase Auth.
-            // For a full implementation, you'd need a server-side function to delete from Auth.
-            await deleteDoc(doc(db, "users", userToDelete.email));
+            const userSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', userToDelete.email)));
+            if (userSnapshot.empty) {
+                toast({ variant: 'destructive', title: "Deletion Failed", description: "Could not find the user to delete." });
+                return;
+            }
+            const userDocId = userSnapshot.docs[0].id;
+            await deleteDoc(doc(db, "users", userDocId));
+            
             loadUsers(); 
             toast({ title: "User Deleted", description: `${userToDelete.email} has been removed.` });
         } catch (error) {
@@ -239,7 +251,6 @@ export default function UsersPage() {
     const onSubmit = async (values: UserFormValues) => {
         if (!editingUser || !db) return;
 
-        // Find the user's document ID, which might not be their email if migrated
         const userSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', editingUser.email)));
         if(userSnapshot.empty) {
             toast({ variant: 'destructive', title: "Update Failed", description: "Could not find the user to update." });
@@ -249,7 +260,20 @@ export default function UsersPage() {
 
         try {
             const userRef = doc(db, "users", userDocId);
-            await setDoc(userRef, values, { merge: true });
+            
+            let finalRole: User['role'] = 'individual';
+            if (values.isDistrictCoordinator && values.isSponsor) {
+              finalRole = 'district_coordinator'; // A DC is also a sponsor
+            } else if (values.isDistrictCoordinator) {
+              finalRole = 'district_coordinator';
+            } else if (values.isSponsor) {
+              finalRole = 'sponsor';
+            }
+
+            const dataToSave = { ...values, role: finalRole };
+            delete (dataToSave as any).isSponsor;
+
+            await setDoc(userRef, dataToSave, { merge: true });
             
             loadUsers();
             toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
@@ -264,8 +288,17 @@ export default function UsersPage() {
     const handleCreateUser = async (values: CreateUserFormValues) => {
         setIsCreatingUser(true);
         try {
-            const { password, ...profileData } = values;
-            await createUserByOrganizer(values.email, password, profileData);
+            const { password, isSponsor, ...profileData } = values;
+
+            let finalRole: User['role'] = 'individual';
+            if (values.isDistrictCoordinator) {
+                finalRole = 'district_coordinator';
+            } else if (values.isSponsor) {
+                finalRole = 'sponsor';
+            }
+
+            await createUserByOrganizer(values.email, password, { ...profileData, role: finalRole });
+            
             toast({
                 title: "User Created Successfully",
                 description: `${values.email} has been created and can now log in with their temporary password.`,
@@ -391,7 +424,7 @@ export default function UsersPage() {
                                         <TableCell>{user.firstName} {user.lastName}</TableCell>
                                         <TableCell className='capitalize'>
                                             {user.role}
-                                            {user.isDistrictCoordinator && <span className="text-xs text-primary font-semibold ml-2">(Coordinator)</span>}
+                                            {user.isDistrictCoordinator && user.role === 'sponsor' && <span className="text-xs text-primary font-semibold ml-2">(Coordinator)</span>}
                                         </TableCell>
                                         <TableCell>{user.school || 'N/A'}{user.district ? ` / ${user.district}`: ''}</TableCell>
                                         <TableCell className="text-right">
@@ -425,42 +458,20 @@ export default function UsersPage() {
                                     <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input disabled {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={form.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={form.control} name="role" render={({ field }) => (
-                                        <FormItem><FormLabel>Role</FormLabel>
-                                        <Select onValueChange={(value) => form.setValue('role', value as User['role'])} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="sponsor">Sponsor</SelectItem>
-                                                <SelectItem value="organizer">Organizer</SelectItem>
-                                                <SelectItem value="individual">Individual</SelectItem>
-                                                <SelectItem value="district_coordinator">District Coordinator</SelectItem>
-                                            </SelectContent>
-                                        </Select><FormMessage />
-                                        </FormItem>
-                                    )} />
-                                    {selectedRoleInEdit === 'sponsor' && (
-                                        <FormField
-                                            control={form.control}
-                                            name="isDistrictCoordinator"
-                                            render={({ field }) => (
-                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                                                <FormControl>
-                                                    <Checkbox
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                    />
-                                                </FormControl>
-                                                <div className="space-y-1 leading-none">
-                                                    <FormLabel>
-                                                    Approve as District Coordinator
-                                                    </FormLabel>
-                                                    <FormDescription>
-                                                        Grants this sponsor view access to all schools and registrations in their district.
-                                                    </FormDescription>
-                                                </div>
-                                                </FormItem>
-                                            )}
-                                        />
-                                    )}
+                                    
+                                    <FormItem>
+                                        <FormLabel>Roles</FormLabel>
+                                        <div className="space-y-2">
+                                            <FormField control={form.control} name="isSponsor" render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Sponsor</FormLabel></FormItem>
+                                            )} />
+                                            <FormField control={form.control} name="isDistrictCoordinator" render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>District Coordinator</FormLabel></FormItem>
+                                            )} />
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+
                                     <FormField control={form.control} name="district" render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>District</FormLabel>
@@ -513,54 +524,57 @@ export default function UsersPage() {
                                     <FormField control={createForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={createForm.control} name="password" render={({ field }) => ( <FormItem><FormLabel>Temporary Password</FormLabel><FormControl><Input type="password" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField control={createForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem> )} />
-                                    <FormField control={createForm.control} name="role" render={({ field }) => (
-                                        <FormItem><FormLabel>Role</FormLabel>
-                                        <Select onValueChange={(value) => createForm.setValue('role', value as User['role'])} value={field.value}><FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="sponsor">Sponsor</SelectItem>
-                                                <SelectItem value="organizer">Organizer</SelectItem>
-                                                <SelectItem value="individual">Individual</SelectItem>
-                                                <SelectItem value="district_coordinator">District Coordinator</SelectItem>
-                                            </SelectContent>
-                                        </Select><FormMessage />
-                                        </FormItem>
-                                    )} />
                                     
-                                    {(selectedRoleInCreate === 'sponsor' || selectedRoleInCreate === 'district_coordinator') && (
-                                        <FormField
-                                            control={createForm.control}
-                                            name="district"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>District</FormLabel>
-                                                    <Select onValueChange={(value) => handleDistrictChange(value, createForm)} value={field.value}>
-                                                        <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
-                                                        <SelectContent>
-                                                            {uniqueDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
+                                    <FormItem>
+                                        <FormLabel>Roles</FormLabel>
+                                        <div className="space-y-2">
+                                            <FormField control={createForm.control} name="isSponsor" render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Sponsor</FormLabel></FormItem>
+                                            )} />
+                                            <FormField control={createForm.control} name="isDistrictCoordinator" render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>District Coordinator</FormLabel></FormItem>
+                                            )} />
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+
+                                    {(createForm.watch('isSponsor') || createForm.watch('isDistrictCoordinator')) && (
+                                        <>
+                                            <FormField
+                                                control={createForm.control}
+                                                name="district"
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>District</FormLabel>
+                                                        <Select onValueChange={(value) => handleDistrictChange(value, createForm)} value={field.value}>
+                                                            <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
+                                                            <SelectContent>
+                                                                {uniqueDistricts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <FormMessage />
+                                                    </FormItem>
+                                                )}
+                                            />
+                                            {createForm.watch('isSponsor') && (
+                                                <FormField
+                                                    control={createForm.control}
+                                                    name="school"
+                                                    render={({ field }) => (
+                                                        <FormItem>
+                                                            <FormLabel>School</FormLabel>
+                                                            <Select onValueChange={field.onChange} value={field.value} disabled={!createForm.watch('district')}>
+                                                                <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
+                                                                <SelectContent>
+                                                                    {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            <FormMessage />
+                                                        </FormItem>
+                                                    )}
+                                                />
                                             )}
-                                        />
-                                    )}
-                                    {selectedRoleInCreate === 'sponsor' && (
-                                        <FormField
-                                            control={createForm.control}
-                                            name="school"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>School</FormLabel>
-                                                    <Select onValueChange={field.onChange} value={field.value} disabled={!createForm.watch('district')}>
-                                                        <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
-                                                        <SelectContent>
-                                                            {schoolsForDistrict.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                        </>
                                     )}
                                 </form>
                             </Form>
