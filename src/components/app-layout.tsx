@@ -87,6 +87,7 @@ const organizerMenuStructure = {
     { href: "/debug-scripts/cleanup-players", icon: Trash2, label: "Cleanup Players DB" },
     { href: "/debug-scripts/import-test-players", icon: Wrench, label: "Import Test Players" },
     { href: "/debug-scripts/dynamic-uscf-test", icon: TestTube2, label: "Dynamic USCF Test" },
+    { href: "/debug-scripts/force-delete-user", icon: Trash2, label: "Force Delete User" },
   ]
 };
 
