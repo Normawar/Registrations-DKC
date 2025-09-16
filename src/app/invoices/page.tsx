@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -365,6 +366,27 @@ export default function UnifiedInvoiceRegistrations() {
         return sum + (totalAmount - totalPaid);
       }, 0);
   }, [filteredAndSortedData]);
+  
+  const gtIndTotals = useMemo(() => {
+    let gtInvoiced = 0;
+    let indInvoiced = 0;
+    
+    filteredAndSortedData.forEach(invoice => {
+        const isGtInvoice = invoice.registrations?.every((reg: MasterPlayer) => reg.studentType === 'gt');
+        const isIndInvoice = invoice.registrations?.every((reg: MasterPlayer) => reg.studentType !== 'gt');
+
+        if (isGtInvoice) {
+            gtInvoiced += invoice.totalAmount || 0;
+        } else if (isIndInvoice) {
+            indInvoiced += invoice.totalAmount || 0;
+        } else {
+            // For mixed invoices, you'd need to calculate based on player fees, which is more complex.
+            // This is a simplified approach assuming split invoices for PSJA.
+        }
+    });
+
+    return { gtInvoiced, indInvoiced };
+  }, [filteredAndSortedData]);
 
   return (
     <AppLayout>
@@ -387,12 +409,10 @@ export default function UnifiedInvoiceRegistrations() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {profile?.role === 'organizer' ? 'Total Revenue' : 'Total Expense'}
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -422,6 +442,36 @@ export default function UnifiedInvoiceRegistrations() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">GT Invoiced</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {clientReady ? (
+                <div className="text-2xl font-bold">${gtIndTotals.gtInvoiced.toFixed(2)}</div>
+              ) : (
+                <Skeleton className="h-8 w-3/4" />
+              )}
+              <p className="text-xs text-muted-foreground">Gifted & Talented total</p>
+            </CardContent>
+          </Card>
+
+           <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Independent Invoiced</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {clientReady ? (
+                <div className="text-2xl font-bold">${gtIndTotals.indInvoiced.toFixed(2)}</div>
+              ) : (
+                <Skeleton className="h-8 w-3/4" />
+              )}
+              <p className="text-xs text-muted-foreground">Independent total</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Paid Invoices</CardTitle>
               <Building className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -432,21 +482,6 @@ export default function UnifiedInvoiceRegistrations() {
                  <Skeleton className="h-8 w-1/2" />
                )}
               <p className="text-xs text-muted-foreground">of {clientReady ? filteredAndSortedData.length : '...'} total</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Records</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-               {clientReady ? (
-                 <div className="text-2xl font-bold">{data.length}</div>
-               ) : (
-                 <Skeleton className="h-8 w-1/2" />
-               )}
-              <p className="text-xs text-muted-foreground">registration records</p>
             </CardContent>
           </Card>
         </div>
