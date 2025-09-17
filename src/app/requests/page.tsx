@@ -76,8 +76,13 @@ export default function RequestsPage() {
                                     const invoiceData = invoiceDoc.data();
                                     schoolName = invoiceData.schoolName;
                                     invoiceNumber = invoiceData.invoiceNumber;
+                                    
                                     const eventDetails = events.find(e => e.id === invoiceData.eventId);
-                                    if(eventDetails && eventDetails.name.toLowerCase().startsWith('test')) {
+                                    
+                                    const eventNameIsTest = eventDetails?.name?.toLowerCase().startsWith('test');
+                                    const schoolDistrictIsTest = invoiceData.district?.toLowerCase().startsWith('test');
+
+                                    if(eventNameIsTest || schoolDistrictIsTest) {
                                         isTestEvent = true;
                                     }
                                 }
