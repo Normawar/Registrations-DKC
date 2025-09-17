@@ -179,35 +179,32 @@ function ManageEventsContent() {
   }, [dbSchools, allPlayers]);
   
   const getDistrictForLocation = useCallback((location: string): string => {
-      if (!isDbLoaded || !location) return 'Unknown';
-      
-      const lowerLocation = location.toLowerCase();
-      
-      // Direct match for test districts
-      if (lowerLocation.includes('testshary')) return 'TestShary';
-      if (lowerLocation.includes('testmcallen')) return 'TestMcAllen';
-      if (lowerLocation.includes('testecisd')) return 'TestECISD';
-      if (lowerLocation === 'test location') return 'Test';
+    if (!isDbLoaded || !location) return 'Unknown';
+    
+    const lowerLocation = location.toLowerCase();
+    
+    // Direct match for test districts from test school data
+    const testSchoolMatch = schoolData.find(s => s.schoolName.toLowerCase() === lowerLocation && s.district.toLowerCase().startsWith('test'));
+    if (testSchoolMatch) return testSchoolMatch.district;
 
+    // Direct match for any school name
+    let foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
 
-      // Find a school whose name is fully or partially in the location string
-      let foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
+    // More robust partial matching if no direct match
+    if (!foundSchool) {
+      foundSchool = schoolData.find(s => {
+        const schoolNameParts = s.schoolName.toLowerCase().split(' ').filter(p => p.length > 2 && !['el', 'ms', 'hs', 'j h', 'h s'].includes(p));
+        return schoolNameParts.some(part => lowerLocation.includes(part));
+      });
+    }
+    
+    if (foundSchool) return foundSchool.district;
+    
+    // Fallback: Check if a district name itself is in the location
+    const foundDistrict = uniqueDistricts.find(d => lowerLocation.includes(d.toLowerCase()));
+    if (foundDistrict) return foundDistrict;
 
-      if (!foundSchool) {
-        // More robust partial matching
-        foundSchool = schoolData.find(s => {
-          const schoolNameParts = s.schoolName.toLowerCase().split(' ').filter(p => p.length > 2 && !['el', 'ms', 'hs'].includes(p));
-          return schoolNameParts.some(part => lowerLocation.includes(part));
-        });
-      }
-      
-      if (foundSchool) return foundSchool.district;
-      
-      // Fallback: Check if a district name itself is in the location
-      const foundDistrict = uniqueDistricts.find(d => lowerLocation.includes(d.toLowerCase()));
-      if (foundDistrict) return foundDistrict;
-
-      return 'Unknown';
+    return 'Unknown';
   }, [isDbLoaded, uniqueDistricts]);
   
   const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
@@ -220,7 +217,7 @@ function ManageEventsContent() {
   const sortedEvents = useMemo(() => {
     const isTestEvent = (event: Event) => {
         const district = getDistrictForLocation(event.location);
-        return district.toLowerCase().startsWith("test") || event.location.toLowerCase() === 'test location';
+        return district.toLowerCase().startsWith("test");
     };
 
     let filteredEvents = [...events].filter(event => {
@@ -284,10 +281,10 @@ function ManageEventsContent() {
       date: new Date(),
       location: '',
       rounds: 5,
-      regularFee: 25,
-      lateFee: 30,
-      veryLateFee: 35,
-      dayOfFee: 40,
+      regularFee: 20,
+      lateFee: 25,
+      veryLateFee: 30,
+      dayOfFee: 35,
       imageUrl: '',
       imageName: '',
       pdfUrl: '',
@@ -341,10 +338,10 @@ function ManageEventsContent() {
           date: new Date(),
           location: '',
           rounds: 5,
-          regularFee: 25,
-          lateFee: 30,
-          veryLateFee: 35,
-          dayOfFee: 40,
+          regularFee: 20,
+          lateFee: 25,
+          veryLateFee: 30,
+          dayOfFee: 35,
           imageUrl: '',
           imageName: '',
           pdfUrl: '',
@@ -401,7 +398,7 @@ function ManageEventsContent() {
           return;
         }
         
-        const name = `${location} on ${format(date, 'PPP')}`;
+        const name = `${location}`;
         
         const eventData = {
           id: `evt-${Date.now()}-${Math.random()}`,
@@ -409,10 +406,10 @@ function ManageEventsContent() {
           date: date.toISOString(),
           location: location,
           rounds: Number(findColumn(row, ['rounds', 'round']) || 5),
-          regularFee: Number(findColumn(row, ['regularfee', 'regular']) || 25),
-          lateFee: Number(findColumn(row, ['latefee', 'late']) || 30),
-          veryLateFee: Number(findColumn(row, ['verylatefee', 'very']) || 35),
-          dayOfFee: Number(findColumn(row, ['dayoffee', 'dayof']) || 40),
+          regularFee: Number(findColumn(row, ['regularfee', 'regular']) || 20),
+          lateFee: Number(findColumn(row, ['latefee', 'late']) || 25),
+          veryLateFee: Number(findColumn(row, ['verylatefee', 'very']) || 30),
+          dayOfFee: Number(findColumn(row, ['dayoffee', 'dayof']) || 35),
           imageUrl: '',
           imageName: '',
           pdfUrl: '',
@@ -828,10 +825,10 @@ function ManageEventsContent() {
                 <div>
                   <Label>Registration Fees</Label>
                   <Card className="p-4 mt-2 bg-muted/50"><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <FormField control={form.control} name="regularFee" render={({ field }) => ( <FormItem><FormLabel>Regular Fee ($)</FormLabel><FormControl><Input type="number" placeholder="25" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name="lateFee" render={({ field }) => ( <FormItem><FormLabel>Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="30" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name="veryLateFee" render={({ field }) => ( <FormItem><FormLabel>Very Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="35" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name="dayOfFee" render={({ field }) => ( <FormItem><FormLabel>Day of Fee ($)</FormLabel><FormControl><Input type="number" placeholder="40" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="regularFee" render={({ field }) => ( <FormItem><FormLabel>Regular Fee ($)</FormLabel><FormControl><Input type="number" placeholder="20" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="lateFee" render={({ field }) => ( <FormItem><FormLabel>Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="25" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="veryLateFee" render={({ field }) => ( <FormItem><FormLabel>Very Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="30" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="dayOfFee" render={({ field }) => ( <FormItem><FormLabel>Day of Fee ($)</FormLabel><FormControl><Input type="number" placeholder="35" {...field} /></FormControl><FormMessage /></FormItem> )}/>
                   </div></Card>
                 </div>
                 <div className="space-y-4">
@@ -1055,6 +1052,7 @@ export default function ManageEventsPage() {
     </OrganizerGuard>
   );
 }
+
 
 
 
