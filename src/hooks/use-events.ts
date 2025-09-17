@@ -33,22 +33,7 @@ export function useEvents() {
         // Fallback to mock data if db is not available
         const mockEvents = [
           {
-            "id": "evt-1757125186611-0.9133269389279093",
-            "name": "Test Donna Wernecke EL",
-            "date": "2025-11-01T05:00:00.000Z",
-            "location": "Test Donna Wernecke EL",
-            "rounds": 5,
-            "regularFee": 20,
-            "lateFee": 25,
-            "veryLateFee": 30,
-            "dayOfFee": 35,
-            "imageUrl": "https://picsum.photos/seed/evt2/600/400",
-            "pdfUrl": "#",
-            "isClosed": false,
-            "isPsjaOnly": false
-          },
-          {
-            "id": "evt-20250920-late-fee-test",
+            "id": "evt-20250920-carmen-avila",
             "name": "Test Carmen Avila Elementary",
             "date": "2025-09-20T06:00:00.000Z",
             "location": "Test Carmen Avila Elementary",
@@ -63,7 +48,22 @@ export function useEvents() {
             "isPsjaOnly": false
           },
           {
-            "id": "evt-1757125186611-0.05756934987789575",
+            "id": "evt-20251101-wernecke",
+            "name": "Test Donna Wernecke EL",
+            "date": "2025-11-01T05:00:00.000Z",
+            "location": "Test Donna Wernecke EL",
+            "rounds": 5,
+            "regularFee": 20,
+            "lateFee": 25,
+            "veryLateFee": 30,
+            "dayOfFee": 35,
+            "imageUrl": "https://picsum.photos/seed/evt2/600/400",
+            "pdfUrl": "#",
+            "isClosed": false,
+            "isPsjaOnly": false
+          },
+          {
+            "id": "evt-20260228-achieve-echs",
             "name": "Test Achieve Early College H S",
             "date": "2026-02-28T06:00:00.000Z",
             "location": "Test Achieve Early College H S",
@@ -90,22 +90,7 @@ export function useEvents() {
     // Add mock data if the collection is empty, including the new test event
     const mockEvents = [
         {
-          "id": "evt-1757125186611-0.9133269389279093",
-          "name": "Test Donna Wernecke EL",
-          "date": "2025-11-01T05:00:00.000Z",
-          "location": "Test Donna Wernecke EL",
-          "rounds": 5,
-          "regularFee": 20,
-          "lateFee": 25,
-          "veryLateFee": 30,
-          "dayOfFee": 35,
-          "imageUrl": "https://picsum.photos/seed/evt2/600/400",
-          "pdfUrl": "#",
-          "isClosed": false,
-          "isPsjaOnly": false
-        },
-        {
-          "id": "evt-20250920-late-fee-test",
+          "id": "evt-20250920-carmen-avila",
           "name": "Test Carmen Avila Elementary",
           "date": "2025-09-20T06:00:00.000Z",
           "location": "Test Carmen Avila Elementary",
@@ -120,7 +105,22 @@ export function useEvents() {
           "isPsjaOnly": false
         },
         {
-          "id": "evt-1757125186611-0.05756934987789575",
+          "id": "evt-20251101-wernecke",
+          "name": "Test Donna Wernecke EL",
+          "date": "2025-11-01T05:00:00.000Z",
+          "location": "Test Donna Wernecke EL",
+          "rounds": 5,
+          "regularFee": 20,
+          "lateFee": 25,
+          "veryLateFee": 30,
+          "dayOfFee": 35,
+          "imageUrl": "https://picsum.photos/seed/evt2/600/400",
+          "pdfUrl": "#",
+          "isClosed": false,
+          "isPsjaOnly": false
+        },
+        {
+          "id": "evt-20260228-achieve-echs",
           "name": "Test Achieve Early College H S",
           "date": "2026-02-28T06:00:00.000Z",
           "location": "Test Achieve Early College H S",
