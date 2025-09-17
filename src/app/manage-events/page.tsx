@@ -196,6 +196,10 @@ function ManageEventsContent() {
     if (lowerLocation.includes("edinburg")) return "EDINBURG CISD";
     if (lowerLocation.includes("sharyland")) return "SHARYLAND ISD";
     if (lowerLocation.includes("la joya")) return "LA JOYA ISD";
+    if (lowerLocation.includes("fall swiss") || lowerLocation.includes("de zavala")) return "EDINBURG CISD";
+    if (lowerLocation.includes("austin ms") || lowerLocation.includes("kennedy ms")) return "PHARR-SAN JUAN-ALAMO ISD";
+    if (lowerLocation.includes("barrientes")) return "EDINBURG CISD";
+
     
     // Check against school data
     const foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
@@ -204,10 +208,6 @@ function ManageEventsContent() {
     // Check against player data as a fallback
     const foundPlayer = allPlayers.find(p => p.school && lowerLocation.includes(p.school.toLowerCase()));
     if (foundPlayer) return foundPlayer.district;
-    
-    // Check for unique school names mentioned in events
-    if (lowerLocation.includes("de zavala") || lowerLocation.includes("barrientes") || lowerLocation.includes("guerra")) return "EDINBURG CISD";
-    if (lowerLocation.includes("austin ms") || lowerLocation.includes("kennedy ms")) return "PHARR-SAN JUAN-ALAMO ISD";
     
     return 'Unknown';
   }, [isDbLoaded, allPlayers]);
@@ -222,7 +222,8 @@ function ManageEventsContent() {
   const sortedEvents = useMemo(() => {
     const isTestEvent = (event: Event) => {
         const district = getDistrictForLocation(event.location);
-        return district.toLowerCase().startsWith("test");
+        const lowerLocation = event.location.toLowerCase();
+        return district.toLowerCase().startsWith("test") || event.name.toLowerCase().startsWith("test") || lowerLocation.startsWith("test");
     };
 
     let filteredEvents = [...events].filter(event => {
@@ -1057,9 +1058,3 @@ export default function ManageEventsPage() {
     </OrganizerGuard>
   );
 }
-
-
-
-
-
-
