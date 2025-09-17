@@ -357,13 +357,12 @@ export async function simpleSignIn(email: string, password: string) {
     } catch (error: any) {
         // If it's a known test email with an invalid credential error, try to create it.
         const isTestAccount = normalizedEmail.startsWith('test') || normalizedEmail === 'sandra.ojeda@psjaisd.us' || normalizedEmail === 'noemi.cuello@psjaisd.us';
-        if (isTestAccount && error.code === 'auth/invalid-credential') {
+        if (isTestAccount && (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found')) {
             console.warn(`⚠️ Sign-in failed for test account ${normalizedEmail}. Attempting to create/reset...`);
             try {
                 // This will create the user with the correct password if they don't exist.
-                await simpleSignUp(email, password, {});
-                // Now, retry the sign-in.
-                userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
+                userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
+                console.log(`✅ Created test user ${normalizedEmail} because they didn't exist.`);
             } catch (createError) {
                 console.error(`❌ Failed to create/reset test account ${normalizedEmail}.`, createError);
                 throw error; // Re-throw the original error if reset fails.
