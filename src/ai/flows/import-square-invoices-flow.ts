@@ -14,6 +14,12 @@ import { type Invoice, ApiError } from 'square';
 import { generateTeamCode } from '@/lib/school-utils';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 
+console.log('Debug: Environment variables check');
+console.log('SQUARE_ACCESS_TOKEN exists:', !!process.env.SQUARE_ACCESS_TOKEN);
+console.log('SQUARE_LOCATION_ID exists:', !!process.env.SQUARE_LOCATION_ID);
+console.log('SQUARE_APPLICATION_ID exists:', !!process.env.SQUARE_APPLICATION_ID);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
   endInvoiceNumber: z.number().describe('The invoice number to end importing at. Use same as startInvoiceNumber for single invoice.'),
