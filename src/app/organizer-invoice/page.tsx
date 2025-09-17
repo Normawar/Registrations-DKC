@@ -19,7 +19,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { schoolData } from '@/lib/data/school-data';
 import { createOrganizerInvoice, recreateOrganizerInvoice, recreateInvoiceFromRoster } from './actions';
 import { Loader2, PlusCircle, Trash2, ExternalLink, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -53,7 +52,7 @@ function OrganizerInvoiceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { events } = useEvents();
-  const { database: allPlayers } = useMasterDb();
+  const { database: allPlayers, dbSchools, dbDistricts } = useMasterDb();
   
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -147,11 +146,6 @@ function OrganizerInvoiceContent() {
   }, [searchParams, form, events, allPlayers]);
 
 
-  const uniqueSchools = useMemo(() => {
-    const schoolNames = schoolData.map(s => s.schoolName);
-    return [...new Set(schoolNames)].sort();
-  }, []);
-
   async function onSubmit(values: InvoiceFormValues) {
     setIsLoading(true);
     try {
@@ -233,7 +227,7 @@ function OrganizerInvoiceContent() {
         previousVersionId: originalInvoice.id, 
         teamCode: values.teamCode,
         schoolName: values.schoolName,
-        district: schoolData.find(s => s.schoolName === values.schoolName)?.district || '',
+        district: allPlayers.find(p => p.school === values.schoolName)?.district || '',
         sponsorName: values.sponsorName,
         sponsorEmail: values.sponsorEmail,
     };
@@ -250,7 +244,7 @@ function OrganizerInvoiceContent() {
   }
 
   async function handleRecreateOrganizerInvoice(values: InvoiceFormValues) {
-      const schoolInfo = schoolData.find(s => s.schoolName === values.schoolName);
+      const schoolInfo = allPlayers.find(p => p.school === values.schoolName);
       const result = await recreateOrganizerInvoice({
           originalInvoiceId: originalInvoice.invoiceId,
           sponsorName: values.sponsorName,
@@ -261,8 +255,8 @@ function OrganizerInvoiceContent() {
           bookkeeperEmail: originalInvoice.bookkeeperEmail,
           gtCoordinatorEmail: originalInvoice.gtCoordinatorEmail,
           district: schoolInfo?.district,
-          schoolAddress: schoolInfo?.streetAddress,
-          schoolPhone: schoolInfo?.phone,
+          schoolAddress: '', // School address from master DB not available yet
+          schoolPhone: '', // School phone from master DB not available yet
       });
       const newInvoiceRecord = createOrganizerInvoiceRecord(values, result);
       
@@ -274,7 +268,7 @@ function OrganizerInvoiceContent() {
   }
 
   async function handleCreateNewOrganizerInvoice(values: InvoiceFormValues) {
-      const schoolInfo = schoolData.find(s => s.schoolName === values.schoolName);
+      const schoolInfo = allPlayers.find(p => p.school === values.schoolName);
       const result = await createOrganizerInvoice({
           sponsorName: values.sponsorName,
           sponsorEmail: values.sponsorEmail,
@@ -284,8 +278,8 @@ function OrganizerInvoiceContent() {
           bookkeeperEmail: originalInvoice?.bookkeeperEmail,
           gtCoordinatorEmail: originalInvoice?.gtCoordinatorEmail,
           district: schoolInfo?.district,
-          schoolAddress: schoolInfo?.streetAddress,
-          schoolPhone: schoolInfo?.phone,
+          schoolAddress: '', // Not available
+          schoolPhone: '', // Not available
       });
       const newInvoiceRecord = createOrganizerInvoiceRecord(values, result);
       
@@ -296,7 +290,7 @@ function OrganizerInvoiceContent() {
   }
 
   const createOrganizerInvoiceRecord = (values: InvoiceFormValues, result: any) => {
-    const schoolInfo = schoolData.find(s => s.schoolName === values.schoolName);
+    const schoolInfo = allPlayers.find(p => p.school === values.schoolName);
     return {
       id: result.newInvoiceId || result.invoiceId,
       invoiceId: result.newInvoiceId || result.invoiceId,
@@ -363,7 +357,7 @@ function OrganizerInvoiceContent() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {uniqueSchools.map((school) => (
+                              {dbSchools.map((school) => (
                                 <SelectItem key={school} value={school}>
                                   {school}
                                 </SelectItem>
@@ -548,5 +542,3 @@ export default function OrganizerInvoicePage() {
         </Suspense>
     );
 }
-
-    
