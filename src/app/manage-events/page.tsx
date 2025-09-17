@@ -450,21 +450,25 @@ function ManageEventsContent() {
   const handleFileImport = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+  
     Papa.parse(file, {
       header: true,
-      skipEmptyLines: 'greedy', 
-      transformHeader: (header: string) => header.trim(), 
+      skipEmptyLines: 'greedy',
+      transformHeader: (header: string) => header.trim(),
       complete: (results) => {
-        const cleanedData = results.data.filter((row: any) => {
-          return row && typeof row === 'object' && 
-                 Object.keys(row).length > 0 &&
-                 !Object.values(row).every(val => val === null || val === '' || val === undefined);
-        });
-        processEventImportData(cleanedData);
+        if (results.data) {
+          const cleanedData = results.data.filter((row: any) => {
+            return row && typeof row === 'object' &&
+                   Object.keys(row).length > 0 &&
+                   !Object.values(row).every(val => val === null || val === '' || val === undefined);
+          });
+          processEventImportData(cleanedData);
+        } else {
+          toast({ variant: 'destructive', title: 'Import Failed', description: 'Could not parse the CSV file.' });
+        }
       },
-      error: (error) => { 
-        toast({ variant: 'destructive', title: 'Import Failed', description: error.message }); 
+      error: (error: any) => {
+        toast({ variant: 'destructive', title: 'Import Failed', description: error.message });
       },
     });
     if (e.target) e.target.value = '';
