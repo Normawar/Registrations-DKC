@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -275,6 +276,43 @@ function SponsorRosterView() {
     }
     return sortablePlayers;
   }, [rosterPlayers, sortConfig, profile]);
+  
+  const handleExportRoster = useCallback(() => {
+    if (sortedPlayers.length === 0) {
+        toast({
+            title: "No Players to Export",
+            description: "Your roster is currently empty.",
+        });
+        return;
+    }
+
+    const dataToExport = sortedPlayers.map(player => ({
+        'Team Code': generateTeamCode({ schoolName: player.school, district: player.district, studentType: player.studentType }),
+        'StudentType': player.studentType || 'regular',
+        'Last Name': player.lastName,
+        'First Name': player.firstName,
+        'Middle Name': player.middleName || '',
+        'USCF ID': player.uscfId,
+        'Grade': player.grade,
+        'Section': player.section,
+        'Rating': player.regularRating || 'UNR',
+    }));
+
+    const csv = Papa.unparse(dataToExport);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const schoolName = profile?.school?.replace(/\s+/g, '_') || 'roster';
+    link.setAttribute('download', `${schoolName}_roster_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+        title: "Export Successful",
+        description: `${sortedPlayers.length} players have been exported.`,
+    });
+  }, [sortedPlayers, profile, toast]);
 
   const requestSort = (key: SortableColumnKey) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -586,6 +624,10 @@ function SponsorRosterView() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button onClick={handleExportRoster} variant="outline" className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Export Roster
+          </Button>
           <Button onClick={() => setIsSearchDialogOpen(true)} variant="outline" className="flex items-center gap-2">
             <Search className="h-4 w-4" />
             Add from Database
@@ -1450,4 +1492,4 @@ export default function RosterPage() {
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
 
-    
+```
