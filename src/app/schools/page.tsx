@@ -65,6 +65,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { useMasterDb } from '@/context/master-db-context';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 export type SchoolWithTeamCode = School & { id: string; teamCode: string };
 
@@ -111,6 +112,8 @@ export default function SchoolsPage() {
   const [noteContent, setNoteContent] = useState('');
   const [poFile, setPoFile] = useState<File | null>(null);
   const [editingNote, setEditingNote] = useState<SchoolNote | null>(null);
+  const [rosterTypeFilter, setRosterTypeFilter] = useState<'real' | 'test'>('real');
+
 
   useEffect(() => {
     if (!isDialogOpen) {
@@ -292,6 +295,13 @@ export default function SchoolsPage() {
     setNewDistrictName('');
   };
 
+  const filteredSchools = useMemo(() => {
+    return schools.filter(school => {
+      const isTest = school.district?.toLowerCase().startsWith('test');
+      return rosterTypeFilter === 'test' ? isTest : !isTest;
+    });
+  }, [schools, rosterTypeFilter]);
+
   return (
     <AppLayout>
       <div className="space-y-8">
@@ -333,8 +343,16 @@ export default function SchoolsPage() {
 
         <Card>
            <CardHeader>
-            <CardTitle>School List</CardTitle>
-            <CardDescription>A complete list of all schools in the system.</CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>School List</CardTitle>
+                <CardDescription>A complete list of all schools in the system.</CardDescription>
+              </div>
+              <RadioGroup value={rosterTypeFilter} onValueChange={(v) => setRosterTypeFilter(v as 'real' | 'test')} className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="real" id="real" /><Label htmlFor="real">Real</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="test" id="test" /><Label htmlFor="test">Test</Label></div>
+              </RadioGroup>
+            </div>
           </CardHeader>
           <CardContent>
             <Table>
@@ -349,7 +367,7 @@ export default function SchoolsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {schools.map((school) => (
+                {filteredSchools.map((school) => (
                   <TableRow key={school.id}>
                     <TableCell className="font-medium">{school.schoolName}</TableCell>
                     <TableCell>{school.teamCode}</TableCell>
@@ -488,3 +506,5 @@ export default function SchoolsPage() {
     </AppLayout>
   );
 }
+
+    

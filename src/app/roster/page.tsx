@@ -19,7 +19,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -30,10 +30,10 @@ import { CalendarIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Label } from '@/components/ui/label';
+import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
+import { Checkbox } from './ui/checkbox';
+import { Badge } from './ui/badge';
 import Papa from 'papaparse';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -859,6 +859,7 @@ function DistrictRosterView() {
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
     const [editFormSchoolsForDistrict, setEditFormSchoolsForDistrict] = useState<string[]>([]);
     const [availableSchools, setAvailableSchools] = useState<string[]>([]);
+    const [rosterTypeFilter, setRosterTypeFilter] = useState<'real' | 'test'>('real');
 
 
     const playerForm = useForm<PlayerFormValues>({
@@ -883,17 +884,38 @@ function DistrictRosterView() {
             setSelectedDistrict(profile.district);
         }
     }, [profile]);
+
+    const availableDistricts = useMemo(() => {
+        return dbDistricts.filter(d => {
+            const isTest = d.toLowerCase().startsWith('test');
+            if (rosterTypeFilter === 'test') return isTest;
+            return !isTest;
+        });
+    }, [dbDistricts, rosterTypeFilter]);
+
+    useEffect(() => {
+        if (!availableDistricts.includes(selectedDistrict)) {
+            setSelectedDistrict('all');
+        }
+    }, [availableDistricts, selectedDistrict]);
+
     
     const districtPlayers = useMemo(() => {
         if (!isDbLoaded || !profile) return [];
         if (selectedDistrict === 'all') {
-            return allPlayers;
+            return allPlayers.filter(p => {
+                const isTest = p.district?.toLowerCase().startsWith('test');
+                if (rosterTypeFilter === 'test') return isTest;
+                return !isTest;
+            });
         }
         return allPlayers.filter(p => p.district === selectedDistrict);
-    }, [allPlayers, isDbLoaded, profile, selectedDistrict]);
+    }, [allPlayers, isDbLoaded, profile, selectedDistrict, rosterTypeFilter]);
     
     const displayedSchools = useMemo(() => {
-        let schoolsToDisplay = availableSchools;
+        let schoolsInDistrict = new Set(districtPlayers.map(p => p.school).filter(Boolean));
+        let schoolsToDisplay = Array.from(schoolsInDistrict).sort();
+
         if (selectedSchool !== 'all') {
             schoolsToDisplay = schoolsToDisplay.filter(school => school === selectedSchool);
         }
@@ -902,7 +924,7 @@ function DistrictRosterView() {
             schoolsToDisplay = schoolsToDisplay.filter(school => activeSchools.has(school));
         }
         return schoolsToDisplay;
-    }, [selectedSchool, availableSchools, showActiveOnly, districtPlayers]);
+    }, [selectedSchool, districtPlayers, showActiveOnly]);
 
     const requestSort = (key: DistrictSortableColumnKey) => {
         let direction: 'ascending' | 'descending' = 'ascending';
@@ -1155,16 +1177,23 @@ function DistrictRosterView() {
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
                 {profile?.role === 'organizer' && (
                     <div className="w-full sm:w-64">
-                        <Label htmlFor="district-filter">Filter by District</Label>
-                        <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-                            <SelectTrigger id="district-filter"><SelectValue placeholder="Select a district" /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Districts</SelectItem>
-                                {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+                         <Label htmlFor="roster-type-filter">Roster Type</Label>
+                        <RadioGroup id="roster-type-filter" value={rosterTypeFilter} onValueChange={(v) => setRosterTypeFilter(v as 'real' | 'test')} className="flex items-center space-x-2 pt-1">
+                            <div className="flex items-center space-x-1"><RadioGroupItem value="real" id="real-rosters" /><Label htmlFor="real-rosters">Real</Label></div>
+                            <div className="flex items-center space-x-1"><RadioGroupItem value="test" id="test-rosters" /><Label htmlFor="test-rosters">Test</Label></div>
+                        </RadioGroup>
                     </div>
                 )}
+                <div className="w-full sm:w-64">
+                    <Label htmlFor="district-filter">Filter by District</Label>
+                    <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                        <SelectTrigger id="district-filter"><SelectValue placeholder="Select a district" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Districts</SelectItem>
+                            {availableDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
                 <div className="w-full sm:w-64">
                     <Label htmlFor="school-filter">Filter by School</Label>
                     <Select value={selectedSchool} onValueChange={setSelectedSchool}>

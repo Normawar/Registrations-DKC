@@ -19,15 +19,18 @@ import { format } from 'date-fns';
 import { type ChangeRequest } from '@/lib/data/requests-data';
 import { processBatchedRequests } from './actions';
 import { ChangeRequestDialog } from '@/components/change-request-dialog';
+import { useEvents } from '@/hooks/use-events';
 
 type EnrichedChangeRequest = ChangeRequest & {
     schoolName?: string;
     invoiceNumber?: string;
+    isTestEvent?: boolean;
 };
 
 export default function RequestsPage() {
     const { profile, isProfileLoaded } = useSponsorProfile();
     const { toast } = useToast();
+    const { events } = useEvents();
     const [requests, setRequests] = useState<EnrichedChangeRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState('Pending');
@@ -39,7 +42,7 @@ export default function RequestsPage() {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     
     const loadRequests = useCallback(async () => {
-        if (!db || !profile) return;
+        if (!db || !profile || events.length === 0) return;
         setIsLoading(true);
 
         try {
@@ -56,29 +59,30 @@ export default function RequestsPage() {
             // Enrich requests with invoice data
             const enrichedRequests: EnrichedChangeRequest[] = await Promise.all(
                 requestList.map(async (req) => {
-                    if (!req.confirmationId) return req;
+                    let schoolName: string | undefined;
+                    let invoiceNumber: string | undefined;
+                    let isTestEvent = false;
 
-                    // Add validation to prevent crashes from invalid IDs
-                    const isValidId = req.confirmationId && !req.confirmationId.includes(':');
-                    if (!isValidId) {
-                        console.warn(`Skipping invalid confirmationId: "${req.confirmationId}" for request ${req.id}`);
-                        return req;
-                    }
-
-                    try {
-                        const invoiceDoc = await getDoc(doc(db, 'invoices', req.confirmationId));
-                        if (invoiceDoc.exists()) {
-                            const invoiceData = invoiceDoc.data();
-                            return {
-                                ...req,
-                                schoolName: invoiceData.schoolName,
-                                invoiceNumber: invoiceData.invoiceNumber,
-                            };
+                    if (req.confirmationId) {
+                        const isValidId = req.confirmationId && !req.confirmationId.includes(':');
+                        if (isValidId) {
+                            try {
+                                const invoiceDoc = await getDoc(doc(db, 'invoices', req.confirmationId));
+                                if (invoiceDoc.exists()) {
+                                    const invoiceData = invoiceDoc.data();
+                                    schoolName = invoiceData.schoolName;
+                                    invoiceNumber = invoiceData.invoiceNumber;
+                                    const eventDetails = events.find(e => e.id === invoiceData.eventId);
+                                    if(eventDetails && eventDetails.name.toLowerCase().startsWith('test')) {
+                                        isTestEvent = true;
+                                    }
+                                }
+                            } catch (e) {
+                                console.error(`Could not fetch invoice ${req.confirmationId} for request ${req.id}`, e);
+                            }
                         }
-                    } catch (e) {
-                        console.error(`Could not fetch invoice ${req.confirmationId} for request ${req.id}`, e);
                     }
-                    return req;
+                    return { ...req, schoolName, invoiceNumber, isTestEvent };
                 })
             );
 
@@ -89,13 +93,13 @@ export default function RequestsPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [profile, toast]);
+    }, [profile, toast, events]);
 
     useEffect(() => {
-        if (isProfileLoaded) {
+        if (isProfileLoaded && events.length > 0) {
             loadRequests();
         }
-    }, [isProfileLoaded, loadRequests]);
+    }, [isProfileLoaded, loadRequests, events]);
     
     const filteredRequests = useMemo(() => {
         if (filter === 'All') return requests;
@@ -263,7 +267,10 @@ export default function RequestsPage() {
                                                     )}
                                                     <TableCell>{req.invoiceNumber || 'N/A'}</TableCell>
                                                     <TableCell>{req.schoolName || 'N/A'}</TableCell>
-                                                    <TableCell>{req.eventDate ? format(new Date(req.eventDate), 'PPP') : 'N/A'}</TableCell>
+                                                    <TableCell>
+                                                        {req.eventDate ? format(new Date(req.eventDate), 'PPP') : 'N/A'}
+                                                        {req.isTestEvent && <Badge variant="outline" className="ml-2">Test</Badge>}
+                                                    </TableCell>
                                                     <TableCell>{req.player}</TableCell>
                                                     <TableCell>{req.type}</TableCell>
                                                     <TableCell>{format(new Date(req.submitted), 'PPP')}</TableCell>
@@ -311,3 +318,5 @@ export default function RequestsPage() {
         </>
     );
 }
+
+    
