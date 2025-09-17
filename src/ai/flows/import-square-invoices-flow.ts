@@ -14,6 +14,7 @@ import { db } from '@/lib/services/firestore-service';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { type Invoice, ApiError } from 'square';
 import { generateTeamCode } from '@/lib/school-utils';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
@@ -40,6 +41,11 @@ const importSquareInvoicesFlow = ai.defineFlow(
     outputSchema: ImportSquareInvoicesOutputSchema,
   },
   async ({ startInvoiceNumber, endInvoiceNumber }) => {
+    const { isConfigured } = await checkSquareConfig();
+    if (!isConfigured) {
+      throw new Error("Square is not configured. Please provide credentials in your environment variables.");
+    }
+    
     if (!db) {
       throw new Error('Firestore database is not initialized.');
     }
