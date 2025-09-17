@@ -34,7 +34,7 @@ export function useEvents() {
         const mockEvents = [
           {
             "id": "evt-1757125186611-0.05756934987789575",
-            "name": "Test PSJA South West Early College on February 28th, 2026",
+            "name": "PSJA South West Early College",
             "date": "2026-02-28T06:00:00.000Z",
             "location": "PSJA South West Early College",
             "rounds": 5,
@@ -49,7 +49,7 @@ export function useEvents() {
           },
           {
             "id": "evt-1757125186611-0.9133269389279093",
-            "name": "Test Wernecke on November 1st, 2025",
+            "name": "Wernecke",
             "date": "2025-11-01T05:00:00.000Z",
             "location": "Wernecke",
             "rounds": 5,
@@ -85,68 +85,79 @@ export function useEvents() {
     setIsLoaded(false);
     const eventsCol = collection(db, 'events');
     const eventSnapshot = await getDocs(eventsCol);
-    const eventList = eventSnapshot.docs.map(doc => doc.data() as Event);
+    let eventList = eventSnapshot.docs.map(doc => doc.data() as Event);
 
-    // Add mock data if the collection is empty
+    // Add mock data if the collection is empty, including the new test event
+    const mockEvents = [
+        {
+          "id": "evt-1757125186611-0.05756934987789575",
+          "name": "PSJA South West Early College",
+          "date": "2026-02-28T06:00:00.000Z",
+          "location": "PSJA South West Early College",
+          "rounds": 5,
+          "regularFee": 20,
+          "lateFee": 25,
+          "veryLateFee": 30,
+          "dayOfFee": 35,
+          "imageUrl": "https://picsum.photos/seed/evt1/600/400",
+          "pdfUrl": "#",
+          "isClosed": false,
+          "isPsjaOnly": true
+        },
+        {
+          "id": "evt-1757125186611-0.9133269389279093",
+          "name": "Wernecke",
+          "date": "2025-11-01T05:00:00.000Z",
+          "location": "Wernecke",
+          "rounds": 5,
+          "regularFee": 20,
+          "lateFee": 25,
+          "veryLateFee": 30,
+          "dayOfFee": 35,
+          "imageUrl": "https://picsum.photos/seed/evt2/600/400",
+          "pdfUrl": "#",
+          "isClosed": false,
+          "isPsjaOnly": false
+        },
+        {
+          "id": "evt-20250920-late-fee-test",
+          "name": "Late Fee Test Event",
+          "date": "2025-09-20T06:00:00.000Z",
+          "location": "Test Location",
+          "rounds": 5,
+          "regularFee": 20,
+          "lateFee": 25,
+          "veryLateFee": 30,
+          "dayOfFee": 35,
+          "imageUrl": "https://picsum.photos/seed/evt3/600/400",
+          "pdfUrl": "#",
+          "isClosed": false,
+          "isPsjaOnly": false
+        },
+    ];
+
     if (eventList.length === 0) {
-      const mockEvents = [
-          {
-            "id": "evt-1757125186611-0.05756934987789575",
-            "name": "Test PSJA South West Early College on February 28th, 2026",
-            "date": "2026-02-28T06:00:00.000Z",
-            "location": "PSJA South West Early College",
-            "rounds": 5,
-            "regularFee": 20,
-            "lateFee": 25,
-            "veryLateFee": 30,
-            "dayOfFee": 35,
-            "imageUrl": "https://picsum.photos/seed/evt1/600/400",
-            "pdfUrl": "#",
-            "isClosed": false,
-            "isPsjaOnly": true
-          },
-          {
-            "id": "evt-1757125186611-0.9133269389279093",
-            "name": "Test Wernecke on November 1st, 2025",
-            "date": "2025-11-01T05:00:00.000Z",
-            "location": "Wernecke",
-            "rounds": 5,
-            "regularFee": 20,
-            "lateFee": 25,
-            "veryLateFee": 30,
-            "dayOfFee": 35,
-            "imageUrl": "https://picsum.photos/seed/evt2/600/400",
-            "pdfUrl": "#",
-            "isClosed": false,
-            "isPsjaOnly": false
-          },
-          {
-            "id": "evt-20250920-late-fee-test",
-            "name": "Late Fee Test Event",
-            "date": "2025-09-20T06:00:00.000Z",
-            "location": "Test Location",
-            "rounds": 5,
-            "regularFee": 20,
-            "lateFee": 25,
-            "veryLateFee": 30,
-            "dayOfFee": 35,
-            "imageUrl": "https://picsum.photos/seed/evt3/600/400",
-            "pdfUrl": "#",
-            "isClosed": false,
-            "isPsjaOnly": false
-          },
-      ];
+      console.log('No events found in Firestore, adding mock events...');
       const batch = writeBatch(db);
       mockEvents.forEach(event => {
           const docRef = doc(db, 'events', event.id);
           batch.set(docRef, event);
       });
       await batch.commit();
-      setEvents(mockEvents);
+      eventList = mockEvents;
     } else {
-      setEvents(eventList);
+      // Ensure the test event exists if it's missing
+      const lateFeeTestEvent = eventList.find(e => e.id === 'evt-20250920-late-fee-test');
+      if (!lateFeeTestEvent) {
+        console.log('Late Fee Test Event not found, adding it...');
+        const newTestEvent = mockEvents.find(e => e.id === 'evt-20250920-late-fee-test')!;
+        const docRef = doc(db, 'events', newTestEvent.id);
+        await setDoc(docRef, newTestEvent);
+        eventList.push(newTestEvent);
+      }
     }
 
+    setEvents(eventList);
     setIsLoaded(true);
   }, []);
 

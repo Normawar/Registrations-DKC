@@ -151,7 +151,7 @@ type StoredDownloads = {
 function ManageEventsContent() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent, clearAllEvents } = useEvents();
-  const { database: allPlayers, isDbLoaded } = useMasterDb();
+  const { database: allPlayers, isDbLoaded, dbSchools } = useMasterDb();
   const { profile } = useSponsorProfile();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -169,27 +169,32 @@ function ManageEventsContent() {
   const [downloadedPlayers, setDownloadedPlayers] = useState<StoredDownloads>({});
 
   const [districtFilter, setDistrictFilter] = useState('all');
-  const [eventTypeFilter, setEventTypeFilter] = useState('real');
+  const [eventTypeFilter, setEventTypeFilter] = useState<'real' | 'test'>('real');
 
   const uniqueDistricts = useMemo(() => {
-    return [...new Set(schoolData.map(s => s.district).filter(Boolean))].sort();
-  }, []);
+    // Combine districts from schools and players to get a complete list
+    const schoolDistricts = dbSchools.map(s => schoolData.find(sd => sd.schoolName === s)?.district).filter(Boolean);
+    const playerDistricts = allPlayers.map(p => p.district).filter(Boolean);
+    return [...new Set([...schoolDistricts, ...playerDistricts])].sort();
+  }, [dbSchools, allPlayers]);
+  
+  const getDistrictForLocation = useCallback((location: string): string => {
+    if (!isDbLoaded) return 'Unknown';
+    // Find a school whose name is in the location string
+    const foundSchool = schoolData.find(s => location.toLowerCase().includes(s.schoolName.toLowerCase()));
+    if(foundSchool) return foundSchool.district;
 
-  const getDistrictForLocation = (location: string): string => {
-    const lowerLocation = location.toLowerCase();
-    // Prioritize finding a full school name first to avoid partial matches like "Don"
-    let foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
-
-    // If no full match, try matching parts of the school name
-    if (!foundSchool) {
-      foundSchool = schoolData.find(s => {
-        const schoolNameParts = s.schoolName.toLowerCase().split(' ').filter(p => p.length > 2 && !['el', 'ms', 'hs'].includes(p));
-        return schoolNameParts.some(part => lowerLocation.includes(part));
-      });
-    }
+    // Fallback for partial matches or test data
+    const locationLower = location.toLowerCase();
+    if (locationLower.includes('psja')) return 'PHARR-SAN JUAN-ALAMO ISD';
+    if (locationLower.includes('wernecke')) return 'TestShary';
     
-    return foundSchool?.district || 'Unknown';
-  };
+    // Check if district name is in location
+    const foundDistrict = uniqueDistricts.find(d => locationLower.includes(d.toLowerCase()));
+    if (foundDistrict) return foundDistrict;
+
+    return 'Unknown';
+  }, [isDbLoaded, uniqueDistricts]);
   
   const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
     if (event.isClosed) return "Closed";
@@ -251,7 +256,7 @@ function ManageEventsContent() {
       });
     }
     return filteredEvents;
-  }, [events, sortConfig, districtFilter, eventTypeFilter]);
+  }, [events, sortConfig, districtFilter, eventTypeFilter, getDistrictForLocation]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -752,15 +757,10 @@ function ManageEventsContent() {
                   const status = getEventStatus(event);
                   const district = getDistrictForLocation(event.location);
                   const displayDistrict = district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'PSJA' : district;
-                  const eventName = isTestEvent(event) ? `Test ${event.name}` : event.name;
-                  
-                  function isTestEvent(event: Event): boolean {
-                    return getDistrictForLocation(event.location).toLowerCase().startsWith("test");
-                  }
                   
                   return (
                     <TableRow key={event.id}>
-                      <TableCell className="font-medium">{eventName}</TableCell>
+                      <TableCell className="font-medium">{event.name}</TableCell>
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                       <TableCell>{displayDistrict}</TableCell>
                       <TableCell>{event.location}</TableCell>
@@ -1038,5 +1038,6 @@ export default function ManageEventsPage() {
     </OrganizerGuard>
   );
 }
+
 
 
