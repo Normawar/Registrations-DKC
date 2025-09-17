@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -725,7 +726,7 @@ export function SponsorRegistrationDialog({
               Back to Selection
             </Button>
             <Button onClick={handleCreateInvoice} disabled={isSubmitting}>
-              {isSubmitting ? 'Creating Invoice...' : `Create Invoice ($${feeBreakdown.total.toFixed(2)})`}
+              {isSubmitting ? 'Registering...' : `Register Now ($${feeBreakdown.total.toFixed(2)})`}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -905,12 +905,12 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                             <DialogFooter className="flex-col sm:flex-col sm:items-stretch gap-2 pt-4">
                                 <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateTeamInvoice)} disabled={isSubmitting}>
                                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Invoice as Team
+                                    Register as Team
                                 </Button>
                                 
                                 <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleGenerateIndividualInvoices)} disabled={isSubmitting}>
                                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Invoice Individuals
+                                    Register as Individuals
                                 </Button>
                                 
                                 <div className="relative">
