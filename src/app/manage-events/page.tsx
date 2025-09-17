@@ -195,10 +195,12 @@ function ManageEventsContent() {
     if (lowerLocation.includes("edinburg")) return "EDINBURG CISD";
     if (lowerLocation.includes("sharyland")) return "SHARYLAND ISD";
     if (lowerLocation.includes("la joya")) return "LA JOYA ISD";
-    if (lowerLocation.includes("fall swiss") || lowerLocation.includes("de zavala")) return "EDINBURG CISD";
+    if (lowerLocation.includes("fall swiss") || lowerLocation.includes("de zavala") || lowerLocation.includes("zavala")) return "EDINBURG CISD";
     if (lowerLocation.includes("austin ms") || lowerLocation.includes("kennedy ms")) return "PHARR-SAN JUAN-ALAMO ISD";
     if (lowerLocation.includes("barrientes")) return "EDINBURG CISD";
-
+    if (lowerLocation.includes("test carmen avila")) return "TestECISD";
+    if (lowerLocation.includes("test alvarez")) return "TestMcAllen";
+    if (lowerLocation.includes("test achieve")) return "TestMcAllen";
     
     // Check against school data
     const foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
