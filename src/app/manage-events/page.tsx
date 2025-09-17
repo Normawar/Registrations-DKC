@@ -183,7 +183,7 @@ function ManageEventsContent() {
     }).filter(Boolean) as string[];
     
     return [...new Set([...schoolDistricts, ...playerDistricts, ...eventLocationDistricts])].sort();
-}, [dbSchools, allPlayers, events]);
+  }, [dbSchools, allPlayers, events]);
   
   const getDistrictForLocation = useCallback((location: string): string => {
     if (!isDbLoaded || !location) return 'Unknown';
@@ -255,9 +255,8 @@ function ManageEventsContent() {
             bValue = getDistrictForLocation(b.location);
         } else {
             aValue = a[sortConfig.key as keyof Event];
+            bValue = b[sortConfig.key as keyof Event];
         }
-
-        bValue = sortConfig.key === 'district' ? getDistrictForLocation(b.location) : b[sortConfig.key as keyof Event];
         
         if (sortConfig.key === 'date') {
             aValue = new Date(a.date).getTime();
@@ -703,10 +702,18 @@ function ManageEventsContent() {
           </div>
           {profile?.role === 'organizer' && (
             <div className="flex items-center gap-2">
-              <input type="file" ref={fileInputRef} className="hidden" accept=".csv" onChange={handleFileImport} />
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept=".csv" 
+                onChange={handleFileImport} 
+              />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Import Events</Button>
+                  <Button variant="outline">
+                    <Upload className="mr-2 h-4 w-4" /> Import Events
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onSelect={() => fileInputRef.current?.click()}>
@@ -735,7 +742,11 @@ function ManageEventsContent() {
                   A list of all upcoming and past events.
                 </CardDescription>
                 <div className="flex items-center gap-4">
-                  <RadioGroup value={eventTypeFilter} onValueChange={(v) => setEventTypeFilter(v as 'real' | 'test')} className="flex items-center space-x-2">
+                  <RadioGroup 
+                    value={eventTypeFilter} 
+                    onValueChange={(v) => setEventTypeFilter(v as 'real' | 'test')} 
+                    className="flex items-center space-x-2"
+                  >
                     <div className="flex items-center space-x-1">
                       <RadioGroupItem value="real" id="real-events" />
                       <Label htmlFor="real-events">Real Events</Label>
@@ -753,7 +764,9 @@ function ManageEventsContent() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Districts</SelectItem>
-                            {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                            {uniqueDistricts.map(d => (
+                              <SelectItem key={d} value={d}>{d}</SelectItem>
+                            ))}
                         </SelectContent>
                     </Select>
                   </div>
@@ -764,13 +777,63 @@ function ManageEventsContent() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('name')}>Event Name {getSortIcon('name')}</Button></TableHead>
-                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('date')}>Date {getSortIcon('date')}</Button></TableHead>
-                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('district')}>District {getSortIcon('district')}</Button></TableHead>
-                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('location')}>Location {getSortIcon('location')}</Button></TableHead>
-                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('regularFee')}>Fees {getSortIcon('regularFee')}</Button></TableHead>
-                  <TableHead className="p-0"><Button variant="ghost" className="w-full justify-start font-medium px-4" onClick={() => requestSort('status')}>Status {getSortIcon('status')}</Button></TableHead>
-                  <TableHead><span className="sr-only">Actions</span></TableHead>
+                  <TableHead className="p-0">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-medium px-4" 
+                      onClick={() => requestSort('name')}
+                    >
+                      Event Name {getSortIcon('name')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-medium px-4" 
+                      onClick={() => requestSort('date')}
+                    >
+                      Date {getSortIcon('date')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-medium px-4" 
+                      onClick={() => requestSort('district')}
+                    >
+                      District {getSortIcon('district')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-medium px-4" 
+                      onClick={() => requestSort('location')}
+                    >
+                      Location {getSortIcon('location')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-medium px-4" 
+                      onClick={() => requestSort('regularFee')}
+                    >
+                      Fees {getSortIcon('regularFee')}
+                    </Button>
+                  </TableHead>
+                  <TableHead className="p-0">
+                    <Button 
+                      variant="ghost" 
+                      className="w-full justify-start font-medium px-4" 
+                      onClick={() => requestSort('status')}
+                    >
+                      Status {getSortIcon('status')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -785,19 +848,46 @@ function ManageEventsContent() {
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                       <TableCell>{displayDistrict}</TableCell>
                       <TableCell>{event.location}</TableCell>
-                      <TableCell>${event.regularFee} / ${event.lateFee} / ${event.veryLateFee} / ${event.dayOfFee}</TableCell>
-                      <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</TableCell>
+                      <TableCell>
+                        ${event.regularFee} / ${event.lateFee} / ${event.veryLateFee} / ${event.dayOfFee}
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} 
+                          className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}
+                        >
+                          {status}
+                        </Badge>
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Toggle menu</span></Button></DropdownMenuTrigger>
+                          <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Toggle menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleViewRegistrations(event)}><Users className="mr-2 h-4 w-4" />View Registrations</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewRegistrations(event)}>
+                              <Users className="mr-2 h-4 w-4" />View Registrations
+                            </DropdownMenuItem>
                             {profile?.role === 'organizer' && (
                               <>
-                                <DropdownMenuItem onClick={() => handleEditEvent(event)}><FilePenLine className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                                <DropdownMenuItem asChild><Link href={`/organizer-registration?eventId=${event.id}`}><PlusCircle className="mr-2 h-4 w-4" />Register Players</Link></DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteEvent(event)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditEvent(event)}>
+                                  <FilePenLine className="mr-2 h-4 w-4" />Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/organizer-registration?eventId=${event.id}`}>
+                                    <PlusCircle className="mr-2 h-4 w-4" />Register Players
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeleteEvent(event)} 
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />Delete
+                                </DropdownMenuItem>
                               </>
                             )}
                           </DropdownMenuContent>
@@ -812,39 +902,219 @@ function ManageEventsContent() {
         </Card>
       </div>
 
-       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] p-0 flex flex-col">
           <DialogHeader className="p-6 pb-4 border-b shrink-0">
-            <DialogTitle>{editingEvent ? 'Edit Event' : 'Add New Event'}</DialogTitle>
-            <DialogDescription>{editingEvent ? 'Update the event details below.' : 'Fill in the form to create a new event.'}</DialogDescription>
+            <DialogTitle>
+              {editingEvent ? 'Edit Event' : 'Add New Event'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingEvent ? 'Update the event details below.' : 'Fill in the form to create a new event.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto p-6">
             <Form {...form}>
               <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="name" render={({ field }) => ( <FormItem><FormLabel>Event Name</FormLabel><FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                  <FormField control={form.control} name="location" render={({ field }) => ( <FormItem><FormLabel>Location</FormLabel><FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField 
+                    control={form.control} 
+                    name="name" 
+                    render={({ field }) => ( 
+                      <FormItem>
+                        <FormLabel>Event Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Spring Open 2024" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem> 
+                    )} 
+                  />
+                  <FormField 
+                    control={form.control} 
+                    name="location" 
+                    render={({ field }) => ( 
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., City Convention Center" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem> 
+                    )} 
+                  />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Event Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10}/></PopoverContent></Popover><FormMessage /></FormItem> )}/>
-                  <FormField control={form.control} name="rounds" render={({ field }) => ( <FormItem><FormLabel>Rounds</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                  <FormField 
+                    control={form.control} 
+                    name="date" 
+                    render={({ field }) => ( 
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Event Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={new Date().getFullYear()}
+                              toYear={new Date().getFullYear() + 10}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem> 
+                    )}
+                  />
+                  <FormField 
+                    control={form.control} 
+                    name="rounds" 
+                    render={({ field }) => ( 
+                      <FormItem>
+                        <FormLabel>Rounds</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem> 
+                    )}
+                  />
                 </div>
                 <div>
                   <Label>Registration Fees</Label>
-                  <Card className="p-4 mt-2 bg-muted/50"><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <FormField control={form.control} name="regularFee" render={({ field }) => ( <FormItem><FormLabel>Regular Fee ($)</FormLabel><FormControl><Input type="number" placeholder="20" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name="lateFee" render={({ field }) => ( <FormItem><FormLabel>Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="25" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name="veryLateFee" render={({ field }) => ( <FormItem><FormLabel>Very Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="30" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      <FormField control={form.control} name="dayOfFee" render={({ field }) => ( <FormItem><FormLabel>Day of Fee ($)</FormLabel><FormControl><Input type="number" placeholder="35" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                  </div></Card>
+                  <Card className="p-4 mt-2 bg-muted/50">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <FormField 
+                        control={form.control} 
+                        name="regularFee" 
+                        render={({ field }) => ( 
+                          <FormItem>
+                            <FormLabel>Regular Fee ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="20" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem> 
+                        )}
+                      />
+                      <FormField 
+                        control={form.control} 
+                        name="lateFee" 
+                        render={({ field }) => ( 
+                          <FormItem>
+                            <FormLabel>Late Fee ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="25" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem> 
+                        )}
+                      />
+                      <FormField 
+                        control={form.control} 
+                        name="veryLateFee" 
+                        render={({ field }) => ( 
+                          <FormItem>
+                            <FormLabel>Very Late Fee ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="30" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem> 
+                        )}
+                      />
+                      <FormField 
+                        control={form.control} 
+                        name="dayOfFee" 
+                        render={({ field }) => ( 
+                          <FormItem>
+                            <FormLabel>Day of Fee ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="35" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem> 
+                        )}
+                      />
+                    </div>
+                  </Card>
                 </div>
                 <div className="space-y-4">
-                  <FormField control={form.control} name="imageUrl" render={({ field }) => ( <FormItem><FormLabel>Image URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                  <FormField control={form.control} name="imageName" render={({ field }) => ( <FormItem><FormLabel>Image Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl><FormDescription>A descriptive name for the image attachment.</FormDescription><FormMessage /></FormItem> )}/>
+                  <FormField 
+                    control={form.control} 
+                    name="imageUrl" 
+                    render={({ field }) => ( 
+                      <FormItem>
+                        <FormLabel>Image URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://placehold.co/100x100.png" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem> 
+                    )}
+                  />
+                  <FormField 
+                    control={form.control} 
+                    name="imageName" 
+                    render={({ field }) => ( 
+                      <FormItem>
+                        <FormLabel>Image Name (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Event Banner" {...field} />
+                        </FormControl>
+                        <FormDescription>A descriptive name for the image attachment.</FormDescription>
+                        <FormMessage />
+                      </FormItem> 
+                    )}
+                  />
                 </div>
                 <div className="space-y-4">
-                  <FormField control={form.control} name="pdfUrl" render={({ field }) => ( <FormItem><FormLabel>PDF Flyer URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                  <FormField control={form.control} name="pdfName" render={({ field }) => ( <FormItem><FormLabel>PDF Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl><FormDescription>A descriptive name for the PDF attachment.</FormDescription><FormMessage /></FormItem> )}/>
+                  <FormField 
+                    control={form.control} 
+                    name="pdfUrl" 
+                    render={({ field }) => ( 
+                      <FormItem>
+                        <FormLabel>PDF Flyer URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="https://example.com/flyer.pdf" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem> 
+                    )}
+                  />
+                  <FormField 
+                    control={form.control} 
+                    name="pdfName" 
+                    render={({ field }) => ( 
+                      <FormItem>
+                        <FormLabel>PDF Name (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Official Flyer" {...field} />
+                        </FormControl>
+                        <FormDescription>A descriptive name for the PDF attachment.</FormDescription>
+                        <FormMessage />
+                      </FormItem> 
+                    )}
+                  />
                 </div>
                 <div className="space-y-4">
                     <FormField
@@ -896,8 +1166,12 @@ function ManageEventsContent() {
             </Form>
           </div>
           <DialogFooter className="p-6 pt-4 border-t shrink-0">
-            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-            <Button type="submit" form="event-form">{editingEvent ? 'Save Changes' : 'Create Event'}</Button>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost">Cancel</Button>
+            </DialogClose>
+            <Button type="submit" form="event-form">
+              {editingEvent ? 'Save Changes' : 'Create Event'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -906,11 +1180,15 @@ function ManageEventsContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone. This will permanently delete the event "{eventToDelete?.name}".</AlertDialogDescription>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the event "{eventToDelete?.name}".
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -919,11 +1197,15 @@ function ManageEventsContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Clear All Events?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone. This will permanently delete all events from the list.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete all events from the list.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">Clear Events</AlertDialogAction>
+            <AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">
+              Clear Events
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -972,11 +1254,12 @@ function ManageEventsContent() {
                     Download All Registrations ({registrations.length})
                 </Button>
                 {profile?.role === 'organizer' && (
-                  <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>
+                  <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">
+                    Reset All Player Statuses
+                  </Button>
                 )}
             </div>
           </div>
-
 
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
@@ -992,7 +1275,13 @@ function ManageEventsContent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {registrations.length === 0 ? ( <TableRow><TableCell colSpan={profile?.role === 'organizer' ? 7 : 6} className="h-24 text-center">No players registered yet.</TableCell></TableRow> ) : (
+                {registrations.length === 0 ? ( 
+                  <TableRow>
+                    <TableCell colSpan={profile?.role === 'organizer' ? 7 : 6} className="h-24 text-center">
+                      No players registered yet.
+                    </TableCell>
+                  </TableRow> 
+                ) : (
                   registrations.map(({ player, details, invoiceNumber }) => {
                     const isWithdrawn = details.status === 'withdrawn';
                     const isExported = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
@@ -1005,8 +1294,12 @@ function ManageEventsContent() {
                             <TableCell className={cn("font-medium", isWithdrawn && "line-through")}>
                                 <div className="flex items-center gap-2">
                                   {player.firstName} {player.lastName}
-                                  {player.studentType === 'gt' && <Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>}
-                                  {player.studentType === 'independent' && <Badge variant="secondary" className="bg-purple-200 text-purple-800">IND</Badge>}
+                                  {player.studentType === 'gt' && (
+                                    <Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>
+                                  )}
+                                  {player.studentType === 'independent' && (
+                                    <Badge variant="secondary" className="bg-purple-200 text-purple-800">IND</Badge>
+                                  )}
                                 </div>
                             </TableCell>
                             <TableCell>{player.uscfId}</TableCell>
@@ -1022,7 +1315,7 @@ function ManageEventsContent() {
                               </TableCell>
                             )}
                         </TableRow>
-                    )
+                    );
                   })
                 )}
               </TableBody>
@@ -1035,16 +1328,32 @@ function ManageEventsContent() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Paste from Spreadsheet</DialogTitle>
-            <DialogDescription>Copy event data from your spreadsheet and paste it into the text area below.</DialogDescription>
+            <DialogDescription>
+              Copy event data from your spreadsheet and paste it into the text area below.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <Tabs defaultValue="events"><TabsList className="grid w-full grid-cols-1"><TabsTrigger value="events">Import Events</TabsTrigger></TabsList>
-              <TabsContent value="events"><Textarea placeholder="Paste event data here..." className="h-64" value={pasteData} onChange={(e) => setPasteData(e.target.value)} /></TabsContent>
+            <Tabs defaultValue="events">
+              <TabsList className="grid w-full grid-cols-1">
+                <TabsTrigger value="events">Import Events</TabsTrigger>
+              </TabsList>
+              <TabsContent value="events">
+                <Textarea 
+                  placeholder="Paste event data here..." 
+                  className="h-64" 
+                  value={pasteData} 
+                  onChange={(e) => setPasteData(e.target.value)} 
+                />
+              </TabsContent>
             </Tabs>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-            <Button onClick={handlePasteImport}><ClipboardPaste className="mr-2 h-4 w-4" />Import Data</Button>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handlePasteImport}>
+              <ClipboardPaste className="mr-2 h-4 w-4" />Import Data
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
