@@ -78,6 +78,7 @@ type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 export default function UsersPage() {
     const { toast } = useToast();
+    const { dbDistricts, getSchoolsForDistrict } = useMasterDb();
     const [users, setUsers] = useState<User[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -94,9 +95,8 @@ export default function UsersPage() {
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     
     const uniqueDistricts = useMemo(() => {
-        const districts = new Set(schoolData.map(s => s.district));
-        return ['None', ...Array.from(districts)].sort();
-    }, []);
+        return ['None', ...dbDistricts].sort();
+    }, [dbDistricts]);
 
     const allSchoolNames = useMemo(() => {
         const schoolNames = schoolData.map(s => s.schoolName);
@@ -190,20 +190,10 @@ export default function UsersPage() {
 
     const handleDistrictChange = (district: string, formInstance: any, resetSchool: boolean = true) => {
         formInstance.setValue('district', district);
+        const schools = getSchoolsForDistrict(district);
+        setSchoolsForDistrict(schools);
         if (resetSchool) {
-            formInstance.setValue('school', '');
-        }
-        if (district === 'None') {
-            setSchoolsForDistrict(allSchoolNames);
-            if (resetSchool) {
-              formInstance.setValue('school', 'Homeschool');
-            }
-        } else {
-            const filteredSchools = schoolData
-                .filter((school) => school.district === district)
-                .map((school) => school.schoolName)
-                .sort();
-            setSchoolsForDistrict([...new Set(filteredSchools)]);
+            formInstance.setValue('school', schools.length > 0 ? '' : 'Homeschool');
         }
     };
     
@@ -225,7 +215,7 @@ export default function UsersPage() {
         });
         handleDistrictChange(initialDistrict, form, false);
       }
-    }, [isDialogOpen, editingUser, form, allSchoolNames]);
+    }, [isDialogOpen, editingUser, form, allSchoolNames, getSchoolsForDistrict]);
 
     const handleEditUser = (user: User) => {
         setEditingUser(user);
@@ -698,4 +688,3 @@ export default function UsersPage() {
         </AppLayout>
     );
 }
-
