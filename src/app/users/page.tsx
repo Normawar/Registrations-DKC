@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -253,7 +251,6 @@ export default function UsersPage() {
             // Delete the temporary role flags before saving
             delete dataToSave.isSponsor;
             delete dataToSave.isOrganizer;
-            // Note: `isDistrictCoordinator` is a valid field we want to keep
     
             await setDoc(userRef, dataToSave, { merge: true });
     
