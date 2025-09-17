@@ -42,12 +42,21 @@ export default function EventsPage() {
     loadRegistrations();
   }, [loadRegistrations]);
 
-  // Get upcoming events
+  // Get upcoming events and filter based on user type (test/real)
   const upcomingEvents = useMemo(() => {
+    const isTestUser = profile?.email?.toLowerCase().includes('test');
+
     return events
-      .filter(event => new Date(event.date) >= new Date())
+      .filter(event => {
+        const isTestEvent = event.name.toLowerCase().includes('test');
+        const isUpcoming = new Date(event.date) >= new Date();
+        
+        if (!isUpcoming) return false;
+        
+        return isTestUser ? isTestEvent : !isTestEvent;
+      })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [events]);
+  }, [events, profile]);
 
   // Get registration status for an event
   const getEventRegistrationStatus = (event: any) => {
