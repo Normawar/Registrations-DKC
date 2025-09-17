@@ -4,6 +4,8 @@
  * @fileOverview A flow to import and process invoices directly from the Square API.
  * This is a more reliable alternative to parsing PDFs for bulk data migration.
  */
+import { config } from 'dotenv';
+config();
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
