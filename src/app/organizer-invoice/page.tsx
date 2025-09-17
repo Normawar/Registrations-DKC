@@ -26,6 +26,7 @@ import { useEvents, type Event } from '@/hooks/use-events';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateTeamCode } from '@/lib/school-utils';
+import { Label } from '@/components/ui/label';
 
 const lineItemSchema = z.object({
   id: z.string().optional(), // Hold player ID if applicable
@@ -52,11 +53,14 @@ function OrganizerInvoiceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { events } = useEvents();
-  const { database: allPlayers, dbSchools, dbDistricts } = useMasterDb();
+  const { database: allPlayers, dbSchools, dbDistricts, getSchoolsForDistrict } = useMasterDb();
   
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [originalInvoice, setOriginalInvoice] = useState<any>(null);
+  
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('all');
+  const [filteredSchools, setFilteredSchools] = useState<string[]>(dbSchools);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceFormSchema),
@@ -88,6 +92,11 @@ function OrganizerInvoiceContent() {
           const invoiceToEdit = { id: docSnap.id, ...docSnap.data() };
           setOriginalInvoice(invoiceToEdit);
           setIsEditing(true);
+          
+          if (invoiceToEdit.district) {
+            setSelectedDistrict(invoiceToEdit.district);
+          }
+
           let lineItems: z.infer<typeof lineItemSchema>[] = [];
           
           if (invoiceToEdit.type === 'event' && invoiceToEdit.eventId && invoiceToEdit.selections) {
@@ -144,6 +153,13 @@ function OrganizerInvoiceContent() {
       fetchInvoice();
     }
   }, [searchParams, form, events, allPlayers]);
+  
+  useEffect(() => {
+    setFilteredSchools(getSchoolsForDistrict(selectedDistrict));
+    if (form.getValues('schoolName') && !getSchoolsForDistrict(selectedDistrict).includes(form.getValues('schoolName'))) {
+      form.setValue('schoolName', '');
+    }
+  }, [selectedDistrict, getSchoolsForDistrict, form]);
 
 
   async function onSubmit(values: InvoiceFormValues) {
@@ -344,6 +360,16 @@ function OrganizerInvoiceContent() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <Label>District</Label>
+                        <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                            <SelectTrigger><SelectValue placeholder="Filter by district..." /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Districts</SelectItem>
+                                {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <FormField
                       control={form.control}
                       name="schoolName"
@@ -357,7 +383,7 @@ function OrganizerInvoiceContent() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {dbSchools.map((school) => (
+                              {filteredSchools.map((school) => (
                                 <SelectItem key={school} value={school}>
                                   {school}
                                 </SelectItem>
@@ -368,17 +394,6 @@ function OrganizerInvoiceContent() {
                         </FormItem>
                       )}
                     />
-                     <FormField
-                        control={form.control}
-                        name="invoiceTitle"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Invoice Title</FormLabel>
-                            <FormControl><Input placeholder="e.g., Fall Chess Club Dues" {...field} /></FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
                 </div>
                  <div className="grid md:grid-cols-2 gap-4">
                     <FormField
@@ -405,6 +420,17 @@ function OrganizerInvoiceContent() {
                     />
                 </div>
                  <div className="grid md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="invoiceTitle"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Invoice Title</FormLabel>
+                            <FormControl><Input placeholder="e.g., Fall Chess Club Dues" {...field} /></FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
                     <FormField
                         control={form.control}
                         name="teamCode"
