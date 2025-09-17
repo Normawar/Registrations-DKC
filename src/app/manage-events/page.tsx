@@ -172,40 +172,45 @@ function ManageEventsContent() {
   const [eventTypeFilter, setEventTypeFilter] = useState<'real' | 'test'>('real');
 
   const uniqueDistricts = useMemo(() => {
-    // Combine districts from schools and players to get a complete list
-    const schoolDistricts = dbSchools.map(s => schoolData.find(sd => sd.schoolName === s)?.district).filter(Boolean);
-    const playerDistricts = allPlayers.map(p => p.district).filter(Boolean);
-    return [...new Set([...schoolDistricts, ...playerDistricts])].sort();
-  }, [dbSchools, allPlayers]);
+    const schoolDistricts = dbSchools.map(s => schoolData.find(sd => sd.schoolName === s)?.district).filter(Boolean) as string[];
+    const playerDistricts = allPlayers.map(p => p.district).filter(Boolean) as string[];
+    const eventLocationDistricts = events.map(e => {
+        const lowerLocation = e.location.toLowerCase();
+        if (lowerLocation.includes("mcallen")) return "MCALLEN ISD";
+        if (lowerLocation.includes("psja") || lowerLocation.includes("austin ms") || lowerLocation.includes("kennedy ms")) return "PHARR-SAN JUAN-ALAMO ISD";
+        if (lowerLocation.includes("edinburg") || lowerLocation.includes("zavala")) return "EDINBURG CISD";
+        if (lowerLocation.includes("sharyland")) return "SHARYLAND ISD";
+        return null;
+    }).filter(Boolean) as string[];
+    
+    return [...new Set([...schoolDistricts, ...playerDistricts, ...eventLocationDistricts])].sort();
+}, [dbSchools, allPlayers, events]);
   
   const getDistrictForLocation = useCallback((location: string): string => {
     if (!isDbLoaded || !location) return 'Unknown';
-    
     const lowerLocation = location.toLowerCase();
-    
-    // Direct match for test districts from test school data
-    const testSchoolMatch = schoolData.find(s => s.schoolName.toLowerCase() === lowerLocation && s.district.toLowerCase().startsWith('test'));
-    if (testSchoolMatch) return testSchoolMatch.district;
 
-    // Direct match for any school name
-    let foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
-
-    // More robust partial matching if no direct match
-    if (!foundSchool) {
-      foundSchool = schoolData.find(s => {
-        const schoolNameParts = s.schoolName.toLowerCase().split(' ').filter(p => p.length > 2 && !['el', 'ms', 'hs', 'j h', 'h s'].includes(p));
-        return schoolNameParts.some(part => lowerLocation.includes(part));
-      });
-    }
+    // Specific keywords for districts
+    if (lowerLocation.includes("psja")) return "PHARR-SAN JUAN-ALAMO ISD";
+    if (lowerLocation.includes("mcallen")) return "MCALLEN ISD";
+    if (lowerLocation.includes("edinburg")) return "EDINBURG CISD";
+    if (lowerLocation.includes("sharyland")) return "SHARYLAND ISD";
+    if (lowerLocation.includes("la joya")) return "LA JOYA ISD";
     
+    // Check against school data
+    const foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
     if (foundSchool) return foundSchool.district;
-    
-    // Fallback: Check if a district name itself is in the location
-    const foundDistrict = uniqueDistricts.find(d => lowerLocation.includes(d.toLowerCase()));
-    if (foundDistrict) return foundDistrict;
 
+    // Check against player data as a fallback
+    const foundPlayer = allPlayers.find(p => p.school && lowerLocation.includes(p.school.toLowerCase()));
+    if (foundPlayer) return foundPlayer.district;
+    
+    // Check for unique school names mentioned in events
+    if (lowerLocation.includes("de zavala") || lowerLocation.includes("barrientes") || lowerLocation.includes("guerra")) return "EDINBURG CISD";
+    if (lowerLocation.includes("austin ms") || lowerLocation.includes("kennedy ms")) return "PHARR-SAN JUAN-ALAMO ISD";
+    
     return 'Unknown';
-  }, [isDbLoaded, uniqueDistricts]);
+  }, [isDbLoaded, allPlayers]);
   
   const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
     if (event.isClosed) return "Closed";
@@ -779,7 +784,7 @@ function ManageEventsContent() {
                       <TableCell>{displayDistrict}</TableCell>
                       <TableCell>{event.location}</TableCell>
                       <TableCell>${event.regularFee} / ${event.lateFee} / ${event.veryLateFee} / ${event.dayOfFee}</TableCell>
-                      <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</Badge></TableCell>
+                      <TableCell><Badge variant={status === 'Open' ? 'default' : status === 'Closed' ? 'destructive' : 'secondary'} className={cn(status === 'Open' ? 'bg-green-600 text-white' : '')}>{status}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Toggle menu</span></Button></DropdownMenuTrigger>
@@ -1052,6 +1057,7 @@ export default function ManageEventsPage() {
     </OrganizerGuard>
   );
 }
+
 
 
 
