@@ -71,10 +71,6 @@ const createInvoiceFlow = ai.defineFlow(
     outputSchema: CreateInvoiceOutputSchema,
   },
   async (input) => {
-    console.log('Debug: Environment variables check');
-    console.log('SQUARE_ACCESS_TOKEN exists:', !!process.env.SQUARE_ACCESS_TOKEN);
-    console.log('SQUARE_LOCATION_ID exists:', !!process.env.SQUARE_LOCATION_ID);
-
     // Step 0: Globally fix all null or undefined fields in players
     const processedPlayers = input.players.map(p => ({
       ...p,
@@ -291,5 +287,3 @@ const createInvoiceFlow = ai.defineFlow(
     }
   }
 );
-
-    
