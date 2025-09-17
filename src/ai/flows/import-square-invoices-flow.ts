@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A flow to import and process invoices directly from the Square API.
@@ -6,7 +5,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
+import { z } from 'genkit';
 import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
@@ -38,7 +37,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     inputSchema: ImportSquareInvoicesInputSchema,
     outputSchema: ImportSquareInvoicesOutputSchema,
   },
-  async ({ startInvoiceNumber, endInvoiceNumber }) => {
+  async (input) => {
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
       throw new Error("Square is not configured. Please provide credentials in your environment variables.");
@@ -54,7 +53,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     let cursor: string | undefined;
     const allInvoices: Invoice[] = [];
 
-    console.log(`Starting import from Square for invoices between #${startInvoiceNumber} and #${endInvoiceNumber}...`);
+    console.log(`Starting import from Square for invoices between #${input.startInvoiceNumber} and #${input.endInvoiceNumber}...`);
 
     try {
         do {
@@ -88,17 +87,17 @@ const importSquareInvoicesFlow = ai.defineFlow(
         const numPart = invoice.invoiceNumber?.replace(/\D/g, '');
         if (!numPart) return false;
         const num = parseInt(numPart, 10);
-        return num >= startInvoiceNumber && num <= endInvoiceNumber;
+        return num >= input.startInvoiceNumber && num <= input.endInvoiceNumber;
     });
 
-    console.log(`Found ${relevantInvoices.length} invoices to process in the range ${startInvoiceNumber}-${endInvoiceNumber}.`);
+    console.log(`Found ${relevantInvoices.length} invoices to process in the range ${input.startInvoiceNumber}-${input.endInvoiceNumber}.`);
     
     let created = 0;
     let updated = 0;
     let failed = 0;
     const errors: string[] = [];
 
-    const existingInvoiceDocs = await getDocs(query(collection(db, 'invoices'), where('invoiceNumber', '>=', String(startInvoiceNumber))));
+    const existingInvoiceDocs = await getDocs(query(collection(db, 'invoices'), where('invoiceNumber', '>=', String(input.startInvoiceNumber))));
     const existingInvoicesMap = new Map(existingInvoiceDocs.docs.map(doc => [doc.data().invoiceNumber, { id: doc.id, ...doc.data() }]));
 
     for (const invoice of relevantInvoices) {
