@@ -16,6 +16,7 @@ import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
+  endInvoiceNumber: z.number().describe('The invoice number to end importing at.'),
 });
 export type ImportSquareInvoicesInput = z.infer<typeof ImportSquareInvoicesInputSchema>;
 
@@ -37,7 +38,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     inputSchema: ImportSquareInvoicesInputSchema,
     outputSchema: ImportSquareInvoicesOutputSchema,
   },
-  async ({ startInvoiceNumber }) => {
+  async ({ startInvoiceNumber, endInvoiceNumber }) => {
     
     const { isConfigured } = await checkSquareConfig();
     if (!isConfigured) {
@@ -54,7 +55,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     let cursor: string | undefined;
     const allInvoices: Invoice[] = [];
 
-    console.log(`Starting import from Square for invoices >= #${startInvoiceNumber}...`);
+    console.log(`Starting import from Square for invoices between #${startInvoiceNumber} and #${endInvoiceNumber}...`);
 
     try {
         do {
@@ -87,10 +88,11 @@ const importSquareInvoicesFlow = ai.defineFlow(
     const relevantInvoices = allInvoices.filter(invoice => {
         const numPart = invoice.invoiceNumber?.replace(/\D/g, '');
         if (!numPart) return false;
-        return parseInt(numPart, 10) >= startInvoiceNumber;
+        const num = parseInt(numPart, 10);
+        return num >= startInvoiceNumber && num <= endInvoiceNumber;
     });
 
-    console.log(`Found ${relevantInvoices.length} invoices to process with number >= ${startInvoiceNumber}.`);
+    console.log(`Found ${relevantInvoices.length} invoices to process in the range ${startInvoiceNumber}-${endInvoiceNumber}.`);
     
     let created = 0;
     let updated = 0;

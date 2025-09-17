@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -14,12 +15,13 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 export default function ImportFromSquarePage() {
   const { toast } = useToast();
   const [startInvoiceNumber, setStartInvoiceNumber] = useState('');
+  const [endInvoiceNumber, setEndInvoiceNumber] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<{ created: number; updated: number; failed: number; errors: string[] } | null>(null);
 
   const handleImport = async () => {
-    if (!startInvoiceNumber.trim()) {
-      toast({ variant: 'destructive', title: 'Invalid Number', description: 'Please enter a valid starting invoice number.' });
+    if (!startInvoiceNumber.trim() || !endInvoiceNumber.trim()) {
+      toast({ variant: 'destructive', title: 'Invalid Number', description: 'Please enter a valid start and end invoice number.' });
       return;
     }
 
@@ -27,7 +29,10 @@ export default function ImportFromSquarePage() {
     setResults(null);
 
     try {
-      const result = await importSquareInvoices({ startInvoiceNumber: parseInt(startInvoiceNumber, 10) });
+      const result = await importSquareInvoices({ 
+        startInvoiceNumber: parseInt(startInvoiceNumber, 10),
+        endInvoiceNumber: parseInt(endInvoiceNumber, 10),
+      });
       setResults(result);
 
       if (result.failed > 0) {
@@ -57,7 +62,7 @@ export default function ImportFromSquarePage() {
         <div>
           <h1 className="text-3xl font-bold font-headline">Direct Square Invoice Importer</h1>
           <p className="text-muted-foreground mt-2">
-            Fetch and process invoices directly from the Square API starting from a specific invoice number.
+            Fetch and process invoices directly from the Square API within a specific invoice number range.
           </p>
         </div>
         
@@ -70,24 +75,37 @@ export default function ImportFromSquarePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>1. Set Starting Point</CardTitle>
-            <CardDescription>Enter the first invoice number you want to start importing from. The tool will fetch all invoices with that number and higher.</CardDescription>
+            <CardTitle>1. Set Invoice Range</CardTitle>
+            <CardDescription>Enter the first and last invoice numbers you want to import. To import a single invoice, enter the same number in both fields.</CardDescription>
           </CardHeader>
           <CardContent>
-             <div className="grid w-full max-w-sm items-center gap-1.5">
-                <Label htmlFor="invoice-number">Starting Invoice Number</Label>
-                <Input
-                    id="invoice-number"
-                    type="number"
-                    placeholder="e.g., 4299"
-                    value={startInvoiceNumber}
-                    onChange={(e) => setStartInvoiceNumber(e.target.value)}
-                    disabled={isProcessing}
-                />
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid w-full items-center gap-1.5">
+                    <Label htmlFor="start-invoice-number">Starting Invoice Number</Label>
+                    <Input
+                        id="start-invoice-number"
+                        type="number"
+                        placeholder="e.g., 4299"
+                        value={startInvoiceNumber}
+                        onChange={(e) => setStartInvoiceNumber(e.target.value)}
+                        disabled={isProcessing}
+                    />
+                </div>
+                <div className="grid w-full items-center gap-1.5">
+                    <Label htmlFor="end-invoice-number">Ending Invoice Number</Label>
+                    <Input
+                        id="end-invoice-number"
+                        type="number"
+                        placeholder="e.g., 4300"
+                        value={endInvoiceNumber}
+                        onChange={(e) => setEndInvoiceNumber(e.target.value)}
+                        disabled={isProcessing}
+                    />
+                </div>
             </div>
           </CardContent>
           <CardFooter>
-            <Button onClick={handleImport} disabled={isProcessing || !startInvoiceNumber}>
+            <Button onClick={handleImport} disabled={isProcessing || !startInvoiceNumber.trim() || !endInvoiceNumber.trim()}>
               <DownloadCloud className="mr-2 h-4 w-4" />
               {isProcessing ? 'Importing from Square...' : 'Start Import'}
             </Button>
