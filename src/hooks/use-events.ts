@@ -30,13 +30,123 @@ export function useEvents() {
   const loadEvents = useCallback(async () => {
     if (!db) {
         console.error("Firestore not initialized.");
+        // Fallback to mock data if db is not available
+        const mockEvents = [
+          {
+            "id": "evt-1757125186611-0.05756934987789575",
+            "name": "Test PSJA South West Early College on February 28th, 2026",
+            "date": "2026-02-28T06:00:00.000Z",
+            "location": "PSJA South West Early College",
+            "rounds": 5,
+            "regularFee": 20,
+            "lateFee": 25,
+            "veryLateFee": 30,
+            "dayOfFee": 35,
+            "imageUrl": "https://picsum.photos/seed/evt1/600/400",
+            "pdfUrl": "#",
+            "isClosed": false,
+            "isPsjaOnly": true
+          },
+          {
+            "id": "evt-1757125186611-0.9133269389279093",
+            "name": "Test Wernecke on November 1st, 2025",
+            "date": "2025-11-01T05:00:00.000Z",
+            "location": "Wernecke",
+            "rounds": 5,
+            "regularFee": 20,
+            "lateFee": 25,
+            "veryLateFee": 30,
+            "dayOfFee": 35,
+            "imageUrl": "https://picsum.photos/seed/evt2/600/400",
+            "pdfUrl": "#",
+            "isClosed": false,
+            "isPsjaOnly": false
+          },
+          {
+            "id": "evt-20250920-late-fee-test",
+            "name": "Late Fee Test Event",
+            "date": "2025-09-20T06:00:00.000Z",
+            "location": "Test Location",
+            "rounds": 5,
+            "regularFee": 20,
+            "lateFee": 25,
+            "veryLateFee": 30,
+            "dayOfFee": 35,
+            "imageUrl": "https://picsum.photos/seed/evt3/600/400",
+            "pdfUrl": "#",
+            "isClosed": false,
+            "isPsjaOnly": false
+          },
+        ];
+        setEvents(mockEvents);
+        setIsLoaded(true);
         return;
     }
     setIsLoaded(false);
     const eventsCol = collection(db, 'events');
     const eventSnapshot = await getDocs(eventsCol);
     const eventList = eventSnapshot.docs.map(doc => doc.data() as Event);
-    setEvents(eventList);
+
+    // Add mock data if the collection is empty
+    if (eventList.length === 0) {
+      const mockEvents = [
+          {
+            "id": "evt-1757125186611-0.05756934987789575",
+            "name": "Test PSJA South West Early College on February 28th, 2026",
+            "date": "2026-02-28T06:00:00.000Z",
+            "location": "PSJA South West Early College",
+            "rounds": 5,
+            "regularFee": 20,
+            "lateFee": 25,
+            "veryLateFee": 30,
+            "dayOfFee": 35,
+            "imageUrl": "https://picsum.photos/seed/evt1/600/400",
+            "pdfUrl": "#",
+            "isClosed": false,
+            "isPsjaOnly": true
+          },
+          {
+            "id": "evt-1757125186611-0.9133269389279093",
+            "name": "Test Wernecke on November 1st, 2025",
+            "date": "2025-11-01T05:00:00.000Z",
+            "location": "Wernecke",
+            "rounds": 5,
+            "regularFee": 20,
+            "lateFee": 25,
+            "veryLateFee": 30,
+            "dayOfFee": 35,
+            "imageUrl": "https://picsum.photos/seed/evt2/600/400",
+            "pdfUrl": "#",
+            "isClosed": false,
+            "isPsjaOnly": false
+          },
+          {
+            "id": "evt-20250920-late-fee-test",
+            "name": "Late Fee Test Event",
+            "date": "2025-09-20T06:00:00.000Z",
+            "location": "Test Location",
+            "rounds": 5,
+            "regularFee": 20,
+            "lateFee": 25,
+            "veryLateFee": 30,
+            "dayOfFee": 35,
+            "imageUrl": "https://picsum.photos/seed/evt3/600/400",
+            "pdfUrl": "#",
+            "isClosed": false,
+            "isPsjaOnly": false
+          },
+      ];
+      const batch = writeBatch(db);
+      mockEvents.forEach(event => {
+          const docRef = doc(db, 'events', event.id);
+          batch.set(docRef, event);
+      });
+      await batch.commit();
+      setEvents(mockEvents);
+    } else {
+      setEvents(eventList);
+    }
+
     setIsLoaded(true);
   }, []);
 
