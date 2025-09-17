@@ -97,6 +97,7 @@ import { db } from '@/lib/services/firestore-service';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { generateTeamCode } from '@/lib/school-utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const eventFormSchema = z.object({
@@ -168,6 +169,7 @@ function ManageEventsContent() {
   const [downloadedPlayers, setDownloadedPlayers] = useState<StoredDownloads>({});
 
   const [districtFilter, setDistrictFilter] = useState('all');
+  const [eventTypeFilter, setEventTypeFilter] = useState('real');
 
   const uniqueDistricts = useMemo(() => {
     return [...new Set(schoolData.map(s => s.district).filter(Boolean))].sort();
@@ -197,11 +199,10 @@ function ManageEventsContent() {
   };
 
   const sortedEvents = useMemo(() => {
-    let filteredEvents = [...events].map(event => {
-        if (getDistrictForLocation(event.location).startsWith("Test")) {
-            return {...event, name: `Test ${event.name}`}
-        }
-        return event;
+    const isTestEvent = (event: Event) => getDistrictForLocation(event.location).toLowerCase().startsWith("test");
+
+    let filteredEvents = [...events].filter(event => {
+        return eventTypeFilter === 'test' ? isTestEvent(event) : !isTestEvent(event);
     });
 
     if (districtFilter !== 'all') {
@@ -250,7 +251,7 @@ function ManageEventsContent() {
       });
     }
     return filteredEvents;
-  }, [events, sortConfig, districtFilter]);
+  }, [events, sortConfig, districtFilter, eventTypeFilter]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -707,16 +708,29 @@ function ManageEventsContent() {
                 <CardDescription>
                   A list of all upcoming and past events.
                 </CardDescription>
-                <div className="w-64">
-                  <Select value={districtFilter} onValueChange={setDistrictFilter}>
-                      <SelectTrigger>
-                          <SelectValue placeholder="Filter by district..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="all">All Districts</SelectItem>
-                          {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                      </SelectContent>
-                  </Select>
+                <div className="flex items-center gap-4">
+                  <RadioGroup value={eventTypeFilter} onValueChange={setEventTypeFilter} className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1">
+                      <RadioGroupItem value="real" id="real-events" />
+                      <Label htmlFor="real-events">Real Events</Label>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <RadioGroupItem value="test" id="test-events" />
+                      <Label htmlFor="test-events">Test Events</Label>
+                    </div>
+                  </RadioGroup>
+
+                  <div className="w-64">
+                    <Select value={districtFilter} onValueChange={setDistrictFilter}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Filter by district..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Districts</SelectItem>
+                            {uniqueDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
           </CardHeader>
@@ -738,9 +752,15 @@ function ManageEventsContent() {
                   const status = getEventStatus(event);
                   const district = getDistrictForLocation(event.location);
                   const displayDistrict = district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'PSJA' : district;
+                  const eventName = isTestEvent(event) ? `Test ${event.name}` : event.name;
+                  
+                  function isTestEvent(event: Event): boolean {
+                    return getDistrictForLocation(event.location).toLowerCase().startsWith("test");
+                  }
+                  
                   return (
                     <TableRow key={event.id}>
-                      <TableCell className="font-medium">{event.name}</TableCell>
+                      <TableCell className="font-medium">{eventName}</TableCell>
                       <TableCell>{format(new Date(event.date), 'PPP')}</TableCell>
                       <TableCell>{displayDistrict}</TableCell>
                       <TableCell>{event.location}</TableCell>
@@ -1018,4 +1038,5 @@ export default function ManageEventsPage() {
     </OrganizerGuard>
   );
 }
+
 
