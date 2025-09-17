@@ -225,33 +225,38 @@ export default function UsersPage() {
 
     const onSubmit = async (values: UserFormValues) => {
         if (!editingUser || !db) return;
-
+    
         const userSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', editingUser.email)));
-        if(userSnapshot.empty) {
+        if (userSnapshot.empty) {
             toast({ variant: 'destructive', title: "Update Failed", description: "Could not find the user to update." });
             return;
         }
         const userDocId = userSnapshot.docs[0].id;
-
+    
         try {
             const userRef = doc(db, "users", userDocId);
-            
+    
             let finalRole: User['role'];
             if (values.isOrganizer) {
-              finalRole = 'organizer';
+                finalRole = 'organizer';
             } else if (values.isDistrictCoordinator) {
-              finalRole = 'district_coordinator';
+                finalRole = 'district_coordinator';
             } else if (values.isSponsor) {
-              finalRole = 'sponsor';
+                finalRole = 'sponsor';
             } else {
-              finalRole = 'individual';
+                finalRole = 'individual'; 
             }
-
-            const dataToSave = { ...values, role: finalRole };
-            delete (dataToSave as any).isSponsor;
-
+    
+            // Create a new object for saving to avoid mutating the form state directly
+            const dataToSave: any = { ...values, role: finalRole };
+    
+            // Delete the temporary role flags before saving
+            delete dataToSave.isSponsor;
+            delete dataToSave.isOrganizer;
+            // Note: `isDistrictCoordinator` is a valid field we want to keep
+    
             await setDoc(userRef, dataToSave, { merge: true });
-            
+    
             loadUsers();
             toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
             setIsDialogOpen(false);
