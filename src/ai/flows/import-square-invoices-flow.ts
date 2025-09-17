@@ -2,7 +2,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
@@ -30,29 +29,41 @@ const importSquareInvoicesFlow = ai.defineFlow(
   async (input) => {
     console.log('TEST: Flow is running! Input:', input);
     
-    // Step 1: Test credential check
-    console.log('TEST: Checking Square config...');
-    const { isConfigured } = await checkSquareConfig();
-    console.log('TEST: checkSquareConfig result:', isConfigured);
+    // Bypass credential check entirely since other flows work
+    console.log('TEST: Bypassing credential check, going straight to Square API...');
     
-    if (!isConfigured) {
-      console.log('TEST: Square not configured');
+    try {
+      // Import and test the actual Square client
+      const { getSquareClient, getSquareLocationId } = await import('@/lib/square-client');
+      
+      console.log('TEST: Getting Square client...');
+      const squareClient = await getSquareClient();
+      const locationId = await getSquareLocationId();
+      
+      console.log('TEST: Square client obtained, testing API call...');
+      const { result } = await squareClient.invoicesApi.listInvoices({
+        locationId: locationId,
+        limit: 1, // Just test with 1 invoice
+      });
+      
+      const invoiceCount = result.invoices?.length || 0;
+      console.log(`TEST: Success! Found ${invoiceCount} invoices in Square`);
+      
+      return {
+        created: 0,
+        updated: 0,
+        failed: 0,
+        errors: [`TEST: Square API works! Found ${invoiceCount} invoices. Credential check is the problem.`],
+      };
+      
+    } catch (error) {
+      console.log('TEST: Square API failed:', error);
       return {
         created: 0,
         updated: 0,
         failed: 1,
-        errors: ['Square is not configured. Please provide credentials in your environment variables.'],
+        errors: [`TEST: Square API error: ${error instanceof Error ? error.message : 'Unknown error'}`],
       };
     }
-    
-    console.log('TEST: Square is configured, proceeding...');
-    
-    // Just return a test response for now
-    return {
-      created: 0,
-      updated: 0,
-      failed: 0,
-      errors: ['TEST: This is just a test run - credentials OK'],
-    };
   }
 );
