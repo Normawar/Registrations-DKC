@@ -1,8 +1,8 @@
-
 'use server';
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
@@ -30,12 +30,29 @@ const importSquareInvoicesFlow = ai.defineFlow(
   async (input) => {
     console.log('TEST: Flow is running! Input:', input);
     
+    // Step 1: Test credential check
+    console.log('TEST: Checking Square config...');
+    const { isConfigured } = await checkSquareConfig();
+    console.log('TEST: checkSquareConfig result:', isConfigured);
+    
+    if (!isConfigured) {
+      console.log('TEST: Square not configured');
+      return {
+        created: 0,
+        updated: 0,
+        failed: 1,
+        errors: ['Square is not configured. Please provide credentials in your environment variables.'],
+      };
+    }
+    
+    console.log('TEST: Square is configured, proceeding...');
+    
     // Just return a test response for now
     return {
       created: 0,
       updated: 0,
       failed: 0,
-      errors: ['TEST: This is just a test run'],
+      errors: ['TEST: This is just a test run - credentials OK'],
     };
   }
 );
