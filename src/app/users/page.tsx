@@ -28,6 +28,7 @@ import { db } from '@/lib/services/firestore-service';
 import { createUserByOrganizer } from '@/app/users/actions';
 import { Loader2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { useMasterDb } from '@/context/master-db-context';
 
 
 type User = {
