@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -48,6 +47,7 @@ export function SponsorRegistrationDialog({
 
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [createdInvoiceId, setCreatedInvoiceId] = useState<string | null>(null);
+  const [splitUscfFees, setSplitUscfFees] = useState(false);
 
   // Enhanced loading effect with better error handling
   useEffect(() => {
@@ -222,7 +222,11 @@ export function SponsorRegistrationDialog({
         return;
     }
 
-    await handleStandardInvoice();
+    if (splitUscfFees) {
+        await handleSplitInvoices();
+    } else {
+        await handleStandardInvoice();
+    }
   };
 
   const handleStandardInvoice = async () => {
@@ -268,6 +272,88 @@ export function SponsorRegistrationDialog({
         handleInvoiceError(error, "Invoice Creation Failed");
     } finally {
         setIsSubmitting(false);
+    }
+  };
+  
+  const handleSplitInvoices = async () => {
+    if (!profile || !event) return;
+  
+    // 1. Create invoice for registrations
+    const registrationPlayers = Object.entries(selectedStudents).map(([playerId, details]) => {
+      const student = rosterPlayers.find(p => p.id === playerId);
+      const { fee: currentFee } = getFeeForEvent();
+      const lateFeeAmount = currentFee - event.regularFee;
+      return {
+        playerName: `${student?.firstName} ${student?.lastName}`,
+        uscfId: student?.uscfId || '',
+        baseRegistrationFee: event.regularFee,
+        lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+        uscfAction: false, // USCF fees handled separately
+        isGtPlayer: student?.studentType === 'gt',
+        section: details.section,
+      };
+    });
+  
+    // 2. Create invoice for USCF fees
+    const uscfPlayers = Object.entries(selectedStudents)
+      .filter(([_, details]) => details.uscfStatus !== 'current')
+      .map(([playerId, details]) => {
+        const student = rosterPlayers.find(p => p.id === playerId);
+        return {
+          playerName: `${student?.firstName} ${student?.lastName}`,
+          uscfId: student?.uscfId || '',
+          baseRegistrationFee: 0,
+          lateFee: 0,
+          uscfAction: true,
+          isGtPlayer: student?.studentType === 'gt',
+          section: details.section,
+        };
+      });
+  
+    try {
+      if (registrationPlayers.length > 0) {
+        const regResult = await createInvoice({
+          sponsorName: `${profile.firstName} ${profile.lastName}`,
+          sponsorEmail: profile.email || '',
+          schoolName: profile.school,
+          teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
+          eventName: `${event.name} - Registration`,
+          eventDate: event.date,
+          uscfFee: 24,
+          players: registrationPlayers,
+          bookkeeperEmail: profile.bookkeeperEmail,
+          gtCoordinatorEmail: profile.gtCoordinatorEmail,
+          schoolAddress: profile.schoolAddress,
+          schoolPhone: profile.schoolPhone,
+          district: profile.district,
+        });
+        await saveConfirmation(regResult.invoiceId, regResult, registrationPlayers, feeBreakdown.registrationFees + feeBreakdown.lateFees, "Registration");
+      }
+  
+      if (uscfPlayers.length > 0) {
+        const uscfResult = await createInvoice({
+          sponsorName: `${profile.firstName} ${profile.lastName}`,
+          sponsorEmail: profile.email || '',
+          schoolName: profile.school,
+          teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
+          eventName: `${event.name} - USCF Fees`,
+          eventDate: event.date,
+          uscfFee: 24,
+          players: uscfPlayers,
+          bookkeeperEmail: profile.bookkeeperEmail,
+          gtCoordinatorEmail: profile.gtCoordinatorEmail,
+          schoolAddress: profile.schoolAddress,
+          schoolPhone: profile.schoolPhone,
+          district: profile.district,
+        });
+        await saveConfirmation(uscfResult.invoiceId, uscfResult, uscfPlayers, feeBreakdown.uscfFees, "USCF");
+      }
+      toast({ title: "Split Invoices Created", description: "Separate invoices for registration and USCF fees have been generated." });
+      resetState();
+    } catch (error) {
+      handleInvoiceError(error, "Split Invoice Creation Failed");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -333,7 +419,7 @@ export function SponsorRegistrationDialog({
     }
   };
 
-  const saveConfirmation = async (invoiceId: string, result: any, playersInInvoice: any[], total: number) => {
+  const saveConfirmation = async (invoiceId: string, result: any, playersInInvoice: any[], total: number, type?: "Registration" | "USCF") => {
     if(!profile || !event || !db) return;
     
     const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
@@ -358,18 +444,23 @@ export function SponsorRegistrationDialog({
         })
     );
     
+    let eventName = event.name;
+    if (type) {
+        eventName = `${event.name} - ${type}`;
+    }
+
     const newConfirmation = {
       id: invoiceId,
       invoiceId: invoiceId,
       invoiceNumber: result.invoiceNumber,
       submissionTimestamp: new Date().toISOString(),
       eventId: event.id,
-      eventName: event.name,
+      eventName: eventName,
       eventDate: event.date,
       schoolName: profile.school,
       district: profile.district,
       teamCode: teamCode,
-      invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
+      invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${eventName}`,
       selections: validatedSelections,
       totalInvoiced: result.newTotalAmount || total,
       totalAmount: result.newTotalAmount || total,
@@ -386,10 +477,12 @@ export function SponsorRegistrationDialog({
     const invoiceDocRef = doc(db, 'invoices', invoiceId);
     await setDoc(invoiceDocRef, newConfirmation);
     
-    setCreatedInvoiceId(invoiceId);
-    setShowInvoiceModal(true);
-    toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
-    resetState();
+    if(!splitUscfFees) {
+        setCreatedInvoiceId(invoiceId);
+        setShowInvoiceModal(true);
+        toast({title: `Invoice #${result.invoiceNumber} created successfully!`});
+        resetState();
+    }
   };
   
   const handleInvoiceError = (error: any, title: string) => {
@@ -706,6 +799,18 @@ export function SponsorRegistrationDialog({
                   <span>${feeBreakdown.total.toFixed(2)}</span>
                 </div>
               </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="split-uscf-fees"
+                checked={splitUscfFees}
+                onCheckedChange={(checked) => setSplitUscfFees(!!checked)}
+                disabled={feeBreakdown.uscfFees === 0}
+              />
+              <Label htmlFor="split-uscf-fees" className="text-sm font-medium">
+                Create a separate invoice for USCF fees
+              </Label>
             </div>
 
             {feeBreakdown.lateFees > 0 && (
