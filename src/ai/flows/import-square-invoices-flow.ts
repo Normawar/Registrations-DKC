@@ -6,13 +6,12 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { type Invoice, ApiError } from 'square';
 import { generateTeamCode } from '@/lib/school-utils';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
@@ -39,12 +38,6 @@ const importSquareInvoicesFlow = ai.defineFlow(
     outputSchema: ImportSquareInvoicesOutputSchema,
   },
   async ({ startInvoiceNumber, endInvoiceNumber }) => {
-    
-    const { isConfigured } = await checkSquareConfig();
-    if (!isConfigured) {
-      throw new Error('Square API is not configured. Please set credentials in your .env file.');
-    }
-
     if (!db) {
       throw new Error('Firestore database is not initialized.');
     }
