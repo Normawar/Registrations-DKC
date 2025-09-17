@@ -34,9 +34,9 @@ export function useEvents() {
         const mockEvents = [
           {
             "id": "evt-1757125186611-0.05756934987789575",
-            "name": "PSJA South West Early College",
+            "name": "Test Achieve Early College H S",
             "date": "2026-02-28T06:00:00.000Z",
-            "location": "PSJA South West Early College",
+            "location": "Test Achieve Early College H S",
             "rounds": 5,
             "regularFee": 20,
             "lateFee": 25,
@@ -45,7 +45,7 @@ export function useEvents() {
             "imageUrl": "https://picsum.photos/seed/evt1/600/400",
             "pdfUrl": "#",
             "isClosed": false,
-            "isPsjaOnly": true
+            "isPsjaOnly": false
           },
           {
             "id": "evt-1757125186611-0.9133269389279093",
@@ -64,9 +64,9 @@ export function useEvents() {
           },
           {
             "id": "evt-20250920-late-fee-test",
-            "name": "Test Alfonso Ramirez EL",
+            "name": "Test Carmen Avila Elementary",
             "date": "2025-09-20T06:00:00.000Z",
-            "location": "Test Alfonso Ramirez EL",
+            "location": "Test Carmen Avila Elementary",
             "rounds": 5,
             "regularFee": 20,
             "lateFee": 25,
@@ -91,9 +91,9 @@ export function useEvents() {
     const mockEvents = [
         {
           "id": "evt-1757125186611-0.05756934987789575",
-          "name": "PSJA South West Early College",
+          "name": "Test Achieve Early College H S",
           "date": "2026-02-28T06:00:00.000Z",
-          "location": "PSJA South West Early College",
+          "location": "Test Achieve Early College H S",
           "rounds": 5,
           "regularFee": 20,
           "lateFee": 25,
@@ -102,7 +102,7 @@ export function useEvents() {
           "imageUrl": "https://picsum.photos/seed/evt1/600/400",
           "pdfUrl": "#",
           "isClosed": false,
-          "isPsjaOnly": true
+          "isPsjaOnly": false
         },
         {
           "id": "evt-1757125186611-0.9133269389279093",
@@ -121,9 +121,9 @@ export function useEvents() {
         },
         {
           "id": "evt-20250920-late-fee-test",
-          "name": "Test Alfonso Ramirez EL",
+          "name": "Test Carmen Avila Elementary",
           "date": "2025-09-20T06:00:00.000Z",
-          "location": "Test Alfonso Ramirez EL",
+          "location": "Test Carmen Avila Elementary",
           "rounds": 5,
           "regularFee": 20,
           "lateFee": 25,
