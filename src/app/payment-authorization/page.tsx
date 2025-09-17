@@ -42,6 +42,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { OrganizerGuard } from '@/components/auth-guard';
+import { useEvents, type Event } from '@/hooks/use-events';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 type Confirmation = {
@@ -63,13 +65,17 @@ type Confirmation = {
   paymentFileUrl?: string;
   paymentFileName?: string;
   invoiceUrl?: string;
+  eventId?: string;
 };
 
 function PaymentAuthorizationPageContent() {
   const { toast } = useToast();
-  const [pendingPayments, setPendingPayments] = useState<Confirmation[]>([]);
+  const { events } = useEvents();
+  const [allPendingPayments, setAllPendingPayments] = useState<Confirmation[]>([]);
   const [isApproving, setIsApproving] = useState(false);
   const [selectedConfirmation, setSelectedConfirmation] = useState<Confirmation | null>(null);
+  const [filter, setFilter] = useState<'real' | 'test'>('real');
+
 
   // State for approval dialog
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -85,7 +91,7 @@ function PaymentAuthorizationPageContent() {
       const invoiceSnapshot = await getDocs(invoicesCol);
       const allConfirmations: Confirmation[] = invoiceSnapshot.docs.map(doc => doc.data() as Confirmation);
       const pending = allConfirmations.filter(c => c.paymentStatus === 'pending-po');
-      setPendingPayments(pending);
+      setAllPendingPayments(pending);
     } catch (error) {
       console.error("Failed to load pending payments:", error);
       toast({
@@ -95,6 +101,15 @@ function PaymentAuthorizationPageContent() {
       });
     }
   }, [toast]);
+  
+    const pendingPayments = useMemo(() => {
+        return allPendingPayments.filter(p => {
+            const event = events.find(e => e.id === p.eventId);
+            const isTestEvent = event?.name.toLowerCase().startsWith('test');
+            if (filter === 'test') return isTestEvent;
+            return !isTestEvent;
+        });
+    }, [allPendingPayments, events, filter]);
 
   useEffect(() => {
     loadPendingPayments();
@@ -115,8 +130,8 @@ function PaymentAuthorizationPageContent() {
   };
   
   const handleApprovePayment = async () => {
-    if (!selectedConfirmation || !selectedConfirmation.invoiceId) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Selected invoice is invalid.' });
+    if (!selectedConfirmation || !selectedConfirmation.invoiceId || !db) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Selected invoice is invalid or database is not available.' });
         return;
     }
     
@@ -129,12 +144,14 @@ function PaymentAuthorizationPageContent() {
         paymentDate: paymentDate ? format(paymentDate, 'yyyy-MM-dd') : undefined,
         requestingUserRole: 'organizer' // Assuming this page is for organizers
       });
-
-      const allInvoices = JSON.parse(localStorage.getItem('all_invoices') || '[]');
-      const updatedInvoices = allInvoices.map((inv: any) =>
-        inv.id === selectedConfirmation.id ? { ...inv, status: result.status, invoiceStatus: result.status, totalPaid: result.totalPaid, paymentStatus: result.status === 'PAID' ? 'paid' : 'unpaid' } : inv
-      );
-      localStorage.setItem('all_invoices', JSON.stringify(updatedInvoices));
+      
+      const invoiceRef = doc(db, 'invoices', selectedConfirmation.id);
+      await setDoc(invoiceRef, { 
+        status: result.status, 
+        invoiceStatus: result.status, 
+        totalPaid: result.totalPaid,
+        paymentStatus: result.status.toLowerCase() === 'paid' ? 'paid' : 'unpaid'
+      }, { merge: true });
       
       await loadPendingPayments();
       
@@ -178,10 +195,18 @@ function PaymentAuthorizationPageContent() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Pending Verifications ({pendingPayments.length})</CardTitle>
-              <CardDescription>
-                Review these submissions and mark them as paid once the funds have been confirmed.
-              </CardDescription>
+              <div className="flex justify-between items-center">
+                  <div>
+                    <CardTitle>Pending Verifications ({pendingPayments.length})</CardTitle>
+                    <CardDescription>
+                        Review these submissions and mark them as paid once the funds have been confirmed.
+                    </CardDescription>
+                  </div>
+                   <RadioGroup value={filter} onValueChange={(v) => setFilter(v as 'real' | 'test')} className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="real" id="real-events" /><Label htmlFor="real-events">Real</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="test" id="test-events" /><Label htmlFor="test-events">Test</Label></div>
+                    </RadioGroup>
+              </div>
             </CardHeader>
             <CardContent>
               {pendingPayments.length === 0 ? (

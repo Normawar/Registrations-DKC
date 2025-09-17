@@ -1,4 +1,5 @@
-// src/components/auth-guard.tsx - Fixed route protection component
+
+// src/components/auth-guard.tsx - Route protection component with fixed organizer logic
 'use client';
 
 import { useEffect } from 'react';
@@ -16,6 +17,8 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
   const { profile, loading } = useSponsorProfile();
   const router = useRouter();
   const pathname = usePathname();
+  console.log('AUTH GUARD CALLED WITH:', { requiredRole, pathname: pathname });
+
 
   useEffect(() => {
     console.log('🔍 AuthGuard useEffect triggered');
@@ -23,7 +26,6 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
       loading,
       profileRole: profile?.role,
       isDistrictCoordinator: profile?.isDistrictCoordinator,
-      forceProfileUpdate: profile?.forceProfileUpdate,
       requiredRole,
       pathname
     });
@@ -48,19 +50,32 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     }
     
     // PRIORITY 2: Handle multi-role for district coordinators
-    // Only redirect to role selection if they have DC capabilities but haven't made a valid role choice yet
+    // This logic sends a user to role selection ONLY if they are a coordinator
+    // but their currently selected role is something else (e.g. 'sponsor').
     if (profile.isDistrictCoordinator && 
         profile.role !== 'organizer' && 
         profile.role !== 'district_coordinator' &&
-        profile.role !== 'sponsor' && // Allow user to act as a sponsor
         pathname !== '/auth/role-selection') {
       
-      console.log('🔄 District coordinator with non-DC/non-Sponsor role, redirecting to role selection');
+      console.log('🔄 District coordinator with non-DC role, redirecting to role selection');
       router.push('/auth/role-selection');
       return;
     }
+    
+    // PRIORITY 3: Handle test user isolation.
+    const isTestUser = profile.email?.toLowerCase().includes('test');
+    const isTestPage = pathname.includes('/debug') || pathname.includes('/reports'); // Assume reports can be used for testing
+    if (isTestUser && !isTestPage && profile.role !== 'organizer') {
+        const allowedTestPaths = ['/dashboard', '/roster', '/events', '/invoices', '/profile', '/auth/role-selection'];
+        if (!allowedTestPaths.some(p => pathname.startsWith(p))) {
+            console.log('🧪 Test user on a non-test page, redirecting to dashboard.');
+            router.push('/dashboard');
+            return;
+        }
+    }
 
-    // PRIORITY 3: Handle role-based access control for pages with specific requirements
+
+    // PRIORITY 4: Handle role-based access control for pages with specific requirements
     if (requiredRole) {
       const isOrganizer = profile.role === 'organizer';
       const isRequired = profile.role === requiredRole;
