@@ -165,10 +165,12 @@ function OrganizerInvoiceContent() {
   async function onSubmit(values: InvoiceFormValues) {
     setIsLoading(true);
     try {
-        if (isEditing && originalInvoice?.type === 'event') {
-            await handleRecreateEventInvoice(values);
-        } else if (isEditing && originalInvoice) {
-            await handleRecreateOrganizerInvoice(values);
+        if (isEditing && originalInvoice) {
+            if (originalInvoice.type === 'event') {
+                await handleRecreateEventInvoice(values);
+            } else { // Assumes 'organizer' or other types fall here
+                await handleRecreateOrganizerInvoice(values);
+            }
         } else {
             await handleCreateNewOrganizerInvoice(values);
         }
