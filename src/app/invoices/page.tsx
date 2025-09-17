@@ -117,7 +117,10 @@ export default function UnifiedInvoiceRegistrations() {
         const invoiceSnapshot = await getDocs(invoicesQuery);
         const invoicesArray = invoiceSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
-            .filter(invoice => invoice.status !== 'CANCELED'); // Filter out canceled invoices
+            .filter(invoice => 
+                invoice.status !== 'CANCELED' && 
+                invoice.invoiceNumber !== 'MOCK_INV'
+            ); 
 
         console.log(`✅ Found ${invoicesArray.length} active documents for role '${profile.role}'.`);
 
