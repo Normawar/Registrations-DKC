@@ -1,18 +1,8 @@
 
 'use server';
-/**
- * @fileOverview A flow to import and process invoices directly from the Square API.
- * This is a more reliable alternative to parsing PDFs for bulk data migration.
- */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { doc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
-import { db } from '@/lib/services/firestore-service';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
-import { type Invoice, ApiError } from 'square';
-import { generateTeamCode } from '@/lib/school-utils';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
@@ -38,133 +28,14 @@ const importSquareInvoicesFlow = ai.defineFlow(
     outputSchema: ImportSquareInvoicesOutputSchema,
   },
   async (input) => {
+    console.log('TEST: Flow is running! Input:', input);
     
-    const { isConfigured } = await checkSquareConfig();
-    if (!isConfigured) {
-      throw new Error("Square is not configured. Please provide credentials in your environment variables.");
-    }
-
-    if (!db) {
-      throw new Error('Firestore database is not initialized.');
-    }
-
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
-
-    let cursor: string | undefined;
-    const allInvoices: Invoice[] = [];
-
-    console.log(`Starting import from Square for invoices >= #${input.startInvoiceNumber}...`);
-
-    try {
-        do {
-            const { result } = await squareClient.invoicesApi.listInvoices({
-                locationId: locationId,
-                limit: 200,
-                cursor,
-            });
-            
-            const invoices = result.invoices || [];
-            allInvoices.push(...invoices);
-            cursor = result.cursor;
-            console.log(`Fetched ${invoices.length} invoices, total so far: ${allInvoices.length}. More available: ${!!cursor}`);
-        } while (cursor);
-    } catch (error: any) {
-        if (error instanceof ApiError) {
-             console.error('Full Square API Error during listInvoices:', {
-                name: error.name,
-                message: error.message,
-                statusCode: error.statusCode,
-                errors: error.errors,
-                body: error.body
-            });
-            throw new Error(`Square API Error: ${error.message} (Status: ${error.statusCode || 'unknown'})`);
-        }
-        console.error('Failed to fetch invoices from Square API:', error);
-        throw new Error('Could not fetch data from Square. Check API credentials and permissions.');
-    }
-
-    const relevantInvoices = allInvoices.filter(invoice => {
-        const numPart = invoice.invoiceNumber?.replace(/\D/g, '');
-        if (!numPart) return false;
-        return parseInt(numPart, 10) >= input.startInvoiceNumber;
-    });
-
-    console.log(`Found ${relevantInvoices.length} invoices to process with number >= ${input.startInvoiceNumber}.`);
-    
-    let created = 0;
-    let updated = 0;
-    let failed = 0;
-    const errors: string[] = [];
-
-    const existingInvoiceDocs = await getDocs(query(collection(db, 'invoices'), where('invoiceNumber', '>=', String(input.startInvoiceNumber))));
-    const existingInvoicesMap = new Map(existingInvoiceDocs.docs.map(doc => [doc.data().invoiceNumber, { id: doc.id, ...doc.data() }]));
-
-    for (const invoice of relevantInvoices) {
-        if (!invoice.id || !invoice.invoiceNumber) {
-            failed++;
-            errors.push(`Skipped Square invoice with missing ID or Number.`);
-            continue;
-        }
-
-        try {
-            const customer = invoice.primaryRecipient;
-            const orderId = invoice.orderId;
-            if (!orderId) {
-                failed++;
-                errors.push(`Invoice #${invoice.invoiceNumber} has no Order ID.`);
-                continue;
-            }
-
-            const { result: { order } } = await squareClient.ordersApi.retrieveOrder(orderId);
-            
-            const totalAmount = Number(invoice.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
-            const totalPaid = Number(invoice.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount || 0) / 100;
-            
-            const schoolName = customer?.companyName?.split(' / ')[0] || customer?.companyName || 'Unknown School';
-            const district = customer?.companyName?.split(' / ')[1] || 'Unknown District';
-            const teamCode = generateTeamCode({ schoolName, district });
-            
-            const firestoreRecord = {
-                id: invoice.id,
-                invoiceId: invoice.id,
-                invoiceNumber: invoice.invoiceNumber,
-                invoiceUrl: invoice.publicUrl,
-                status: invoice.status,
-                invoiceStatus: invoice.status,
-                submissionTimestamp: invoice.createdAt,
-                createdAt: invoice.createdAt,
-                updatedAt: invoice.updatedAt,
-                totalInvoiced: totalAmount,
-                totalAmount,
-                totalPaid: totalPaid,
-                purchaserName: `${customer?.givenName || ''} ${customer?.familyName || ''}`.trim(),
-                sponsorEmail: customer?.emailAddress,
-                schoolName,
-                district,
-                teamCode,
-                eventName: invoice.title,
-                selections: {}, // Simplified for now, can be enriched if player data is in notes
-                type: 'organizer' // Assume general organizer invoice from Square
-            };
-            
-            const existing = existingInvoicesMap.get(invoice.invoiceNumber);
-
-            if (existing) {
-                await setDoc(doc(db, 'invoices', existing.id), firestoreRecord, { merge: true });
-                updated++;
-            } else {
-                await setDoc(doc(db, 'invoices', invoice.id), firestoreRecord);
-                created++;
-            }
-
-        } catch (error) {
-            failed++;
-            const msg = error instanceof Error ? error.message : 'Unknown processing error.';
-            errors.push(`Invoice #${invoice.invoiceNumber}: ${msg}`);
-        }
-    }
-
-    return { created, updated, failed, errors };
+    // Just return a test response for now
+    return {
+      created: 0,
+      updated: 0,
+      failed: 0,
+      errors: ['TEST: This is just a test run'],
+    };
   }
 );
