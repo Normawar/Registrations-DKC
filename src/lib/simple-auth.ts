@@ -107,13 +107,6 @@ async function handleSpecialAccounts(normalizedEmail: string, trimmedPassword: s
     return await handleOrganizerAccount(normalizedEmail, trimmedPassword, authInstance);
   }
   
-  // Handle test accounts
-  const testAccountProfileData = getTestAccountProfile(normalizedEmail);
-  if (testAccountProfileData) {
-      // This function doesn't exist, so we comment it out to avoid breaking the build.
-      // return await handleTestAccount(normalizedEmail, trimmedPassword, authInstance, testAccountProfileData);
-  }
-  
   return null;
 }
 
