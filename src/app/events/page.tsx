@@ -16,6 +16,23 @@ import { Calendar, MapPin, DollarSign, Users, CheckCircle, Clock, Lock } from 'l
 import { useRouter } from 'next/navigation';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
+import { schoolData } from '@/lib/data/school-data';
+
+// Helper function to determine the district for a given location.
+const getDistrictForLocation = (location: string): string => {
+    const lowerLocation = location.toLowerCase();
+    let foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
+
+    if (!foundSchool) {
+      foundSchool = schoolData.find(s => {
+        const schoolNameParts = s.schoolName.toLowerCase().split(' ').filter(p => p.length > 2 && !['el', 'ms', 'hs'].includes(p));
+        return schoolNameParts.some(part => lowerLocation.includes(part));
+      });
+    }
+    
+    return foundSchool?.district || 'Unknown';
+};
+
 
 export default function EventsPage() {
   const { profile } = useSponsorProfile();
@@ -47,13 +64,24 @@ export default function EventsPage() {
     const isTestUser = profile?.email?.toLowerCase().includes('test');
 
     return events
+      .map(event => {
+        // Add "Test" prefix to event names based on their location's district
+        if (getDistrictForLocation(event.location).startsWith("Test")) {
+            return { ...event, name: `Test ${event.name}` };
+        }
+        return event;
+      })
       .filter(event => {
         const isTestEvent = event.name.toLowerCase().includes('test');
         const isUpcoming = new Date(event.date) >= new Date();
         
         if (!isUpcoming) return false;
         
-        return isTestUser ? isTestEvent : !isTestEvent;
+        if (isTestUser) {
+            return isTestEvent;
+        } else {
+            return !isTestEvent;
+        }
       })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [events, profile]);
