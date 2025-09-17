@@ -5,6 +5,32 @@ import { doc, getDoc, setDoc, writeBatch, updateDoc } from 'firebase/firestore';
 import { sendPasswordResetEmail, type User, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
 
+// Add this at the very top of your current simple-auth.ts to identify the recursion
+
+let callDepth = 0;
+const MAX_DEPTH = 10;
+const callHistory: string[] = [];
+
+function trackCall(functionName: string, email?: string) {
+  callDepth++;
+  const callInfo = `${functionName}${email ? `(${email})` : ''} - depth: ${callDepth}`;
+  callHistory.push(callInfo);
+  
+  console.log(`🔄 ${callInfo}`);
+  
+  if (callDepth > MAX_DEPTH) {
+    console.error('🚨 STACK OVERFLOW DETECTED!');
+    console.error('Call history:', callHistory);
+    throw new Error(`Stack overflow detected at depth ${callDepth} in ${functionName}`);
+  }
+  
+  return () => {
+    callDepth--;
+    // console.log(`✅ ${functionName} completed - depth now: ${callDepth}`);
+  };
+}
+
+
 // Move all Firebase imports to the top level to prevent repeated dynamic imports
 // This is a common cause of stack overflow in Firebase apps
 
@@ -25,6 +51,7 @@ const authOperationsInProgress = new Set<string>();
 
 // FIXED: Simplified signup function that prevents recursion
 export async function simpleSignUp(email: string, password: string, userData: Omit<SponsorProfile, 'uid' | 'email'>) {
+  const cleanup = trackCall('simpleSignUp', email);
   const normalizedEmail = normalizeEmail(email);
   
   // Prevent concurrent operations on the same email
@@ -97,59 +124,71 @@ export async function simpleSignUp(email: string, password: string, userData: Om
     throw new Error(getAuthErrorMessage(error));
   } finally {
     authOperationsInProgress.delete(normalizedEmail);
+    cleanup();
   }
 }
 
 // FIXED: Extract special account handling to prevent nested complexity
 async function handleSpecialAccounts(normalizedEmail: string, trimmedPassword: string, authInstance: any): Promise<any | null> {
-  // Handle organizer account
-  if (normalizedEmail === 'norma@dkchess.com') {
-    return await handleOrganizerAccount(normalizedEmail, trimmedPassword, authInstance);
+  const cleanup = trackCall('handleSpecialAccounts', normalizedEmail);
+  try {
+    // Handle organizer account
+    if (normalizedEmail === 'norma@dkchess.com') {
+      return await handleOrganizerAccount(normalizedEmail, trimmedPassword, authInstance);
+    }
+    
+    return null;
+  } finally {
+    cleanup();
   }
-  
-  return null;
 }
 
 async function handleOrganizerAccount(email: string, password: string, authInstance: any) {
-  let user: User;
-  
+  const cleanup = trackCall('handleOrganizerAccount', email);
   try {
-    const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
-    user = userCredential.user;
-    console.log('✅ Organizer signed in');
-  } catch (error: any) {
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-      const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
+      let user: User;
+    
+    try {
+      const userCredential = await signInWithEmailAndPassword(authInstance, email, password);
       user = userCredential.user;
-      console.log('✅ Organizer created');
-    } else {
-      throw error;
+      console.log('✅ Organizer signed in');
+    } catch (error: any) {
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+        const userCredential = await createUserWithEmailAndPassword(authInstance, email, password);
+        user = userCredential.user;
+        console.log('✅ Organizer created');
+      } else {
+        throw error;
+      }
     }
+    
+    const organizerProfile: SponsorProfile = {
+      uid: user.uid,
+      email,
+      firstName: 'Norma',
+      lastName: 'Guerra-Stueber',
+      role: 'organizer',
+      district: 'All Districts',
+      school: 'Dark Knight Chess',
+      phone: '956-393-8875',
+      isDistrictCoordinator: true,
+      avatarType: 'icon',
+      avatarValue: 'KingIcon',
+      forceProfileUpdate: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    
+    await setDoc(doc(db, 'users', user.uid), organizerProfile, { merge: true });
+    return { success: true, user, profile: organizerProfile };
+  } finally {
+    cleanup();
   }
-  
-  const organizerProfile: SponsorProfile = {
-    uid: user.uid,
-    email,
-    firstName: 'Norma',
-    lastName: 'Guerra-Stueber',
-    role: 'organizer',
-    district: 'All Districts',
-    school: 'Dark Knight Chess',
-    phone: '956-393-8875',
-    isDistrictCoordinator: true,
-    avatarType: 'icon',
-    avatarValue: 'KingIcon',
-    forceProfileUpdate: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
-  
-  await setDoc(doc(db, 'users', user.uid), organizerProfile, { merge: true });
-  return { success: true, user, profile: organizerProfile };
 }
 
 // FIXED: Simplified signin function
 export async function simpleSignIn(email: string, password: string) {
+  const cleanup = trackCall('simpleSignIn', email);
   const normalizedEmail = normalizeEmail(email);
   
   if (authOperationsInProgress.has(normalizedEmail)) {
@@ -176,6 +215,7 @@ export async function simpleSignIn(email: string, password: string) {
       // Only handle test accounts with creation fallback
       if (isTestAccount(normalizedEmail) && (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found')) {
         console.warn(`⚠️ Test account ${normalizedEmail} doesn't exist, creating...`);
+        // This is where recursion was happening. Instead of calling simpleSignUp, we create the user directly.
         userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
       } else {
         throw error;
@@ -198,6 +238,7 @@ export async function simpleSignIn(email: string, password: string) {
     throw new Error(getAuthErrorMessage(error));
   } finally {
     authOperationsInProgress.delete(normalizedEmail);
+    cleanup();
   }
 }
 
@@ -228,18 +269,32 @@ function getTestAccountProfile(email: string): Partial<SponsorProfile> | null {
 }
 
 async function getOrCreateUserProfile(user: User, normalizedEmail: string): Promise<SponsorProfile> {
-  const profileDoc = await getDoc(doc(db, 'users', user.uid));
-  let profileData = profileDoc.exists() ? profileDoc.data() as SponsorProfile : null;
+  const cleanup = trackCall('getOrCreateUserProfile', normalizedEmail);
+  try {
+    const profileDoc = await getDoc(doc(db, 'users', user.uid));
+    let profileData = profileDoc.exists() ? profileDoc.data() as SponsorProfile : null;
 
-  // Apply corrections if needed
-  profileData = applyProfileCorrections(profileData, user, normalizedEmail);
+    // Apply corrections if needed
+    profileData = applyProfileCorrections(profileData, user, normalizedEmail);
 
-  if (!profileData) {
-    profileData = createFallbackProfile(user, normalizedEmail);
-    await setDoc(doc(db, 'users', user.uid), profileData);
+    if (!profileData) {
+      const testProfileData = getTestAccountProfile(normalizedEmail);
+      if (testProfileData) {
+          profileData = {
+              uid: user.uid,
+              email: normalizedEmail,
+              ...testProfileData,
+          } as SponsorProfile;
+      } else {
+          profileData = createFallbackProfile(user, normalizedEmail);
+      }
+      await setDoc(doc(db, 'users', user.uid), profileData);
+    }
+
+    return profileData;
+  } finally {
+    cleanup();
   }
-
-  return profileData;
 }
 
 function applyProfileCorrections(profileData: SponsorProfile | null, user: User, normalizedEmail: string): SponsorProfile | null {
@@ -494,43 +549,45 @@ export async function directFirebaseSignIn(email: string, password: string) {
 
 // Helper function to correct organizer account data
 export async function correctOrganizerAccountData(email: string, password: string) {
-  console.log('🔧 Attempting to correct organizer account data for:', email);
-  
+  const cleanup = trackCall('correctOrganizerAccountData', email);
   try {
-    // First, try to sign in to get the user's UID
-    const signInResult = await simpleSignIn(email, password);
+      console.log('🔧 Attempting to correct organizer account data for:', email);
     
-    if (signInResult.success && signInResult.user) {
-      const uid = signInResult.user.uid;
-      console.log('✅ Successfully signed in, UID:', uid);
+      // First, try to sign in to get the user's UID
+      const signInResult = await simpleSignIn(email, password);
       
-      // Now update the user's profile in Firestore with correct organizer data
-      const userDocRef = doc(db, 'users', uid);
-      const correctedProfile: Partial<SponsorProfile> & {correctedAt?: string} = {
-        role: 'organizer',
-        isDistrictCoordinator: false, // Organizers are not district coordinators
-        district: 'All Districts', // Organizers can manage all districts
-        school: 'Dark Knight Chess', // Organization name
-        updatedAt: new Date().toISOString(),
-        correctedAt: new Date().toISOString(), // Mark when this correction happened
-      };
+      if (signInResult.success && signInResult.user) {
+        const uid = signInResult.user.uid;
+        console.log('✅ Successfully signed in, UID:', uid);
+        
+        // Now update the user's profile in Firestore with correct organizer data
+        const userDocRef = doc(db, 'users', uid);
+        const correctedProfile: Partial<SponsorProfile> & {correctedAt?: string} = {
+          role: 'organizer',
+          isDistrictCoordinator: false, // Organizers are not district coordinators
+          district: 'All Districts', // Organizers can manage all districts
+          school: 'Dark Knight Chess', // Organization name
+          updatedAt: new Date().toISOString(),
+          correctedAt: new Date().toISOString(), // Mark when this correction happened
+        };
+        
+        await setDoc(userDocRef, correctedProfile, { merge: true });
+        console.log('✅ Profile corrected successfully');
+        
+        // Return the corrected profile
+        const updatedProfile = { ...signInResult.profile, ...correctedProfile };
+        return {
+          success: true,
+          user: signInResult.user,
+          profile: updatedProfile
+        };
+      }
       
-      await setDoc(userDocRef, correctedProfile, { merge: true });
-      console.log('✅ Profile corrected successfully');
-      
-      // Return the corrected profile
-      const updatedProfile = { ...signInResult.profile, ...correctedProfile };
-      return {
-        success: true,
-        user: signInResult.user,
-        profile: updatedProfile
-      };
-    }
-    
-    throw new Error('Failed to sign in for data correction');
-    
+      throw new Error('Failed to sign in for data correction');
   } catch (error) {
     console.error('❌ Data correction failed:', error);
     throw error;
+  } finally {
+      cleanup();
   }
 }
