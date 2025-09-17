@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -77,7 +78,7 @@ type CreateUserFormValues = z.infer<typeof createUserFormSchema>;
 
 export default function UsersPage() {
     const { toast } = useToast();
-    const { dbDistricts, getSchoolsForDistrict } = useMasterDb();
+    const { dbDistricts, getSchoolsForDistrict, allSchoolNames } = useMasterDb();
     const [users, setUsers] = useState<User[]>([]);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -96,16 +97,6 @@ export default function UsersPage() {
     const uniqueDistricts = useMemo(() => {
         return ['None', ...dbDistricts].sort();
     }, [dbDistricts]);
-
-    const allSchoolNames = useMemo(() => {
-        const schoolNames = schoolData.map(s => s.schoolName);
-        const uniqueSchoolNames = [...new Set(schoolNames)].sort();
-        if (!uniqueSchoolNames.includes('Homeschool')) {
-            return ['Homeschool', ...uniqueSchoolNames];
-        }
-        return uniqueSchoolNames;
-    }, []);
-
 
     const loadUsers = async () => {
         if (!db) return;
@@ -196,13 +187,16 @@ export default function UsersPage() {
         }
     };
     
+    // 1. FIXED useEffect - Only check the appropriate role checkbox
     useEffect(() => {
       if (isDialogOpen && editingUser) {
         const initialDistrict = editingUser.district || 'None';
         form.reset({
             email: editingUser.email || '',
-            isSponsor: editingUser.role === 'sponsor' || editingUser.role === 'district_coordinator',
-            isDistrictCoordinator: editingUser.isDistrictCoordinator || editingUser.role === 'district_coordinator',
+            // FIX: Only check sponsor if role is specifically 'sponsor'
+            isSponsor: editingUser.role === 'sponsor',
+            // FIX: Check district coordinator if role is 'district_coordinator' OR if they have the flag
+            isDistrictCoordinator: editingUser.role === 'district_coordinator' || editingUser.isDistrictCoordinator === true,
             isOrganizer: editingUser.role === 'organizer',
             firstName: editingUser.firstName || '',
             lastName: editingUser.lastName || '',
@@ -221,19 +215,20 @@ export default function UsersPage() {
         setIsDialogOpen(true);
     };
 
+    // 2. FIXED onSubmit - Clean up ALL temporary fields
     const onSubmit = async (values: UserFormValues) => {
         if (!editingUser || !db) return;
-    
+
         const userSnapshot = await getDocs(query(collection(db, 'users'), where('email', '==', editingUser.email)));
         if (userSnapshot.empty) {
             toast({ variant: 'destructive', title: "Update Failed", description: "Could not find the user to update." });
             return;
         }
         const userDocId = userSnapshot.docs[0].id;
-    
+
         try {
             const userRef = doc(db, "users", userDocId);
-    
+
             let finalRole: User['role'];
             if (values.isOrganizer) {
                 finalRole = 'organizer';
@@ -244,16 +239,25 @@ export default function UsersPage() {
             } else {
                 finalRole = 'individual'; 
             }
-    
-            // Create a new object for saving to avoid mutating the form state directly
-            const dataToSave: any = { ...values, role: finalRole };
-    
-            // Delete the temporary role flags before saving
+
+            // Create a clean object for saving
+            const dataToSave: any = { 
+                ...values, 
+                role: finalRole,
+                // Ensure isDistrictCoordinator boolean field matches the role
+                isDistrictCoordinator: finalRole === 'district_coordinator' || values.isDistrictCoordinator,
+                updatedAt: new Date().toISOString() // Add timestamp
+            };
+
+            // FIX: Delete ALL temporary role flags before saving
             delete dataToSave.isSponsor;
             delete dataToSave.isOrganizer;
-    
+            // Note: Keep isDistrictCoordinator as it's a real field in your User type
+
+            console.log('Updating user with data:', dataToSave); // Debug log
+
             await setDoc(userRef, dataToSave, { merge: true });
-    
+
             loadUsers();
             toast({ title: "User Updated", description: `${values.email}'s information has been updated.` });
             setIsDialogOpen(false);
