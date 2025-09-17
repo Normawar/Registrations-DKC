@@ -20,6 +20,9 @@ import { type ChangeRequest } from '@/lib/data/requests-data';
 import { processBatchedRequests } from './actions';
 import { ChangeRequestDialog } from '@/components/change-request-dialog';
 import { useEvents } from '@/hooks/use-events';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+
 
 type EnrichedChangeRequest = ChangeRequest & {
     schoolName?: string;
@@ -34,6 +37,7 @@ export default function RequestsPage() {
     const [requests, setRequests] = useState<EnrichedChangeRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filter, setFilter] = useState('Pending');
+    const [eventTypeFilter, setEventTypeFilter] = useState<'real' | 'test'>('real');
     const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -102,9 +106,12 @@ export default function RequestsPage() {
     }, [isProfileLoaded, loadRequests, events]);
     
     const filteredRequests = useMemo(() => {
-        if (filter === 'All') return requests;
-        return requests.filter(r => r.status === filter);
-    }, [requests, filter]);
+        return requests.filter(r => {
+            const statusMatch = filter === 'All' || r.status === filter;
+            const typeMatch = eventTypeFilter === 'real' ? !r.isTestEvent : r.isTestEvent;
+            return statusMatch && typeMatch;
+        });
+    }, [requests, filter, eventTypeFilter]);
 
     const handleSelectRequest = (requestId: string) => {
         setSelectedRequestIds(prev =>
@@ -197,6 +204,10 @@ export default function RequestsPage() {
                                     </CardDescription>
                                 </div>
                                 <div className="flex items-center gap-4">
+                                    <RadioGroup value={eventTypeFilter} onValueChange={(v) => setEventTypeFilter(v as 'real' | 'test')} className="flex items-center space-x-2">
+                                        <div className="flex items-center space-x-1"><RadioGroupItem value="real" id="real-events" /><Label htmlFor="real-events">Real</Label></div>
+                                        <div className="flex items-center space-x-1"><RadioGroupItem value="test" id="test-events" /><Label htmlFor="test-events">Test</Label></div>
+                                    </RadioGroup>
                                     <Select value={filter} onValueChange={setFilter}>
                                         <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                                         <SelectContent>
@@ -269,7 +280,6 @@ export default function RequestsPage() {
                                                     <TableCell>{req.schoolName || 'N/A'}</TableCell>
                                                     <TableCell>
                                                         {req.eventDate ? format(new Date(req.eventDate), 'PPP') : 'N/A'}
-                                                        {req.isTestEvent && <Badge variant="outline" className="ml-2">Test</Badge>}
                                                     </TableCell>
                                                     <TableCell>{req.player}</TableCell>
                                                     <TableCell>{req.type}</TableCell>
@@ -318,5 +328,3 @@ export default function RequestsPage() {
         </>
     );
 }
-
-    
