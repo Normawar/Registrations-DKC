@@ -14,15 +14,8 @@ import { type Invoice, ApiError } from 'square';
 import { generateTeamCode } from '@/lib/school-utils';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 
-console.log('Debug: Environment variables check');
-console.log('SQUARE_ACCESS_TOKEN exists:', !!process.env.SQUARE_ACCESS_TOKEN);
-console.log('SQUARE_LOCATION_ID exists:', !!process.env.SQUARE_LOCATION_ID);
-console.log('SQUARE_APPLICATION_ID exists:', !!process.env.SQUARE_APPLICATION_ID);
-console.log('NODE_ENV:', process.env.NODE_ENV);
-
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
-  endInvoiceNumber: z.number().describe('The invoice number to end importing at. Use same as startInvoiceNumber for single invoice.'),
 });
 export type ImportSquareInvoicesInput = z.infer<typeof ImportSquareInvoicesInputSchema>;
 
@@ -46,19 +39,9 @@ const importSquareInvoicesFlow = ai.defineFlow(
   },
   async (input) => {
     
-    console.log('Debug: Checking Square config...');
-    try {
-      const { isConfigured } = await checkSquareConfig();
-      console.log('Debug: checkSquareConfig result:', { isConfigured });
-      if (!isConfigured) {
-        // Try to get the client anyway to see if credentials actually work
-        console.log('Debug: checkSquareConfig says not configured, but trying to get client anyway...');
-        const testClient = await getSquareClient();
-        console.log('Debug: getSquareClient succeeded despite checkSquareConfig saying not configured');
-      }
-    } catch (error) {
-      console.log('Debug: checkSquareConfig threw error:', error);
-      throw new Error(`Credential check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    const { isConfigured } = await checkSquareConfig();
+    if (!isConfigured) {
+      throw new Error("Square is not configured. Please provide credentials in your environment variables.");
     }
 
     if (!db) {
@@ -71,7 +54,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     let cursor: string | undefined;
     const allInvoices: Invoice[] = [];
 
-    console.log(`Starting import from Square for invoices #${input.startInvoiceNumber} to #${input.endInvoiceNumber}...`);
+    console.log(`Starting import from Square for invoices >= #${input.startInvoiceNumber}...`);
 
     try {
         do {
@@ -101,15 +84,13 @@ const importSquareInvoicesFlow = ai.defineFlow(
         throw new Error('Could not fetch data from Square. Check API credentials and permissions.');
     }
 
-    // Filter invoices to be within the specified range
     const relevantInvoices = allInvoices.filter(invoice => {
         const numPart = invoice.invoiceNumber?.replace(/\D/g, '');
         if (!numPart) return false;
-        const invoiceNum = parseInt(numPart, 10);
-        return invoiceNum >= input.startInvoiceNumber && invoiceNum <= input.endInvoiceNumber;
+        return parseInt(numPart, 10) >= input.startInvoiceNumber;
     });
 
-    console.log(`Found ${relevantInvoices.length} invoices to process in range #${input.startInvoiceNumber}-#${input.endInvoiceNumber}.`);
+    console.log(`Found ${relevantInvoices.length} invoices to process with number >= ${input.startInvoiceNumber}.`);
     
     let created = 0;
     let updated = 0;
