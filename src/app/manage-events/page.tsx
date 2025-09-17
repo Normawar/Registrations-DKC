@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
@@ -689,7 +688,7 @@ function ManageEventsContent() {
     setDownloadedPlayers(updatedDownloads);
     localStorage.setItem('downloaded_registrations', JSON.stringify(updatedDownloads));
   };
-
+  
   return (
     <AppLayout>
       <div className="space-y-8">
