@@ -146,15 +146,19 @@ export function useEvents() {
       await batch.commit();
       eventList = mockEvents;
     } else {
-      // Ensure the test event exists if it's missing
-      const lateFeeTestEvent = eventList.find(e => e.id === 'evt-20250920-late-fee-test');
-      if (!lateFeeTestEvent) {
-        console.log('Late Fee Test Event not found, adding it...');
-        const newTestEvent = mockEvents.find(e => e.id === 'evt-20250920-late-fee-test')!;
-        const docRef = doc(db, 'events', newTestEvent.id);
-        await setDoc(docRef, newTestEvent);
-        eventList.push(newTestEvent);
-      }
+        // Ensure all mock events exist if they are missing
+        const existingEventIds = new Set(eventList.map(e => e.id));
+        const missingMockEvents = mockEvents.filter(me => !existingEventIds.has(me.id));
+        if (missingMockEvents.length > 0) {
+            console.log(`Missing ${missingMockEvents.length} mock events, adding them...`);
+            const batch = writeBatch(db);
+            missingMockEvents.forEach(event => {
+                const docRef = doc(db, 'events', event.id);
+                batch.set(docRef, event);
+            });
+            await batch.commit();
+            eventList = [...eventList, ...missingMockEvents];
+        }
     }
 
     setEvents(eventList);

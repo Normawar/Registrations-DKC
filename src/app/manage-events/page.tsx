@@ -179,21 +179,35 @@ function ManageEventsContent() {
   }, [dbSchools, allPlayers]);
   
   const getDistrictForLocation = useCallback((location: string): string => {
-    if (!isDbLoaded) return 'Unknown';
-    // Find a school whose name is in the location string
-    const foundSchool = schoolData.find(s => location.toLowerCase().includes(s.schoolName.toLowerCase()));
-    if(foundSchool) return foundSchool.district;
+      if (!isDbLoaded || !location) return 'Unknown';
+      
+      const lowerLocation = location.toLowerCase();
+      
+      // Direct match for test districts
+      if (lowerLocation.includes('testshary')) return 'TestShary';
+      if (lowerLocation.includes('testmcallen')) return 'TestMcAllen';
+      if (lowerLocation.includes('testecisd')) return 'TestECISD';
+      if (lowerLocation === 'test location') return 'Test';
 
-    // Fallback for partial matches or test data
-    const locationLower = location.toLowerCase();
-    if (locationLower.includes('psja')) return 'PHARR-SAN JUAN-ALAMO ISD';
-    if (locationLower.includes('wernecke')) return 'TestShary';
-    
-    // Check if district name is in location
-    const foundDistrict = uniqueDistricts.find(d => locationLower.includes(d.toLowerCase()));
-    if (foundDistrict) return foundDistrict;
 
-    return 'Unknown';
+      // Find a school whose name is fully or partially in the location string
+      let foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
+
+      if (!foundSchool) {
+        // More robust partial matching
+        foundSchool = schoolData.find(s => {
+          const schoolNameParts = s.schoolName.toLowerCase().split(' ').filter(p => p.length > 2 && !['el', 'ms', 'hs'].includes(p));
+          return schoolNameParts.some(part => lowerLocation.includes(part));
+        });
+      }
+      
+      if (foundSchool) return foundSchool.district;
+      
+      // Fallback: Check if a district name itself is in the location
+      const foundDistrict = uniqueDistricts.find(d => lowerLocation.includes(d.toLowerCase()));
+      if (foundDistrict) return foundDistrict;
+
+      return 'Unknown';
   }, [isDbLoaded, uniqueDistricts]);
   
   const getEventStatus = (event: Event): "Open" | "Completed" | "Closed" => {
@@ -204,7 +218,10 @@ function ManageEventsContent() {
   };
 
   const sortedEvents = useMemo(() => {
-    const isTestEvent = (event: Event) => getDistrictForLocation(event.location).toLowerCase().startsWith("test");
+    const isTestEvent = (event: Event) => {
+        const district = getDistrictForLocation(event.location);
+        return district.toLowerCase().startsWith("test") || event.location.toLowerCase() === 'test location';
+    };
 
     let filteredEvents = [...events].filter(event => {
         return eventTypeFilter === 'test' ? isTestEvent(event) : !isTestEvent(event);
@@ -714,7 +731,7 @@ function ManageEventsContent() {
                   A list of all upcoming and past events.
                 </CardDescription>
                 <div className="flex items-center gap-4">
-                  <RadioGroup value={eventTypeFilter} onValueChange={setEventTypeFilter} className="flex items-center space-x-2">
+                  <RadioGroup value={eventTypeFilter} onValueChange={(v) => setEventTypeFilter(v as 'real' | 'test')} className="flex items-center space-x-2">
                     <div className="flex items-center space-x-1">
                       <RadioGroupItem value="real" id="real-events" />
                       <Label htmlFor="real-events">Real Events</Label>
@@ -1038,6 +1055,7 @@ export default function ManageEventsPage() {
     </OrganizerGuard>
   );
 }
+
 
 
 
