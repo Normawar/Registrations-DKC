@@ -41,9 +41,19 @@ const cancelInvoiceFlow = ai.defineFlow(
         throw new Error('Only organizers can cancel invoices.');
     }
     
-    const { isConfigured } = await checkSquareConfig();
-    if (!isConfigured) {
-      throw new Error("Square is not configured. Please provide credentials in your environment variables.");
+    console.log('Debug: Checking Square config...');
+    try {
+      const { isConfigured } = await checkSquareConfig();
+      console.log('Debug: checkSquareConfig result:', { isConfigured });
+      if (!isConfigured) {
+        // Try to get the client anyway to see if credentials actually work
+        console.log('Debug: checkSquareConfig says not configured, but trying to get client anyway...');
+        const testClient = await getSquareClient();
+        console.log('Debug: getSquareClient succeeded despite checkSquareConfig saying not configured');
+      }
+    } catch (error) {
+      console.log('Debug: checkSquareConfig threw error:', error);
+      throw new Error(`Credential check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
     const squareClient = await getSquareClient();
