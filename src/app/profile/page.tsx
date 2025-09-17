@@ -28,7 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,6 +39,7 @@ import { Loader2, Building, User, Info } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { generateTeamCode } from '@/lib/school-utils';
+import { useMasterDb } from '@/context/master-db-context';
 
 const profileFormSchema = z.object({
   firstName: z.string().min(1, { message: 'First name is required.' }),
@@ -132,10 +132,8 @@ const ProfilePageSkeleton = () => (
 export default function ProfilePage() {
   const { toast } = useToast();
   const { profile, updateProfile, isProfileLoaded } = useSponsorProfile();
+  const { schools, dbDistricts, getSchoolsForDistrict } = useMasterDb();
   const router = useRouter();
-
-  const [schoolData, setSchoolData] = useState<School[]>([]);
-  const [uniqueDistricts, setUniqueDistricts] = useState<string[]>([]);
   
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const [isSchoolListReady, setIsSchoolListReady] = useState(false);
@@ -182,38 +180,10 @@ export default function ProfilePage() {
       },
   });
   
-  useEffect(() => {
-    const storedSchoolData = localStorage.getItem('school_data');
-    const data = storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData;
-    setSchoolData(data);
-    const districts = [...new Set(data.map((s: School) => s.district))].sort();
-    if (!districts.includes('None')) {
-      districts.unshift('None');
-    }
-    setUniqueDistricts(districts);
-  }, []);
-
-  const allSchoolNames = useMemo(() => {
-    const schoolNames = schoolData.map(s => s.schoolName);
-    const uniqueSchoolNames = [...new Set(schoolNames)].sort();
-    if (!uniqueSchoolNames.includes('Homeschool')) {
-        return ['Homeschool', ...uniqueSchoolNames];
-    }
-    return uniqueSchoolNames;
-  }, [schoolData]);
-  
   const handleDistrictChange = (district: string) => {
     profileForm.setValue('district', district);
-    let filteredSchools: string[];
-    if (district === 'None') {
-        filteredSchools = allSchoolNames;
-    } else {
-        filteredSchools = schoolData
-            .filter((school) => school.district === district)
-            .map((school) => school.schoolName)
-            .sort();
-    }
-    setSchoolsForDistrict([...new Set(filteredSchools)]);
+    const filteredSchools = getSchoolsForDistrict(district);
+    setSchoolsForDistrict(filteredSchools);
     profileForm.setValue('school', '');
   };
   
@@ -241,7 +211,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (isSchoolListReady && profile) {
-        const schoolInfo = schoolData.find(s => s.schoolName === profile.school && s.district === profile.district);
+        const schoolInfo = schools.find(s => s.schoolName === profile.school && s.district === profile.district);
         profileForm.reset({
             ...profile,
             schoolAddress: schoolInfo?.streetAddress || '',
@@ -251,7 +221,7 @@ export default function ProfilePage() {
             zip: schoolInfo?.zip || '',
         });
     }
-  }, [isSchoolListReady, profile, profileForm, schoolData]);
+  }, [isSchoolListReady, profile, profileForm, schools]);
 
 
   useEffect(() => {
@@ -512,7 +482,7 @@ export default function ProfilePage() {
                         {isSponsorOrCoordinator && (
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { handleDistrictChange(value); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={profileForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { handleDistrictChange(value); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{dbDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                     <FormField control={profileForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!isSchoolListReady}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
