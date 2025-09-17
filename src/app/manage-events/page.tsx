@@ -456,7 +456,7 @@ function ManageEventsContent() {
       skipEmptyLines: 'greedy',
       transformHeader: (header: string) => header.trim(),
       complete: (results) => {
-        if (results.data) {
+        if (results.data && Array.isArray(results.data)) {
           const cleanedData = results.data.filter((row: any) => {
             return row && typeof row === 'object' &&
                    Object.keys(row).length > 0 &&
