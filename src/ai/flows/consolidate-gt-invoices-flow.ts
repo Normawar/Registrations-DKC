@@ -6,8 +6,7 @@ import { z } from 'genkit';
 import { collection, query, where, getDocs, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { createInvoice } from './create-invoice-flow';
-import { getSquareClient } from '@/lib/square-client';
-import { type ApiError } from 'square';
+import { type ApiError, Client, Environment } from 'square';
 
 const ConsolidateGtInvoicesInputSchema = z.object({
   eventId: z.string().describe('The event ID to consolidate GT invoices for'),
@@ -118,7 +117,10 @@ const consolidateGtInvoicesFlow = ai.defineFlow(
     });
 
     // Step 4: Cancel individual GT invoices
-    const squareClient = await getSquareClient();
+    const squareClient = new Client({
+        accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+        environment: Environment.Production,
+    });
     const { invoicesApi } = squareClient;
     const batch = writeBatch(db);
 

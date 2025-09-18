@@ -8,8 +8,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError } from 'square';
-import { getSquareClient } from '@/lib/square-client';
+import { ApiError, Client, Environment } from 'square';
 import { createOrganizerInvoice } from './create-organizer-invoice-flow';
 import { cancelInvoice } from './cancel-invoice-flow';
 
@@ -55,7 +54,11 @@ const recreateOrganizerInvoiceFlow = ai.defineFlow(
     outputSchema: RecreateOrganizerInvoiceOutputSchema,
   },
   async (input) => {
-    const squareClient = await getSquareClient();
+    // Hard-coded Square client initialization
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
 
     try {
       const { result: { invoice: originalInvoice } } = await squareClient.invoicesApi.getInvoice(input.originalInvoiceId);

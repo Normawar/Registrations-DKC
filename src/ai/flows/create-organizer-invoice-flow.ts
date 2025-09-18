@@ -11,9 +11,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type InvoiceRecipient, type Address } from 'square';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
-import { checkSquareConfig } from '@/lib/actions/check-config';
+import { ApiError, type InvoiceRecipient, type Address, Client, Environment } from 'square';
 
 const LineItemSchema = z.object({
   name: z.string().describe('The name or description of the line item.'),
@@ -54,23 +52,12 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
     outputSchema: CreateOrganizerInvoiceOutputSchema,
   },
   async (input) => {
-    console.log('Debug: Checking Square config...');
-    try {
-      const { isConfigured } = await checkSquareConfig();
-      console.log('Debug: checkSquareConfig result:', { isConfigured });
-      if (!isConfigured) {
-        // Try to get the client anyway to see if credentials actually work
-        console.log('Debug: checkSquareConfig says not configured, but trying to get client anyway...');
-        const testClient = await getSquareClient();
-        console.log('Debug: getSquareClient succeeded despite checkSquareConfig saying not configured');
-      }
-    } catch (error) {
-      console.log('Debug: checkSquareConfig threw error:', error);
-      throw new Error(`Credential check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
+    // Hard-coded Square client initialization
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
+    const locationId = "CTED7GVSVH5H8";
     const { customersApi, ordersApi, invoicesApi } = squareClient;
     
     console.log("Starting Square organizer invoice creation with input:", input);
@@ -238,5 +225,3 @@ const createOrganizerInvoiceFlow = ai.defineFlow(
     }
   }
 );
-
-    

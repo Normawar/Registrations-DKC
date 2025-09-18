@@ -3,9 +3,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { getSquareClient } from '@/lib/square-client';
-import { checkSquareConfig } from '@/lib/actions/check-config';
-import { Payment, ApiError } from 'square';
+import { Client, Environment, Payment, ApiError } from 'square';
 
 const GetInvoiceStatusInputSchema = z.object({
   invoiceId: z.string().describe('The Square invoice ID to check'),
@@ -58,22 +56,11 @@ export const getInvoiceStatusWithPayments = ai.defineFlow(
     outputSchema: GetInvoiceStatusOutputSchema,
   },
   async (input) => {
-    console.log('Debug: Checking Square config...');
-    try {
-      const { isConfigured } = await checkSquareConfig();
-      console.log('Debug: checkSquareConfig result:', { isConfigured });
-      if (!isConfigured) {
-        // Try to get the client anyway to see if credentials actually work
-        console.log('Debug: checkSquareConfig says not configured, but trying to get client anyway...');
-        const testClient = await getSquareClient();
-        console.log('Debug: getSquareClient succeeded despite checkSquareConfig saying not configured');
-      }
-    } catch (error) {
-      console.log('Debug: checkSquareConfig threw error:', error);
-      throw new Error(`Credential check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-
-    const squareClient = await getSquareClient();
+    // Hard-coded Square client initialization
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
     const { invoicesApi, ordersApi, paymentsApi } = squareClient;
 
     try {

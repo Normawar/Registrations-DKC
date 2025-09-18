@@ -11,10 +11,8 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type InvoiceRecipient, type Address } from 'square';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
+import { ApiError, type InvoiceRecipient, type Address, Client, Environment } from 'square';
 import { format } from 'date-fns';
-import { checkSquareConfig } from '@/lib/actions/check-config';
 
 const PlayerInfoSchema = z.object({
   firstName: z.string().describe('The first name of the player.'),
@@ -64,23 +62,12 @@ const createMembershipInvoiceFlow = ai.defineFlow(
         throw new Error(`Invalid membership type provided: "${input.membershipType}". Please return to the previous page and get a valid membership suggestion.`);
     }
     
-    console.log('Debug: Checking Square config...');
-    try {
-      const { isConfigured } = await checkSquareConfig();
-      console.log('Debug: checkSquareConfig result:', { isConfigured });
-      if (!isConfigured) {
-        // Try to get the client anyway to see if credentials actually work
-        console.log('Debug: checkSquareConfig says not configured, but trying to get client anyway...');
-        const testClient = await getSquareClient();
-        console.log('Debug: getSquareClient succeeded despite checkSquareConfig saying not configured');
-      }
-    } catch (error) {
-      console.log('Debug: checkSquareConfig threw error:', error);
-      throw new Error(`Credential check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
+    // Hard-coded Square client initialization
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
+    const locationId = "CTED7GVSVH5H8";
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
     console.log("Starting Square membership invoice creation with input:", input);
@@ -266,5 +253,3 @@ const createMembershipInvoiceFlow = ai.defineFlow(
     }
   }
 );
-
-    
