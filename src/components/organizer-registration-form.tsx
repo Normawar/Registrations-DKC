@@ -145,6 +145,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     const [editingPlayer, setEditingPlayer] = useState<StagedPlayer | null>(null);
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showConfirmation, setShowConfirmation] = useState(false);
 
     // Player search and filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -317,7 +318,15 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setStagedPlayers(stagedPlayers.filter(p => p.id !== id));
     };
 
-    const handleOpenInvoiceDialog = async () => {
+    const handleProceedToConfirmation = async () => {
+        if (stagedPlayers.length === 0) {
+            toast({
+                variant: 'destructive',
+                title: 'No Players Staged',
+                description: 'Please add at least one player to the list before registering.',
+            });
+            return;
+        }
         if (selectedSchool === 'all' || !db) {
             toast({
                 variant: 'destructive',
@@ -326,15 +335,15 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             });
             return;
         }
-
+    
         // Find a sponsor for the selected school
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where('school', '==', selectedSchool), limit(1));
         const querySnapshot = await getDocs(q);
-
+    
         let sponsorName = '';
         let sponsorEmail = '';
-
+    
         if (!querySnapshot.empty) {
             const sponsorDoc = querySnapshot.docs[0].data();
             sponsorName = `${sponsorDoc.firstName} ${sponsorDoc.lastName}`;
@@ -352,8 +361,8 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             sponsorEmail: sponsorEmail,
             teamCode: generateTeamCode({ schoolName: selectedSchool, district: selectedDistrict }),
         });
-
-        setIsInvoiceDialogOpen(true);
+    
+        setShowConfirmation(true);
     };
 
     const calculateTotalForPlayers = (players: StagedPlayer[], feePerPlayer: number) => {
@@ -416,7 +425,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             toast({ title: "Team Invoice Generated Successfully!", description: `Invoice ${result.invoiceNumber || result.invoiceId} for ${stagedPlayers.length} players has been created.` });
             
             setStagedPlayers([]);
-            setIsInvoiceDialogOpen(false);
+            setShowConfirmation(false);
             
         } catch (error) {
             console.error("Failed to create team invoice:", error);
@@ -470,7 +479,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
           toast({ title: "Split Invoices Created Successfully!", description: "Separate invoices for GT and Independent players have been created."});
           
           setStagedPlayers([]);
-          setIsInvoiceDialogOpen(false);
+          setShowConfirmation(false);
           
         } catch (error) {
           handleInvoiceError(error, "Split Invoice Creation Failed");
@@ -535,7 +544,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         }
         
         setStagedPlayers([]);
-        setIsInvoiceDialogOpen(false);
+        setShowConfirmation(false);
         setIsSubmitting(false);
     };
 
@@ -581,6 +590,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             submissionTimestamp: new Date().toISOString(), 
             selections: selections,
             totalInvoiced: result.newTotalAmount || total, 
+            totalAmount: result.newTotalAmount || total,
             invoiceUrl: result.invoiceUrl, 
             invoiceNumber: result.invoiceNumber, 
             teamCode: teamCode,
@@ -632,7 +642,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             });
 
             setStagedPlayers([]);
-            setIsInvoiceDialogOpen(false);
+            setShowConfirmation(false);
 
         } catch (error) {
           handleInvoiceError(error, "Failed to comp registration");
@@ -835,7 +845,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     </div>
                 </CardContent>
                 <CardFooter>
-                    <Button onClick={handleOpenInvoiceDialog} disabled={stagedPlayers.length === 0}>
+                    <Button onClick={handleProceedToConfirmation} disabled={stagedPlayers.length === 0}>
                         Proceed to Register ({stagedPlayers.length} Players)
                     </Button>
                 </CardFooter>
@@ -881,9 +891,8 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 </DialogContent>
             </Dialog>
             
-            {/* Invoice Recipient Dialog */}
-            <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
-                 <DialogContent>
+            <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Finalize Registration</DialogTitle>
                         <DialogDescription>Provide recipient details for the invoice, or comp the registration.</DialogDescription>
@@ -918,7 +927,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                             </DialogFooter>
                         </form>
                     </Form>
-                 </DialogContent>
+                </DialogContent>
             </Dialog>
 
         </div>
