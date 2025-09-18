@@ -126,6 +126,33 @@ const createInvoiceFlow = ai.defineFlow(
       }
     }
     
+    // Debug what the config is actually returning
+    console.log('=== DEBUGGING CONFIG AFTER CHANGES ===');
+    try {
+      const { squareConfig } = await import('@/config/square-config');
+      console.log('Config values:');
+      console.log('- accessToken (first 15):', squareConfig.accessToken?.substring(0, 15) + '...' || 'UNDEFINED');
+      console.log('- environment:', squareConfig.environment);
+      console.log('- locationId:', squareConfig.locationId);
+      
+      // Check if they match expected values
+      const tokenOK = squareConfig.accessToken?.startsWith('EAAAl7QTGApQ59S');
+      const envOK = squareConfig.environment === 'production';
+      const locationOK = squareConfig.locationId === 'CTED7GVSVH5H8';
+      
+      console.log('Validation:');
+      console.log('- Token correct:', tokenOK);
+      console.log('- Environment correct:', envOK);
+      console.log('- Location correct:', locationOK);
+      
+      if (!tokenOK || !envOK || !locationOK) {
+        throw new Error(`Config still wrong: token=${tokenOK}, env=${envOK}, location=${locationOK}`);
+      }
+    } catch (e: any) {
+      console.error('Config debug error:', e);
+    }
+    console.log('=== END CONFIG DEBUG ===');
+
     const squareClient = await getSquareClient();
     const locationId = await getSquareLocationId();
 
