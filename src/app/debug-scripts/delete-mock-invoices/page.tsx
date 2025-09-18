@@ -10,6 +10,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Trash2 } from 'lucide-react';
 import { OrganizerGuard } from '@/components/auth-guard';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 function DeleteMockInvoicesPage() {
   const { toast } = useToast();
@@ -17,10 +28,6 @@ function DeleteMockInvoicesPage() {
   const [results, setResults] = useState<string[]>([]);
 
   const handleDeleteMocks = async () => {
-    if (!confirm('Are you sure you want to permanently delete all mock invoices? This action cannot be undone.')) {
-      return;
-    }
-
     setIsDeleting(true);
     setResults([]);
     const log = (message: string) => setResults(prev => [...prev, message]);
@@ -80,10 +87,28 @@ function DeleteMockInvoicesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleDeleteMocks} disabled={isDeleting} variant="destructive">
-              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Delete All Mock Invoices
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button disabled={isDeleting} variant="destructive">
+                  {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Delete All Mock Invoices
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all mock invoices. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteMocks} className="bg-destructive hover:bg-destructive/90">
+                    Yes, Delete Mocks
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
 
