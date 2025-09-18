@@ -143,7 +143,7 @@ const DateInput = React.forwardRef<HTMLInputElement, {
       const day = parseInt(dayStr, 10);
       const year = parseInt(yearStr, 10);
 
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900 && year <= new Date().getFullYear()) {
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900) {
         const parsedDate = new Date(year, month - 1, day);
 
         if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
