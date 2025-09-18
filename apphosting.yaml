@@ -12,3 +12,5 @@ runConfig:
       value: sq0idp-2nOEj3tUd-PtlED-EdE3MQ
     - variable: SQUARE_ENVIRONMENT
       value: production
+    - variable: SQUARE_LOCATION_ID
+      value: CTED7GVSVH5H8
