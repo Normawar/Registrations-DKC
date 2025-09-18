@@ -253,7 +253,7 @@ const createInvoiceFlow = ai.defineFlow(
         
         // Add bulk pricing information to the note
         if (isBulkOrder) {
-          uscfNote += `\n\nBULK PRICING: $${uscfPrice} each (${uscfActionPlayers.length} memberships)\nTotal savings: $${totalSavings}`;
+          uscfNote += `\n\nBULK PRICING: $${uscfPrice} each (${uscfActionPlayers.length} memberships)\nTotal savings: $${totalSavings.toFixed(2)}`;
         }
         
         lineItems.push({
