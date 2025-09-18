@@ -19,8 +19,6 @@ import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
 
-console.log('SQUARE_ACCESS_TOKEN:', process.env.SQUARE_ACCESS_TOKEN ? 'EXISTS' : 'MISSING');
-console.log('SQUARE_LOCATION_ID:', process.env.SQUARE_LOCATION_ID ? 'EXISTS' : 'MISSING');
 const PlayerInvoiceInfoSchema = z.object({
   playerName: z.string().describe('The full name of the player.'),
   uscfId: z.string().describe('The USCF ID of the player.'),
