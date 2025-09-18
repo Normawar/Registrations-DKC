@@ -37,20 +37,14 @@ function CleanupPlayersPage() {
       const allPlayers = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
       console.log(`Total players in database: ${allPlayers.length}`);
 
-      // 3. Determine which players to delete based on the new, more specific rules
+      // **UPDATED RULE**: Specifically target players whose first name starts with "test", regardless of roster assignment.
       const toDelete = allPlayers.filter(player => {
-        // **NEW RULE**: Specifically target players whose first name starts with "test"
         const firstName = player.firstName || '';
-        if (firstName.toLowerCase().startsWith('test')) {
-            // But always keep the essential test players
-            if (playersToKeep.has(player.id)) {
-                return false;
-            }
-            return true;
-        }
+        const isTestPlayer = firstName.toLowerCase().startsWith('test');
+        const isProtected = playersToKeep.has(player.id);
         
-        // For any other player, do not delete them.
-        return false;
+        // Delete if it's a test player AND not protected.
+        return isTestPlayer && !isProtected;
       });
 
       console.log(`Identified ${toDelete.length} players to delete.`);
