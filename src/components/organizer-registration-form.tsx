@@ -127,7 +127,7 @@ const invoiceRecipientSchema = z.object({
     sponsorName: z.string().min(1, 'Sponsor name is required.'),
     sponsorEmail: z.string().email('Please enter a valid email.'),
     schoolName: z.string().min(1, 'School name is required.'),
-    teamCode: z.string().min(1, 'Team code is required.'),
+    teamCode: z.string().optional(),
 });
 type InvoiceRecipientValues = z.infer<typeof invoiceRecipientSchema>;
 
@@ -403,6 +403,14 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setView('finalize');
     };
 
+    const handleGenerateInvoice = async (values: InvoiceRecipientValues) => {
+        if (invoiceType === 'team') {
+            await handleGenerateTeamInvoice(values);
+        } else {
+            await handleGenerateIndividualInvoices(values);
+        }
+    };
+    
     const handleGenerateTeamInvoice = async (recipient: InvoiceRecipientValues) => {
         if (!event || !db) return;
         
@@ -627,8 +635,8 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             eventDate: event.date, 
             submissionTimestamp: new Date().toISOString(), 
             selections: selections,
-            totalInvoiced: total, 
-            totalAmount: total,
+            totalInvoiced: result.newTotalAmount || total, 
+            totalAmount: result.newTotalAmount || total,
             invoiceUrl: result.invoiceUrl, 
             invoiceNumber: result.invoiceNumber, 
             teamCode: teamCode,
@@ -778,7 +786,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 </CardContent>
                 <CardFooter className="flex justify-between">
                     <Button variant="outline" onClick={() => setView('selection')}>Back to Selection</Button>
-                    <Button onClick={handleFinalize}>Finalize Registration</Button>
+                    <Button onClick={handleFinalize}>Proceed to Finalize</Button>
                 </CardFooter>
             </Card>
         );
@@ -801,29 +809,21 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                         </form>
                     </Form>
                 </CardContent>
-                <CardFooter className="flex-col sm:items-stretch gap-2 pt-4">
-                     {invoiceType === 'team' ? (
-                        <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateTeamInvoice)} disabled={isSubmitting}>
-                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create Team Invoice(s)
-                        </Button>
-                    ) : (
-                        <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleGenerateIndividualInvoices)} disabled={isSubmitting}>
-                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create Individual Invoices
-                        </Button>
-                    )}
-                    
-                    <div className="relative">
-                        <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                        <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
+                <CardFooter className="flex flex-col sm:flex-row items-stretch gap-2 pt-4">
+                    <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateInvoice)} disabled={isSubmitting} className="flex-1">
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {invoiceType === 'team' ? 'Create Team Invoice(s)' : 'Create Individual Invoices'}
+                    </Button>
+                    <div className="relative flex items-center">
+                        <div className="flex-grow border-t"></div>
+                        <span className="flex-shrink mx-4 text-muted-foreground text-xs">OR</span>
+                        <div className="flex-grow border-t"></div>
                     </div>
-                    
-                    <Button type="button" variant="outline" onClick={invoiceForm.handleSubmit(handleCompRegistration)} disabled={isSubmitting}>
+                    <Button type="button" variant="outline" onClick={invoiceForm.handleSubmit(handleCompRegistration)} disabled={isSubmitting} className="flex-1">
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Award className="mr-2 h-4 w-4" />}
                         Comp Registration (No Invoice)
                     </Button>
-                     <Button variant="ghost" onClick={() => setView('review')}>Back to Review</Button>
+                    <Button variant="ghost" onClick={() => setView('review')} className="sm:absolute sm:top-4 sm:right-4">Back</Button>
                 </CardFooter>
             </Card>
         );
