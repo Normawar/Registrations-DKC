@@ -156,36 +156,64 @@ export function SponsorRegistrationDialog({
 
   // Calculate fees with breakdown
   const calculateFeeBreakdown = () => {
-    if (!event) return { registrationFees: 0, lateFees: 0, uscfFees: 0, total: 0, feeType: 'Regular Registration' };
+    if (!event) return { 
+      registrationFees: 0, 
+      lateFees: 0, 
+      uscfFees: 0, 
+      total: 0, 
+      feeType: 'Regular Registration',
+      gtBreakdown: { registrationFees: 0, lateFees: 0 },
+      schoolBreakdown: { registrationFees: 0, lateFees: 0, uscfFees: 0 }
+    };
     
     const { fee: currentFee, type: feeType } = getFeeForEvent();
-    
     const selectedCount = Object.keys(selectedStudents).length;
     const baseTotal = selectedCount * event.regularFee;
-    const lateFeeTotal = selectedCount * (currentFee - event.regularFee);
+    const lateFeePerStudent = currentFee - event.regularFee;
+    const lateFeeTotal = selectedCount * lateFeePerStudent;
     
-    let uscfTotal = 0;
-    const uscfFee = 24;
+    // Separate GT and Independent students
+    const gtStudents = Object.entries(selectedStudents).filter(([playerId]) => {
+      const player = rosterPlayers.find(p => p.id === playerId);
+      return player?.studentType === 'gt';
+    });
     
-    const uscfPlayersToCharge = Object.entries(selectedStudents).filter(([playerId, details]) => {
-      if (details.uscfStatus === 'current') return false;
-      
-      if (profile?.district === 'PHARR-SAN JUAN-ALAMO ISD') {
-        const player = rosterPlayers.find(p => p.id === playerId);
-        return player?.studentType !== 'gt';
-      }
-      
-      return true;
+    const independentStudents = Object.entries(selectedStudents).filter(([playerId]) => {
+      const player = rosterPlayers.find(p => p.id === playerId);
+      return player?.studentType !== 'gt';
     });
 
-    uscfTotal = uscfPlayersToCharge.length * uscfFee;
+    // GT breakdown (only registration fees)
+    const gtRegistrationFees = gtStudents.length * event.regularFee;
+    const gtLateFees = gtStudents.length * lateFeePerStudent; // Will be moved to school invoice
+
+    // Independent/School breakdown
+    const indRegistrationFees = independentStudents.length * event.regularFee;
+    const allLateFees = lateFeeTotal; // School pays ALL late fees (GT + Independent)
+    
+    // USCF fees (Independent students only, exclude GT)
+    const uscfFee = 24;
+    const uscfPlayersToCharge = independentStudents.filter(([playerId, details]) => {
+      if (details.uscfStatus === 'current') return false;
+      return true; // Independent students pay USCF fees
+    });
+    const uscfTotal = uscfPlayersToCharge.length * uscfFee;
     
     return {
       registrationFees: baseTotal,
       lateFees: lateFeeTotal,
       uscfFees: uscfTotal,
       total: baseTotal + lateFeeTotal + uscfTotal,
-      feeType: feeType
+      feeType: feeType,
+      gtBreakdown: {
+        registrationFees: gtRegistrationFees,
+        lateFees: 0, // GT never pays late fees
+      },
+      schoolBreakdown: {
+        registrationFees: indRegistrationFees,
+        lateFees: allLateFees, // School pays ALL late fees
+        uscfFees: uscfTotal,
+      }
     };
   };
 
@@ -359,67 +387,68 @@ export function SponsorRegistrationDialog({
 
   const handlePsjaSplitInvoice = async () => {
     if (!profile || !event) return;
-
+  
+    setIsSubmitting(true);
     const { fee: currentFee } = getFeeForEvent();
     const lateFeeAmount = currentFee - event.regularFee;
-
+  
     const playersToInvoice = Object.entries(selectedStudents).map(([playerId, details]) => {
-        const student = rosterPlayers.find(p => p.id === playerId);
-        return {
-          playerName: `${student?.firstName} ${student?.lastName}`,
-          uscfId: student?.uscfId || '',
-          baseRegistrationFee: event.regularFee,
-          lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
-          uscfAction: details.uscfStatus !== 'current',
-          isGtPlayer: student?.studentType === 'gt'
-        };
+      const student = rosterPlayers.find(p => p.id === playerId);
+      return {
+        playerName: `${student?.firstName} ${student?.lastName}`,
+        uscfId: student?.uscfId || '',
+        baseRegistrationFee: event.regularFee,
+        lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+        uscfAction: details.uscfStatus !== 'current',
+        isGtPlayer: student?.studentType === 'gt',
+        section: details.section,
+      };
     });
-
+  
     try {
       const result = await createPsjaSplitInvoice({
-          sponsorName: `${profile.firstName} ${profile.lastName}`,
-          sponsorEmail: profile.email,
-          bookkeeperEmail: profile.bookkeeperEmail,
-          gtCoordinatorEmail: profile.gtCoordinatorEmail,
-          schoolName: profile.school,
-          schoolAddress: profile.schoolAddress,
-          schoolPhone: profile.schoolPhone,
-          district: 'PHARR-SAN JUAN-ALAMO ISD',
-          teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
-          eventName: event.name,
-          eventDate: event.date,
-          uscfFee: 24,
-          players: playersToInvoice
+        sponsorName: `${profile.firstName} ${profile.lastName}`,
+        sponsorEmail: profile.email,
+        bookkeeperEmail: profile.bookkeeperEmail,
+        gtCoordinatorEmail: profile.gtCoordinatorEmail,
+        schoolName: profile.school,
+        schoolAddress: profile.schoolAddress,
+        schoolPhone: profile.schoolPhone,
+        district: 'PHARR-SAN JUAN-ALAMO ISD',
+        teamCode: generateTeamCode({ schoolName: profile.school, district: profile.district }),
+        eventName: event.name,
+        eventDate: event.date,
+        uscfFee: 24,
+        players: playersToInvoice
       });
-
-      let gtInvoiceId: string | null = null;
-      let indInvoiceId: string | null = null;
-
+  
+      // Save confirmations for both invoices
       if (result.gtInvoice) {
         const gtPlayers = playersToInvoice.filter(p => p.isGtPlayer);
-        await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0); // Total will be recalculated
-        gtInvoiceId = result.gtInvoice.invoiceId;
+        await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, 0, "GT");
       }
-
+  
       if (result.independentInvoice) {
         const indPlayers = playersToInvoice.filter(p => !p.isGtPlayer);
-        await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, 0); // Total will be recalculated
-        indInvoiceId = result.independentInvoice.invoiceId;
+        await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, 0, "Independent");
       }
       
-      toast({ title: "Split Invoices Created Successfully!", description: "Separate invoices for GT and Independent players have been created."});
-      setCreatedInvoiceId(indInvoiceId || gtInvoiceId);
+      toast({ 
+        title: "PSJA Split Invoices Created!", 
+        description: "GT program and school invoices created with correct fee allocation."
+      });
+      setCreatedInvoiceId(result.independentInvoice?.invoiceId || result.gtInvoice?.invoiceId);
       setShowInvoiceModal(true);
       resetState();
       
     } catch (error) {
-      handleInvoiceError(error, "Split Invoice Creation Failed");
+      handleInvoiceError(error, "PSJA Split Invoice Creation Failed");
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
-  const saveConfirmation = async (invoiceId: string, result: any, playersInInvoice: any[], total: number, type?: "Registration" | "USCF") => {
+  const saveConfirmation = async (invoiceId: string, result: any, playersInInvoice: any[], total: number, type?: "Registration" | "USCF" | "GT" | "Independent") => {
     if(!profile || !event || !db) return;
     
     const teamCode = generateTeamCode({ schoolName: profile.school, district: profile.district });
@@ -522,6 +551,111 @@ export function SponsorRegistrationDialog({
       setSelectedStudents({});
     }
   };
+
+  const renderStandardFeeBreakdown = () => (
+    <div className="border rounded-lg p-4 space-y-3">
+      <h3 className="font-semibold">Charge Breakdown</h3>
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span>Registration Fees ({Object.keys(selectedStudents).length} × ${event.regularFee})</span>
+          <span>${feeBreakdown.registrationFees.toFixed(2)}</span>
+        </div>
+        {feeBreakdown.lateFees > 0 && (
+          <div className="flex justify-between text-amber-600">
+            <span>{feeBreakdown.feeType} ({Object.keys(selectedStudents).length} × ${(feeBreakdown.lateFees / Object.keys(selectedStudents).length).toFixed(2)})</span>
+            <span>${feeBreakdown.lateFees.toFixed(2)}</span>
+          </div>
+        )}
+        {feeBreakdown.uscfFees > 0 && (
+          <div className="flex justify-between">
+            <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current' && !rosterPlayers.find(p => p.id === Object.keys(selectedStudents)[Object.values(selectedStudents).indexOf(s)])?.studentType?.includes('gt')).length} × $24)</span>
+            <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="border-t pt-2 flex justify-between font-semibold">
+          <span>Total Amount</span>
+          <span>${feeBreakdown.total.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPsjaFeeBreakdown = () => {
+    const breakdown = calculateFeeBreakdown();
+    const hasGt = Object.entries(selectedStudents).some(([playerId]) => {
+      const player = rosterPlayers.find(p => p.id === playerId);
+      return player?.studentType === 'gt';
+    });
+    
+    const hasIndependent = Object.entries(selectedStudents).some(([playerId]) => {
+      const player = rosterPlayers.find(p => p.id === playerId);
+      return player?.studentType !== 'gt';
+    });
+  
+    if (!hasGt && !hasIndependent) {
+      return renderStandardFeeBreakdown(); // Fall back to standard breakdown
+    }
+  
+    return (
+      <div className="border rounded-lg p-4 space-y-3">
+        <h3 className="font-semibold">PSJA Split Invoice Breakdown</h3>
+        
+        {hasGt && (
+          <div className="bg-blue-50 p-3 rounded">
+            <h4 className="font-medium text-blue-800">GT Program Invoice</h4>
+            <div className="space-y-1 text-sm mt-2">
+              <div className="flex justify-between">
+                <span>Registration Fees ({Object.entries(selectedStudents).filter(([playerId]) => {
+                  const player = rosterPlayers.find(p => p.id === playerId);
+                  return player?.studentType === 'gt';
+                }).length} GT students × ${event.regularFee})</span>
+                <span>${breakdown.gtBreakdown.registrationFees.toFixed(2)}</span>
+              </div>
+              <div className="text-xs text-blue-600">
+                • USCF fees covered under district bulk plan<br/>
+                • Late fees billed to school
+              </div>
+            </div>
+          </div>
+        )}
+  
+        {hasIndependent && (
+          <div className="bg-green-50 p-3 rounded">
+            <h4 className="font-medium text-green-800">School Invoice</h4>
+            <div className="space-y-1 text-sm mt-2">
+              <div className="flex justify-between">
+                <span>Registration Fees ({Object.entries(selectedStudents).filter(([playerId]) => {
+                  const player = rosterPlayers.find(p => p.id === playerId);
+                  return player?.studentType !== 'gt';
+                }).length} Independent × ${event.regularFee})</span>
+                <span>${breakdown.schoolBreakdown.registrationFees.toFixed(2)}</span>
+              </div>
+              
+              {breakdown.lateFees > 0 && (
+                <div className="flex justify-between text-amber-600">
+                  <span>ALL Late Fees ({Object.keys(selectedStudents).length} students × ${(breakdown.lateFees / Object.keys(selectedStudents).length).toFixed(2)})</span>
+                  <span>${breakdown.schoolBreakdown.lateFees.toFixed(2)}</span>
+                </div>
+              )}
+              
+              {breakdown.schoolBreakdown.uscfFees > 0 && (
+                <div className="flex justify-between">
+                  <span>USCF Fees (Independent only)</span>
+                  <span>${breakdown.schoolBreakdown.uscfFees.toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        <div className="border-t pt-2 flex justify-between font-semibold">
+          <span>Combined Total</span>
+          <span>${breakdown.total.toFixed(2)}</span>
+        </div>
+      </div>
+    );
+  };
+
 
   if (!event) return null;
 
@@ -771,35 +905,7 @@ export function SponsorRegistrationDialog({
               </div>
             </div>
 
-            <div className="border rounded-lg p-4 space-y-3">
-              <h3 className="font-semibold">Charge Breakdown</h3>
-              
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Registration Fees ({Object.keys(selectedStudents).length} × ${event.regularFee})</span>
-                  <span>${feeBreakdown.registrationFees.toFixed(2)}</span>
-                </div>
-                
-                {feeBreakdown.lateFees > 0 && (
-                  <div className="flex justify-between text-amber-600">
-                    <span>{feeBreakdown.feeType} ({Object.keys(selectedStudents).length} × ${(feeBreakdown.lateFees / Object.keys(selectedStudents).length).toFixed(2)})</span>
-                    <span>${feeBreakdown.lateFees.toFixed(2)}</span>
-                  </div>
-                )}
-                
-                {feeBreakdown.uscfFees > 0 && (
-                  <div className="flex justify-between">
-                    <span>USCF Fees ({Object.values(selectedStudents).filter(s => s.uscfStatus !== 'current' && !rosterPlayers.find(p => p.id === Object.keys(selectedStudents)[Object.values(selectedStudents).indexOf(s)])?.studentType?.includes('gt')).length} × $24)</span>
-                    <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
-                  </div>
-                )}
-                
-                <div className="border-t pt-2 flex justify-between font-semibold">
-                  <span>Total Amount</span>
-                  <span>${feeBreakdown.total.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
+            {profile?.district === 'PHARR-SAN JUAN-ALAMO ISD' ? renderPsjaFeeBreakdown() : renderStandardFeeBreakdown()}
             
             <div className="flex items-center space-x-2">
               <Checkbox
