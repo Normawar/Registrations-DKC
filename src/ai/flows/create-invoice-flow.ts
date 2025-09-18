@@ -126,29 +126,69 @@ const createInvoiceFlow = ai.defineFlow(
         }
       }
     }
+    
+    // Add this RIGHT after line 120 (after the Firestore section, before Square client init)
 
-    console.log('Debug: Getting Square client...');
+    console.log('=== DEBUGGING ACTUAL CONFIG VALUES ===');
+
+    // Check what the functions are returning
+    try {
+      // Import the config directly to see what it contains
+      const { squareConfig } = await import('@/config/square-config');
+      
+      console.log('Direct config import:');
+      console.log('- accessToken (first 15):', squareConfig.accessToken.substring(0, 15) + '...');
+      console.log('- environment:', squareConfig.environment);
+      console.log('- locationId:', squareConfig.locationId);
+      
+      // Check environment variables
+      console.log('Environment variables:');
+      console.log('- SQUARE_ACCESS_TOKEN exists:', !!process.env.SQUARE_ACCESS_TOKEN);
+      console.log('- SQUARE_ENVIRONMENT:', process.env.SQUARE_ENVIRONMENT || 'UNDEFINED');
+      console.log('- SQUARE_LOCATION_ID:', process.env.SQUARE_LOCATION_ID || 'UNDEFINED');
+      
+      // Expected values
+      console.log('Expected values:');
+      console.log('- Expected token starts with: EAAAl7QTGApQ59S...');
+      console.log('- Expected environment: production');
+      console.log('- Expected location: CTED7GVSVH5H8');
+      
+      // Validation
+      const tokenMatches = squareConfig.accessToken.startsWith('EAAAl7QTGApQ59S');
+      const envMatches = squareConfig.environment === 'production';
+      const locationMatches = squareConfig.locationId === 'CTED7GVSVH5H8';
+      
+      console.log('Validation results:');
+      console.log('- Token matches expected:', tokenMatches);
+      console.log('- Environment matches expected:', envMatches);  
+      console.log('- Location matches expected:', locationMatches);
+      
+      if (!tokenMatches || !envMatches || !locationMatches) {
+        throw new Error(`CONFIG_MISMATCH: token=${tokenMatches}, env=${envMatches}, location=${locationMatches}`);
+      }
+      
+    } catch (configError) {
+      console.error('Config debug error:', configError);
+      throw new Error(`Configuration debugging failed: ${configError.message}`);
+    }
+
+    console.log('=== END CONFIG DEBUG ===');
+
+    // Step 2: Initialize Square client and location
     let squareClient;
     let locationId;
 
     try {
       squareClient = await getSquareClient();
       locationId = await getSquareLocationId();
-      console.log('Debug: Square client and location ID obtained successfully');
     } catch (error) {
-      console.error('Debug: Failed to get Square client:', error);
+      console.error('Failed to initialize Square client:', error);
       throw new Error(`Square configuration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
-    const { customersApi, ordersApi, invoicesApi, locationsApi } = squareClient;
+    const { customersApi, ordersApi, invoicesApi } = squareClient;
 
     try {
-      // Add this right before your failing invoice creation:
-      console.log('Testing client with simple API call...');
-      const testResponse = await locationsApi.listLocations();
-      console.log('Simple API call succeeded:', !!testResponse.result.locations);
-
-
       // --- Customer Creation / Lookup ---
       const searchCustomersResponse = await customersApi.searchCustomers({
         query: {

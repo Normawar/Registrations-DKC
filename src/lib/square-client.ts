@@ -1,14 +1,21 @@
-
 import { Client, Environment } from 'square';
+import { squareConfig } from '../config/square-config';
 
 export async function getSquareClient(): Promise<Client> {
-  // Hard-coded working values - exactly what works when you hard-code elsewhere
+  const environment = squareConfig.environment === 'production' 
+    ? Environment.Production 
+    : Environment.Sandbox;
+
+  console.log('Square client configured with environment:', environment);
+  console.log('Using access token from:', process.env.SQUARE_ACCESS_TOKEN ? 'ENV VAR' : 'FALLBACK');
+
   return new Client({
-    accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-    environment: Environment.Sandbox,
+    accessToken: squareConfig.accessToken,
+    environment: environment,
   });
 }
 
 export async function getSquareLocationId(): Promise<string> {
-  return "CTED7GVSVH5H8";
+  console.log('Using location ID from:', process.env.SQUARE_LOCATION_ID ? 'ENV VAR' : 'FALLBACK');
+  return squareConfig.locationId;
 }
