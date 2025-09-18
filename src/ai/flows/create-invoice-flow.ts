@@ -140,9 +140,15 @@ const createInvoiceFlow = ai.defineFlow(
       throw new Error(`Square configuration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
-    const { customersApi, ordersApi, invoicesApi } = squareClient;
+    const { customersApi, ordersApi, invoicesApi, locationsApi } = squareClient;
 
     try {
+      // Add this right before your failing invoice creation:
+      console.log('Testing client with simple API call...');
+      const testResponse = await locationsApi.listLocations();
+      console.log('Simple API call succeeded:', !!testResponse.result.locations);
+
+
       // --- Customer Creation / Lookup ---
       const searchCustomersResponse = await customersApi.searchCustomers({
         query: {
