@@ -51,6 +51,11 @@ function CleanupPlayersPage() {
 
       // 3. Determine which players to delete based on the new, more specific rules
       const toDelete = allPlayers.filter(player => {
+        // **NEW RULE**: Specifically target and delete the corrupted "test1 test" players
+        if (player.firstName === 'test1' && player.lastName === 'test') {
+            return true;
+        }
+
         // Rule 1: Always keep the essential test players
         if (playersToKeep.has(player.id)) {
           return false;
