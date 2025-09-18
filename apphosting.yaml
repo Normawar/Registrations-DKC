@@ -5,3 +5,10 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  env:
+    - variable: SQUARE_ACCESS_TOKEN
+      value: EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC
+    - variable: SQUARE_APPLICATION_ID
+      value: sq0idp-2nOEj3tUd-PtlED-EdE3MQ
+    - variable: SQUARE_ENVIRONMENT
+      value: production
