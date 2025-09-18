@@ -1,16 +1,8 @@
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
-
 runConfig:
-  # Increase this value if you'd like to automatically spin up
-  # more instances in response to increased traffic.
-  maxInstances: 1
   env:
-    - variable: SQUARE_ACCESS_TOKEN
-      value: EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC
-    - variable: SQUARE_APPLICATION_ID
-      value: sq0idp-2nOEj3tUd-PtlED-EdE3MQ
-    - variable: SQUARE_ENVIRONMENT
-      value: production
-    - variable: SQUARE_LOCATION_ID
-      value: CTED7GVSVH5H8
+    SQUARE_ACCESS_TOKEN: EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC
+    SQUARE_APPLICATION_ID: sq0idp-2nOEj3tUd-PtlED-EdE3MQ
+    SQUARE_ENVIRONMENT: production
+    SQUARE_LOCATION_ID: CTED7GVSVH5H8
