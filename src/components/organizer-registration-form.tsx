@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
@@ -7,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format, differenceInHours, isSameDay, isValid, parse } from 'date-fns';
+import { format, differenceInHours, isSameDay, isValid, parse, startOfDay } from 'date-fns';
 import { doc, setDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 
@@ -383,14 +382,11 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         }
 
         setIsSubmitting(true);
-        let registrationFeePerPlayer = event.regularFee;
-        const eventDate = new Date(event.date);
-        const now = new Date();
-        if (isSameDay(eventDate, now)) { registrationFeePerPlayer = event.dayOfFee; } 
-        else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFeePerPlayer = event.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFeePerPlayer = event.lateFee; } }
+        const { fee: registrationFeePerPlayer } = getFeeForEvent();
+        
+        const lateFeeAmount = registrationFeePerPlayer - event.regularFee;
 
         const playersToInvoice = stagedPlayers.map(p => {
-            const lateFeeAmount = registrationFeePerPlayer - event.regularFee;
             return {
                 playerName: `${p.firstName} ${p.lastName}`,
                 uscfId: p.uscfId,
@@ -489,12 +485,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         setIsSubmitting(true);
         
         const promises = stagedPlayers.map(async (player) => {
-            let registrationFee = event.regularFee;
-            const eventDate = new Date(event.date);
-            const now = new Date();
-            if (isSameDay(eventDate, now)) { registrationFee = event.dayOfFee; }
-            else { const hoursUntilEvent = differenceInHours(eventDate, now); if (hoursUntilEvent <= 24) { registrationFee = event.veryLateFee; } else if (hoursUntilEvent <= 48) { registrationFee = event.lateFee; } }
-            
+            const { fee: registrationFee } = getFeeForEvent();
             const lateFeeAmount = registrationFee - event.regularFee;
 
             const playerToInvoice = {
@@ -659,18 +650,20 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     const getFeeForEvent = () => {
         if (!event) return { fee: 0, type: 'Regular Registration' };
         
-        const eventDate = new Date(event.date);
+        // Use the event's registration deadline if available, otherwise default to the event date.
+        const deadline = event.registrationDeadline ? new Date(event.registrationDeadline) : new Date(event.date);
         const now = new Date();
-  
-        if (isSameDay(eventDate, now)) {
-            return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
-        }
-        
-        const hoursUntilEvent = differenceInHours(eventDate, now);
-        
-        if (hoursUntilEvent <= 24) {
-            return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
-        } else if (hoursUntilEvent <= 48) {
+    
+        // Only apply late fees if the current date is after the registration deadline.
+        if (startOfDay(now) > startOfDay(deadline)) {
+            const eventDate = new Date(event.date);
+            if (isSameDay(eventDate, now)) {
+                return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
+            }
+            const hoursUntilEvent = differenceInHours(eventDate, now);
+            if (hoursUntilEvent <= 24) {
+                return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
+            }
             return { fee: event.lateFee || event.regularFee, type: 'Late Registration' };
         }
         
