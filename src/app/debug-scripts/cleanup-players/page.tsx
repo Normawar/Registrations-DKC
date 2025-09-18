@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -13,176 +14,27 @@ import { useToast } from '@/hooks/use-toast';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
 import { OrganizerGuard } from '@/components/auth-guard';
 
-// This is the set of essential test players to always keep.
-const playersToKeep = new Set([
-  "90000001", "90000002", "90000003", "90000004", "90000005",
-  "90000006", "90000007", "90000008", "90000009", "90000010"
-]);
-
-function CleanupPlayersPage() {
-  const { toast } = useToast();
-  const [playersToDelete, setPlayersToDelete] = useState<MasterPlayer[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const findPlayersToDelete = useCallback(async () => {
-    if (!db) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Firestore is not initialized.' });
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const playersSnapshot = await getDocs(collection(db, 'players'));
-      const allPlayers = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
-      console.log(`Total players in database: ${allPlayers.length}`);
-
-      // **UPDATED RULE**: Specifically target players whose first name starts with "test", regardless of roster assignment.
-      const toDelete = allPlayers.filter(player => {
-        const firstName = player.firstName || '';
-        const isTestPlayer = firstName.toLowerCase().startsWith('test');
-        const isProtected = playersToKeep.has(player.id);
-        
-        // Delete if it's a test player AND not protected.
-        return isTestPlayer && !isProtected;
-      });
-
-      console.log(`Identified ${toDelete.length} players to delete.`);
-      setPlayersToDelete(toDelete);
-
-    } catch (error) {
-      console.error("Error fetching players for cleanup:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch data from the database to determine cleanup targets.' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    findPlayersToDelete();
-  }, [findPlayersToDelete]);
-
-  const handleCleanup = async () => {
-    if (!db || playersToDelete.length === 0) {
-      toast({ title: 'No players to delete.' });
-      return;
-    }
-  
-    setIsDeleting(true);
-    try {
-      const BATCH_SIZE = 450; // Stay safely under Firebase's 500 operation limit
-      const totalPlayers = playersToDelete.length;
-      let deletedCount = 0;
-  
-      // Process players in batches
-      for (let i = 0; i < totalPlayers; i += BATCH_SIZE) {
-        const batch = writeBatch(db);
-        const currentBatch = playersToDelete.slice(i, i + BATCH_SIZE);
-        
-        currentBatch.forEach(player => {
-          const playerRef = doc(db, 'players', player.id);
-          batch.delete(playerRef);
-        });
-  
-        await batch.commit();
-        deletedCount += currentBatch.length;
-        
-        // Update progress
-        toast({
-          title: `Progress: ${deletedCount}/${totalPlayers} deleted`,
-          description: `Batch ${Math.ceil(deletedCount / BATCH_SIZE)} of ${Math.ceil(totalPlayers / BATCH_SIZE)} complete`,
-        });
-  
-        // Small delay between batches to avoid rate limiting
-        if (i + BATCH_SIZE < totalPlayers) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-      }
-  
-      toast({
-        title: 'Cleanup Complete!',
-        description: `${deletedCount} player records have been deleted from Firestore.`,
-        variant: 'default'
-      });
-      
-      // Refresh the list after deletion
-      await findPlayersToDelete();
-      
-    } catch (error: any) {
-      console.error('Error deleting players:', error);
-      toast({ 
-        variant: 'destructive', 
-        title: 'Cleanup Failed', 
-        description: `Error: ${error.message}` 
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
+// This tool is now deprecated and its more powerful replacement is at /debug-scripts/force-delete-user
+function DeprecatedCleanupPlayersPage() {
   return (
     <AppLayout>
       <div className="space-y-8 max-w-4xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Database Cleanup Tool</CardTitle>
+            <CardTitle>Tool Deprecated</CardTitle>
             <CardDescription>
-              This tool will permanently delete players whose first name starts with "test". It will always preserve the 10 core test accounts (ID 90000001-90000010).
+              This cleanup tool is no longer in use. Please use the "Force Delete User" tool for more reliable user deletion.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Alert variant="destructive">
               <ShieldAlert className="h-4 w-4" />
-              <AlertTitle>Warning: Destructive Action</AlertTitle>
+              <AlertTitle>This tool is deprecated.</AlertTitle>
               <AlertDescription>
-                This action cannot be undone. Please review the list of players to be deleted carefully. It is recommended to back up your data before proceeding.
+                A more reliable tool for deleting users by email is now available at "Force Delete User" in the sidebar. This page can be removed.
               </AlertDescription>
             </Alert>
           </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Players Targeted for Deletion ({isLoading ? '...' : playersToDelete.length})</CardTitle>
-            <CardDescription>The following players will be permanently removed from the database when you click the button below.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center h-24">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span className="ml-2">Analyzing database...</span>
-              </div>
-            ) : playersToDelete.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                <p>No players with a first name starting with "test" were found to delete. Your database is clean according to the rules!</p>
-              </div>
-            ) : (
-              <ul className="text-sm space-y-1 list-disc list-inside max-h-60 overflow-y-auto">
-                {playersToDelete.slice(0, 100).map(p => (
-                  <li key={p.id}>
-                    {p.firstName} {p.lastName} (ID: {p.id}) - School: {p.school || 'N/A'}, District: {p.district || 'N/A'}
-                  </li>
-                ))}
-                {playersToDelete.length > 100 && (
-                  <li className="font-bold">... and {playersToDelete.length - 100} more.</li>
-                )}
-              </ul>
-            )}
-          </CardContent>
-          <CardFooter>
-            <Button
-              onClick={handleCleanup}
-              disabled={isLoading || isDeleting || playersToDelete.length === 0}
-              variant="destructive"
-            >
-              {isDeleting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
-              )}
-              Permanently Delete {playersToDelete.length} Player(s)
-            </Button>
-          </CardFooter>
         </Card>
       </div>
     </AppLayout>
@@ -192,7 +44,7 @@ function CleanupPlayersPage() {
 export default function GuardedCleanupPage() {
     return (
         <OrganizerGuard>
-            <CleanupPlayersPage />
+            <DeprecatedCleanupPlayersPage />
         </OrganizerGuard>
     )
 }
