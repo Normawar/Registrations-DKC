@@ -18,3 +18,4 @@ import '@/ai/flows/create-psja-split-invoice-flow.ts';
 import '@/ai/flows/process-batched-requests-flow.ts';
 import '@/ai/flows/extract-invoice-data-flow.ts';
 import '@/ai/flows/import-square-invoices-flow.ts';
+import '@/ai/flows/consolidate-gt-invoices-flow.ts';

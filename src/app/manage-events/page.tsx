@@ -39,7 +39,8 @@ import {
     Download,
     Check,
     Edit,
-    Delete
+    Delete,
+    Combine
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -98,6 +99,7 @@ import { OrganizerGuard } from '@/components/auth-guard';
 import { generateTeamCode } from '@/lib/school-utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { canConsolidateGtInvoices, consolidateGtInvoices } from '@/ai/flows/consolidate-gt-invoices-flow';
 
 
 const eventFormSchema = z.object({
@@ -181,6 +183,9 @@ function ManageEventsContent() {
 
   const [districtFilter, setDistrictFilter] = useState('all');
   const [eventTypeFilter, setEventTypeFilter] = useState<'real' | 'test'>('real');
+  
+  const [consolidationStatus, setConsolidationStatus] = useState<Record<string, { canConsolidate: boolean, gtInvoiceCount: number, totalGtStudents: number }>>({});
+  const [isConsolidating, setIsConsolidating] = useState<string | null>(null);
 
   const uniqueDistricts = useMemo(() => {
     const schoolDistricts = dbSchools.map(s => schoolData.find(sd => sd.schoolName === s)?.district).filter(Boolean) as string[];
@@ -231,6 +236,52 @@ function ManageEventsContent() {
     const eventDay = startOfDay(new Date(event.date));
     return eventDay < today ? "Completed" : "Open";
   };
+  
+  const handleConsolidateGt = async (event: Event) => {
+    if (!profile || profile.role !== 'organizer') return;
+    
+    setIsConsolidating(event.id);
+    try {
+      const result = await consolidateGtInvoices({
+        eventId: event.id,
+        eventName: event.name,
+        eventDate: event.date,
+        gtCoordinatorEmail: 'gt_coordinator@psjaisd.us', // Replace with dynamic value if available
+        gtCoordinatorName: 'PSJA GT Coordinator',
+      });
+      toast({
+        title: 'Consolidation Successful',
+        description: `Created invoice ${result.consolidatedInvoiceNumber} for ${result.totalGtStudents} GT students and canceled ${result.canceledInvoiceIds.length} individual invoices.`,
+      });
+      // Re-check consolidation status
+      checkConsolidationForEvent(event.id);
+    } catch (error) {
+      console.error("Failed to consolidate GT invoices:", error);
+      toast({
+        variant: 'destructive',
+        title: 'Consolidation Failed',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    } finally {
+      setIsConsolidating(null);
+    }
+  };
+  
+  const checkConsolidationForEvent = useCallback(async (eventId: string) => {
+    try {
+      const status = await canConsolidateGtInvoices(eventId);
+      setConsolidationStatus(prev => ({ ...prev, [eventId]: status }));
+    } catch (error) {
+      console.warn(`Could not check consolidation status for event ${eventId}:`, error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const psjaEvents = events.filter(e => getDistrictForLocation(e.location) === 'PHARR-SAN JUAN-ALAMO ISD');
+    psjaEvents.forEach(event => {
+      checkConsolidationForEvent(event.id);
+    });
+  }, [events, getDistrictForLocation, checkConsolidationForEvent]);
 
   const sortedEvents = useMemo(() => {
     const isTestEvent = (event: Event) => {
@@ -553,6 +604,9 @@ function ManageEventsContent() {
     const flatRegistrations: RegistrationInfo[] = [];
 
     allConfirmations.forEach(conf => {
+      // Exclude mock invoices from this view
+      if (conf.invoiceNumber === 'MOCK_INV') return;
+
         if (!invoicesMap.has(conf.id)) {
             invoicesMap.set(conf.id, {
                 invoiceId: conf.id,
@@ -861,6 +915,7 @@ function ManageEventsContent() {
                   const status = getEventStatus(event);
                   const district = getDistrictForLocation(event.location);
                   const displayDistrict = district === 'PHARR-SAN JUAN-ALAMO ISD' ? 'PSJA' : district;
+                  const canConsolidateInfo = consolidationStatus[event.id];
                   
                   return (
                     <TableRow key={event.id}>
@@ -897,6 +952,12 @@ function ManageEventsContent() {
                                 <DropdownMenuItem onClick={() => handleEditEvent(event)}>
                                   <FilePenLine className="mr-2 h-4 w-4" />Edit
                                 </DropdownMenuItem>
+                                {canConsolidateInfo?.canConsolidate && (
+                                  <DropdownMenuItem onClick={() => handleConsolidateGt(event)} disabled={isConsolidating === event.id}>
+                                    {isConsolidating === event.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Combine className="mr-2 h-4 w-4" />}
+                                    Consolidate GT Invoices ({canConsolidateInfo.gtInvoiceCount})
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem asChild>
                                   <Link href={`/organizer-registration?eventId=${event.id}`}>
                                     <PlusCircle className="mr-2 h-4 w-4" />Register Players
