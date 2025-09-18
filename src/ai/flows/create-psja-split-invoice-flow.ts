@@ -47,13 +47,16 @@ const CreateInvoiceOutputSchema = z.object({
   invoiceUrl: z.string().url().describe('The URL to view the invoice online.'),
 });
 
-export type CreatePsjaSplitInvoiceOutput = z.infer<typeof CreatePsjaSplitInvoiceOutputSchema>;
+export type CreatePsjaSplitInvoiceOutput = z
+  .infer<typeof CreatePsjaSplitInvoiceOutputSchema>;
 const CreatePsjaSplitInvoiceOutputSchema = z.object({
   gtInvoice: CreateInvoiceOutputSchema.optional(),
   independentInvoice: CreateInvoiceOutputSchema.optional(),
 });
 
-export async function createPsjaSplitInvoice(input: CreatePsjaSplitInvoiceInput): Promise<CreatePsjaSplitInvoiceOutput> {
+export async function createPsjaSplitInvoice(
+  input: CreatePsjaSplitInvoiceInput
+): Promise<CreatePsjaSplitInvoiceOutput> {
   return createPsjaSplitInvoiceFlow(input);
 }
 
@@ -64,19 +67,18 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
     outputSchema: CreatePsjaSplitInvoiceOutputSchema,
   },
   async (input) => {
-    const gtPlayers = input.players.filter(p => p.isGtPlayer);
-    const independentPlayers = input.players.filter(p => !p.isGtPlayer);
-    
-    // GT students' late fees need to be moved to Independent invoice
-    const gtLateFeesTotal = gtPlayers.reduce((sum, p) => sum + (p.lateFee || 0), 0);
-    const gtLateFeeCount = gtPlayers.filter(p => (p.lateFee || 0) > 0).length;
+    const gtPlayers = input.players.filter((p) => p.isGtPlayer);
+    const independentPlayers = input.players.filter((p) => !p.isGtPlayer);
 
+    const gtLateFeePlayers = gtPlayers.filter(p => (p.lateFee || 0) > 0);
+    
     let gtInvoice: CreatePsjaSplitInvoiceOutput['gtInvoice'] = undefined;
-    let independentInvoice: CreatePsjaSplitInvoiceOutput['independentInvoice'] = undefined;
+    let independentInvoice:
+      | CreatePsjaSplitInvoiceOutput['independentInvoice'] = undefined;
 
     // Create GT Invoice (Registration fees only - NO late fees, NO USCF fees)
     if (gtPlayers.length > 0) {
-      const gtPlayersForInvoice = gtPlayers.map(p => ({
+      const gtPlayersForInvoice = gtPlayers.map((p) => ({
         ...p,
         lateFee: 0, // GT students never pay late fees on their invoice
         uscfAction: false, // GT students covered under district bulk USCF plan
@@ -100,26 +102,25 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
       });
     }
 
-    // Create Independent Invoice (includes ALL late fees - GT and Independent)
-    if (independentPlayers.length > 0 || gtLateFeesTotal > 0) {
-      const independentPlayersForInvoice: CreateInvoiceInput['players'] = [...independentPlayers.map(p => ({...p, lateFee: p.lateFee ?? 0}))];
+    // Create Independent Invoice (includes its own late fees + ALL GT late fees)
+    if (independentPlayers.length > 0 || gtLateFeePlayers.length > 0) {
+      const independentPlayersForInvoice: CreateInvoiceInput['players'] = [
+        ...independentPlayers.map(p => ({...p, lateFee: p.lateFee ?? 0}))
+      ];
       
-      // Add GT late fees as separate line items to Independent invoice
-      if (gtLateFeesTotal > 0) {
-        // Find a representative GT player to attach the late fee note to
-        const gtPlayerWithLateFee = gtPlayers.find(p => (p.lateFee || 0) > 0);
-        if (gtPlayerWithLateFee) {
-            independentPlayersForInvoice.push({
-                playerName: `${gtPlayers.length} GT Player Late Fee(s)`,
-                uscfId: 'GT-LATE-FEES',
-                baseRegistrationFee: gtLateFeesTotal, // Bill the total late fees as a base fee
-                lateFee: 0,
-                uscfAction: false,
-                isGtPlayer: false, // Billing to school, not GT program
-                section: 'N/A',
-            });
-        }
-      }
+      // Add GT late fees to Independent invoice as if they were for independent players
+      gtLateFeePlayers.forEach(p => {
+        independentPlayersForInvoice.push({
+          playerName: `${p.playerName} (GT Late Fee)`,
+          uscfId: p.uscfId,
+          baseRegistrationFee: 0, // No registration fee, just the late fee
+          lateFee: p.lateFee || 0, // Apply the late fee
+          uscfAction: false,
+          isGtPlayer: false, // Important: Treat as non-GT for billing purposes
+          section: p.section,
+        });
+      });
+
 
       independentInvoice = await createInvoice({
         sponsorName: input.sponsorName,
@@ -135,8 +136,8 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
         eventDate: input.eventDate,
         uscfFee: input.uscfFee,
         players: independentPlayersForInvoice,
-        description: gtLateFeesTotal > 0 
-          ? `Invoice for independent students and all applicable late fees (including GT program students).`
+        description: gtLateFeePlayers.length > 0 
+          ? `Invoice for independent students and all applicable late fees (including for ${gtLateFeePlayers.length} GT program students).`
           : `Invoice for independent students only.`,
       });
     }
