@@ -11,9 +11,8 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
+import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address, Client, Environment } from 'square';
 import { format } from 'date-fns';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
@@ -126,35 +125,17 @@ const createInvoiceFlow = ai.defineFlow(
       }
     }
     
-    // Debug what the config is actually returning
-    console.log('=== DEBUGGING CONFIG AFTER CHANGES ===');
-    try {
-      const { squareConfig } = await import('@/config/square-config');
-      console.log('Config values:');
-      console.log('- accessToken (first 15):', squareConfig.accessToken?.substring(0, 15) + '...' || 'UNDEFINED');
-      console.log('- environment:', squareConfig.environment);
-      console.log('- locationId:', squareConfig.locationId);
-      
-      // Check if they match expected values
-      const tokenOK = squareConfig.accessToken?.startsWith('EAAAl7QTGApQ59S');
-      const envOK = squareConfig.environment === 'production';
-      const locationOK = squareConfig.locationId === 'CTED7GVSVH5H8';
-      
-      console.log('Validation:');
-      console.log('- Token correct:', tokenOK);
-      console.log('- Environment correct:', envOK);
-      console.log('- Location correct:', locationOK);
-      
-      if (!tokenOK || !envOK || !locationOK) {
-        throw new Error(`Config still wrong: token=${tokenOK}, env=${envOK}, location=${locationOK}`);
-      }
-    } catch (e: any) {
-      console.error('Config debug error:', e);
-    }
-    console.log('=== END CONFIG DEBUG ===');
+    // Hard-coded Square client initialization - bypass configuration issues
+    console.log('Initializing Square client with hard-coded values...');
 
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
+
+    const locationId = "CTED7GVSVH5H8";
+
+    console.log('Square client initialized with hard-coded production credentials');
 
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
