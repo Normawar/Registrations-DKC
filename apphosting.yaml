@@ -1,12 +1,6 @@
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
 runConfig:
-  env:
-    - name: SQUARE_ACCESS_TOKEN
-      value: EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC
-    - name: SQUARE_APPLICATION_ID  
-      value: sq0idp-2nOEj3tUd-PtlED-EdE3MQ
-    - name: SQUARE_ENVIRONMENT
-      value: production
-    - name: SQUARE_LOCATION_ID
-      value: CTED7GVSVH5H8
+  # Environment variables are now managed in the Firebase console for better security.
+  # This section is intentionally left empty.
+{}

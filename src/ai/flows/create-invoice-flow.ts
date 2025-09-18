@@ -11,9 +11,9 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address, Client, Environment } from 'square';
+import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
 import { format } from 'date-fns';
-import { checkSquareConfig } from '@/lib/actions/check-config';
+import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
@@ -126,14 +126,8 @@ const createInvoiceFlow = ai.defineFlow(
       }
     }
     
-    // TEMPORARY BYPASS - Direct hard-code since config is broken
-    const squareClient = new Client({
-      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
-      environment: Environment.Production,
-    });
-    const locationId = "CTED7GVSVH5H8";
-
-    console.log('Using direct hard-coded values to bypass config issue');
+    const squareClient = await getSquareClient();
+    const locationId = await getSquareLocationId();
 
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
