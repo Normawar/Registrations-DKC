@@ -144,9 +144,12 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     const [stagedPlayers, setStagedPlayers] = useState<StagedPlayer[]>([]);
     const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState<StagedPlayer | null>(null);
-    const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [view, setView] = useState<'selection' | 'review' | 'finalize'>('selection');
+
+    // Finalize state
+    const [invoiceType, setInvoiceType] = useState<'team' | 'individual'>('team');
+    const [splitUscfFees, setSplitUscfFees] = useState(false);
 
     // Player search and filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -752,6 +755,26 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                             </div>
                         </div>
                     </div>
+
+                    <div className="space-y-3 pt-4">
+                        <Label>Invoice Options</Label>
+                        <RadioGroup value={invoiceType} onValueChange={(v) => setInvoiceType(v as 'team' | 'individual')} className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="team" id="team" /><Label htmlFor="team" className="cursor-pointer">Invoice as Team (One Invoice)</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="individual" id="individual" /><Label htmlFor="individual" className="cursor-pointer">Invoice Individually</Label></div>
+                        </RadioGroup>
+                        {invoiceType === 'team' && (
+                            <div className="pl-6 flex items-center space-x-2">
+                                <Checkbox
+                                    id="split-uscf-fees"
+                                    checked={splitUscfFees}
+                                    onCheckedChange={(checked) => setSplitUscfFees(!!checked)}
+                                    disabled={feeBreakdown.uscfFees === 0}
+                                />
+                                <Label htmlFor="split-uscf-fees" className="text-sm font-medium">Create separate invoice for USCF fees</Label>
+                            </div>
+                        )}
+                    </div>
+
                 </CardContent>
                 <CardFooter className="flex justify-between">
                     <Button variant="outline" onClick={() => setView('selection')}>Back to Selection</Button>
@@ -779,15 +802,17 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     </Form>
                 </CardContent>
                 <CardFooter className="flex-col sm:items-stretch gap-2 pt-4">
-                    <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateTeamInvoice)} disabled={isSubmitting}>
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Register as Team
-                    </Button>
-                    
-                    <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleGenerateIndividualInvoices)} disabled={isSubmitting}>
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Register as Individuals
-                    </Button>
+                     {invoiceType === 'team' ? (
+                        <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateTeamInvoice)} disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Create Team Invoice(s)
+                        </Button>
+                    ) : (
+                        <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleGenerateIndividualInvoices)} disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Create Individual Invoices
+                        </Button>
+                    )}
                     
                     <div className="relative">
                         <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>

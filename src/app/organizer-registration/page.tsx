@@ -41,3 +41,4 @@ function OrganizerRegistrationSkeleton() {
 
 
 export default OrganizerRegistrationPage;
+
