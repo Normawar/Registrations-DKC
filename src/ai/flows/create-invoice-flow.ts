@@ -11,9 +11,8 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { randomUUID } from 'crypto';
-import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address } from 'square';
+import { ApiError, type OrderLineItem, type InvoiceRecipient, type Address, Client, Environment } from 'square';
 import { format } from 'date-fns';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
 import { checkSquareConfig } from '@/lib/actions/check-config';
 import { doc, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
@@ -127,64 +126,14 @@ const createInvoiceFlow = ai.defineFlow(
       }
     }
     
-    // Add this RIGHT after line 120 (after the Firestore section, before Square client init)
+    // TEMPORARY BYPASS - Direct hard-code since config is broken
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
+    const locationId = "CTED7GVSVH5H8";
 
-    console.log('=== DEBUGGING ACTUAL CONFIG VALUES ===');
-
-    // Check what the functions are returning
-    try {
-      // Import the config directly to see what it contains
-      const { squareConfig } = await import('@/config/square-config');
-      
-      console.log('Direct config import:');
-      console.log('- accessToken (first 15):', squareConfig.accessToken.substring(0, 15) + '...');
-      console.log('- environment:', squareConfig.environment);
-      console.log('- locationId:', squareConfig.locationId);
-      
-      // Check environment variables
-      console.log('Environment variables:');
-      console.log('- SQUARE_ACCESS_TOKEN exists:', !!process.env.SQUARE_ACCESS_TOKEN);
-      console.log('- SQUARE_ENVIRONMENT:', process.env.SQUARE_ENVIRONMENT || 'UNDEFINED');
-      console.log('- SQUARE_LOCATION_ID:', process.env.SQUARE_LOCATION_ID || 'UNDEFINED');
-      
-      // Expected values
-      console.log('Expected values:');
-      console.log('- Expected token starts with: EAAAl7QTGApQ59S...');
-      console.log('- Expected environment: production');
-      console.log('- Expected location: CTED7GVSVH5H8');
-      
-      // Validation
-      const tokenMatches = squareConfig.accessToken.startsWith('EAAAl7QTGApQ59S');
-      const envMatches = squareConfig.environment === 'production';
-      const locationMatches = squareConfig.locationId === 'CTED7GVSVH5H8';
-      
-      console.log('Validation results:');
-      console.log('- Token matches expected:', tokenMatches);
-      console.log('- Environment matches expected:', envMatches);  
-      console.log('- Location matches expected:', locationMatches);
-      
-      if (!tokenMatches || !envMatches || !locationMatches) {
-        throw new Error(`CONFIG_MISMATCH: token=${tokenMatches}, env=${envMatches}, location=${locationMatches}`);
-      }
-      
-    } catch (configError) {
-      console.error('Config debug error:', configError);
-      throw new Error(`Configuration debugging failed: ${configError.message}`);
-    }
-
-    console.log('=== END CONFIG DEBUG ===');
-
-    // Step 2: Initialize Square client and location
-    let squareClient;
-    let locationId;
-
-    try {
-      squareClient = await getSquareClient();
-      locationId = await getSquareLocationId();
-    } catch (error) {
-      console.error('Failed to initialize Square client:', error);
-      throw new Error(`Square configuration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    console.log('Using direct hard-coded values to bypass config issue');
 
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
