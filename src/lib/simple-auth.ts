@@ -366,7 +366,7 @@ export const resetPassword = async (email: string): Promise<void> => {
 };
 
 // Functions from auth-debug merged here for simplicity and to avoid circular dependencies.
-export function debugFirebaseConfig() {
+export function checkFirebaseConfig() {
   console.log('=== Firebase Configuration Debug ===');
   console.log('Auth instance:', auth);
   console.log('DB instance:', db);
