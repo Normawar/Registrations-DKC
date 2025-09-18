@@ -97,6 +97,7 @@ import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { generateTeamCode } from '@/lib/school-utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 
 const eventFormSchema = z.object({
@@ -147,6 +148,16 @@ type StoredDownloads = {
   [eventId: string]: string[]; // Array of player IDs that have been downloaded
 };
 
+type InvoiceGrouping = {
+    invoiceId: string;
+    invoiceNumber: string;
+    invoiceStatus: string;
+    totalAmount: number;
+    schoolName: string;
+    sponsorEmail: string;
+    players: RegistrationInfo[];
+};
+
 function ManageEventsContent() {
   const { toast } = useToast();
   const { events, addBulkEvents, updateEvent, deleteEvent, clearAllEvents } = useEvents();
@@ -162,6 +173,7 @@ function ManageEventsContent() {
   
   const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
   const [registrations, setRegistrations] = useState<RegistrationInfo[]>([]);
+  const [invoicesForEvent, setInvoicesForEvent] = useState<InvoiceGrouping[]>([]);
   const [selectedEventForReg, setSelectedEventForReg] = useState<Event | null>(null);
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pasteData, setPasteData] = useState('');
@@ -532,41 +544,45 @@ function ManageEventsContent() {
     }
 
     const invoicesCol = collection(db, 'invoices');
-    const invoiceSnapshot = await getDocs(invoicesCol);
-    const allConfirmations: StoredConfirmation[] = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as StoredConfirmation[];
+    const q = query(invoicesCol, where('eventId', '==', event.id));
+    const invoiceSnapshot = await getDocs(q);
+    const allConfirmations = invoiceSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
     
     const playerMap = new Map(allPlayers.map(p => [p.id, p]));
-    const uniquePlayerRegistrations = new Map<string, RegistrationInfo>();
-    const eventDate = parseISO(event.date);
+    const invoicesMap = new Map<string, InvoiceGrouping>();
+    const flatRegistrations: RegistrationInfo[] = [];
 
-    const activeConfirmations = allConfirmations.filter(conf => 
-        conf.invoiceStatus !== 'CANCELED' && 
-        conf.invoiceStatus !== 'COMPED'
-    );
-
-    for (const conf of activeConfirmations) {
-        if (conf.eventId !== event.id) continue;
+    allConfirmations.forEach(conf => {
+        if (!invoicesMap.has(conf.id)) {
+            invoicesMap.set(conf.id, {
+                invoiceId: conf.id,
+                invoiceNumber: conf.invoiceNumber || 'N/A',
+                invoiceStatus: conf.invoiceStatus || 'UNKNOWN',
+                totalAmount: conf.totalInvoiced || 0,
+                schoolName: conf.schoolName,
+                sponsorEmail: conf.sponsorEmail,
+                players: [],
+            });
+        }
+        const invoiceGroup = invoicesMap.get(conf.id)!;
         
         for (const playerId in conf.selections) {
-            if (uniquePlayerRegistrations.has(playerId)) continue;
-            
-            const registrationDetails = conf.selections[playerId];
             const player = playerMap.get(playerId);
-            
             if (player) {
-                uniquePlayerRegistrations.set(playerId, { 
-                    player, 
-                    details: registrationDetails, 
-                    invoiceId: conf.invoiceId, 
-                    invoiceNumber: conf.invoiceNumber 
-                });
+                const regInfo: RegistrationInfo = {
+                    player,
+                    details: conf.selections[playerId],
+                    invoiceId: conf.id,
+                    invoiceNumber: conf.invoiceNumber,
+                };
+                invoiceGroup.players.push(regInfo);
+                flatRegistrations.push(regInfo);
             }
         }
-    }
-
-    const eventRegistrations = Array.from(uniquePlayerRegistrations.values());
+    });
     
-    setRegistrations(eventRegistrations);
+    setInvoicesForEvent(Array.from(invoicesMap.values()));
+    setRegistrations(flatRegistrations);
     setSelectedEventForReg(event);
     setIsRegistrationsOpen(true);
   };
@@ -1266,64 +1282,60 @@ function ManageEventsContent() {
           </div>
 
           <div className="max-h-[60vh] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                    <TableHead>Player</TableHead>
-                    <TableHead>USCF ID</TableHead>
-                    <TableHead>School</TableHead>
-                    <TableHead>Section</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Invoice #</TableHead>
-                    {profile?.role === 'organizer' && <TableHead className="text-right">Action</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {registrations.length === 0 ? ( 
-                  <TableRow>
-                    <TableCell colSpan={profile?.role === 'organizer' ? 7 : 6} className="h-24 text-center">
-                      No players registered yet.
-                    </TableCell>
-                  </TableRow> 
-                ) : (
-                  registrations.map(({ player, details, invoiceNumber }) => {
-                    const isWithdrawn = details.status === 'withdrawn';
-                    const isExported = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
-                    let status: React.ReactNode = <Badge variant="secondary">Registered</Badge>;
-                    if(isWithdrawn) status = <Badge variant="destructive">Withdrawn</Badge>;
-                    else if(isExported) status = <Badge variant="default" className="bg-green-600 text-white">Exported</Badge>;
-                    
-                    return (
-                        <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
-                            <TableCell className={cn("font-medium", isWithdrawn && "line-through")}>
-                                <div className="flex items-center gap-2">
-                                  {player.firstName} {player.lastName}
-                                  {player.studentType === 'gt' && (
-                                    <Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>
-                                  )}
-                                  {player.studentType === 'independent' && (
-                                    <Badge variant="secondary" className="bg-purple-200 text-purple-800">IND</Badge>
-                                  )}
-                                </div>
-                            </TableCell>
-                            <TableCell>{player.uscfId}</TableCell>
-                            <TableCell>{player.school}</TableCell>
-                            <TableCell>{details.section}</TableCell>
-                            <TableCell>{status}</TableCell>
-                            <TableCell>{invoiceNumber || 'N/A'}</TableCell>
-                            {profile?.role === 'organizer' && !isWithdrawn && (
-                              <TableCell className="text-right">
-                                <Button variant="ghost" size="sm" onClick={() => togglePlayerStatus(player.id)}>
-                                  Change Status
-                                </Button>
-                              </TableCell>
-                            )}
-                        </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+            <Accordion type="multiple" className="w-full">
+              {invoicesForEvent.map(invoice => (
+                <AccordionItem key={invoice.invoiceId} value={invoice.invoiceId}>
+                  <AccordionTrigger>
+                    <div className="flex justify-between w-full pr-4 items-center">
+                      <div>
+                        <span className="font-semibold">#{invoice.invoiceNumber}</span> - {invoice.schoolName}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{invoice.players.length} player(s)</Badge>
+                        <Badge variant={invoice.invoiceStatus === 'PAID' ? 'default' : 'destructive'} className={invoice.invoiceStatus === 'PAID' ? 'bg-green-600' : ''}>
+                          {invoice.invoiceStatus}
+                        </Badge>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Player</TableHead>
+                            <TableHead>USCF ID</TableHead>
+                            <TableHead>Section</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {invoice.players.map(({ player, details }) => {
+                            const isWithdrawn = details.status === 'withdrawn';
+                            const isExported = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
+                            let status: React.ReactNode = <Badge variant="secondary">Registered</Badge>;
+                            if(isWithdrawn) status = <Badge variant="destructive">Withdrawn</Badge>;
+                            else if(isExported) status = <Badge variant="default" className="bg-green-600 text-white">Exported</Badge>;
+                            
+                            return (
+                              <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
+                                <TableCell className={cn("font-medium", isWithdrawn && "line-through")}>
+                                  <div className="flex items-center gap-2">
+                                    {player.firstName} {player.lastName}
+                                    {player.studentType === 'gt' && (<Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>)}
+                                  </div>
+                                </TableCell>
+                                <TableCell>{player.uscfId}</TableCell>
+                                <TableCell>{details.section}</TableCell>
+                                <TableCell>{status}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
         </DialogContent>
       </Dialog>
