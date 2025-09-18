@@ -222,7 +222,7 @@ const createInvoiceFlow = ai.defineFlow(
         });
       }
 
-      // 4. USCF Fee (exclude GT for PSJA district)
+      // 4. USCF Fee (exclude GT for PSJA district) - with bulk discount
       const uscfActionPlayers = processedPlayers.filter(p => {
         if (!p.uscfAction) return false;
         if (input.district === 'PHARR-SAN JUAN-ALAMO ISD' && p.isGtPlayer) return false;
@@ -230,14 +230,37 @@ const createInvoiceFlow = ai.defineFlow(
       });
 
       if (uscfActionPlayers.length > 0) {
+        // Bulk discount: $4 off per membership for 24+ memberships
+        const isBulkOrder = uscfActionPlayers.length >= 24;
+        const bulkDiscount = 4; // $4 discount per membership
+        const uscfPrice = isBulkOrder ? (input.uscfFee - bulkDiscount) : input.uscfFee;
+        const totalSavings = isBulkOrder ? bulkDiscount * uscfActionPlayers.length : 0;
+        
         const uscfPlayerNotes = uscfActionPlayers.map((p, i) => `${i + 1}. ${p.playerName}`).join('\n');
+        
+        // Build the line item name
+        const uscfLineItemName = isBulkOrder 
+          ? 'USCF Membership (Bulk Rate - 24+)' 
+          : 'USCF Membership (New/Renew)';
+        
+        // Build the note with bulk pricing details
+        let uscfNote = '';
+        if (input.district === 'PHARR-SAN JUAN-ALAMO ISD') {
+          uscfNote = `Applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`;
+        } else {
+          uscfNote = `Applies to players needing USCF membership.\n${uscfPlayerNotes}`;
+        }
+        
+        // Add bulk pricing information to the note
+        if (isBulkOrder) {
+          uscfNote += `\n\nBULK PRICING: $${uscfPrice} each (${uscfActionPlayers.length} memberships)\nTotal savings: $${totalSavings}`;
+        }
+        
         lineItems.push({
-          name: 'USCF Membership (New/Renew)',
+          name: uscfLineItemName,
           quantity: String(uscfActionPlayers.length),
-          basePriceMoney: { amount: BigInt(Math.round(input.uscfFee * 100)), currency: 'USD' },
-          note: input.district === 'PHARR-SAN JUAN-ALAMO ISD'
-            ? `Applies to non-GT players needing USCF membership.\n${uscfPlayerNotes}`
-            : `Applies to players needing USCF membership.\n${uscfPlayerNotes}`,
+          basePriceMoney: { amount: BigInt(Math.round(uscfPrice * 100)), currency: 'USD' },
+          note: uscfNote,
         });
       }
 
