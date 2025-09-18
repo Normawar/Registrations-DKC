@@ -82,6 +82,7 @@ import { Label } from './ui/label';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { generateTeamCode } from '@/lib/school-utils';
+import { DollarSign } from 'lucide-react';
 
 // --- Types and Schemas ---
 
@@ -145,7 +146,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     const [editingPlayer, setEditingPlayer] = useState<StagedPlayer | null>(null);
     const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [showConfirmation, setShowConfirmation] = useState(false);
+    const [view, setView] = useState<'selection' | 'review' | 'finalize'>('selection');
 
     // Player search and filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -335,8 +336,42 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             });
             return;
         }
+        setView('review');
+    };
+
+    const getFeeForEvent = () => {
+        if (!event) return { fee: 0, type: 'Regular Registration' };
+        
+        const deadline = event.registrationDeadline ? new Date(event.registrationDeadline) : new Date(event.date);
+        const now = new Date();
     
-        // Find a sponsor for the selected school
+        if (startOfDay(now) > startOfDay(deadline)) {
+            const eventDate = new Date(event.date);
+            if (isSameDay(eventDate, now)) {
+                return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
+            }
+            const hoursUntilEvent = differenceInHours(eventDate, now);
+            if (hoursUntilEvent <= 24) {
+                return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
+            }
+            return { fee: event.lateFee || event.regularFee, type: 'Late Registration' };
+        }
+        
+        return { fee: event.regularFee, type: 'Regular Registration' };
+    };
+
+    const feeBreakdown = useMemo(() => {
+        if (!event) return { registrationFees: 0, uscfFees: 0, lateFees: 0, total: 0, feeType: 'Regular Registration' };
+        const { fee: currentFee, type: feeType } = getFeeForEvent();
+        const uscfFee = 24;
+        const registrationFees = stagedPlayers.length * event.regularFee;
+        const lateFees = stagedPlayers.length * (currentFee - event.regularFee);
+        const uscfFees = stagedPlayers.filter(s => s.uscfStatus !== 'current' && s.studentType !== 'gt').length * uscfFee;
+        const total = registrationFees + lateFees + uscfFees;
+        return { registrationFees, uscfFees, lateFees, total, feeType };
+    }, [stagedPlayers, event]);
+
+    const handleFinalize = async () => {
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where('school', '==', selectedSchool), limit(1));
         const querySnapshot = await getDocs(q);
@@ -350,7 +385,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             sponsorEmail = sponsorDoc.email;
         } else {
             toast({
-                title: "No Sponsor Found",
+                title: "No Default Sponsor Found",
                 description: `No default sponsor found for ${selectedSchool}. Please enter their details manually.`,
             });
         }
@@ -361,19 +396,8 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             sponsorEmail: sponsorEmail,
             teamCode: generateTeamCode({ schoolName: selectedSchool, district: selectedDistrict }),
         });
-    
-        setShowConfirmation(true);
-    };
 
-    const calculateTotalForPlayers = (players: StagedPlayer[], feePerPlayer: number) => {
-        const uscfFee = 24;
-        return players.reduce((total, player) => {
-          let playerTotal = feePerPlayer;
-          if (player.uscfStatus !== 'current' && player.studentType !== 'gt') {
-            playerTotal += uscfFee;
-          }
-          return total + playerTotal;
-        }, 0);
+        setView('finalize');
     };
 
     const handleGenerateTeamInvoice = async (recipient: InvoiceRecipientValues) => {
@@ -406,7 +430,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             };
         });
 
-        const totalInvoiced = calculateTotalForPlayers(stagedPlayers, registrationFeePerPlayer);
+        const totalInvoiced = feeBreakdown.total;
 
         try {
             const result = await createInvoice({
@@ -425,7 +449,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             toast({ title: "Team Invoice Generated Successfully!", description: `Invoice ${result.invoiceNumber || result.invoiceId} for ${stagedPlayers.length} players has been created.` });
             
             setStagedPlayers([]);
-            setShowConfirmation(false);
+            setView('selection');
             
         } catch (error) {
             console.error("Failed to create team invoice:", error);
@@ -449,7 +473,8 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             baseRegistrationFee: event.regularFee,
             lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
             uscfAction: p.uscfStatus !== 'current',
-            isGtPlayer: p.studentType === 'gt'
+            isGtPlayer: p.studentType === 'gt',
+            section: p.section
         }));
     
         try {
@@ -466,23 +491,26 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     
           if (result.gtInvoice) {
             const gtPlayers = playersToInvoice.filter(p => p.isGtPlayer);
-            const gtTotal = calculateTotalForPlayers(stagedPlayers.filter(p => p.studentType === 'gt'), currentFee);
-            await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, gtTotal);
+            const gtTotal = gtPlayers.length * event.regularFee;
+            await saveConfirmation(result.gtInvoice.invoiceId, result.gtInvoice, gtPlayers, gtTotal, "GT");
           }
     
           if (result.independentInvoice) {
             const indPlayers = playersToInvoice.filter(p => !p.isGtPlayer);
-            const indTotal = calculateTotalForPlayers(stagedPlayers.filter(p => p.studentType !== 'gt'), currentFee);
-            await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, indTotal);
+            const indUscfFees = indPlayers.filter(p => p.uscfAction).length * 24;
+            const indLateFees = stagedPlayers.length * lateFeeAmount;
+            const indRegFees = indPlayers.length * event.regularFee;
+            const indTotal = indRegFees + indLateFees + indUscfFees;
+            await saveConfirmation(result.independentInvoice.invoiceId, result.independentInvoice, indPlayers, indTotal, "Independent");
           }
           
-          toast({ title: "Split Invoices Created Successfully!", description: "Separate invoices for GT and Independent players have been created."});
+          toast({ title: "PSJA Split Invoices Created!", description: "Separate invoices for GT and Independent players have been created."});
           
           setStagedPlayers([]);
-          setShowConfirmation(false);
+          setView('selection');
           
         } catch (error) {
-          handleInvoiceError(error, "Split Invoice Creation Failed");
+          handleInvoiceError(error, "PSJA Split Invoice Creation Failed");
         } finally {
             setIsSubmitting(false);
         }
@@ -503,10 +531,12 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 baseRegistrationFee: event.regularFee,
                 lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
                 uscfAction: player.uscfStatus !== 'current',
+                section: player.section,
+                isGtPlayer: player.studentType === 'gt'
             };
 
             const uscfFee = 24;
-            const totalInvoiced = registrationFee + (player.uscfStatus !== 'current' ? uscfFee : 0);
+            const totalInvoiced = registrationFee + (player.uscfStatus !== 'current' && player.studentType !== 'gt' ? uscfFee : 0);
             
             try {
                 const result = await createInvoice({
@@ -544,11 +574,11 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         }
         
         setStagedPlayers([]);
-        setShowConfirmation(false);
+        setView('selection');
         setIsSubmitting(false);
     };
 
-    const saveConfirmation = async (invoiceId: string, result: any, playersList: any[], total: number) => {
+    const saveConfirmation = async (invoiceId: string, result: any, playersInInvoice: any[], total: number, type?: "Registration" | "USCF" | "GT" | "Independent") => {
         if (!event || !db) {
           console.error('Missing event or db in saveConfirmation');
           throw new Error('Cannot save confirmation: missing dependencies');
@@ -557,7 +587,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const selections = Object.fromEntries(
             stagedPlayers
               .filter(player => {
-                return playersList.some(pl => pl.playerName === `${player.firstName} ${player.lastName}`);
+                return playersInInvoice.some(pl => pl.playerName === `${player.firstName} ${player.lastName}`);
               })
               .map(player => [
                 player.id!,
@@ -581,20 +611,26 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
           invoiceForm.getValues('teamCode') || 
           generateTeamCode({ schoolName: selectedSchool, district: selectedDistrict });
         
+        let eventName = event.name.replace(/\(PSJA students only\)/i, '').trim();
+        if (type) {
+            eventName = `${eventName} - ${type}`;
+        }
+
         const newConfirmation = {
             id: invoiceId, 
             invoiceId: invoiceId, 
             eventId: event.id, 
-            eventName: event.name.replace(/\(PSJA students only\)/i, '').trim(), 
+            eventName: eventName,
             eventDate: event.date, 
             submissionTimestamp: new Date().toISOString(), 
             selections: selections,
-            totalInvoiced: result.newTotalAmount || total, 
-            totalAmount: result.newTotalAmount || total,
+            totalInvoiced: total, 
+            totalAmount: total,
             invoiceUrl: result.invoiceUrl, 
             invoiceNumber: result.invoiceNumber, 
             teamCode: teamCode,
             invoiceStatus: result.status,
+            status: result.status,
             purchaserName: result.sponsorName || invoiceForm.getValues('sponsorName'), 
             schoolName: result.schoolName || invoiceForm.getValues('schoolName'), 
             sponsorEmail: result.sponsorEmail || invoiceForm.getValues('sponsorEmail'), 
@@ -623,7 +659,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 eventName: event.name.replace(/\(PSJA students only\)/i, '').trim(),
                 eventDate: event.date,
                 submissionTimestamp: new Date().toISOString(),
-                selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus } }), {}),
+                selections: stagedPlayers.reduce((acc, p) => ({ ...acc, [p.id!]: { byes: p.byes, section: p.section, uscfStatus: p.uscfStatus, studentType: p.studentType, status: 'active' } }), {}),
                 totalInvoiced: 0,
                 teamCode: recipient.teamCode,
                 invoiceStatus: 'COMPED',
@@ -642,7 +678,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             });
 
             setStagedPlayers([]);
-            setShowConfirmation(false);
+            setView('selection');
 
         } catch (error) {
           handleInvoiceError(error, "Failed to comp registration");
@@ -656,29 +692,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         const description = error instanceof Error ? error.message : "An unknown error occurred.";
         toast({ variant: "destructive", title: "Submission Error", description });
     };
-
-    const getFeeForEvent = () => {
-        if (!event) return { fee: 0, type: 'Regular Registration' };
-        
-        // Use the event's registration deadline if available, otherwise default to the event date.
-        const deadline = event.registrationDeadline ? new Date(event.registrationDeadline) : new Date(event.date);
-        const now = new Date();
-    
-        // Only apply late fees if the current date is after the registration deadline.
-        if (startOfDay(now) > startOfDay(deadline)) {
-            const eventDate = new Date(event.date);
-            if (isSameDay(eventDate, now)) {
-                return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
-            }
-            const hoursUntilEvent = differenceInHours(eventDate, now);
-            if (hoursUntilEvent <= 24) {
-                return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
-            }
-            return { fee: event.lateFee || event.regularFee, type: 'Late Registration' };
-        }
-        
-        return { fee: event.regularFee, type: 'Regular Registration' };
-    };
     
     if (!event) {
         return (
@@ -686,6 +699,107 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 <CardContent className='pt-6'>
                     Event not found. Please go back to Manage Events and select an event.
                 </CardContent>
+            </Card>
+        );
+    }
+    
+    if(view === 'review') {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Confirm Registration & Charges</CardTitle>
+                    <CardDescription>Review the total charges for {event.name} before finalizing.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div>
+                        <h3 className="font-semibold mb-3">Selected Students ({stagedPlayers.length})</h3>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {stagedPlayers.map((player) => (
+                                <div key={player.id} className="flex justify-between items-center text-sm bg-muted/50 rounded p-2">
+                                <span>{player.firstName} {player.lastName}</span>
+                                <div className="flex gap-2">
+                                    <Badge variant="outline" className="text-xs">{player.section}</Badge>
+                                    {player.uscfStatus !== 'current' && (
+                                    <Badge variant="secondary" className="text-xs">USCF {player.uscfStatus}</Badge>
+                                    )}
+                                </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="border rounded-lg p-4 space-y-3">
+                        <h3 className="font-semibold">Charge Breakdown</h3>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                            <span>Registration Fees ({stagedPlayers.length} × ${event.regularFee})</span>
+                            <span>${feeBreakdown.registrationFees.toFixed(2)}</span>
+                            </div>
+                            {feeBreakdown.lateFees > 0 && (
+                            <div className="flex justify-between text-amber-600">
+                                <span>{feeBreakdown.feeType} ({stagedPlayers.length} × ${(feeBreakdown.lateFees / stagedPlayers.length).toFixed(2)})</span>
+                                <span>${feeBreakdown.lateFees.toFixed(2)}</span>
+                            </div>
+                            )}
+                            {feeBreakdown.uscfFees > 0 && (
+                            <div className="flex justify-between">
+                                <span>USCF Fees ({stagedPlayers.filter(s => s.uscfStatus !== 'current' && s.studentType !== 'gt').length} × $24)</span>
+                                <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
+                            </div>
+                            )}
+                            <div className="border-t pt-2 flex justify-between font-semibold">
+                            <span>Total Amount</span>
+                            <span>${feeBreakdown.total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                    <Button variant="outline" onClick={() => setView('selection')}>Back to Selection</Button>
+                    <Button onClick={handleFinalize}>Finalize Registration</Button>
+                </CardFooter>
+            </Card>
+        );
+    }
+    
+    if(view === 'finalize') {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Finalize Registration</CardTitle>
+                    <CardDescription>Provide recipient details for the invoice, or comp the registration.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Form {...invoiceForm}>
+                        <form className="space-y-4 pt-4">
+                            <FormField control={invoiceForm.control} name="sponsorName" render={({ field }) => ( <FormItem><FormLabel>Recipient/Sponsor Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={invoiceForm.control} name="sponsorEmail" render={({ field }) => ( <FormItem><FormLabel>Recipient Email</FormLabel><FormControl><Input type="email" placeholder="sponsor@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={invoiceForm.control} name="schoolName" render={({ field }) => ( <FormItem><FormLabel>School/Organization Name</FormLabel><FormControl><Input placeholder="e.g., Lincoln High School" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={invoiceForm.control} name="teamCode" render={({ field }) => ( <FormItem><FormLabel>Team Code</FormLabel><FormControl><Input placeholder="e.g., LIHS" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        </form>
+                    </Form>
+                </CardContent>
+                <CardFooter className="flex-col sm:items-stretch gap-2 pt-4">
+                    <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateTeamInvoice)} disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Register as Team
+                    </Button>
+                    
+                    <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleGenerateIndividualInvoices)} disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Register as Individuals
+                    </Button>
+                    
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+                        <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
+                    </div>
+                    
+                    <Button type="button" variant="outline" onClick={invoiceForm.handleSubmit(handleCompRegistration)} disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Award className="mr-2 h-4 w-4" />}
+                        Comp Registration (No Invoice)
+                    </Button>
+                     <Button variant="ghost" onClick={() => setView('review')}>Back to Review</Button>
+                </CardFooter>
             </Card>
         );
     }
@@ -890,46 +1004,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            
-            <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Finalize Registration</DialogTitle>
-                        <DialogDescription>Provide recipient details for the invoice, or comp the registration.</DialogDescription>
-                    </DialogHeader>
-                    <Form {...invoiceForm}>
-                        <form className="space-y-4 pt-4">
-                            <FormField control={invoiceForm.control} name="sponsorName" render={({ field }) => ( <FormItem><FormLabel>Recipient/Sponsor Name</FormLabel><FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={invoiceForm.control} name="sponsorEmail" render={({ field }) => ( <FormItem><FormLabel>Recipient Email</FormLabel><FormControl><Input type="email" placeholder="sponsor@example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={invoiceForm.control} name="schoolName" render={({ field }) => ( <FormItem><FormLabel>School/Organization Name</FormLabel><FormControl><Input placeholder="e.g., Lincoln High School" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={invoiceForm.control} name="teamCode" render={({ field }) => ( <FormItem><FormLabel>Team Code</FormLabel><FormControl><Input placeholder="e.g., LIHS" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            
-                            <DialogFooter className="flex-col sm:flex-col sm:items-stretch gap-2 pt-4">
-                                <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateTeamInvoice)} disabled={isSubmitting}>
-                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Register as Team
-                                </Button>
-                                
-                                <Button type="button" variant="secondary" onClick={invoiceForm.handleSubmit(handleGenerateIndividualInvoices)} disabled={isSubmitting}>
-                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Register as Individuals
-                                </Button>
-                                
-                                <div className="relative">
-                                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-                                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">Or</span></div>
-                                </div>
-                                
-                                <Button type="button" variant="outline" onClick={invoiceForm.handleSubmit(handleCompRegistration)} disabled={isSubmitting}>
-                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Award className="mr-2 h-4 w-4" />}
-                                    Comp Registration (No Invoice)
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
-
         </div>
     );
 }
