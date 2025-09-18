@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { doc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMasterDb, type MasterPlayer } from "@/context/master-db-context";
 import { useSponsorProfile } from "@/hooks/use-sponsor-profile";
 import { School, User, DollarSign, CheckCircle, Clock, AlertCircle, Lock } from "lucide-react";
-import { format, differenceInHours, isSameDay } from "date-fns";
+import { format, differenceInHours, isSameDay, startOfDay } from "date-fns";
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { createPsjaSplitInvoice } from '@/ai/flows/create-psja-split-invoice-flow';
@@ -136,18 +136,18 @@ export function SponsorRegistrationDialog({
   const getFeeForEvent = () => {
       if (!event) return { fee: 0, type: 'Regular Registration' };
       
-      const eventDate = new Date(event.date);
+      const deadline = event.registrationDeadline ? new Date(event.registrationDeadline) : new Date(event.date);
       const now = new Date();
 
-      if (isSameDay(eventDate, now)) {
-          return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
-      }
-      
-      const hoursUntilEvent = differenceInHours(eventDate, now);
-      
-      if (hoursUntilEvent <= 24) {
-          return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
-      } else if (hoursUntilEvent <= 48) {
+      if (startOfDay(now) > startOfDay(deadline)) {
+          const eventDate = new Date(event.date);
+          if (isSameDay(eventDate, now)) {
+              return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
+          }
+          const hoursUntilEvent = differenceInHours(eventDate, now);
+          if (hoursUntilEvent <= 24) {
+              return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
+          }
           return { fee: event.lateFee || event.regularFee, type: 'Late Registration' };
       }
       
