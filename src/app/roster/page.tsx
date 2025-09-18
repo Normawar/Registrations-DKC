@@ -54,7 +54,7 @@ const playerFormSchema = z.object({
   uscfExpiration: z.date().optional(),
   regularRating: z.preprocess(
     (val) => {
-      if (!val || String(val).toUpperCase() === 'UNR' || val === '') {
+      if (!val || String(val).toUpperCase() === 'UNR' || val === '' || val === 'NEW') {
         return undefined;
       }
       return val;
@@ -120,7 +120,7 @@ const DateInput = React.forwardRef<HTMLInputElement, {
   
   useEffect(() => {
     const newDisplayValue = (value instanceof Date && !isNaN(value.getTime())) 
-      ? format(value, 'MM/dd/yyyy') 
+      ? format(value, 'yyyy-MM-dd') 
       : '';
     setDisplayValue(newDisplayValue);
   }, [value]);
@@ -134,29 +134,24 @@ const DateInput = React.forwardRef<HTMLInputElement, {
       return;
     }
 
-    const dateRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+    const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
     const match = inputValue.match(dateRegex);
 
     if (match) {
-      const [, monthStr, dayStr, yearStr] = match;
-      const month = parseInt(monthStr, 10);
-      const day = parseInt(dayStr, 10);
-      const year = parseInt(yearStr, 10);
-
-      if (month >= 1 && month <= 12 && day >= 1 && day <= 31 && year >= 1900) {
-        const parsedDate = new Date(year, month - 1, day);
-
-        if (parsedDate.getDate() === day && parsedDate.getMonth() === month - 1 && parsedDate.getFullYear() === year) {
-          onChange?.(parsedDate);
+        const [, year, month, day] = match.map(Number);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            const date = new Date(year, month - 1, day);
+            if (isValid(date)) {
+                onChange?.(date);
+            }
         }
-      }
     }
   };
 
   return (
     <Input
       ref={ref}
-      type="text"
+      type="date"
       value={displayValue}
       onChange={handleChange}
       placeholder={placeholder}
@@ -734,95 +729,89 @@ function SponsorRosterView() {
 
       {/* Edit Player Dialog */}
       <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
-          <DialogContent className="sm:max-w-3xl w-full max-w-[90vw] p-0" style={{ height: '90vh', maxHeight: '90vh' }}>
-              <Tabs defaultValue="details" className="w-full h-full flex flex-col">
-                  <div className="p-6 pb-4 border-b bg-white z-10" style={{ minHeight: '120px', maxHeight: '120px' }}>
-                      <DialogTitle>
-                          {editingPlayer && database.some(p => p.id === editingPlayer.id) ? 'Edit Player' : 'Add New Player'}
-                      </DialogTitle>
-                      <DialogDescription>
-                          Complete the player's information. This will add them to or update their record in the master database.
-                      </DialogDescription>
-                      <TabsList className="grid w-full grid-cols-2 mt-3">
-                          <TabsTrigger value="details">Player Details</TabsTrigger>
-                          <TabsTrigger value="history">Change History</TabsTrigger>
-                      </TabsList>
-                  </div>
-      
-                  <div style={{ height: 'calc(90vh - 200px)', overflow: 'hidden' }}>
-                      <TabsContent value="details" className="h-full m-0 data-[state=active]:block">
-                          <div 
-                              className="h-full p-6 overflow-y-scroll"
-                              style={{ height: '100%', maxHeight: '100%', overflowY: 'scroll', scrollbarWidth: 'thin' }}
-                          >
-                              <Form {...playerForm}>
-                                  <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6 pb-4">
-                                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                        <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                        <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { field.onChange(value); playerForm.setValue('school', ''); }} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{dbDistricts.map(district => ( <SelectItem key={district} value={district}>{district}</SelectItem> ))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                        <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={!selectedEditDistrict || editFormSchoolsForDistrict.length === 0}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{editFormSchoolsForDistrict.map(school => ( <SelectItem key={school} value={school}>{school}</SelectItem> ))}</SelectContent></Select><FormMessage />{selectedEditDistrict && editFormSchoolsForDistrict.length === 0 && ( <FormDescription className="text-amber-600">No schools found for this district. You may need to add schools to this district first.</FormDescription> )}</FormItem> )} />
-                                      </div>
-                                      {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && ( <FormField control={playerForm.control} name="studentType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Student Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} /> )}
-                                      <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${''}${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input type="text" placeholder="Enter USCF ID or 'NEW'" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
-                                      <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY (e.g., 11/01/1986)"/></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY (e.g., 12/31/2025)"/></FormControl><FormMessage /></FormItem>)} />
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                          <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                          <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                          <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" placeholder="Enter email address" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                          <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input type="text" placeholder="Enter zip code" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <FormField control={playerForm.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                      </div>
-                                      <div className="h-20"></div>
-                                  </form>
-                              </Form>
-                          </div>
-                      </TabsContent>
-                      <TabsContent value="history" className="h-full m-0 data-[state=active]:block">
-                          <div className="h-full overflow-y-scroll" style={{ height: '100%', maxHeight: '100%', overflowY: 'scroll', scrollbarWidth: 'thin' }}>
-                              <ChangeHistoryTab player={editingPlayer} />
-                          </div>
-                      </TabsContent>
-                  </div>
-                  <div className="p-6 pt-4 border-t bg-white z-10" style={{ minHeight: '80px', maxHeight: '80px' }}>
-                      <div className="flex justify-end space-x-4">
-                          <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
-                          <Button type="submit" form="edit-player-form">Save Changes</Button>
-                      </div>
-                  </div>
-              </Tabs>
-          </DialogContent>
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
+               <Tabs defaultValue="details" className="w-full h-full flex flex-col">
+                <DialogHeader className="p-6 pb-0 border-b shrink-0">
+                    <DialogTitle>{editingPlayer && database.some(p => p.id === editingPlayer.id) ? 'Edit Player' : 'Add New Player'}</DialogTitle>
+                    <DialogDescription>
+                        Complete the player's information. This will add them to or update their record in the master database.
+                    </DialogDescription>
+                    <TabsList className="grid w-full grid-cols-2 mt-3">
+                        <TabsTrigger value="details">Player Details</TabsTrigger>
+                        <TabsTrigger value="history">Change History</TabsTrigger>
+                    </TabsList>
+                </DialogHeader>
+                <TabsContent value="details" className="flex-1 overflow-hidden m-0">
+                  <ScrollArea className='h-full'>
+                    <div className='p-6'>
+                      <Form {...playerForm}>
+                          <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { field.onChange(value); playerForm.setValue('school', ''); }} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{dbDistricts.map(district => ( <SelectItem key={district} value={district}>{district}</SelectItem> ))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={!selectedEditDistrict || editFormSchoolsForDistrict.length === 0}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{editFormSchoolsForDistrict.map(school => ( <SelectItem key={school} value={school}>{school}</SelectItem> ))}</SelectContent></Select><FormMessage />{selectedEditDistrict && editFormSchoolsForDistrict.length === 0 && ( <FormDescription className="text-amber-600">No schools found for this district. Add one on the Schools page.</FormDescription> )}</FormItem> )} />
+                              </div>
+                              {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                  <FormField control={playerForm.control} name="studentType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Student Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                              )}
+                              <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${''}${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
+                              <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD"/></FormControl><FormMessage /></FormItem> )} />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                  <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" placeholder="Enter email address" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input placeholder="Enter zip code" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={playerForm.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={playerForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                              </div>
+                          </form>
+                      </Form>
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+                 <TabsContent value="history" className="h-full m-0 data-[state=active]:block">
+                  <ScrollArea className='h-full'>
+                    <ChangeHistoryTab player={editingPlayer} />
+                  </ScrollArea>
+                </TabsContent>
+               </Tabs>
+                <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                    <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
+                    <Button type="submit" form="edit-player-form">Save Player</Button>
+                </DialogFooter>
+            </DialogContent>
       </Dialog>
 
 
       {/* Create New Player Dialog */}
       <Dialog open={isCreatePlayerDialogOpen} onOpenChange={setIsCreatePlayerDialogOpen}>
           <DialogContent className="sm:max-w-4xl w-full max-w-[90vw] p-0" style={{ height: '90vh', maxHeight: '90vh' }}>
-              <div className="p-6 pb-4 border-b bg-white z-10" style={{ minHeight: '80px', maxHeight: '80px' }}>
+              <div className="p-6 pb-4 border-b bg-white z-10">
                   <DialogTitle>Create New Player</DialogTitle>
                   <DialogDescription>Add a new player to the database and your roster. This player will be added to the master database and assigned to your school.</DialogDescription>
               </div>
-              <div style={{ height: 'calc(90vh - 160px)', overflow: 'hidden' }}>
-                  <div className="h-full p-6 overflow-y-scroll" style={{ height: '100%', maxHeight: '100%', overflowY: 'scroll', scrollbarWidth: 'thin' }}>
+              <ScrollArea className='flex-1 overflow-y-auto'>
+                  <div className="p-6">
                       <Form {...createPlayerForm}>
-                          <form id="create-player-form" onSubmit={createPlayerForm.handleSubmit(handleCreatePlayerSubmit)} className="space-y-6 pb-4">
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                  <FormField control={createPlayerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                  <FormField control={createPlayerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                  <FormField control={createPlayerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
+                          <form id="create-player-form" onSubmit={createPlayerForm.handleSubmit(handleCreatePlayerSubmit)} className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  <FormField control={createPlayerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input type="text" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  <FormField control={createPlayerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input type="text" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  <FormField control={createPlayerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input type="text" {...field} /></FormControl><FormMessage /></FormItem> )} />
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <FormField control={createPlayerForm.control} name="district" render={({ field }) => (
                                       <FormItem><FormLabel>District</FormLabel>
                                       <Select onValueChange={(value) => handleDistrictChange(value, createPlayerForm)} value={field.value}>
@@ -840,13 +829,13 @@ function SponsorRosterView() {
                                       </FormItem>
                                   )} />
                               </div>
-                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${''}${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input type="text" placeholder="Enter USCF ID or 'NEW'" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
-                              <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField control={createPlayerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY (e.g., 11/01/1986)"/></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={createPlayerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="MM/DD/YYYY (e.g., 12/31/2025)"/></FormControl><FormMessage /></FormItem>)} />
+                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${''}${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
+                              <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={createPlayerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={createPlayerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD"/></FormControl><FormMessage /></FormItem> )} />
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <FormField control={createPlayerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                                   <FormField control={createPlayerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
                               </div>
@@ -862,24 +851,22 @@ function SponsorRosterView() {
                                       </FormItem>
                                   )} />
                               )}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" placeholder="Enter email address" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                  <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input type="text" placeholder="Enter zip code" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <FormField control={createPlayerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" placeholder="Enter email address" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  <FormField control={createPlayerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input placeholder="Enter zip code" {...field} /></FormControl><FormMessage /></FormItem> )} />
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  <FormField control={createPlayerForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" placeholder="Enter phone number" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <FormField control={createPlayerForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField control={createPlayerForm.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                               </div>
-                              <div className="h-20"></div>
                           </form>
                       </Form>
                   </div>
-              </div>
-              <div className="p-6 pt-4 border-t bg-white z-10" style={{ minHeight: '80px', maxHeight: '80px' }}>
-                  <div className="flex justify-end space-x-4">
-                      <Button type="button" variant="ghost" onClick={handleCancelCreate}>Cancel</Button>
-                      <Button type="submit" form="create-player-form">Create Player</Button>
-                  </div>
-              </div>
+              </ScrollArea>
+              <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                  <Button type="button" variant="ghost" onClick={handleCancelCreate}>Cancel</Button>
+                  <Button type="submit" form="create-player-form">Create Player</Button>
+              </DialogFooter>
           </DialogContent>
       </Dialog>
     </div>
@@ -1367,95 +1354,67 @@ function DistrictRosterView() {
             })}
              <Dialog open={isEditPlayerDialogOpen} onOpenChange={setIsEditPlayerDialogOpen}>
                 <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-                    <DialogHeader className="p-6 pb-4 border-b shrink-0"><DialogTitle>Edit Player</DialogTitle></DialogHeader>
-                    <div className='flex-1 overflow-y-auto p-6'>
-                    <Form {...playerForm}>
-                        <form id="edit-player-form-district" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-6">
-                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                                <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input type="text" value={field.value || ''} onChange={field.onChange} onBlur={field.onBlur} name={field.name} /></FormControl><FormMessage /></FormItem> )} />
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FormField 
-                                    control={playerForm.control} 
-                                    name="district" 
-                                    render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>District</FormLabel>
-                                        <Select 
-                                        onValueChange={(value) => {
-                                            field.onChange(value);
-                                            playerForm.setValue('school', '');
-                                        }} 
-                                        value={field.value || ''}
-                                        >
-                                        <FormControl>
-                                            <SelectTrigger>
-                                            <SelectValue placeholder="Select a district" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {dbDistricts.map(district => (
-                                            <SelectItem key={district} value={district}>{district}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                    )} 
-                                />
-                                
-                                <FormField 
-                                    control={playerForm.control} 
-                                    name="school" 
-                                    render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>School</FormLabel>
-                                        <Select 
-                                        onValueChange={field.onChange} 
-                                        value={field.value || ''}
-                                        disabled={!selectedEditDistrict || editFormSchoolsForDistrict.length === 0}
-                                        >
-                                        <FormControl>
-                                            <SelectTrigger>
-                                            <SelectValue placeholder="Select a school" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            {editFormSchoolsForDistrict.map(school => (
-                                            <SelectItem key={school} value={school}>{school}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                        {selectedEditDistrict && editFormSchoolsForDistrict.length === 0 && (
-                                        <FormDescription className="text-amber-600">
-                                            No schools found for this district. You may need to add schools to this district first.
-                                        </FormDescription>
-                                        )}
-                                    </FormItem>
-                                    )} 
-                                />
-                            </div>
-                            <FormField control={playerForm.control} name="studentType" render={({ field }) => (
-                                <FormItem className="space-y-3"><FormLabel>Student Type</FormLabel>
-                                <FormControl>
-                                    <RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT</FormLabel></FormItem>
-                                    </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )} />
-                        </form>
-                    </Form>
-                    </div>
-                    <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                        <Button variant="ghost" onClick={() => setIsEditPlayerDialogOpen(false)}>Cancel</Button>
-                        <Button type="submit" form="edit-player-form-district">Save Changes</Button>
-                    </DialogFooter>
+                  <Tabs defaultValue="details" className="w-full h-full flex flex-col">
+                    <DialogHeader className="p-6 pb-0 border-b shrink-0">
+                      <DialogTitle>Edit Player</DialogTitle>
+                      <DialogDescription>
+                          Modify the player's information below.
+                      </DialogDescription>
+                      <TabsList className="grid w-full grid-cols-2 mt-3">
+                          <TabsTrigger value="details">Player Details</TabsTrigger>
+                          <TabsTrigger value="history">Change History</TabsTrigger>
+                      </TabsList>
+                    </DialogHeader>
+                    <TabsContent value="details" className="flex-1 overflow-hidden m-0">
+                      <ScrollArea className='h-full'>
+                        <div className='p-6'>
+                            <Form {...playerForm}>
+                                <form id="edit-player-form-district" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <FormField control={playerForm.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={playerForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={playerForm.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField control={playerForm.control} name="district" render={({ field }) => ( <FormItem><FormLabel>District</FormLabel><Select onValueChange={(value) => { field.onChange(value); playerForm.setValue('school', ''); }} value={field.value || ''}><FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl><SelectContent>{dbDistricts.map(district => ( <SelectItem key={district} value={district}>{district}</SelectItem> ))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField control={playerForm.control} name="school" render={({ field }) => ( <FormItem><FormLabel>School</FormLabel><Select onValueChange={field.onChange} value={field.value || ''} disabled={!selectedEditDistrict || editFormSchoolsForDistrict.length === 0}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{editFormSchoolsForDistrict.map(school => ( <SelectItem key={school} value={school}>{school}</SelectItem> ))}</SelectContent></Select><FormMessage />{selectedEditDistrict && editFormSchoolsForDistrict.length === 0 && ( <FormDescription className="text-amber-600">No schools found for this district.</FormDescription> )}</FormItem> )} />
+                                  </div>
+                                  {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                      <FormField control={playerForm.control} name="studentType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Student Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                                  )}
+                                  <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${''}${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
+                                  <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => ( <FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD"/></FormControl><FormMessage /></FormItem> )} />
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <FormField control={playerForm.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                      <FormField control={playerForm.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent position="item-aligned">{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <FormField control={playerForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" placeholder="Enter email address" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                      <FormField control={playerForm.control} name="zipCode" render={({ field }) => ( <FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input placeholder="Enter zip code" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <FormField control={playerForm.control} name="state" render={({ field }) => ( <FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField control={playerForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Phone (Optional)</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                  </div>
+                                </form>
+                            </Form>
+                        </div>
+                      </ScrollArea>
+                    </TabsContent>
+                     <TabsContent value="history" className="h-full m-0 data-[state=active]:block">
+                      <ScrollArea className='h-full'>
+                        <ChangeHistoryTab player={editingPlayer} />
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
+                  <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                      <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>
+                      <Button type="submit" form="edit-player-form-district">Save Changes</Button>
+                  </DialogFooter>
                 </DialogContent>
             </Dialog>
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
