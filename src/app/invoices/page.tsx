@@ -13,9 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowUpDown, ArrowUp, ArrowDown, ExternalLink, Eye, Users, DollarSign, Calendar, Building, AlertCircle, Edit, Trash2, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
+import { SponsorDetailsDialog } from '@/components/sponsor-details-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
+import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -69,6 +70,10 @@ export default function UnifiedInvoiceRegistrations() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [invoiceToCancel, setInvoiceToCancel] = useState<any | null>(null);
   const [isCanceling, setIsCanceling] = useState(false);
+  
+  const [viewingSponsor, setViewingSponsor] = useState<SponsorProfile | null>(null);
+  const [isSponsorDialogOpen, setIsSponsorDialogOpen] = useState(false);
+  const [allUsers, setAllUsers] = useState<SponsorProfile[]>([]);
 
   const { database: allPlayers, dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
   const [districtFilter, setDistrictFilter] = useState('all');
@@ -113,6 +118,9 @@ export default function UnifiedInvoiceRegistrations() {
         }
         
         // For organizers, no role-based filter is applied, fetching all invoices.
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const users = usersSnapshot.docs.map(doc => doc.data() as SponsorProfile);
+        setAllUsers(users);
         
         const invoiceSnapshot = await getDocs(invoicesQuery);
         const invoicesArray = invoiceSnapshot.docs
@@ -261,6 +269,20 @@ export default function UnifiedInvoiceRegistrations() {
   const handleCancelInvoiceClick = (invoice: any) => {
     setInvoiceToCancel(invoice);
     setIsAlertOpen(true);
+  };
+  
+  const handleViewSponsor = (sponsorEmail: string) => {
+    const sponsorProfile = allUsers.find(u => u.email.toLowerCase() === sponsorEmail.toLowerCase());
+    if (sponsorProfile) {
+        setViewingSponsor(sponsorProfile);
+        setIsSponsorDialogOpen(true);
+    } else {
+        toast({
+            variant: 'destructive',
+            title: 'Sponsor Not Found',
+            description: 'Could not find a user profile for this email address.',
+        });
+    }
   };
 
   const confirmCancel = async () => {
@@ -639,7 +661,12 @@ export default function UnifiedInvoiceRegistrations() {
                       </td>
                       <td className="p-2">
                         <div className="space-y-1">
-                          <div className="font-medium">{invoice.companyName}</div>
+                          <button 
+                            className="font-medium text-primary hover:underline"
+                            onClick={() => handleViewSponsor(invoice.contactEmail)}
+                          >
+                              {invoice.companyName}
+                          </button>
                           <div className="text-sm text-muted-foreground">{invoice.contactEmail}</div>
                         </div>
                       </td>
@@ -728,6 +755,14 @@ export default function UnifiedInvoiceRegistrations() {
             }}
             confirmation={selectedInvoice}
           />
+        )}
+        
+        {viewingSponsor && (
+            <SponsorDetailsDialog
+                isOpen={isSponsorDialogOpen}
+                onClose={() => setIsSponsorDialogOpen(false)}
+                sponsor={viewingSponsor}
+            />
         )}
       </div>
       
