@@ -99,6 +99,9 @@ const cancelInvoiceFlow = ai.defineFlow(
         if (isNotCancelable) {
              console.warn(`Invoice ${input.invoiceId} cannot be canceled through the API (likely already paid or in a final state). Fetching and returning its current state.`);
              const { result: { invoice } } = await invoicesApi.getInvoice(input.invoiceId);
+             if (!invoice) {
+                throw new Error(`Could not find invoice or invoice version for ID: ${input.invoiceId}`);
+             }
              return { invoiceId: input.invoiceId, status: invoice?.status || 'UNKNOWN' };
         }
 
