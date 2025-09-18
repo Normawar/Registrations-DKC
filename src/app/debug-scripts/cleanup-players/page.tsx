@@ -33,51 +33,24 @@ function CleanupPlayersPage() {
     }
     setIsLoading(true);
     try {
-      // 1. Get all player IDs from existing invoices
-      const invoicesSnapshot = await getDocs(collection(db, 'invoices'));
-      const playersOnInvoices = new Set<string>();
-      invoicesSnapshot.forEach(invoiceDoc => {
-        const selections = invoiceDoc.data().selections;
-        if (selections && typeof selections === 'object') {
-          Object.keys(selections).forEach(playerId => playersOnInvoices.add(playerId));
-        }
-      });
-      console.log(`Found ${playersOnInvoices.size} unique players on invoices.`);
-
-      // 2. Fetch all players
       const playersSnapshot = await getDocs(collection(db, 'players'));
       const allPlayers = playersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MasterPlayer));
       console.log(`Total players in database: ${allPlayers.length}`);
 
       // 3. Determine which players to delete based on the new, more specific rules
       const toDelete = allPlayers.filter(player => {
-        // **NEW RULE**: Specifically target and delete the corrupted "test1 test" players
-        if (player.firstName === 'test1' && player.lastName === 'test') {
+        // **NEW RULE**: Specifically target players whose first name starts with "test"
+        const firstName = player.firstName || '';
+        if (firstName.toLowerCase().startsWith('test')) {
+            // But always keep the essential test players
+            if (playersToKeep.has(player.id)) {
+                return false;
+            }
             return true;
         }
-
-        // Rule 1: Always keep the essential test players
-        if (playersToKeep.has(player.id)) {
-          return false;
-        }
-
-        // Rule 2: Keep all players from the PSJA district
-        if (player.district === 'PHARR-SAN JUAN-ALAMO ISD') {
-          return false;
-        }
         
-        // Rule 3: Keep players who are on an invoice
-        if (playersOnInvoices.has(player.id)) {
-          return false;
-        }
-
-        // Rule 4: Keep players who are on a roster (have a school and district assigned)
-        if (player.school && player.district && player.school.trim() !== '' && player.district.trim() !== '') {
-          return false;
-        }
-
-        // If none of the above conditions are met, the player should be deleted.
-        return true;
+        // For any other player, do not delete them.
+        return false;
       });
 
       console.log(`Identified ${toDelete.length} players to delete.`);
@@ -160,7 +133,7 @@ function CleanupPlayersPage() {
           <CardHeader>
             <CardTitle>Database Cleanup Tool</CardTitle>
             <CardDescription>
-              This tool will permanently delete players who are **not** on any roster, **not** on any invoice, and **not** from the PSJA district. It will always preserve the 10 core test accounts.
+              This tool will permanently delete players whose first name starts with "test". It will always preserve the 10 core test accounts (ID 90000001-90000010).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -187,7 +160,7 @@ function CleanupPlayersPage() {
               </div>
             ) : playersToDelete.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
-                <p>No unrostered or un-invoiced players found to delete. Your database is clean according to the rules!</p>
+                <p>No players with a first name starting with "test" were found to delete. Your database is clean according to the rules!</p>
               </div>
             ) : (
               <ul className="text-sm space-y-1 list-disc list-inside max-h-60 overflow-y-auto">
