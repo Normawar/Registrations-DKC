@@ -6,16 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { AppLayout } from '@/components/app-layout';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrganizerRegistrationForm } from '@/components/organizer-registration-form';
-
-function OrganizerRegistrationPage() {
-    return (
-        <AppLayout>
-            <Suspense fallback={<OrganizerRegistrationSkeleton />}>
-                <OrganizerRegistrationContent />
-            </Suspense>
-        </AppLayout>
-    );
-}
+import { OrganizerGuard } from '@/components/auth-guard';
 
 function OrganizerRegistrationContent() {
     const searchParams = useSearchParams();
@@ -39,7 +30,14 @@ function OrganizerRegistrationSkeleton() {
     );
 }
 
-
-export default OrganizerRegistrationPage;
-
-
+export default function OrganizerRegistrationPage() {
+    return (
+        <OrganizerGuard>
+            <AppLayout>
+                <Suspense fallback={<OrganizerRegistrationSkeleton />}>
+                    <OrganizerRegistrationContent />
+                </Suspense>
+            </AppLayout>
+        </OrganizerGuard>
+    );
+}

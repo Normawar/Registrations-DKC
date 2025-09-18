@@ -66,12 +66,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
@@ -718,7 +714,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Confirm Registration & Charges</CardTitle>
+                    <CardTitle>Confirm Registration &amp; Charges</CardTitle>
                     <CardDescription>Review the total charges for {event.name} before finalizing.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
