@@ -5,13 +5,14 @@ import { Client, Environment } from 'square';
  * Throws an error if Square credentials are not set in the environment.
  */
 function checkSquareCredentials() {
-  // Add debugging
-  console.log('DEBUG: All environment variables:', Object.keys(process.env));
-  console.log('DEBUG: SQUARE_ACCESS_TOKEN exists:', !!process.env.SQUARE_ACCESS_TOKEN);
-  console.log('DEBUG: SQUARE_LOCATION_ID exists:', !!process.env.SQUARE_LOCATION_ID);
-  console.log('DEBUG: SQUARE_APPLICATION_ID exists:', !!process.env.SQUARE_APPLICATION_ID);
-  console.log('DEBUG: SQUARE_ENVIRONMENT exists:', !!process.env.SQUARE_ENVIRONMENT);
-
+  console.log('=== COMPLETE ENV DEBUG ===');
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('All env vars:', Object.keys(process.env).sort());
+  console.log('Square-related vars:', Object.keys(process.env).filter(k => k.includes('SQUARE')));
+  console.log('SQUARE_ACCESS_TOKEN value:', process.env.SQUARE_ACCESS_TOKEN ? 'EXISTS' : 'MISSING');
+  console.log('SQUARE_LOCATION_ID value:', process.env.SQUARE_LOCATION_ID ? 'EXISTS' : 'MISSING');
+  console.log('=== END DEBUG ===');
+  
   const accessToken = process.env.SQUARE_ACCESS_TOKEN;
   const locationId = process.env.SQUARE_LOCATION_ID;
   const applicationId = process.env.SQUARE_APPLICATION_ID;
