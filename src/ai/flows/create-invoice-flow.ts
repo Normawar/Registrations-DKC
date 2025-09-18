@@ -127,23 +127,19 @@ const createInvoiceFlow = ai.defineFlow(
       }
     }
 
-    console.log('Debug: Checking Square config...');
+    console.log('Debug: Getting Square client...');
+    let squareClient;
+    let locationId;
+
     try {
-      const { isConfigured } = await checkSquareConfig();
-      console.log('Debug: checkSquareConfig result:', { isConfigured });
-      if (!isConfigured) {
-        // Try to get the client anyway to see if credentials actually work
-        console.log('Debug: checkSquareConfig says not configured, but trying to get client anyway...');
-        const testClient = await getSquareClient();
-        console.log('Debug: getSquareClient succeeded despite checkSquareConfig saying not configured');
-      }
+      squareClient = await getSquareClient();
+      locationId = await getSquareLocationId();
+      console.log('Debug: Square client and location ID obtained successfully');
     } catch (error) {
-      console.log('Debug: checkSquareConfig threw error:', error);
-      throw new Error(`Credential check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Debug: Failed to get Square client:', error);
+      throw new Error(`Square configuration error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
     const { customersApi, ordersApi, invoicesApi } = squareClient;
 
     try {
