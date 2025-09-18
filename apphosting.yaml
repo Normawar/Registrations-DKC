@@ -2,7 +2,11 @@
 # https://firebase.google.com/docs/app-hosting/configure
 runConfig:
   env:
-    SQUARE_ACCESS_TOKEN: EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC
-    SQUARE_APPLICATION_ID: sq0idp-2nOEj3tUd-PtlED-EdE3MQ
-    SQUARE_ENVIRONMENT: production
-    SQUARE_LOCATION_ID: CTED7GVSVH5H8
+    - name: SQUARE_ACCESS_TOKEN
+      value: EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC
+    - name: SQUARE_APPLICATION_ID  
+      value: sq0idp-2nOEj3tUd-PtlED-EdE3MQ
+    - name: SQUARE_ENVIRONMENT
+      value: production
+    - name: SQUARE_LOCATION_ID
+      value: CTED7GVSVH5H8

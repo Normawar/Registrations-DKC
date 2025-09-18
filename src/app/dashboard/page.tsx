@@ -112,6 +112,10 @@ function DashboardContent() {
 
   const playersWithMissingInfo = useMemo(() => {
     return rosterPlayers.filter(player => {
+      // **FIX:** Explicitly filter out corrupted "test1 test" players
+      if (player.firstName === 'test1' && player.lastName === 'test') {
+        return false;
+      }
       return !player.uscfId || !player.grade || !player.section || !player.email || !player.dob || !player.zipCode;
     });
   }, [rosterPlayers]);
