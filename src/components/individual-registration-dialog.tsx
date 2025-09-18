@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -67,19 +67,21 @@ export function IndividualRegistrationDialog({
   }, [parentProfile, database, isOpen, event]);
   
     useEffect(() => {
-        const loadRegistrations = () => {
-            const storedConfirmations = localStorage.getItem('confirmations');
-            if (storedConfirmations) {
-                setRegistrations(JSON.parse(storedConfirmations));
+        const loadRegistrations = async () => {
+            if (isOpen && db && event?.id) {
+              const invoicesCol = collection(db, 'invoices');
+              const q = query(invoicesCol, where('eventId', '==', event.id));
+              const querySnapshot = await getDocs(q);
+              const eventRegistrations = querySnapshot.docs.map(doc => doc.data());
+              setRegistrations(eventRegistrations);
             }
         };
         loadRegistrations();
-    }, [isOpen]);
+    }, [isOpen, event?.id]);
 
   // Check which students are already registered
   const getStudentRegistrationStatus = (student: MasterPlayer) => {
     const existingReg = registrations.find((confirmation: any) => 
-      confirmation.eventId === event.id && 
       confirmation.selections && 
       confirmation.selections[student.id]
     );
@@ -239,17 +241,17 @@ export function IndividualRegistrationDialog({
         district: 'Individual',
         teamCode: teamCode,
         invoiceTitle: `${teamCode} @ ${format(new Date(event.date), 'MM/dd/yyyy')} ${event.name}`,
-        sponsorEmail: parentProfile.email,
-        sponsorPhone: parentProfile.phone || '',
-        contactEmail: parentProfile.email,
-        purchaserEmail: parentProfile.email,
-        purchaserName: `${parentProfile.firstName} ${parentProfile.lastName}`,
         selections: Object.fromEntries(Object.entries(selectedStudents).map(([playerId, details]) => [ playerId, { ...details, status: 'active' } ])),
         totalInvoiced: feeBreakdown.total,
         totalAmount: feeBreakdown.total,
         invoiceStatus: result.status,
         status: result.status,
         invoiceUrl: result.invoiceUrl,
+        purchaserName: `${parentProfile.firstName} ${parentProfile.lastName}`,
+        sponsorEmail: parentProfile.email,
+        sponsorPhone: parentProfile.phone || '',
+        contactEmail: parentProfile.email,
+        purchaserEmail: parentProfile.email,
       };
   
       const invoiceDocRef = doc(db, 'invoices', result.invoiceId);
@@ -268,7 +270,7 @@ export function IndividualRegistrationDialog({
     } catch (error) {
       console.error('Registration failed:', error);
       const description = error instanceof Error ? error.message : "An unknown error occurred.";
-      toast({ variant: 'destructive', title: "Registration Failed", description });
+      toast({ variant: "destructive", title: "Registration Failed", description });
     } finally {
       setIsSubmitting(false);
     }
