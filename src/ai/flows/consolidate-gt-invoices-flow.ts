@@ -1,4 +1,4 @@
-// src/ai/flows/consolidate-gt-invoices-flow.ts
+
 'use server';
 
 import { ai } from '@/ai/genkit';
@@ -124,10 +124,16 @@ const consolidateGtInvoicesFlow = ai.defineFlow(
 
     for (const invoice of gtInvoices) {
       try {
-        await invoicesApi.cancelInvoice(invoice.invoiceId, { version: invoice.version || 1 });
-        const invoiceRef = doc(db, 'invoices', invoice.id);
-        batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated' });
-        console.log(`Canceled invoice ${invoice.invoiceId}`);
+        if (invoice.invoiceId && invoice.version) {
+          await invoicesApi.cancelInvoice(invoice.invoiceId, { version: invoice.version });
+          const invoiceRef = doc(db, 'invoices', invoice.id);
+          batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated' });
+          console.log(`Canceled invoice ${invoice.invoiceId}`);
+        } else {
+           console.warn(`Invoice ${invoice.id} is missing invoiceId or version, marking as canceled locally.`);
+           const invoiceRef = doc(db, 'invoices', invoice.id);
+           batch.update(invoiceRef, { status: 'CANCELED', invoiceStatus: 'CANCELED', cancelReason: 'Consolidated - Missing Square ID/Version' });
+        }
       } catch (error: any) {
         if (error.statusCode === 404 || (error.body && error.body.includes('not found'))) {
           console.warn(`Invoice ${invoice.invoiceId} not found in Square, marking as canceled locally.`);
