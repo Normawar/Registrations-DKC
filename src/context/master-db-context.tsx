@@ -265,9 +265,18 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
   const [playerCount, setPlayerCount] = useState(0);
 
   const dbSchools = useMemo(() => [...new Set(schools.map(s => s.schoolName))].sort(), [schools]);
-  const dbDistricts = useMemo(() => [...new Set(schools.map(s => s.district))].sort(), [schools]);
+  const dbDistricts = useMemo(() => {
+    const districts = [...new Set(schools.map(s => s.district))].sort();
+    if (!districts.includes('Homeschool')) {
+      districts.unshift('Homeschool');
+    }
+    return districts;
+  }, [schools]);
   
   const getSchoolsForDistrict = useCallback((district: string): string[] => {
+    if (district === 'Homeschool') {
+      return ['Homeschool'];
+    }
     if (district === 'all' || !district) {
       return dbSchools;
     }

@@ -184,13 +184,18 @@ export default function ProfilePage() {
     profileForm.setValue('district', district);
     const filteredSchools = getSchoolsForDistrict(district);
     setSchoolsForDistrict(filteredSchools);
-    profileForm.setValue('school', '');
+
+    if (district === 'Homeschool') {
+      profileForm.setValue('school', 'Homeschool');
+    } else {
+      profileForm.setValue('school', '');
+    }
   };
   
   useEffect(() => {
     if (isProfileLoaded && profile) {
         setIsSchoolListReady(false); // Reset flag
-        handleDistrictChange(profile.district);
+        handleDistrictChange(profile.district || 'Homeschool');
         setActiveTab(profile.avatarType);
         if (profile.avatarType === 'icon') {
             setSelectedIconName(profile.avatarValue);
