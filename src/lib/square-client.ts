@@ -40,11 +40,16 @@ function checkSquareCredentials() {
  * @returns {Promise<Client>} The initialized Square client.
  */
 export async function getSquareClient(): Promise<Client> {
-  const accessToken = "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC";
-  const environment = Environment.Production;
+  checkSquareCredentials(); // This will run the debug logging
+  
+  const environment = process.env.SQUARE_ENVIRONMENT === 'production' 
+    ? Environment.Production 
+    : Environment.Sandbox;
+
+  console.log('Square client configured with environment:', environment);
 
   return new Client({
-    accessToken: accessToken,
+    accessToken: process.env.SQUARE_ACCESS_TOKEN,
     environment: environment,
   });
 }
@@ -55,5 +60,6 @@ export async function getSquareClient(): Promise<Client> {
  * @returns {Promise<string>} The Square Location ID.
  */
 export async function getSquareLocationId(): Promise<string> {
-  return "CTED7GVSVH5H8";
+  checkSquareCredentials(); // This will run the debug logging
+  return process.env.SQUARE_LOCATION_ID!;
 }
