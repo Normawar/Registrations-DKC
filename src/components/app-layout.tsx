@@ -72,6 +72,7 @@ const organizerMenuStructure = {
     { href: "/roster", icon: Users, label: "District Rosters" },
     { href: "/schools", icon: School, label: "Schools & Districts" },
     { href: "/previous-events", icon: History, label: "Previous Events" },
+    { href: "/quick-start-guide", icon: BookOpen, label: "Quick Start Guide" },
   ],
   "Accounting": [
     { href: "/payment-authorization", icon: ShieldCheck, label: "Payment Authorization" },
@@ -100,6 +101,7 @@ const individualMenuItems = [
   { href: "/invoices", icon: Receipt, label: "Invoices & Payments" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
   { href: "/previous-events", icon: History, label: "Previous Events" },
+  { href: "/quick-start-guide", icon: BookOpen, label: "Quick Start Guide" },
 ];
 
 const icons: { [key: string]: React.ElementType } = {
