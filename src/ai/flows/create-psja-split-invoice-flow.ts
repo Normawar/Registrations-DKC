@@ -18,6 +18,7 @@ const PlayerToInvoiceSchema = z.object({
   uscfAction: z.boolean(),
   isGtPlayer: z.boolean().optional(),
   section: z.string().optional(),
+  waiveLateFee: z.boolean().optional(), // Added field
 });
 
 export type CreatePsjaSplitInvoiceInput = z.infer<typeof CreatePsjaSplitInvoiceInputSchema>;
@@ -70,7 +71,8 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
     const gtPlayers = input.players.filter((p) => p.isGtPlayer);
     const independentPlayers = input.players.filter((p) => !p.isGtPlayer);
 
-    const gtLateFeePlayers = gtPlayers.filter(p => (p.lateFee || 0) > 0);
+    // Filter for GT players who have a late fee that is NOT waived
+    const gtLateFeePlayers = gtPlayers.filter(p => (p.lateFee || 0) > 0 && !p.waiveLateFee);
     
     let gtInvoice: CreatePsjaSplitInvoiceOutput['gtInvoice'] = undefined;
     let independentInvoice:
@@ -82,6 +84,7 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
         ...p,
         lateFee: 0, // GT students never pay late fees on their invoice
         uscfAction: false, // GT students covered under district bulk USCF plan
+        waiveLateFee: true, // Always waive late fee on the GT invoice itself
       }));
 
       gtInvoice = await createInvoice({
@@ -102,7 +105,7 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
       });
     }
 
-    // Create Independent Invoice (includes its own late fees + ALL GT late fees)
+    // Create Independent Invoice (includes its own late fees + ALL applicable GT late fees)
     if (independentPlayers.length > 0 || gtLateFeePlayers.length > 0) {
       const independentPlayersForInvoice: CreateInvoiceInput['players'] = [
         ...independentPlayers.map(p => ({...p, lateFee: p.lateFee ?? 0}))
@@ -118,6 +121,7 @@ const createPsjaSplitInvoiceFlow = ai.defineFlow(
           uscfAction: false,
           isGtPlayer: false, // Important: Treat as non-GT for billing purposes
           section: p.section,
+          waiveLateFee: false, // Ensure late fee is applied on this invoice
         });
       });
 
