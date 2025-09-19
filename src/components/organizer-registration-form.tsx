@@ -415,6 +415,11 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             await handlePsjaSplitInvoice(recipient, district);
             return;
         }
+        
+        if (splitUscfFees) {
+            await handleSplitInvoices(recipient, district);
+            return;
+        }
 
         setIsSubmitting(true);
         const { fee: registrationFeePerPlayer } = getFeeForEvent();
@@ -460,6 +465,78 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             toast({ variant: "destructive", title: "Submission Error", description });
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleSplitInvoices = async (recipient: InvoiceRecipientValues, district?: string) => {
+        if (!event || !db) return;
+      
+        setIsSubmitting(true);
+        const { fee: currentFee } = getFeeForEvent();
+        const lateFeeAmount = currentFee - event.regularFee;
+      
+        // 1. Create invoice for registrations + late fees
+        const registrationPlayers = stagedPlayers.map(p => ({
+          playerName: `${p.firstName} ${p.lastName}`,
+          uscfId: p.uscfId,
+          baseRegistrationFee: event.regularFee,
+          lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
+          uscfAction: false, // USCF fees handled separately
+          isGtPlayer: p.studentType === 'gt',
+          section: p.section,
+        }));
+      
+        // 2. Create invoice for USCF fees only
+        const uscfPlayers = stagedPlayers
+          .filter(p => p.uscfStatus !== 'current')
+          .map(p => ({
+            playerName: `${p.firstName} ${p.lastName}`,
+            uscfId: p.uscfId,
+            baseRegistrationFee: 0, // No registration fee on this invoice
+            lateFee: 0,
+            uscfAction: true,
+            isGtPlayer: p.studentType === 'gt',
+            section: p.section,
+          }));
+      
+        try {
+          // Create Registration Invoice
+          if (registrationPlayers.length > 0) {
+            const regResult = await createInvoice({
+              ...recipient,
+              district,
+              eventName: `${event.name} - Registration`,
+              eventDate: event.date,
+              uscfFee: 24,
+              players: registrationPlayers,
+              bookkeeperEmail: '',
+              gtCoordinatorEmail: '',
+            });
+            await saveConfirmation(regResult.invoiceId, regResult, registrationPlayers, feeBreakdown.registrationFees + feeBreakdown.lateFees, "Registration");
+          }
+      
+          // Create USCF Invoice
+          if (uscfPlayers.length > 0) {
+            const uscfResult = await createInvoice({
+              ...recipient,
+              district,
+              eventName: `${event.name} - USCF Fees`,
+              eventDate: event.date,
+              uscfFee: 24,
+              players: uscfPlayers,
+              bookkeeperEmail: '',
+              gtCoordinatorEmail: '',
+            });
+            await saveConfirmation(uscfResult.invoiceId, uscfResult, uscfPlayers, feeBreakdown.uscfFees, "USCF");
+          }
+      
+          toast({ title: "Split Invoices Created", description: "Separate invoices for registration and USCF fees have been generated." });
+          setStagedPlayers([]);
+          setView('selection');
+        } catch (error) {
+          handleInvoiceError(error, "Split Invoice Creation Failed");
+        } finally {
+          setIsSubmitting(false);
         }
     };
     
@@ -769,7 +846,9 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                                     onCheckedChange={(checked) => setSplitUscfFees(!!checked)}
                                     disabled={feeBreakdown.uscfFees === 0}
                                 />
-                                <Label htmlFor="split-uscf-fees" className="text-sm font-medium">Create separate invoice for USCF fees</Label>
+                                <Label htmlFor="split-uscf-fees" className="text-sm font-medium">
+                                    Create a separate invoice for USCF fees
+                                </Label>
                             </div>
                         )}
                     </div>
@@ -980,7 +1059,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 </CardFooter>
             </Card>
 
-            {/* Player Add/Edit Dialog */}
             <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
                 <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-6 pb-4 border-b shrink-0">
