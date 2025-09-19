@@ -45,7 +45,7 @@ export default function QuickStartGuidePage() {
                 <CardContent className="space-y-4">
                   <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
                    <div className="border rounded-lg p-4 bg-muted/50">
-                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Froster.png?alt=media&token=8d2771c5-f3c5-4328-9f37-640a3311097e" alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." width={600} height={400} className="rounded-md" data-ai-hint="team roster page" />
+                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Froster.png?alt=media" alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." width={600} height={400} className="rounded-md" data-ai-hint="team roster page" />
                   </div>
                   <p className="text-sm">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
                   <p className="text-sm">3. When searching, use the filters to find players by name, USCF ID, school, or district.</p>
