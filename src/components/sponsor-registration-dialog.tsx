@@ -524,14 +524,14 @@ export function SponsorRegistrationDialog({
     });
   };
 
+  const handleBackToSelection = () => {
+    setShowConfirmation(false);
+  };
+
   const resetState = () => {
     setSelectedStudents({});
     setShowConfirmation(false);
     onOpenChange(false);
-  };
-
-  const handleBackToSelection = () => {
-    setShowConfirmation(false);
   };
   
   const toggleSelectAll = (checked: boolean) => {

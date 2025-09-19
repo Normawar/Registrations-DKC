@@ -16,7 +16,7 @@ import { School, User, DollarSign, CheckCircle, Lock, AlertCircle, Clock } from 
 import { format, differenceInHours, isSameDay, startOfDay } from "date-fns";
 import { createInvoice } from '@/ai/flows/create-invoice-flow';
 import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 interface IndividualRegistrationDialogProps {
   isOpen: boolean;
