@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -64,62 +63,107 @@ export default function QuickStartGuidePage() {
   const [openAccordionItems, setOpenAccordionItems] = useState(['item-1']);
 
   const handleDownloadPdf = async () => {
-  setIsDownloading(true);
+    setIsDownloading(true);
 
-  try {
-    const originalState = [...openAccordionItems];
-    setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const originalState = [...openAccordionItems];
+      setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const pdf = new jsPDF('portrait', 'pt', 'a4');
-    const margin = 36;
-    const contentWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
+      const pdf = new jsPDF('portrait', 'pt', 'a4');
+      const margin = 36;
+      const contentWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
 
-    // Capture sections individually
-    const sections = [
-      { selector: '#guide-content > *:first-child', title: 'Alert' }, // Alert
-      { selector: '[value="item-1"]', title: 'Step 1', newPage: false },
-      { selector: '[value="item-2"]', title: 'Step 2', newPage: true },
-      { selector: '[value="item-3"]', title: 'Step 3', newPage: true },
-      { selector: '[value="item-4"]', title: 'Step 4', newPage: false }
-    ];
+      // Capture sections individually
+      const sections = [
+        { selector: '#guide-content > *:first-child', title: 'Alert' }, // Alert
+        { selector: '[value="item-1"]', title: 'Step 1', newPage: false },
+        { selector: '[value="item-2"]', title: 'Step 2', newPage: true },
+        { selector: '[value="item-3"]', title: 'Step 3', newPage: true },
+        { selector: '[value="item-4"]', title: 'Step 4', newPage: false }
+      ];
 
-    let isFirstSection = true;
+      let isFirstSection = true;
 
-    for (const section of sections) {
-      const element = document.querySelector(section.selector) as HTMLElement;
-      if (!element) continue;
+      for (const section of sections) {
+        const element = document.querySelector(section.selector) as HTMLElement;
+        if (!element) continue;
 
-      // Add new page if specified (except for first section)
-      if (section.newPage && !isFirstSection) {
-        pdf.addPage();
+        // Add new page if specified (except for first section)
+        if (section.newPage && !isFirstSection) {
+          pdf.addPage();
+        }
+
+        const canvas = await html2canvas(element, {
+          scale: 1.5,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const imgHeight = (canvas.height * contentWidth) / canvas.width;
+
+        pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, imgHeight);
+        
+        isFirstSection = false;
       }
 
-      const canvas = await html2canvas(element, {
-        scale: 1.5,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-      });
-
-      const imgData = canvas.toDataURL('image/png');
-      const imgHeight = (canvas.height * contentWidth) / canvas.width;
-
-      pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, imgHeight);
+      pdf.save('ChessMate_Quick_Start_Guide.pdf');
+      setOpenAccordionItems(originalState);
       
-      isFirstSection = false;
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      alert("Sorry, there was an error generating the PDF. Please try again.");
+    } finally {
+      setIsDownloading(false);
     }
+  };
 
-    pdf.save('ChessMate_Quick_Start_Guide.pdf');
-    setOpenAccordionItems(originalState);
+  // Add this debug function to see what elements are found
+  const debugSelectors = () => {
+    console.log('=== DEBUGGING SELECTORS ===');
     
-  } catch (error) {
-    console.error("Failed to generate PDF:", error);
-    alert("Sorry, there was an error generating the PDF. Please try again.");
-  } finally {
-    setIsDownloading(false);
-  }
-};
+    // Check the guide content
+    const guideContent = document.getElementById('guide-content');
+    console.log('Guide content found:', !!guideContent);
+    
+    if (guideContent) {
+      console.log('Guide content children:', guideContent.children.length);
+      Array.from(guideContent.children).forEach((child, index) => {
+        console.log(`Child ${index}:`, child.tagName, child.className, child.getAttribute('value'));
+      });
+    }
+    
+    // Check for accordion items
+    const accordionItems = [
+      document.querySelector('[value="item-1"]'),
+      document.querySelector('[value="item-2"]'), 
+      document.querySelector('[value="item-3"]'),
+      document.querySelector('[value="item-4"]')
+    ];
+    
+    console.log('Accordion items found:', accordionItems.map((item, i) => `item-${i+1}: ${!!item}`));
+    
+    // Try alternative selectors
+    const altSelectors = [
+      document.querySelector('[data-value="item-1"]'),
+      document.querySelector('[data-radix-accordion-item]'),
+      document.querySelectorAll('[data-radix-accordion-item]'),
+      document.querySelector('div[value="item-1"]')
+    ];
+    
+    console.log('Alternative selectors:', altSelectors.map((item, i) => `Alt ${i}: ${!!item || (item?.length > 0)}`));
+    
+    // Check accordion structure
+    const accordion = document.querySelector('[data-radix-accordion-root]') || document.querySelector('.accordion');
+    if (accordion) {
+      console.log('Accordion found, children:', accordion.children.length);
+      Array.from(accordion.children).forEach((child, index) => {
+        console.log(`Accordion child ${index}:`, child.tagName, child.getAttribute('value'), child.getAttribute('data-value'));
+      });
+    }
+  };
 
   return (
     <AppLayout>
@@ -131,10 +175,15 @@ export default function QuickStartGuidePage() {
               Welcome to ChessMate! This guide will walk you through the essential steps to get started.
             </p>
           </div>
-           <Button onClick={handleDownloadPdf} disabled={isDownloading}>
-            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-            {isDownloading ? 'Generating PDF...' : 'Download PDF'}
-          </Button>
+          <div className="flex items-center">
+            <Button onClick={handleDownloadPdf} disabled={isDownloading}>
+              {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {isDownloading ? 'Generating PDF...' : 'Download PDF'}
+            </Button>
+            <Button onClick={debugSelectors} variant="outline" className="ml-2">
+              Debug Elements
+            </Button>
+          </div>
         </div>
 
         <div id="guide-content" className="space-y-6">
