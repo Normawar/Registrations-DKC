@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -69,11 +68,47 @@ export default function QuickStartGuidePage() {
   try {
     const originalState = [...openAccordionItems];
     
-    // Expand all accordion items
+    // Step 1: Expand accordion via state
     setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
     await new Promise(resolve => setTimeout(resolve, 4000));
 
-    // Wait for images to load
+    // Step 2: MANUALLY force all content visible via DOM manipulation
+    console.log('Manually expanding all accordion content...');
+    
+    // Find all accordion content and force it visible
+    const allAccordionContent = document.querySelectorAll('[data-radix-accordion-content]');
+    console.log(`Found ${allAccordionContent.length} accordion content sections`);
+    
+    const originalStyles: any[] = [];
+    allAccordionContent.forEach((content, index) => {
+      // Store original styles so we can restore them
+      originalStyles[index] = {
+        display: (content as HTMLElement).style.display,
+        height: (content as HTMLElement).style.height,
+        overflow: (content as HTMLElement).style.overflow,
+        dataState: content.getAttribute('data-state')
+      };
+      
+      // Force visible
+      content.setAttribute('data-state', 'open');
+      (content as HTMLElement).style.display = 'block !important';
+      (content as HTMLElement).style.height = 'auto !important';
+      (content as HTMLElement).style.overflow = 'visible !important';
+      (content as HTMLElement).style.maxHeight = 'none !important';
+      
+      console.log(`Expanded accordion content ${index + 1}`);
+    });
+
+    // Step 3: Also force accordion triggers to show open state
+    const allTriggers = document.querySelectorAll('[data-radix-accordion-trigger]');
+    allTriggers.forEach(trigger => {
+      trigger.setAttribute('data-state', 'open');
+      trigger.setAttribute('aria-expanded', 'true');
+    });
+
+    // Step 4: Wait for DOM to update and images to load
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    
     const images = document.querySelectorAll('img');
     const imagePromises = Array.from(images).map(img => {
       if (img.complete) return Promise.resolve();
@@ -85,111 +120,102 @@ export default function QuickStartGuidePage() {
     });
     await Promise.all(imagePromises);
 
-    // Create a temporary container that includes BOTH the header and the content
+    // Step 5: Check what we actually have
+    const guideContent = document.getElementById('guide-content')!;
+    console.log('Guide content height:', guideContent.scrollHeight);
+    
+    allAccordionContent.forEach((content, index) => {
+      console.log(`Accordion ${index + 1} height:`, (content as HTMLElement).offsetHeight, 'visible:', (content as HTMLElement).offsetHeight > 0);
+    });
+
+    // Step 6: Create complete container with header
     const tempContainer = document.createElement('div');
     tempContainer.style.backgroundColor = 'white';
     tempContainer.style.padding = '20px';
-    tempContainer.style.maxWidth = '900px';
-    tempContainer.style.margin = '0 auto';
+    tempContainer.style.width = '800px';
+    tempContainer.style.fontFamily = 'system-ui, -apple-system, sans-serif';
 
-    // Find and clone the header (the no-print section)
-    const headerSection = document.querySelector('.flex.justify-between.items-start.no-print');
-    if (headerSection) {
-      const headerClone = headerSection.cloneNode(true) as HTMLElement;
-      // Remove the download button from the clone
-      const button = headerClone.querySelector('button');
-      if (button) button.remove();
-      // Remove no-print class
-      headerClone.classList.remove('no-print');
-      tempContainer.appendChild(headerClone);
-    }
+    // Add header
+    const header = document.createElement('div');
+    header.innerHTML = `
+      <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 8px;">Sponsor Quick Start Guide</h1>
+      <p style="color: #666; margin-bottom: 30px;">Welcome to the new Registration App for Dark Knights Chess! This guide will walk you through the essential steps to get started.</p>
+    `;
+    tempContainer.appendChild(header);
 
-    // Add some spacing
-    const spacer = document.createElement('div');
-    spacer.style.height = '30px';
-    tempContainer.appendChild(spacer);
+    // Clone the ENTIRE guide content (now with everything expanded)
+    const contentClone = guideContent.cloneNode(true) as HTMLElement;
+    tempContainer.appendChild(contentClone);
 
-    // Find and clone the guide content
-    const guideContent = document.getElementById('guide-content');
-    if (guideContent) {
-      const contentClone = guideContent.cloneNode(true) as HTMLElement;
-      
-      // Ensure all accordion content is visible in the clone
-      const accordionContent = contentClone.querySelectorAll('[data-state="closed"]');
-      accordionContent.forEach(content => {
-        content.setAttribute('data-state', 'open');
-        (content as HTMLElement).style.display = 'block';
-        (content as HTMLElement).style.height = 'auto';
-        (content as HTMLElement).style.overflow = 'visible';
-      });
-      
-      tempContainer.appendChild(contentClone);
-    }
-
-    // Temporarily add to DOM for capture
+    // Temporarily add to DOM
     document.body.appendChild(tempContainer);
     
-    console.log('Capturing complete content including header...');
+    console.log('Capturing expanded content...');
+    console.log('Temp container height:', tempContainer.scrollHeight);
 
-    // Capture the temporary container
+    // Step 7: Capture with more aggressive settings
     const canvas = await html2canvas(tempContainer, {
-      scale: 1.2,
+      scale: 1.0, // Lower scale to ensure everything fits
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       height: tempContainer.scrollHeight,
       width: tempContainer.scrollWidth,
+      scrollX: 0,
+      scrollY: 0,
+      logging: true, // Enable logging to see what's happening
     });
 
     // Remove temporary container
     document.body.removeChild(tempContainer);
 
-    console.log(`Canvas captured: ${canvas.width}x${canvas.height}`);
+    console.log(`Final canvas: ${canvas.width}x${canvas.height}`);
 
+    // Step 8: Create PDF with generous page sizing
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('portrait', 'pt', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
-    const margin = 36; // 0.5 inch margins
+    const margin = 36;
     const contentWidth = pdfWidth - (margin * 2);
-    const availableHeight = pdfHeight - (margin * 2);
     
     const imgWidth = canvas.width;
     const imgHeight = canvas.height;
     const ratio = contentWidth / imgWidth;
     const scaledHeight = imgHeight * ratio;
     
-    console.log(`Scaled height: ${scaledHeight}, Available height per page: ${availableHeight}`);
+    // Use smaller pages to ensure nothing gets cut off
+    const pageHeight = (pdfHeight - (margin * 2)) * 0.8; // Use 80% of page height
+    const numPages = Math.ceil(scaledHeight / pageHeight);
     
-    // Calculate number of pages - use more pages for cleaner breaks
-    // Reduce effective page height to create more, cleaner pages
-    const effectivePageHeight = availableHeight * 0.85; // Use 85% of available height for cleaner breaks
-    const numPages = Math.ceil(scaledHeight / effectivePageHeight);
-    
-    console.log(`Will create ${numPages} pages (using ${effectivePageHeight}pt effective height)`);
+    console.log(`Creating ${numPages} pages, scaled height: ${scaledHeight}`);
 
-    // Add pages with clean breaks (no overlap)
     for (let page = 0; page < numPages; page++) {
-      if (page > 0) {
-        pdf.addPage();
-      }
+      if (page > 0) pdf.addPage();
       
-      // Calculate Y position - clean, no overlap
-      const yPosition = margin - (page * effectivePageHeight);
-      
+      const yPosition = margin - (page * pageHeight);
       pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, scaledHeight);
-      
-      console.log(`Added page ${page + 1}, Y position: ${yPosition}`);
     }
+
+    // Step 9: Restore original accordion states
+    allAccordionContent.forEach((content, index) => {
+      if (originalStyles[index]) {
+        (content as HTMLElement).style.display = originalStyles[index].display || '';
+        (content as HTMLElement).style.height = originalStyles[index].height || '';
+        (content as HTMLElement).style.overflow = originalStyles[index].overflow || '';
+        if (originalStyles[index].dataState) {
+          content.setAttribute('data-state', originalStyles[index].dataState);
+        }
+      }
+    });
 
     pdf.save('ChessMate_Quick_Start_Guide.pdf');
     setOpenAccordionItems(originalState);
     
-    console.log(`PDF completed with ${numPages} pages`);
+    console.log(`PDF completed successfully with ${numPages} pages`);
     
   } catch (error) {
     console.error("Failed to generate PDF:", error);
-    console.error("Error details:", (error as Error).stack);
     alert(`Sorry, there was an error generating the PDF: ${(error as Error).message}`);
   } finally {
     setIsDownloading(false);
@@ -222,7 +248,7 @@ export default function QuickStartGuidePage() {
           </Alert>
 
           <Accordion type="multiple" className="w-full" value={openAccordionItems} onValueChange={setOpenAccordionItems}>
-            <AccordionItem value="item-1" className="pdf-page-break-avoid">
+            <AccordionItem value="item-1" data-radix-accordion-item className="pdf-page-break-avoid">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full"><Users className="h-5 w-5 text-primary" /></div>
@@ -255,7 +281,7 @@ export default function QuickStartGuidePage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-2" className="pdf-page-break-avoid">
+            <AccordionItem value="item-2" data-radix-accordion-item className="pdf-page-break-avoid">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full"><Calendar className="h-5 w-5 text-primary" /></div>
@@ -298,7 +324,7 @@ export default function QuickStartGuidePage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-3" className="pdf-page-break-avoid">
+            <AccordionItem value="item-3" data-radix-accordion-item className="pdf-page-break-avoid">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full"><Receipt className="h-5 w-5 text-primary" /></div>
@@ -340,7 +366,7 @@ export default function QuickStartGuidePage() {
               </AccordionContent>
             </AccordionItem>
             
-            <AccordionItem value="item-4" className="pdf-page-break-avoid">
+            <AccordionItem value="item-4" data-radix-accordion-item className="pdf-page-break-avoid">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full"><FileQuestion className="h-5 w-5 text-primary" /></div>
@@ -357,5 +383,3 @@ export default function QuickStartGuidePage() {
     </AppLayout>
   );
 }
-
-    
