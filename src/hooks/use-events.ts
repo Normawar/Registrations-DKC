@@ -9,7 +9,9 @@ export type Event = {
   id: string;
   name: string;
   date: string; // ISO 8601 string format
-  registrationDeadline?: string; // ISO 8601 string format
+  regularDeadline?: string; // ISO 8601 string format
+  lateDeadline?: string; // ISO 8601 string format
+  veryLateDeadline?: string; // ISO 8601 string format
   location: string;
   rounds: number;
   regularFee: number;
