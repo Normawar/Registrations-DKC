@@ -67,7 +67,47 @@ export default function QuickStartGuidePage() {
   setIsDownloading(true);
 
   try {
-    // Create a completely static version of your content for PDF
+    const originalState = [...openAccordionItems];
+    
+    // Expand all accordion items first
+    setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
+    await new Promise(resolve => setTimeout(resolve, 4000));
+
+    // Get the existing images from your current DOM (these are already loaded)
+    const existingImages = {
+      roster: document.querySelector('img[src*="1h.png"]'),
+      eventList: document.querySelector('img[src*="1k.png"]'), 
+      registrationDialog: document.querySelector('img[src*="1L.png"]'),
+      invoiceDetails: document.querySelector('img[src*="1p.png"]'),
+      invoicePayment: document.querySelector('img[src*="1q.png"]')
+    };
+
+    console.log('Found existing images:', Object.keys(existingImages).map(key => 
+      `${key}: ${existingImages[key] ? 'found' : 'not found'}`
+    ));
+
+    // Convert existing images to base64 data URLs to avoid CORS
+    const imageDataUrls = {};
+    for (const [key, img] of Object.entries(existingImages)) {
+      if (img && img.complete) {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          ctx.drawImage(img, 0, 0);
+          imageDataUrls[key] = canvas.toDataURL('image/png');
+          console.log(`Converted ${key} to data URL`);
+        } catch (error) {
+          console.log(`Failed to convert ${key}:`, error.message);
+          imageDataUrls[key] = null;
+        }
+      } else {
+        imageDataUrls[key] = null;
+      }
+    }
+
+    // Create static content with data URL images
     const staticContent = `
       <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 800px; padding: 20px; background: white;">
         <!-- Header -->
@@ -77,10 +117,7 @@ export default function QuickStartGuidePage() {
         <!-- Alert -->
         <div style="background: #f3f4f6; border-left: 4px solid #3b82f6; padding: 16px; margin-bottom: 30px; border-radius: 8px;">
           <div style="display: flex; align-items: start; gap: 12px;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="m15 12-8.5-8.5c-.83-.83-2.17-.83-3 0 0 0 0 0 0 0l-8.5 8.5c-.83.83-.83 2.17 0 3l8.5 8.5c.83.83 2.17.83 3 0l8.5-8.5c.83-.83.83-2.17 0-3z"/>
-              <path d="M9 12h6m-3-3v6"/>
-            </svg>
+            <div style="width: 20px; height: 20px; background: #3b82f6; border-radius: 50%; flex-shrink: 0; margin-top: 2px;"></div>
             <div>
               <h3 style="font-weight: bold; margin: 0 0 8px 0;">First Things First: Your Roster</h3>
               <p style="margin: 0; color: #555;">The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the Roster page to get started.</p>
@@ -91,7 +128,7 @@ export default function QuickStartGuidePage() {
         <!-- Step 1 -->
         <div style="margin-bottom: 40px;">
           <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex;">👥</span>
+            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">1</span>
             Step 1: Managing Your Roster
           </h2>
           
@@ -103,9 +140,10 @@ export default function QuickStartGuidePage() {
             <p style="font-size: 14px; margin-bottom: 12px;">1. Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</p>
             
             <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd" 
-                   alt="Team Roster page screenshot" 
-                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">
+              ${imageDataUrls.roster ? 
+                `<img src="${imageDataUrls.roster}" alt="Team Roster page screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">` :
+                '<div style="text-align: center; color: #666; padding: 20px;">[Team Roster Page Screenshot]<br><small>Shows the Add from Database and Create New Player buttons</small></div>'
+              }
             </div>
             
             <p style="font-size: 14px; margin-bottom: 12px;">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
@@ -117,7 +155,7 @@ export default function QuickStartGuidePage() {
         <!-- Step 2 -->
         <div style="margin-bottom: 40px;">
           <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex;">📅</span>
+            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">2</span>
             Step 2: Registering for an Event
           </h2>
           
@@ -130,12 +168,14 @@ export default function QuickStartGuidePage() {
             <p style="font-size: 14px; margin-bottom: 12px;">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
             
             <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1k.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c" 
-                   alt="Event registration page screenshot" 
-                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">
-              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1L.png?alt=media&token=1d074a8e-9c30-4327-9e1e-483a30988f56" 
-                   alt="Registration dialog screenshot" 
-                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">
+              ${imageDataUrls.eventList ? 
+                `<img src="${imageDataUrls.eventList}" alt="Event registration page screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">` :
+                '<div style="text-align: center; color: #666; padding: 20px;">[Event Registration Page Screenshot]<br><small>Shows the event list with register button highlighted</small></div>'
+              }
+              ${imageDataUrls.registrationDialog ? 
+                `<img src="${imageDataUrls.registrationDialog}" alt="Registration dialog screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">` :
+                '<div style="text-align: center; color: #666; padding: 20px;">[Registration Dialog Screenshot]<br><small>Shows player selection interface</small></div>'
+              }
             </div>
             
             <p style="font-size: 14px; margin-bottom: 12px;">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
@@ -148,7 +188,7 @@ export default function QuickStartGuidePage() {
         <!-- Step 3 -->
         <div style="margin-bottom: 40px;">
           <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex;">🧾</span>
+            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">3</span>
             Step 3: Handling Invoices
           </h2>
           
@@ -164,12 +204,14 @@ export default function QuickStartGuidePage() {
             <p style="font-size: 14px; margin-bottom: 12px;">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
             
             <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16" 
-                   alt="Invoice details screenshot" 
-                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">
-              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1q.png?alt=media&token=358d7596-a152-4980-89fb-152eaac99f39" 
-                   alt="Invoice payment options screenshot" 
-                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">
+              ${imageDataUrls.invoiceDetails ? 
+                `<img src="${imageDataUrls.invoiceDetails}" alt="Invoice details screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">` :
+                '<div style="text-align: center; color: #666; padding: 20px;">[Invoice Details Screenshot]<br><small>Shows player and fee breakdown</small></div>'
+              }
+              ${imageDataUrls.invoicePayment ? 
+                `<img src="${imageDataUrls.invoicePayment}" alt="Invoice payment options screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">` :
+                '<div style="text-align: center; color: #666; padding: 20px;">[Invoice Payment Options Screenshot]<br><small>Shows PO, Check, and other payment methods</small></div>'
+              }
             </div>
           </div>
         </div>
@@ -177,7 +219,7 @@ export default function QuickStartGuidePage() {
         <!-- Step 4 -->
         <div style="margin-bottom: 40px;">
           <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex;">❓</span>
+            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">4</span>
             Need More Help?
           </h2>
           
@@ -186,7 +228,7 @@ export default function QuickStartGuidePage() {
       </div>
     `;
 
-    // Create temporary container with static content
+    // Create temporary container
     const tempContainer = document.createElement('div');
     tempContainer.innerHTML = staticContent;
     tempContainer.style.position = 'absolute';
@@ -195,26 +237,13 @@ export default function QuickStartGuidePage() {
     
     // Add to DOM
     document.body.appendChild(tempContainer);
-    
-    // Wait for images to load
-    const images = tempContainer.querySelectorAll('img');
-    const imagePromises = Array.from(images).map(img => {
-      if (img.complete) return Promise.resolve();
-      return new Promise((resolve) => {
-        img.onload = resolve;
-        img.onerror = resolve;
-        setTimeout(resolve, 3000);
-      });
-    });
-    await Promise.all(imagePromises);
 
-    console.log('Capturing static content...');
-    console.log('Container height:', tempContainer.scrollHeight);
+    console.log('Capturing content with converted images...');
 
-    // Capture the static content
+    // Capture (using data URLs, no CORS issues)
     const canvas = await html2canvas(tempContainer, {
       scale: 1.2,
-      useCORS: true,
+      useCORS: false,
       allowTaint: true,
       backgroundColor: '#ffffff',
       height: tempContainer.scrollHeight,
@@ -253,6 +282,7 @@ export default function QuickStartGuidePage() {
     }
 
     pdf.save('ChessMate_Quick_Start_Guide.pdf');
+    setOpenAccordionItems(originalState);
     
     console.log('PDF completed successfully');
     
