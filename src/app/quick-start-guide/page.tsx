@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -82,7 +81,7 @@ export default function QuickStartGuidePage() {
       invoicePayment: document.querySelector('img[src*="1q.png"]')
     };
 
-    const imageDataUrls: Record<string, any> = {};
+    const imageDataUrls:any = {};
     for (const [key, img] of Object.entries(existingImages)) {
       if (img && (img as HTMLImageElement).complete) {
         try {
@@ -110,28 +109,27 @@ export default function QuickStartGuidePage() {
     const pdfHeight = pdf.internal.pageSize.getHeight();
     const margin = 36;
     const contentWidth = pdfWidth - (margin * 2);
-    const maxContentHeight = pdfHeight - (margin * 2);
 
     let currentPage = 0;
 
-    // Helper function to capture a section and add to PDF
-    const captureSection = async (htmlContent: string, isFirstSection = false) => {
+    // Helper function with better image sizing
+    const captureSection = async (htmlContent:string, isFirstSection = false) => {
       const tempContainer = document.createElement('div');
       tempContainer.innerHTML = htmlContent;
       tempContainer.style.position = 'absolute';
       tempContainer.style.left = '-9999px';
       tempContainer.style.top = '0';
-      tempContainer.style.width = '750px';
+      tempContainer.style.width = '700px'; // Slightly smaller container
       tempContainer.style.fontFamily = 'system-ui, -apple-system, sans-serif';
       tempContainer.style.backgroundColor = 'white';
-      tempContainer.style.padding = '20px';
+      tempContainer.style.padding = '16px'; // Reduced padding
       
       document.body.appendChild(tempContainer);
       
       console.log(`Capturing section, height: ${tempContainer.scrollHeight}`);
 
       const canvas = await html2canvas(tempContainer, {
-        scale: 1.2,
+        scale: 1.1, // Slightly lower scale for better fit
         useCORS: false,
         allowTaint: true,
         backgroundColor: '#ffffff',
@@ -154,107 +152,108 @@ export default function QuickStartGuidePage() {
       }
 
       pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, scaledHeight);
-      console.log(`Added section to page ${currentPage + 1}`);
+      console.log(`Added section to page ${currentPage + 1}, scaled height: ${scaledHeight}`);
     };
 
-    // Section 1: Header + Alert + Step 1
+    // Section 1: Header + Alert + Step 1 (more compact)
     await captureSection(`
       <div>
-        <h1 style="font-size: 28px; font-weight: bold; margin-bottom: 8px;">Sponsor Quick Start Guide</h1>
-        <p style="color: #666; margin-bottom: 30px; font-size: 16px;">Welcome to ChessMate! This guide will walk you through the essential steps to get started.</p>
+        <h1 style="font-size: 26px; font-weight: bold; margin-bottom: 6px;">Sponsor Quick Start Guide</h1>
+        <p style="color: #666; margin-bottom: 24px; font-size: 15px;">Welcome to ChessMate! This guide will walk you through the essential steps to get started.</p>
         
-        <div style="background: #f3f4f6; border-left: 4px solid #3b82f6; padding: 16px; margin-bottom: 30px; border-radius: 8px;">
-          <h3 style="font-weight: bold; margin: 0 0 8px 0;">First Things First: Your Roster</h3>
-          <p style="margin: 0; color: #555;">The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the Roster page to get started.</p>
+        <div style="background: #f3f4f6; border-left: 4px solid #3b82f6; padding: 12px; margin-bottom: 24px; border-radius: 6px;">
+          <h3 style="font-weight: bold; margin: 0 0 6px 0; font-size: 16px;">First Things First: Your Roster</h3>
+          <p style="margin: 0; color: #555; font-size: 14px;">The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the Roster page to get started.</p>
         </div>
 
-        <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-          <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">1</span>
+        <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+          <span style="background: #dbeafe; padding: 6px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px;">1</span>
           Step 1: Managing Your Roster
         </h2>
         
-        <p style="margin-bottom: 20px;">Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
+        <p style="margin-bottom: 16px; font-size: 14px;">Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
         
-        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
-          <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Adding a Player to Your Roster</h3>
-          <p style="font-size: 14px; margin-bottom: 12px;">1. Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</p>
+        <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px;">
+          <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">Adding a Player to Your Roster</h3>
+          <p style="font-size: 13px; margin-bottom: 8px;">1. Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</p>
           
           ${imageDataUrls.roster ? 
-            `<div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              <img src="${imageDataUrls.roster}" alt="Team Roster page" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">
+            `<div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 12px; background: #f9fafb; margin: 10px 0;">
+              <img src="${imageDataUrls.roster}" alt="Team Roster page" style="width: 100%; max-width: 450px; height: auto; border-radius: 4px;">
             </div>` :
-            '<div style="text-align: center; color: #666; padding: 16px; background: #f9fafb; border-radius: 8px; margin: 16px 0;">[Team Roster Page Screenshot]</div>'
+            '<div style="text-align: center; color: #666; padding: 12px; background: #f9fafb; border-radius: 6px; margin: 10px 0; font-size: 13px;">[Team Roster Page Screenshot]</div>'
           }
           
-          <p style="font-size: 14px; margin-bottom: 12px;">2. Click <strong>Add from Database</strong> to search for existing players or <strong>Create New Player</strong> to add a student.</p>
-          <p style="font-size: 14px; margin-bottom: 12px;">3. Use filters to find players by name, USCF ID, school, or district.</p>
-          <p style="font-size: 14px; margin-bottom: 0;">4. Click <strong>Select</strong> and fill in any missing information. The player will be added to your roster.</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">2. Click <strong>Add from Database</strong> to search for existing players or <strong>Create New Player</strong> to add a student.</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">3. Use filters to find players by name, USCF ID, school, or district.</p>
+          <p style="font-size: 13px; margin-bottom: 0;">4. Click <strong>Select</strong> and fill in any missing information. The player will be added to your roster.</p>
         </div>
       </div>
     `, true);
 
-    // Section 2: Step 2
+    // Section 2: Step 2 (optimized for better image fit)
     await captureSection(`
       <div>
-        <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-          <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">2</span>
+        <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+          <span style="background: #dbeafe; padding: 6px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px;">2</span>
           Step 2: Registering for an Event
         </h2>
         
-        <p style="margin-bottom: 20px;">Once your roster is set, you can register your selected players for any open tournament.</p>
+        <p style="margin-bottom: 16px; font-size: 14px;">Once your roster is set, you can register your selected players for any open tournament.</p>
         
-        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
-          <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Event Registration Process</h3>
+        <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px;">
+          <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">Event Registration Process</h3>
           
-          <p style="font-size: 14px; margin-bottom: 12px;">1. Go to the <strong>Dashboard</strong> or <strong>Register for Event</strong> page.</p>
-          <p style="font-size: 14px; margin-bottom: 12px;">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">1. Go to the <strong>Dashboard</strong> or <strong>Register for Event</strong> page.</p>
+          <p style="font-size: 13px; margin-bottom: 10px;">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
           
           ${imageDataUrls.eventList ? 
-            `<div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              <img src="${imageDataUrls.eventList}" alt="Event registration page" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">
+            `<div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; background: #f9fafb; margin: 8px 0;">
+              <img src="${imageDataUrls.eventList}" alt="Event registration page" style="width: 100%; max-width: 400px; height: auto; border-radius: 4px; margin-bottom: 8px;">
               ${imageDataUrls.registrationDialog ? 
-                `<img src="${imageDataUrls.registrationDialog}" alt="Registration dialog" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">` : ''
+                `<img src="${imageDataUrls.registrationDialog}" alt="Registration dialog" style="width: 100%; max-width: 400px; height: auto; border-radius: 4px;">` : ''
               }
             </div>` :
-            '<div style="text-align: center; color: #666; padding: 16px; background: #f9fafb; border-radius: 8px; margin: 16px 0;">[Event Registration Screenshots]</div>'
+            '<div style="text-align: center; color: #666; padding: 12px; background: #f9fafb; border-radius: 6px; margin: 8px 0; font-size: 13px;">[Event Registration Screenshots]</div>'
           }
           
-          <p style="font-size: 14px; margin-bottom: 12px;">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
-          <p style="font-size: 14px; margin-bottom: 12px;">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
-          <p style="font-size: 14px; margin-bottom: 12px;">5. Click <strong>Review Charges</strong> to see a full breakdown of fees.</p>
-          <p style="font-size: 14px; margin-bottom: 0;">6. Finally, click <strong>Register Now</strong>. This will generate an official invoice and complete the registration.</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">3. Select the players you wish to register for this event.</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">4. Confirm their <strong>Section</strong> and <strong>USCF Status</strong>.</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">5. Click <strong>Review Charges</strong> to see fees.</p>
+          <p style="font-size: 13px; margin-bottom: 0;">6. Click <strong>Register Now</strong> to complete registration.</p>
         </div>
       </div>
     `);
 
-    // Section 3: Step 3
+    // Section 3: Step 3 (optimized for better image fit)
     await captureSection(`
       <div>
-        <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-          <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">3</span>
+        <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+          <span style="background: #dbeafe; padding: 6px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px;">3</span>
           Step 3: Handling Invoices
         </h2>
         
-        <p style="margin-bottom: 20px;">After registering, you can view and manage all your invoices from one place.</p>
+        <p style="margin-bottom: 16px; font-size: 14px;">After registering, you can view and manage all your invoices from one place.</p>
         
-        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
-          <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Viewing and Paying Invoices</h3>
+        <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 16px;">
+          <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">Viewing and Paying Invoices</h3>
           
-          <p style="font-size: 14px; margin-bottom: 12px;">1. Navigate to the <strong>Invoices & Payments</strong> page from the sidebar.</p>
-          <p style="font-size: 14px; margin-bottom: 12px;">2. Here you will see a list of all your invoices and their current status (e.g., Paid, Unpaid, Canceled).</p>
-          <p style="font-size: 14px; margin-bottom: 12px;">3. Click <strong>Details</strong> to view a specific invoice. From here, you can see the registered players and submit payment information.</p>
-          <p style="font-size: 14px; margin-bottom: 12px;">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
-          <p style="font-size: 14px; margin-bottom: 12px;">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">1. Navigate to the <strong>Invoices & Payments</strong> page from the sidebar.</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">2. You will see a list of all your invoices and their current status (Paid, Unpaid, Canceled).</p>
+          <p style="font-size: 13px; margin-bottom: 6px;">3. Click <strong>Details</strong> to view a specific invoice and see registered players.</p>
+          <p style="font-size: 13px; margin-bottom: 10px;">4. For payment, click <strong>View Invoice on Square</strong> for credit card, or use offline methods (PO, Check, CashApp, Zelle).</p>
           
           ${imageDataUrls.invoiceDetails ? 
-            `<div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              <img src="${imageDataUrls.invoiceDetails}" alt="Invoice details" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">
+            `<div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; background: #f9fafb; margin: 8px 0;">
+              <img src="${imageDataUrls.invoiceDetails}" alt="Invoice details" style="width: 100%; max-width: 400px; height: auto; border-radius: 4px; margin-bottom: 8px;">
               ${imageDataUrls.invoicePayment ? 
-                `<img src="${imageDataUrls.invoicePayment}" alt="Invoice payment options" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">` : ''
+                `<img src="${imageDataUrls.invoicePayment}" alt="Invoice payment options" style="width: 100%; max-width: 400px; height: auto; border-radius: 4px;">` : ''
               }
             </div>` :
-            '<div style="text-align: center; color: #666; padding: 16px; background: #f9fafb; border-radius: 8px; margin: 16px 0;">[Invoice Screenshots]</div>'
+            '<div style="text-align: center; color: #666; padding: 12px; background: #f9fafb; border-radius: 6px; margin: 8px 0; font-size: 13px;">[Invoice Screenshots]</div>'
           }
+          
+          <p style="font-size: 13px; margin-bottom: 0;">5. If paying offline, select payment method, fill in details (PO/check number), upload proof, and click <strong>Submit Payment Information</strong> for review.</p>
         </div>
       </div>
     `);
@@ -262,20 +261,20 @@ export default function QuickStartGuidePage() {
     // Section 4: Step 4
     await captureSection(`
       <div>
-        <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-          <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">4</span>
+        <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+          <span style="background: #dbeafe; padding: 6px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px;">4</span>
           Need More Help?
         </h2>
         
-        <p style="margin-bottom: 40px;">For more detailed instructions on every feature, please visit our new <strong>Help Center</strong>.</p>
+        <p style="margin-bottom: 30px; font-size: 14px;">For more detailed instructions on every feature, please visit our new <strong>Help Center</strong>.</p>
         
-        <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; background: #f8fafc;">
-          <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Additional Resources</h3>
-          <ul style="margin: 0; padding-left: 20px;">
-            <li style="margin-bottom: 8px;">Complete step-by-step tutorials for each feature</li>
-            <li style="margin-bottom: 8px;">Frequently asked questions and troubleshooting</li>
-            <li style="margin-bottom: 8px;">Video guides for complex processes</li>
-            <li style="margin-bottom: 0;">Contact information for technical support</li>
+        <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 20px; background: #f8fafc;">
+          <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 16px;">Additional Resources</h3>
+          <ul style="margin: 0; padding-left: 20px; line-height: 1.6;">
+            <li style="margin-bottom: 8px; font-size: 14px;">Complete step-by-step tutorials for each feature</li>
+            <li style="margin-bottom: 8px; font-size: 14px;">Frequently asked questions and troubleshooting</li>
+            <li style="margin-bottom: 8px; font-size: 14px;">Video guides for complex processes</li>
+            <li style="margin-bottom: 0; font-size: 14px;">Contact information for technical support</li>
           </ul>
         </div>
       </div>
