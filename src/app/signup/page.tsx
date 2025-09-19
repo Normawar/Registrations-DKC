@@ -31,11 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { schoolData as initialSchoolData, type School } from '@/lib/data/school-data';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useSponsorProfile, type SponsorProfile } from '@/hooks/use-sponsor-profile';
 import { useToast } from '@/hooks/use-toast';
 import { simpleSignUp, simpleSignIn, checkFirebaseConfig } from '@/lib/simple-auth';
+import { useMasterDb } from '@/context/master-db-context';
 
 const sponsorFormSchema = z.object({
   firstName: z.string().min(1, { message: "First name is required." }),
@@ -103,33 +103,10 @@ async function correctOrganizerAccountData(email: string, password: string) {
 const SponsorSignUpForm = () => {
   const router = useRouter();
   const { toast } = useToast();
+  const { dbDistricts, getSchoolsForDistrict, schools: schoolData, isDbLoaded } = useMasterDb();
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const { updateProfile } = useSponsorProfile();
   const [isLoading, setIsLoading] = useState(false);
-  
-  const [schoolData, setSchoolData] = useState<School[]>([]);
-  const [uniqueDistricts, setUniqueDistricts] = useState<string[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  useEffect(() => {
-    if (!isInitialized) {
-      const storedSchoolData = localStorage.getItem('school_data');
-      const data = storedSchoolData ? JSON.parse(storedSchoolData) : initialSchoolData;
-      setSchoolData(data);
-      const districts = [...new Set(data.map((s: School) => s.district))].sort();
-      
-      // Ensure all required districts are present
-      const requiredDistricts = ['None', 'Test', 'TestECISD', 'TestShary', 'TestMcAllen'];
-      requiredDistricts.forEach(d => {
-        if (!districts.includes(d)) {
-          districts.unshift(d);
-        }
-      });
-
-      setUniqueDistricts(districts.sort());
-      setIsInitialized(true);
-    }
-  }, [isInitialized]);
 
   const allSchoolNames = useMemo(() => {
     const schoolNames = schoolData.map(s => s.schoolName);
@@ -139,7 +116,7 @@ const SponsorSignUpForm = () => {
     }
     return uniqueSchoolNames;
   }, [schoolData]);
-  
+
   const form = useForm<z.infer<typeof sponsorFormSchema>>({
     resolver: zodResolver(sponsorFormSchema),
     defaultValues: {
@@ -161,13 +138,10 @@ const SponsorSignUpForm = () => {
     form.setValue('district', district);
     let filteredSchools: string[];
     if (district === 'None') {
-        filteredSchools = allSchoolNames;
+      filteredSchools = allSchoolNames;
     } else {
-        filteredSchools = schoolData
-            .filter((school) => school.district === district)
-            .map((school) => school.schoolName)
-            .sort();
-        filteredSchools.unshift("All Schools");
+      filteredSchools = getSchoolsForDistrict(district);
+      filteredSchools.unshift("All Schools");
     }
     setSchoolsForDistrict([...new Set(filteredSchools)]);
 
@@ -181,11 +155,11 @@ const SponsorSignUpForm = () => {
   };
 
   useEffect(() => {
-    if (isInitialized && schoolData.length > 0) {
+    if (isDbLoaded) {
       handleDistrictChange(form.getValues('district'), false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, schoolData]);
+  }, [isDbLoaded]);
   
   async function onSubmit(values: z.infer<typeof sponsorFormSchema>) {
     setIsLoading(true);
@@ -252,7 +226,7 @@ const SponsorSignUpForm = () => {
             <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input placeholder="John" {...field} disabled={isLoading} autoComplete="given-name" /></FormControl><FormMessage /></FormItem> )}/>
             <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} disabled={isLoading} autoComplete="family-name" /></FormControl><FormMessage /></FormItem> )}/>
           </div>
-          <FormField control={form.control} name="district" render={({ field }) => ( <FormItem> <FormLabel>District</FormLabel> <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value} disabled={isLoading}> <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl> <SelectContent>{uniqueDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+          <FormField control={form.control} name="district" render={({ field }) => ( <FormItem> <FormLabel>District</FormLabel> <Select onValueChange={(value) => handleDistrictChange(value)} value={field.value} disabled={isLoading}> <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl> <SelectContent>{dbDistricts.map((district) => (<SelectItem key={district} value={district}>{district}</SelectItem>))}</SelectContent> </Select> <FormMessage /> </FormItem> )}/>
           <FormField control={form.control} name="school" render={({ field }) => ( <FormItem> <FormLabel>School</FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}><FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl><SelectContent>{schoolsForDistrict.map((school) => (<SelectItem key={school} value={school}>{school}</SelectItem>))}</SelectContent></Select> <FormMessage /> </FormItem> )}/>
           <FormField control={form.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} disabled={isLoading} autoComplete="email" /></FormControl><FormMessage /></FormItem> )}/>
           <FormField control={form.control} name="bookkeeperEmail" render={({ field }) => ( <FormItem><FormLabel>Bookkeeper/Secretary Email (Optional)</FormLabel><FormControl><Input type="email" placeholder="bookkeeper@example.com" {...field} disabled={isLoading} /></FormControl><FormDescription>This email will receive a copy of all invoices.</FormDescription><FormMessage /></FormItem> )}/>
