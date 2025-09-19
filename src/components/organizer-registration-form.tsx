@@ -784,6 +784,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
     }
     
     if(view === 'review') {
+        const registrationTotal = feeBreakdown.registrationFees + feeBreakdown.lateFees;
         return (
             <Card>
                 <CardHeader>
@@ -807,31 +808,64 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                             ))}
                         </div>
                     </div>
-                    <div className="border rounded-lg p-4 space-y-3">
-                        <h3 className="font-semibold">Charge Breakdown</h3>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                            <span>Registration Fees ({stagedPlayers.length} × ${event.regularFee})</span>
-                            <span>${feeBreakdown.registrationFees.toFixed(2)}</span>
+
+                    {splitUscfFees && feeBreakdown.uscfFees > 0 ? (
+                        <div className="space-y-4">
+                            <div className="border rounded-lg p-4 space-y-3">
+                                <h3 className="font-semibold">Invoice 1: Registration & Late Fees</h3>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span>Registration & Late Fees</span>
+                                        <span>${registrationTotal.toFixed(2)}</span>
+                                    </div>
+                                    <div className="border-t pt-2 flex justify-between font-bold">
+                                        <span>Invoice 1 Total</span>
+                                        <span>${registrationTotal.toFixed(2)}</span>
+                                    </div>
+                                </div>
                             </div>
-                            {feeBreakdown.lateFees > 0 && (
-                            <div className="flex justify-between text-amber-600">
-                                <span>{feeBreakdown.feeType} ({stagedPlayers.length} × ${(feeBreakdown.lateFees / stagedPlayers.length).toFixed(2)})</span>
-                                <span>${feeBreakdown.lateFees.toFixed(2)}</span>
-                            </div>
-                            )}
-                            {feeBreakdown.uscfFees > 0 && (
-                            <div className="flex justify-between">
-                                <span>USCF Fees ({stagedPlayers.filter(s => s.uscfStatus !== 'current' && s.studentType !== 'gt').length} × $24)</span>
-                                <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
-                            </div>
-                            )}
-                            <div className="border-t pt-2 flex justify-between font-semibold">
-                            <span>Total Amount</span>
-                            <span>${feeBreakdown.total.toFixed(2)}</span>
+                            <div className="border rounded-lg p-4 space-y-3">
+                                <h3 className="font-semibold">Invoice 2: USCF Memberships</h3>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span>USCF Fees</span>
+                                        <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
+                                    </div>
+                                    <div className="border-t pt-2 flex justify-between font-bold">
+                                        <span>Invoice 2 Total</span>
+                                        <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="border rounded-lg p-4 space-y-3">
+                            <h3 className="font-semibold">Charge Breakdown</h3>
+                            <div className="space-y-2 text-sm">
+                                <div className="flex justify-between">
+                                <span>Registration Fees ({stagedPlayers.length} × ${event.regularFee})</span>
+                                <span>${feeBreakdown.registrationFees.toFixed(2)}</span>
+                                </div>
+                                {feeBreakdown.lateFees > 0 && (
+                                <div className="flex justify-between text-amber-600">
+                                    <span>{feeBreakdown.feeType} ({stagedPlayers.length} × ${(feeBreakdown.lateFees / stagedPlayers.length).toFixed(2)})</span>
+                                    <span>${feeBreakdown.lateFees.toFixed(2)}</span>
+                                </div>
+                                )}
+                                {feeBreakdown.uscfFees > 0 && (
+                                <div className="flex justify-between">
+                                    <span>USCF Fees ({stagedPlayers.filter(s => s.uscfStatus !== 'current' && s.studentType !== 'gt').length} × $24)</span>
+                                    <span>${feeBreakdown.uscfFees.toFixed(2)}</span>
+                                </div>
+                                )}
+                                <div className="border-t pt-2 flex justify-between font-semibold">
+                                <span>Total Amount</span>
+                                <span>${feeBreakdown.total.toFixed(2)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-3 pt-4">
                         <Label>Invoice Options</Label>
                         <RadioGroup value={invoiceType} onValueChange={(v) => setInvoiceType(v as 'team' | 'individual')} className="flex items-center space-x-4">
@@ -1098,5 +1132,15 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 </DialogContent>
             </Dialog>
         </div>
+    );
+}
+
+export default function OrganizerRegistrationPage() {
+    return (
+        <OrganizerGuard>
+            <AppLayout>
+                <OrganizerRegistrationForm eventId={useSearchParams().get('eventId')} />
+            </AppLayout>
+        </OrganizerGuard>
     );
 }
