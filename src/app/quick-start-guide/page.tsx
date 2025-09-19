@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -146,7 +145,7 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
                   <p className="text-sm">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
                   <p className="text-sm">5. Click <strong>Review Charges</strong> to see a full breakdown of fees.</p>
-                   <p className="text-sm">6. Finally, click <strong>Create Invoice</strong>. This will generate an official invoice and complete the registration.</p>
+                   <p className="text-sm">6. Finally, click <strong>Register Now</strong>. This will generate an official invoice and complete the registration.</p>
                 </CardContent>
               </Card>
             </AccordionContent>
