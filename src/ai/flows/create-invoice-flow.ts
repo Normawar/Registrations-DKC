@@ -181,7 +181,7 @@ const createInvoiceFlow = ai.defineFlow(
       if (processedPlayers.length > 0) {
         const registrationFee = processedPlayers[0].baseRegistrationFee;
         const playerNotes = processedPlayers
-          .map((p, idx) => `${idx + 1}. ${p.playerName} (${p.uscfId})${p.isGtPlayer ? ' (GT)' : ''}`)
+          .map((p, idx) => `${idx + 1}. ${p.playerName} (${p.uscfId})${p.isGtPlayer ? ' (GT)' : ''} - Section: ${p.section}`)
           .join('\n');
 
         lineItems.push({
@@ -313,3 +313,5 @@ const createInvoiceFlow = ai.defineFlow(
     }
   }
 );
+
+    
