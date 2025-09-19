@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -70,39 +69,44 @@ export default function QuickStartGuidePage() {
 
     try {
       const canvas = await html2canvas(guideContent, {
-        scale: 2, // Increase resolution
-        useCORS: true, // Important for external images
+        scale: 2,
+        useCORS: true,
         onclone: (document) => {
-            // This can be used to modify the cloned document before rendering
-        }
+          // You can modify the cloned document before rendering if needed
+        },
       });
-      
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
-        unit: 'px',
-        format: 'a4'
+        unit: 'pt', // Use points for margins
+        format: 'a4',
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const margin = 36; // 0.5 inches * 72 points/inch
+      const contentWidth = pdfWidth - margin * 2;
+      
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
       const ratio = canvasWidth / canvasHeight;
-      const width = pdfWidth;
-      const height = width / ratio;
+      const contentHeight = contentWidth / ratio;
 
+      let heightLeft = contentHeight;
       let position = 0;
-      let heightLeft = height;
+      let pageNumber = 1;
 
-      pdf.addImage(imgData, 'PNG', 0, position, width, height);
-      heightLeft -= pdfHeight;
+      pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, contentHeight);
+      heightLeft -= (pdfHeight - margin * 2);
 
       while (heightLeft > 0) {
-        position = heightLeft - height;
+        position = -((pdfHeight - margin * 2) * pageNumber);
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, width, height);
-        heightLeft -= pdfHeight;
+        pdf.addImage(imgData, 'PNG', margin, position + margin, contentWidth, contentHeight);
+        heightLeft -= (pdfHeight - margin * 2);
+        pageNumber++;
       }
       
       pdf.save('ChessMate_Quick_Start_Guide.pdf');
