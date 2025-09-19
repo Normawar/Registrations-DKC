@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
@@ -250,14 +249,13 @@ function ManageEventsContent() {
         eventId: event.id,
         eventName: event.name,
         eventDate: event.date,
-        gtCoordinatorEmail: 'gt_coordinator@psjaisd.us', // Replace with dynamic value if available
+        gtCoordinatorEmail: 'gt_coordinator@psjaisd.us',
         gtCoordinatorName: 'PSJA GT Coordinator',
       });
       toast({
         title: 'Consolidation Successful',
         description: `Created invoice ${result.consolidatedInvoiceNumber} for ${result.totalGtStudents} GT students and canceled ${result.canceledInvoiceIds.length} individual invoices.`,
       });
-      // Re-check consolidation status
       checkConsolidationForEvent(event.id);
     } catch (error) {
       console.error("Failed to consolidate GT invoices:", error);
@@ -617,7 +615,6 @@ function ManageEventsContent() {
     const flatRegistrations: RegistrationInfo[] = [];
 
     allConfirmations.forEach(conf => {
-      // Exclude mock invoices from this view
       if (conf.invoiceNumber === 'MOCK_INV') return;
 
         if (!invoicesMap.has(conf.id)) {
@@ -1013,16 +1010,16 @@ function ManageEventsContent() {
                             <FormField control={form.control} name="location" render={({ field }) => ( <FormItem><FormLabel>Location</FormLabel><FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Event Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}><>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                            <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Event Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
                             <FormField control={form.control} name="rounds" render={({ field }) => ( <FormItem><FormLabel>Rounds</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div>
                           <Label>Registration Deadlines (Optional)</Label>
                           <Card className="p-4 mt-2 bg-muted/50">
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                              <FormField control={form.control} name="regularDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Regular Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}><>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
-                              <FormField control={form.control} name="lateDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Late Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}><>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
-                              <FormField control={form.control} name="veryLateDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Very Late Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}><>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                              <FormField control={form.control} name="regularDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Regular Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                              <FormField control={form.control} name="lateDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Late Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                              <FormField control={form.control} name="veryLateDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Very Late Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
                             </div>
                             <FormDescription className="text-xs mt-2">If deadlines are not set, fees will be based on the event date.</FormDescription>
                           </Card>
@@ -1070,7 +1067,9 @@ function ManageEventsContent() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1079,11 +1078,15 @@ function ManageEventsContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Clear All Events?</AlertDialogTitle>
-            <AlertDialogDescription>This action cannot be undone. This will permanently delete all events from the list.</AlertDialogDescription>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete all events from the list.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">Clear Events</AlertDialogAction>
+            <AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">
+              Clear Events
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
