@@ -73,7 +73,7 @@ export default function QuickStartGuidePage() {
     setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
     await new Promise(resolve => setTimeout(resolve, 4000));
 
-    // Get the existing images from your current DOM (these are already loaded)
+    // Get the existing images from DOM and convert to data URLs
     const existingImages = {
       roster: document.querySelector('img[src*="1h.png"]'),
       eventList: document.querySelector('img[src*="1k.png"]'), 
@@ -86,20 +86,22 @@ export default function QuickStartGuidePage() {
       `${key}: ${existingImages[key] ? 'found' : 'not found'}`
     ));
 
-    // Convert existing images to base64 data URLs to avoid CORS
-    const imageDataUrls = {};
+    // Convert to data URLs
+    const imageDataUrls: Record<string, string | null> = {};
     for (const [key, img] of Object.entries(existingImages)) {
-      if (img && img.complete) {
+      if (img && (img as HTMLImageElement).complete) {
         try {
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          canvas.width = img.naturalWidth || img.width;
-          canvas.height = img.naturalHeight || img.height;
-          ctx.drawImage(img, 0, 0);
+          canvas.width = (img as HTMLImageElement).naturalWidth || (img as HTMLImageElement).width;
+          canvas.height = (img as HTMLImageElement).naturalHeight || (img as HTMLImageElement).height;
+          ctx!.drawImage(img as HTMLImageElement, 0, 0);
           imageDataUrls[key] = canvas.toDataURL('image/png');
           console.log(`Converted ${key} to data URL`);
         } catch (error) {
-          console.log(`Failed to convert ${key}:`, error.message);
+            if(error instanceof Error) {
+                console.log(`Failed to convert ${key}:`, error.message);
+            }
           imageDataUrls[key] = null;
         }
       } else {
@@ -107,123 +109,117 @@ export default function QuickStartGuidePage() {
       }
     }
 
-    // Create static content with data URL images
+    // Create more compact static content
     const staticContent = `
-      <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 800px; padding: 20px; background: white;">
+      <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 750px; padding: 16px; background: white; line-height: 1.4;">
         <!-- Header -->
-        <h1 style="font-size: 28px; font-weight: bold; margin-bottom: 8px;">Sponsor Quick Start Guide</h1>
-        <p style="color: #666; margin-bottom: 40px; font-size: 16px;">Welcome to the new Registration App for Dark Knights Chess!</p>
+        <h1 style="font-size: 26px; font-weight: bold; margin-bottom: 6px;">Sponsor Quick Start Guide</h1>
+        <p style="color: #666; margin-bottom: 24px; font-size: 15px;">Welcome to ChessMate! This guide will walk you through the essential steps to get started.</p>
         
         <!-- Alert -->
-        <div style="background: #f3f4f6; border-left: 4px solid #3b82f6; padding: 16px; margin-bottom: 30px; border-radius: 8px;">
-          <div style="display: flex; align-items: start; gap: 12px;">
-            <div style="width: 20px; height: 20px; background: #3b82f6; border-radius: 50%; flex-shrink: 0; margin-top: 2px;"></div>
-            <div>
-              <h3 style="font-weight: bold; margin: 0 0 8px 0;">First Things First: Your Roster</h3>
-              <p style="margin: 0; color: #555;">The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the Roster page to get started.</p>
-            </div>
-          </div>
+        <div style="background: #f3f4f6; border-left: 4px solid #3b82f6; padding: 12px; margin-bottom: 24px; border-radius: 6px;">
+          <h3 style="font-weight: bold; margin: 0 0 6px 0; font-size: 16px;">First Things First: Your Roster</h3>
+          <p style="margin: 0; color: #555; font-size: 14px;">The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the Roster page to get started.</p>
         </div>
 
         <!-- Step 1 -->
-        <div style="margin-bottom: 40px;">
-          <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">1</span>
+        <div style="margin-bottom: 28px;">
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+            <span style="background: #dbeafe; padding: 6px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px;">1</span>
             Step 1: Managing Your Roster
           </h2>
           
-          <p style="margin-bottom: 20px;">Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
+          <p style="margin-bottom: 12px; font-size: 14px;">Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
           
-          <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-            <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Adding a Player to Your Roster</h3>
+          <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px; margin-bottom: 16px;">
+            <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">Adding a Player to Your Roster</h3>
             
-            <p style="font-size: 14px; margin-bottom: 12px;">1. Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</p>
+            <p style="font-size: 13px; margin-bottom: 8px;">1. Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</p>
             
-            <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              ${imageDataUrls.roster ? 
-                `<img src="${imageDataUrls.roster}" alt="Team Roster page screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">` :
-                '<div style="text-align: center; color: #666; padding: 20px;">[Team Roster Page Screenshot]<br><small>Shows the Add from Database and Create New Player buttons</small></div>'
-              }
-            </div>
+            ${imageDataUrls.roster ? 
+              `<div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 12px; background: #f9fafb; margin: 12px 0;">
+                <img src="${imageDataUrls.roster}" alt="Team Roster page" style="width: 100%; max-width: 500px; height: auto; border-radius: 4px;">
+              </div>` :
+              '<div style="text-align: center; color: #666; padding: 12px; background: #f9fafb; border-radius: 6px; margin: 12px 0; font-size: 13px;">[Team Roster Page Screenshot]</div>'
+            }
             
-            <p style="font-size: 14px; margin-bottom: 12px;">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
-            <p style="font-size: 14px; margin-bottom: 12px;">3. When searching, use the filters to find players by name, USCF ID, school, or district.</p>
-            <p style="font-size: 14px; margin-bottom: 0;">4. Once you find your student, click <strong>Select</strong>. You will be prompted to fill in any missing required information (like Grade or Section). The player will then be added to your school's roster.</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">2. Click <strong>Add from Database</strong> to search for existing players or <strong>Create New Player</strong> to add a student.</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">3. Use filters to find players by name, USCF ID, school, or district.</p>
+            <p style="font-size: 13px; margin-bottom: 0;">4. Click <strong>Select</strong> and fill in any missing information. The player will be added to your roster.</p>
           </div>
         </div>
 
         <!-- Step 2 -->
-        <div style="margin-bottom: 40px;">
-          <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">2</span>
+        <div style="margin-bottom: 28px;">
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+            <span style="background: #dbeafe; padding: 6px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px;">2</span>
             Step 2: Registering for an Event
           </h2>
           
-          <p style="margin-bottom: 20px;">Once your roster is set, you can register your selected players for any open tournament.</p>
+          <p style="margin-bottom: 12px; font-size: 14px;">Once your roster is set, you can register your selected players for any open tournament.</p>
           
-          <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-            <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Event Registration Process</h3>
+          <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px; margin-bottom: 16px;">
+            <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">Event Registration Process</h3>
             
-            <p style="font-size: 14px; margin-bottom: 12px;">1. Go to the <strong>Dashboard</strong> or <strong>Register for Event</strong> page.</p>
-            <p style="font-size: 14px; margin-bottom: 12px;">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">1. Go to the <strong>Dashboard</strong> or <strong>Register for Event</strong> page.</p>
+            <p style="font-size: 13px; margin-bottom: 8px;">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
             
-            <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              ${imageDataUrls.eventList ? 
-                `<img src="${imageDataUrls.eventList}" alt="Event registration page screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">` :
-                '<div style="text-align: center; color: #666; padding: 20px;">[Event Registration Page Screenshot]<br><small>Shows the event list with register button highlighted</small></div>'
-              }
-              ${imageDataUrls.registrationDialog ? 
-                `<img src="${imageDataUrls.registrationDialog}" alt="Registration dialog screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">` :
-                '<div style="text-align: center; color: #666; padding: 20px;">[Registration Dialog Screenshot]<br><small>Shows player selection interface</small></div>'
-              }
-            </div>
+            ${imageDataUrls.eventList ? 
+              `<div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 12px; background: #f9fafb; margin: 8px 0;">
+                <img src="${imageDataUrls.eventList}" alt="Event registration page" style="width: 100%; max-width: 450px; height: auto; border-radius: 4px; margin-bottom: 8px;">
+                ${imageDataUrls.registrationDialog ? 
+                  `<img src="${imageDataUrls.registrationDialog}" alt="Registration dialog" style="width: 100%; max-width: 450px; height: auto; border-radius: 4px;">` : ''
+                }
+              </div>` :
+              '<div style="text-align: center; color: #666; padding: 12px; background: #f9fafb; border-radius: 6px; margin: 8px 0; font-size: 13px;">[Event Registration Screenshots]</div>'
+            }
             
-            <p style="font-size: 14px; margin-bottom: 12px;">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
-            <p style="font-size: 14px; margin-bottom: 12px;">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
-            <p style="font-size: 14px; margin-bottom: 12px;">5. Click <strong>Review Charges</strong> to see a full breakdown of fees.</p>
-            <p style="font-size: 14px; margin-bottom: 0;">6. Finally, click <strong>Register Now</strong>. This will generate an official invoice and complete the registration.</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">3. A dialog will appear listing all players on your roster. Select the players you wish to register.</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">4. For each player, confirm their <strong>Section</strong> and <strong>USCF Status</strong>.</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">5. Click <strong>Review Charges</strong> to see a full breakdown of fees.</p>
+            <p style="font-size: 13px; margin-bottom: 0;">6. Finally, click <strong>Register Now</strong> to generate an invoice and complete registration.</p>
           </div>
         </div>
 
         <!-- Step 3 -->
-        <div style="margin-bottom: 40px;">
-          <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">3</span>
+        <div style="margin-bottom: 28px;">
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+            <span style="background: #dbeafe; padding: 6px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px;">3</span>
             Step 3: Handling Invoices
           </h2>
           
-          <p style="margin-bottom: 20px;">After registering, you can view and manage all your invoices from one place.</p>
+          <p style="margin-bottom: 12px; font-size: 14px;">After registering, you can view and manage all your invoices from one place.</p>
           
-          <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
-            <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Viewing and Paying Invoices</h3>
+          <div style="border: 1px solid #e5e7eb; border-radius: 6px; padding: 14px; margin-bottom: 16px;">
+            <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">Viewing and Paying Invoices</h3>
             
-            <p style="font-size: 14px; margin-bottom: 12px;">1. Navigate to the <strong>Invoices & Payments</strong> page from the sidebar.</p>
-            <p style="font-size: 14px; margin-bottom: 12px;">2. Here you will see a list of all your invoices and their current status (e.g., Paid, Unpaid, Canceled).</p>
-            <p style="font-size: 14px; margin-bottom: 12px;">3. Click <strong>Details</strong> to view a specific invoice. From here, you can see the registered players and submit payment information.</p>
-            <p style="font-size: 14px; margin-bottom: 12px;">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
-            <p style="font-size: 14px; margin-bottom: 12px;">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">1. Navigate to the <strong>Invoices & Payments</strong> page from the sidebar.</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">2. You will see a list of all your invoices and their current status (Paid, Unpaid, Canceled).</p>
+            <p style="font-size: 13px; margin-bottom: 6px;">3. Click <strong>Details</strong> to view a specific invoice and see registered players.</p>
+            <p style="font-size: 13px; margin-bottom: 8px;">4. For payment, click <strong>View Invoice on Square</strong> for credit card, or use offline methods (PO, Check, CashApp, Zelle).</p>
             
-            <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
-              ${imageDataUrls.invoiceDetails ? 
-                `<img src="${imageDataUrls.invoiceDetails}" alt="Invoice details screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">` :
-                '<div style="text-align: center; color: #666; padding: 20px;">[Invoice Details Screenshot]<br><small>Shows player and fee breakdown</small></div>'
-              }
-              ${imageDataUrls.invoicePayment ? 
-                `<img src="${imageDataUrls.invoicePayment}" alt="Invoice payment options screenshot" style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">` :
-                '<div style="text-align: center; color: #666; padding: 20px;">[Invoice Payment Options Screenshot]<br><small>Shows PO, Check, and other payment methods</small></div>'
-              }
-            </div>
+            ${imageDataUrls.invoiceDetails ? 
+              `<div style="border: 1px solid #d1d5db; border-radius: 6px; padding: 12px; background: #f9fafb; margin: 8px 0;">
+                <img src="${imageDataUrls.invoiceDetails}" alt="Invoice details" style="width: 100%; max-width: 450px; height: auto; border-radius: 4px; margin-bottom: 8px;">
+                ${imageDataUrls.invoicePayment ? 
+                  `<img src="${imageDataUrls.invoicePayment}" alt="Invoice payment options" style="width: 100%; max-width: 450px; height: auto; border-radius: 4px;">` : ''
+                }
+              </div>` :
+              '<div style="text-align: center; color: #666; padding: 12px; background: #f9fafb; border-radius: 6px; margin: 8px 0; font-size: 13px;">[Invoice Screenshots]</div>'
+            }
+            
+            <p style="font-size: 13px; margin-bottom: 0;">5. If paying offline, select payment method, fill in details (PO/check number), upload proof, and click <strong>Submit Payment Information</strong> for review.</p>
           </div>
         </div>
 
         <!-- Step 4 -->
-        <div style="margin-bottom: 40px;">
-          <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
-            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 40px; height: 40px; justify-content: center; align-items: center;">4</span>
+        <div style="margin-bottom: 20px;">
+          <h2 style="font-size: 20px; font-weight: bold; margin-bottom: 14px; display: flex; align-items: center; gap: 10px;">
+            <span style="background: #dbeafe; padding: 6px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px;">4</span>
             Need More Help?
           </h2>
           
-          <p style="margin-bottom: 0;">For more detailed instructions on every feature, please visit our new <strong>Help Center</strong>.</p>
+          <p style="margin-bottom: 0; font-size: 14px;">For more detailed instructions on every feature, please visit our new <strong>Help Center</strong>.</p>
         </div>
       </div>
     `;
@@ -237,17 +233,19 @@ export default function QuickStartGuidePage() {
     
     // Add to DOM
     document.body.appendChild(tempContainer);
+    
+    console.log('Capturing complete compact content...');
+    console.log('Container height:', tempContainer.scrollHeight);
 
-    console.log('Capturing content with converted images...');
-
-    // Capture (using data URLs, no CORS issues)
+    // Capture with adjusted settings for better handling of long content
     const canvas = await html2canvas(tempContainer, {
-      scale: 1.2,
+      scale: 1.0, // Lower scale to handle more content
       useCORS: false,
       allowTaint: true,
       backgroundColor: '#ffffff',
       height: tempContainer.scrollHeight,
       width: tempContainer.scrollWidth,
+      logging: false,
     });
 
     // Remove temp container
@@ -255,7 +253,7 @@ export default function QuickStartGuidePage() {
 
     console.log(`Canvas captured: ${canvas.width}x${canvas.height}`);
 
-    // Create PDF
+    // Create PDF with multiple pages to ensure all content fits
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('portrait', 'pt', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -268,11 +266,11 @@ export default function QuickStartGuidePage() {
     const ratio = contentWidth / imgWidth;
     const scaledHeight = imgHeight * ratio;
     
-    // Calculate pages
-    const pageHeight = pdfHeight - (margin * 2);
+    // Use shorter pages to ensure nothing gets cut off
+    const pageHeight = (pdfHeight - (margin * 2)) * 0.75; // Use 75% to create more pages
     const numPages = Math.ceil(scaledHeight / pageHeight);
     
-    console.log(`Creating ${numPages} pages`);
+    console.log(`Creating ${numPages} pages for complete content`);
 
     for (let page = 0; page < numPages; page++) {
       if (page > 0) pdf.addPage();
@@ -284,11 +282,13 @@ export default function QuickStartGuidePage() {
     pdf.save('ChessMate_Quick_Start_Guide.pdf');
     setOpenAccordionItems(originalState);
     
-    console.log('PDF completed successfully');
+    console.log('Complete PDF generated successfully');
     
   } catch (error) {
-    console.error("Failed to generate PDF:", error);
-    alert(`Sorry, there was an error generating the PDF: ${error.message}`);
+    if(error instanceof Error) {
+        console.error("Failed to generate PDF:", error);
+        alert(`Sorry, there was an error generating the PDF: ${error.message}`);
+    }
   } finally {
     setIsDownloading(false);
   }
