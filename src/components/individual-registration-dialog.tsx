@@ -131,14 +131,16 @@ export function IndividualRegistrationDialog({
 
   const getFeeForEvent = () => {
     if (!event) return { fee: 0, type: 'Regular Registration' };
-    const deadline = event.registrationDeadline ? new Date(event.registrationDeadline) : new Date(event.date);
-    const now = new Date();
-    if (startOfDay(now) > startOfDay(deadline)) {
-        const eventDate = new Date(event.date);
-        if (isSameDay(eventDate, now)) return { fee: event.dayOfFee || event.regularFee, type: 'Day-of Registration' };
-        const hoursUntilEvent = differenceInHours(eventDate, now);
-        if (hoursUntilEvent <= 24) return { fee: event.veryLateFee || event.regularFee, type: 'Very Late Registration' };
-        return { fee: event.lateFee || event.regularFee, type: 'Late Registration' };
+    const now = startOfDay(new Date());
+
+    if (event.veryLateDeadline && now > startOfDay(new Date(event.veryLateDeadline))) {
+        return { fee: event.dayOfFee, type: 'Day-of Registration' };
+    }
+    if (event.lateDeadline && now > startOfDay(new Date(event.lateDeadline))) {
+        return { fee: event.veryLateFee, type: 'Very Late Registration' };
+    }
+    if (event.regularDeadline && now > startOfDay(new Date(event.regularDeadline))) {
+        return { fee: event.lateFee, type: 'Late Registration' };
     }
     return { fee: event.regularFee, type: 'Regular Registration' };
   };

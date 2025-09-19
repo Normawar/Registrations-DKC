@@ -340,7 +340,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
 
     const getFeeForEvent = () => {
         if (!event) return { fee: 0, type: 'Regular Registration' };
-        
         const now = startOfDay(new Date());
 
         if (event.veryLateDeadline && now > startOfDay(new Date(event.veryLateDeadline))) {
@@ -352,7 +351,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
         if (event.regularDeadline && now > startOfDay(new Date(event.regularDeadline))) {
             return { fee: event.lateFee, type: 'Late Registration' };
         }
-        
         return { fee: event.regularFee, type: 'Regular Registration' };
     };
 
