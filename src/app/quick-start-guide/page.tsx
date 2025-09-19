@@ -161,20 +161,20 @@ export default function QuickStartGuidePage() {
     
     console.log(`Scaled height: ${scaledHeight}, Available height per page: ${availableHeight}`);
     
-    // Calculate number of pages with some overlap to avoid cutting text
-    const pageOverlap = 50; // 50pt overlap to avoid cutting text
-    const effectivePageHeight = availableHeight - pageOverlap;
+    // Calculate number of pages - use more pages for cleaner breaks
+    // Reduce effective page height to create more, cleaner pages
+    const effectivePageHeight = availableHeight * 0.85; // Use 85% of available height for cleaner breaks
     const numPages = Math.ceil(scaledHeight / effectivePageHeight);
     
-    console.log(`Will create ${numPages} pages with ${pageOverlap}pt overlap`);
+    console.log(`Will create ${numPages} pages (using ${effectivePageHeight}pt effective height)`);
 
-    // Add pages with overlap to prevent text cutting
+    // Add pages with clean breaks (no overlap)
     for (let page = 0; page < numPages; page++) {
       if (page > 0) {
         pdf.addPage();
       }
       
-      // Calculate Y position with overlap
+      // Calculate Y position - clean, no overlap
       const yPosition = margin - (page * effectivePageHeight);
       
       pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, scaledHeight);
@@ -357,3 +357,5 @@ export default function QuickStartGuidePage() {
     </AppLayout>
   );
 }
+
+    
