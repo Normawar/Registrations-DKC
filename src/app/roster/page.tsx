@@ -162,28 +162,28 @@ const DateInput = React.forwardRef<HTMLInputElement, {
 DateInput.displayName = 'DateInput';
 
 const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
-    if (!player?.changeHistory || player.changeHistory.length === 0) {
-        return <div className="p-6 text-center text-muted-foreground">No change history available for this player.</div>;
-    }
+  if (!player?.changeHistory || player.changeHistory.length === 0) {
+      return <div className="p-6 text-center text-muted-foreground">No change history available for this player.</div>;
+  }
 
-    return (
-        <div className="p-6 space-y-4">
-            {player.changeHistory.slice().reverse().map(entry => (
-                <div key={entry.timestamp} className="text-sm border-l-2 pl-4">
-                    <p className="font-medium">
-                        {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
-                    </p>
-                    <ul className="list-disc pl-5 mt-1 text-muted-foreground text-xs">
-                        {entry.changes.map((change, index) => (
-                            <li key={index}>
-                                Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic">'{String(change.oldValue)}'</span> to <span className="italic">'{String(change.newValue)}'</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            ))}
-        </div>
-    );
+  return (
+      <div className="p-6 space-y-4">
+          {player.changeHistory.slice().reverse().map(entry => (
+              <div key={entry.timestamp} className="text-sm border-l-2 pl-4">
+                  <p className="font-medium">
+                      {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
+                  </p>
+                  <ul className="list-disc pl-5 mt-1 text-muted-foreground text-xs">
+                      {entry.changes.map((change, index) => (
+                          <li key={index}>
+                              Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic">'{String(change.oldValue)}'</span> to <span className="italic">'{String(change.newValue)}'</span>
+                          </li>
+                      ))}
+                  </ul>
+              </div>
+          ))}
+      </div>
+  );
 };
 
 function SponsorRosterView() {
@@ -402,7 +402,7 @@ function SponsorRosterView() {
   const confirmRemoveFromRoster = () => {
     if (playerToDelete && profile) {
       updatePlayer({ ...playerToDelete, school: '', district: '' }, profile);
-      toast({ title: "Player removed", description: `${''}${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from your roster.` });
+      toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from your roster.` });
     }
     setIsAlertOpen(false);
     setPlayerToDelete(null);
@@ -424,14 +424,14 @@ function SponsorRosterView() {
       await addPlayer(updatedPlayerRecord);
       toast({ 
         title: "Player Added to Roster", 
-        description: `${''}${values.firstName} ${values.lastName} has been successfully added to your roster.`
+        description: `${values.firstName} ${values.lastName} has been successfully added to your roster.`
       });
       setPendingPlayer(null);
     } else {
       await updatePlayer(updatedPlayerRecord, profile);
       toast({ 
         title: "Player Updated", 
-        description: `${''}${values.firstName} ${values.lastName}'s information has been updated.`
+        description: `${values.firstName} ${values.lastName}'s information has been updated.`
       });
     }
     
@@ -491,7 +491,7 @@ function SponsorRosterView() {
     await addPlayer(newPlayerRecord);
     toast({ 
         title: "Player Created", 
-        description: `${''}${values.firstName} ${values.lastName} has been created and added to your roster.`
+        description: `${values.firstName} ${values.lastName} has been created and added to your roster.`
     });
     
     setIsCreatePlayerDialogOpen(false);
@@ -524,7 +524,7 @@ function SponsorRosterView() {
       await updatePlayer(updatedPlayer, profile);
       toast({ 
         title: "Match Confirmed", 
-        description: `${''}${player.firstName} ${player.lastName} updated with USCF ID ${player.potentialUscfMatch.uscfId}`
+        description: `${player.firstName} ${player.lastName} updated with USCF ID ${player.potentialUscfMatch.uscfId}`
       });
     };
   
@@ -668,10 +668,10 @@ function SponsorRosterView() {
                     <TableRow key={player.id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png`} alt={`${''}${player.firstName} ${player.lastName}`} data-ai-hint="person face" /><AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback></Avatar>
+                          <Avatar className="h-8 w-8"><AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" /><AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback></Avatar>
                           <div>
                             <div className="font-medium flex items-center gap-2">
-                              {`${''}${player.firstName} ${player.middleName || ''} ${player.lastName}`.replace(/\s+/g, ' ').trim()}
+                              {`${player.firstName} ${player.middleName || ''} ${player.lastName}`.replace(/\s+/g, ' ').trim()}
                               {player.studentType === 'gt' && <Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>}
                             </div>
                             <div className="text-sm text-muted-foreground">{player.email}</div>
@@ -757,7 +757,7 @@ function SponsorRosterView() {
                               {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
                                   <FormField control={playerForm.control} name="studentType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Student Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                               )}
-                              <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${''}${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
+                              <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
                               <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem> )} />
@@ -828,7 +828,7 @@ function SponsorRosterView() {
                                       </FormItem>
                                   )} />
                               </div>
-                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${''}${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
+                              <FormField control={createPlayerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
                               <FormField control={createPlayerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <FormField control={createPlayerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem> )} />
@@ -1169,7 +1169,7 @@ function DistrictRosterView() {
         await updatePlayer(updatedPlayerRecord, profile);
         toast({ 
             title: "Player Updated", 
-            description: `${''}${values.firstName} ${values.lastName}'s information has been updated.`
+            description: `${values.firstName} ${values.lastName}'s information has been updated.`
         });
         
         setIsEditPlayerDialogOpen(false);
@@ -1186,7 +1186,7 @@ function DistrictRosterView() {
             await deletePlayer(playerToDelete.id);
             toast({
                 title: "Player Deleted",
-                description: `${''}${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the database.`,
+                description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the database.`,
             });
         }
         setIsAlertOpen(false);
@@ -1303,7 +1303,7 @@ function DistrictRosterView() {
                                     </TableHeader>
                                     <TableBody>
                                         {sortedSchoolRoster.map((player) => {
-                                            const displayName = (player.firstName && player.lastName) ? `${''}${player.lastName}, ${player.firstName}` : 'Invalid Player Record';
+                                            const displayName = (player.firstName && player.lastName) ? `${player.lastName}, ${player.firstName}` : 'Invalid Player Record';
                                             return (
                                                 <TableRow key={player.id}>
                                                     <TableCell>
@@ -1381,7 +1381,7 @@ function DistrictRosterView() {
                                   {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
                                       <FormField control={playerForm.control} name="studentType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Student Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                                   )}
-                                  <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${''}${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
+                                  <FormField control={playerForm.control} name="uscfId" render={({ field }) => { const rawValue = field.value?.toString() || ''; const numericValue = rawValue.replace(/\D/g, ''); const isValidUscfId = numericValue && numericValue !== '' && numericValue.length >= 7 && rawValue.toUpperCase() !== 'NEW'; const verificationUrl = `https://www.uschess.org/msa/MbrDtlTnmtHst.php?${numericValue}`; return ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input placeholder="Enter USCF ID or 'NEW'" {...field} /></FormControl>{isValidUscfId && ( <div className="flex items-center gap-2 mt-2 p-2 bg-blue-50 rounded border border-blue-200"><LinkIcon className="h-4 w-4 text-blue-600 shrink-0" /><div className="flex flex-col gap-1"><a href={verificationUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium">Verify USCF ID {numericValue} on official website</a><p className="text-xs text-blue-700">Opens USCF member details and tournament history</p></div></div> )}{rawValue && !isValidUscfId && rawValue.toUpperCase() !== 'NEW' && ( <p className="text-xs text-amber-600 mt-1">{numericValue.length < 7 && numericValue.length > 0 ? `Enter at least 7 digits for USCF verification (current: ${numericValue.length})` : 'Enter a valid USCF ID (7+ digits) to show verification link'}</p> )}{rawValue.toUpperCase() === 'NEW' && (<p className="text-xs text-green-600 mt-1">NEW player - no USCF verification needed</p>)}<FormDescription>Enter USCF ID number or "NEW" for new players</FormDescription><FormMessage /></FormItem> );}} />
                                   <FormField control={playerForm.control} name="regularRating" render={({ field }) => ( <FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="Enter rating, UNR, or NEW" value={field.value !== undefined ? String(field.value) : ''} onChange={(e) => { const value = e.target.value.trim().toUpperCase(); if (value === '' || value === 'UNR' || value === 'NEW') { field.onChange(value === '' ? undefined : value); } else { const numValue = parseFloat(value); field.onChange(!isNaN(numValue) ? numValue : value); } }} /></FormControl><FormMessage /></FormItem> )} />
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <FormField control={playerForm.control} name="dob" render={({ field }) => ( <FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem> )} />
@@ -1448,3 +1448,5 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
+
+    
