@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -153,7 +154,7 @@ export default function QuickStartGuidePage() {
       document.querySelector('div[value="item-1"]')
     ];
     
-    console.log('Alternative selectors:', altSelectors.map((item, i) => `Alt ${i}: ${!!item || (item?.length > 0)}`));
+    console.log('Alternative selectors:', altSelectors.map((item, i) => `Alt ${i}: ${!!item || (item instanceof NodeList ? item.length > 0 : false)}`));
     
     // Check accordion structure
     const accordion = document.querySelector('[data-radix-accordion-root]') || document.querySelector('.accordion');
@@ -164,6 +165,7 @@ export default function QuickStartGuidePage() {
       });
     }
   };
+
 
   return (
     <AppLayout>
