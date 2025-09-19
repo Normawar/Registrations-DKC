@@ -41,6 +41,10 @@ interface MasterDbContextType {
     csvFile: File,
     onProgress?: (progress: UploadProgress) => void
   ) => Promise<{ uploaded: number; errors: string[]; }>;
+  bulkUpdateFromCSV: (
+    csvFile: File,
+    onProgress?: (progress: UploadProgress) => void
+  ) => Promise<{ updated: number; created: number, errors: string[]; }>;
   clearDatabase: () => Promise<void>;
   isDbLoaded: boolean;
   isDbError: boolean;
@@ -513,6 +517,87 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     // ... rest of the implementation
     return { uploaded: 0, errors: [] }; // Placeholder
   };
+
+  const bulkUpdateFromCSV = async (
+    csvFile: File,
+    onProgress?: (progress: UploadProgress) => void
+  ): Promise<{ updated: number; created: number; errors: string[]; }> => {
+    if (!db) {
+        return { updated: 0, created: 0, errors: ['Database not connected.'] };
+    }
+    
+    return new Promise((resolve) => {
+        Papa.parse(csvFile, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                const data = results.data as any[];
+                if (data.length === 0) {
+                    resolve({ updated: 0, created: 0, errors: ['CSV file is empty or invalid.'] });
+                    return;
+                }
+                
+                const playersToUpdate = parseCSVData(data);
+                let updatedCount = 0;
+                let createdCount = 0;
+                const errors: string[] = [];
+
+                const BATCH_SIZE = 400;
+                const totalRecords = playersToUpdate.length;
+                const totalBatches = Math.ceil(totalRecords / BATCH_SIZE);
+
+                onProgress?.({ stage: 'uploading', currentBatch: 0, totalBatches, uploadedRecords: 0, totalRecords, percentage: 0, message: 'Preparing to update...'});
+                
+                for (let i = 0; i < totalRecords; i += BATCH_SIZE) {
+                    const batchData = playersToUpdate.slice(i, i + BATCH_SIZE);
+                    const batch = writeBatch(db);
+                    
+                    for (const player of batchData) {
+                        if (!player.id) {
+                            errors.push(`Skipping record with missing USCF ID: ${player.lastName}`);
+                            continue;
+                        }
+                        const playerRef = doc(db, 'players', player.id);
+                        const docSnap = await getDoc(playerRef);
+
+                        if (docSnap.exists()) {
+                            batch.update(playerRef, player);
+                            updatedCount++;
+                        } else {
+                            batch.set(playerRef, player);
+                            createdCount++;
+                        }
+                    }
+
+                    try {
+                        await batch.commit();
+                    } catch(e) {
+                        const message = e instanceof Error ? e.message : 'Unknown batch commit error';
+                        errors.push(`Batch ${i / BATCH_SIZE + 1} failed: ${message}`);
+                    }
+                    
+                    onProgress?.({
+                        stage: 'uploading',
+                        currentBatch: (i / BATCH_SIZE) + 1,
+                        totalBatches,
+                        uploadedRecords: i + batchData.length,
+                        totalRecords,
+                        percentage: Math.round(((i + batchData.length) / totalRecords) * 100),
+                        message: `Processed batch ${i / BATCH_SIZE + 1} of ${totalBatches}...`
+                    });
+                }
+                
+                onProgress?.({ stage: 'complete', currentBatch: totalBatches, totalBatches, uploadedRecords: totalRecords, totalRecords, percentage: 100, message: 'Update complete! Refreshing local data...' });
+                
+                await loadDatabase();
+                resolve({ updated: updatedCount, created: createdCount, errors });
+            },
+            error: (error: any) => {
+                resolve({ updated: 0, created: 0, errors: [error.message] });
+            }
+        });
+    });
+  };
   
   const clearDatabase = async() => {
     //...
@@ -577,6 +662,7 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     renameDistrict,
     addBulkSchools,
     bulkUploadCSV,
+    bulkUpdateFromCSV,
     clearDatabase,
     updatePlayerFromUscfData,
     isDbLoaded,

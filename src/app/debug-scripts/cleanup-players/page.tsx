@@ -23,7 +23,7 @@ function DeprecatedCleanupPlayersPage() {
           <CardHeader>
             <CardTitle>Tool Deprecated</CardTitle>
             <CardDescription>
-              This cleanup tool is no longer in use. Please use the "Force Delete User" tool for more reliable user deletion.
+              This cleanup tool is no longer in use. Please use the "User Management" page for a more reliable way to delete users.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -31,7 +31,7 @@ function DeprecatedCleanupPlayersPage() {
               <ShieldAlert className="h-4 w-4" />
               <AlertTitle>This tool is deprecated.</AlertTitle>
               <AlertDescription>
-                A more reliable tool for deleting users by email is now available at "Force Delete User" in the sidebar. This page can be removed.
+                A more reliable tool for deleting users is now available on the "User Management" page. This page can be removed.
               </AlertDescription>
             </Alert>
           </CardContent>
