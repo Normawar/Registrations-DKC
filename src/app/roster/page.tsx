@@ -672,7 +672,7 @@ function SponsorRosterView() {
                           <div>
                             <div className="font-medium flex items-center gap-2">
                               {`${player.firstName} ${player.middleName || ''} ${player.lastName}`.replace(/\s+/g, ' ').trim()}
-                              {player.studentType === 'gt' && <Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>}
+                              {player.district === 'PHARR-SAN JUAN-ALAMO ISD' && player.studentType === 'gt' && <Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>}
                             </div>
                             <div className="text-sm text-muted-foreground">{player.email}</div>
                           </div>
@@ -1312,7 +1312,7 @@ function DistrictRosterView() {
                                                     <TableCell>{player.section}</TableCell>
                                                     {showGtColumn && (
                                                         <TableCell>
-                                                            {player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
+                                                            {player.district === 'PHARR-SAN JUAN-ALAMO ISD' && player.studentType === 'gt' && <Check className="h-5 w-5 text-green-600" />}
                                                         </TableCell>
                                                     )}
                                                     <TableCell className="text-right">
