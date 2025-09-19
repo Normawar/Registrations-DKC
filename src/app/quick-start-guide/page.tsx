@@ -68,24 +68,62 @@ export default function QuickStartGuidePage() {
 
     setIsDownloading(true);
 
-    // Expand all accordion items to ensure they are in the DOM for capture
-    const allItemValues = ['item-1', 'item-2', 'item-3', 'item-4'];
-    setOpenAccordionItems(allItemValues);
-
-    // Allow time for accordion to expand before capturing
-    await new Promise(resolve => setTimeout(resolve, 500));
-
     try {
+      // Store original accordion state
+      const originalState = [...openAccordionItems];
+      
+      // Expand all accordion items
+      const allItemValues = ['item-1', 'item-2', 'item-3', 'item-4'];
+      setOpenAccordionItems(allItemValues);
+
+      // Wait longer for accordion content to fully render and images to load
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Wait for all images to load before capturing
+      const images = guideContent.querySelectorAll('img');
+      const imagePromises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = resolve; // Continue even if image fails
+          setTimeout(resolve, 5000); // Timeout after 5 seconds
+        });
+      });
+      
+      await Promise.all(imagePromises);
+
+      // Additional wait to ensure everything is rendered
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       const canvas = await html2canvas(guideContent, {
-        scale: 2,
+        scale: 1.5, // Reduced scale for better performance
         useCORS: true,
+        allowTaint: true,
         logging: false,
-        onclone: (document) => {
-          // Remove the download button from the clone so it doesn't appear in the PDF
-          const button = document.querySelector('.no-print');
+        height: guideContent.scrollHeight,
+        width: guideContent.scrollWidth,
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (clonedDocument) => {
+          // Ensure all accordion items are expanded in the clone
+          const accordions = clonedDocument.querySelectorAll('[data-state="closed"]');
+          accordions.forEach(accordion => {
+            accordion.setAttribute('data-state', 'open');
+          });
+          
+          // Remove the download button from the clone
+          const button = clonedDocument.querySelector('.no-print');
           if (button) {
             button.style.display = 'none';
           }
+
+          // Ensure all content is visible
+          const accordionContent = clonedDocument.querySelectorAll('[data-state="closed"]');
+          accordionContent.forEach(content => {
+            content.style.display = 'block';
+            content.style.height = 'auto';
+            content.style.overflow = 'visible';
+          });
         },
       });
 
@@ -99,40 +137,43 @@ export default function QuickStartGuidePage() {
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
       
-      const margin = 36; // 0.5 inches * 72 points/inch
-      const contentWidth = pdfWidth - margin * 2;
+      // 0.5 inch margins = 36 points (72 points per inch)
+      const margin = 36;
+      const contentWidth = pdfWidth - (margin * 2);
       
       const canvasWidth = canvas.width;
       const canvasHeight = canvas.height;
-      const ratio = canvasWidth / canvasHeight;
-      const contentHeight = contentWidth / ratio;
+      const ratio = contentWidth / canvasWidth;
+      const contentHeight = canvasHeight * ratio;
 
-      let heightLeft = contentHeight;
       let yPosition = margin;
+      let heightLeft = contentHeight;
+      const pageContentHeight = pdfHeight - (margin * 2);
 
       // Add the first page
       pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, contentHeight);
-      heightLeft -= (pdfHeight - (margin * 2));
+      heightLeft -= pageContentHeight;
 
-      // Add subsequent pages if needed
+      // Add subsequent pages if content is longer than one page
       while (heightLeft > 0) {
-        yPosition = yPosition - pdfHeight + (margin * 2);
         pdf.addPage();
+        yPosition = -(contentHeight - heightLeft) + margin;
         pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, contentHeight);
-        heightLeft -= (pdfHeight - (margin * 2));
+        heightLeft -= pageContentHeight;
       }
       
       pdf.save('ChessMate_Quick_Start_Guide.pdf');
+      
+      // Restore original accordion state
+      setOpenAccordionItems(originalState);
+      
     } catch (error) {
       console.error("Failed to generate PDF:", error);
       alert("Sorry, there was an error generating the PDF. Please try again.");
     } finally {
       setIsDownloading(false);
-      // Optional: collapse back to default state after download
-      setOpenAccordionItems(['item-1']);
     }
   };
-
 
   return (
     <AppLayout>
@@ -150,7 +191,7 @@ export default function QuickStartGuidePage() {
           </Button>
         </div>
 
-        <div id="guide-content">
+        <div id="guide-content" className="space-y-6">
           <Alert>
               <Lightbulb className="h-4 w-4" />
               <AlertTitle>First Things First: Your Roster</AlertTitle>
@@ -277,6 +318,7 @@ export default function QuickStartGuidePage() {
                 </Card>
               </AccordionContent>
             </AccordionItem>
+            
             <AccordionItem value="item-4">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
