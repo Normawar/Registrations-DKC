@@ -64,118 +64,62 @@ export default function QuickStartGuidePage() {
   const [openAccordionItems, setOpenAccordionItems] = useState(['item-1']);
 
   const handleDownloadPdf = async () => {
-    const guideContent = document.getElementById('guide-content');
-    if (!guideContent) return;
+  setIsDownloading(true);
 
-    setIsDownloading(true);
+  try {
+    const originalState = [...openAccordionItems];
+    setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    try {
-      const originalState = [...openAccordionItems];
-      
-      // Expand all accordion items
-      const allItemValues = ['item-1', 'item-2', 'item-3', 'item-4'];
-      setOpenAccordionItems(allItemValues);
+    const pdf = new jsPDF('portrait', 'pt', 'a4');
+    const margin = 36;
+    const contentWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
 
-      // Add CSS for better page breaks
-      const printStyles = document.createElement('style');
-      printStyles.textContent = `
-        .pdf-page-break { 
-          page-break-before: always; 
-          break-before: page;
-          height: 20px;
-          visibility: hidden;
-        }
-        .pdf-page-break-avoid { 
-          page-break-inside: avoid; 
-          break-inside: avoid; 
-        }
-      `;
-      document.head.appendChild(printStyles);
+    // Capture sections individually
+    const sections = [
+      { selector: '#guide-content > *:first-child', title: 'Alert' }, // Alert
+      { selector: '[value="item-1"]', title: 'Step 1', newPage: false },
+      { selector: '[value="item-2"]', title: 'Step 2', newPage: true },
+      { selector: '[value="item-3"]', title: 'Step 3', newPage: true },
+      { selector: '[value="item-4"]', title: 'Step 4', newPage: false }
+    ];
 
-      // Add page break markers
-      const accordionItems = guideContent.querySelectorAll('[data-radix-accordion-item]');
-      accordionItems.forEach((item, index) => {
-        if (index > 0) { // Skip first item
-          const pageBreak = document.createElement('div');
-          pageBreak.className = 'pdf-page-break';
-          pageBreak.textContent = 'PAGE_BREAK_MARKER';
-          item.parentNode?.insertBefore(pageBreak, item);
-        }
-      });
+    let isFirstSection = true;
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+    for (const section of sections) {
+      const element = document.querySelector(section.selector) as HTMLElement;
+      if (!element) continue;
 
-      // Wait for images
-      const images = guideContent.querySelectorAll('img');
-      const imagePromises = Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = resolve;
-          setTimeout(resolve, 3000);
-        });
-      });
-      await Promise.all(imagePromises);
+      // Add new page if specified (except for first section)
+      if (section.newPage && !isFirstSection) {
+        pdf.addPage();
+      }
 
-      const canvas = await html2canvas(guideContent, {
+      const canvas = await html2canvas(element, {
         scale: 1.5,
         useCORS: true,
         allowTaint: true,
-        logging: false,
-        height: guideContent.scrollHeight,
-        width: guideContent.scrollWidth,
-        onclone: (clonedDocument) => {
-          const button = clonedDocument.querySelector('.no-print');
-          if (button) button.style.display = 'none';
-          
-          const accordionContent = clonedDocument.querySelectorAll('[data-state="closed"]');
-          accordionContent.forEach(content => {
-            content.style.display = 'block';
-            content.style.height = 'auto';
-          });
-        },
+        backgroundColor: '#ffffff',
       });
 
-      // Clean up
-      document.head.removeChild(printStyles);
-      const pageBreaks = guideContent.querySelectorAll('.pdf-page-break');
-      pageBreaks.forEach(el => el.remove());
-
-      // Smart PDF generation with page break detection
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('portrait', 'pt', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const margin = 36;
-      const contentWidth = pdfWidth - (margin * 2);
-      const pageHeight = pdfHeight - (margin * 2);
+      const imgHeight = (canvas.height * contentWidth) / canvas.width;
+
+      pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, imgHeight);
       
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = contentWidth / imgWidth;
-      const scaledHeight = imgHeight * ratio;
-
-      // Calculate better page breaks
-      const numPages = Math.ceil(scaledHeight / pageHeight);
-      const pageBreakHeight = scaledHeight / numPages;
-
-      for (let page = 0; page < numPages; page++) {
-        if (page > 0) pdf.addPage();
-        
-        const yOffset = -(page * pageBreakHeight) + margin;
-        pdf.addImage(imgData, 'PNG', margin, yOffset, contentWidth, scaledHeight);
-      }
-
-      pdf.save('ChessMate_Quick_Start_Guide.pdf');
-      setOpenAccordionItems(originalState);
-      
-    } catch (error) {
-      console.error("Failed to generate PDF:", error);
-      alert("Sorry, there was an error generating the PDF. Please try again.");
-    } finally {
-      setIsDownloading(false);
+      isFirstSection = false;
     }
-  };
+
+    pdf.save('ChessMate_Quick_Start_Guide.pdf');
+    setOpenAccordionItems(originalState);
+    
+  } catch (error) {
+    console.error("Failed to generate PDF:", error);
+    alert("Sorry, there was an error generating the PDF. Please try again.");
+  } finally {
+    setIsDownloading(false);
+  }
+};
 
   return (
     <AppLayout>
@@ -338,5 +282,3 @@ export default function QuickStartGuidePage() {
     </AppLayout>
   );
 }
-
-    
