@@ -68,38 +68,48 @@ export default function QuickStartGuidePage() {
 
     try {
       const originalState = [...openAccordionItems];
+      
+      // Expand all accordion items
       setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Wait for images to load
+      const images = document.querySelectorAll('#guide-content img');
+      const imagePromises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+          setTimeout(resolve, 3000);
+        });
+      });
+      await Promise.all(imagePromises);
 
       const pdf = new jsPDF('portrait', 'pt', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
       const margin = 36;
-      const contentWidth = pdf.internal.pageSize.getWidth() - (margin * 2);
+      const contentWidth = pdfWidth - (margin * 2);
 
-      // Capture sections individually
-      const sections = [
-        { selector: '#guide-content > *:first-child', title: 'Alert' }, // Alert
-        { selector: '[value="item-1"]', title: 'Step 1', newPage: false },
-        { selector: '[value="item-2"]', title: 'Step 2', newPage: true },
-        { selector: '[value="item-3"]', title: 'Step 3', newPage: true },
-        { selector: '[value="item-4"]', title: 'Step 4', newPage: false }
-      ];
+      let isFirstPage = true;
 
-      let isFirstSection = true;
+      // Helper function to capture and add element to PDF
+      const captureElement = async (element: Element, forceNewPage = false) => {
+        if (!element) return;
 
-      for (const section of sections) {
-        const element = document.querySelector(section.selector) as HTMLElement;
-        if (!element) continue;
+        console.log('Capturing element:', element.tagName, element.className);
 
-        // Add new page if specified (except for first section)
-        if (section.newPage && !isFirstSection) {
+        // Start new page if requested (except for first element)
+        if (forceNewPage && !isFirstPage) {
           pdf.addPage();
         }
 
-        const canvas = await html2canvas(element, {
+        const canvas = await html2canvas(element as HTMLElement, {
           scale: 1.5,
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#ffffff',
+          logging: false,
         });
 
         const imgData = canvas.toDataURL('image/png');
@@ -107,65 +117,49 @@ export default function QuickStartGuidePage() {
 
         pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, imgHeight);
         
-        isFirstSection = false;
+        isFirstPage = false;
+        console.log('Added element to PDF');
+      };
+
+      const guideContent = document.getElementById('guide-content');
+      if (!guideContent) {
+        throw new Error("Guide content not found");
+      }
+      
+      // Capture the Alert (first child)
+      if (guideContent.children[0]) {
+        console.log('Capturing alert section...');
+        await captureElement(guideContent.children[0], false);
+      }
+
+      // Find all accordion items using the working selector from debug
+      const accordionItems = document.querySelectorAll('[data-radix-accordion-item]');
+      console.log(`Found ${accordionItems.length} accordion items`);
+
+      // Capture each accordion item on its own page
+      for (let i = 0; i < accordionItems.length; i++) {
+        const item = accordionItems[i];
+        console.log(`Capturing accordion item ${i + 1}...`);
+        
+        // Force new page for each step
+        await captureElement(item, true);
+        
+        // Small delay between captures
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       pdf.save('ChessMate_Quick_Start_Guide.pdf');
       setOpenAccordionItems(originalState);
       
+      console.log(`PDF generated with ${accordionItems.length + 1} pages`);
+      
     } catch (error) {
       console.error("Failed to generate PDF:", error);
-      alert("Sorry, there was an error generating the PDF. Please try again.");
+      alert(`Sorry, there was an error generating the PDF: ${(error as Error).message}`);
     } finally {
       setIsDownloading(false);
     }
   };
-
-  // Add this debug function to see what elements are found
-  const debugSelectors = () => {
-    console.log('=== DEBUGGING SELECTORS ===');
-    
-    // Check the guide content
-    const guideContent = document.getElementById('guide-content');
-    console.log('Guide content found:', !!guideContent);
-    
-    if (guideContent) {
-      console.log('Guide content children:', guideContent.children.length);
-      Array.from(guideContent.children).forEach((child, index) => {
-        console.log(`Child ${index}:`, child.tagName, child.className, child.getAttribute('value'));
-      });
-    }
-    
-    // Check for accordion items
-    const accordionItems = [
-      document.querySelector('[value="item-1"]'),
-      document.querySelector('[value="item-2"]'), 
-      document.querySelector('[value="item-3"]'),
-      document.querySelector('[value="item-4"]')
-    ];
-    
-    console.log('Accordion items found:', accordionItems.map((item, i) => `item-${i+1}: ${!!item}`));
-    
-    // Try alternative selectors
-    const altSelectors = [
-      document.querySelector('[data-value="item-1"]'),
-      document.querySelector('[data-radix-accordion-item]'),
-      document.querySelectorAll('[data-radix-accordion-item]'),
-      document.querySelector('div[value="item-1"]')
-    ];
-    
-    console.log('Alternative selectors:', altSelectors.map((item, i) => `Alt ${i}: ${!!item || (item instanceof NodeList ? item.length > 0 : false)}`));
-    
-    // Check accordion structure
-    const accordion = document.querySelector('[data-radix-accordion-root]') || document.querySelector('.accordion');
-    if (accordion) {
-      console.log('Accordion found, children:', accordion.children.length);
-      Array.from(accordion.children).forEach((child, index) => {
-        console.log(`Accordion child ${index}:`, child.tagName, child.getAttribute('value'), child.getAttribute('data-value'));
-      });
-    }
-  };
-
 
   return (
     <AppLayout>
@@ -177,15 +171,10 @@ export default function QuickStartGuidePage() {
               Welcome to ChessMate! This guide will walk you through the essential steps to get started.
             </p>
           </div>
-          <div className="flex items-center">
-            <Button onClick={handleDownloadPdf} disabled={isDownloading}>
-              {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isDownloading ? 'Generating PDF...' : 'Download PDF'}
-            </Button>
-            <Button onClick={debugSelectors} variant="outline" className="ml-2">
-              Debug Elements
-            </Button>
-          </div>
+           <Button onClick={handleDownloadPdf} disabled={isDownloading}>
+            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            {isDownloading ? 'Generating PDF...' : 'Download PDF'}
+          </Button>
         </div>
 
         <div id="guide-content" className="space-y-6">
@@ -333,3 +322,5 @@ export default function QuickStartGuidePage() {
     </AppLayout>
   );
 }
+
+    
