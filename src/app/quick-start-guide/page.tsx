@@ -93,7 +93,7 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
                    <div className="border rounded-lg p-4 bg-muted/50">
                      <GuideImage 
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Froster.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd" 
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd" 
                        alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." 
                        width={600} 
                        height={400} 
