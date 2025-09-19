@@ -9,6 +9,7 @@ export type Event = {
   id: string;
   name: string;
   date: string; // ISO 8601 string format
+  registrationDeadline?: string; // ISO 8601 string format
   location: string;
   rounds: number;
   regularFee: number;

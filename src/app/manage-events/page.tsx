@@ -106,6 +106,7 @@ const eventFormSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(3, { message: "Name must be at least 3 characters." }),
   date: z.date({ required_error: "An event date is required." }),
+  registrationDeadline: z.date().optional(),
   location: z.string().min(3, { message: "Location is required." }),
   rounds: z.coerce.number().int().min(1, { message: "Must be at least 1 round." }),
   regularFee: z.coerce.number().min(0, { message: "Fee cannot be negative." }),
@@ -348,6 +349,7 @@ function ManageEventsContent() {
     defaultValues: {
       name: '',
       date: new Date(),
+      registrationDeadline: undefined,
       location: '',
       rounds: 5,
       regularFee: 20,
@@ -394,6 +396,7 @@ function ManageEventsContent() {
         form.reset({
           ...editingEvent,
           date: new Date(editingEvent.date),
+          registrationDeadline: editingEvent.registrationDeadline ? new Date(editingEvent.registrationDeadline) : undefined,
           imageUrl: editingEvent.imageUrl || '',
           imageName: editingEvent.imageName || '',
           pdfUrl: editingEvent.pdfUrl || '',
@@ -405,6 +408,7 @@ function ManageEventsContent() {
         form.reset({
           name: '',
           date: new Date(),
+          registrationDeadline: undefined,
           location: '',
           rounds: 5,
           regularFee: 20,
@@ -655,12 +659,13 @@ function ManageEventsContent() {
       const eventData = { 
         ...editingEvent,
         ...values, 
-        date: values.date.toISOString() 
+        date: values.date.toISOString(),
+        registrationDeadline: values.registrationDeadline?.toISOString() 
       };
       updateEvent(eventData as Event);
       toast({ title: "Event Updated", description: `"${values.name}" has been successfully updated.` });
     } else {
-      const eventData = { ...values, date: values.date.toISOString() };
+      const eventData = { ...values, date: values.date.toISOString(), registrationDeadline: values.registrationDeadline?.toISOString() };
       addBulkEvents([{ ...eventData, id: Date.now().toString() }]);
       toast({ title: "Event Added", description: `"${values.name}" has been successfully created.` });
     }
@@ -997,443 +1002,54 @@ function ManageEventsContent() {
             <Form {...form}>
               <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField 
-                    control={form.control} 
-                    name="name" 
-                    render={({ field }) => ( 
-                      <FormItem>
-                        <FormLabel>Event Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Spring Open 2024" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem> 
-                    )} 
-                  />
-                  <FormField 
-                    control={form.control} 
-                    name="location" 
-                    render={({ field }) => ( 
-                      <FormItem>
-                        <FormLabel>Location</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., City Convention Center" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem> 
-                    )} 
-                  />
+                  <FormField control={form.control} name="name" render={({ field }) => ( <FormItem><FormLabel>Event Name</FormLabel><FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField control={form.control} name="location" render={({ field }) => ( <FormItem><FormLabel>Location</FormLabel><FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField 
-                    control={form.control} 
-                    name="date" 
-                    render={({ field }) => ( 
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Event Date</FormLabel>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button
-                                variant={"outline"}
-                                className={cn(
-                                  "pl-3 text-left font-normal",
-                                  !field.value && "text-muted-foreground"
-                                )}
-                              >
-                                {field.value ? (
-                                  format(field.value, "PPP")
-                                ) : (
-                                  <span>Pick a date</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={field.onChange}
-                              initialFocus
-                              captionLayout="dropdown-buttons"
-                              fromYear={new Date().getFullYear()}
-                              toYear={new Date().getFullYear() + 10}
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem> 
-                    )}
-                  />
-                  <FormField 
-                    control={form.control} 
-                    name="rounds" 
-                    render={({ field }) => ( 
-                      <FormItem>
-                        <FormLabel>Rounds</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem> 
-                    )}
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Event Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}><>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                  <FormField control={form.control} name="registrationDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Registration Deadline</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}><>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                  <FormField control={form.control} name="rounds" render={({ field }) => ( <FormItem><FormLabel>Rounds</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
                 <div>
                   <Label>Registration Fees</Label>
                   <Card className="p-4 mt-2 bg-muted/50">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <FormField 
-                        control={form.control} 
-                        name="regularFee" 
-                        render={({ field }) => ( 
-                          <FormItem>
-                            <FormLabel>Regular Fee ($)</FormLabel>
-                            <FormControl>
-                              <Input type="number" placeholder="20" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem> 
-                        )}
-                      />
-                      <FormField 
-                        control={form.control} 
-                        name="lateFee" 
-                        render={({ field }) => ( 
-                          <FormItem>
-                            <FormLabel>Late Fee ($)</FormLabel>
-                            <FormControl>
-                              <Input type="number" placeholder="25" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem> 
-                        )}
-                      />
-                      <FormField 
-                        control={form.control} 
-                        name="veryLateFee" 
-                        render={({ field }) => ( 
-                          <FormItem>
-                            <FormLabel>Very Late Fee ($)</FormLabel>
-                            <FormControl>
-                              <Input type="number" placeholder="30" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem> 
-                        )}
-                      />
-                      <FormField 
-                        control={form.control} 
-                        name="dayOfFee" 
-                        render={({ field }) => ( 
-                          <FormItem>
-                            <FormLabel>Day of Fee ($)</FormLabel>
-                            <FormControl>
-                              <Input type="number" placeholder="35" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem> 
-                        )}
-                      />
+                      <FormField control={form.control} name="regularFee" render={({ field }) => ( <FormItem><FormLabel>Regular Fee ($)</FormLabel><FormControl><Input type="number" placeholder="20" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="lateFee" render={({ field }) => ( <FormItem><FormLabel>Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="25" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="veryLateFee" render={({ field }) => ( <FormItem><FormLabel>Very Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="30" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="dayOfFee" render={({ field }) => ( <FormItem><FormLabel>Day of Fee ($)</FormLabel><FormControl><Input type="number" placeholder="35" {...field} /></FormControl><FormMessage /></FormItem> )}/>
                     </div>
                   </Card>
                 </div>
                 <div className="space-y-4">
-                  <FormField 
-                    control={form.control} 
-                    name="imageUrl" 
-                    render={({ field }) => ( 
-                      <FormItem>
-                        <FormLabel>Image URL (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://placehold.co/100x100.png" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem> 
-                    )}
-                  />
-                  <FormField 
-                    control={form.control} 
-                    name="imageName" 
-                    render={({ field }) => ( 
-                      <FormItem>
-                        <FormLabel>Image Name (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Event Banner" {...field} />
-                        </FormControl>
-                        <FormDescription>A descriptive name for the image attachment.</FormDescription>
-                        <FormMessage />
-                      </FormItem> 
-                    )}
-                  />
+                  <FormField control={form.control} name="imageUrl" render={({ field }) => ( <FormItem><FormLabel>Image URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                  <FormField control={form.control} name="imageName" render={({ field }) => ( <FormItem><FormLabel>Image Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl><FormDescription>A descriptive name for the image attachment.</FormDescription><FormMessage /></FormItem> )}/>
                 </div>
                 <div className="space-y-4">
-                  <FormField 
-                    control={form.control} 
-                    name="pdfUrl" 
-                    render={({ field }) => ( 
-                      <FormItem>
-                        <FormLabel>PDF Flyer URL (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://example.com/flyer.pdf" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem> 
-                    )}
-                  />
-                  <FormField 
-                    control={form.control} 
-                    name="pdfName" 
-                    render={({ field }) => ( 
-                      <FormItem>
-                        <FormLabel>PDF Name (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Official Flyer" {...field} />
-                        </FormControl>
-                        <FormDescription>A descriptive name for the PDF attachment.</FormDescription>
-                        <FormMessage />
-                      </FormItem> 
-                    )}
-                  />
+                  <FormField control={form.control} name="pdfUrl" render={({ field }) => ( <FormItem><FormLabel>PDF Flyer URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                  <FormField control={form.control} name="pdfName" render={({ field }) => ( <FormItem><FormLabel>PDF Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl><FormDescription>A descriptive name for the PDF attachment.</FormDescription><FormMessage /></FormItem> )}/>
                 </div>
                 <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="isClosed"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>
-                              Close Registrations
-                            </FormLabel>
-                            <FormDescription>
-                              Check this box to prevent any new registrations for this event.
-                            </FormDescription>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="isPsjaOnly"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4">
-                          <FormControl>
-                            <Checkbox
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel>
-                              Restrict to PSJA Students
-                            </FormLabel>
-                            <FormDescription>
-                              Only allow sponsors and parents of students in PHARR-SAN JUAN-ALAMO ISD to register.
-                            </FormDescription>
-                          </div>
-                        </FormItem>
-                      )}
-                    />
+                    <FormField control={form.control} name="isClosed" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Close Registrations</FormLabel><FormDescription>Check this box to prevent any new registrations for this event.</FormDescription></div></FormItem>)}/>
+                    <FormField control={form.control} name="isPsjaOnly" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Restrict to PSJA Students</FormLabel><FormDescription>Only allow sponsors and parents of students in PHARR-SAN JUAN-ALAMO ISD to register.</FormDescription></div></FormItem>)}/>
                 </div>
               </form>
             </Form>
           </div>
           <DialogFooter className="p-6 pt-4 border-t shrink-0">
-            <DialogClose asChild>
-              <Button type="button" variant="ghost">Cancel</Button>
-            </DialogClose>
-            <Button type="submit" form="event-form">
-              {editingEvent ? 'Save Changes' : 'Create Event'}
-            </Button>
+            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+            <Button type="submit" form="event-form">{editingEvent ? 'Save Changes' : 'Create Event'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the event "{eventToDelete?.name}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the event "{eventToDelete?.name}".</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       
-      <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Clear All Events?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete all events from the list.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">
-              Clear Events
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Clear All Events?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete all events from the list.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearEvents} className="bg-destructive hover:bg-destructive/90">Clear Events</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
 
-      <Dialog open={isRegistrationsOpen} onOpenChange={setIsRegistrationsOpen}>
-        <DialogContent className="sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle>
-            <DialogDescription className="sr-only">
-              View registrations for the selected event.
-            </DialogDescription>
-             <div className="flex items-center gap-4 text-sm pt-2">
-               <Badge variant="outline">Registered: {registeredPlayers.length}</Badge>
-               <Badge variant="secondary">Exported: {exportedPlayers.length}</Badge>
-             </div>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {profile?.role === 'organizer' && (
-                <div className="border border-amber-500 bg-amber-50 rounded-lg p-4 inline-block">
-                    <p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p>
-                    <div className='flex items-center gap-2'>
-                        <Button 
-                            onClick={() => handleDownload(registeredPlayers, 'registered')} 
-                            disabled={registeredPlayers.length === 0} 
-                            size="sm"
-                            className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Export Registered Players ({registeredPlayers.length})
-                        </Button>
-                        <Button 
-                            onClick={() => handleDownload(exportedPlayers, 'exported')} 
-                            disabled={exportedPlayers.length === 0} 
-                            size="sm"
-                            className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Download Exported List ({exportedPlayers.length})
-                        </Button>
-                    </div>
-                </div>
-            )}
-            <div className='flex items-center gap-4 mt-2'>
-                <Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">
-                    Download All Registrations ({registrations.length})
-                </Button>
-                {profile?.role === 'organizer' && (
-                  <Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">
-                    Reset All Player Statuses
-                  </Button>
-                )}
-            </div>
-          </div>
-
-          <div className="max-h-[60vh] overflow-y-auto">
-            <Accordion type="multiple" className="w-full">
-              {invoicesForEvent.map(invoice => (
-                <AccordionItem key={invoice.invoiceId} value={invoice.invoiceId}>
-                  <AccordionTrigger>
-                    <div className="flex justify-between w-full pr-4 items-center">
-                      <div>
-                        <span className="font-semibold">#{invoice.invoiceNumber}</span> - {invoice.schoolName}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{invoice.players.length} player(s)</Badge>
-                        <Badge variant={invoice.invoiceStatus === 'PAID' ? 'default' : 'destructive'} className={invoice.invoiceStatus === 'PAID' ? 'bg-green-600' : ''}>
-                          {invoice.invoiceStatus}
-                        </Badge>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Player</TableHead>
-                            <TableHead>USCF ID</TableHead>
-                            <TableHead>Section</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {invoice.players.map(({ player, details }) => {
-                            const isWithdrawn = details.status === 'withdrawn';
-                            const isExported = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id);
-                            let status: React.ReactNode = <Badge variant="secondary">Registered</Badge>;
-                            if(isWithdrawn) status = <Badge variant="destructive">Withdrawn</Badge>;
-                            else if(isExported) status = <Badge variant="default" className="bg-green-600 text-white">Exported</Badge>;
-                            
-                            return (
-                              <TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}>
-                                <TableCell className={cn("font-medium", isWithdrawn && "line-through")}>
-                                  <div className="flex items-center gap-2">
-                                    {player.firstName} {player.lastName}
-                                    {player.studentType === 'gt' && (<Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>)}
-                                  </div>
-                                </TableCell>
-                                <TableCell>{player.uscfId}</TableCell>
-                                <TableCell>{details.section}</TableCell>
-                                <TableCell>{status}</TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <Dialog open={isRegistrationsOpen} onOpenChange={setIsRegistrationsOpen}><DialogContent className="sm:max-w-4xl"><DialogHeader><DialogTitle>Registrations for {selectedEventForReg?.name}</DialogTitle><DialogDescription className="sr-only">View registrations for the selected event.</DialogDescription><div className="flex items-center gap-4 text-sm pt-2"><Badge variant="outline">Registered: {registeredPlayers.length}</Badge><Badge variant="secondary">Exported: {exportedPlayers.length}</Badge></div></DialogHeader><div className="space-y-4">{profile?.role === 'organizer' && (<div className="border border-amber-500 bg-amber-50 rounded-lg p-4 inline-block"><p className="text-sm font-medium italic text-amber-800 mb-2">For SwissSys only:</p><div className='flex items-center gap-2'><Button onClick={() => handleDownload(registeredPlayers, 'registered')} disabled={registeredPlayers.length === 0} size="sm" className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"><Download className="mr-2 h-4 w-4" />Export Registered Players ({registeredPlayers.length})</Button><Button onClick={() => handleDownload(exportedPlayers, 'exported')} disabled={exportedPlayers.length === 0} size="sm" className="bg-yellow-400 text-yellow-900 hover:bg-yellow-500"><Download className="mr-2 h-4 w-4" />Download Exported List ({exportedPlayers.length})</Button></div></div>)}<div className='flex items-center gap-4 mt-2'><Button onClick={() => handleDownload(registrations, 'all')} size="sm" variant="outline">Download All Registrations ({registrations.length})</Button>{profile?.role === 'organizer' && (<Button variant="link" size="sm" onClick={handleResetAll} className="text-xs">Reset All Player Statuses</Button>)}</div></div><div className="max-h-[60vh] overflow-y-auto"><Accordion type="multiple" className="w-full">{invoicesForEvent.map(invoice => (<AccordionItem key={invoice.invoiceId} value={invoice.invoiceId}><AccordionTrigger><div className="flex justify-between w-full pr-4 items-center"><div><span className="font-semibold">#{invoice.invoiceNumber}</span> - {invoice.schoolName}</div><div className="flex items-center gap-2"><Badge variant="outline">{invoice.players.length} player(s)</Badge><Badge variant={invoice.invoiceStatus === 'PAID' ? 'default' : 'destructive'} className={invoice.invoiceStatus === 'PAID' ? 'bg-green-600' : ''}>{invoice.invoiceStatus}</Badge></div></div></AccordionTrigger><AccordionContent><Table><TableHeader><TableRow><TableHead>Player</TableHead><TableHead>USCF ID</TableHead><TableHead>Section</TableHead><TableHead>Status</TableHead></TableRow></TableHeader><TableBody>{invoice.players.map(({ player, details }) => { const isWithdrawn = details.status === 'withdrawn'; const isExported = selectedEventForReg && (downloadedPlayers[selectedEventForReg.id] || []).includes(player.id); let status: React.ReactNode = <Badge variant="secondary">Registered</Badge>; if(isWithdrawn) status = <Badge variant="destructive">Withdrawn</Badge>; else if(isExported) status = <Badge variant="default" className="bg-green-600 text-white">Exported</Badge>; return (<TableRow key={player.id} className={cn(isWithdrawn && 'text-muted-foreground opacity-60')}><TableCell className={cn("font-medium", isWithdrawn && "line-through")}><div className="flex items-center gap-2">{player.firstName} {player.lastName}{player.studentType === 'gt' && (<Badge variant="secondary" className="bg-yellow-200 text-yellow-800">GT</Badge>)}</div></TableCell><TableCell>{player.uscfId}</TableCell><TableCell>{details.section}</TableCell><TableCell>{status}</TableCell></TableRow>);})}</TableBody></Table></AccordionContent></AccordionItem>))}</Accordion></div></DialogContent></Dialog>
       
-      <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Paste from Spreadsheet</DialogTitle>
-            <DialogDescription>
-              Copy event data from your spreadsheet and paste it into the text area below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <Tabs defaultValue="events">
-              <TabsList className="grid w-full grid-cols-1">
-                <TabsTrigger value="events">Import Events</TabsTrigger>
-              </TabsList>
-              <TabsContent value="events">
-                <Textarea 
-                  placeholder="Paste event data here..." 
-                  className="h-64" 
-                  value={pasteData} 
-                  onChange={(e) => setPasteData(e.target.value)} 
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost">Cancel</Button>
-            </DialogClose>
-            <Button onClick={handlePasteImport}>
-              <ClipboardPaste className="mr-2 h-4 w-4" />Import Data
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}><DialogContent className="sm:max-w-2xl"><DialogHeader><DialogTitle>Paste from Spreadsheet</DialogTitle><DialogDescription>Copy event data from your spreadsheet and paste it into the text area below.</DialogDescription></DialogHeader><div className="py-4 space-y-4"><Tabs defaultValue="events"><TabsList className="grid w-full grid-cols-1"><TabsTrigger value="events">Import Events</TabsTrigger></TabsList><TabsContent value="events"><Textarea placeholder="Paste event data here..." className="h-64" value={pasteData} onChange={(e) => setPasteData(e.target.value)} /></TabsContent></Tabs></div><DialogFooter><DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose><Button onClick={handlePasteImport}><ClipboardPaste className="mr-2 h-4 w-4" />Import Data</Button></DialogFooter></DialogContent></Dialog>
     </AppLayout>
   );
 }
