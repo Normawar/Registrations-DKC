@@ -60,6 +60,7 @@ const GuideImage = ({ src, alt, width, height, className, ...props }: any) => {
 
 export default function QuickStartGuidePage() {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [openAccordionItems, setOpenAccordionItems] = useState(['item-1']);
 
   const handleDownloadPdf = async () => {
     const guideContent = document.getElementById('guide-content');
@@ -67,19 +68,31 @@ export default function QuickStartGuidePage() {
 
     setIsDownloading(true);
 
+    // Expand all accordion items to ensure they are in the DOM for capture
+    const allItemValues = ['item-1', 'item-2', 'item-3', 'item-4'];
+    setOpenAccordionItems(allItemValues);
+
+    // Allow time for accordion to expand before capturing
+    await new Promise(resolve => setTimeout(resolve, 500));
+
     try {
       const canvas = await html2canvas(guideContent, {
         scale: 2,
         useCORS: true,
+        logging: false,
         onclone: (document) => {
-          // You can modify the cloned document before rendering if needed
+          // Remove the download button from the clone so it doesn't appear in the PDF
+          const button = document.querySelector('.no-print');
+          if (button) {
+            button.style.display = 'none';
+          }
         },
       });
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
-        unit: 'pt', // Use points for margins
+        unit: 'pt',
         format: 'a4',
       });
 
@@ -95,18 +108,18 @@ export default function QuickStartGuidePage() {
       const contentHeight = contentWidth / ratio;
 
       let heightLeft = contentHeight;
-      let position = 0;
-      let pageNumber = 1;
+      let yPosition = margin;
 
-      pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, contentHeight);
-      heightLeft -= (pdfHeight - margin * 2);
+      // Add the first page
+      pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, contentHeight);
+      heightLeft -= (pdfHeight - (margin * 2));
 
+      // Add subsequent pages if needed
       while (heightLeft > 0) {
-        position = -((pdfHeight - margin * 2) * pageNumber);
+        yPosition = yPosition - pdfHeight + (margin * 2);
         pdf.addPage();
-        pdf.addImage(imgData, 'PNG', margin, position + margin, contentWidth, contentHeight);
-        heightLeft -= (pdfHeight - margin * 2);
-        pageNumber++;
+        pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, contentHeight);
+        heightLeft -= (pdfHeight - (margin * 2));
       }
       
       pdf.save('ChessMate_Quick_Start_Guide.pdf');
@@ -115,13 +128,15 @@ export default function QuickStartGuidePage() {
       alert("Sorry, there was an error generating the PDF. Please try again.");
     } finally {
       setIsDownloading(false);
+      // Optional: collapse back to default state after download
+      setOpenAccordionItems(['item-1']);
     }
   };
 
 
   return (
     <AppLayout>
-      <div id="guide-content" className="space-y-8 max-w-4xl mx-auto">
+      <div className="space-y-8 max-w-4xl mx-auto">
         <div className="flex justify-between items-start no-print">
           <div>
             <h1 className="text-3xl font-bold font-headline">Sponsor Quick Start Guide</h1>
@@ -135,144 +150,146 @@ export default function QuickStartGuidePage() {
           </Button>
         </div>
 
-        <Alert>
-            <Lightbulb className="h-4 w-4" />
-            <AlertTitle>First Things First: Your Roster</AlertTitle>
-            <AlertDescription>
-                The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the <Link href="/roster" className="font-semibold underline">Roster</Link> page to get started.
-            </AlertDescription>
-        </Alert>
+        <div id="guide-content">
+          <Alert>
+              <Lightbulb className="h-4 w-4" />
+              <AlertTitle>First Things First: Your Roster</AlertTitle>
+              <AlertDescription>
+                  The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the <Link href="/roster" className="font-semibold underline">Roster</Link> page to get started.
+              </AlertDescription>
+          </Alert>
 
-        <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
-          <AccordionItem value="item-1">
-            <AccordionTrigger className="text-lg font-semibold">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-2 rounded-full"><Users className="h-5 w-5 text-primary" /></div>
-                Step 1: Managing Your Roster
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pl-12 pt-2 space-y-4">
-              <p>Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Adding a Player to Your Roster</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
-                   <div className="border rounded-lg p-4 bg-muted/50">
-                     <GuideImage
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd"
-                       alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons."
-                       width={600}
-                       height={400}
-                       className="rounded-md w-full h-auto"
-                       priority
-                     />
-                  </div>
-                  <p className="text-sm">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
-                  <p className="text-sm">3. When searching, use the filters to find players by name, USCF ID, school, or district.</p>
-                  <p className="text-sm">4. Once you find your student, click <strong>Select</strong>. You will be prompted to fill in any missing required information (like Grade or Section). The player will then be added to your school's roster.</p>
-                </CardContent>
-              </Card>
-            </AccordionContent>
-          </AccordionItem>
+          <Accordion type="multiple" className="w-full" value={openAccordionItems} onValueChange={setOpenAccordionItems}>
+            <AccordionItem value="item-1">
+              <AccordionTrigger className="text-lg font-semibold">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full"><Users className="h-5 w-5 text-primary" /></div>
+                  Step 1: Managing Your Roster
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pl-12 pt-2 space-y-4">
+                <p>Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Adding a Player to Your Roster</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
+                     <div className="border rounded-lg p-4 bg-muted/50">
+                       <GuideImage
+                         src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd"
+                         alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons."
+                         width={600}
+                         height={400}
+                         className="rounded-md w-full h-auto"
+                         priority
+                       />
+                    </div>
+                    <p className="text-sm">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
+                    <p className="text-sm">3. When searching, use the filters to find players by name, USCF ID, school, or district.</p>
+                    <p className="text-sm">4. Once you find your student, click <strong>Select</strong>. You will be prompted to fill in any missing required information (like Grade or Section). The player will then be added to your school's roster.</p>
+                  </CardContent>
+                </Card>
+              </AccordionContent>
+            </AccordionItem>
 
-          <AccordionItem value="item-2">
-            <AccordionTrigger className="text-lg font-semibold">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-2 rounded-full"><Calendar className="h-5 w-5 text-primary" /></div>
-                Step 2: Registering for an Event
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pl-12 pt-2 space-y-4">
-              <p>Once your roster is set, you can register your selected players for any open tournament.</p>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Event Registration Process</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm">1. Go to the <Link href="/dashboard" className="font-medium underline">Dashboard</Link> or <Link href="/events" className="font-medium underline">Register for Event</Link> page.</p>
-                  <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
-                  <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                     <GuideImage
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1k.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c"
-                       alt="A screenshot showing the event list with the register button highlighted."
-                       width={600}
-                       height={350}
-                       className="rounded-md w-full h-auto"
-                       priority
-                     />
-                     <GuideImage
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1L.png?alt=media&token=1d074a8e-9c30-4327-9e1e-483a30988f56"
-                       alt="A screenshot of the registration dialog where players from a roster can be selected."
-                       width={600}
-                       height={450}
-                       className="rounded-md w-full h-auto"
-                       priority
-                     />
-                  </div>
-                  <p className="text-sm">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
-                  <p className="text-sm">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
-                  <p className="text-sm">5. Click <strong>Review Charges</strong> to see a full breakdown of fees.</p>
-                   <p className="text-sm">6. Finally, click <strong>Register Now</strong>. This will generate an official invoice and complete the registration.</p>
-                </CardContent>
-              </Card>
-            </AccordionContent>
-          </AccordionItem>
+            <AccordionItem value="item-2">
+              <AccordionTrigger className="text-lg font-semibold">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full"><Calendar className="h-5 w-5 text-primary" /></div>
+                  Step 2: Registering for an Event
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pl-12 pt-2 space-y-4">
+                <p>Once your roster is set, you can register your selected players for any open tournament.</p>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Event Registration Process</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm">1. Go to the <Link href="/dashboard" className="font-medium underline">Dashboard</Link> or <Link href="/events" className="font-medium underline">Register for Event</Link> page.</p>
+                    <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
+                    <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
+                       <GuideImage
+                         src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1k.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c"
+                         alt="A screenshot showing the event list with the register button highlighted."
+                         width={600}
+                         height={350}
+                         className="rounded-md w-full h-auto"
+                         priority
+                       />
+                       <GuideImage
+                         src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1L.png?alt=media&token=1d074a8e-9c30-4327-9e1e-483a30988f56"
+                         alt="A screenshot of the registration dialog where players from a roster can be selected."
+                         width={600}
+                         height={450}
+                         className="rounded-md w-full h-auto"
+                         priority
+                       />
+                    </div>
+                    <p className="text-sm">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
+                    <p className="text-sm">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
+                    <p className="text-sm">5. Click <strong>Review Charges</strong> to see a full breakdown of fees.</p>
+                     <p className="text-sm">6. Finally, click <strong>Register Now</strong>. This will generate an official invoice and complete the registration.</p>
+                  </CardContent>
+                </Card>
+              </AccordionContent>
+            </AccordionItem>
 
-          <AccordionItem value="item-3">
-            <AccordionTrigger className="text-lg font-semibold">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-2 rounded-full"><Receipt className="h-5 w-5 text-primary" /></div>
-                Step 3: Handling Invoices
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pl-12 pt-2 space-y-4">
-              <p>After registering, you can view and manage all your invoices from one place.</p>
-               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Viewing and Paying Invoices</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm">1. Navigate to the <Link href="/invoices" className="font-medium underline">Invoices & Payments</Link> page from the sidebar.</p>
-                  <p className="text-sm">2. Here you will see a list of all your invoices and their current status (e.g., Paid, Unpaid, Canceled).</p>
-                  <p className="text-sm">3. Click <strong>Details</strong> to view a specific invoice. From here, you can see the registered players and submit payment information.</p>
-                  <p className="text-sm">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
-                  <p className="text-sm">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
-                   <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                    <GuideImage
-                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16"
-                      alt="A screenshot of the invoice details view, showing player and fee breakdown."
-                      width={600}
-                      height={400}
-                      className="rounded-md w-full h-auto"
-                      priority
-                    />
-                    <GuideImage
-                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1q.png?alt=media&token=358d7596-a152-4980-89fb-152eaac99f39"
-                      alt="A screenshot of the invoice details view showing payment options like PO and Check."
-                      width={600}
-                      height={300}
-                      className="rounded-md w-full h-auto"
-                      priority
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </AccordionContent>
-          </AccordionItem>
-          <AccordionItem value="item-4">
-            <AccordionTrigger className="text-lg font-semibold">
-              <div className="flex items-center gap-3">
-                <div className="bg-primary/10 p-2 rounded-full"><FileQuestion className="h-5 w-5 text-primary" /></div>
-                Need More Help?
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pl-12 pt-2 space-y-4">
-                <p>For more detailed instructions on every feature, please visit our new <Link href="/help" className="font-semibold underline">Help Center</Link>.</p>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+            <AccordionItem value="item-3">
+              <AccordionTrigger className="text-lg font-semibold">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full"><Receipt className="h-5 w-5 text-primary" /></div>
+                  Step 3: Handling Invoices
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pl-12 pt-2 space-y-4">
+                <p>After registering, you can view and manage all your invoices from one place.</p>
+                 <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Viewing and Paying Invoices</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm">1. Navigate to the <Link href="/invoices" className="font-medium underline">Invoices & Payments</Link> page from the sidebar.</p>
+                    <p className="text-sm">2. Here you will see a list of all your invoices and their current status (e.g., Paid, Unpaid, Canceled).</p>
+                    <p className="text-sm">3. Click <strong>Details</strong> to view a specific invoice. From here, you can see the registered players and submit payment information.</p>
+                    <p className="text-sm">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
+                    <p className="text-sm">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
+                     <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
+                      <GuideImage
+                        src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16"
+                        alt="A screenshot of the invoice details view, showing player and fee breakdown."
+                        width={600}
+                        height={400}
+                        className="rounded-md w-full h-auto"
+                        priority
+                      />
+                      <GuideImage
+                        src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1q.png?alt=media&token=358d7596-a152-4980-89fb-152eaac99f39"
+                        alt="A screenshot of the invoice details view showing payment options like PO and Check."
+                        width={600}
+                        height={300}
+                        className="rounded-md w-full h-auto"
+                        priority
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-4">
+              <AccordionTrigger className="text-lg font-semibold">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 p-2 rounded-full"><FileQuestion className="h-5 w-5 text-primary" /></div>
+                  Need More Help?
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pl-12 pt-2 space-y-4">
+                  <p>For more detailed instructions on every feature, please visit our new <Link href="/help" className="font-semibold underline">Help Center</Link>.</p>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
       </div>
     </AppLayout>
   );
