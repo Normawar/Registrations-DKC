@@ -238,7 +238,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
             email: player.email,
             zipCode: player.zipCode,
             grade: player.grade,
-            section: player.section,
+            section: player.section, // Use existing section
             uscfStatus: uscfStatus,
             studentType: player.studentType,
             byes: { round1: 'none', round2: 'none' }
@@ -265,7 +265,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                         email: player.email,
                         zipCode: player.zipCode,
                         grade: player.grade,
-                        section: player.section,
+                        section: player.section, // Use existing section
                         uscfStatus: uscfStatus,
                         studentType: player.studentType,
                         byes: { round1: 'none', round2: 'none' }
@@ -759,6 +759,24 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                             </div>
                         </div>
                     </div>
+                    <div className="space-y-3 pt-4">
+                        <Label>Invoice Options</Label>
+                        <RadioGroup value={invoiceType} onValueChange={(v) => setInvoiceType(v as 'team' | 'individual')} className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="team" id="team" /><Label htmlFor="team" className="cursor-pointer">Invoice as Team (One Invoice)</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="individual" id="individual" /><Label htmlFor="individual" className="cursor-pointer">Invoice Individually</Label></div>
+                        </RadioGroup>
+                        {invoiceType === 'team' && (
+                            <div className="pl-6 flex items-center space-x-2">
+                                <Checkbox
+                                    id="split-uscf-fees"
+                                    checked={splitUscfFees}
+                                    onCheckedChange={(checked) => setSplitUscfFees(!!checked)}
+                                    disabled={feeBreakdown.uscfFees === 0}
+                                />
+                                <Label htmlFor="split-uscf-fees" className="text-sm font-medium">Create separate invoice for USCF fees</Label>
+                            </div>
+                        )}
+                    </div>
                 </CardContent>
                 <CardFooter className="flex justify-between">
                     <Button variant="outline" onClick={() => setView('selection')}>Back to Selection</Button>
@@ -784,24 +802,6 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                             <FormField control={invoiceForm.control} name="teamCode" render={({ field }) => ( <FormItem><FormLabel>Team Code</FormLabel><FormControl><Input placeholder="e.g., LIHS" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </form>
                     </Form>
-                     <div className="space-y-3 pt-4">
-                        <Label>Invoice Options</Label>
-                        <RadioGroup value={invoiceType} onValueChange={(v) => setInvoiceType(v as 'team' | 'individual')} className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="team" id="team" /><Label htmlFor="team" className="cursor-pointer">Invoice as Team (One Invoice)</Label></div>
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="individual" id="individual" /><Label htmlFor="individual" className="cursor-pointer">Invoice Individually</Label></div>
-                        </RadioGroup>
-                        {invoiceType === 'team' && (
-                            <div className="pl-6 flex items-center space-x-2">
-                                <Checkbox
-                                    id="split-uscf-fees"
-                                    checked={splitUscfFees}
-                                    onCheckedChange={(checked) => setSplitUscfFees(!!checked)}
-                                    disabled={feeBreakdown.uscfFees === 0}
-                                />
-                                <Label htmlFor="split-uscf-fees" className="text-sm font-medium">Create separate invoice for USCF fees</Label>
-                            </div>
-                        )}
-                    </div>
                 </CardContent>
                 <CardFooter className="flex flex-col sm:flex-row items-stretch gap-2 pt-4">
                     <Button type="button" onClick={invoiceForm.handleSubmit(handleGenerateInvoice)} disabled={isSubmitting} className="flex-1">
