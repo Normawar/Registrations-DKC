@@ -101,7 +101,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { canConsolidateGtInvoices, consolidateGtInvoices } from '@/ai/flows/consolidate-gt-invoices-flow';
 
-
 const eventFormSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(3, { message: "Name must be at least 3 characters." }),
@@ -150,7 +149,7 @@ type RegistrationInfo = {
 };
 
 type StoredDownloads = {
-  [eventId: string]: string[]; // Array of player IDs that have been downloaded
+  [eventId: string]: string[];
 };
 
 type InvoiceGrouping = {
@@ -209,7 +208,6 @@ function ManageEventsContent() {
     if (!isDbLoaded || !location) return 'Unknown';
     const lowerLocation = location.toLowerCase();
 
-    // Specific keywords for districts
     if (lowerLocation.includes("psja")) return "PHARR-SAN JUAN-ALAMO ISD";
     if (lowerLocation.includes("mcallen")) return "MCALLEN ISD";
     if (lowerLocation.includes("edinburg")) return "EDINBURG CISD";
@@ -222,11 +220,9 @@ function ManageEventsContent() {
     if (lowerLocation.includes("test alvarez")) return "TestMcAllen";
     if (lowerLocation.includes("test achieve")) return "TestMcAllen";
     
-    // Check against school data
     const foundSchool = schoolData.find(s => lowerLocation.includes(s.schoolName.toLowerCase()));
     if (foundSchool) return foundSchool.district;
 
-    // Check against player data as a fallback
     const foundPlayer = allPlayers.find(p => p.school && lowerLocation.includes(p.school.toLowerCase()));
     if (foundPlayer) return foundPlayer.district;
     
@@ -1056,7 +1052,6 @@ function ManageEventsContent() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1090,7 +1085,6 @@ function ManageEventsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <Dialog open={isRegistrationsOpen} onOpenChange={setIsRegistrationsOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
