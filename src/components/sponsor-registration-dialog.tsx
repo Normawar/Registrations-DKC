@@ -230,7 +230,7 @@ export function SponsorRegistrationDialog({
 
   const handleCreateInvoice = async () => {
     if (!profile || !event || !db) return;
-
+  
     setIsSubmitting(true);
     
     const isPsjaDistrict = profile.district === 'PHARR-SAN JUAN-ALAMO ISD';
@@ -238,19 +238,16 @@ export function SponsorRegistrationDialog({
       player: rosterPlayers.find(p => p.id === playerId),
       details
     }));
-
+  
     const hasGt = allSelectedPlayers.some(p => p.player?.studentType === 'gt');
     const hasIndependent = allSelectedPlayers.some(p => p.player?.studentType !== 'gt');
-
+  
     if (isPsjaDistrict && hasGt && hasIndependent) {
-        await handlePsjaSplitInvoice();
-        return;
-    }
-
-    if (splitUscfFees) {
-        await handleSplitInvoices();
+      await handlePsjaSplitInvoice();
+    } else if (splitUscfFees) {
+      await handleSplitInvoices();
     } else {
-        await handleStandardInvoice();
+      await handleStandardInvoice();
     }
   };
 
