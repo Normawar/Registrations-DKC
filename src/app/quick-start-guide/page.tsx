@@ -127,7 +127,7 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
                   <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
                      <GuideImage 
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Fevent-registration.png?alt=media&token=__REPLACE_WITH_UNIQUE_TOKEN__" 
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1k.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c" 
                        alt="A screenshot showing the event list with the register button highlighted." 
                        width={600} 
                        height={350} 
@@ -135,7 +135,7 @@ export default function QuickStartGuidePage() {
                        priority 
                      />
                      <GuideImage 
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Fregistration-dialog.png?alt=media&token=__REPLACE_WITH_UNIQUE_TOKEN__"
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1L.png?alt=media&token=1d074a8e-9c30-4327-9e1e-483a30988f56" 
                        alt="A screenshot of the registration dialog where players from a roster can be selected." 
                        width={600} 
                        height={450} 
@@ -173,7 +173,7 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
                    <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
                     <GuideImage 
-                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Finvoice-details.png?alt=media&token=__REPLACE_WITH_UNIQUE_TOKEN__"
+                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16" 
                       alt="A screenshot of the invoice details view, showing player and fee breakdown." 
                       width={600} 
                       height={400} 
@@ -181,7 +181,7 @@ export default function QuickStartGuidePage() {
                       priority 
                     />
                     <GuideImage 
-                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Finvoice-payment.png?alt=media&token=__REPLACE_WITH_UNIQUE_TOKEN__"
+                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1q.png?alt=media&token=358d7596-a152-4980-89fb-152eaac99f39" 
                       alt="A screenshot of the invoice details view showing payment options like PO and Check." 
                       width={600} 
                       height={300} 
