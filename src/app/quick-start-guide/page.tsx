@@ -43,12 +43,12 @@ export default function QuickStartGuidePage() {
                   <CardTitle className="text-base">Adding a Player to Your Roster</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar.</p>
-                  <p className="text-sm">2. Click the <strong>Add from Database</strong> button. This will open a search dialog.</p>
-                  <p className="text-sm">3. Use the filters to search for players by name, USCF ID, school, or district.</p>
-                  <div className="border rounded-lg p-4 bg-muted/50">
-                     <Image src="https://picsum.photos/seed/qs1/600/400" alt="A screenshot of the player search dialog showing filters for name and school." width={600} height={400} className="rounded-md" data-ai-hint="player search dialog" />
+                  <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
+                   <div className="border rounded-lg p-4 bg-muted/50">
+                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/roster.png?alt=media&token=8d2771c5-f3c5-4328-9f37-640a3311097e" alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." width={600} height={400} className="rounded-md" data-ai-hint="team roster page" />
                   </div>
+                  <p className="text-sm">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
+                  <p className="text-sm">3. When searching, use the filters to find players by name, USCF ID, school, or district.</p>
                   <p className="text-sm">4. Once you find your student, click <strong>Select</strong>. You will be prompted to fill in any missing required information (like Grade or Section). The player will then be added to your school's roster.</p>
                 </CardContent>
               </Card>
