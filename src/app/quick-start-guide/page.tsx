@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -32,7 +33,7 @@ const GuideImage = ({ src, alt, width, height, className, ...props }: any) => {
   }
 
   return (
-    <div className="relative">
+    <div className="relative page-break-avoid">
       {loading && (
         <div
           className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center"
@@ -69,102 +70,103 @@ export default function QuickStartGuidePage() {
     setIsDownloading(true);
 
     try {
-      // Store original accordion state
       const originalState = [...openAccordionItems];
       
       // Expand all accordion items
       const allItemValues = ['item-1', 'item-2', 'item-3', 'item-4'];
       setOpenAccordionItems(allItemValues);
 
-      // Wait longer for accordion content to fully render and images to load
+      // Add CSS for better page breaks
+      const printStyles = document.createElement('style');
+      printStyles.textContent = `
+        .pdf-page-break { 
+          page-break-before: always; 
+          break-before: page;
+          height: 20px;
+          visibility: hidden;
+        }
+        .pdf-page-break-avoid { 
+          page-break-inside: avoid; 
+          break-inside: avoid; 
+        }
+      `;
+      document.head.appendChild(printStyles);
+
+      // Add page break markers
+      const accordionItems = guideContent.querySelectorAll('[data-radix-accordion-item]');
+      accordionItems.forEach((item, index) => {
+        if (index > 0) { // Skip first item
+          const pageBreak = document.createElement('div');
+          pageBreak.className = 'pdf-page-break';
+          pageBreak.textContent = 'PAGE_BREAK_MARKER';
+          item.parentNode?.insertBefore(pageBreak, item);
+        }
+      });
+
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Wait for all images to load before capturing
+      // Wait for images
       const images = guideContent.querySelectorAll('img');
       const imagePromises = Array.from(images).map(img => {
         if (img.complete) return Promise.resolve();
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
           img.onload = resolve;
-          img.onerror = resolve; // Continue even if image fails
-          setTimeout(resolve, 5000); // Timeout after 5 seconds
+          img.onerror = resolve;
+          setTimeout(resolve, 3000);
         });
       });
-      
       await Promise.all(imagePromises);
 
-      // Additional wait to ensure everything is rendered
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       const canvas = await html2canvas(guideContent, {
-        scale: 1.5, // Reduced scale for better performance
+        scale: 1.5,
         useCORS: true,
         allowTaint: true,
         logging: false,
         height: guideContent.scrollHeight,
         width: guideContent.scrollWidth,
-        scrollX: 0,
-        scrollY: 0,
         onclone: (clonedDocument) => {
-          // Ensure all accordion items are expanded in the clone
-          const accordions = clonedDocument.querySelectorAll('[data-state="closed"]');
-          accordions.forEach(accordion => {
-            accordion.setAttribute('data-state', 'open');
-          });
-          
-          // Remove the download button from the clone
           const button = clonedDocument.querySelector('.no-print');
-          if (button) {
-            button.style.display = 'none';
-          }
-
-          // Ensure all content is visible
+          if (button) button.style.display = 'none';
+          
           const accordionContent = clonedDocument.querySelectorAll('[data-state="closed"]');
           accordionContent.forEach(content => {
             content.style.display = 'block';
             content.style.height = 'auto';
-            content.style.overflow = 'visible';
           });
         },
       });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'pt',
-        format: 'a4',
-      });
+      // Clean up
+      document.head.removeChild(printStyles);
+      const pageBreaks = guideContent.querySelectorAll('.pdf-page-break');
+      pageBreaks.forEach(el => el.remove());
 
+      // Smart PDF generation with page break detection
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('portrait', 'pt', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      // 0.5 inch margins = 36 points (72 points per inch)
       const margin = 36;
       const contentWidth = pdfWidth - (margin * 2);
+      const pageHeight = pdfHeight - (margin * 2);
       
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const ratio = contentWidth / canvasWidth;
-      const contentHeight = canvasHeight * ratio;
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const ratio = contentWidth / imgWidth;
+      const scaledHeight = imgHeight * ratio;
 
-      let yPosition = margin;
-      let heightLeft = contentHeight;
-      const pageContentHeight = pdfHeight - (margin * 2);
+      // Calculate better page breaks
+      const numPages = Math.ceil(scaledHeight / pageHeight);
+      const pageBreakHeight = scaledHeight / numPages;
 
-      // Add the first page
-      pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, contentHeight);
-      heightLeft -= pageContentHeight;
-
-      // Add subsequent pages if content is longer than one page
-      while (heightLeft > 0) {
-        pdf.addPage();
-        yPosition = -(contentHeight - heightLeft) + margin;
-        pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, contentHeight);
-        heightLeft -= pageContentHeight;
+      for (let page = 0; page < numPages; page++) {
+        if (page > 0) pdf.addPage();
+        
+        const yOffset = -(page * pageBreakHeight) + margin;
+        pdf.addImage(imgData, 'PNG', margin, yOffset, contentWidth, scaledHeight);
       }
-      
+
       pdf.save('ChessMate_Quick_Start_Guide.pdf');
-      
-      // Restore original accordion state
       setOpenAccordionItems(originalState);
       
     } catch (error) {
@@ -192,7 +194,7 @@ export default function QuickStartGuidePage() {
         </div>
 
         <div id="guide-content" className="space-y-6">
-          <Alert>
+          <Alert className="pdf-page-break-avoid">
               <Lightbulb className="h-4 w-4" />
               <AlertTitle>First Things First: Your Roster</AlertTitle>
               <AlertDescription>
@@ -201,7 +203,7 @@ export default function QuickStartGuidePage() {
           </Alert>
 
           <Accordion type="multiple" className="w-full" value={openAccordionItems} onValueChange={setOpenAccordionItems}>
-            <AccordionItem value="item-1">
+            <AccordionItem value="item-1" className="pdf-page-break-avoid">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full"><Users className="h-5 w-5 text-primary" /></div>
@@ -210,13 +212,13 @@ export default function QuickStartGuidePage() {
               </AccordionTrigger>
               <AccordionContent className="pl-12 pt-2 space-y-4">
                 <p>Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
-                <Card>
+                <Card className="pdf-page-break-avoid">
                   <CardHeader>
                     <CardTitle className="text-base">Adding a Player to Your Roster</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
-                     <div className="border rounded-lg p-4 bg-muted/50">
+                     <div className="border rounded-lg p-4 bg-muted/50 pdf-page-break-avoid">
                        <GuideImage
                          src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd"
                          alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons."
@@ -234,7 +236,7 @@ export default function QuickStartGuidePage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-2">
+            <AccordionItem value="item-2" className="pdf-page-break-avoid">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full"><Calendar className="h-5 w-5 text-primary" /></div>
@@ -243,14 +245,14 @@ export default function QuickStartGuidePage() {
               </AccordionTrigger>
               <AccordionContent className="pl-12 pt-2 space-y-4">
                 <p>Once your roster is set, you can register your selected players for any open tournament.</p>
-                <Card>
+                <Card className="pdf-page-break-avoid">
                   <CardHeader>
                     <CardTitle className="text-base">Event Registration Process</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm">1. Go to the <Link href="/dashboard" className="font-medium underline">Dashboard</Link> or <Link href="/events" className="font-medium underline">Register for Event</Link> page.</p>
                     <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
-                    <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
+                    <div className="border rounded-lg p-4 bg-muted/50 space-y-4 pdf-page-break-avoid">
                        <GuideImage
                          src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1k.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c"
                          alt="A screenshot showing the event list with the register button highlighted."
@@ -277,7 +279,7 @@ export default function QuickStartGuidePage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-3">
+            <AccordionItem value="item-3" className="pdf-page-break-avoid">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full"><Receipt className="h-5 w-5 text-primary" /></div>
@@ -286,7 +288,7 @@ export default function QuickStartGuidePage() {
               </AccordionTrigger>
               <AccordionContent className="pl-12 pt-2 space-y-4">
                 <p>After registering, you can view and manage all your invoices from one place.</p>
-                 <Card>
+                 <Card className="pdf-page-break-avoid">
                   <CardHeader>
                     <CardTitle className="text-base">Viewing and Paying Invoices</CardTitle>
                   </CardHeader>
@@ -296,7 +298,7 @@ export default function QuickStartGuidePage() {
                     <p className="text-sm">3. Click <strong>Details</strong> to view a specific invoice. From here, you can see the registered players and submit payment information.</p>
                     <p className="text-sm">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
                     <p className="text-sm">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
-                     <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
+                     <div className="border rounded-lg p-4 bg-muted/50 space-y-4 pdf-page-break-avoid">
                       <GuideImage
                         src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16"
                         alt="A screenshot of the invoice details view, showing player and fee breakdown."
@@ -319,7 +321,7 @@ export default function QuickStartGuidePage() {
               </AccordionContent>
             </AccordionItem>
             
-            <AccordionItem value="item-4">
+            <AccordionItem value="item-4" className="pdf-page-break-avoid">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                   <div className="bg-primary/10 p-2 rounded-full"><FileQuestion className="h-5 w-5 text-primary" /></div>
@@ -336,3 +338,5 @@ export default function QuickStartGuidePage() {
     </AppLayout>
   );
 }
+
+    
