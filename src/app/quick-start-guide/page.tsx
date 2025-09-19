@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -5,9 +6,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import Image from 'next/image';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Lightbulb, Users, Calendar, Receipt, FileQuestion } from 'lucide-react';
+import { Lightbulb, Users, Calendar, Receipt, FileQuestion, Download, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Component for handling image errors with fallback
 const GuideImage = ({ src, alt, width, height, className, ...props }: any) => {
@@ -16,7 +20,7 @@ const GuideImage = ({ src, alt, width, height, className, ...props }: any) => {
 
   if (error) {
     return (
-      <div 
+      <div
         className={`${className} bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center`}
         style={{ width, height }}
       >
@@ -31,7 +35,7 @@ const GuideImage = ({ src, alt, width, height, className, ...props }: any) => {
   return (
     <div className="relative">
       {loading && (
-        <div 
+        <div
           className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center"
           style={{ width, height }}
         >
@@ -56,14 +60,75 @@ const GuideImage = ({ src, alt, width, height, className, ...props }: any) => {
 };
 
 export default function QuickStartGuidePage() {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    const guideContent = document.getElementById('guide-content');
+    if (!guideContent) return;
+
+    setIsDownloading(true);
+
+    try {
+      const canvas = await html2canvas(guideContent, {
+        scale: 2, // Increase resolution
+        useCORS: true, // Important for external images
+        onclone: (document) => {
+            // This can be used to modify the cloned document before rendering
+        }
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: 'a4'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const ratio = canvasWidth / canvasHeight;
+      const width = pdfWidth;
+      const height = width / ratio;
+
+      let position = 0;
+      let heightLeft = height;
+
+      pdf.addImage(imgData, 'PNG', 0, position, width, height);
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - height;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, width, height);
+        heightLeft -= pdfHeight;
+      }
+      
+      pdf.save('ChessMate_Quick_Start_Guide.pdf');
+    } catch (error) {
+      console.error("Failed to generate PDF:", error);
+      alert("Sorry, there was an error generating the PDF. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+
   return (
     <AppLayout>
-      <div className="space-y-8 max-w-4xl mx-auto">
-        <div>
-          <h1 className="text-3xl font-bold font-headline">Sponsor Quick Start Guide</h1>
-          <p className="text-muted-foreground mt-2">
-            Welcome to ChessMate! This guide will walk you through the essential steps to get started.
-          </p>
+      <div id="guide-content" className="space-y-8 max-w-4xl mx-auto">
+        <div className="flex justify-between items-start no-print">
+          <div>
+            <h1 className="text-3xl font-bold font-headline">Sponsor Quick Start Guide</h1>
+            <p className="text-muted-foreground mt-2">
+              Welcome to ChessMate! This guide will walk you through the essential steps to get started.
+            </p>
+          </div>
+           <Button onClick={handleDownloadPdf} disabled={isDownloading}>
+            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            {isDownloading ? 'Generating PDF...' : 'Download PDF'}
+          </Button>
         </div>
 
         <Alert>
@@ -91,13 +156,13 @@ export default function QuickStartGuidePage() {
                 <CardContent className="space-y-4">
                   <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
                    <div className="border rounded-lg p-4 bg-muted/50">
-                     <GuideImage 
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd" 
-                       alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." 
-                       width={600} 
-                       height={400} 
-                       className="rounded-md w-full h-auto" 
-                       priority 
+                     <GuideImage
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd"
+                       alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons."
+                       width={600}
+                       height={400}
+                       className="rounded-md w-full h-auto"
+                       priority
                      />
                   </div>
                   <p className="text-sm">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
@@ -125,21 +190,21 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">1. Go to the <Link href="/dashboard" className="font-medium underline">Dashboard</Link> or <Link href="/events" className="font-medium underline">Register for Event</Link> page.</p>
                   <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
                   <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                     <GuideImage 
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1k.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c" 
-                       alt="A screenshot showing the event list with the register button highlighted." 
-                       width={600} 
-                       height={350} 
-                       className="rounded-md w-full h-auto" 
-                       priority 
+                     <GuideImage
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1k.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c"
+                       alt="A screenshot showing the event list with the register button highlighted."
+                       width={600}
+                       height={350}
+                       className="rounded-md w-full h-auto"
+                       priority
                      />
-                     <GuideImage 
-                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1L.png?alt=media&token=1d074a8e-9c30-4327-9e1e-483a30988f56" 
-                       alt="A screenshot of the registration dialog where players from a roster can be selected." 
-                       width={600} 
-                       height={450} 
-                       className="rounded-md w-full h-auto" 
-                       priority 
+                     <GuideImage
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1L.png?alt=media&token=1d074a8e-9c30-4327-9e1e-483a30988f56"
+                       alt="A screenshot of the registration dialog where players from a roster can be selected."
+                       width={600}
+                       height={450}
+                       className="rounded-md w-full h-auto"
+                       priority
                      />
                   </div>
                   <p className="text-sm">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
@@ -171,21 +236,21 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
                   <p className="text-sm">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
                    <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                    <GuideImage 
-                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16" 
-                      alt="A screenshot of the invoice details view, showing player and fee breakdown." 
-                      width={600} 
-                      height={400} 
-                      className="rounded-md w-full h-auto" 
-                      priority 
+                    <GuideImage
+                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16"
+                      alt="A screenshot of the invoice details view, showing player and fee breakdown."
+                      width={600}
+                      height={400}
+                      className="rounded-md w-full h-auto"
+                      priority
                     />
-                    <GuideImage 
-                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1q.png?alt=media&token=358d7596-a152-4980-89fb-152eaac99f39" 
-                      alt="A screenshot of the invoice details view showing payment options like PO and Check." 
-                      width={600} 
-                      height={300} 
-                      className="rounded-md w-full h-auto" 
-                      priority 
+                    <GuideImage
+                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1q.png?alt=media&token=358d7596-a152-4980-89fb-152eaac99f39"
+                      alt="A screenshot of the invoice details view showing payment options like PO and Check."
+                      width={600}
+                      height={300}
+                      className="rounded-md w-full h-auto"
+                      priority
                     />
                   </div>
                 </CardContent>
