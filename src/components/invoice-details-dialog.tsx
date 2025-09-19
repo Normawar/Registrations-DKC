@@ -161,10 +161,18 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
 
   return (
     <div className="space-y-6">
+       {confirmation.invoiceUrl && (
+        <Button asChild className="w-full">
+          <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
+            <CreditCard className="mr-2 h-4 w-4" /> View Invoice on Square
+          </a>
+        </Button>
+      )}
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-medium text-blue-800 mb-2">Payment Instructions</h3>
+        <h3 className="font-medium text-blue-800 mb-2">Offline Payment Instructions</h3>
         <p className="text-sm text-blue-700 mb-3">
-          Please submit payment using one of the methods below, then upload proof of payment for verification.
+          Alternatively, submit payment using one of the methods below, then upload proof for verification.
         </p>
       </div>
 
@@ -522,4 +530,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
-
