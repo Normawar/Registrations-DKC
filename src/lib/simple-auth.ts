@@ -1,3 +1,4 @@
+
 // FIXED VERSION: Refactored to prevent recursion
 
 import { auth, db } from '@/lib/firebase';
