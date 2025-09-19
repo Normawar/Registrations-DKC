@@ -266,6 +266,8 @@ export default function QuickStartGuidePage() {
     };
 
     // Section 1: Header + Alert + Step 1
+    const rosterImageHtml = generateImageHtml('roster', 'Team Roster page', 'Screenshot not available');
+    
     const section1Html = `
       <div>
         <h1 style="font-size: 28px; font-weight: bold; margin-bottom: 8px; color: #1f2937;">Sponsor Quick Start Guide</h1>
@@ -287,12 +289,7 @@ export default function QuickStartGuidePage() {
           <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #1f2937;">Adding a Player to Your Roster</h3>
           <p style="font-size: 13px; margin-bottom: 8px; line-height: 1.5;"><strong>1.</strong> Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</p>
           
-          ${imageDataUrls.roster ? 
-            `<div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: white; margin: 12px 0; text-align: center;">
-              <img src="${imageDataUrls.roster}" alt="Team Roster page" style="width: 100%; max-width: 400px; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            </div>` :
-            '<div style="text-align: center; color: #dc2626; padding: 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 12px 0; font-size: 13px;"><strong>⚠️ Screenshot not available</strong><br>Please refer to the written instructions above</div>'
-          }
+          ${rosterImageHtml}
           
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>2.</strong> Click <strong>Add from Database</strong> to search for existing players or <strong>Create New Player</strong> to add a student.</p>
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>3.</strong> Use filters to find players by name, USCF ID, school, or district.</p>
@@ -303,6 +300,12 @@ export default function QuickStartGuidePage() {
     await captureSection(section1Html, true);
 
     // Section 2: Step 2
+    const eventImagesHtml = generateMultiImageHtml(
+      ['eventList', 'registrationDialog'], 
+      ['Event registration page', 'Registration dialog'], 
+      'Screenshots not available'
+    );
+    
     const section2Html = `
       <div>
         <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #1f2937;">
@@ -318,19 +321,7 @@ export default function QuickStartGuidePage() {
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>1.</strong> Go to the <strong>Dashboard</strong> or <strong>Register for Event</strong> page.</p>
           <p style="font-size: 13px; margin-bottom: 12px; line-height: 1.5;"><strong>2.</strong> Find an upcoming event and click the <strong>Register Students</strong> button.</p>
           
-          ${imageDataUrls.eventList || imageDataUrls.registrationDialog ? 
-            `<div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: white; margin: 12px 0; text-align: center;">
-              ${imageDataUrls.eventList ? 
-                `<img src="${imageDataUrls.eventList}" alt="Event registration page" style="width: 100%; max-width: 350px; height: auto; border-radius: 6px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">` : 
-                '<div style="color: #6b7280; padding: 8px; font-size: 12px;">Event List Image Not Found</div>'
-              }
-              ${imageDataUrls.registrationDialog ? 
-                `<img src="${imageDataUrls.registrationDialog}" alt="Registration dialog" style="width: 100%; max-width: 350px; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">` : 
-                '<div style="color: #6b7280; padding: 8px; font-size: 12px;">Registration Dialog Image Not Found</div>'
-              }
-            </div>` :
-            '<div style="text-align: center; color: #dc2626; padding: 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 12px 0; font-size: 13px;"><strong>⚠️ Screenshots not available</strong><br>Please refer to the written instructions above</div>'
-          }
+          ${eventImagesHtml}
           
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>3.</strong> Select the players you wish to register for this event.</p>
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>4.</strong> Confirm their <strong>Section</strong> and <strong>USCF Status</strong>.</p>
@@ -342,6 +333,12 @@ export default function QuickStartGuidePage() {
     await captureSection(section2Html);
 
     // Section 3: Step 3
+    const invoiceImagesHtml = generateMultiImageHtml(
+      ['invoiceDetails', 'invoicePayment'], 
+      ['Invoice details', 'Invoice payment options'], 
+      'Screenshots not available'
+    );
+    
     const section3Html = `
       <div>
         <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #1f2937;">
@@ -359,19 +356,7 @@ export default function QuickStartGuidePage() {
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>3.</strong> Click <strong>Details</strong> to view a specific invoice and see registered players.</p>
           <p style="font-size: 13px; margin-bottom: 12px; line-height: 1.5;"><strong>4.</strong> For payment, click <strong>View Invoice on Square</strong> for credit card, or use offline methods (PO, Check, CashApp, Zelle).</p>
           
-          ${imageDataUrls.invoiceDetails || imageDataUrls.invoicePayment ? 
-            `<div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: white; margin: 12px 0; text-align: center;">
-              ${imageDataUrls.invoiceDetails ? 
-                `<img src="${imageDataUrls.invoiceDetails}" alt="Invoice details" style="width: 100%; max-width: 350px; height: auto; border-radius: 6px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">` : 
-                '<div style="color: #6b7280; padding: 8px; font-size: 12px;">Invoice Details Image Not Found</div>'
-              }
-              ${imageDataUrls.invoicePayment ? 
-                `<img src="${imageDataUrls.invoicePayment}" alt="Invoice payment options" style="width: 100%; max-width: 350px; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">` : 
-                '<div style="color: #6b7280; padding: 8px; font-size: 12px;">Invoice Payment Image Not Found</div>'
-              }
-            </div>` :
-            '<div style="text-align: center; color: #dc2626; padding: 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 12px 0; font-size: 13px;"><strong>⚠️ Screenshots not available</strong><br>Please refer to the written instructions above</div>'
-          }
+          ${invoiceImagesHtml}
           
           <p style="font-size: 13px; margin-bottom: 0; line-height: 1.5;"><strong>5.</strong> If paying offline, select payment method, fill in details (PO/check number), upload proof, and click <strong>Submit Payment Information</strong> for review.</p>
         </div>
@@ -414,3 +399,4 @@ export default function QuickStartGuidePage() {
     setIsDownloading(false);
   }
 };
+}
