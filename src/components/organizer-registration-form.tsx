@@ -434,6 +434,7 @@ export function OrganizerRegistrationForm({ eventId }: { eventId: string | null 
                 lateFee: lateFeeAmount > 0 ? lateFeeAmount : 0,
                 uscfAction: p.uscfStatus !== 'current',
                 isGtPlayer: p.studentType === 'gt',
+                section: p.section
             };
         });
 
