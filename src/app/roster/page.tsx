@@ -161,6 +161,30 @@ const DateInput = React.forwardRef<HTMLInputElement, {
 });
 DateInput.displayName = 'DateInput';
 
+const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
+    if (!player?.changeHistory || player.changeHistory.length === 0) {
+        return <div className="p-6 text-center text-muted-foreground">No change history available for this player.</div>;
+    }
+
+    return (
+        <div className="p-6 space-y-4">
+            {player.changeHistory.slice().reverse().map(entry => (
+                <div key={entry.timestamp} className="text-sm border-l-2 pl-4">
+                    <p className="font-medium">
+                        {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
+                    </p>
+                    <ul className="list-disc pl-5 mt-1 text-muted-foreground text-xs">
+                        {entry.changes.map((change, index) => (
+                            <li key={index}>
+                                Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic">'{String(change.oldValue)}'</span> to <span className="italic">'{String(change.newValue)}'</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ))}
+        </div>
+    );
+};
 
 function SponsorRosterView() {
   const { toast } = useToast();
@@ -583,31 +607,6 @@ function SponsorRosterView() {
     );
   };
   
-  const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
-    if (!player?.changeHistory || player.changeHistory.length === 0) {
-        return <div className="p-6 text-center text-muted-foreground">No change history available for this player.</div>;
-    }
-
-    return (
-        <div className="p-6 space-y-4">
-            {player.changeHistory.slice().reverse().map(entry => (
-                <div key={entry.timestamp} className="text-sm border-l-2 pl-4">
-                    <p className="font-medium">
-                        {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
-                    </p>
-                    <ul className="list-disc pl-5 mt-1 text-muted-foreground text-xs">
-                        {entry.changes.map((change, index) => (
-                            <li key={index}>
-                                Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic">'{String(change.oldValue)}'</span> to <span className="italic">'{String(change.newValue)}'</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            ))}
-        </div>
-    );
-  };
-
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
