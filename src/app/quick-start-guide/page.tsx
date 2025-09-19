@@ -45,7 +45,7 @@ export default function QuickStartGuidePage() {
                 <CardContent className="space-y-4">
                   <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
                    <div className="border rounded-lg p-4 bg-muted/50">
-                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/roster.png?alt=media&token=8d2771c5-f3c5-4328-9f37-640a3311097e" alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." width={600} height={400} className="rounded-md" data-ai-hint="team roster page" />
+                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Froster.png?alt=media&token=8d2771c5-f3c5-4328-9f37-640a3311097e" alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." width={600} height={400} className="rounded-md" data-ai-hint="team roster page" />
                   </div>
                   <p className="text-sm">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
                   <p className="text-sm">3. When searching, use the filters to find players by name, USCF ID, school, or district.</p>
@@ -72,8 +72,8 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">1. Go to the <Link href="/dashboard" className="font-medium underline">Dashboard</Link> or <Link href="/events" className="font-medium underline">Register for Event</Link> page.</p>
                   <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
                   <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                     <Image src="https://picsum.photos/seed/qs2/600/350" alt="A screenshot showing the event list with the register button highlighted." width={600} height={350} className="rounded-md" data-ai-hint="event registration" />
-                     <Image src="https://picsum.photos/seed/qs3/600/450" alt="A screenshot of the registration dialog where players from a roster can be selected." width={600} height={450} className="rounded-md" data-ai-hint="registration dialog" />
+                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Fevent-registration.png?alt=media" alt="A screenshot showing the event list with the register button highlighted." width={600} height={350} className="rounded-md" data-ai-hint="event registration" />
+                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Fregistration-dialog.png?alt=media" alt="A screenshot of the registration dialog where players from a roster can be selected." width={600} height={450} className="rounded-md" data-ai-hint="registration dialog" />
                   </div>
                   <p className="text-sm">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
                   <p className="text-sm">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
@@ -104,8 +104,8 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
                   <p className="text-sm">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
                    <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                    <Image src="https://picsum.photos/seed/qs4/600/400" alt="A screenshot of the invoice details view, showing player and fee breakdown." width={600} height={400} className="rounded-md" data-ai-hint="invoice details" />
-                    <Image src="https://picsum.photos/seed/qs5/600/300" alt="A screenshot of the invoice details view showing payment options like PO and Check." width={600} height={300} className="rounded-md" data-ai-hint="invoice payment" />
+                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Finvoice-details.png?alt=media" alt="A screenshot of the invoice details view, showing player and fee breakdown." width={600} height={400} className="rounded-md" data-ai-hint="invoice details" />
+                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Finvoice-payment.png?alt=media" alt="A screenshot of the invoice details view showing payment options like PO and Check." width={600} height={300} className="rounded-md" data-ai-hint="invoice payment" />
                   </div>
                 </CardContent>
               </Card>
