@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -83,10 +84,10 @@ export default function QuickStartGuidePage() {
       // Find and expand the content within this item
       const content = item.querySelector('[data-radix-accordion-content]');
       if (content) {
-        (content as HTMLElement).setAttribute('data-state', 'open');
-        (content as HTMLElement).style.display = 'block';
-        (content as HTMLElement).style.height = 'auto';
-        (content as HTMLElement).style.overflow = 'visible';
+        content.setAttribute('data-state', 'open');
+        content.style.display = 'block';
+        content.style.height = 'auto';
+        content.style.overflow = 'visible';
         console.log(`Expanded content for item ${index + 1}`);
       }
       
@@ -249,7 +250,7 @@ export default function QuickStartGuidePage() {
           <div>
             <h1 className="text-3xl font-bold font-headline">Sponsor Quick Start Guide</h1>
             <p className="text-muted-foreground mt-2">
-              Welcome to ChessMate! This guide will walk you through the essential steps to get started.
+              Welcome to the new Registration App for Dark Knights Chess! This guide will walk you through the essential steps to get started.
             </p>
           </div>
            <Button onClick={handleDownloadPdf} disabled={isDownloading}>
