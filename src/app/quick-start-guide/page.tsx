@@ -66,78 +66,137 @@ export default function QuickStartGuidePage() {
   setIsDownloading(true);
 
   try {
-    const originalState = [...openAccordionItems];
-    
-    // Step 1: Expand accordion via state
-    setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
-    await new Promise(resolve => setTimeout(resolve, 4000));
+    // Create a completely static version of your content for PDF
+    const staticContent = `
+      <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 800px; padding: 20px; background: white;">
+        <!-- Header -->
+        <h1 style="font-size: 28px; font-weight: bold; margin-bottom: 8px;">Sponsor Quick Start Guide</h1>
+        <p style="color: #666; margin-bottom: 40px; font-size: 16px;">Welcome to the new Registration App for Dark Knights Chess!</p>
+        
+        <!-- Alert -->
+        <div style="background: #f3f4f6; border-left: 4px solid #3b82f6; padding: 16px; margin-bottom: 30px; border-radius: 8px;">
+          <div style="display: flex; align-items: start; gap: 12px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m15 12-8.5-8.5c-.83-.83-2.17-.83-3 0 0 0 0 0 0 0l-8.5 8.5c-.83.83-.83 2.17 0 3l8.5 8.5c.83.83 2.17.83 3 0l8.5-8.5c.83-.83.83-2.17 0-3z"/>
+              <path d="M9 12h6m-3-3v6"/>
+            </svg>
+            <div>
+              <h3 style="font-weight: bold; margin: 0 0 8px 0;">First Things First: Your Roster</h3>
+              <p style="margin: 0; color: #555;">The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the Roster page to get started.</p>
+            </div>
+          </div>
+        </div>
 
-    // Step 2: Debug and find the actual accordion structure
-    console.log('=== DEBUGGING ACCORDION STRUCTURE ===');
-    
-    // Try multiple possible selectors
-    const possibleSelectors = [
-      '[data-radix-accordion-content]',
-      '[data-state="closed"]',
-      '[data-state="open"]', 
-      '.accordion-content',
-      '[role="region"]',
-      '[data-radix-collapsible-content]'
-    ];
-    
-    let accordionContent = [];
-    
-    for (const selector of possibleSelectors) {
-      const elements = document.querySelectorAll(selector);
-      console.log(`${selector}: found ${elements.length} elements`);
-      if (elements.length > 0) {
-        accordionContent = Array.from(elements);
-        console.log(`Using selector: ${selector}`);
-        break;
-      }
-    }
-    
-    // If still nothing found, try finding by structure
-    if (accordionContent.length === 0) {
-      const accordionItems = document.querySelectorAll('[data-radix-accordion-item]');
-      console.log(`Found ${accordionItems.length} accordion items, looking for content inside...`);
-      
-      accordionItems.forEach((item, index) => {
-        // Look for any div that might be content inside the accordion item
-        const contentDivs = item.querySelectorAll('div[style*="height"], div[data-state]');
-        console.log(`Item ${index + 1} has ${contentDivs.length} potential content divs`);
-        contentDivs.forEach(div => accordionContent.push(div));
-      });
-    }
+        <!-- Step 1 -->
+        <div style="margin-bottom: 40px;">
+          <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex;">👥</span>
+            Step 1: Managing Your Roster
+          </h2>
+          
+          <p style="margin-bottom: 20px;">Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
+          
+          <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Adding a Player to Your Roster</h3>
+            
+            <p style="font-size: 14px; margin-bottom: 12px;">1. Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</p>
+            
+            <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
+              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd" 
+                   alt="Team Roster page screenshot" 
+                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">
+            </div>
+            
+            <p style="font-size: 14px; margin-bottom: 12px;">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
+            <p style="font-size: 14px; margin-bottom: 12px;">3. When searching, use the filters to find players by name, USCF ID, school, or district.</p>
+            <p style="font-size: 14px; margin-bottom: 0;">4. Once you find your student, click <strong>Select</strong>. You will be prompted to fill in any missing required information (like Grade or Section). The player will then be added to your school's roster.</p>
+          </div>
+        </div>
 
-    console.log(`Total accordion content sections found: ${accordionContent.length}`);
+        <!-- Step 2 -->
+        <div style="margin-bottom: 40px;">
+          <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex;">📅</span>
+            Step 2: Registering for an Event
+          </h2>
+          
+          <p style="margin-bottom: 20px;">Once your roster is set, you can register your selected players for any open tournament.</p>
+          
+          <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Event Registration Process</h3>
+            
+            <p style="font-size: 14px; margin-bottom: 12px;">1. Go to the <strong>Dashboard</strong> or <strong>Register for Event</strong> page.</p>
+            <p style="font-size: 14px; margin-bottom: 12px;">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
+            
+            <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
+              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1k.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c" 
+                   alt="Event registration page screenshot" 
+                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">
+              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1L.png?alt=media&token=1d074a8e-9c30-4327-9e1e-483a30988f56" 
+                   alt="Registration dialog screenshot" 
+                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">
+            </div>
+            
+            <p style="font-size: 14px; margin-bottom: 12px;">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
+            <p style="font-size: 14px; margin-bottom: 12px;">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
+            <p style="font-size: 14px; margin-bottom: 12px;">5. Click <strong>Review Charges</strong> to see a full breakdown of fees.</p>
+            <p style="font-size: 14px; margin-bottom: 0;">6. Finally, click <strong>Register Now</strong>. This will generate an official invoice and complete the registration.</p>
+          </div>
+        </div>
 
-    // Step 3: Force all found content visible
-    const originalStyles = [];
-    accordionContent.forEach((content, index) => {
-      // Store original styles
-      originalStyles[index] = {
-        display: content.style.display,
-        height: content.style.height,
-        overflow: content.style.overflow,
-        maxHeight: content.style.maxHeight,
-        dataState: content.getAttribute('data-state')
-      };
-      
-      // Force visible with !important
-      content.setAttribute('data-state', 'open');
-      content.style.setProperty('display', 'block', 'important');
-      content.style.setProperty('height', 'auto', 'important');
-      content.style.setProperty('max-height', 'none', 'important');
-      content.style.setProperty('overflow', 'visible', 'important');
-      
-      console.log(`Expanded content ${index + 1}, new height: ${content.offsetHeight}px`);
-    });
+        <!-- Step 3 -->
+        <div style="margin-bottom: 40px;">
+          <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex;">🧾</span>
+            Step 3: Handling Invoices
+          </h2>
+          
+          <p style="margin-bottom: 20px;">After registering, you can view and manage all your invoices from one place.</p>
+          
+          <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+            <h3 style="font-size: 18px; font-weight: bold; margin-bottom: 16px;">Viewing and Paying Invoices</h3>
+            
+            <p style="font-size: 14px; margin-bottom: 12px;">1. Navigate to the <strong>Invoices & Payments</strong> page from the sidebar.</p>
+            <p style="font-size: 14px; margin-bottom: 12px;">2. Here you will see a list of all your invoices and their current status (e.g., Paid, Unpaid, Canceled).</p>
+            <p style="font-size: 14px; margin-bottom: 12px;">3. Click <strong>Details</strong> to view a specific invoice. From here, you can see the registered players and submit payment information.</p>
+            <p style="font-size: 14px; margin-bottom: 12px;">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
+            <p style="font-size: 14px; margin-bottom: 12px;">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
+            
+            <div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 16px; background: #f9fafb; margin: 16px 0;">
+              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16" 
+                   alt="Invoice details screenshot" 
+                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px; margin-bottom: 16px;">
+              <img src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2F1q.png?alt=media&token=358d7596-a152-4980-89fb-152eaac99f39" 
+                   alt="Invoice payment options screenshot" 
+                   style="width: 100%; max-width: 600px; height: auto; border-radius: 6px;">
+            </div>
+          </div>
+        </div>
 
-    // Step 4: Wait and load images
-    await new Promise(resolve => setTimeout(resolve, 3000));
+        <!-- Step 4 -->
+        <div style="margin-bottom: 40px;">
+          <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;">
+            <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex;">❓</span>
+            Need More Help?
+          </h2>
+          
+          <p style="margin-bottom: 0;">For more detailed instructions on every feature, please visit our new <strong>Help Center</strong>.</p>
+        </div>
+      </div>
+    `;
+
+    // Create temporary container with static content
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = staticContent;
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '0';
     
-    const images = document.querySelectorAll('img');
+    // Add to DOM
+    document.body.appendChild(tempContainer);
+    
+    // Wait for images to load
+    const images = tempContainer.querySelectorAll('img');
     const imagePromises = Array.from(images).map(img => {
       if (img.complete) return Promise.resolve();
       return new Promise((resolve) => {
@@ -148,43 +207,17 @@ export default function QuickStartGuidePage() {
     });
     await Promise.all(imagePromises);
 
-    // Step 5: Check final state
-    const guideContent = document.getElementById('guide-content');
-    console.log('Final guide content height:', guideContent.scrollHeight);
+    console.log('Capturing static content...');
+    console.log('Container height:', tempContainer.scrollHeight);
 
-    // Step 6: Create container with header
-    const tempContainer = document.createElement('div');
-    tempContainer.style.backgroundColor = 'white';
-    tempContainer.style.padding = '20px';
-    tempContainer.style.width = '800px';
-    tempContainer.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-
-    // Add header
-    const header = document.createElement('div');
-    header.innerHTML = `
-      <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 8px; font-family: inherit;">Sponsor Quick Start Guide</h1>
-      <p style="color: #666; margin-bottom: 30px; font-family: inherit;">Welcome to the new Registration App for Dark Knights Chess!</p>
-    `;
-    tempContainer.appendChild(header);
-
-    // Clone the guide content
-    const contentClone = guideContent.cloneNode(true);
-    tempContainer.appendChild(contentClone);
-
-    // Add to DOM temporarily
-    document.body.appendChild(tempContainer);
-    
-    console.log('Temp container final height:', tempContainer.scrollHeight);
-
-    // Step 7: Capture
+    // Capture the static content
     const canvas = await html2canvas(tempContainer, {
-      scale: 1.0,
+      scale: 1.2,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       height: tempContainer.scrollHeight,
       width: tempContainer.scrollWidth,
-      logging: false, // Reduce console spam
     });
 
     // Remove temp container
@@ -192,7 +225,7 @@ export default function QuickStartGuidePage() {
 
     console.log(`Canvas captured: ${canvas.width}x${canvas.height}`);
 
-    // Step 8: Create PDF with more pages for better breaks
+    // Create PDF
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('portrait', 'pt', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -205,11 +238,11 @@ export default function QuickStartGuidePage() {
     const ratio = contentWidth / imgWidth;
     const scaledHeight = imgHeight * ratio;
     
-    // Use smaller effective page height for more pages and cleaner breaks
-    const pageHeight = (pdfHeight - (margin * 2)) * 0.7; // Use 70% for more pages
+    // Calculate pages
+    const pageHeight = pdfHeight - (margin * 2);
     const numPages = Math.ceil(scaledHeight / pageHeight);
     
-    console.log(`Creating ${numPages} pages (using 70% page height for cleaner breaks)`);
+    console.log(`Creating ${numPages} pages`);
 
     for (let page = 0; page < numPages; page++) {
       if (page > 0) pdf.addPage();
@@ -218,24 +251,9 @@ export default function QuickStartGuidePage() {
       pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, scaledHeight);
     }
 
-    // Step 9: Restore original styles
-    accordionContent.forEach((content, index) => {
-      if (originalStyles[index]) {
-        const original = originalStyles[index];
-        content.style.display = original.display || '';
-        content.style.height = original.height || '';
-        content.style.maxHeight = original.maxHeight || '';
-        content.style.overflow = original.overflow || '';
-        if (original.dataState) {
-          content.setAttribute('data-state', original.dataState);
-        }
-      }
-    });
-
     pdf.save('ChessMate_Quick_Start_Guide.pdf');
-    setOpenAccordionItems(originalState);
     
-    console.log(`PDF completed with ${numPages} pages`);
+    console.log('PDF completed successfully');
     
   } catch (error) {
     console.error("Failed to generate PDF:", error);
