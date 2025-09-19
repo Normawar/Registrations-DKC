@@ -72,41 +72,69 @@ export default function QuickStartGuidePage() {
     setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
     await new Promise(resolve => setTimeout(resolve, 4000));
 
-    // Step 2: MANUALLY force all content visible via DOM manipulation
-    console.log('Manually expanding all accordion content...');
+    // Step 2: Debug and find the actual accordion structure
+    console.log('=== DEBUGGING ACCORDION STRUCTURE ===');
     
-    // Find all accordion content and force it visible
-    const allAccordionContent = document.querySelectorAll('[data-radix-accordion-content]');
-    console.log(`Found ${allAccordionContent.length} accordion content sections`);
+    // Try multiple possible selectors
+    const possibleSelectors = [
+      '[data-radix-accordion-content]',
+      '[data-state="closed"]',
+      '[data-state="open"]', 
+      '.accordion-content',
+      '[role="region"]',
+      '[data-radix-collapsible-content]'
+    ];
     
-    const originalStyles: any[] = [];
-    allAccordionContent.forEach((content, index) => {
-      // Store original styles so we can restore them
+    let accordionContent = [];
+    
+    for (const selector of possibleSelectors) {
+      const elements = document.querySelectorAll(selector);
+      console.log(`${selector}: found ${elements.length} elements`);
+      if (elements.length > 0) {
+        accordionContent = Array.from(elements);
+        console.log(`Using selector: ${selector}`);
+        break;
+      }
+    }
+    
+    // If still nothing found, try finding by structure
+    if (accordionContent.length === 0) {
+      const accordionItems = document.querySelectorAll('[data-radix-accordion-item]');
+      console.log(`Found ${accordionItems.length} accordion items, looking for content inside...`);
+      
+      accordionItems.forEach((item, index) => {
+        // Look for any div that might be content inside the accordion item
+        const contentDivs = item.querySelectorAll('div[style*="height"], div[data-state]');
+        console.log(`Item ${index + 1} has ${contentDivs.length} potential content divs`);
+        contentDivs.forEach(div => accordionContent.push(div));
+      });
+    }
+
+    console.log(`Total accordion content sections found: ${accordionContent.length}`);
+
+    // Step 3: Force all found content visible
+    const originalStyles = [];
+    accordionContent.forEach((content, index) => {
+      // Store original styles
       originalStyles[index] = {
-        display: (content as HTMLElement).style.display,
-        height: (content as HTMLElement).style.height,
-        overflow: (content as HTMLElement).style.overflow,
+        display: content.style.display,
+        height: content.style.height,
+        overflow: content.style.overflow,
+        maxHeight: content.style.maxHeight,
         dataState: content.getAttribute('data-state')
       };
       
-      // Force visible
+      // Force visible with !important
       content.setAttribute('data-state', 'open');
-      (content as HTMLElement).style.display = 'block !important';
-      (content as HTMLElement).style.height = 'auto !important';
-      (content as HTMLElement).style.overflow = 'visible !important';
-      (content as HTMLElement).style.maxHeight = 'none !important';
+      content.style.setProperty('display', 'block', 'important');
+      content.style.setProperty('height', 'auto', 'important');
+      content.style.setProperty('max-height', 'none', 'important');
+      content.style.setProperty('overflow', 'visible', 'important');
       
-      console.log(`Expanded accordion content ${index + 1}`);
+      console.log(`Expanded content ${index + 1}, new height: ${content.offsetHeight}px`);
     });
 
-    // Step 3: Also force accordion triggers to show open state
-    const allTriggers = document.querySelectorAll('[data-radix-accordion-trigger]');
-    allTriggers.forEach(trigger => {
-      trigger.setAttribute('data-state', 'open');
-      trigger.setAttribute('aria-expanded', 'true');
-    });
-
-    // Step 4: Wait for DOM to update and images to load
+    // Step 4: Wait and load images
     await new Promise(resolve => setTimeout(resolve, 3000));
     
     const images = document.querySelectorAll('img');
@@ -120,15 +148,11 @@ export default function QuickStartGuidePage() {
     });
     await Promise.all(imagePromises);
 
-    // Step 5: Check what we actually have
-    const guideContent = document.getElementById('guide-content')!;
-    console.log('Guide content height:', guideContent.scrollHeight);
-    
-    allAccordionContent.forEach((content, index) => {
-      console.log(`Accordion ${index + 1} height:`, (content as HTMLElement).offsetHeight, 'visible:', (content as HTMLElement).offsetHeight > 0);
-    });
+    // Step 5: Check final state
+    const guideContent = document.getElementById('guide-content');
+    console.log('Final guide content height:', guideContent.scrollHeight);
 
-    // Step 6: Create complete container with header
+    // Step 6: Create container with header
     const tempContainer = document.createElement('div');
     tempContainer.style.backgroundColor = 'white';
     tempContainer.style.padding = '20px';
@@ -138,40 +162,37 @@ export default function QuickStartGuidePage() {
     // Add header
     const header = document.createElement('div');
     header.innerHTML = `
-      <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 8px;">Sponsor Quick Start Guide</h1>
-      <p style="color: #666; margin-bottom: 30px;">Welcome to the new Registration App for Dark Knights Chess! This guide will walk you through the essential steps to get started.</p>
+      <h1 style="font-size: 24px; font-weight: bold; margin-bottom: 8px; font-family: inherit;">Sponsor Quick Start Guide</h1>
+      <p style="color: #666; margin-bottom: 30px; font-family: inherit;">Welcome to the new Registration App for Dark Knights Chess!</p>
     `;
     tempContainer.appendChild(header);
 
-    // Clone the ENTIRE guide content (now with everything expanded)
-    const contentClone = guideContent.cloneNode(true) as HTMLElement;
+    // Clone the guide content
+    const contentClone = guideContent.cloneNode(true);
     tempContainer.appendChild(contentClone);
 
-    // Temporarily add to DOM
+    // Add to DOM temporarily
     document.body.appendChild(tempContainer);
     
-    console.log('Capturing expanded content...');
-    console.log('Temp container height:', tempContainer.scrollHeight);
+    console.log('Temp container final height:', tempContainer.scrollHeight);
 
-    // Step 7: Capture with more aggressive settings
+    // Step 7: Capture
     const canvas = await html2canvas(tempContainer, {
-      scale: 1.0, // Lower scale to ensure everything fits
+      scale: 1.0,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
       height: tempContainer.scrollHeight,
       width: tempContainer.scrollWidth,
-      scrollX: 0,
-      scrollY: 0,
-      logging: true, // Enable logging to see what's happening
+      logging: false, // Reduce console spam
     });
 
-    // Remove temporary container
+    // Remove temp container
     document.body.removeChild(tempContainer);
 
-    console.log(`Final canvas: ${canvas.width}x${canvas.height}`);
+    console.log(`Canvas captured: ${canvas.width}x${canvas.height}`);
 
-    // Step 8: Create PDF with generous page sizing
+    // Step 8: Create PDF with more pages for better breaks
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('portrait', 'pt', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -184,11 +205,11 @@ export default function QuickStartGuidePage() {
     const ratio = contentWidth / imgWidth;
     const scaledHeight = imgHeight * ratio;
     
-    // Use smaller pages to ensure nothing gets cut off
-    const pageHeight = (pdfHeight - (margin * 2)) * 0.8; // Use 80% of page height
+    // Use smaller effective page height for more pages and cleaner breaks
+    const pageHeight = (pdfHeight - (margin * 2)) * 0.7; // Use 70% for more pages
     const numPages = Math.ceil(scaledHeight / pageHeight);
     
-    console.log(`Creating ${numPages} pages, scaled height: ${scaledHeight}`);
+    console.log(`Creating ${numPages} pages (using 70% page height for cleaner breaks)`);
 
     for (let page = 0; page < numPages; page++) {
       if (page > 0) pdf.addPage();
@@ -197,14 +218,16 @@ export default function QuickStartGuidePage() {
       pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, scaledHeight);
     }
 
-    // Step 9: Restore original accordion states
-    allAccordionContent.forEach((content, index) => {
+    // Step 9: Restore original styles
+    accordionContent.forEach((content, index) => {
       if (originalStyles[index]) {
-        (content as HTMLElement).style.display = originalStyles[index].display || '';
-        (content as HTMLElement).style.height = originalStyles[index].height || '';
-        (content as HTMLElement).style.overflow = originalStyles[index].overflow || '';
-        if (originalStyles[index].dataState) {
-          content.setAttribute('data-state', originalStyles[index].dataState);
+        const original = originalStyles[index];
+        content.style.display = original.display || '';
+        content.style.height = original.height || '';
+        content.style.maxHeight = original.maxHeight || '';
+        content.style.overflow = original.overflow || '';
+        if (original.dataState) {
+          content.setAttribute('data-state', original.dataState);
         }
       }
     });
@@ -212,11 +235,11 @@ export default function QuickStartGuidePage() {
     pdf.save('ChessMate_Quick_Start_Guide.pdf');
     setOpenAccordionItems(originalState);
     
-    console.log(`PDF completed successfully with ${numPages} pages`);
+    console.log(`PDF completed with ${numPages} pages`);
     
   } catch (error) {
     console.error("Failed to generate PDF:", error);
-    alert(`Sorry, there was an error generating the PDF: ${(error as Error).message}`);
+    alert(`Sorry, there was an error generating the PDF: ${error.message}`);
   } finally {
     setIsDownloading(false);
   }
