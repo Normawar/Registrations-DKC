@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -84,58 +85,64 @@ export default function QuickStartGuidePage() {
     });
     await Promise.all(imagePromises);
 
-    // Find the entire content area - not just guide-content
-    const mainContainer = document.querySelector('.space-y-8.max-w-4xl.mx-auto') as HTMLElement;
-    
-    if (!mainContainer) {
-      throw new Error('Main container not found');
+    // Create a temporary container that includes BOTH the header and the content
+    const tempContainer = document.createElement('div');
+    tempContainer.style.backgroundColor = 'white';
+    tempContainer.style.padding = '20px';
+    tempContainer.style.maxWidth = '900px';
+    tempContainer.style.margin = '0 auto';
+
+    // Find and clone the header (the no-print section)
+    const headerSection = document.querySelector('.flex.justify-between.items-start.no-print');
+    if (headerSection) {
+      const headerClone = headerSection.cloneNode(true) as HTMLElement;
+      // Remove the download button from the clone
+      const button = headerClone.querySelector('button');
+      if (button) button.remove();
+      // Remove no-print class
+      headerClone.classList.remove('no-print');
+      tempContainer.appendChild(headerClone);
     }
 
-    console.log('Capturing entire container including header...');
+    // Add some spacing
+    const spacer = document.createElement('div');
+    spacer.style.height = '30px';
+    tempContainer.appendChild(spacer);
 
-    // Capture the entire container (includes header + guide content)
-    const canvas = await html2canvas(mainContainer, {
-      scale: 1.2, // Slightly lower scale for better performance
+    // Find and clone the guide content
+    const guideContent = document.getElementById('guide-content');
+    if (guideContent) {
+      const contentClone = guideContent.cloneNode(true) as HTMLElement;
+      
+      // Ensure all accordion content is visible in the clone
+      const accordionContent = contentClone.querySelectorAll('[data-state="closed"]');
+      accordionContent.forEach(content => {
+        content.setAttribute('data-state', 'open');
+        (content as HTMLElement).style.display = 'block';
+        (content as HTMLElement).style.height = 'auto';
+        (content as HTMLElement).style.overflow = 'visible';
+      });
+      
+      tempContainer.appendChild(contentClone);
+    }
+
+    // Temporarily add to DOM for capture
+    document.body.appendChild(tempContainer);
+    
+    console.log('Capturing complete content including header...');
+
+    // Capture the temporary container
+    const canvas = await html2canvas(tempContainer, {
+      scale: 1.2,
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
-      height: mainContainer.scrollHeight,
-      width: mainContainer.scrollWidth,
-      scrollX: 0,
-      scrollY: 0,
-      onclone: (clonedDocument) => {
-        // In the clone, show the header (remove no-print restriction)
-        const noPrintElements = clonedDocument.querySelectorAll('.no-print');
-        noPrintElements.forEach(el => {
-          // Don't hide the header div, only hide the download button
-          if (el.tagName === 'BUTTON' || el.querySelector('button')) {
-            (el as HTMLElement).style.display = 'none';
-          } else {
-            // This is likely the header div - show it but hide the button inside
-            (el as HTMLElement).style.display = 'block';
-            const buttons = el.querySelectorAll('button');
-            buttons.forEach(btn => (btn as HTMLElement).style.display = 'none');
-          }
-        });
-        
-        // Ensure all accordion content is visible
-        const accordionContent = clonedDocument.querySelectorAll('[data-state="closed"]');
-        accordionContent.forEach(content => {
-          content.setAttribute('data-state', 'open');
-          (content as HTMLElement).style.display = 'block';
-          (content as HTMLElement).style.height = 'auto';
-          (content as HTMLElement).style.overflow = 'visible';
-        });
-
-        // Make sure images are visible
-        const clonedImages = clonedDocument.querySelectorAll('img');
-        clonedImages.forEach(img => {
-          img.style.display = 'block';
-          img.style.maxWidth = '100%';
-          img.style.height = 'auto';
-        });
-      },
+      height: tempContainer.scrollHeight,
+      width: tempContainer.scrollWidth,
     });
+
+    // Remove temporary container
+    document.body.removeChild(tempContainer);
 
     console.log(`Canvas captured: ${canvas.width}x${canvas.height}`);
 
@@ -145,28 +152,30 @@ export default function QuickStartGuidePage() {
     const pdfHeight = pdf.internal.pageSize.getHeight();
     const margin = 36; // 0.5 inch margins
     const contentWidth = pdfWidth - (margin * 2);
-    const contentHeight = pdfHeight - (margin * 2);
+    const availableHeight = pdfHeight - (margin * 2);
     
     const imgWidth = canvas.width;
     const imgHeight = canvas.height;
     const ratio = contentWidth / imgWidth;
     const scaledHeight = imgHeight * ratio;
     
-    console.log(`Scaled height: ${scaledHeight}, Content height per page: ${contentHeight}`);
+    console.log(`Scaled height: ${scaledHeight}, Available height per page: ${availableHeight}`);
     
-    // Calculate number of pages needed
-    const numPages = Math.ceil(scaledHeight / contentHeight);
-    console.log(`Will create ${numPages} pages`);
+    // Calculate number of pages with some overlap to avoid cutting text
+    const pageOverlap = 50; // 50pt overlap to avoid cutting text
+    const effectivePageHeight = availableHeight - pageOverlap;
+    const numPages = Math.ceil(scaledHeight / effectivePageHeight);
+    
+    console.log(`Will create ${numPages} pages with ${pageOverlap}pt overlap`);
 
-    // Add pages with proper content positioning
+    // Add pages with overlap to prevent text cutting
     for (let page = 0; page < numPages; page++) {
       if (page > 0) {
         pdf.addPage();
       }
       
-      // Calculate the Y position for this page
-      // Each page shows a different vertical slice of the content
-      const yPosition = margin - (page * contentHeight);
+      // Calculate Y position with overlap
+      const yPosition = margin - (page * effectivePageHeight);
       
       pdf.addImage(imgData, 'PNG', margin, yPosition, contentWidth, scaledHeight);
       
