@@ -8,6 +8,53 @@ import Image from 'next/image';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Lightbulb, Users, Calendar, Receipt, FileQuestion } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
+
+// Component for handling image errors with fallback
+const GuideImage = ({ src, alt, width, height, className, ...props }: any) => {
+  const [error, setError] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  if (error) {
+    return (
+      <div 
+        className={`${className} bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center`}
+        style={{ width, height }}
+      >
+        <div className="text-center p-4">
+          <p className="text-sm text-gray-500 mb-2">Image not available</p>
+          <p className="text-xs text-gray-400">{alt}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {loading && (
+        <div 
+          className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center"
+          style={{ width, height }}
+        >
+          <span className="text-sm text-gray-500">Loading...</span>
+        </div>
+      )}
+      <Image
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        className={className}
+        onError={() => {
+          setError(true);
+          setLoading(false);
+        }}
+        onLoad={() => setLoading(false)}
+        {...props}
+      />
+    </div>
+  );
+};
 
 export default function QuickStartGuidePage() {
   return (
@@ -45,7 +92,14 @@ export default function QuickStartGuidePage() {
                 <CardContent className="space-y-4">
                   <p className="text-sm">1. Navigate to the <Link href="/roster" className="font-medium underline">Roster</Link> page from the sidebar. You will see your team information and an empty roster list.</p>
                    <div className="border rounded-lg p-4 bg-muted/50">
-                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Froster.png?alt=media&token=e9188591-6280-4590-b183-a7f45c8b7405" alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." width={600} height={400} className="rounded-md" data-ai-hint="team roster page" priority />
+                     <GuideImage 
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Froster.png?alt=media&token=e9188591-6280-4590-b183-a7f45c8b7405" 
+                       alt="A screenshot of the Team Roster page showing the Add from Database and Create New Player buttons." 
+                       width={600} 
+                       height={400} 
+                       className="rounded-md w-full h-auto" 
+                       priority 
+                     />
                   </div>
                   <p className="text-sm">2. Click the <strong>Add from Database</strong> button to search for existing players or <strong>Create New Player</strong> to add a student who is not in the system.</p>
                   <p className="text-sm">3. When searching, use the filters to find players by name, USCF ID, school, or district.</p>
@@ -72,8 +126,22 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">1. Go to the <Link href="/dashboard" className="font-medium underline">Dashboard</Link> or <Link href="/events" className="font-medium underline">Register for Event</Link> page.</p>
                   <p className="text-sm">2. Find an upcoming event and click the <strong>Register Students</strong> button.</p>
                   <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Fevent-registration.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c" alt="A screenshot showing the event list with the register button highlighted." width={600} height={350} className="rounded-md" data-ai-hint="event registration" priority />
-                     <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Fregistration-dialog.png?alt=media&token=d1d234a9-6e9f-4b08-8f55-7d5a5dd0e6f2" alt="A screenshot of the registration dialog where players from a roster can be selected." width={600} height={450} className="rounded-md" data-ai-hint="registration dialog" priority />
+                     <GuideImage 
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Fevent-registration.png?alt=media&token=c19a9a14-432d-45a4-8451-872f9b8c381c" 
+                       alt="A screenshot showing the event list with the register button highlighted." 
+                       width={600} 
+                       height={350} 
+                       className="rounded-md w-full h-auto" 
+                       priority 
+                     />
+                     <GuideImage 
+                       src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Fregistration-dialog.png?alt=media&token=d1d234a9-6e9f-4b08-8f55-7d5a5dd0e6f2" 
+                       alt="A screenshot of the registration dialog where players from a roster can be selected." 
+                       width={600} 
+                       height={450} 
+                       className="rounded-md w-full h-auto" 
+                       priority 
+                     />
                   </div>
                   <p className="text-sm">3. A dialog will appear listing all players on your roster. Select the players you wish to register for this event.</p>
                   <p className="text-sm">4. For each selected player, confirm their <strong>Section</strong> and <strong>USCF Status</strong> (e.g., if they need a new membership or a renewal).</p>
@@ -104,8 +172,22 @@ export default function QuickStartGuidePage() {
                   <p className="text-sm">4. For payment, you can either click the <strong>View Invoice on Square</strong> button to pay directly with a credit card, or use an offline method like PO, Check, CashApp, or Zelle.</p>
                   <p className="text-sm">5. If paying offline, select the payment method, fill in the details (like PO or check number), upload proof of payment, and click <strong>Submit Payment Information</strong> for an organizer to review.</p>
                    <div className="border rounded-lg p-4 bg-muted/50 space-y-4">
-                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Finvoice-details.png?alt=media&token=d1d6a6a2-6366-4e5c-a574-0f2f3d6118b7" alt="A screenshot of the invoice details view, showing player and fee breakdown." width={600} height={400} className="rounded-md" data-ai-hint="invoice details" priority />
-                    <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Finvoice-payment.png?alt=media&token=8e9b6a1e-8b1b-4171-8b0b-999335a9630c" alt="A screenshot of the invoice details view showing payment options like PO and Check." width={600} height={300} className="rounded-md" data-ai-hint="invoice payment" priority />
+                    <GuideImage 
+                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Finvoice-details.png?alt=media&token=d1d6a6a2-6366-4e5c-a574-0f2f3d6118b7" 
+                      alt="A screenshot of the invoice details view, showing player and fee breakdown." 
+                      width={600} 
+                      height={400} 
+                      className="rounded-md w-full h-auto" 
+                      priority 
+                    />
+                    <GuideImage 
+                      src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/App-Images%2Finvoice-payment.png?alt=media&token=8e9b6a1e-8b1b-4171-8b0b-999335a9630c" 
+                      alt="A screenshot of the invoice details view showing payment options like PO and Check." 
+                      width={600} 
+                      height={300} 
+                      className="rounded-md w-full h-auto" 
+                      priority 
+                    />
                   </div>
                 </CardContent>
               </Card>
