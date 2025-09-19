@@ -242,6 +242,19 @@ export function ReviewRequestDialog({ isOpen, onOpenChange, request, profile, on
             <div><span className="font-semibold text-muted-foreground">Request Type:</span> {request.type}</div>
             <div><span className="font-semibold text-muted-foreground">Details:</span> <p className="text-sm p-2 bg-muted rounded-md mt-1">{request.details}</p></div>
             <div><span className="font-semibold text-muted-foreground">Submitted By:</span> {request.submittedBy} on {format(new Date(request.submitted), 'PPP p')}</div>
+            
+            {request.status !== 'Pending' && (
+                <div className="border-t pt-4 mt-4 space-y-2">
+                    <h4 className="text-lg font-semibold">Decision</h4>
+                    <div><span className="font-semibold text-muted-foreground">Status:</span> {request.status}</div>
+                    {request.approvedBy && (
+                        <div><span className="font-semibold text-muted-foreground">Processed By:</span> {request.approvedBy}</div>
+                    )}
+                    {request.approvedAt && (
+                        <div><span className="font-semibold text-muted-foreground">Processed At:</span> {format(new Date(request.approvedAt), 'PPP p')}</div>
+                    )}
+                </div>
+            )}
 
             {chargeSummary && (
                 <div className="border-t pt-4 mt-4">
