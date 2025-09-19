@@ -993,66 +993,71 @@ function ManageEventsContent() {
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                <DialogTitle>{editingEvent ? 'Edit Event' : 'Add New Event'}</DialogTitle>
-                <DialogDescription>
-                {editingEvent ? 'Update the event details below.' : 'Fill in the form to create a new event.'}
-                </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto p-6">
-                <Form {...form}>
-                    <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="name" render={({ field }) => ( <FormItem><FormLabel>Event Name</FormLabel><FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField control={form.control} name="location" render={({ field }) => ( <FormItem><FormLabel>Location</FormLabel><FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Event Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
-                            <FormField control={form.control} name="rounds" render={({ field }) => ( <FormItem><FormLabel>Rounds</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                        </div>
-                        <div>
-                          <Label>Registration Deadlines (Optional)</Label>
-                          <Card className="p-4 mt-2 bg-muted/50">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <DialogHeader className="p-6 pb-4 border-b shrink-0">
+              <DialogTitle>{editingEvent ? 'Edit Event' : 'Add New Event'}</DialogTitle>
+              <DialogDescription>
+              {editingEvent ? 'Update the event details below.' : 'Fill in the form to create a new event.'}
+              </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto p-6">
+              <Form {...form}>
+                  <form id="event-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField control={form.control} name="name" render={({ field }) => ( <FormItem><FormLabel>Event Name</FormLabel><FormControl><Input placeholder="e.g., Spring Open 2024" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                          <FormField control={form.control} name="location" render={({ field }) => ( <FormItem><FormLabel>Location</FormLabel><FormControl><Input placeholder="e.g., City Convention Center" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField control={form.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Event Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                          <FormField control={form.control} name="rounds" render={({ field }) => ( <FormItem><FormLabel>Rounds</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                      </div>
+                      <div>
+                        <Label>Registration Deadlines (Optional)</Label>
+                        <Card className="p-4 mt-2 bg-muted/50">
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                               <FormField control={form.control} name="regularDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Regular Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
                               <FormField control={form.control} name="lateDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Late Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
                               <FormField control={form.control} name="veryLateDeadline" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Very Late Ends</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} size="sm" className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 10} /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
-                            </div>
-                            <FormDescription className="text-xs mt-2">If deadlines are not set, fees will be based on the event date.</FormDescription>
-                          </Card>
-                        </div>
-                        <div>
-                          <Label>Registration Fees</Label>
-                          <Card className="p-4 mt-2 bg-muted/50">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                              <FormField control={form.control} name="regularFee" render={({ field }) => ( <FormItem><FormLabel>Regular Fee ($)</FormLabel><FormControl><Input type="number" placeholder="20" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                              <FormField control={form.control} name="lateFee" render={({ field }) => ( <FormItem><FormLabel>Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="25" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                              <FormField control={form.control} name="veryLateFee" render={({ field }) => ( <FormItem><FormLabel>Very Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="30" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                              <FormField control={form.control} name="dayOfFee" render={({ field }) => ( <FormItem><FormLabel>Day of Fee ($)</FormLabel><FormControl><Input type="number" placeholder="35" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                            </div>
-                          </Card>
-                        </div>
-                        <div className="space-y-4">
-                            <FormField control={form.control} name="imageUrl" render={({ field }) => ( <FormItem><FormLabel>Image URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                            <FormField control={form.control} name="imageName" render={({ field }) => ( <FormItem><FormLabel>Image Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl><FormDescription>A descriptive name for the image attachment.</FormDescription><FormMessage /></FormItem> )}/>
-                        </div>
-                        <div className="space-y-4">
-                            <FormField control={form.control} name="pdfUrl" render={({ field }) => ( <FormItem><FormLabel>PDF Flyer URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                            <FormField control={form.control} name="pdfName" render={({ field }) => ( <FormItem><FormLabel>PDF Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl><FormDescription>A descriptive name for the PDF attachment.</FormDescription><FormMessage /></FormItem> )}/>
-                        </div>
-                        <div className="space-y-4">
-                            <FormField control={form.control} name="isClosed" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Close Registrations</FormLabel><FormDescription>Check this box to prevent any new registrations for this event.</FormDescription></div></FormItem>)}/>
-                            <FormField control={form.control} name="isPsjaOnly" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Restrict to PSJA Students</FormLabel><FormDescription>Only allow sponsors and parents of students in PHARR-SAN JUAN-ALAMO ISD to register.</FormDescription></div></FormItem>)}/>
-                        </div>
-                    </form>
-                </Form>
-            </div>
-            <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                <Button type="submit" form="event-form">{editingEvent ? 'Save Changes' : 'Create Event'}</Button>
-            </DialogFooter>
+                              <div className="flex flex-col space-y-2.5">
+                                <Label className="text-sm font-medium">Day Of</Label>
+                                <p className="text-sm text-muted-foreground h-9 flex items-center">Starts after "Very Late" ends.</p>
+                              </div>
+                          </div>
+                          <FormDescription className="text-xs mt-2">If deadlines are not set, fees will be based on the event date.</FormDescription>
+                        </Card>
+                      </div>
+                      <div>
+                        <Label>Registration Fees</Label>
+                        <Card className="p-4 mt-2 bg-muted/50">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <FormField control={form.control} name="regularFee" render={({ field }) => ( <FormItem><FormLabel>Regular Fee ($)</FormLabel><FormControl><Input type="number" placeholder="20" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                            <FormField control={form.control} name="lateFee" render={({ field }) => ( <FormItem><FormLabel>Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="25" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                            <FormField control={form.control} name="veryLateFee" render={({ field }) => ( <FormItem><FormLabel>Very Late Fee ($)</FormLabel><FormControl><Input type="number" placeholder="30" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                            <FormField control={form.control} name="dayOfFee" render={({ field }) => ( <FormItem><FormLabel>Day of Fee ($)</FormLabel><FormControl><Input type="number" placeholder="35" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                          </div>
+                        </Card>
+                      </div>
+                      <div className="space-y-4">
+                          <FormField control={form.control} name="imageUrl" render={({ field }) => ( <FormItem><FormLabel>Image URL (Optional)</FormLabel><FormControl><Input placeholder="https://placehold.co/100x100.png" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                          <FormField control={form.control} name="imageName" render={({ field }) => ( <FormItem><FormLabel>Image Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Event Banner" {...field} /></FormControl><FormDescription>A descriptive name for the image attachment.</FormDescription><FormMessage /></FormItem> )}/>
+                      </div>
+                      <div className="space-y-4">
+                          <FormField control={form.control} name="pdfUrl" render={({ field }) => ( <FormItem><FormLabel>PDF Flyer URL (Optional)</FormLabel><FormControl><Input placeholder="https://example.com/flyer.pdf" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                          <FormField control={form.control} name="pdfName" render={({ field }) => ( <FormItem><FormLabel>PDF Name (Optional)</FormLabel><FormControl><Input placeholder="e.g., Official Flyer" {...field} /></FormControl><FormDescription>A descriptive name for the PDF attachment.</FormDescription><FormMessage /></FormItem> )}/>
+                      </div>
+                      <div className="space-y-4">
+                          <FormField control={form.control} name="isClosed" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Close Registrations</FormLabel><FormDescription>Check this box to prevent any new registrations for this event.</FormDescription></div></FormItem>)}/>
+                          <FormField control={form.control} name="isPsjaOnly" render={({ field }) => (<FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Restrict to PSJA Students</FormLabel><FormDescription>Only allow sponsors and parents of students in PHARR-SAN JUAN-ALAMO ISD to register.</FormDescription></div></FormItem>)}/>
+                      </div>
+                  </form>
+              </Form>
+          </div>
+          <DialogFooter className="p-6 pt-4 border-t shrink-0">
+              <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+              <Button type="submit" form="event-form">{editingEvent ? 'Save Changes' : 'Create Event'}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1086,6 +1091,7 @@ function ManageEventsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
       <Dialog open={isRegistrationsOpen} onOpenChange={setIsRegistrationsOpen}>
         <DialogContent className="sm:max-w-4xl">
           <DialogHeader>
@@ -1174,6 +1180,7 @@ function ManageEventsContent() {
           </div>
         </DialogContent>
       </Dialog>
+      
       <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
