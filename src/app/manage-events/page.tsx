@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
@@ -89,7 +90,7 @@ import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { schoolData } from '@/lib/data/school-data';
 import Papa from 'papaparse';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsList, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsContent, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -1173,7 +1174,6 @@ function ManageEventsContent() {
           </div>
         </DialogContent>
       </Dialog>
-      
       <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
