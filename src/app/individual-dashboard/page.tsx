@@ -131,8 +131,12 @@ function IndividualDashboardContent() {
 
   // Force re-render when student data changes
   const triggerUpdate = useCallback(() => {
+    if (profile?.email && dataManager.current.isLoaded()) {
+      const students = dataManager.current.getStudentsForParent(profile.email);
+      setParentStudents(students);
+    }
     forceUpdate({});
-  }, []);
+  }, [profile?.email]);
 
   // Subscribe to data manager updates
   useEffect(() => {
@@ -145,16 +149,10 @@ function IndividualDashboardContent() {
     if (allPlayers?.length > 0 && !isInitialized.current) {
       dataManager.current.setPlayers(allPlayers);
       isInitialized.current = true;
+      // Trigger an initial load
+      triggerUpdate();
     }
-  }, [allPlayers]);
-
-  // Update parent students when profile changes or data updates
-  useEffect(() => {
-    if (profile?.email && dataManager.current.isLoaded()) {
-      const students = dataManager.current.getStudentsForParent(profile.email);
-      setParentStudents(students);
-    }
-  }, [profile?.email, triggerUpdate]); // triggerUpdate ensures this runs when data changes
+  }, [allPlayers, triggerUpdate]);
 
   // Stable memoized values
   const parentStudentIds = useMemo(() => 
@@ -168,6 +166,7 @@ function IndividualDashboardContent() {
   }, [parentStudents]);
 
   const upcomingEvents = useMemo(() => {
+    if (!events) return [];
     return events
       .filter(event => {
         const isUpcoming = new Date(event.date) >= new Date();

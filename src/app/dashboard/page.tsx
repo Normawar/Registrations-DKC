@@ -48,33 +48,22 @@ function DashboardContent() {
   const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   
-  const profileRef = useRef(profile);
-  const dataLoadedRef = useRef(false);
-
-  useEffect(() => {
-    profileRef.current = profile;
-    if (profile?.uid) {
-        dataLoadedRef.current = false; // Reset loaded flag if profile changes
-        setDataLoaded(false);
-    }
-  }, [profile]);
-  
   const loadDashboardData = useCallback(async () => {
-    const currentProfile = profileRef.current;
-    if (!db || !currentProfile || dataLoadedRef.current) return;
+    if (!db || !profile || dataLoaded) return;
 
     try {
+      setDataLoaded(false); // Set loading state
       const playersQuery = query(collection(db, 'players'), 
-        where('district', '==', currentProfile.district), 
-        where('school', '==', currentProfile.school)
+        where('district', '==', profile.district), 
+        where('school', '==', profile.school)
       );
       const allPlayersSnapshotPromise = getDocs(collection(db, 'players'));
       
       let invoicesQuery = query(collection(db, 'invoices'));
-      if (currentProfile.role === 'sponsor' || currentProfile.role === 'district_coordinator') {
-        invoicesQuery = query(invoicesQuery, where('district', '==', currentProfile.district), where('schoolName', '==', currentProfile.school));
-      } else if (currentProfile.role === 'individual') {
-          invoicesQuery = query(invoicesQuery, where('parentEmail', '==', currentProfile.email));
+      if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+        invoicesQuery = query(invoicesQuery, where('district', '==', profile.district), where('schoolName', '==', profile.school));
+      } else if (profile.role === 'individual') {
+          invoicesQuery = query(invoicesQuery, where('parentEmail', '==', profile.email));
       }
 
       const [playersSnapshot, allPlayersSnapshot, invoiceSnapshot] = await Promise.all([
@@ -108,19 +97,18 @@ function DashboardContent() {
           };
         });
       setRecentActivity(activity);
-      dataLoadedRef.current = true;
       setDataLoaded(true);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
-      setDataLoaded(true);
+      setDataLoaded(true); // Ensure loading completes even on error
     }
-  }, []);
+  }, [profile, dataLoaded]); // Depend on profile and dataLoaded flag
   
   useEffect(() => {
-    if (profile && !loading && !dataLoadedRef.current) {
+    if (profile && !loading && !dataLoaded) {
       loadDashboardData();
     }
-  }, [profile, loading, loadDashboardData]);
+  }, [profile, loading, loadDashboardData, dataLoaded]);
 
   const playersWithMissingInfo = useMemo(() => {
     return rosterPlayers.filter(player => {
@@ -133,11 +121,12 @@ function DashboardContent() {
   }, [rosterPlayers]);
 
   const eventDates = useMemo(() => {
+    if (!events) return [];
     return events.map(event => new Date(event.date));
   }, [events]);
 
   const eventsForSelectedDate = useMemo(() => {
-    if (!selectedDate) return [];
+    if (!selectedDate || !events) return [];
     return events.filter(event => isSameDay(new Date(event.date), selectedDate));
   }, [events, selectedDate]);
   

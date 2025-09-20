@@ -164,7 +164,7 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
        {confirmation.invoiceUrl && (
         <Button asChild className="w-full">
           <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
-            <CreditCard className="mr-2 h-4 w-4" /> Pay with Credit Card
+            <CreditCard className="mr-2 h-4 w-4" /> Pay by Credit Card
           </a>
         </Button>
       )}
@@ -413,7 +413,7 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    const validFiles = files.filter(file => { const isValidType = file.type.startsWith('image/'); const isValidSize = file.size <= 5 * 1024 * 1024; return isValidType && isValidSize; });
+    const validFiles = files.filter(file => { const isValidType = file.type.startsWith('image/') || file.type === 'application/pdf'; const isValidSize = file.size <= 5 * 1024 * 1024; return isValidType && isValidSize; });
     if (validFiles.length > 0) { setFileToUpload(validFiles[0]); setFileUrls(validFiles.map(file => URL.createObjectURL(file))); }
     if (fileInputRef.current) { fileInputRef.current.value = ''; }
   };
@@ -461,14 +461,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
             </div>
         </div>
     );
-
-    const ProofOfPaymentSection = () => (
-      <div className="mt-4">
-        <h4 className="text-md font-medium mb-2">Proof of Payment</h4>
-        <div className="mb-3"><input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" multiple className="hidden" /><Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="w-full"><Upload className="w-4 h-4 mr-2" />Upload Screenshot/Photo</Button></div>
-        {fileUrls.length > 0 && (<div className="space-y-2"><p className="text-sm text-gray-600">Uploaded files:</p><div className="grid grid-cols-2 gap-2">{fileUrls.map((url, index) => (<div key={index} className="relative"><img src={url} alt={`Proof ${index + 1}`} className="w-full h-20 object-cover rounded border" /><button onClick={() => removeFile(index)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">×</button></div>))}</div></div>)}
-      </div>
-    );
     
     const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
         const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]); const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
@@ -489,7 +481,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
             </div>
             <button onClick={handleRecordPayment} disabled={!isValidPayment() || isUpdating} className={`w-full py-2 px-4 rounded font-medium transition-colors ${isValidPayment() && !isUpdating ? 'bg-green-600 hover:bg-green-700 text-white cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}>{isUpdating ? (<> <Loader2 className="w-4 h-4 mr-2 animate-spin inline" /> Recording Payment... </>) : isValidPayment() ? '💳 Record Payment' : '⏸️ Select Payment Method'}</button>
             {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 && (<div className="mt-4 p-3 bg-gray-50 border rounded"><h4 className="font-medium mb-2">💳 Payment History</h4><div className="space-y-2 max-h-32 overflow-y-auto">{confirmation.paymentHistory.map((payment: any, index: number) => (<div key={payment.id || index} className="text-sm flex justify-between items-center p-2 bg-white rounded border"><div> <span className="font-medium">{payment.method}</span> <span className="text-gray-600 ml-2">${payment.amount.toFixed(2)}</span> </div><div className="text-xs text-gray-500"> {payment.organizerInitials && <span className="bg-blue-100 px-1 rounded mr-1">{payment.organizerInitials}</span>} {payment.dateFormatted || format(new Date(payment.date), 'MMM dd, HH:mm')} </div></div>))}</div></div>)}
-            <ProofOfPaymentSection />
           </div>
         );
     };
