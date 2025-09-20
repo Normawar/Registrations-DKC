@@ -23,7 +23,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { format, isSameDay } from "date-fns";
 import { Info, FileText, ImageIcon, User, PlusCircle, Search } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -37,7 +37,6 @@ import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 import { useToast } from "@/hooks/use-toast";
 import { IndividualGuard } from "@/components/auth-guard";
 
-
 function IndividualDashboardContent() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
@@ -49,72 +48,120 @@ function IndividualDashboardContent() {
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
+  const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   
-  const loadParentStudents = () => {
-    if (profile?.email && allPlayers.length > 0) {
-      try {
-        const storedParentStudents = localStorage.getItem(`parent_students_${profile.email}`);
-        if (storedParentStudents) {
-          const studentIds = JSON.parse(storedParentStudents);
-          const students = allPlayers.filter(p => studentIds.includes(p.id));
-          setParentStudents(students);
-        } else {
-          setParentStudents([]);
-        }
-      } catch (error) {
-        console.error('Failed to load parent students:', error);
-      }
-    }
-  };
+  // Ref to track if we've loaded students to prevent unnecessary re-loads
+  const hasLoadedStudents = useRef(false);
+  const currentEmail = useRef<string | null>(null);
 
+  // Memoized function to load parent students - wrapped in useCallback to prevent recreation
+  const loadParentStudents = useCallback(async () => {
+    if (!profile?.email || allPlayers.length === 0) {
+      return;
+    }
+
+    // Prevent unnecessary reloads if email hasn't changed and we've already loaded
+    if (hasLoadedStudents.current && currentEmail.current === profile.email) {
+      return;
+    }
+
+    setIsLoadingStudents(true);
+    
+    try {
+      const parentStudentsKey = `parent_students_${profile.email}`;
+      const storedParentStudents = localStorage.getItem(parentStudentsKey);
+      
+      if (storedParentStudents) {
+        const studentIds = JSON.parse(storedParentStudents);
+        const students = allPlayers.filter(p => studentIds.includes(p.id));
+        setParentStudents(students);
+      } else {
+        setParentStudents([]);
+      }
+      
+      hasLoadedStudents.current = true;
+      currentEmail.current = profile.email;
+    } catch (error) {
+      console.error('Failed to load parent students:', error);
+      setParentStudents([]);
+    } finally {
+      setIsLoadingStudents(false);
+    }
+  }, [profile?.email, allPlayers]); // Proper dependencies
+
+  // Reset loading state when profile or allPlayers change significantly
+  useEffect(() => {
+    if (profile?.email !== currentEmail.current) {
+      hasLoadedStudents.current = false;
+    }
+  }, [profile?.email]);
+
+  // Load students when profile and allPlayers are available
   useEffect(() => {
     loadParentStudents();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, allPlayers]);
+  }, [loadParentStudents]);
   
-  const parentStudentIds = useMemo(() => parentStudents.map(p => p.id), [parentStudents]);
+  // Memoized student IDs to prevent unnecessary recalculations
+  const parentStudentIds = useMemo(() => 
+    parentStudents.map(p => p.id), [parentStudents]
+  );
 
+  // Memoized players with missing info
   const playersWithMissingInfo = useMemo(() => {
     return parentStudents.filter(player => {
       return !player.uscfId || !player.grade || !player.section || !player.email || !player.dob || !player.zipCode;
     });
   }, [parentStudents]);
 
+  // Memoized event dates
   const eventDates = useMemo(() => {
     return events.map(event => new Date(event.date));
   }, [events]);
 
+  // Memoized events for selected date
   const eventsForSelectedDate = useMemo(() => {
     if (!selectedDate) return [];
     return events.filter(event => isSameDay(new Date(event.date), selectedDate));
   }, [events, selectedDate]);
   
-  const handleRegisterClick = (event: any) => {
+  const handleRegisterClick = useCallback((event: any) => {
     setSelectedEvent(event);
     setIsRegistrationDialogOpen(true);
-  };
+  }, []);
   
-  const handleStudentAdded = (newStudent: MasterPlayer) => {
-    if (!profile) return;
+  const handleStudentAdded = useCallback((newStudent: MasterPlayer) => {
+    if (!profile?.email) return;
     
     const parentStudentsKey = `parent_students_${profile.email}`;
     const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
+    
     if (!existingStudentIds.includes(newStudent.id)) {
-        const updatedStudentIds = [...existingStudentIds, newStudent.id];
-        localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
-        loadParentStudents();
-        toast({
-            title: "Student Added",
-            description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
-        });
+      const updatedStudentIds = [...existingStudentIds, newStudent.id];
+      localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
+      
+      // Force reload by resetting the flag
+      hasLoadedStudents.current = false;
+      loadParentStudents();
+      
+      toast({
+        title: "Student Added",
+        description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
+      });
     } else {
-        toast({
-            variant: 'destructive',
-            title: "Student Already Added",
-            description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
-        });
+      toast({
+        variant: 'destructive',
+        title: "Student Already Added",
+        description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
+      });
     }
-  };
+  }, [profile?.email, loadParentStudents, toast]);
+
+  const handleAddStudentClick = useCallback(() => {
+    setIsAddStudentDialogOpen(true);
+  }, []);
+
+  // Show loading state while profile is loading or students are being loaded
+  const showLoadingState = loading || isLoadingStudents;
 
   return (
     <>
@@ -145,7 +192,7 @@ function IndividualDashboardContent() {
                       <CardDescription>Highlighted dates indicate a scheduled tournament.</CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center">
-                      {loading ? (
+                      {showLoadingState ? (
                         <div className="w-full flex flex-col items-center gap-4">
                           <Skeleton className="h-[290px] w-[280px]" />
                           <Skeleton className="h-20 w-full" />
@@ -207,12 +254,12 @@ function IndividualDashboardContent() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>My Students ({loading ? '...' : parentStudents.length})</CardTitle>
+                  <CardTitle>My Students ({showLoadingState ? '...' : parentStudents.length})</CardTitle>
                   <CardDescription>A quick view of your managed students.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-96">
-                    {loading ? (
+                    {showLoadingState ? (
                       <div className="space-y-4">
                           <Skeleton className="h-12 w-full" />
                           <Skeleton className="h-12 w-full" />
@@ -228,32 +275,44 @@ function IndividualDashboardContent() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {parentStudents.map((player) => (
-                            <TableRow key={player.id}>
-                              <TableCell>
-                                <div className="flex items-center gap-3">
-                                  <Avatar className="h-9 w-9">
-                                    <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                                    <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {player.email || 'No email'}
+                          {parentStudents.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={2} className="text-center text-muted-foreground py-8">
+                                No students added yet. Click "Add Student" to get started.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            parentStudents.map((player) => (
+                              <TableRow key={player.id}>
+                                <TableCell>
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-9 w-9">
+                                      <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                      <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="font-medium">{player.lastName}, {player.firstName}</div>
+                                      <div className="text-sm text-muted-foreground">
+                                        {player.email || 'No email'}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
-                            </TableRow>
-                          ))}
+                                </TableCell>
+                                <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
+                              </TableRow>
+                            ))
+                          )}
                         </TableBody>
                       </Table>
                     )}
                   </ScrollArea>
                 </CardContent>
                 <CardFooter>
-                  <Button onClick={() => setIsAddStudentDialogOpen(true)} variant="outline">
+                  <Button 
+                    onClick={handleAddStudentClick} 
+                    variant="outline"
+                    disabled={showLoadingState}
+                  >
                     <Search className="mr-2 h-4 w-4"/> Add Student from Database
                   </Button>
                 </CardFooter>

@@ -23,7 +23,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEvents } from "@/hooks/use-events";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { format, isSameDay } from "date-fns";
 import { Info, FileText, ImageIcon, Lock } from "lucide-react";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -47,55 +47,65 @@ function DashboardContent() {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<MasterPlayer[]>([]);
   const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  const hasLoadedData = useRef(false);
 
   const loadDashboardData = useCallback(async () => {
-    if (!db || !profile) return;
+    if (!db || !profile || hasLoadedData.current) return;
 
-    // Fetch roster players for the specific school
-    const playersQuery = query(collection(db, 'players'), 
-      where('district', '==', profile.district), 
-      where('school', '==', profile.school)
-    );
-    const playersSnapshot = await getDocs(playersQuery);
-    const schoolRoster = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-    setRosterPlayers(schoolRoster);
-    
-    // Fetch all players (for name lookups in recent activity)
-    // In a production app with millions of players, this should be optimized
-    const allPlayersSnapshot = await getDocs(collection(db, 'players'));
-    const allPlayerData = allPlayersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
-    setAllPlayers(allPlayerData);
+    setIsLoadingData(true);
 
-    // Fetch recent invoices
-    let q = query(collection(db, 'invoices'));
-    if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
-      q = query(q, where('district', '==', profile.district), where('schoolName', '==', profile.school));
-    } else if (profile.role === 'individual') {
-        q = query(q, where('parentEmail', '==', profile.email));
+    try {
+      const playersQuery = query(collection(db, 'players'), 
+        where('district', '==', profile.district), 
+        where('school', '==', profile.school)
+      );
+      const allPlayersSnapshotPromise = getDocs(collection(db, 'players'));
+      
+      let invoicesQuery = query(collection(db, 'invoices'));
+      if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
+        invoicesQuery = query(invoicesQuery, where('district', '==', profile.district), where('schoolName', '==', profile.school));
+      } else if (profile.role === 'individual') {
+          invoicesQuery = query(invoicesQuery, where('parentEmail', '==', profile.email));
+      }
+
+      const [playersSnapshot, allPlayersSnapshot, invoiceSnapshot] = await Promise.all([
+        getDocs(playersQuery),
+        allPlayersSnapshotPromise,
+        getDocs(invoicesQuery)
+      ]);
+
+      const schoolRoster = playersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+      setRosterPlayers(schoolRoster);
+      
+      const allPlayerData = allPlayersSnapshot.docs.map(doc => doc.data() as MasterPlayer);
+      setAllPlayers(allPlayerData);
+
+      const allInvoices = invoiceSnapshot.docs.map(doc => doc.data());
+      const activity = allInvoices
+        .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime())
+        .slice(0, 5)
+        .map(inv => {
+          const firstPlayerName = Object.keys(inv.selections || {}).length > 0
+            ? allPlayerData.find(p => p.id === Object.keys(inv.selections)[0])?.firstName || 'Unknown Player'
+            : 'N/A';
+          
+          return {
+            id: inv.id,
+            player: firstPlayerName,
+            email: inv.purchaserEmail,
+            event: inv.eventName,
+            status: inv.invoiceStatus,
+            date: inv.submissionTimestamp,
+          };
+        });
+      setRecentActivity(activity);
+      hasLoadedData.current = true;
+    } catch (error) {
+      console.error("Failed to load dashboard data:", error);
+    } finally {
+      setIsLoadingData(false);
     }
-
-    const invoiceSnapshot = await getDocs(q);
-    const allInvoices = invoiceSnapshot.docs.map(doc => doc.data());
-    
-    const activity = allInvoices
-      .sort((a, b) => new Date(b.submissionTimestamp).getTime() - new Date(a.submissionTimestamp).getTime())
-      .slice(0, 5)
-      .map(inv => {
-        const firstPlayerName = Object.keys(inv.selections || {}).length > 0
-          ? allPlayerData.find(p => p.id === Object.keys(inv.selections)[0])?.firstName || 'Unknown Player'
-          : 'N/A';
-        
-        return {
-          id: inv.id,
-          player: firstPlayerName,
-          email: inv.purchaserEmail,
-          event: inv.eventName,
-          status: inv.invoiceStatus,
-          date: inv.submissionTimestamp,
-        };
-      });
-
-    setRecentActivity(activity);
   }, [profile]);
   
   useEffect(() => {
@@ -103,6 +113,11 @@ function DashboardContent() {
       loadDashboardData();
     }
   }, [profile, loadDashboardData]);
+  
+  useEffect(() => {
+      // Reset loaded flag if profile changes, to allow refetching
+      hasLoadedData.current = false;
+  }, [profile?.uid]);
 
   const playersWithMissingInfo = useMemo(() => {
     return rosterPlayers.filter(player => {
@@ -143,6 +158,8 @@ function DashboardContent() {
     }
   };
 
+  const showLoadingState = loading || isLoadingData;
+
   return (
     <>
       <AppLayout>
@@ -172,7 +189,7 @@ function DashboardContent() {
                       <CardDescription>Highlighted dates indicate a scheduled tournament.</CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center">
-                      {loading ? (
+                      {showLoadingState ? (
                         <div className="w-full flex flex-col items-center gap-4">
                           <Skeleton className="h-[290px] w-[280px]" />
                           <Skeleton className="h-20 w-full" />
@@ -240,12 +257,12 @@ function DashboardContent() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>My Roster ({loading ? '...' : rosterPlayers.length})</CardTitle>
+                  <CardTitle>My Roster ({showLoadingState ? '...' : rosterPlayers.length})</CardTitle>
                   <CardDescription>A quick view of your sponsored players.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-96">
-                    {loading ? (
+                    {showLoadingState ? (
                       <div className="space-y-4">
                           <Skeleton className="h-12 w-full" />
                           <Skeleton className="h-12 w-full" />
