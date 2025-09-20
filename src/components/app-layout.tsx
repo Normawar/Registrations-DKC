@@ -97,6 +97,7 @@ const organizerMenuStructure = {
 const individualMenuItems = [
   { href: "/profile", icon: User, label: "Profile" },
   { href: "/individual-dashboard", icon: QueenIcon, label: "Dashboard" },
+  { href: "/roster", icon: Users, label: "My Students" },
   { href: "/events", icon: RookIcon, label: "Register for event" },
   { href: "/invoices", icon: Receipt, label: "Invoices & Payments" },
   { href: "/membership", icon: BishopIcon, label: "USCF Membership ONLY" },
@@ -352,3 +353,5 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
