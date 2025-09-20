@@ -481,7 +481,7 @@ export default function ProfilePage() {
                             <FormField control={profileForm.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input placeholder="Doe" {...field} autoComplete="family-name" /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={profileForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} disabled autoComplete="email" /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField control={profileForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="name@example.com" {...field} autoComplete="email" /></FormControl><FormMessage /></FormItem> )} />
                             <FormField control={profileForm.control} name="phone" render={({ field }) => ( <FormItem><FormLabel>Cell Phone Number</FormLabel><FormControl><Input type="tel" placeholder="(555) 555-5555" {...field} autoComplete="tel" /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         {isSponsorOrCoordinator && (
