@@ -199,12 +199,15 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
             <AccordionContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row gap-4 items-center">
                     <div>
-                        <p className="text-sm text-gray-600">Scan the QR code and enter the total amount due. Upload a screenshot of the confirmation.</p>
+                        <p className="text-sm text-gray-600">Scan the QR code and enter the total amount due, or use the cash app code below. Upload a screenshot of the confirmation.</p>
                         <p className="font-bold text-lg mt-1">$DKChess</p>
                     </div>
-                    <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer">
-                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
-                    </a>
+                    <div className="text-center">
+                        <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" target="_blank" rel="noopener noreferrer">
+                            <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/CashApp%20QR%20Code.jpg?alt=media&token=a30aa7de-0064-4b49-8b0e-c58f715b6cdd" alt="CashApp QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
+                        </a>
+                        <p className="text-xs text-muted-foreground mt-1">click image to enlarge</p>
+                    </div>
                 </div>
                 <div><Label htmlFor="cashapp-amount">Payment Amount ($)</Label><Input id="cashapp-amount" type="number" placeholder="0.00" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} step="0.01" min="0" /></div>
             </AccordionContent>
@@ -217,9 +220,12 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
                         <p className="text-sm text-gray-600">Scan the QR code or use the phone number to send the total amount due. Upload a screenshot of the confirmation.</p>
                         <p className="font-bold text-lg mt-1">956-393-8875</p>
                     </div>
-                     <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer">
-                        <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
-                    </a>
+                     <div className="text-center">
+                        <a href="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" target="_blank" rel="noopener noreferrer">
+                            <Image src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/Zelle%20QR%20code.jpg?alt=media&token=2b1635bd-180e-457d-8e1e-f91f71bcff89" alt="Zelle QR Code" width={100} height={100} className="rounded-md transition-transform duration-200 ease-in-out hover:scale-125" data-ai-hint="QR code" />
+                        </a>
+                        <p className="text-xs text-muted-foreground mt-1">click image to enlarge</p>
+                    </div>
                 </div>
                 <div><Label htmlFor="zelle-amount">Payment Amount ($)</Label><Input id="zelle-amount" type="number" placeholder="0.00" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} step="0.01" min="0" /></div>
             </AccordionContent>
