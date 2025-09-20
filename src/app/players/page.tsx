@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { format } from 'date-fns';
+import { format, isValid, parse } from 'date-fns';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 import { AppLayout } from '@/components/app-layout';
@@ -82,6 +82,84 @@ const playerFormSchema = z.object({
 });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
+
+const DateInput = React.forwardRef<HTMLInputElement, {
+  value?: Date;
+  onChange?: (date: Date | undefined) => void;
+  placeholder?: string;
+  className?: string;
+}>(({ value, onChange, placeholder, className }, ref) => {
+  const [displayValue, setDisplayValue] = useState('');
+  
+  useEffect(() => {
+    const newDisplayValue = (value instanceof Date && !isNaN(value.getTime())) 
+      ? format(value, 'yyyy-MM-dd') 
+      : '';
+    setDisplayValue(newDisplayValue);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    setDisplayValue(inputValue);
+
+    if (inputValue === '') {
+      onChange?.(undefined);
+      return;
+    }
+
+    const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const match = inputValue.match(dateRegex);
+
+    if (match) {
+        const [, year, month, day] = match.map(Number);
+        if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+            const date = new Date(year, month - 1, day);
+            if (isValid(date)) {
+                onChange?.(date);
+            }
+        }
+    }
+  };
+
+  return (
+    <Input
+      ref={ref}
+      type="date"
+      value={displayValue}
+      onChange={handleChange}
+      placeholder={placeholder}
+      className={className}
+    />
+  );
+});
+DateInput.displayName = 'DateInput';
+
+
+const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
+    if (!player?.changeHistory || player.changeHistory.length === 0) {
+        return <div className="p-6 text-center text-muted-foreground">No change history available for this player.</div>;
+    }
+
+    return (
+        <div className="p-6 space-y-4">
+            {player.changeHistory.slice().reverse().map(entry => (
+                <div key={entry.timestamp} className="text-sm border-l-2 pl-4">
+                    <p className="font-medium">
+                        {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
+                    </p>
+                    <ul className="list-disc pl-5 mt-1 text-muted-foreground text-xs">
+                        {entry.changes.map((change, index) => (
+                            <li key={index}>
+                                Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic">'{String(change.oldValue)}'</span> to <span className="italic">'{String(change.newValue)}'</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ))}
+        </div>
+    );
+  };
+
 
 function PlayersPageContent() {
   const { addPlayer, updatePlayer, database } = useMasterDb();
@@ -179,32 +257,6 @@ function PlayersPageContent() {
     setIsEditOpen(false);
     setEditingPlayer(null);
   };
-  
-  const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
-    if (!player?.changeHistory || player.changeHistory.length === 0) {
-        return <div className="p-6 text-center text-muted-foreground">No change history available for this player.</div>;
-    }
-
-    return (
-        <div className="p-6 space-y-4">
-            {player.changeHistory.slice().reverse().map(entry => (
-                <div key={entry.timestamp} className="text-sm border-l-2 pl-4">
-                    <p className="font-medium">
-                        {format(new Date(entry.timestamp), 'PPP p')} by {entry.userName}
-                    </p>
-                    <ul className="list-disc pl-5 mt-1 text-muted-foreground text-xs">
-                        {entry.changes.map((change, index) => (
-                            <li key={index}>
-                                Field <span className="font-semibold text-foreground">{change.field}</span> changed from <span className="italic">'{String(change.oldValue)}'</span> to <span className="italic">'{String(change.newValue)}'</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            ))}
-        </div>
-    );
-  };
-
 
   return (
     <AppLayout>
@@ -264,90 +316,90 @@ function PlayersPageContent() {
               <DialogDescription>
                 Complete the player's information. This will add them to or update their record in the master database.
               </DialogDescription>
-              <Tabs defaultValue="details" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mt-4">
-                  <TabsTrigger value="details">Player Details</TabsTrigger>
-                  <TabsTrigger value="history">Change History</TabsTrigger>
-                </TabsList>
-                <ScrollArea className="flex-1 overflow-y-auto">
-                  <TabsContent value="details" className="mt-0">
-                    <div className='p-6'>
-                      <Form {...playerForm}>
-                        <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-4">
-                          {/* Form fields here */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={playerForm.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={playerForm.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={playerForm.control} name="school" render={({ field }) => (<FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={playerForm.control} name="district" render={({ field }) => (<FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
-                          </div>
-                          {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                            <FormField
-                              control={playerForm.control}
-                              name="studentType"
-                              render={({ field }) => (
-                                <FormItem className="space-y-3">
-                                  <FormLabel>Student Type</FormLabel>
-                                  <FormControl>
-                                    <RadioGroup
-                                      onValueChange={field.onChange}
-                                      value={field.value || 'independent'}
-                                      className="flex items-center space-x-4"
-                                    >
-                                      <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                          <RadioGroupItem value="independent" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">Independent</FormLabel>
-                                      </FormItem>
-                                      <FormItem className="flex items-center space-x-2 space-y-0">
-                                        <FormControl>
-                                          <RadioGroupItem value="gt" />
-                                        </FormControl>
-                                        <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
-                                      </FormItem>
-                                    </RadioGroup>
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          )}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={playerForm.control} name="uscfId" render={({ field }) => (<FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={playerForm.control} name="regularRating" render={({ field }) => (<FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormMessage /></FormItem>)} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={playerForm.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const date = e.target.valueAsDate; field.onChange(date ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : undefined); }} /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => { const date = e.target.valueAsDate; field.onChange(date ? new Date(date.getTime() + date.getTimezoneOffset() * 60000) : undefined); }} /></FormControl><FormMessage /></FormItem>)} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={playerForm.control} name="grade" render={({ field }) => (<FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                            <FormField control={playerForm.control} name="section" render={({ field }) => (<FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={playerForm.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                            <FormField control={playerForm.control} name="zipCode" render={({ field }) => (<FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={playerForm.control} name="state" render={({ field }) => (<FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                          </div>
-                        </form>
-                      </Form>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="history" className="mt-0 flex-1 overflow-y-auto">
-                    <ChangeHistoryTab player={editingPlayer} />
-                  </TabsContent>
-                </ScrollArea>
-              </Tabs>
             </DialogHeader>
-            <DialogFooter className="p-6 pt-4 border-t shrink-0">
-              <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-              <Button type="submit" form="edit-player-form">Save Player</Button>
-            </DialogFooter>
+            <Tabs defaultValue="details" className="w-full h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-2 mt-4 px-6">
+                <TabsTrigger value="details">Player Details</TabsTrigger>
+                <TabsTrigger value="history">Change History</TabsTrigger>
+              </TabsList>
+              <ScrollArea className="flex-1 overflow-y-auto">
+                <TabsContent value="details" className="mt-0">
+                  <div className='p-6'>
+                    <Form {...playerForm}>
+                      <form id="edit-player-form" onSubmit={playerForm.handleSubmit(handlePlayerFormSubmit)} className="space-y-4">
+                        {/* Form fields here */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField control={playerForm.control} name="firstName" render={({ field }) => (<FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                          <FormField control={playerForm.control} name="lastName" render={({ field }) => (<FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField control={playerForm.control} name="school" render={({ field }) => (<FormItem><FormLabel>School</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                          <FormField control={playerForm.control} name="district" render={({ field }) => (<FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>)} />
+                        </div>
+                        {editingPlayer?.district === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                          <FormField
+                            control={playerForm.control}
+                            name="studentType"
+                            render={({ field }) => (
+                              <FormItem className="space-y-3">
+                                <FormLabel>Student Type</FormLabel>
+                                <FormControl>
+                                  <RadioGroup
+                                    onValueChange={field.onChange}
+                                    value={field.value || 'independent'}
+                                    className="flex items-center space-x-4"
+                                  >
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                      <FormControl>
+                                        <RadioGroupItem value="independent" />
+                                      </FormControl>
+                                      <FormLabel className="font-normal">Independent</FormLabel>
+                                    </FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                      <FormControl>
+                                        <RadioGroupItem value="gt" />
+                                      </FormControl>
+                                      <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
+                                    </FormItem>
+                                  </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField control={playerForm.control} name="uscfId" render={({ field }) => (<FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                          <FormField control={playerForm.control} name="regularRating" render={({ field }) => (<FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="1500 or UNR" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormMessage /></FormItem>)} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <FormField control={playerForm.control} name="dob" render={({ field }) => (<FormItem><FormLabel>Date of Birth</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD" /></FormControl><FormMessage /></FormItem>)} />
+                           <FormField control={playerForm.control} name="uscfExpiration" render={({ field }) => (<FormItem><FormLabel>USCF Expiration</FormLabel><FormControl><DateInput value={field.value} onChange={field.onChange} placeholder="YYYY-MM-DD"/></FormControl><FormMessage /></FormItem>)} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField control={playerForm.control} name="grade" render={({ field }) => (<FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                          <FormField control={playerForm.control} name="section" render={({ field }) => (<FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField control={playerForm.control} name="email" render={({ field }) => (<FormItem><FormLabel>Email *</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                          <FormField control={playerForm.control} name="zipCode" render={({ field }) => (<FormItem><FormLabel>Zip Code *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField control={playerForm.control} name="state" render={({ field }) => (<FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        </div>
+                      </form>
+                    </Form>
+                  </div>
+                </TabsContent>
+                <TabsContent value="history" className="mt-0 flex-1 overflow-y-auto">
+                  <ChangeHistoryTab player={editingPlayer} />
+                </TabsContent>
+              </ScrollArea>
+              <DialogFooter className="p-6 pt-4 border-t shrink-0">
+                <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                <Button type="submit" form="edit-player-form">Update Player</Button>
+              </DialogFooter>
+            </Tabs>
           </DialogContent>
         </Dialog>
       </div>
@@ -367,6 +419,3 @@ function PlayersPage() {
 }
 
 export default PlayersPage;
-
-
-    
