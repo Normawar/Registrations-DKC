@@ -124,8 +124,8 @@ const handleDownloadPdf = async () => {
           console.log(`Converted ${name}: ${width}x${height}`);
           return canvas.toDataURL('image/png');
         }
-      } catch (error: any) {
-        console.log(`Failed to convert ${name}:`, error.message);
+      } catch (error) {
+        console.log(`Failed to convert ${name}:`, (error as Error).message);
       }
       return null;
     };
@@ -166,12 +166,17 @@ const handleDownloadPdf = async () => {
 
       const canvas = await html2canvas(tempContainer, {
         scale: 1.5,
-        useCORS: false,
+        useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         height: tempContainer.scrollHeight,
         width: tempContainer.scrollWidth,
         logging: false,
+        ignoreElements: (element) => {
+          // Skip any elements that might cause CORS issues
+          return element.tagName === 'IFRAME' || 
+                 (element.tagName === 'IMG' && !element.src.startsWith('data:'));
+        }
       });
 
       document.body.removeChild(tempContainer);
@@ -197,8 +202,10 @@ const handleDownloadPdf = async () => {
     // Simple function to create image HTML
     const createImageHtml = (dataUrl: string | null, altText: string, placeholder: string) => {
       if (dataUrl) {
+        console.log(`Creating image HTML for ${altText} with data URL length: ${dataUrl.length}`);
         return '<div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: white; margin: 12px 0; text-align: center;"><img src="' + dataUrl + '" alt="' + altText + '" style="width: 100%; max-width: 400px; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>';
       } else {
+        console.log(`No data URL for ${altText}, using placeholder`);
         return '<div style="text-align: center; color: #9ca3af; padding: 8px; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 4px; margin: 8px 0; font-size: 11px;">📷 ' + placeholder + '</div>';
       }
     };
@@ -238,143 +245,11 @@ const handleDownloadPdf = async () => {
     
     console.log(`PDF completed with ${currentPage + 1} pages`);
     
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to generate PDF:", error);
-    alert(`Sorry, there was an error generating the PDF: ${error.message}`);
+    alert(`Sorry, there was an error generating the PDF: ${(error as Error).message}`);
   } finally {
     setIsDownloading(false);
   }
 };
-
-  return (
-    <AppLayout>
-      <div className="space-y-8" id="guide-content">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold font-headline">Sponsor Quick Start Guide</h1>
-            <p className="text-muted-foreground">Welcome to ChessMate! This guide will walk you through the essential steps to get started.</p>
-          </div>
-          <Button onClick={handleDownloadPdf} disabled={isDownloading}>
-            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-            {isDownloading ? 'Generating PDF...' : 'Download as PDF'}
-          </Button>
-        </div>
-
-        <Alert className="bg-blue-50 border-blue-200 text-blue-800">
-          <Lightbulb className="h-4 w-4 !text-blue-600" />
-          <AlertTitle className="text-blue-900">First Things First: Your Roster</AlertTitle>
-          <AlertDescription>
-            The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the <Link href="/roster" className="font-bold underline hover:text-blue-700">Roster page</Link> to get started.
-          </AlertDescription>
-        </Alert>
-
-        <Accordion type="multiple" defaultValue={['item-1']} value={openAccordionItems} onValueChange={setOpenAccordionItems} className="w-full space-y-4">
-          <Card>
-            <AccordionItem value="item-1" className="border-b-0">
-              <AccordionTrigger className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="bg-primary/10 text-primary p-3 rounded-full">
-                    <Users className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-left">Step 1: Managing Your Roster</h2>
-                    <p className="text-sm text-muted-foreground text-left">Add or create players to build your team.</p>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6">
-                <p className="mb-4">Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
-                <ol className="list-decimal list-inside space-y-4">
-                  <li>Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</li>
-                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/1h.png?alt=media&token=c3c6f8f1-8f56-4b13-883a-86c071d18c99" alt="Team Roster page showing an empty list and options to add players." width={800} height={450} className="rounded-lg border shadow-md my-2" />
-                  <li>Click <strong>Add from Database</strong> to search for existing players in the entire system or <strong>Create New Player</strong> to add a completely new student.</li>
-                  <li>Use the search filters to find players by name, USCF ID, school, or district.</li>
-                  <li>From the search results, click <strong>Select</strong> and then fill in any missing information (like grade or section) in the dialog that appears. The player will then be added to your official roster.</li>
-                </ol>
-              </AccordionContent>
-            </AccordionItem>
-          </Card>
-
-          <Card>
-            <AccordionItem value="item-2" className="border-b-0">
-              <AccordionTrigger className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="bg-primary/10 text-primary p-3 rounded-full">
-                    <Calendar className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-left">Step 2: Registering for an Event</h2>
-                    <p className="text-sm text-muted-foreground text-left">Select players from your roster for a tournament.</p>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6">
-                 <p className="mb-4">Once your roster is set, you can register your players for any open tournament.</p>
-                <ol className="list-decimal list-inside space-y-4">
-                  <li>Go to the <strong>Dashboard</strong> or <strong>Register for Event</strong> page.</li>
-                  <li>Find an upcoming event and click the <strong>Register Students</strong> button.</li>
-                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/1k.png?alt=media&token=9635e9c0-6d43-4318-9710-38827f31c260" alt="Event registration page showing a list of upcoming tournaments." width={800} height={450} className="rounded-lg border shadow-md my-2" />
-                  <li>In the dialog that appears, select the players from your roster you wish to register.</li>
-                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/1L.png?alt=media&token=2b719089-9a74-4b53-a550-96f3c5b497b7" alt="Registration dialog showing a list of players to select." width={800} height={450} className="rounded-lg border shadow-md my-2" />
-                  <li>For each selected player, you must confirm their <strong>Section</strong> and their <strong>USCF Status</strong>. If a player needs a new or renewed membership, select the appropriate option to add the USCF fee to the invoice.</li>
-                  <li>Click <strong>Review Charges</strong> to see a breakdown of all fees.</li>
-                  <li>Click <strong>Register Now</strong> to finalize the registration and create an invoice.</li>
-                </ol>
-              </AccordionContent>
-            </AccordionItem>
-          </Card>
-
-          <Card>
-            <AccordionItem value="item-3" className="border-b-0">
-              <AccordionTrigger className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="bg-primary/10 text-primary p-3 rounded-full">
-                    <Receipt className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-left">Step 3: Handling Invoices</h2>
-                    <p className="text-sm text-muted-foreground text-left">View and pay for your event registrations.</p>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6">
-                <p className="mb-4">After registering, you can view and manage all your invoices from one central place.</p>
-                 <ol className="list-decimal list-inside space-y-4">
-                  <li>Navigate to the <strong>Invoices & Payments</strong> page from the sidebar to see a list of all your invoices and their status (Paid, Unpaid, Canceled).</li>
-                  <li>Click <strong>Details</strong> to view a specific invoice, including the list of registered players.</li>
-                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/1p.png?alt=media&token=f6a1d82f-87a1-4328-86d1-447a16f2125f" alt="Invoice details dialog showing player list and payment summary." width={800} height={450} className="rounded-lg border shadow-md my-2" />
-                  <li>To pay online, click <strong>View Invoice on Square</strong> to use a credit card.</li>
-                  <li>To pay offline, select the payment method (PO, Check, etc.), fill in the details, upload proof, and click <strong>Submit Payment Information</strong> for review.</li>
-                   <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/1q.png?alt=media&token=f0d2c67c-9b88-466d-8533-3112a9e3fc1e" alt="Offline payment options including Purchase Order, Check, CashApp, and Zelle." width={800} height={450} className="rounded-lg border shadow-md my-2" />
-                </ol>
-              </AccordionContent>
-            </AccordionItem>
-          </Card>
-          
-           <Card>
-            <AccordionItem value="item-4" className="border-b-0">
-              <AccordionTrigger className="p-6">
-                <div className="flex items-center gap-4">
-                  <div className="bg-primary/10 text-primary p-3 rounded-full">
-                    <FileQuestion className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-left">Need More Help?</h2>
-                    <p className="text-sm text-muted-foreground text-left">Find detailed guides and answers to common questions.</p>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6">
-                <p className="mb-4">For more detailed instructions, troubleshooting, and video guides, please visit our comprehensive <strong>Help Center</strong>.</p>
-                <Button asChild>
-                  <Link href="/help">Go to Help Center</Link>
-                </Button>
-              </AccordionContent>
-            </AccordionItem>
-          </Card>
-
-        </Accordion>
-      </div>
-    </AppLayout>
-  );
 }
