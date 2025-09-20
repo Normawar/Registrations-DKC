@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -163,7 +164,7 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
        {confirmation.invoiceUrl && (
         <Button asChild className="w-full">
           <a href={confirmation.invoiceUrl} target="_blank" rel="noopener noreferrer">
-            <CreditCard className="mr-2 h-4 w-4" /> View Invoice on Square
+            <CreditCard className="mr-2 h-4 w-4" /> Pay with Credit Card
           </a>
         </Button>
       )}
