@@ -64,19 +64,16 @@ export default function EventsPage() {
     const isTestUser = profile?.email?.toLowerCase().includes('test');
 
     return events
-      .map(event => {
-        // Add "Test" prefix to event names based on their location's district
-        if (getDistrictForLocation(event.location).startsWith("Test")) {
-            return { ...event, name: `Test ${event.name}` };
-        }
-        return event;
-      })
       .filter(event => {
-        const isTestEvent = event.name.toLowerCase().includes('test');
         const isUpcoming = new Date(event.date) >= new Date();
+        if (!isUpcoming || event.isClosed) return false;
+
+        const isTestEvent = event.name.toLowerCase().startsWith('test') || getDistrictForLocation(event.location).toLowerCase().startsWith("test");
         
-        if (!isUpcoming) return false;
-        
+        if (profile?.role === 'individual') {
+          return !isTestEvent;
+        }
+
         if (isTestUser) {
             return isTestEvent;
         } else {

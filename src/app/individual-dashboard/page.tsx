@@ -36,10 +36,87 @@ import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 import { useToast } from "@/hooks/use-toast";
 import { IndividualGuard } from "@/components/auth-guard";
 
+// Stable state container to prevent flickering
+class StudentDataManager {
+  private static instance: StudentDataManager;
+  private allPlayers: MasterPlayer[] = [];
+  private playersLoaded = false;
+  private subscribers = new Set<() => void>();
+
+  static getInstance() {
+    if (!StudentDataManager.instance) {
+      StudentDataManager.instance = new StudentDataManager();
+    }
+    return StudentDataManager.instance;
+  }
+
+  setPlayers(players: MasterPlayer[]) {
+    if (this.playersLoaded && this.allPlayers.length > 0) return; // Prevent unnecessary updates
+    this.allPlayers = players;
+    this.playersLoaded = true;
+    this.notifySubscribers();
+  }
+
+  getPlayers() {
+    return this.allPlayers;
+  }
+
+  isLoaded() {
+    return this.playersLoaded;
+  }
+
+  subscribe(callback: () => void) {
+    this.subscribers.add(callback);
+    return () => this.subscribers.delete(callback);
+  }
+
+  private notifySubscribers() {
+    this.subscribers.forEach(callback => callback());
+  }
+
+  getStudentsForParent(email: string): MasterPlayer[] {
+    if (!this.playersLoaded || !email) return [];
+    
+    try {
+      const parentStudentsKey = `parent_students_${email}`;
+      const storedStudentIds = localStorage.getItem(parentStudentsKey);
+      
+      if (storedStudentIds) {
+        const studentIds = JSON.parse(storedStudentIds);
+        return this.allPlayers.filter(p => studentIds.includes(p.id));
+      }
+    } catch (error) {
+      console.error('Failed to load parent students:', error);
+    }
+    
+    return [];
+  }
+
+  addStudentForParent(email: string, studentId: string): boolean {
+    if (!email) return false;
+    
+    try {
+      const parentStudentsKey = `parent_students_${email}`;
+      const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
+      
+      if (!existingStudentIds.includes(studentId)) {
+        const updatedStudentIds = [...existingStudentIds, studentId];
+        localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
+        this.notifySubscribers();
+        return true;
+      }
+    } catch (error) {
+      console.error('Failed to add student:', error);
+    }
+    
+    return false;
+  }
+}
+
 function IndividualDashboardContent() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
-  const { profile, loading } = useSponsorProfile();
+  const { profile, loading: profileLoading } = useSponsorProfile();
   const { toast } = useToast();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
@@ -47,79 +124,39 @@ function IndividualDashboardContent() {
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
-  const [studentsLoaded, setStudentsLoaded] = useState(false);
-  
-  // Cache the allPlayers reference to prevent unnecessary updates
-  const allPlayersRef = useRef<MasterPlayer[]>([]);
-  const profileEmailRef = useRef<string | null>(null);
-  const studentsLoadedRef = useRef(false);
+  const [, forceUpdate] = useState({});
 
-  // Update refs when data actually changes (not just reference changes)
+  const dataManager = useRef(StudentDataManager.getInstance());
+  const isInitialized = useRef(false);
+
+  // Force re-render when student data changes
+  const triggerUpdate = useCallback(() => {
+    forceUpdate({});
+  }, []);
+
+  // Subscribe to data manager updates
   useEffect(() => {
-    if (allPlayers?.length > 0 && 
-        (allPlayersRef.current.length !== allPlayers.length || 
-         allPlayersRef.current !== allPlayers)) {
-      allPlayersRef.current = allPlayers;
+    const unsubscribe = dataManager.current.subscribe(triggerUpdate);
+    return unsubscribe;
+  }, [triggerUpdate]);
+
+  // Initialize data manager with players from context (one-time only)
+  useEffect(() => {
+    if (allPlayers?.length > 0 && !isInitialized.current) {
+      dataManager.current.setPlayers(allPlayers);
+      isInitialized.current = true;
     }
   }, [allPlayers]);
 
+  // Update parent students when profile changes or data updates
   useEffect(() => {
-    if (profile?.email && profileEmailRef.current !== profile.email) {
-      profileEmailRef.current = profile.email;
-      studentsLoadedRef.current = false;
-      setStudentsLoaded(false);
+    if (profile?.email && dataManager.current.isLoaded()) {
+      const students = dataManager.current.getStudentsForParent(profile.email);
+      setParentStudents(students);
     }
-  }, [profile?.email]);
+  }, [profile?.email, triggerUpdate]); // triggerUpdate ensures this runs when data changes
 
-  // Stable function to load students that doesn't depend on changing references
-  const loadParentStudents = useCallback(() => {
-    const currentEmail = profileEmailRef.current;
-    const currentAllPlayers = allPlayersRef.current;
-    
-    if (!currentEmail || currentAllPlayers.length === 0 || studentsLoadedRef.current) {
-      return;
-    }
-
-    try {
-      const parentStudentsKey = `parent_students_${currentEmail}`;
-      const storedParentStudents = localStorage.getItem(parentStudentsKey);
-      
-      if (storedParentStudents) {
-        const studentIds = JSON.parse(storedParentStudents);
-        const students = currentAllPlayers.filter(p => studentIds.includes(p.id));
-        setParentStudents(students);
-      } else {
-        setParentStudents([]);
-      }
-      
-      studentsLoadedRef.current = true;
-      setStudentsLoaded(true);
-    } catch (error) {
-      console.error('Failed to load parent students:', error);
-      setParentStudents([]);
-      setStudentsLoaded(true);
-    }
-  }, []); // No dependencies - uses refs for stable access to current values
-
-  // Load students when conditions are met
-  useEffect(() => {
-    const hasProfile = !!profileEmailRef.current;
-    const hasPlayers = allPlayersRef.current.length > 0;
-    const notLoaded = !studentsLoadedRef.current;
-    
-    if (hasProfile && hasPlayers && notLoaded && !loading) {
-      loadParentStudents();
-    }
-  }, [loadParentStudents, loading, profile?.email, allPlayers?.length]);
-
-  // Force reload function for when students are added
-  const forceReloadStudents = useCallback(() => {
-    studentsLoadedRef.current = false;
-    setStudentsLoaded(false);
-    loadParentStudents();
-  }, [loadParentStudents]);
-  
-  // Memoized values - only recalculate when parentStudents actually changes
+  // Stable memoized values
   const parentStudentIds = useMemo(() => 
     parentStudents.map(p => p.id), [parentStudents]
   );
@@ -130,15 +167,24 @@ function IndividualDashboardContent() {
     });
   }, [parentStudents]);
 
-  // Stable event-related memos
-  const eventDates = useMemo(() => {
-    return events?.map(event => new Date(event.date)) || [];
+  const upcomingEvents = useMemo(() => {
+    return events
+      .filter(event => {
+        const isUpcoming = new Date(event.date) >= new Date();
+        const isTestEvent = event.name.toLowerCase().startsWith('test');
+        return isUpcoming && !event.isClosed && !isTestEvent;
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [events]);
 
+  const eventDates = useMemo(() => {
+    return upcomingEvents.map(event => new Date(event.date));
+  }, [upcomingEvents]);
+
   const eventsForSelectedDate = useMemo(() => {
-    if (!selectedDate || !events) return [];
-    return events.filter(event => isSameDay(new Date(event.date), selectedDate));
-  }, [events, selectedDate]);
+    if (!selectedDate) return [];
+    return upcomingEvents.filter(event => isSameDay(new Date(event.date), selectedDate));
+  }, [upcomingEvents, selectedDate]);
   
   // Stable event handlers
   const handleRegisterClick = useCallback((event: any) => {
@@ -147,18 +193,11 @@ function IndividualDashboardContent() {
   }, []);
   
   const handleStudentAdded = useCallback((newStudent: MasterPlayer) => {
-    const currentEmail = profileEmailRef.current;
-    if (!currentEmail) return;
+    if (!profile?.email) return;
     
-    const parentStudentsKey = `parent_students_${currentEmail}`;
-    const existingStudentIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
+    const success = dataManager.current.addStudentForParent(profile.email, newStudent.id);
     
-    if (!existingStudentIds.includes(newStudent.id)) {
-      const updatedStudentIds = [...existingStudentIds, newStudent.id];
-      localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
-      
-      forceReloadStudents();
-      
+    if (success) {
       toast({
         title: "Student Added",
         description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
@@ -170,15 +209,15 @@ function IndividualDashboardContent() {
         description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
       });
     }
-  }, [forceReloadStudents, toast]);
+  }, [profile?.email, toast]);
 
   const handleAddStudentClick = useCallback(() => {
     setIsAddStudentDialogOpen(true);
   }, []);
 
-  // Determine loading state
-  const isInitialLoading = loading || !studentsLoaded;
-  const hasData = profile && allPlayersRef.current.length > 0;
+  // Determine loading state - only show loading if profile is loading OR we haven't loaded data yet
+  const isLoading = profileLoading || !dataManager.current.isLoaded();
+  const hasProfile = !!profile?.email;
 
   return (
     <>
@@ -191,7 +230,7 @@ function IndividualDashboardContent() {
             </p>
           </div>
 
-          {playersWithMissingInfo.length > 0 && (
+          {!isLoading && playersWithMissingInfo.length > 0 && (
             <Alert variant="destructive">
               <Info className="h-4 w-4" />
               <AlertTitle>Incomplete Student Information</AlertTitle>
@@ -209,7 +248,7 @@ function IndividualDashboardContent() {
                       <CardDescription>Highlighted dates indicate a scheduled tournament.</CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center">
-                      {isInitialLoading ? (
+                      {isLoading ? (
                         <div className="w-full flex flex-col items-center gap-4">
                           <Skeleton className="h-[290px] w-[280px]" />
                           <Skeleton className="h-20 w-full" />
@@ -271,12 +310,12 @@ function IndividualDashboardContent() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>My Students ({isInitialLoading ? '...' : parentStudents.length})</CardTitle>
+                  <CardTitle>My Students ({isLoading ? '...' : parentStudents.length})</CardTitle>
                   <CardDescription>A quick view of your managed students.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-96">
-                    {isInitialLoading ? (
+                    {isLoading ? (
                       <div className="space-y-4">
                           <Skeleton className="h-12 w-full" />
                           <Skeleton className="h-12 w-full" />
@@ -328,7 +367,7 @@ function IndividualDashboardContent() {
                   <Button 
                     onClick={handleAddStudentClick} 
                     variant="outline"
-                    disabled={isInitialLoading}
+                    disabled={isLoading}
                   >
                     <Search className="mr-2 h-4 w-4"/> Add Student from Database
                   </Button>
@@ -338,7 +377,7 @@ function IndividualDashboardContent() {
         </div>
       </AppLayout>
 
-      {hasData && (
+      {hasProfile && !isLoading && (
         <>
           <IndividualRegistrationDialog
             isOpen={isRegistrationDialogOpen}

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -33,10 +34,14 @@ export function ParentRegistrationComponent({ parentProfile }: ParentRegistratio
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
   const [registrations, setRegistrations] = useState<any[]>([]);
 
-  // Get upcoming events only
+  // Get upcoming events and filter out test events
   const upcomingEvents = useMemo(() => {
     return events
-      .filter(event => new Date(event.date) >= new Date())
+      .filter(event => {
+        const isUpcoming = new Date(event.date) >= new Date();
+        const isTestEvent = event.name.toLowerCase().startsWith('test');
+        return isUpcoming && !event.isClosed && !isTestEvent;
+      })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [events]);
 
