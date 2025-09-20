@@ -1,4 +1,3 @@
-
 // src/components/auth-guard.tsx - Route protection component with fixed organizer logic
 'use client';
 
@@ -66,10 +65,14 @@ export function AuthGuard({ children, requiredRole, redirectTo = '/' }: AuthGuar
     const isTestUser = profile.email?.toLowerCase().includes('test');
     const isTestPage = pathname.includes('/debug') || pathname.includes('/reports'); // Assume reports can be used for testing
     if (isTestUser && !isTestPage && profile.role !== 'organizer') {
-        const allowedTestPaths = ['/dashboard', '/roster', '/events', '/invoices', '/profile', '/auth/role-selection'];
+        const allowedTestPaths = ['/dashboard', '/roster', '/events', '/invoices', '/profile', '/auth/role-selection', '/individual-dashboard'];
         if (!allowedTestPaths.some(p => pathname.startsWith(p))) {
-            console.log('🧪 Test user on a non-test page, redirecting to dashboard.');
-            router.push('/dashboard');
+            console.log('🧪 Test user on a non-test page, redirecting based on role.');
+            if (profile.role === 'individual') {
+                router.push('/individual-dashboard');
+            } else {
+                router.push('/dashboard');
+            }
             return;
         }
     }
