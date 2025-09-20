@@ -319,12 +319,16 @@ export default function ProfilePage() {
   };
   
   function onProfileSubmit(values: z.infer<typeof profileFormSchema>) {
-    // Clear the profile update flag when the user saves
-    updateProfile({ ...values, forceProfileUpdate: false });
+    const newProfileData = { ...values, forceProfileUpdate: false };
+    updateProfile(newProfileData);
     toast({
       title: 'Profile Updated',
       description: 'Your information has been successfully saved.',
     });
+
+    if (profile?.role === 'individual') {
+        router.push('/individual-dashboard');
+    }
   }
   
   function onPasswordSubmit(values: z.infer<typeof passwordFormSchema>) {
