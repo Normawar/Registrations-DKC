@@ -1,4 +1,3 @@
-
 'use client';
 
 import { AppLayout } from "@/components/app-layout";
@@ -47,26 +46,35 @@ function DashboardContent() {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<MasterPlayer[]>([]);
   const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(false);
-  const hasLoadedData = useRef(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  
+  const profileRef = useRef(profile);
+  const dataLoadedRef = useRef(false);
 
+  useEffect(() => {
+    profileRef.current = profile;
+    if (profile?.uid) {
+        dataLoadedRef.current = false; // Reset loaded flag if profile changes
+        setDataLoaded(false);
+    }
+  }, [profile]);
+  
   const loadDashboardData = useCallback(async () => {
-    if (!db || !profile || hasLoadedData.current) return;
-
-    setIsLoadingData(true);
+    const currentProfile = profileRef.current;
+    if (!db || !currentProfile || dataLoadedRef.current) return;
 
     try {
       const playersQuery = query(collection(db, 'players'), 
-        where('district', '==', profile.district), 
-        where('school', '==', profile.school)
+        where('district', '==', currentProfile.district), 
+        where('school', '==', currentProfile.school)
       );
       const allPlayersSnapshotPromise = getDocs(collection(db, 'players'));
       
       let invoicesQuery = query(collection(db, 'invoices'));
-      if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
-        invoicesQuery = query(invoicesQuery, where('district', '==', profile.district), where('schoolName', '==', profile.school));
-      } else if (profile.role === 'individual') {
-          invoicesQuery = query(invoicesQuery, where('parentEmail', '==', profile.email));
+      if (currentProfile.role === 'sponsor' || currentProfile.role === 'district_coordinator') {
+        invoicesQuery = query(invoicesQuery, where('district', '==', currentProfile.district), where('schoolName', '==', currentProfile.school));
+      } else if (currentProfile.role === 'individual') {
+          invoicesQuery = query(invoicesQuery, where('parentEmail', '==', currentProfile.email));
       }
 
       const [playersSnapshot, allPlayersSnapshot, invoiceSnapshot] = await Promise.all([
@@ -100,29 +108,23 @@ function DashboardContent() {
           };
         });
       setRecentActivity(activity);
-      hasLoadedData.current = true;
+      dataLoadedRef.current = true;
+      setDataLoaded(true);
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
-    } finally {
-      setIsLoadingData(false);
+      setDataLoaded(true);
     }
-  }, [profile]);
+  }, []);
   
   useEffect(() => {
-    if(profile) {
+    if (profile && !loading && !dataLoadedRef.current) {
       loadDashboardData();
     }
-  }, [profile, loadDashboardData]);
-  
-  useEffect(() => {
-      // Reset loaded flag if profile changes, to allow refetching
-      hasLoadedData.current = false;
-  }, [profile?.uid]);
+  }, [profile, loading, loadDashboardData]);
 
   const playersWithMissingInfo = useMemo(() => {
     return rosterPlayers.filter(player => {
         if (!player || typeof player !== 'object') return false;
-        // **FIX:** Only filter out corrupted "test1 test" players specifically
         if (player.firstName === 'test1' && player.lastName === 'test') {
             return false;
         }
@@ -158,7 +160,7 @@ function DashboardContent() {
     }
   };
 
-  const showLoadingState = loading || isLoadingData;
+  const isInitialLoading = loading || !dataLoaded;
 
   return (
     <>
@@ -189,7 +191,7 @@ function DashboardContent() {
                       <CardDescription>Highlighted dates indicate a scheduled tournament.</CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center">
-                      {showLoadingState ? (
+                      {isInitialLoading ? (
                         <div className="w-full flex flex-col items-center gap-4">
                           <Skeleton className="h-[290px] w-[280px]" />
                           <Skeleton className="h-20 w-full" />
@@ -257,12 +259,12 @@ function DashboardContent() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>My Roster ({showLoadingState ? '...' : rosterPlayers.length})</CardTitle>
+                  <CardTitle>My Roster ({isInitialLoading ? '...' : rosterPlayers.length})</CardTitle>
                   <CardDescription>A quick view of your sponsored players.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-96">
-                    {showLoadingState ? (
+                    {isInitialLoading ? (
                       <div className="space-y-4">
                           <Skeleton className="h-12 w-full" />
                           <Skeleton className="h-12 w-full" />
