@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppLayout } from '@/components/app-layout';
@@ -64,159 +65,82 @@ export default function QuickStartGuidePage() {
 
   const handleDownloadPdf = async () => {
     setIsDownloading(true);
-
+  
     try {
       const originalState = [...openAccordionItems];
       
       // Expand all accordion items first
       setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
       await new Promise(resolve => setTimeout(resolve, 4000));
-
-      // Get the existing images and convert to data URLs
-      const existingImages: { [key: string]: HTMLImageElement | null } = {
-        roster: document.querySelector('img[src*="1h.png"]'),
-        eventList: document.querySelector('img[src*="1k.png"]'), 
-        registrationDialog: document.querySelector('img[src*="1L.png"]'),
-        invoiceDetails: document.querySelector('img[src*="1p.png"]'),
-        invoicePayment: document.querySelector('img[src*="1q.png"]')
-      };
-
-      // Fallback: if specific images not found, try to find any images on the page
-      if (!existingImages.roster || !existingImages.eventList || !existingImages.invoiceDetails) {
-        console.log('Some images not found with specific selectors, trying fallback...');
-        const allImages = Array.from(document.querySelectorAll('img'));
-        console.log(`Found ${allImages.length} images on page`);
-        
-        // Log all image sources for debugging
-        allImages.forEach((img, index) => {
-          console.log(`Image ${index}: ${img.src}`);
-        });
-
-        // Try to match images by common patterns or positions
-        if (!existingImages.roster && allImages.length > 0) {
-          existingImages.roster = allImages.find(img => 
-            img.src.includes('roster') || 
-            img.alt?.toLowerCase().includes('roster') ||
-            img.src.includes('1h')
-          ) || allImages[0];
-        }
-        
-        if (!existingImages.eventList && allImages.length > 1) {
-          existingImages.eventList = allImages.find(img => 
-            img.src.includes('event') || 
-            img.alt?.toLowerCase().includes('event') ||
-            img.src.includes('1k')
-          ) || allImages[1];
-        }
-        
-        if (!existingImages.registrationDialog && allImages.length > 2) {
-          existingImages.registrationDialog = allImages.find(img => 
-            img.src.includes('registration') || 
-            img.alt?.toLowerCase().includes('registration') ||
-            img.src.includes('1L')
-          ) || allImages[2];
-        }
-        
-        if (!existingImages.invoiceDetails && allImages.length > 3) {
-          existingImages.invoiceDetails = allImages.find(img => 
-            img.src.includes('invoice') || 
-            img.alt?.toLowerCase().includes('invoice') ||
-            img.src.includes('1p')
-          ) || allImages[3];
-        }
-        
-        if (!existingImages.invoicePayment && allImages.length > 4) {
-          existingImages.invoicePayment = allImages.find(img => 
-            img.src.includes('payment') || 
-            img.alt?.toLowerCase().includes('payment') ||
-            img.src.includes('1q')
-          ) || allImages[4];
-        }
-      }
-
-      // Debug: Log which images were found
-      console.log('Images found:', Object.entries(existingImages).map(([key, img]) => ({
-        [key]: img ? 'Found' : 'Not found'
-      })));
-
-      // Wait for all images to fully load
-      const imageLoadPromises = Object.values(existingImages).filter(img => img).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = resolve;
-          // Fallback timeout
-          setTimeout(resolve, 2000);
+  
+      console.log('Starting image detection...');
+      
+      // Find all images on the page
+      const allImages = Array.from(document.querySelectorAll('img'));
+      console.log(`Total images found: ${allImages.length}`);
+      
+      allImages.forEach((img, index) => {
+        console.log(`Image ${index}:`, {
+          src: img.src,
+          alt: img.alt,
+          width: img.width,
+          height: img.height
         });
       });
-
-      await Promise.all(imageLoadPromises);
-      console.log('All images loaded');
-
+  
+      // Try to find specific images
+      const existingImages: { [key: string]: HTMLImageElement | null | undefined } = {
+        roster: document.querySelector('img[src*="1h.png"]') || allImages[0],
+        eventList: document.querySelector('img[src*="1k.png"]') || allImages[1], 
+        registrationDialog: document.querySelector('img[src*="1L.png"]') || allImages[2],
+        invoiceDetails: document.querySelector('img[src*="1p.png"]') || allImages[3],
+        invoicePayment: document.querySelector('img[src*="1q.png"]') || allImages[4]
+      };
+  
+      console.log('Final image detection results:');
+      Object.entries(existingImages).forEach(([key, img]) => {
+        console.log(`${key}:`, img ? `Found - ${img.src}` : 'Not found');
+      });
+  
+      // Convert images to data URLs
       const imageDataUrls: { [key: string]: string | null } = {};
       for (const [key, img] of Object.entries(existingImages)) {
         if (img) {
           try {
-            // Create a new image to ensure it's fully loaded
-            const newImg = new Image();
-            newImg.crossOrigin = 'anonymous';
+            console.log(`Processing image ${key}:`, { src: img.src, complete: img.complete });
             
-            await new Promise<void>((resolve, reject) => {
-              newImg.onload = () => resolve();
-              newImg.onerror = () => reject();
-              newImg.src = img.src;
-            });
-
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = newImg.naturalWidth || newImg.width || img.width;
-            canvas.height = newImg.naturalHeight || newImg.height || img.height;
             
-            if (ctx) {
-              ctx.drawImage(newImg, 0, 0);
-              imageDataUrls[key] = canvas.toDataURL('image/png');
-              console.log(`Successfully converted ${key} to data URL (${canvas.width}x${canvas.height})`);
-            } else {
-              throw new Error('Canvas context not available');
-            }
-
-          } catch (error: any) {
-            console.log(`Failed to convert ${key}:`, error.message);
-            // Fallback: try with original image
-            try {
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              canvas.width = img.naturalWidth || img.width || 300;
-              canvas.height = img.naturalHeight || img.height || 200;
-              if (ctx) {
-                  ctx.drawImage(img, 0, 0);
-                  imageDataUrls[key] = canvas.toDataURL('image/png');
-                  console.log(`Fallback conversion successful for ${key}`);
-              } else {
-                  throw new Error('Canvas context not available for fallback');
-              }
-            } catch (fallbackError: any) {
-              console.log(`Fallback also failed for ${key}:`, fallbackError.message);
-              imageDataUrls[key] = null;
-            }
+            const width = img.naturalWidth || img.width || 400;
+            const height = img.naturalHeight || img.height || 300;
+            
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            imageDataUrls[key] = canvas.toDataURL('image/png');
+            console.log(`✓ Successfully converted ${key} (${width}x${height})`);
+            
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            console.log(`✗ Failed to convert ${key}:`, message);
+            imageDataUrls[key] = null;
           }
         } else {
-          console.log(`No image element found for ${key}`);
+          console.log(`✗ No image element found for ${key}`);
           imageDataUrls[key] = null;
         }
       }
-
-      // Debug: Log final conversion results
-      console.log('Image conversion results:', Object.entries(imageDataUrls).map(([key, dataUrl]) => ({
-        [key]: dataUrl ? 'Converted' : 'Failed'
-      })));
-      
-      // Debug: Show which sections will have images
-      console.log('Sections with images:');
-      console.log('- Section 1 (Roster):', imageDataUrls.roster ? 'YES' : 'NO');
-      console.log('- Section 2 (Events):', (imageDataUrls.eventList || imageDataUrls.registrationDialog) ? 'YES' : 'NO'); 
-      console.log('- Section 3 (Invoices):', (imageDataUrls.invoiceDetails || imageDataUrls.invoicePayment) ? 'YES' : 'NO');
-
+  
+      // Debug output
+      const totalImagesFound = Object.values(imageDataUrls).filter(Boolean).length;
+      if (totalImagesFound === 0) {
+        console.log('⚠️ No images were found. PDF will be generated with placeholders.');
+      } else {
+        console.log(`✓ Found ${totalImagesFound} images for the PDF.`);
+      }
+  
       // Helper function to generate image HTML
       const generateImageHtml = (imageKey: string, altText: string, fallbackText: string) => {
         if (imageDataUrls[imageKey]) {
@@ -224,12 +148,12 @@ export default function QuickStartGuidePage() {
             <img src="${imageDataUrls[imageKey]}" alt="${altText}" style="width: 100%; max-width: 400px; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
           </div>`;
         } else {
-          return `<div style="text-align: center; color: #dc2626; padding: 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 12px 0; font-size: 13px;">
-            <strong>⚠️ ${fallbackText}</strong><br>Please refer to the written instructions above
+          return `<div style="text-align: center; color: #9ca3af; padding: 8px; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 4px; margin: 8px 0; font-size: 11px;">
+            📷 ${fallbackText}
           </div>`;
         }
       };
-
+  
       // Helper function to generate multi-image HTML
       const generateMultiImageHtml = (imageKeys: string[], altTexts: string[], fallbackText: string) => {
         const hasAnyImage = imageKeys.some(key => imageDataUrls[key]);
@@ -239,7 +163,7 @@ export default function QuickStartGuidePage() {
             if (imageDataUrls[key]) {
               return `<img src="${imageDataUrls[key]}" alt="${altTexts[index]}" style="width: 100%; max-width: 350px; height: auto; border-radius: 6px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">`;
             } else {
-              return `<div style="color: #6b7280; padding: 8px; font-size: 12px;">${altTexts[index]} Not Found</div>`;
+              return `<div style="color: #9ca3af; padding: 4px; font-size: 10px;">📷 ${altTexts[index]} not found</div>`;
             }
           }).join('');
           
@@ -247,16 +171,16 @@ export default function QuickStartGuidePage() {
             ${imageHtmlParts}
           </div>`;
         } else {
-          return `<div style="text-align: center; color: #dc2626; padding: 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 12px 0; font-size: 13px;">
-            <strong>⚠️ ${fallbackText}</strong><br>Please refer to the written instructions above
+          return `<div style="text-align: center; color: #9ca3af; padding: 8px; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 4px; margin: 8px 0; font-size: 11px;">
+            📷 ${fallbackText}
           </div>`;
         }
       };
-
+  
       // Create PDF
       const pdf = new jsPDF('portrait', 'pt', 'a4');
       let currentPage = 0;
-
+  
       // Helper function with better layout preservation
       const captureSection = async (htmlContent: string, isFirstSection = false) => {
         const tempContainer = document.createElement('div');
@@ -272,12 +196,10 @@ export default function QuickStartGuidePage() {
         tempContainer.style.boxSizing = 'border-box';
         
         document.body.appendChild(tempContainer);
-        
-        // Wait a moment for content to render
         await new Promise(resolve => setTimeout(resolve, 100));
         
         console.log(`Capturing section, height: ${tempContainer.scrollHeight}`);
-
+  
         const canvas = await html2canvas(tempContainer, {
           scale: 1.5,
           useCORS: false,
@@ -287,9 +209,9 @@ export default function QuickStartGuidePage() {
           width: tempContainer.scrollWidth,
           logging: false,
         });
-
+  
         document.body.removeChild(tempContainer);
-
+  
         const imgData = canvas.toDataURL('image/png');
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const margin = 40;
@@ -298,20 +220,32 @@ export default function QuickStartGuidePage() {
         const imgHeight = canvas.height;
         const ratio = contentWidth / imgWidth;
         const scaledHeight = imgHeight * ratio;
-
-        // Add new page if not the first section
+  
         if (!isFirstSection) {
           pdf.addPage();
           currentPage++;
         }
-
+  
         pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, scaledHeight);
         console.log(`Added section to page ${currentPage + 1}, scaled height: ${scaledHeight}`);
       };
-
+  
+      // Generate image HTML strings
+      const rosterImageHtml = generateImageHtml('roster', 'Team Roster page', 'Screenshot will be added here');
+  
+      const eventImagesHtml = generateMultiImageHtml(
+        ['eventList', 'registrationDialog'], 
+        ['Event registration page', 'Registration dialog'], 
+        'Screenshots will be added here'
+      );
+  
+      const invoiceImagesHtml = generateMultiImageHtml(
+        ['invoiceDetails', 'invoicePayment'], 
+        ['Invoice details', 'Invoice payment options'], 
+        'Screenshots will be added here'
+      );
+  
       // Section 1: Header + Alert + Step 1
-      const rosterImageHtml = generateImageHtml('roster', 'Team Roster page', 'Screenshot not available');
-      
       const section1Html = `
         <div>
           <h1 style="font-size: 28px; font-weight: bold; margin-bottom: 8px; color: #1f2937;">Sponsor Quick Start Guide</h1>
@@ -321,7 +255,7 @@ export default function QuickStartGuidePage() {
             <h3 style="font-weight: bold; margin: 0 0 8px 0; font-size: 16px; color: #1f2937;">First Things First: Your Roster</h3>
             <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the Roster page to get started.</p>
           </div>
-
+  
           <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #1f2937;">
             <span style="background: #dbeafe; padding: 8px; border-radius: 50%; display: inline-flex; width: 32px; height: 32px; justify-content: center; align-items: center; font-size: 14px; font-weight: bold;">1</span>
             Step 1: Managing Your Roster
@@ -342,14 +276,8 @@ export default function QuickStartGuidePage() {
         </div>
       `;
       await captureSection(section1Html, true);
-
+  
       // Section 2: Step 2
-      const eventImagesHtml = generateMultiImageHtml(
-        ['eventList', 'registrationDialog'], 
-        ['Event registration page', 'Registration dialog'], 
-        'Screenshots not available'
-      );
-      
       const section2Html = `
         <div>
           <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #1f2937;">
@@ -375,14 +303,8 @@ export default function QuickStartGuidePage() {
         </div>
       `;
       await captureSection(section2Html);
-
+  
       // Section 3: Step 3
-      const invoiceImagesHtml = generateMultiImageHtml(
-        ['invoiceDetails', 'invoicePayment'], 
-        ['Invoice details', 'Invoice payment options'], 
-        'Screenshots not available'
-      );
-      
       const section3Html = `
         <div>
           <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #1f2937;">
@@ -407,7 +329,7 @@ export default function QuickStartGuidePage() {
         </div>
       `;
       await captureSection(section3Html);
-
+  
       // Section 4: Step 4
       const section4Html = `
         <div>
@@ -430,17 +352,136 @@ export default function QuickStartGuidePage() {
         </div>
       `;
       await captureSection(section4Html);
-
+  
       pdf.save('ChessMate_Quick_Start_Guide.pdf');
       setOpenAccordionItems(originalState);
       
       console.log(`PDF completed with ${currentPage + 1} pages`);
       
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       console.error("Failed to generate PDF:", error);
-      alert(`Sorry, there was an error generating the PDF: ${error.message}`);
+      alert(`Sorry, there was an error generating the PDF: ${message}`);
     } finally {
       setIsDownloading(false);
     }
   };
+
+  return (
+    <AppLayout>
+      <div className="space-y-8" id="guide-content">
+        <div className="flex justify-between items-center no-print">
+          <div>
+            <h1 className="text-3xl font-bold font-headline">Sponsor Quick Start Guide</h1>
+            <p className="text-muted-foreground">Welcome to ChessMate! This guide will walk you through the essential steps.</p>
+          </div>
+          <Button onClick={handleDownloadPdf} disabled={isDownloading}>
+            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            {isDownloading ? 'Generating PDF...' : 'Download as PDF'}
+          </Button>
+        </div>
+
+        <Alert className="no-print">
+          <Lightbulb className="h-4 w-4" />
+          <AlertTitle>First Things First: Your Roster</AlertTitle>
+          <AlertDescription>
+            The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the <Link href="/roster" className="font-bold underline">Roster</Link> page to get started.
+          </AlertDescription>
+        </Alert>
+
+        <Accordion type="multiple" className="w-full" value={openAccordionItems} onValueChange={setOpenAccordionItems}>
+          <AccordionItem value="item-1">
+            <AccordionTrigger>
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 text-blue-800 rounded-full h-8 w-8 flex items-center justify-center font-bold">1</div>
+                Step 1: Managing Your Roster
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4">
+              <p>Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
+              <Card>
+                <CardHeader><CardTitle>Adding a Player to Your Roster</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <p><strong>1.</strong> Navigate to the <Link href="/roster" className="text-primary underline">Roster</Link> page from the sidebar. You will see your team information and a roster list.</p>
+                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1h.png?alt=media&token=e11400e9-2287-43c2-a8c6-f78a221f7ed4" alt="Team Roster page showing an empty roster and options to add players." width={800} height={450} className="rounded-md border shadow-sm" />
+                  <p><strong>2.</strong> Click <strong>Add from Database</strong> to search for existing players or <strong>Create New Player</strong> to add a student from scratch.</p>
+                  <p><strong>3.</strong> Use filters to find players by name, USCF ID, school, or district.</p>
+                  <p><strong>4.</strong> Click <strong>Select</strong> next to the correct player and fill in any missing information in the dialog that appears. The player will then be added to your roster.</p>
+                </CardContent>
+              </Card>
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="item-2">
+            <AccordionTrigger>
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 text-blue-800 rounded-full h-8 w-8 flex items-center justify-center font-bold">2</div>
+                Step 2: Registering for an Event
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4">
+              <p>Once your roster is set, you can register your selected players for any open tournament.</p>
+              <Card>
+                <CardHeader><CardTitle>Event Registration Process</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <p><strong>1.</strong> Go to the <Link href="/dashboard" className="text-primary underline">Dashboard</Link> or <Link href="/events" className="text-primary underline">Register for Event</Link> page.</p>
+                  <p><strong>2.</strong> Find an upcoming event and click the <strong>Register Students</strong> button.</p>
+                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1k.png?alt=media&token=c190209c-3081-42e5-82e1-454589d873d9" alt="Event registration page showing a list of upcoming tournaments." width={800} height={450} className="rounded-md border shadow-sm" />
+                  <p><strong>3.</strong> In the dialog that opens, select the players you wish to register for this event.</p>
+                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1L.png?alt=media&token=42e5ab71-7053-4328-9892-36c1e55bd35f" alt="Registration dialog showing a list of students to select for the tournament." width={800} height={450} className="rounded-md border shadow-sm" />
+                  <p><strong>4.</strong> Confirm their <strong>Section</strong> and <strong>USCF Status</strong>. If a player needs a new or renewed membership, select the appropriate option to add the USCF fee to the invoice.</p>
+                  <p><strong>5.</strong> Click <strong>Review Charges</strong> to see a breakdown of all fees (Registration, Late Fees, USCF Fees).</p>
+                  <p><strong>6.</strong> Click <strong>Create Invoice</strong> to finalize the registration. An invoice will be generated and you will be taken to the Invoices page to complete payment.</p>
+                </CardContent>
+              </Card>
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="item-3">
+            <AccordionTrigger>
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 text-blue-800 rounded-full h-8 w-8 flex items-center justify-center font-bold">3</div>
+                Step 3: Handling Invoices
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4">
+              <p>After registering, you can view and manage all your invoices from one place.</p>
+              <Card>
+                <CardHeader><CardTitle>Viewing and Paying Invoices</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                  <p><strong>1.</strong> Navigate to the <Link href="/invoices" className="text-primary underline">Invoices & Payments</Link> page from the sidebar.</p>
+                  <p><strong>2.</strong> You will see a list of all your invoices and their current status (Paid, Unpaid, Canceled).</p>
+                  <p><strong>3.</strong> Click <strong>Details</strong> to view a specific invoice and see registered players.</p>
+                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1p.png?alt=media&token=c190209c-3081-42e5-82e1-454589d873d9" alt="Invoice details dialog showing registered players and total amount due." width={800} height={450} className="rounded-md border shadow-sm" />
+                  <p><strong>4.</strong> For payment, click <strong>View Invoice on Square</strong> for credit card, or use offline methods (PO, Check, CashApp, Zelle).</p>
+                  <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1q.png?alt=media&token=d143c080-6927-4c4f-9e73-b7b5e40e29b1" alt="Invoice payment options, including online via Square and offline methods like PO and Check." width={800} height={450} className="rounded-md border shadow-sm" />
+                  <p><strong>5.</strong> If paying offline, select payment method, fill in details (PO/check number), upload proof, and click <strong>Submit Payment Information</strong> for review.</p>
+                </CardContent>
+              </Card>
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="item-4">
+            <AccordionTrigger>
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 text-blue-800 rounded-full h-8 w-8 flex items-center justify-center font-bold">4</div>
+                Need More Help?
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4">
+              <p>For more detailed instructions on every feature, please visit our new <Link href="/help" className="text-primary underline">Help Center</Link>.</p>
+              <Card>
+                <CardHeader><CardTitle>Additional Resources</CardTitle></CardHeader>
+                <CardContent>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li>Complete step-by-step tutorials for each feature</li>
+                    <li>Frequently asked questions and troubleshooting</li>
+                    <li>Video guides for complex processes</li>
+                    <li>Contact information for technical support</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      </div>
+    </AppLayout>
+  );
 }
