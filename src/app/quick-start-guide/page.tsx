@@ -73,7 +73,60 @@ export default function QuickStartGuidePage() {
     setOpenAccordionItems(['item-1', 'item-2', 'item-3', 'item-4']);
     await new Promise(resolve => setTimeout(resolve, 4000));
 
-    // Create PDF without touching original page images
+    // Correct Firebase Storage URLs with proper tokens
+    const imageUrls = {
+      roster: "https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/App-Images%2F1h.png?alt=media&token=d5caad84-adad-41e3-aa27-ce735ab3c6fd",
+      eventList: "https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/App-Images%2F1k.png?alt=media&token=3ae8d3de-6956-4886-980c-4af456ddf6ac",
+      registrationDialog: "https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/App-Images%2F1L.png?alt=media&token=1d074a8e-9c30-4327-9e1e-483a30988f56",
+      invoiceDetails: "https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/App-Images%2F1p.png?alt=media&token=7a9e0a18-3a9d-42a5-9bb0-e3f873815d16",
+      invoicePayment: "https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.appspot.com/o/App-Images%2F1q.png?alt=media&token=358d7596-a152-4980-89fb-152eaac99f39"
+    };
+
+    console.log('Using Firebase Storage URLs with proper tokens');
+
+    // Convert images to data URLs
+    const convertImageToDataUrl = async (url, name) => {
+      try {
+        console.log(`Loading ${name} from:`, url);
+        
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const blob = await response.blob();
+        
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (error) {
+        console.log(`Failed to convert ${name}:`, error.message);
+        return null;
+      }
+    };
+
+    // Load all images
+    console.log('Converting images to data URLs...');
+    const [rosterData, eventData, dialogData, invoiceData, paymentData] = await Promise.all([
+      convertImageToDataUrl(imageUrls.roster, 'roster'),
+      convertImageToDataUrl(imageUrls.eventList, 'eventList'),
+      convertImageToDataUrl(imageUrls.registrationDialog, 'registrationDialog'),
+      convertImageToDataUrl(imageUrls.invoiceDetails, 'invoiceDetails'),
+      convertImageToDataUrl(imageUrls.invoicePayment, 'invoicePayment')
+    ]);
+
+    console.log('Image conversion results:', {
+      roster: rosterData ? 'Success' : 'Failed',
+      event: eventData ? 'Success' : 'Failed',
+      dialog: dialogData ? 'Success' : 'Failed',
+      invoice: invoiceData ? 'Success' : 'Failed',
+      payment: paymentData ? 'Success' : 'Failed'
+    });
+
+    // Create PDF
     const pdf = new jsPDF('portrait', 'pt', 'a4');
     let currentPage = 0;
 
@@ -91,11 +144,11 @@ export default function QuickStartGuidePage() {
       tempContainer.style.boxSizing = 'border-box';
       
       document.body.appendChild(tempContainer);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const canvas = await html2canvas(tempContainer, {
         scale: 1.5,
-        useCORS: false,
+        useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         height: tempContainer.scrollHeight,
@@ -120,14 +173,25 @@ export default function QuickStartGuidePage() {
       }
 
       pdf.addImage(imgData, 'PNG', margin, margin, contentWidth, scaledHeight);
+      console.log(`Added section to page ${currentPage + 1}`);
     };
 
-    // Create placeholder image HTML for PDF sections only
-    const createPlaceholderImageHtml = (description) => {
-      return '<div style="text-align: center; color: #9ca3af; padding: 12px; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 8px; margin: 12px 0; font-size: 12px;">📷 ' + description + ' screenshot</div>';
+    // Helper function to create image HTML
+    const createImageHtml = (dataUrl, altText, placeholder) => {
+      if (dataUrl) {
+        return `<div style="border: 1px solid #d1d5db; border-radius: 8px; padding: 12px; background: white; margin: 12px 0; text-align: center;">
+          <img src="${dataUrl}" alt="${altText}" style="width: 100%; max-width: 400px; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        </div>`;
+      } else {
+        return `<div style="text-align: center; color: #9ca3af; padding: 8px; background: #f9fafb; border: 1px dashed #d1d5db; border-radius: 4px; margin: 8px 0; font-size: 11px;">
+          📷 ${placeholder}
+        </div>`;
+      }
     };
 
     // Section 1: Header + Alert + Step 1
+    const rosterImageHtml = createImageHtml(rosterData, 'Team Roster page', 'Roster screenshot here');
+    
     const section1Html = `
       <div>
         <h1 style="font-size: 28px; font-weight: bold; margin-bottom: 8px; color: #1f2937;">Sponsor Quick Start Guide</h1>
@@ -149,7 +213,7 @@ export default function QuickStartGuidePage() {
           <h3 style="font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #1f2937;">Adding a Player to Your Roster</h3>
           <p style="font-size: 13px; margin-bottom: 8px; line-height: 1.5;"><strong>1.</strong> Navigate to the <strong>Roster</strong> page from the sidebar. You will see your team information and an empty roster list.</p>
           
-          ${createPlaceholderImageHtml('Team roster page')}
+          ${rosterImageHtml}
           
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>2.</strong> Click <strong>Add from Database</strong> to search for existing players or <strong>Create New Player</strong> to add a student.</p>
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>3.</strong> Use filters to find players by name, USCF ID, school, or district.</p>
@@ -160,6 +224,9 @@ export default function QuickStartGuidePage() {
     await captureSection(section1Html, true);
 
     // Section 2: Step 2
+    const eventImageHtml = createImageHtml(eventData, 'Event registration page', 'Event screenshot here');
+    const dialogImageHtml = createImageHtml(dialogData, 'Registration dialog', 'Dialog screenshot here');
+    
     const section2Html = `
       <div>
         <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #1f2937;">
@@ -175,8 +242,8 @@ export default function QuickStartGuidePage() {
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>1.</strong> Go to the <strong>Dashboard</strong> or <strong>Register for Event</strong> page.</p>
           <p style="font-size: 13px; margin-bottom: 12px; line-height: 1.5;"><strong>2.</strong> Find an upcoming event and click the <strong>Register Students</strong> button.</p>
           
-          ${createPlaceholderImageHtml('Event registration page')}
-          ${createPlaceholderImageHtml('Registration dialog')}
+          ${eventImageHtml}
+          ${dialogImageHtml}
           
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>3.</strong> Select the players you wish to register for this event.</p>
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>4.</strong> Confirm their <strong>Section</strong> and <strong>USCF Status</strong>.</p>
@@ -188,6 +255,9 @@ export default function QuickStartGuidePage() {
     await captureSection(section2Html);
 
     // Section 3: Step 3
+    const invoiceImageHtml = createImageHtml(invoiceData, 'Invoice details', 'Invoice screenshot here');
+    const paymentImageHtml = createImageHtml(paymentData, 'Payment options', 'Payment screenshot here');
+    
     const section3Html = `
       <div>
         <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #1f2937;">
@@ -205,8 +275,8 @@ export default function QuickStartGuidePage() {
           <p style="font-size: 13px; margin-bottom: 6px; line-height: 1.5;"><strong>3.</strong> Click <strong>Details</strong> to view a specific invoice and see registered players.</p>
           <p style="font-size: 13px; margin-bottom: 12px; line-height: 1.5;"><strong>4.</strong> For payment, click <strong>View Invoice on Square</strong> for credit card, or use offline methods (PO, Check, CashApp, Zelle).</p>
           
-          ${createPlaceholderImageHtml('Invoice details page')}
-          ${createPlaceholderImageHtml('Payment options dialog')}
+          ${invoiceImageHtml}
+          ${paymentImageHtml}
           
           <p style="font-size: 13px; margin-bottom: 0; line-height: 1.5;"><strong>5.</strong> If paying offline, select payment method, fill in details (PO/check number), upload proof, and click <strong>Submit Payment Information</strong> for review.</p>
         </div>
@@ -214,7 +284,7 @@ export default function QuickStartGuidePage() {
     `;
     await captureSection(section3Html);
 
-    // Section 4: Help
+    // Section 4: Step 4
     const section4Html = `
       <div>
         <h2 style="font-size: 22px; font-weight: bold; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; color: #1f2937;">
@@ -249,162 +319,6 @@ export default function QuickStartGuidePage() {
     setIsDownloading(false);
   }
 };
+};
 
-  return (
-    <AppLayout>
-      <div className="space-y-6" id="pdf-content">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold font-headline">Sponsor Quick Start Guide</h1>
-            <p className="text-muted-foreground">Welcome to ChessMate! Here are the essential steps to get you started.</p>
-          </div>
-          <Button onClick={handleDownloadPdf} disabled={isDownloading}>
-            {isDownloading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            {isDownloading ? 'Generating PDF...' : 'Download as PDF'}
-          </Button>
-        </div>
-
-        <Alert className="page-break-avoid">
-          <Lightbulb className="h-4 w-4" />
-          <AlertTitle>First Things First: Your Roster</AlertTitle>
-          <AlertDescription>
-            The most important first step is to ensure your team roster is complete and accurate. You cannot register players for an event if their information is missing. Visit the <Link href="/roster" className="font-semibold text-primary underline">Roster page</Link> to get started.
-          </AlertDescription>
-        </Alert>
-
-        <Accordion type="multiple" defaultValue={['item-1']} value={openAccordionItems} onValueChange={setOpenAccordionItems} className="w-full space-y-4">
-          <AccordionItem value="item-1" className="border-b-0">
-            <Card className="page-break-avoid">
-              <CardHeader>
-                <AccordionTrigger className="w-full p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-blue-100 p-3 rounded-full"><Users className="h-6 w-6 text-blue-600" /></div>
-                    <div>
-                      <CardTitle>Step 1: Managing Your Roster</CardTitle>
-                      <CardDescription>Add, edit, and manage the players on your school's team.</CardDescription>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-              </CardHeader>
-              <AccordionContent>
-                <CardContent>
-                  <div className="space-y-4 text-muted-foreground">
-                    <p>Your roster is the list of all students sponsored by your school. Keeping this up-to-date is crucial for event registration.</p>
-                    <h4 className="font-semibold text-foreground">Adding a Player to Your Roster:</h4>
-                    <ol className="list-decimal list-inside space-y-2">
-                      <li>Navigate to the <Link href="/roster" className="text-primary underline">Roster</Link> page from the sidebar. You will see your team information and a list of current players.</li>
-                      <li>Click <strong>Add from Database</strong> to search for existing players in the system or <strong>Create New Player</strong> to add a student who has never played before.</li>
-                      <li>Use the filters to find players by name, USCF ID, school, or district.</li>
-                      <li>Click <strong>Select</strong> next to the correct player and fill in any missing information like grade or section. The player will now be on your roster.</li>
-                    </ol>
-                    <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1h.png?alt=media&token=c19a9097-f5df-4b77-a8a5-d86016752718" alt="Team Roster page showing a list of players with an 'Add from Database' button." width={800} height={450} className="rounded-lg border" />
-                  </div>
-                </CardContent>
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
-
-          <AccordionItem value="item-2" className="border-b-0">
-            <Card className="page-break-avoid">
-              <CardHeader>
-                <AccordionTrigger className="w-full p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-green-100 p-3 rounded-full"><Calendar className="h-6 w-6 text-green-600" /></div>
-                    <div>
-                      <CardTitle>Step 2: Registering for an Event</CardTitle>
-                      <CardDescription>Sign up your selected players for an upcoming tournament.</CardDescription>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-              </CardHeader>
-              <AccordionContent>
-                <CardContent>
-                  <div className="space-y-4 text-muted-foreground">
-                    <p>Once your roster is set, you can register your players for any open tournament.</p>
-                    <ol className="list-decimal list-inside space-y-2">
-                      <li>Go to the <Link href="/dashboard" className="text-primary underline">Dashboard</Link> or <Link href="/events" className="text-primary underline">Register for Event</Link> page.</li>
-                      <li>Find an upcoming event and click the <strong>Register Students</strong> button.</li>
-                    </ol>
-                    <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1k.png?alt=media&token=c19a9097-f5df-4b77-a8a5-d86016752718" alt="Event list showing an upcoming tournament with a 'Register Students' button." width={800} height={450} className="rounded-lg border" />
-                    <ol start={3} className="list-decimal list-inside space-y-2">
-                      <li>Select the players you wish to register for this event.</li>
-                      <li>Confirm their <strong>Section</strong> and <strong>USCF Status</strong>. If a player needs a new or renewed membership, select the appropriate option to add the USCF fee to the invoice.</li>
-                      <li>Click <strong>Review Charges</strong> to see a breakdown of fees.</li>
-                      <li>Click <strong>Create Invoice</strong> to finalize the registration. An invoice will be generated, and you'll be directed to the Invoices page.</li>
-                    </ol>
-                    <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1L.png?alt=media&token=c19a9097-f5df-4b77-a8a5-d86016752718" alt="Registration dialog showing a list of players being selected for an event." width={800} height={450} className="rounded-lg border" />
-                  </div>
-                </CardContent>
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
-
-          <AccordionItem value="item-3" className="border-b-0">
-            <Card className="page-break-avoid">
-              <CardHeader>
-                <AccordionTrigger className="w-full p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-purple-100 p-3 rounded-full"><Receipt className="h-6 w-6 text-purple-600" /></div>
-                    <div>
-                      <CardTitle>Step 3: Handling Invoices</CardTitle>
-                      <CardDescription>View, manage, and pay your registration invoices.</CardDescription>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-              </CardHeader>
-              <AccordionContent>
-                <CardContent>
-                  <div className="space-y-4 text-muted-foreground">
-                    <p>After registering, you can view and manage all your invoices from one place.</p>
-                    <ol className="list-decimal list-inside space-y-2">
-                      <li>Navigate to the <Link href="/invoices" className="text-primary underline">Invoices & Payments</Link> page.</li>
-                      <li>You will see a list of all your invoices and their status (Paid, Unpaid, Canceled).</li>
-                      <li>Click <strong>Details</strong> to view a specific invoice and its registered players.</li>
-                    </ol>
-                    <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1p.png?alt=media&token=c19a9097-f5df-4b77-a8a5-d86016752718" alt="Invoice details dialog showing registered players and total amount due." width={800} height={450} className="rounded-lg border" />
-                    <h4 className="font-semibold text-foreground pt-4">Paying an Invoice</h4>
-                    <p>There are two main ways to pay:</p>
-                    <ul className="list-disc list-inside space-y-2">
-                      <li><strong>Online (Credit Card):</strong> In the invoice details, click <strong>View Invoice on Square</strong> to pay securely online. Payments made through Square are automatically synced and will update the invoice status to "Paid".</li>
-                      <li><strong>Offline (PO, Check, etc.):</strong> In the details, select your payment method (e.g., Purchase Order), fill in the required info (like PO number), upload proof, and submit for verification.</li>
-                    </ul>
-                    <GuideImage src="https://firebasestorage.googleapis.com/v0/b/chessmate-w17oa.firebasestorage.app/o/1q.png?alt=media&token=c19a9097-f5df-4b77-a8a5-d86016752718" alt="Invoice payment options showing selections for Purchase Order, Check, CashApp, and Zelle." width={800} height={450} className="rounded-lg border" />
-                  </div>
-                </CardContent>
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
-
-          <AccordionItem value="item-4" className="border-b-0">
-            <Card className="page-break-avoid">
-              <CardHeader>
-                <AccordionTrigger className="w-full p-0">
-                  <div className="flex items-center gap-4">
-                    <div className="bg-red-100 p-3 rounded-full"><FileQuestion className="h-6 w-6 text-red-600" /></div>
-                    <div>
-                      <CardTitle>Need More Help?</CardTitle>
-                      <CardDescription>Find detailed guides and get support.</CardDescription>
-                    </div>
-                  </div>
-                </AccordionTrigger>
-              </CardHeader>
-              <AccordionContent>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    For more detailed instructions on every feature, please visit our new <Link href="/help" className="text-primary underline font-semibold">Help Center</Link>.
-                  </p>
-                </CardContent>
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
-        </Accordion>
-      </div>
-    </AppLayout>
-  );
-}
-
-    
+I will replace the existing `handleDownloadPdf` function in `src/app/quick-start-guide/page.tsx` with this new, improved version. This should finally resolve the image loading issues and make the PDF generation more reliable.
