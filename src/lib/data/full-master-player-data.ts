@@ -49,6 +49,7 @@ export type MasterPlayer = {
 // This is a placeholder for a much larger dataset.
 // In a real application, this would be fetched from a server.
 export const fullMasterPlayerData: MasterPlayer[] = [
+    { "id": "30415816", "uscfId": "30415816", "firstName": "Ira Jaya", "lastName": "Banala", "state": "TX", "regularRating": 1041, "uscfExpiration": "2027-01-31T00:00:00.000Z", "grade": "", "section": "", "email": "", "school": "", "district": "", "events": 0, "eventIds": [] },
     { "id": "80000000", "uscfId": "80000000", "firstName": "John", "lastName": "TestDoe0", "school": "", "district": "", "grade": "3rd Grade", "section": "Primary K-3", "email": "test0@example.com", "events": 0, "eventIds": [] },
     { "id": "80000001", "uscfId": "80000001", "firstName": "Jane", "lastName": "TestSmith1", "school": "", "district": "", "grade": "4th Grade", "section": "Elementary K-5", "email": "test1@example.com", "events": 0, "eventIds": [] },
     { "id": "80000002", "uscfId": "80000002", "firstName": "Peter", "lastName": "TestJones2", "school": "", "district": "", "grade": "7th Grade", "section": "Middle School K-8", "email": "test2@example.com", "events": 0, "eventIds": [] },
