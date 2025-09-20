@@ -32,14 +32,9 @@ import { MasterPlayer } from '@/lib/data/full-master-player-data';
 
 function DistrictDashboardContent() {
   console.log('🏢 DISTRICT DASHBOARD CONTENT LOADED');
-  const { profile } = useSponsorProfile();
-  const [clientReady, setClientReady] = useState(false);
+  const { profile, loading } = useSponsorProfile();
   const [districtPlayers, setDistrictPlayers] = useState<MasterPlayer[]>([]);
 
-  useEffect(() => {
-    setClientReady(true);
-  }, []);
-  
   const loadDistrictPlayers = useCallback(async () => {
     if (!profile?.district || !db) return;
     const playersQuery = query(collection(db, 'players'), where('district', '==', profile.district));
@@ -88,9 +83,9 @@ function DistrictDashboardContent() {
                     <Building className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    {clientReady ? (
+                    {loading ? <Skeleton className="h-8 w-1/2" /> : (
                         <div className="text-2xl font-bold">{districtStats.totalSchools}</div>
-                    ) : <Skeleton className="h-8 w-1/2" />}
+                    )}
                     <p className="text-xs text-muted-foreground">in {profile?.district}</p>
                 </CardContent>
             </Card>
@@ -100,9 +95,9 @@ function DistrictDashboardContent() {
                     <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    {clientReady ? (
+                    {loading ? <Skeleton className="h-8 w-1/2" /> : (
                         <div className="text-2xl font-bold">{districtStats.totalPlayers}</div>
-                    ) : <Skeleton className="h-8 w-1/2" />}
+                    )}
                     <p className="text-xs text-muted-foreground">across all schools in the district</p>
                 </CardContent>
             </Card>
@@ -113,9 +108,9 @@ function DistrictDashboardContent() {
                         <Award className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        {clientReady ? (
+                        {loading ? <Skeleton className="h-8 w-1/2" /> : (
                             <div className="text-2xl font-bold">{districtStats.totalGtPlayers}</div>
-                        ) : <Skeleton className="h-8 w-1/2" />}
+                        )}
                         <p className="text-xs text-muted-foreground">identified as Gifted & Talented</p>
                     </CardContent>
                 </Card>

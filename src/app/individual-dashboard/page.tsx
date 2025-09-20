@@ -41,20 +41,14 @@ import { IndividualGuard } from "@/components/auth-guard";
 function IndividualDashboardContent() {
   const { events } = useEvents();
   const { database: allPlayers } = useMasterDb();
-  const { profile } = useSponsorProfile();
+  const { profile, loading } = useSponsorProfile();
   const { toast } = useToast();
   
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [clientReady, setClientReady] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
   const [isAddStudentDialogOpen, setIsAddStudentDialogOpen] = useState(false);
   const [parentStudents, setParentStudents] = useState<MasterPlayer[]>([]);
-
-  useEffect(() => {
-    setClientReady(true);
-    setSelectedDate(new Date());
-  }, []);
   
   const loadParentStudents = () => {
     if (profile?.email && allPlayers.length > 0) {
@@ -151,7 +145,12 @@ function IndividualDashboardContent() {
                       <CardDescription>Highlighted dates indicate a scheduled tournament.</CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center">
-                      {clientReady ? (
+                      {loading ? (
+                        <div className="w-full flex flex-col items-center gap-4">
+                          <Skeleton className="h-[290px] w-[280px]" />
+                          <Skeleton className="h-20 w-full" />
+                        </div>
+                      ) : (
                         <>
                           <Calendar
                               mode="single"
@@ -202,23 +201,25 @@ function IndividualDashboardContent() {
                               )}
                           </div>
                         </>
-                      ) : (
-                        <div className="w-full flex flex-col items-center gap-4">
-                          <Skeleton className="h-[290px] w-[280px]" />
-                          <Skeleton className="h-20 w-full" />
-                        </div>
                       )}
                   </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>My Students ({clientReady ? parentStudents.length : '...'})</CardTitle>
+                  <CardTitle>My Students ({loading ? '...' : parentStudents.length})</CardTitle>
                   <CardDescription>A quick view of your managed students.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-96">
-                    {clientReady ? (
+                    {loading ? (
+                      <div className="space-y-4">
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                      </div>
+                    ) : (
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -248,13 +249,6 @@ function IndividualDashboardContent() {
                           ))}
                         </TableBody>
                       </Table>
-                    ) : (
-                      <div className="space-y-4">
-                          <Skeleton className="h-12 w-full" />
-                          <Skeleton className="h-12 w-full" />
-                          <Skeleton className="h-12 w-full" />
-                          <Skeleton className="h-12 w-full" />
-                      </div>
                     )}
                   </ScrollArea>
                 </CardContent>

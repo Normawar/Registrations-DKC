@@ -39,20 +39,14 @@ import { MasterPlayer } from "@/lib/data/full-master-player-data";
 
 function DashboardContent() {
   const { events } = useEvents();
-  const { profile } = useSponsorProfile();
+  const { profile, loading } = useSponsorProfile();
   
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [clientReady, setClientReady] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isRegistrationDialogOpen, setIsRegistrationDialogOpen] = useState(false);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<MasterPlayer[]>([]);
   const [allPlayers, setAllPlayers] = useState<MasterPlayer[]>([]);
-
-  useEffect(() => {
-    setClientReady(true);
-    setSelectedDate(new Date());
-  }, []);
 
   const loadDashboardData = useCallback(async () => {
     if (!db || !profile) return;
@@ -178,7 +172,12 @@ function DashboardContent() {
                       <CardDescription>Highlighted dates indicate a scheduled tournament.</CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center">
-                      {clientReady ? (
+                      {loading ? (
+                        <div className="w-full flex flex-col items-center gap-4">
+                          <Skeleton className="h-[290px] w-[280px]" />
+                          <Skeleton className="h-20 w-full" />
+                        </div>
+                      ) : (
                         <>
                           <Calendar
                               mode="single"
@@ -235,23 +234,25 @@ function DashboardContent() {
                               )}
                           </div>
                         </>
-                      ) : (
-                        <div className="w-full flex flex-col items-center gap-4">
-                          <Skeleton className="h-[290px] w-[280px]" />
-                          <Skeleton className="h-20 w-full" />
-                        </div>
                       )}
                   </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>My Roster ({clientReady ? rosterPlayers.length : '...'})</CardTitle>
+                  <CardTitle>My Roster ({loading ? '...' : rosterPlayers.length})</CardTitle>
                   <CardDescription>A quick view of your sponsored players.</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-96">
-                    {clientReady ? (
+                    {loading ? (
+                      <div className="space-y-4">
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                          <Skeleton className="h-12 w-full" />
+                      </div>
+                    ) : (
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -281,13 +282,6 @@ function DashboardContent() {
                           ))}
                         </TableBody>
                       </Table>
-                    ) : (
-                      <div className="space-y-4">
-                          <Skeleton className="h-12 w-full" />
-                          <Skeleton className="h-12 w-full" />
-                          <Skeleton className="h-12 w-full" />
-                          <Skeleton className="h-12 w-full" />
-                      </div>
                     )}
                   </ScrollArea>
                 </CardContent>
