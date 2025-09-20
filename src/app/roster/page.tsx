@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -36,6 +37,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import Papa from 'papaparse';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useRouter } from 'next/navigation';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 type DistrictSortableColumnKey = SortableColumnKey | 'gt';
@@ -199,6 +201,7 @@ function SponsorRosterView() {
 
   const { profile, isProfileLoaded } = useSponsorProfile();
   const { database, addPlayer, updatePlayer, isDbLoaded, generatePlayerId, dbDistricts, dbSchools, getSchoolsForDistrict } = useMasterDb();
+  const router = useRouter();
   
   const teamCode = profile ? generateTeamCode({ schoolName: profile.school, district: profile.district }) : null;
 
@@ -268,6 +271,14 @@ function SponsorRosterView() {
 
   const rosterPlayers = useMemo(() => {
     if (!isProfileLoaded || !isDbLoaded || !profile) return [];
+    if(profile.role === 'individual') {
+        const stored = localStorage.getItem(`parent_students_${profile.email}`);
+        if(stored) {
+            const studentIds = JSON.parse(stored);
+            return database.filter(p => studentIds.includes(p.id));
+        }
+        return [];
+    }
     return database.filter(player => player.district === profile.district && player.school === profile.school);
   }, [database, profile, isProfileLoaded, isDbLoaded]);
 
@@ -391,7 +402,17 @@ function SponsorRosterView() {
     };
     
     setPendingPlayer(playerToEdit);
-    handleEditPlayer(playerToEdit); // Use the same centralized edit handler
+    
+    if(profile?.role === 'individual' && playerToEdit.id) {
+        const key = `parent_students_${profile.email}`;
+        const currentIds = JSON.parse(localStorage.getItem(key) || '[]');
+        if(!currentIds.includes(playerToEdit.id)) {
+            localStorage.setItem(key, JSON.stringify([...currentIds, playerToEdit.id]));
+        }
+        router.push(`/players?edit=${playerToEdit.id}`);
+    } else {
+      handleEditPlayer(playerToEdit);
+    }
   };
   
   const handleRemoveFromRoster = (player: MasterPlayer) => {
@@ -401,7 +422,13 @@ function SponsorRosterView() {
   
   const confirmRemoveFromRoster = () => {
     if (playerToDelete && profile) {
-      updatePlayer({ ...playerToDelete, school: '', district: '' }, profile);
+      if(profile.role === 'individual') {
+        const key = `parent_students_${profile.email}`;
+        const currentIds = JSON.parse(localStorage.getItem(key) || '[]');
+        localStorage.setItem(key, JSON.stringify(currentIds.filter((id: string) => id !== playerToDelete.id)));
+      } else {
+        updatePlayer({ ...playerToDelete, school: '', district: '' }, profile);
+      }
       toast({ title: "Player removed", description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from your roster.` });
     }
     setIsAlertOpen(false);
@@ -611,9 +638,9 @@ function SponsorRosterView() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold font-headline">Team Roster</h1>
+          <h1 className="text-3xl font-bold font-headline">{profile?.role === 'individual' ? 'My Students' : 'Team Roster'}</h1>
           <p className="text-muted-foreground">
-            Manage your team players and their information. ({rosterPlayers.length} players)
+            Manage your {profile?.role === 'individual' ? 'students' : 'team players'} and their information. ({rosterPlayers.length} players)
           </p>
         </div>
         <div className="flex gap-2">
@@ -632,7 +659,7 @@ function SponsorRosterView() {
         </div>
       </div>
 
-      {profile && teamCode && (
+      {profile && teamCode && profile.role !== 'individual' && (
         <Alert>
           <AlertTitle>Team Information</AlertTitle>
           <AlertDescription>
@@ -646,7 +673,7 @@ function SponsorRosterView() {
       <PotentialMatchesReview />
 
       <Card>
-        <CardHeader><CardTitle>Current Roster</CardTitle><CardDescription>Players registered under your school and district</CardDescription></CardHeader>
+        <CardHeader><CardTitle>Current Roster</CardTitle><CardDescription>Players registered under your {profile?.role === 'individual' ? 'account' : 'school and district'}</CardDescription></CardHeader>
         <CardContent>
           {rosterPlayers.length === 0 ? (
             <div className="text-center py-8"><p className="text-muted-foreground">No players in your roster yet.</p></div>
@@ -784,7 +811,7 @@ function SponsorRosterView() {
                </Tabs>
                 <DialogFooter className="p-6 pt-4 border-t shrink-0">
                     <Button type="button" variant="ghost" onClick={handleCancelEdit}>Cancel</Button>
-                    <Button type="submit" form="edit-player-form">Save Player</Button>
+                    <Button type="submit" form="edit-player-form">{editingPlayer && !pendingPlayer ? 'Update Player' : 'Add to Roster'}</Button>
                 </DialogFooter>
             </DialogContent>
       </Dialog>

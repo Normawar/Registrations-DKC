@@ -35,6 +35,7 @@ import { IndividualRegistrationDialog } from "@/components/individual-registrati
 import { PlayerSearchDialog } from "@/components/PlayerSearchDialog";
 import { useToast } from "@/hooks/use-toast";
 import { IndividualGuard } from "@/components/auth-guard";
+import { useRouter } from "next/navigation";
 
 // Stable state container to prevent flickering
 class StudentDataManager {
@@ -42,6 +43,8 @@ class StudentDataManager {
   private allPlayers: MasterPlayer[] = [];
   private playersLoaded = false;
   private subscribers = new Set<() => void>();
+
+  private constructor() {} // Private constructor for singleton
 
   static getInstance() {
     if (!StudentDataManager.instance) {
@@ -51,14 +54,11 @@ class StudentDataManager {
   }
 
   setPlayers(players: MasterPlayer[]) {
-    if (this.playersLoaded && this.allPlayers.length > 0) return; // Prevent unnecessary updates
+    // Only set if not already loaded or if the underlying data has changed
+    if (this.playersLoaded && this.allPlayers.length === players.length) return;
     this.allPlayers = players;
     this.playersLoaded = true;
     this.notifySubscribers();
-  }
-
-  getPlayers() {
-    return this.allPlayers;
   }
 
   isLoaded() {
@@ -102,7 +102,7 @@ class StudentDataManager {
       if (!existingStudentIds.includes(studentId)) {
         const updatedStudentIds = [...existingStudentIds, studentId];
         localStorage.setItem(parentStudentsKey, JSON.stringify(updatedStudentIds));
-        this.notifySubscribers();
+        this.notifySubscribers(); // Notify components that data has changed
         return true;
       }
     } catch (error) {
@@ -118,6 +118,7 @@ function IndividualDashboardContent() {
   const { database: allPlayers } = useMasterDb();
   const { profile, loading: profileLoading } = useSponsorProfile();
   const { toast } = useToast();
+  const router = useRouter();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -127,34 +128,32 @@ function IndividualDashboardContent() {
   const [, forceUpdate] = useState({});
 
   const dataManager = useRef(StudentDataManager.getInstance());
-  const isInitialized = useRef(false);
 
-  // Force re-render when student data changes
-  const triggerUpdate = useCallback(() => {
-    if (profile?.email && dataManager.current.isLoaded()) {
-      const students = dataManager.current.getStudentsForParent(profile.email);
-      setParentStudents(students);
-    }
-    forceUpdate({});
+  // Effect to handle data updates from the singleton manager
+  useEffect(() => {
+    const updateStudents = () => {
+      if (profile?.email) {
+        const students = dataManager.current.getStudentsForParent(profile.email);
+        setParentStudents(students);
+      }
+      forceUpdate({}); // Force a re-render to reflect changes
+    };
+
+    const unsubscribe = dataManager.current.subscribe(updateStudents);
+    
+    // Initial load
+    updateStudents();
+    
+    return () => unsubscribe();
   }, [profile?.email]);
 
-  // Subscribe to data manager updates
+  // Initialize data manager with players from context
   useEffect(() => {
-    const unsubscribe = dataManager.current.subscribe(triggerUpdate);
-    return unsubscribe;
-  }, [triggerUpdate]);
-
-  // Initialize data manager with players from context (one-time only)
-  useEffect(() => {
-    if (allPlayers?.length > 0 && !isInitialized.current) {
+    if (allPlayers?.length > 0) {
       dataManager.current.setPlayers(allPlayers);
-      isInitialized.current = true;
-      // Trigger an initial load
-      triggerUpdate();
     }
-  }, [allPlayers, triggerUpdate]);
+  }, [allPlayers]);
 
-  // Stable memoized values
   const parentStudentIds = useMemo(() => 
     parentStudents.map(p => p.id), [parentStudents]
   );
@@ -165,27 +164,25 @@ function IndividualDashboardContent() {
     });
   }, [parentStudents]);
 
-  const upcomingEvents = useMemo(() => {
-    if (!events) return [];
-    return events
-      .filter(event => {
-        const isUpcoming = new Date(event.date) >= new Date();
-        const isTestEvent = event.name.toLowerCase().startsWith('test');
-        return isUpcoming && !event.isClosed && !isTestEvent;
-      })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const eventDates = useMemo(() => {
+    const upcoming = events?.filter(event => {
+      const isUpcoming = new Date(event.date) >= new Date();
+      const isTestEvent = event.name.toLowerCase().startsWith('test');
+      return isUpcoming && !event.isClosed && !isTestEvent;
+    }) || [];
+    return upcoming.map(event => new Date(event.date));
   }, [events]);
 
-  const eventDates = useMemo(() => {
-    return upcomingEvents.map(event => new Date(event.date));
-  }, [upcomingEvents]);
-
   const eventsForSelectedDate = useMemo(() => {
-    if (!selectedDate) return [];
-    return upcomingEvents.filter(event => isSameDay(new Date(event.date), selectedDate));
-  }, [upcomingEvents, selectedDate]);
+    if (!selectedDate || !events) return [];
+    const upcoming = events.filter(event => {
+      const isUpcoming = new Date(event.date) >= new Date();
+      const isTestEvent = event.name.toLowerCase().startsWith('test');
+      return isUpcoming && !event.isClosed && !isTestEvent;
+    });
+    return upcoming.filter(event => isSameDay(new Date(event.date), selectedDate));
+  }, [events, selectedDate]);
   
-  // Stable event handlers
   const handleRegisterClick = useCallback((event: any) => {
     setSelectedEvent(event);
     setIsRegistrationDialogOpen(true);
@@ -201,6 +198,8 @@ function IndividualDashboardContent() {
         title: "Student Added",
         description: `${newStudent.firstName} ${newStudent.lastName} has been added to your list.`
       });
+      // Redirect to edit page
+      router.push(`/players?edit=${newStudent.id}`);
     } else {
       toast({
         variant: 'destructive',
@@ -208,13 +207,12 @@ function IndividualDashboardContent() {
         description: `${newStudent.firstName} ${newStudent.lastName} is already on your list.`
       });
     }
-  }, [profile?.email, toast]);
+  }, [profile?.email, toast, router]);
 
   const handleAddStudentClick = useCallback(() => {
     setIsAddStudentDialogOpen(true);
   }, []);
 
-  // Determine loading state - only show loading if profile is loading OR we haven't loaded data yet
   const isLoading = profileLoading || !dataManager.current.isLoaded();
   const hasProfile = !!profile?.email;
 
@@ -340,18 +338,18 @@ function IndividualDashboardContent() {
                             parentStudents.map((player) => (
                               <TableRow key={player.id}>
                                 <TableCell>
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="h-9 w-9">
-                                      <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
-                                      <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <div className="font-medium">{player.lastName}, {player.firstName}</div>
-                                      <div className="text-sm text-muted-foreground">
-                                        {player.email || 'No email'}
-                                      </div>
-                                    </div>
-                                  </div>
+                                    <Link href={`/players?edit=${player.id}`} className="flex items-center gap-3 group">
+                                        <Avatar className="h-9 w-9">
+                                        <AvatarImage src={`https://placehold.co/40x40.png`} alt={`${player.firstName} ${player.lastName}`} data-ai-hint="person face" />
+                                        <AvatarFallback>{player.firstName.charAt(0)}{player.lastName.charAt(0)}</AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                        <div className="font-medium group-hover:underline">{player.lastName}, {player.firstName}</div>
+                                        <div className="text-sm text-muted-foreground">
+                                            {player.email || 'No email'}
+                                        </div>
+                                        </div>
+                                    </Link>
                                 </TableCell>
                                 <TableCell className="text-right">{player.regularRating || 'N/A'}</TableCell>
                               </TableRow>
