@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, useCallback } from 'react';
@@ -96,7 +97,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
-import { OrganizerGuard } from '@/components/auth-guard';
 import { generateTeamCode } from '@/lib/school-utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
@@ -697,28 +697,32 @@ function ManageEventsContent() {
 
     const exportedIds = new Set(downloadedPlayers[selectedEventForReg.id] || []);
 
-    const csvData = playerList.map(p => {
+    const csvData = playerList.map(({ player: p, details: reg }) => {
         let status = 'Registered';
-        if (p.details.status === 'withdrawn') {
+        if (reg.status === 'withdrawn') {
             status = 'Withdrawn';
         } else if (type === 'all') {
-            status = exportedIds.has(p.player.id) ? 'Exported' : 'Registered';
+            status = exportedIds.has(p.id) ? 'Exported' : 'Registered';
         } else if (type === 'exported') {
             status = 'Exported';
         }
 
         return {
-            "Team Code": generateTeamCode({ schoolName: p.player.school, district: p.player.district, studentType: p.player.studentType }),
-            "StudentType": p.player.studentType || 'regular',
-            "Last Name": p.player.lastName,
-            "First Name": p.player.firstName,
-            "Middle Name": p.player.middleName || '',
-            "USCF ID": p.player.uscfId,
-            "Grade": p.player.grade,
-            "Section": p.details.section,
-            "Rating": p.player.regularRating || 'UNR',
+            "Team Code": generateTeamCode({ schoolName: p.school, district: p.district, studentType: p.studentType }),
+            "StudentType": p.studentType || 'regular',
+            "Last Name": p.lastName,
+            "First Name": p.firstName,
+            "Middle Name": p.middleName || '',
+            "USCF ID": p.uscfId,
+            "USCF Status": reg.uscfStatus,
+            "Grade": p.grade,
+            "Section": reg.section,
+            "Rating": p.regularRating || 'UNR',
             "Status": status,
-            "Invoice #": p.invoiceNumber || 'N/A'
+            "Invoice #": invoicesForEvent.find(inv => inv.players.some(pl => pl.player.id === p.id))?.invoiceNumber || 'N/A',
+            "Date of Birth": p.dob ? format(new Date(p.dob), 'yyyy-MM-dd') : '',
+            "Email": p.email,
+            "Zip Code": p.zipCode,
         };
     });
 
