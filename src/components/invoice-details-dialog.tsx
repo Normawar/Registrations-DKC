@@ -142,13 +142,7 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         let uploadedFileName: string | undefined;
 
         if (uploadedFiles.length > 0) {
-            if (!storage) {
-                toast({ variant: 'destructive', title: 'Upload Failed', description: 'Firebase Storage is not configured.' });
-                setIsSubmitting(false);
-                return;
-            }
-
-            // ENHANCED AUTH CHECK - Wait for authentication to complete
+             // ENHANCED AUTH CHECK - Wait for authentication to complete
             console.log("🔐 Checking authentication before upload...");
             
             if (!auth.currentUser) {
@@ -565,22 +559,40 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
         );
       };
 
-    const PaymentSummarySection = () => (
-        <div className="mt-4">
+    const PaymentSummarySection = ({ confirmation }: { confirmation: any }) => {
+        const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
+        const totalPaid = Math.max(
+          confirmation?.paymentHistory?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0,
+          confirmation?.totalPaid || 0
+        );
+        const balanceDue = Math.max(0, totalInvoiced - totalPaid);
+      
+        return (
+          <div className="mt-4">
             <h4 className="text-md font-medium mb-2">Payment Summary</h4>
             <div className="p-3 bg-gray-50 border rounded-md space-y-2 text-sm">
-                <div className="flex justify-between"><span>Total Invoiced</span><span className="font-medium">${totalInvoiced.toFixed(2)}</span></div>
-                <div className="flex justify-between"><span>Total Paid</span><span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span></div>
-                <Separator />
-                <div className="flex justify-between text-base font-semibold"><span>Balance Due</span><span>${balanceDue.toFixed(2)}</span></div>
+              <div className="flex justify-between">
+                <span>Total Invoiced</span>
+                <span className="font-medium">${totalInvoiced.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Paid</span>
+                <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-base font-semibold">
+                <span>Balance Due</span>
+                <span>${balanceDue.toFixed(2)}</span>
+              </div>
             </div>
             {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 && (
-                <div className="mt-4">
-                    <PaymentHistoryDisplay confirmation={confirmation} />
-                </div>
+              <div className="mt-4">
+                <PaymentHistoryDisplay confirmation={confirmation} />
+              </div>
             )}
-        </div>
-    );
+          </div>
+        );
+    };
     
     const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
         const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]); const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
@@ -634,7 +646,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
           <DialogDescription className="sr-only">Dialog for viewing invoice details.</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div><div className="bg-white rounded-lg border p-4"><h3 className="text-lg font-semibold mb-4">Registration Details</h3><RegistrationDetailsSection invoice={confirmation} profile={profile} /><div className="mt-4"><h4 className="text-md font-medium mb-2">Registered Players</h4><Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>USCF ID</TableHead><TableHead className="text-right">Reg. Fee</TableHead><TableHead className="text-right">Late Fee</TableHead><TableHead className="text-right">USCF Fee</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader><TableBody>{registeredPlayers.length === 0 && (<TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No players on this invoice.</TableCell></TableRow>)}{registeredPlayers.map(player => { const playerDetails = confirmation?.selections?.[player.id]; if (!playerDetails) return null; const regFee = eventDetails?.regularFee || 0; const lateFee = (confirmation.totalInvoiced / Object.keys(confirmation.selections).length) - regFee - ((playerDetails?.uscfStatus !== 'current' && ('studentType' in player && player.studentType !== 'gt')) ? uscfFee : 0); const playerUscfFee = (playerDetails?.uscfStatus !== 'current' && ('studentType' in player && player.studentType !== 'gt')) ? uscfFee : 0; const playerTotal = regFee + lateFee + playerUscfFee; return (<TableRow key={player.id}><TableCell>{player.firstName} {player.lastName}</TableCell><TableCell>{player.uscfId}</TableCell><TableCell className="text-right">${regFee.toFixed(2)}</TableCell><TableCell className="text-right">${lateFee > 0 ? lateFee.toFixed(2) : '0.00'}</TableCell><TableCell className="text-right">${playerUscfFee.toFixed(2)}</TableCell><TableCell className="text-right font-medium">${playerTotal.toFixed(2)}</TableCell></TableRow>);})}</TableBody></Table></div><PaymentSummarySection /></div></div>
+          <div><div className="bg-white rounded-lg border p-4"><h3 className="text-lg font-semibold mb-4">Registration Details</h3><RegistrationDetailsSection invoice={confirmation} profile={profile} /><div className="mt-4"><h4 className="text-md font-medium mb-2">Registered Players</h4><Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>USCF ID</TableHead><TableHead className="text-right">Reg. Fee</TableHead><TableHead className="text-right">Late Fee</TableHead><TableHead className="text-right">USCF Fee</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader><TableBody>{registeredPlayers.length === 0 && (<TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">No players on this invoice.</TableCell></TableRow>)}{registeredPlayers.map(player => { const playerDetails = confirmation?.selections?.[player.id]; if (!playerDetails) return null; const regFee = eventDetails?.regularFee || 0; const lateFee = (confirmation.totalInvoiced / Object.keys(confirmation.selections).length) - regFee - ((playerDetails?.uscfStatus !== 'current' && ('studentType' in player && player.studentType !== 'gt')) ? uscfFee : 0); const playerUscfFee = (playerDetails?.uscfStatus !== 'current' && ('studentType' in player && player.studentType !== 'gt')) ? uscfFee : 0; const playerTotal = regFee + lateFee + playerUscfFee; return (<TableRow key={player.id}><TableCell>{player.firstName} {player.lastName}</TableCell><TableCell>{player.uscfId}</TableCell><TableCell className="text-right">${regFee.toFixed(2)}</TableCell><TableCell className="text-right">${lateFee > 0 ? lateFee.toFixed(2) : '0.00'}</TableCell><TableCell className="text-right">${playerUscfFee.toFixed(2)}</TableCell><TableCell className="text-right font-medium">${playerTotal.toFixed(2)}</TableCell></TableRow>);})}</TableBody></Table></div>
+          <PaymentSummarySection confirmation={confirmation} />
+          </div></div>
           <div><div className="bg-white rounded-lg border p-4"><h3 className="text-lg font-semibold mb-4">Submit Payment Information</h3>{profile?.role === 'sponsor' || isIndividualInvoice ? (<SponsorPaymentComponent confirmation={confirmation} onPaymentSubmitted={setConfirmation} />) : (<PaymentFormComponent invoice={confirmation} />)}</div></div>
         </div>
       </DialogContent>
