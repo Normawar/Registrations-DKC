@@ -45,11 +45,15 @@ const recordPaymentFlow = ai.defineFlow(
         throw new Error('Only organizers can record payments.');
     }
     
-    // Hard-coded Square client initialization
+    // Hard-coded Square client initialization - same as create invoice
+    console.log('Initializing Square client with hard-coded values...');
     const squareClient = new Client({
       accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
       environment: Environment.Production,
     });
+    const locationId = "CTED7GVSVH5H8"; // Same locationId as create invoice
+    console.log('Square client initialized with hard-coded production credentials');
+    
     const { paymentsApi, invoicesApi } = squareClient;
 
     try {
@@ -70,6 +74,7 @@ const recordPaymentFlow = ai.defineFlow(
             idempotencyKey: input.externalPaymentId || randomUUID(),
             amountMoney: amountMoney,
             orderId: invoice.orderId,
+            locationId: locationId, // Include the same locationId
             note: input.note,
             externalDetails: {
                 type: 'OTHER',
