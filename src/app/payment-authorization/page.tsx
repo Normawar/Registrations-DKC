@@ -123,7 +123,7 @@ function PaymentAuthorizationPageContent() {
     setPaymentDate(new Date());
     
     const paymentMethodLabel = getPaymentMethodLabel(confirmation.paymentMethod);
-    let note = paymentMethodLabel; // Default note is the payment method itself
+    let note = paymentMethodLabel;
 
     if (confirmation.paymentMethod === 'po' || confirmation.paymentMethod === 'purchase-order') {
         note = `${paymentMethodLabel}: PO #${confirmation.poNumber || 'N/A'}`;
