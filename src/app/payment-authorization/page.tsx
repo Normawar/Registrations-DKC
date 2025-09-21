@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -39,11 +38,12 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { useEvents, type Event } from '@/hooks/use-events';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { InvoiceDetailsDialog } from '@/components/invoice-details-dialog';
 
 
 type Confirmation = {
@@ -75,6 +75,8 @@ function PaymentAuthorizationPageContent() {
   const [isApproving, setIsApproving] = useState(false);
   const [selectedConfirmation, setSelectedConfirmation] = useState<Confirmation | null>(null);
   const [filter, setFilter] = useState<'real' | 'test'>('real');
+  const [viewingInvoice, setViewingInvoice] = useState<Confirmation | null>(null);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
 
 
   // State for approval dialog
@@ -88,10 +90,9 @@ function PaymentAuthorizationPageContent() {
     if (!db) return;
     try {
       const invoicesCol = collection(db, 'invoices');
-      const invoiceSnapshot = await getDocs(invoicesCol);
-      const allConfirmations: Confirmation[] = invoiceSnapshot.docs.map(doc => doc.data() as Confirmation);
-      const pending = allConfirmations.filter(c => c.paymentStatus === 'pending-po');
-      setAllPendingPayments(pending);
+      const invoiceSnapshot = await getDocs(query(invoicesCol, where('paymentStatus', '==', 'pending-po')));
+      const allConfirmations: Confirmation[] = invoiceSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as Confirmation));
+      setAllPendingPayments(allConfirmations);
     } catch (error) {
       console.error("Failed to load pending payments:", error);
       toast({
@@ -127,6 +128,11 @@ function PaymentAuthorizationPageContent() {
     }
     setPaymentNote(note);
     setIsDialogOpen(true);
+  };
+
+  const openDetailsDialog = (confirmation: Confirmation) => {
+    setViewingInvoice(confirmation);
+    setIsDetailsDialogOpen(true);
   };
   
   const handleApprovePayment = async () => {
@@ -220,6 +226,7 @@ function PaymentAuthorizationPageContent() {
                       <TableHeader>
                           <TableRow>
                               <TableHead>School</TableHead>
+                              <TableHead>Invoice #</TableHead>
                               <TableHead>Event</TableHead>
                               <TableHead>Amount</TableHead>
                               <TableHead>Method</TableHead>
@@ -231,6 +238,11 @@ function PaymentAuthorizationPageContent() {
                           {pendingPayments.map(p => (
                               <TableRow key={p.id}>
                                   <TableCell className="font-medium">{p.schoolName}</TableCell>
+                                  <TableCell>
+                                    <Button variant="link" className="p-0 h-auto font-medium" onClick={() => openDetailsDialog(p)}>
+                                        #{p.invoiceNumber}
+                                    </Button>
+                                  </TableCell>
                                   <TableCell>{p.eventName}</TableCell>
                                   <TableCell>
                                       <span className="flex items-center gap-1">
@@ -328,6 +340,11 @@ function PaymentAuthorizationPageContent() {
               </DialogFooter>
           </DialogContent>
       </Dialog>
+      <InvoiceDetailsDialog
+          isOpen={isDetailsDialogOpen}
+          onClose={() => setIsDetailsDialogOpen(false)}
+          confirmation={viewingInvoice}
+      />
     </>
   );
 }
