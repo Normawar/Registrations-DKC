@@ -142,7 +142,8 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
             }
             const file = uploadedFiles[0];
             const sanitizedConfirmationId = confirmation.id.replace(/:/g, '-');
-            const storageRef = ref(storage, `payment_proofs/${sanitizedConfirmationId}/${file.name}`);
+            // FIX: Use payment-proofs (with hyphen) to match the security rules
+            const storageRef = ref(storage, `payment-proofs/${sanitizedConfirmationId}/${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             uploadedFileUrl = await getDownloadURL(snapshot.ref);
             uploadedFileName = file.name;
@@ -569,3 +570,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
+
+    
