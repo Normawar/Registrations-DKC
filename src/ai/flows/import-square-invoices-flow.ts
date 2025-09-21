@@ -3,7 +3,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { Client, Environment, type Invoice, type Customer } from 'square';
+import { Client, Environment, type Invoice, type Customer, type Order } from 'square';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
@@ -84,7 +84,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
 
         for (const invoice of invoicesToProcess) {
             try {
-                const invoiceData = await processSingleInvoice(squareClient, invoice);
+                const invoiceData = await processSingleInvoice(squareClient, invoice, batch);
                 const q = query(collection(db, 'invoices'), where('invoiceId', '==', invoice.id));
                 const querySnapshot = await getDocs(q);
 
@@ -117,7 +117,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
 );
 
 
-async function processSingleInvoice(client: Client, invoice: Invoice) {
+async function processSingleInvoice(client: Client, invoice: Invoice, batch: FirebaseFirestore.WriteBatch) {
     if (!invoice.orderId || !invoice.primaryRecipient?.customerId) {
         throw new Error(`Invoice #${invoice.invoiceNumber} is missing order or customer ID.`);
     }
@@ -125,41 +125,12 @@ async function processSingleInvoice(client: Client, invoice: Invoice) {
     const { result: { order } } = await client.ordersApi.retrieveOrder(invoice.orderId);
     const { result: { customer } } = await client.customersApi.retrieveCustomer(invoice.primaryRecipient.customerId);
     
-    const selections: Record<string, any> = {};
-    const uscfFee = 24;
-    let baseRegistrationFee = 0;
-
-    order.lineItems?.forEach((item: any) => {
-        if (item.name?.toLowerCase().includes('registration')) {
-            baseRegistrationFee = Number(item.basePriceMoney?.amount || 0) / 100;
-            const playerNotes = item.note?.split('\n') || [];
-            playerNotes.forEach((note: string) => {
-                const match = note.match(/\d+\.\s*(.+?)\s*\((\d{8}|\w+)\)/);
-                if (match) {
-                    const [, name, uscfId] = match;
-                    selections[uscfId] = {
-                        playerName: name.trim(),
-                        section: 'Unknown', // This info isn't on the Square invoice
-                        uscfStatus: 'current', // Assume current unless USCF fee is present
-                        baseRegistrationFee,
-                    };
-                }
-            });
-        } else if (item.name?.toLowerCase().includes('uscf')) {
-            const playerNotes = item.note?.split('\n') || [];
-            playerNotes.forEach((note: string) => {
-                const match = note.match(/\d+\.\s*(.+)/);
-                if (match) {
-                    const name = match[1].trim();
-                    // Find the player in selections and update their USCF status
-                    const playerEntry = Object.entries(selections).find(([_, p]) => p.playerName === name);
-                    if (playerEntry) {
-                        selections[playerEntry[0]].uscfStatus = 'new';
-                    }
-                }
-            });
-        }
-    });
+    // Extract school and district from companyName
+    const companyParts = customer.companyName?.split(' / ');
+    const schoolName = companyParts?.[0] || customer.companyName || 'Unknown School';
+    const district = companyParts?.[1] || 'Unknown District';
+    
+    const { selections } = await parseSelectionsFromOrder(order, schoolName, district, batch);
 
     const totalInvoiced = Number(invoice.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
     
@@ -170,10 +141,6 @@ async function processSingleInvoice(client: Client, invoice: Invoice) {
     // Use nickname if available, otherwise construct from given/family name
     const purchaserName = customer.nickname || `${customer.givenName || ''} ${customer.familyName || ''}`.trim();
     
-    // Extract school and district from companyName
-    const companyParts = customer.companyName?.split(' / ');
-    const schoolName = companyParts?.[0] || customer.companyName || 'Unknown School';
-    const district = companyParts?.[1] || 'Unknown District';
 
     return {
         id: invoice.id,
@@ -197,3 +164,62 @@ async function processSingleInvoice(client: Client, invoice: Invoice) {
         type: 'event', // Mark as an event type invoice
     };
 }
+
+
+async function parseSelectionsFromOrder(order: Order, schoolName: string, district: string, batch: FirebaseFirestore.WriteBatch) {
+    const selections: Record<string, any> = {};
+    let baseRegistrationFee = 0;
+
+    if (!order.lineItems) return { selections, baseRegistrationFee };
+  
+    for (const item of order.lineItems) {
+      const itemNameLower = item.name?.toLowerCase() || '';
+      if (itemNameLower.includes('registration') || itemNameLower.includes('uscf')) {
+        
+        baseRegistrationFee = Math.max(baseRegistrationFee, Number(item.basePriceMoney?.amount || 0) / 100);
+        
+        const playerNotes = item.note?.split('\n') || [];
+        
+        for (const note of playerNotes) {
+          // Regex to capture: Name, USCF ID, Expiration Date, DOB
+          const match = note.match(/([\w\s]+)\s+(\d{8})\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
+          
+          if (match) {
+            const [, rawName, uscfId, expDate, dob] = match;
+            const nameParts = rawName.trim().split(/\s+/);
+            const lastName = nameParts[0];
+            const firstName = nameParts.slice(1).join(' ');
+
+            const newPlayer: MasterPlayer = {
+                id: uscfId,
+                uscfId: uscfId,
+                firstName: firstName,
+                lastName: lastName,
+                uscfExpiration: new Date(expDate).toISOString(),
+                dob: new Date(dob).toISOString(),
+                school: schoolName,
+                district: district,
+                email: '', 
+                grade: '', 
+                section: 'Unknown',
+                events: 1,
+                eventIds: [order.id!], 
+                createdAt: order.createdAt,
+            };
+
+            const playerRef = doc(db, 'players', uscfId);
+            batch.set(playerRef, newPlayer, { merge: true });
+
+            selections[uscfId] = {
+              playerName: `${firstName} ${lastName}`,
+              section: 'Unknown',
+              uscfStatus: 'renewing',
+              baseRegistrationFee,
+            };
+          }
+        }
+      }
+    }
+    
+    return { selections, baseRegistrationFee };
+  }
