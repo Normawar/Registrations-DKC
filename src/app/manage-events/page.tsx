@@ -101,6 +101,7 @@ import { generateTeamCode } from '@/lib/school-utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { canConsolidateGtInvoices, consolidateGtInvoices } from '@/ai/flows/consolidate-gt-invoices-flow';
+import { OrganizerGuard } from '@/components/auth-guard';
 
 const eventFormSchema = z.object({
   id: z.string().optional(),
