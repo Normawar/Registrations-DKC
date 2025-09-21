@@ -574,6 +574,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                 <Separator />
                 <div className="flex justify-between text-base font-semibold"><span>Balance Due</span><span>${balanceDue.toFixed(2)}</span></div>
             </div>
+            {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 && (
+                <div className="mt-4">
+                    <PaymentHistoryDisplay confirmation={confirmation} />
+                </div>
+            )}
         </div>
     );
     
