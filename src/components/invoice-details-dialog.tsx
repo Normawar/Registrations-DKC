@@ -142,7 +142,7 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         let uploadedFileName: string | undefined;
 
         if (uploadedFiles.length > 0) {
-             // ENHANCED AUTH CHECK - Wait for authentication to complete
+            // ENHANCED AUTH CHECK - Wait for authentication to complete
             console.log("🔐 Checking authentication before upload...");
             
             if (!auth.currentUser) {
@@ -558,6 +558,87 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
           </div>
         );
       };
+      
+    const PendingPaymentSection = () => {
+        if (confirmation?.paymentStatus !== 'pending-po') return null;
+        
+        const getPaymentMethodLabel = (method: string | undefined) => {
+            switch (method) {
+                case 'po': case 'purchase-order': return 'Purchase Order';
+                case 'check': return 'Check';
+                case 'cash-app': return 'Cash App';
+                case 'zelle': return 'Zelle';
+                default: return 'Unknown';
+            }
+        };
+
+        const handleApprove = async () => {
+            if (!confirmation?.invoiceId) return;
+            setIsUpdating(true);
+            try {
+                const result = await recordPayment({
+                    invoiceId: confirmation.invoiceId,
+                    amount: confirmation.amountPaid || confirmation.totalInvoiced,
+                    note: `Payment approved by ${profile?.firstName}. Method: ${confirmation.paymentMethod}, Ref: ${confirmation.poNumber || confirmation.checkNumber || 'N/A'}`,
+                    requestingUserRole: 'organizer'
+                });
+                
+                const updatedConf = {
+                    ...confirmation,
+                    status: result.status,
+                    invoiceStatus: result.status,
+                    totalPaid: result.totalPaid,
+                    paymentStatus: result.status.toLowerCase() === 'paid' ? 'paid' : 'unpaid'
+                };
+                
+                const invoiceRef = doc(db, 'invoices', confirmation.id);
+                await setDoc(invoiceRef, { 
+                    status: result.status, 
+                    invoiceStatus: result.status, 
+                    totalPaid: result.totalPaid,
+                    paymentStatus: result.status.toLowerCase() === 'paid' ? 'paid' : 'unpaid'
+                }, { merge: true });
+                
+                setConfirmation(updatedConf);
+                toast({ title: 'Payment Approved', description: 'The payment has been recorded in Square.' });
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Approval Failed', description: error instanceof Error ? error.message : 'Unknown error' });
+            } finally {
+                setIsUpdating(false);
+            }
+        };
+        
+        return (
+            <Card className="bg-amber-50 border-amber-300">
+                <CardHeader>
+                    <CardTitle className="text-amber-800 flex items-center gap-2"><Loader2 className="animate-spin h-5 w-5"/>Pending Payment Verification</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                    <p><strong>Method:</strong> {getPaymentMethodLabel(confirmation.paymentMethod)}</p>
+                    <p><strong>Amount Submitted:</strong> ${confirmation.amountPaid?.toFixed(2) || confirmation.totalInvoiced?.toFixed(2)}</p>
+                    {(confirmation.poNumber || confirmation.checkNumber) && (
+                        <p><strong>Reference:</strong> {confirmation.poNumber || confirmation.checkNumber}</p>
+                    )}
+                    {(confirmation.poFileUrl || confirmation.paymentFileUrl) && (
+                        <div className="flex items-center gap-2">
+                            <strong>Proof:</strong>
+                            <Button variant="link" asChild className="p-0 h-auto">
+                                <a href={confirmation.poFileUrl || confirmation.paymentFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                                    <Download className="h-4 w-4" /> View Document
+                                </a>
+                            </Button>
+                        </div>
+                    )}
+                    {profile?.role === 'organizer' && (
+                        <Button onClick={handleApprove} disabled={isUpdating} className="w-full mt-2">
+                            {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Check className="mr-2 h-4 w-4"/>}
+                            Approve & Record Payment
+                        </Button>
+                    )}
+                </CardContent>
+            </Card>
+        );
+    };
 
     const PaymentSummarySection = ({ confirmation }: { confirmation: any }) => {
         const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
@@ -586,7 +667,8 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
               </div>
             </div>
             
-            {/* Always show payment history section */}
+            <PendingPaymentSection />
+            
             <div className="mt-4">
               <h4 className="text-md font-medium mb-2">Payment History</h4>
               {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 ? (
@@ -662,5 +744,6 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
+
 
     
