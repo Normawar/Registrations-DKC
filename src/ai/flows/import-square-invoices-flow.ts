@@ -167,6 +167,14 @@ async function processSingleInvoice(client: Client, invoice: Invoice) {
     const titleParts = invoice.title?.split('@');
     const eventName = titleParts?.length === 2 ? titleParts[1].trim().split(' ').slice(1).join(' ') : invoice.title;
 
+    // Use nickname if available, otherwise construct from given/family name
+    const purchaserName = customer.nickname || `${customer.givenName || ''} ${customer.familyName || ''}`.trim();
+    
+    // Extract school and district from companyName
+    const companyParts = customer.companyName?.split(' / ');
+    const schoolName = companyParts?.[0] || customer.companyName || 'Unknown School';
+    const district = companyParts?.[1] || 'Unknown District';
+
     return {
         id: invoice.id,
         invoiceId: invoice.id,
@@ -181,11 +189,11 @@ async function processSingleInvoice(client: Client, invoice: Invoice) {
         invoiceUrl: invoice.publicUrl,
         invoiceStatus: invoice.status,
         status: invoice.status,
-        purchaserName: customer.nickname || `${customer.givenName} ${customer.familyName}`,
-        schoolName: customer.companyName?.split(' / ')[0] || customer.companyName,
+        purchaserName: purchaserName,
+        schoolName: schoolName,
         sponsorEmail: customer.emailAddress,
-        district: customer.companyName?.split(' / ')[1] || 'Unknown',
-        teamCode: generateTeamCode({ schoolName: customer.companyName, district: customer.companyName?.split(' / ')[1] }),
+        district: district,
+        teamCode: generateTeamCode({ schoolName: schoolName, district: district }),
         type: 'event', // Mark as an event type invoice
     };
 }
