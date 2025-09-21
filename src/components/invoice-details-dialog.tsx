@@ -141,7 +141,7 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
                 return;
             }
             const file = uploadedFiles[0];
-            const storageRef = ref(storage, `payment_proof/${confirmation.id}/${file.name}`);
+            const storageRef = ref(storage, `payment_proofs/${confirmation.id}/${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             uploadedFileUrl = await getDownloadURL(snapshot.ref);
             uploadedFileName = file.name;
@@ -568,5 +568,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
-
-    
