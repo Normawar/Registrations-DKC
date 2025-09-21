@@ -3,12 +3,12 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { getSquareClient, getSquareLocationId } from '@/lib/square-client';
+import { Client, Environment, type Invoice, type Customer } from 'square';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
 import { type MasterPlayer } from '@/lib/data/full-master-player-data';
-import type { Invoice, Order, Customer } from 'square';
+
 
 const ImportSquareInvoicesInputSchema = z.object({
   startInvoiceNumber: z.number().describe('The invoice number to start importing from.'),
@@ -39,8 +39,14 @@ const importSquareInvoicesFlow = ai.defineFlow(
       return { created: 0, updated: 0, failed: 1, errors: ['Firestore is not initialized.'] };
     }
 
-    const squareClient = await getSquareClient();
-    const locationId = await getSquareLocationId();
+    // Hard-coded Square client initialization - same as other flows
+    console.log('Initializing Square client with hard-coded values...');
+    const squareClient = new Client({
+      accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
+      environment: Environment.Production,
+    });
+    const locationId = "CTED7GVSVH5H8"; // Same locationId as other flows
+    console.log('Square client initialized with hard-coded production credentials');
     
     let createdCount = 0;
     let updatedCount = 0;
@@ -110,7 +116,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
 );
 
 
-async function processSingleInvoice(client: any, invoice: Invoice) {
+async function processSingleInvoice(client: Client, invoice: Invoice) {
     if (!invoice.orderId || !invoice.primaryRecipient?.customerId) {
         throw new Error(`Invoice #${invoice.invoiceNumber} is missing order or customer ID.`);
     }
