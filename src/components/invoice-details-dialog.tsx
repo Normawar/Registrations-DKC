@@ -585,11 +585,18 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                 <span>${balanceDue.toFixed(2)}</span>
               </div>
             </div>
-            {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 && (
-              <div className="mt-4">
+            
+            {/* Always show payment history section */}
+            <div className="mt-4">
+              <h4 className="text-md font-medium mb-2">Payment History</h4>
+              {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 ? (
                 <PaymentHistoryDisplay confirmation={confirmation} />
-              </div>
-            )}
+              ) : (
+                <div className="p-3 bg-gray-50 border rounded-md text-sm text-gray-600 text-center">
+                  No payments recorded yet
+                </div>
+              )}
+            </div>
           </div>
         );
     };
@@ -655,3 +662,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
+
+    
