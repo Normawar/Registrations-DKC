@@ -126,9 +126,12 @@ async function processSingleInvoice(client: Client, invoice: Invoice) {
     const { result: { customer } } = await client.customersApi.retrieveCustomer(invoice.primaryRecipient.customerId);
     
     const selections: Record<string, any> = {};
+    const uscfFee = 24;
+    let baseRegistrationFee = 0;
 
     order.lineItems?.forEach((item: any) => {
         if (item.name?.toLowerCase().includes('registration')) {
+            baseRegistrationFee = Number(item.basePriceMoney?.amount || 0) / 100;
             const playerNotes = item.note?.split('\n') || [];
             playerNotes.forEach((note: string) => {
                 const match = note.match(/\d+\.\s*(.+?)\s*\((\d{8}|\w+)\)/);
@@ -137,14 +140,32 @@ async function processSingleInvoice(client: Client, invoice: Invoice) {
                     selections[uscfId] = {
                         playerName: name.trim(),
                         section: 'Unknown', // This info isn't on the Square invoice
-                        uscfStatus: 'current', // Assume current, can't know for sure
+                        uscfStatus: 'current', // Assume current unless USCF fee is present
+                        baseRegistrationFee,
                     };
+                }
+            });
+        } else if (item.name?.toLowerCase().includes('uscf')) {
+            const playerNotes = item.note?.split('\n') || [];
+            playerNotes.forEach((note: string) => {
+                const match = note.match(/\d+\.\s*(.+)/);
+                if (match) {
+                    const name = match[1].trim();
+                    // Find the player in selections and update their USCF status
+                    const playerEntry = Object.entries(selections).find(([_, p]) => p.playerName === name);
+                    if (playerEntry) {
+                        selections[playerEntry[0]].uscfStatus = 'new';
+                    }
                 }
             });
         }
     });
 
-    const totalInvoiced = Number(invoice.paymentRequests?.[0]?.totalCompletedAmountMoney?.amount || 0) / 100;
+    const totalInvoiced = Number(invoice.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
+    
+    // Extract event name from title (e.g., "TEAMCODE @ DATE EVENT NAME")
+    const titleParts = invoice.title?.split('@');
+    const eventName = titleParts?.length === 2 ? titleParts[1].trim().split(' ').slice(1).join(' ') : invoice.title;
 
     return {
         id: invoice.id,
@@ -153,16 +174,18 @@ async function processSingleInvoice(client: Client, invoice: Invoice) {
         invoiceTitle: invoice.title,
         submissionTimestamp: invoice.createdAt,
         eventDate: invoice.createdAt, // Best guess from invoice creation
-        eventName: invoice.title,
+        eventName: eventName,
         selections,
         totalInvoiced: totalInvoiced,
+        totalAmount: totalInvoiced, // Make sure totalAmount is also set
         invoiceUrl: invoice.publicUrl,
         invoiceStatus: invoice.status,
         status: invoice.status,
-        purchaserName: `${customer.givenName} ${customer.familyName}`,
-        schoolName: customer.companyName,
+        purchaserName: customer.nickname || `${customer.givenName} ${customer.familyName}`,
+        schoolName: customer.companyName?.split(' / ')[0] || customer.companyName,
         sponsorEmail: customer.emailAddress,
         district: customer.companyName?.split(' / ')[1] || 'Unknown',
         teamCode: generateTeamCode({ schoolName: customer.companyName, district: customer.companyName?.split(' / ')[1] }),
+        type: 'event', // Mark as an event type invoice
     };
 }
