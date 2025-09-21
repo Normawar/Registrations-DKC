@@ -3,7 +3,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { Client, Environment, type Invoice, type Customer, type Order } from 'square';
+import { Client, Environment, type Invoice, type Order, type Customer } from 'square';
 import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { generateTeamCode } from '@/lib/school-utils';
@@ -52,10 +52,6 @@ const importSquareInvoicesFlow = ai.defineFlow(
     let updatedCount = 0;
     let failedCount = 0;
     const errors: string[] = [];
-
-    // The Square API doesn't allow searching by invoice number range directly.
-    // We search a broad range of invoices by date and then filter.
-    // This is not ideal but is a limitation of the API. We'll list invoices and then filter.
     
     try {
         console.log('Fetching all invoices from Square. This might take a moment...');
@@ -181,8 +177,6 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
         const playerNotes = item.note?.split('\n') || [];
         
         for (const note of playerNotes) {
-          // Regex to capture: Name, USCF ID, Expiration Date, DOB
-          // This is now more flexible, allowing for missing parts.
           const match = note.match(/(?:[0-9]+\.\s*)?([\w\s',\.-]+?)\s+\((\d{8})\)/);
           
           if (match) {
@@ -191,13 +185,11 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
             const lastName = nameParts.length > 1 ? nameParts.pop() : rawName.trim();
             const firstName = nameParts.join(' ');
 
-            const newPlayer: MasterPlayer = {
+            const newPlayer: Partial<MasterPlayer> = {
                 id: uscfId,
                 uscfId: uscfId,
                 firstName: firstName,
                 lastName: lastName!,
-                uscfExpiration: undefined,
-                dob: undefined,
                 school: schoolName,
                 district: district,
                 email: '', 
@@ -207,6 +199,19 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
                 eventIds: [order.id!], 
                 createdAt: order.createdAt,
             };
+
+            // Only add expiration and dob if they are valid
+            // (Note: The current regex does not capture these, so this is a safe guard)
+            if (newPlayer.uscfExpiration) {
+              // Assuming a date format, add validation if needed
+            } else {
+              delete newPlayer.uscfExpiration;
+            }
+            if (newPlayer.dob) {
+              // Assuming a date format, add validation if needed
+            } else {
+              delete newPlayer.dob;
+            }
 
             const playerRef = doc(db, 'players', uscfId);
             batch.set(playerRef, newPlayer, { merge: true });
