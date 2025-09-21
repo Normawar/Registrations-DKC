@@ -53,12 +53,34 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
   const [fileUrls, setFileUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   
   // Payment method specific fields
   const [paymentAmount, setPaymentAmount] = useState('');
   const [poNumber, setPoNumber] = useState('');
   const [checkNumber, setCheckNumber] = useState('');
   const [payByCheckAtTournament, setPayByCheckAtTournament] = useState(false);
+
+  useEffect(() => {
+    if (!auth || !storage) {
+        setAuthError("Firebase is not configured, so file uploads are disabled.");
+        setIsAuthReady(true); // Still allow form to be used, but uploads will fail gracefully
+        return;
+    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+            setIsAuthReady(true);
+            setAuthError(null);
+        } else {
+            signInAnonymously(auth).catch((error) => {
+                console.error("Anonymous sign-in failed:", error);
+                setAuthError("Authentication error. File uploads are disabled.");
+            });
+        }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -107,6 +129,17 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         let uploadedFileName: string | undefined;
 
         if (uploadedFiles.length > 0) {
+            if (!isAuthReady) {
+                const message = authError || "Authentication is not ready. Cannot upload files.";
+                toast({ variant: 'destructive', title: 'Upload Failed', description: message });
+                setIsSubmitting(false);
+                return;
+            }
+            if (!storage) {
+                toast({ variant: 'destructive', title: 'Upload Failed', description: 'Firebase Storage is not configured.' });
+                setIsSubmitting(false);
+                return;
+            }
             const file = uploadedFiles[0];
             const storageRef = ref(storage, `payment_proof/${confirmation.id}/${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
@@ -158,6 +191,8 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         setIsSubmitting(false);
     }
   };
+  
+  const isSubmitDisabled = isSubmitting || !isAuthReady || !selectedPaymentMethod || !paymentAmount;
 
   return (
     <div className="space-y-6">
@@ -256,11 +291,17 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
               </div>
             </div>
           )}
+          {authError && (
+              <Alert variant="destructive" className="mt-4">
+                  <AlertTitle>Uploads Disabled</AlertTitle>
+                  <AlertDescription>{authError}</AlertDescription>
+              </Alert>
+          )}
           <div className="space-y-3 mt-4">
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-sm text-amber-800 font-medium">📋 Review & Approval Process</p><p className="text-xs text-amber-700 mt-1">All payment submissions will be reviewed and approved by the Tournament Organizer. You will receive confirmation once your payment is verified.</p></div>
-            <Button onClick={handleSubmitProof} disabled={isSubmitting || !selectedPaymentMethod || !paymentAmount} className="w-full">
-              {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Submit Payment Information
+            <Button onClick={handleSubmitProof} disabled={isSubmitDisabled} className="w-full">
+              {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : !isAuthReady ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {isSubmitting ? 'Submitting...' : !isAuthReady ? 'Authenticating...' : 'Submit Payment Information'}
             </Button>
           </div>
         </div>
@@ -527,3 +568,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
+
+    
