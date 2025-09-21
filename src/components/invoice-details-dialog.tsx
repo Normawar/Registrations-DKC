@@ -565,20 +565,96 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
         );
       };
       
+    const getPaymentMethodLabel = (method: string | undefined) => {
+        // Normalize the method to lowercase for comparison
+        const normalizedMethod = method?.toLowerCase();
+        
+        switch (normalizedMethod) {
+            case 'po':
+            case 'purchase-order':
+            case 'purchaseorder':
+            case 'purchase_order':
+                 return 'Purchase Order';
+            case 'check':
+            case 'checks':
+            case 'bank-check':
+            case 'bankcheck':
+            case 'bank_check':
+                 return 'Check';
+            case 'cash-app':
+            case 'cashapp':
+            case 'cash_app':
+            case '$cashtag':
+            case 'cashtag':
+                 return 'Cash App';
+            case 'zelle':
+            case 'zell':
+            case 'zellepay':
+            case 'zelle-pay':
+            case 'zelle_pay':
+                 return 'Zelle';
+            case 'cash':
+            case 'currency':
+            case 'bills':
+            case 'paper-money':
+            case 'cash-payment':
+                 return 'Cash';
+            case 'credit-card':
+            case 'creditcard':
+            case 'credit_card':
+            case 'cc':
+            case 'card':
+                 return 'Credit Card';
+            case 'debit-card':
+            case 'debitcard':
+            case 'debit_card':
+            case 'debit':
+                 return 'Debit Card';
+            case 'venmo':
+            case 'ven-mo':
+            case 'paypal-venmo':
+                 return 'Venmo';
+            case 'paypal':
+            case 'pay-pal':
+            case 'pay_pal':
+            case 'pp':
+                 return 'PayPal';
+            case 'wire-transfer':
+            case 'wiretransfer':
+            case 'wire_transfer':
+            case 'wire':
+            case 'bank-wire':
+            case 'bankwire':
+            case 'bank_wire':
+                 return 'Wire Transfer';
+            case 'ach':
+            case 'ach-transfer':
+            case 'ach_transfer':
+            case 'electronic-transfer':
+            case 'e-transfer':
+                 return 'ACH Transfer';
+            case 'money-order':
+            case 'moneyorder':
+            case 'money_order':
+            case 'mo':
+                 return 'Money Order';
+            case 'apple-pay':
+            case 'applepay':
+            case 'apple_pay':
+                 return 'Apple Pay';
+            case 'google-pay':
+            case 'googlepay':
+            case 'google_pay':
+            case 'gpay':
+                 return 'Google Pay';
+            default: 
+                 return 'Unknown';
+        }
+    };
+
     const PendingPaymentSection = () => {
         if (confirmation?.paymentStatus !== 'pending-po') return null;
         
-        const getPaymentMethodLabel = (method: string | undefined) => {
-            switch (method) {
-                case 'po':
-                case 'purchase-order': return 'Purchase Order';
-                case 'check': return 'Check';
-                case 'cash-app': case 'cashapp': return 'Cash App';
-                case 'zelle': return 'Zelle';
-                default: return method || 'Unknown';
-            }
-        };
-
         const handleApprove = async () => {
             if (!confirmation?.invoiceId) return;
             setIsUpdating(true);
@@ -652,49 +728,49 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     };
 
     const PaymentSummarySection = ({ confirmation }: { confirmation: any }) => {
-      if (!confirmation) return null;
-    
-      const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
-      const totalPaid = Math.max(
-        (confirmation?.paymentHistory?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0),
-        confirmation?.totalPaid || 0
-      );
-      const balanceDue = Math.max(0, totalInvoiced - totalPaid);
-    
-      return (
-        <div className="mt-4">
-          <h4 className="text-md font-medium mb-2">Payment Summary</h4>
-          <div className="p-3 bg-gray-50 border rounded-md space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Total Invoiced</span>
-              <span className="font-medium">${totalInvoiced.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Total Paid</span>
-              <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between text-base font-semibold">
-              <span>Balance Due</span>
-              <span>${balanceDue.toFixed(2)}</span>
-            </div>
-          </div>
-          
-          <PendingPaymentSection />
-          
+        if (!confirmation) return null;
+      
+        const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
+        const totalPaid = Math.max(
+          (confirmation?.paymentHistory?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0),
+          confirmation?.totalPaid || 0
+        );
+        const balanceDue = Math.max(0, totalInvoiced - totalPaid);
+      
+        return (
           <div className="mt-4">
-            <h4 className="text-md font-medium mb-2">Payment History</h4>
-            {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 ? (
-              <PaymentHistoryDisplay confirmation={confirmation} />
-            ) : (
-              <div className="p-3 bg-gray-50 border rounded-md text-sm text-gray-600 text-center">
-                No payments recorded yet
+            <h4 className="text-md font-medium mb-2">Payment Summary</h4>
+            <div className="p-3 bg-gray-50 border rounded-md space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Total Invoiced</span>
+                <span className="font-medium">${totalInvoiced.toFixed(2)}</span>
               </div>
-            )}
+              <div className="flex justify-between">
+                <span>Total Paid</span>
+                <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between text-base font-semibold">
+                <span>Balance Due</span>
+                <span>${balanceDue.toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <PendingPaymentSection />
+            
+            <div className="mt-4">
+              <h4 className="text-md font-medium mb-2">Payment History</h4>
+              {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 ? (
+                <PaymentHistoryDisplay confirmation={confirmation} />
+              ) : (
+                <div className="p-3 bg-gray-50 border rounded-md text-sm text-gray-600 text-center">
+                  No payments recorded yet
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      );
-    };
+        );
+      };
     
     const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
         const [localSelectedMethods, setLocalSelectedMethods] = useState<string[]>([]); const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
@@ -757,3 +833,5 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
+
+    

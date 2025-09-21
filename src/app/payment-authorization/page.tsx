@@ -123,7 +123,7 @@ function PaymentAuthorizationPageContent() {
     setPaymentDate(new Date());
     
     const paymentMethodLabel = getPaymentMethodLabel(confirmation.paymentMethod);
-    let note = paymentMethodLabel; // Default note is the payment method itself
+    let note = paymentMethodLabel; 
 
     if (confirmation.paymentMethod === 'po' || confirmation.paymentMethod === 'purchase-order') {
         note = `${paymentMethodLabel}: PO #${confirmation.poNumber || 'N/A'}`;
@@ -181,15 +181,89 @@ function PaymentAuthorizationPageContent() {
   };
 
   const getPaymentMethodLabel = (method: string | undefined) => {
-    switch (method) {
+    // Normalize the method to lowercase for comparison
+    const normalizedMethod = method?.toLowerCase();
+    
+    switch (normalizedMethod) {
         case 'po':
         case 'purchase-order':
+        case 'purchaseorder':
+        case 'purchase_order':
              return 'Purchase Order';
-        case 'check': return 'Check';
-        case 'cash-app': return 'Cash App';
-        case 'zelle': return 'Zelle';
-        case 'cash': return 'Cash';
-        default: return 'Unknown';
+        case 'check':
+        case 'checks':
+        case 'bank-check':
+        case 'bankcheck':
+        case 'bank_check':
+             return 'Check';
+        case 'cash-app':
+        case 'cashapp':
+        case 'cash_app':
+        case '$cashtag':
+        case 'cashtag':
+             return 'Cash App';
+        case 'zelle':
+        case 'zell':
+        case 'zellepay':
+        case 'zelle-pay':
+        case 'zelle_pay':
+             return 'Zelle';
+        case 'cash':
+        case 'currency':
+        case 'bills':
+        case 'paper-money':
+        case 'cash-payment':
+             return 'Cash';
+        case 'credit-card':
+        case 'creditcard':
+        case 'credit_card':
+        case 'cc':
+        case 'card':
+             return 'Credit Card';
+        case 'debit-card':
+        case 'debitcard':
+        case 'debit_card':
+        case 'debit':
+             return 'Debit Card';
+        case 'venmo':
+        case 'ven-mo':
+        case 'paypal-venmo':
+             return 'Venmo';
+        case 'paypal':
+        case 'pay-pal':
+        case 'pay_pal':
+        case 'pp':
+             return 'PayPal';
+        case 'wire-transfer':
+        case 'wiretransfer':
+        case 'wire_transfer':
+        case 'wire':
+        case 'bank-wire':
+        case 'bankwire':
+        case 'bank_wire':
+             return 'Wire Transfer';
+        case 'ach':
+        case 'ach-transfer':
+        case 'ach_transfer':
+        case 'electronic-transfer':
+        case 'e-transfer':
+             return 'ACH Transfer';
+        case 'money-order':
+        case 'moneyorder':
+        case 'money_order':
+        case 'mo':
+             return 'Money Order';
+        case 'apple-pay':
+        case 'applepay':
+        case 'apple_pay':
+             return 'Apple Pay';
+        case 'google-pay':
+        case 'googlepay':
+        case 'google_pay':
+        case 'gpay':
+             return 'Google Pay';
+        default: 
+             return 'Unknown';
     }
   };
 
@@ -361,3 +435,5 @@ export default function GuardedPaymentAuthorizationPage() {
         </OrganizerGuard>
     )
 }
+
+    
