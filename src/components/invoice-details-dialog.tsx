@@ -141,7 +141,8 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
                 return;
             }
             const file = uploadedFiles[0];
-            const storageRef = ref(storage, `payment_proofs/${confirmation.id}/${file.name}`);
+            const sanitizedConfirmationId = confirmation.id.replace(/:/g, '_');
+            const storageRef = ref(storage, `payment_proofs/${sanitizedConfirmationId}/${file.name}`);
             const snapshot = await uploadBytes(storageRef, file);
             uploadedFileUrl = await getDownloadURL(snapshot.ref);
             uploadedFileName = file.name;
@@ -234,7 +235,7 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
             <AccordionContent className="space-y-4">
                 <div className="flex flex-col sm:flex-row gap-4 items-center">
                     <div>
-                        <p className="text-sm text-gray-600">Scan the QR code and enter the total amount due, or use the cash app code below. Upload a screenshot of the confirmation.</p>
+                        <p className="text-sm text-gray-600">Scan the QR code or use the cash app code below and enter the total amount due. Upload a screenshot of the confirmation.</p>
                         <p className="font-bold text-lg mt-1">$DKChess</p>
                     </div>
                     <div className="text-center">
