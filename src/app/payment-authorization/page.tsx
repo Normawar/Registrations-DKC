@@ -122,9 +122,9 @@ function PaymentAuthorizationPageContent() {
     setPaymentDate(new Date());
     let note = '';
     if (confirmation.paymentMethod === 'po' || confirmation.paymentMethod === 'purchase-order') {
-        note = `PO: ${confirmation.poNumber || 'N/A'}`;
+        note = `PO #: ${confirmation.poNumber || 'N/A'}`;
     } else if (confirmation.paymentMethod === 'check') {
-        note = `Check: ${confirmation.checkNumber || 'N/A'}`;
+        note = `Check #: ${confirmation.checkNumber || 'N/A'}`;
     }
     setPaymentNote(note);
     setIsDialogOpen(true);
@@ -302,7 +302,7 @@ function PaymentAuthorizationPageContent() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent>
               <DialogHeader>
-                  <DialogTitle>Record Payment & Approve</DialogTitle>
+                  <DialogTitle>Record Payment &amp; Approve</DialogTitle>
                   <DialogDescription>
                     Confirm the payment details to be recorded on the Square invoice. This will mark the invoice as paid.
                   </DialogDescription>
