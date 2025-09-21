@@ -33,6 +33,7 @@ import { useRouter } from 'next/navigation';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const getStudentBreakdown = (invoice: any) => {
     if (!invoice.selections) return '0';
@@ -53,9 +54,13 @@ const getStudentBreakdown = (invoice: any) => {
     return `${totalCount}`;
 };
 
+const STATUSES = ['PAID', 'UNPAID', 'PARTIALLY_PAID', 'COMPED', 'PENDING-PO', 'CANCELED'] as const;
+type Status = typeof STATUSES[number];
+
+
 export default function UnifiedInvoiceRegistrations() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState<Status[]>(['PAID', 'UNPAID', 'PARTIALLY_PAID', 'PENDING-PO']);
   const [sortField, setSortField] = useState<string>('submissionTimestamp');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
@@ -78,6 +83,7 @@ export default function UnifiedInvoiceRegistrations() {
   const { database: allPlayers, dbSchools, dbDistricts, isDbLoaded } = useMasterDb();
   const [districtFilter, setDistrictFilter] = useState('all');
   const [schoolFilter, setSchoolFilter] = useState('all');
+  const [eventFilter, setEventFilter] = useState('all');
   const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
   const [playerTypeFilter, setPlayerTypeFilter] = useState('all');
 
@@ -126,7 +132,6 @@ export default function UnifiedInvoiceRegistrations() {
         const invoicesArray = invoiceSnapshot.docs
             .map(doc => ({ id: doc.id, ...doc.data() }))
             .filter(invoice => 
-                invoice.status !== 'CANCELED' && 
                 invoice.invoiceNumber !== 'MOCK_INV'
             ); 
 
@@ -183,6 +188,11 @@ export default function UnifiedInvoiceRegistrations() {
     return sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
   };
 
+  const uniqueEvents = useMemo(() => {
+    const eventNames = new Set(data.map(item => item.eventName).filter(Boolean));
+    return Array.from(eventNames).sort();
+  }, [data]);
+
   const filteredAndSortedData = useMemo(() => {
     const filtered = data.filter((item: any) => {
         const lowerSearchTerm = searchTerm.toLowerCase();
@@ -197,9 +207,10 @@ export default function UnifiedInvoiceRegistrations() {
                 (reg.lastName || '').toLowerCase().includes(lowerSearchTerm)
             ));
 
-        const matchesStatus = statusFilter === 'all' || (item.status && item.status.toUpperCase() === statusFilter.toUpperCase());
+        const matchesStatus = statusFilter.length === 0 || statusFilter.includes((item.status || 'UNKNOWN').toUpperCase() as Status);
         const matchesDistrict = districtFilter === 'all' || (item.district === districtFilter);
         const matchesSchool = schoolFilter === 'all' || (item.companyName === schoolFilter);
+        const matchesEvent = eventFilter === 'all' || (item.eventName === eventFilter);
 
         let matchesPlayerType = true;
         if (playerTypeFilter !== 'all') {
@@ -210,7 +221,7 @@ export default function UnifiedInvoiceRegistrations() {
             }
         }
 
-        return matchesSearch && matchesStatus && matchesDistrict && matchesSchool && matchesPlayerType;
+        return matchesSearch && matchesStatus && matchesDistrict && matchesSchool && matchesEvent && matchesPlayerType;
     });
 
     return filtered.sort((a: any, b: any) => {
@@ -235,7 +246,7 @@ export default function UnifiedInvoiceRegistrations() {
       if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [data, searchTerm, statusFilter, sortField, sortDirection, districtFilter, schoolFilter, playerTypeFilter]);
+  }, [data, searchTerm, statusFilter, sortField, sortDirection, districtFilter, schoolFilter, eventFilter, playerTypeFilter]);
 
   const playerCounts = useMemo(() => {
     let allPlayersInFilteredInvoices = new Set<string>();
@@ -412,6 +423,15 @@ export default function UnifiedInvoiceRegistrations() {
 
     return { gtInvoiced, indInvoiced };
   }, [filteredAndSortedData]);
+  
+  const handleStatusFilterChange = (status: Status, checked: boolean | 'indeterminate') => {
+    if (checked) {
+      setStatusFilter(prev => [...prev, status]);
+    } else {
+      setStatusFilter(prev => prev.filter(s => s !== status));
+    }
+  };
+
 
   return (
     <AppLayout>
@@ -519,27 +539,22 @@ export default function UnifiedInvoiceRegistrations() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
+                    <Label>Event</Label>
+                    <Select value={eventFilter} onValueChange={setEventFilter}>
+                      <SelectTrigger><SelectValue placeholder="Filter by event" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Events</SelectItem>
+                        {uniqueEvents.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                </div>
+                <div>
                     <Label>Search</Label>
                     <Input
-                      placeholder="Search by invoice #, school, event, student..."
+                      placeholder="Search by invoice #, school, student..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
-                </div>
-                <div>
-                    <Label>Status</Label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger><SelectValue placeholder="Filter by status" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="PAID">Paid</SelectItem>
-                        <SelectItem value="PARTIALLY_PAID">Partially Paid</SelectItem>
-                        <SelectItem value="UNPAID">Unpaid</SelectItem>
-                        <SelectItem value="PENDING-PO">Pending Verification</SelectItem>
-                        <SelectItem value="COMPED">Comped</SelectItem>
-                        <SelectItem value="CANCELED">Canceled</SelectItem>
-                      </SelectContent>
-                    </Select>
                 </div>
                 {profile?.role === 'organizer' && (
                     <div>
@@ -575,6 +590,23 @@ export default function UnifiedInvoiceRegistrations() {
                         </RadioGroup>
                     </div>
                 )}
+            </div>
+             <div className="pt-4">
+                <Label>Status</Label>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2">
+                    {STATUSES.map(status => (
+                        <div key={status} className="flex items-center space-x-2">
+                            <Checkbox 
+                                id={`status-${status}`} 
+                                checked={statusFilter.includes(status)}
+                                onCheckedChange={(checked) => handleStatusFilterChange(status, checked)}
+                            />
+                            <Label htmlFor={`status-${status}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                {status.replace(/-/g, ' ')}
+                            </Label>
+                        </div>
+                    ))}
+                </div>
             </div>
           </CardContent>
         </Card>
