@@ -117,33 +117,20 @@ function PaymentAuthorizationPageContent() {
     loadPendingPayments();
   }, [loadPendingPayments]);
   
-  const getPaymentMethodLabel = (method: string | undefined) => {
-    switch (method) {
-        case 'po':
-        case 'purchase-order':
-             return 'Purchase Order';
-        case 'check': return 'Check';
-        case 'cash-app': return 'Cash App';
-        case 'zelle': return 'Zelle';
-        case 'cash': return 'Cash';
-        default: return 'Unknown';
-    }
-  };
-
   const openApprovalDialog = (confirmation: Confirmation) => {
     setSelectedConfirmation(confirmation);
     setPaymentAmount(String(confirmation.totalInvoiced));
     setPaymentDate(new Date());
-    let note = '';
+    
     const paymentMethodLabel = getPaymentMethodLabel(confirmation.paymentMethod);
+    let note = paymentMethodLabel; // Default note is the payment method itself
 
     if (confirmation.paymentMethod === 'po' || confirmation.paymentMethod === 'purchase-order') {
         note = `${paymentMethodLabel}: PO #${confirmation.poNumber || 'N/A'}`;
     } else if (confirmation.paymentMethod === 'check') {
         note = `${paymentMethodLabel}: Check #${confirmation.checkNumber || 'N/A'}`;
-    } else if (confirmation.paymentMethod) {
-        note = paymentMethodLabel;
     }
+    
     setPaymentNote(note);
     setIsDialogOpen(true);
   };
@@ -190,6 +177,19 @@ function PaymentAuthorizationPageContent() {
       toast({ variant: 'destructive', title: 'Approval Failed', description: error instanceof Error ? error.message : 'Could not approve payment.' });
     } finally {
       setIsApproving(false);
+    }
+  };
+
+  const getPaymentMethodLabel = (method: string | undefined) => {
+    switch (method) {
+        case 'po':
+        case 'purchase-order':
+             return 'Purchase Order';
+        case 'check': return 'Check';
+        case 'cash-app': return 'Cash App';
+        case 'zelle': return 'Zelle';
+        case 'cash': return 'Cash';
+        default: return 'Unknown';
     }
   };
 
