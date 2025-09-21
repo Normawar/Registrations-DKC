@@ -182,21 +182,22 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
         
         for (const note of playerNotes) {
           // Regex to capture: Name, USCF ID, Expiration Date, DOB
-          const match = note.match(/([\w\s]+)\s+(\d{8})\s+(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}\/\d{1,2}\/\d{4})/);
+          // This is now more flexible, allowing for missing parts.
+          const match = note.match(/(?:[0-9]+\.\s*)?([\w\s',\.-]+?)\s+\((\d{8})\)/);
           
           if (match) {
-            const [, rawName, uscfId, expDate, dob] = match;
+            const [, rawName, uscfId] = match;
             const nameParts = rawName.trim().split(/\s+/);
-            const lastName = nameParts[0];
-            const firstName = nameParts.slice(1).join(' ');
+            const lastName = nameParts.length > 1 ? nameParts.pop() : rawName.trim();
+            const firstName = nameParts.join(' ');
 
             const newPlayer: MasterPlayer = {
                 id: uscfId,
                 uscfId: uscfId,
                 firstName: firstName,
-                lastName: lastName,
-                uscfExpiration: new Date(expDate).toISOString(),
-                dob: new Date(dob).toISOString(),
+                lastName: lastName!,
+                uscfExpiration: undefined,
+                dob: undefined,
                 school: schoolName,
                 district: district,
                 email: '', 
@@ -223,3 +224,5 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
     
     return { selections, baseRegistrationFee };
   }
+
+    
