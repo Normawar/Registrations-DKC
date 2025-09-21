@@ -177,36 +177,35 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
         const playerNotes = item.note?.split('\n') || [];
         
         for (const note of playerNotes) {
-          // Robust regex to capture name and ID, allowing for variations
-          const match = note.match(/(?:[0-9]+\.?\s*)?([\w\s,'-.]+?)\s+\((\d{8,})\)/);
+          // New, more robust regex to capture name (with optional middle name/initial) and USCF ID
+          const match = note.match(/(?:[0-9]+\.?\s*)?([A-Z\s,'-]+\s[A-Z\s\.'-]+)\s\((\d{8,})\)/i);
           
           if (match) {
-            const [, rawName, uscfId] = match;
-            const nameParts = rawName.trim().split(/\s+/);
-            const lastName = nameParts.length > 1 ? nameParts.pop() : rawName.trim();
-            const firstName = nameParts.join(' ');
-
-            const newPlayer: Partial<MasterPlayer> = {
+            let [, rawName, uscfId] = match;
+            rawName = rawName.trim();
+            
+            const nameParts = rawName.split(/\s+/);
+            const lastName = nameParts.pop() || 'Unknown';
+            const firstName = nameParts.shift() || 'Unknown';
+            const middleName = nameParts.join(' ');
+            
+            const playerDoc: Partial<MasterPlayer> = {
                 id: uscfId,
                 uscfId: uscfId,
                 firstName: firstName,
-                lastName: lastName!,
+                lastName: lastName,
+                middleName: middleName || undefined,
                 school: schoolName,
                 district: district,
-                email: '', 
-                grade: '', 
-                section: 'Unknown',
-                events: 1,
-                eventIds: [order.id!], 
                 createdAt: order.createdAt,
             };
             
-            // Remove undefined fields before setting
-            Object.keys(newPlayer).forEach(key => newPlayer[key as keyof typeof newPlayer] === undefined && delete newPlayer[key as keyof typeof newPlayer]);
+            // Remove any undefined keys before setting to Firestore
+            Object.keys(playerDoc).forEach(key => playerDoc[key as keyof typeof playerDoc] === undefined && delete playerDoc[key as keyof typeof playerDoc]);
 
             const playerRef = doc(db, 'players', uscfId);
-            // Use { merge: true } to avoid overwriting existing valid data
-            batch.set(playerRef, newPlayer, { merge: true });
+            // Use merge to avoid overwriting existing data fields like grade, section, etc.
+            batch.set(playerRef, playerDoc, { merge: true });
 
             selections[uscfId] = {
               playerName: `${firstName} ${lastName}`,
@@ -221,3 +220,4 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
     
     return { selections, baseRegistrationFee };
   }
+
