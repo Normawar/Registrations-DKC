@@ -128,12 +128,12 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         toast({ variant: 'destructive', title: 'Error', description: 'Database not initialized.' });
         return;
     }
-    
-    // Validation
+    // ... validation code ...
     if (!selectedPaymentMethod) { toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select a payment method.' }); return; }
     if (!paymentAmount) { toast({ variant: 'destructive', title: 'Missing Information', description: 'Please enter the payment amount.' }); return; }
     if (selectedPaymentMethod === 'PO' && !poNumber) { toast({ variant: 'destructive', title: 'Missing Information', description: 'Please enter the PO number.' }); return; }
     if (selectedPaymentMethod === 'Check' && !payByCheckAtTournament && !checkNumber) { toast({ variant: 'destructive', title: 'Missing Information', description: 'Please enter the check number.' }); return; }
+
 
     setIsSubmitting(true);
 
@@ -142,6 +142,12 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         let uploadedFileName: string | undefined;
 
         if (uploadedFiles.length > 0) {
+            if (!storage) {
+                toast({ variant: 'destructive', title: 'Upload Failed', description: 'Firebase Storage is not configured.' });
+                setIsSubmitting(false);
+                return;
+            }
+
             // ENHANCED AUTH CHECK - Wait for authentication to complete
             console.log("🔐 Checking authentication before upload...");
             
@@ -564,11 +570,12 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
         
         const getPaymentMethodLabel = (method: string | undefined) => {
             switch (method) {
-                case 'po': case 'purchase-order': return 'Purchase Order';
+                case 'po':
+                case 'purchase-order': return 'Purchase Order';
                 case 'check': return 'Check';
-                case 'cash-app': return 'Cash App';
+                case 'cash-app': case 'cashapp': return 'Cash App';
                 case 'zelle': return 'Zelle';
-                default: return 'Unknown';
+                default: return method || 'Unknown';
             }
         };
 
@@ -576,10 +583,11 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
             if (!confirmation?.invoiceId) return;
             setIsUpdating(true);
             try {
+                const note = `Payment approved by ${profile?.firstName}. Method: ${getPaymentMethodLabel(confirmation.paymentMethod)}, Ref: ${confirmation.poNumber || confirmation.checkNumber || 'N/A'}`;
                 const result = await recordPayment({
                     invoiceId: confirmation.invoiceId,
                     amount: confirmation.amountPaid || confirmation.totalInvoiced,
-                    note: `Payment approved by ${profile?.firstName}. Method: ${confirmation.paymentMethod}, Ref: ${confirmation.poNumber || confirmation.checkNumber || 'N/A'}`,
+                    note: note,
                     requestingUserRole: 'organizer'
                 });
                 
@@ -616,6 +624,9 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
                 <CardContent className="space-y-3 text-sm">
                     <p><strong>Method:</strong> {getPaymentMethodLabel(confirmation.paymentMethod)}</p>
                     <p><strong>Amount Submitted:</strong> ${confirmation.amountPaid?.toFixed(2) || confirmation.totalInvoiced?.toFixed(2)}</p>
+                    {confirmation.paymentSubmittedAt && (
+                      <p><strong>Submitted:</strong> {format(new Date(confirmation.paymentSubmittedAt), 'PPP p')}</p>
+                    )}
                     {(confirmation.poNumber || confirmation.checkNumber) && (
                         <p><strong>Reference:</strong> {confirmation.poNumber || confirmation.checkNumber}</p>
                     )}
@@ -641,46 +652,48 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     };
 
     const PaymentSummarySection = ({ confirmation }: { confirmation: any }) => {
-        const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
-        const totalPaid = Math.max(
-          confirmation?.paymentHistory?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0,
-          confirmation?.totalPaid || 0
-        );
-        const balanceDue = Math.max(0, totalInvoiced - totalPaid);
-      
-        return (
-          <div className="mt-4">
-            <h4 className="text-md font-medium mb-2">Payment Summary</h4>
-            <div className="p-3 bg-gray-50 border rounded-md space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Total Invoiced</span>
-                <span className="font-medium">${totalInvoiced.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total Paid</span>
-                <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between text-base font-semibold">
-                <span>Balance Due</span>
-                <span>${balanceDue.toFixed(2)}</span>
-              </div>
+      if (!confirmation) return null;
+    
+      const totalInvoiced = confirmation?.totalAmount || confirmation?.totalInvoiced || 0;
+      const totalPaid = Math.max(
+        (confirmation?.paymentHistory?.reduce((sum: number, p: any) => sum + (p.amount || 0), 0) || 0),
+        confirmation?.totalPaid || 0
+      );
+      const balanceDue = Math.max(0, totalInvoiced - totalPaid);
+    
+      return (
+        <div className="mt-4">
+          <h4 className="text-md font-medium mb-2">Payment Summary</h4>
+          <div className="p-3 bg-gray-50 border rounded-md space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span>Total Invoiced</span>
+              <span className="font-medium">${totalInvoiced.toFixed(2)}</span>
             </div>
-            
-            <PendingPaymentSection />
-            
-            <div className="mt-4">
-              <h4 className="text-md font-medium mb-2">Payment History</h4>
-              {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 ? (
-                <PaymentHistoryDisplay confirmation={confirmation} />
-              ) : (
-                <div className="p-3 bg-gray-50 border rounded-md text-sm text-gray-600 text-center">
-                  No payments recorded yet
-                </div>
-              )}
+            <div className="flex justify-between">
+              <span>Total Paid</span>
+              <span className="font-semibold text-green-600">${totalPaid.toFixed(2)}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between text-base font-semibold">
+              <span>Balance Due</span>
+              <span>${balanceDue.toFixed(2)}</span>
             </div>
           </div>
-        );
+          
+          <PendingPaymentSection />
+          
+          <div className="mt-4">
+            <h4 className="text-md font-medium mb-2">Payment History</h4>
+            {confirmation?.paymentHistory && confirmation.paymentHistory.length > 0 ? (
+              <PaymentHistoryDisplay confirmation={confirmation} />
+            ) : (
+              <div className="p-3 bg-gray-50 border rounded-md text-sm text-gray-600 text-center">
+                No payments recorded yet
+              </div>
+            )}
+          </div>
+        </div>
+      );
     };
     
     const PaymentFormComponent = ({ invoice }: { invoice: any }) => {
@@ -744,6 +757,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
-
-
-    
