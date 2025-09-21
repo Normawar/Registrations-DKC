@@ -68,19 +68,31 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         setIsAuthReady(true); // Still allow form to be used, but uploads will fail gracefully
         return;
     }
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        console.log("🔐 Auth state changed:", {
+            authenticated: !!user,
+            uid: user?.uid,
+            isAnonymous: user?.isAnonymous
+        });
+        
         if (user) {
             setIsAuthReady(true);
             setAuthError(null);
         } else {
-            signInAnonymously(auth).catch((error) => {
-                console.error("Anonymous sign-in failed:", error);
+            console.log("🔐 No user, attempting anonymous sign-in...");
+            try {
+                await signInAnonymously(auth);
+                console.log("✅ Anonymous sign-in initiated");
+            } catch (error) {
+                console.error("❌ Anonymous sign-in failed:", error);
                 setAuthError("Authentication error. File uploads are disabled.");
-            });
+                setIsAuthReady(true); // Still allow form usage
+            }
         }
     });
+    
     return () => unsubscribe();
-  }, []);
+}, []);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -116,6 +128,7 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         toast({ variant: 'destructive', title: 'Error', description: 'Database not initialized.' });
         return;
     }
+    
     // Validation
     if (!selectedPaymentMethod) { toast({ variant: 'destructive', title: 'Missing Information', description: 'Please select a payment method.' }); return; }
     if (!paymentAmount) { toast({ variant: 'destructive', title: 'Missing Information', description: 'Please enter the payment amount.' }); return; }
@@ -129,26 +142,67 @@ const SponsorPaymentComponent = ({ confirmation, onPaymentSubmitted }: { confirm
         let uploadedFileName: string | undefined;
 
         if (uploadedFiles.length > 0) {
-            if (!isAuthReady) {
-                const message = authError || "Authentication is not ready. Cannot upload files.";
-                toast({ variant: 'destructive', title: 'Upload Failed', description: message });
-                setIsSubmitting(false);
-                return;
-            }
             if (!storage) {
                 toast({ variant: 'destructive', title: 'Upload Failed', description: 'Firebase Storage is not configured.' });
                 setIsSubmitting(false);
                 return;
             }
+
+            // ENHANCED AUTH CHECK - Wait for authentication to complete
+            console.log("🔐 Checking authentication before upload...");
+            
+            if (!auth.currentUser) {
+                console.log("❌ No user authenticated, attempting anonymous sign-in...");
+                try {
+                    const userCredential = await signInAnonymously(auth);
+                    console.log("✅ Anonymous sign-in successful:", userCredential.user.uid);
+                } catch (authError) {
+                    console.error("❌ Anonymous sign-in failed:", authError);
+                    toast({ variant: 'destructive', title: 'Authentication Failed', description: 'Cannot authenticate for file upload.' });
+                    setIsSubmitting(false);
+                    return;
+                }
+            }
+
+            // Double-check authentication
+            const currentUser = auth.currentUser;
+            console.log("🔐 Current user before upload:", {
+                uid: currentUser?.uid,
+                isAnonymous: currentUser?.isAnonymous,
+                authenticated: !!currentUser
+            });
+
+            if (!currentUser) {
+                toast({ variant: 'destructive', title: 'Upload Failed', description: 'User not authenticated.' });
+                setIsSubmitting(false);
+                return;
+            }
+
             const file = uploadedFiles[0];
             const sanitizedConfirmationId = confirmation.id.replace(/:/g, '-');
-            // FIX: Use payment-proofs (with hyphen) to match the security rules
+            
+            console.log("📁 Upload path:", `payment-proofs/${sanitizedConfirmationId}/${file.name}`);
+            
             const storageRef = ref(storage, `payment-proofs/${sanitizedConfirmationId}/${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
-            uploadedFileUrl = await getDownloadURL(snapshot.ref);
-            uploadedFileName = file.name;
+            
+            try {
+                console.log("⬆️ Starting file upload...");
+                const snapshot = await uploadBytes(storageRef, file);
+                uploadedFileUrl = await getDownloadURL(snapshot.ref);
+                uploadedFileName = file.name;
+                console.log("✅ Upload successful:", uploadedFileUrl);
+            } catch (uploadError: any) {
+                console.error("❌ Upload failed:", uploadError);
+                toast({ 
+                    variant: 'destructive', 
+                    title: 'Upload Failed', 
+                    description: `Upload error: ${uploadError.message}` 
+                });
+                setIsSubmitting(false);
+                return;
+            }
         }
-
+        
         const invoiceRef = doc(db, 'invoices', confirmation.id);
         const updateData: any = {
             paymentStatus: 'pending-po',
@@ -409,7 +463,19 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
       }
     }
     if (!auth || !storage) { setAuthError("Firebase is not configured, so file uploads are disabled."); setIsAuthReady(true); return; }
-    const unsubscribe = onAuthStateChanged(auth, (user) => { if (user) { setCurrentUser(user); setAuthError(null); } else { signInAnonymously(auth).catch((error) => { console.error("Anonymous sign-in failed:", error); setAuthError("Authentication error. File uploads are disabled."); setCurrentUser(null); }); } setIsAuthReady(true); });
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            setCurrentUser(user);
+            setAuthError(null);
+        } else {
+            signInAnonymously(auth).catch((error) => {
+                console.error("Anonymous sign-in failed:", error);
+                setAuthError("Authentication error. File uploads are disabled.");
+                setCurrentUser(null);
+            });
+        }
+        setIsAuthReady(true);
+    });
     return () => unsubscribe();
   }, [isOpen, initialConfirmation, confirmationId, loadConfirmationData]);
 
@@ -570,5 +636,3 @@ export function InvoiceDetailsDialog({ isOpen, onClose, confirmation: initialCon
     </Dialog>
   );
 }
-
-    
