@@ -200,20 +200,8 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
                 createdAt: order.createdAt,
             };
 
-            // Only add expiration and dob if they are valid
-            // (Note: The current regex does not capture these, so this is a safe guard)
-            if (newPlayer.uscfExpiration) {
-              // Assuming a date format, add validation if needed
-            } else {
-              delete newPlayer.uscfExpiration;
-            }
-            if (newPlayer.dob) {
-              // Assuming a date format, add validation if needed
-            } else {
-              delete newPlayer.dob;
-            }
-
             const playerRef = doc(db, 'players', uscfId);
+            // Use { merge: true } to avoid overwriting existing valid data with undefined values
             batch.set(playerRef, newPlayer, { merge: true });
 
             selections[uscfId] = {
@@ -229,5 +217,3 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
     
     return { selections, baseRegistrationFee };
   }
-
-    
