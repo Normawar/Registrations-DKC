@@ -177,7 +177,8 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
         const playerNotes = item.note?.split('\n') || [];
         
         for (const note of playerNotes) {
-          const match = note.match(/(?:[0-9]+\.\s*)?([\w\s',\.-]+?)\s+\((\d{8})\)/);
+          // Robust regex to capture name and ID, allowing for variations
+          const match = note.match(/(?:[0-9]+\.?\s*)?([\w\s,'-.]+?)\s+\((\d{8,})\)/);
           
           if (match) {
             const [, rawName, uscfId] = match;
@@ -199,9 +200,12 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
                 eventIds: [order.id!], 
                 createdAt: order.createdAt,
             };
+            
+            // Remove undefined fields before setting
+            Object.keys(newPlayer).forEach(key => newPlayer[key as keyof typeof newPlayer] === undefined && delete newPlayer[key as keyof typeof newPlayer]);
 
             const playerRef = doc(db, 'players', uscfId);
-            // Use { merge: true } to avoid overwriting existing valid data with undefined values
+            // Use { merge: true } to avoid overwriting existing valid data
             batch.set(playerRef, newPlayer, { merge: true });
 
             selections[uscfId] = {
