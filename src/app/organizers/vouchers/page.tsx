@@ -84,11 +84,17 @@ export default function VoucherManagementPage() {
         if ((selection as any).uscfStatus === 'new' || (selection as any).uscfStatus === 'renewing') {
           const player = database.find(p => p.id === playerId);
           if (player && !assignedPlayerIds.has(playerId)) {
-            // GT players can be processed regardless of payment status.
-            const isGt = player.studentType === 'gt';
-            const isPaid = confirmation.invoiceStatus === 'PAID' || confirmation.invoiceStatus === 'COMPED';
             
-            if (isGt || isPaid) {
+            const isPaid = confirmation.invoiceStatus === 'PAID' || confirmation.invoiceStatus === 'COMPED';
+            const isPsjaDistrict = player.district === 'PHARR-SAN JUAN-ALAMO ISD';
+            const isGtPlayer = player.studentType === 'gt';
+
+            // Logic for voucher eligibility:
+            // 1. If PSJA district and GT player, eligible regardless of payment status.
+            // 2. For all other cases (PSJA Independent, other districts), invoice must be paid.
+            const isEligibleForVoucher = (isPsjaDistrict && isGtPlayer) || isPaid;
+
+            if (isEligibleForVoucher) {
               pending.push({
                 playerId,
                 player,
