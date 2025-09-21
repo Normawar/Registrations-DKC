@@ -90,7 +90,8 @@ function PaymentAuthorizationPageContent() {
     if (!db) return;
     try {
       const invoicesCol = collection(db, 'invoices');
-      const invoiceSnapshot = await getDocs(query(invoicesCol, where('paymentStatus', '==', 'pending-po')));
+      const q = query(invoicesCol, where('paymentStatus', '==', 'pending-po'));
+      const invoiceSnapshot = await getDocs(q);
       const allConfirmations: Confirmation[] = invoiceSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()} as Confirmation));
       setAllPendingPayments(allConfirmations);
     } catch (error) {
@@ -116,15 +117,32 @@ function PaymentAuthorizationPageContent() {
     loadPendingPayments();
   }, [loadPendingPayments]);
   
+  const getPaymentMethodLabel = (method: string | undefined) => {
+    switch (method) {
+        case 'po':
+        case 'purchase-order':
+             return 'Purchase Order';
+        case 'check': return 'Check';
+        case 'cash-app': return 'Cash App';
+        case 'zelle': return 'Zelle';
+        case 'cash': return 'Cash';
+        default: return 'Unknown';
+    }
+  };
+
   const openApprovalDialog = (confirmation: Confirmation) => {
     setSelectedConfirmation(confirmation);
     setPaymentAmount(String(confirmation.totalInvoiced));
     setPaymentDate(new Date());
     let note = '';
+    const paymentMethodLabel = getPaymentMethodLabel(confirmation.paymentMethod);
+
     if (confirmation.paymentMethod === 'po' || confirmation.paymentMethod === 'purchase-order') {
-        note = `PO #: ${confirmation.poNumber || 'N/A'}`;
+        note = `${paymentMethodLabel}: PO #${confirmation.poNumber || 'N/A'}`;
     } else if (confirmation.paymentMethod === 'check') {
-        note = `Check #: ${confirmation.checkNumber || 'N/A'}`;
+        note = `${paymentMethodLabel}: Check #${confirmation.checkNumber || 'N/A'}`;
+    } else if (confirmation.paymentMethod) {
+        note = paymentMethodLabel;
     }
     setPaymentNote(note);
     setIsDialogOpen(true);
@@ -172,19 +190,6 @@ function PaymentAuthorizationPageContent() {
       toast({ variant: 'destructive', title: 'Approval Failed', description: error instanceof Error ? error.message : 'Could not approve payment.' });
     } finally {
       setIsApproving(false);
-    }
-  };
-  
-  const getPaymentMethodLabel = (method: string | undefined) => {
-    switch (method) {
-        case 'po':
-        case 'purchase-order':
-             return 'Purchase Order';
-        case 'check': return 'Check';
-        case 'cash-app': return 'Cash App';
-        case 'zelle': return 'Zelle';
-        case 'cash': return 'Cash';
-        default: return 'Unknown';
     }
   };
 
@@ -302,7 +307,7 @@ function PaymentAuthorizationPageContent() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent>
               <DialogHeader>
-                  <DialogTitle>Record Payment &amp; Approve</DialogTitle>
+                  <DialogTitle>Record Payment & Approve</DialogTitle>
                   <DialogDescription>
                     Confirm the payment details to be recorded on the Square invoice. This will mark the invoice as paid.
                   </DialogDescription>
