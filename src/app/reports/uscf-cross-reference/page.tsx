@@ -31,6 +31,8 @@ type MatchedPlayer = UploadedPlayer & {
   firebaseDob: string;
   firebaseEmail: string;
   firebaseZipCode: string;
+  firebaseStudentType: string;
+  firebaseUscfExpiration: string;
   matchStatus: 'found_by_id' | 'found_by_name' | 'not_found' | 'multiple_found';
 };
 
@@ -91,6 +93,8 @@ function UscfCrossReferencePageContent() {
           firebaseDob: player.dob ? format(new Date(player.dob), 'yyyy-MM-dd') : 'Not Set',
           firebaseEmail: player.email || 'Not Set',
           firebaseZipCode: player.zipCode || 'Not Set',
+          firebaseStudentType: player.studentType || 'Not Set',
+          firebaseUscfExpiration: player.uscfExpiration ? format(new Date(player.uscfExpiration), 'yyyy-MM-dd') : 'Not Set',
           matchStatus: status,
         };
       };
@@ -166,6 +170,8 @@ function UscfCrossReferencePageContent() {
         firebaseDob: 'N/A',
         firebaseEmail: 'N/A',
         firebaseZipCode: 'N/A',
+        firebaseStudentType: 'N/A',
+        firebaseUscfExpiration: 'N/A',
         matchStatus: 'not_found',
       };
     });
@@ -200,6 +206,8 @@ function UscfCrossReferencePageContent() {
         'FIREBASE DOB': p.firebaseDob,
         'FIREBASE EMAIL': p.firebaseEmail,
         'FIREBASE ZIP': p.firebaseZipCode,
+        'FIREBASE STUDENT TYPE': p.firebaseStudentType,
+        'FIREBASE USCF EXPIRATION': p.firebaseUscfExpiration,
         'MATCH STATUS': p.matchStatus,
     }));
 
@@ -278,14 +286,16 @@ function UscfCrossReferencePageContent() {
                   <TableHead>Firebase DOB</TableHead>
                   <TableHead>Firebase Email</TableHead>
                   <TableHead>Firebase Zip</TableHead>
+                  <TableHead>Firebase Student Type</TableHead>
+                  <TableHead>Firebase USCF Exp.</TableHead>
                   <TableHead>Match Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isProcessing ? (
-                  <TableRow><TableCell colSpan={7} className="text-center">Processing...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center">Processing...</TableCell></TableRow>
                 ) : matchedData.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="h-24 text-center">Upload a file to see results.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="h-24 text-center">Upload a file to see results.</TableCell></TableRow>
                 ) : (
                   matchedData.map((player, index) => (
                     <TableRow key={index} className={getStatusColor(player.matchStatus)}>
@@ -295,6 +305,8 @@ function UscfCrossReferencePageContent() {
                       <TableCell>{player.firebaseDob}</TableCell>
                       <TableCell>{player.firebaseEmail}</TableCell>
                       <TableCell>{player.firebaseZipCode}</TableCell>
+                      <TableCell>{player.firebaseStudentType}</TableCell>
+                      <TableCell>{player.firebaseUscfExpiration}</TableCell>
                       <TableCell className="font-medium capitalize">
                         {player.matchStatus.replace(/_/g, ' ')}
                       </TableCell>
