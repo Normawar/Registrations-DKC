@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -906,10 +905,12 @@ function DistrictRosterView() {
     const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState<MasterPlayer | null>(null);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isBulkDeleteAlertOpen, setIsBulkDeleteAlertOpen] = useState(false);
     const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
     const [editFormSchoolsForDistrict, setEditFormSchoolsForDistrict] = useState<string[]>([]);
     const [availableSchools, setAvailableSchools] = useState<string[]>([]);
     const [rosterTypeFilter, setRosterTypeFilter] = useState<'real' | 'test'>('real');
+    const [selectedPlayers, setSelectedPlayers] = useState<Record<string, boolean>>({});
 
 
     const playerForm = useForm<PlayerFormValues>({
@@ -1203,6 +1204,28 @@ function DistrictRosterView() {
         setPlayerToDelete(player);
         setIsAlertOpen(true);
     };
+    
+    const handleBulkDelete = () => {
+        if (Object.keys(selectedPlayers).length > 0) {
+            setIsBulkDeleteAlertOpen(true);
+        }
+    };
+    
+    const confirmBulkDelete = async () => {
+        const playerIdsToDelete = Object.keys(selectedPlayers).filter(id => selectedPlayers[id]);
+        if (playerIdsToDelete.length === 0) return;
+
+        for (const playerId of playerIdsToDelete) {
+            await deletePlayer(playerId);
+        }
+        
+        toast({
+            title: "Players Deleted",
+            description: `${playerIdsToDelete.length} players have been removed from the database.`,
+        });
+        setSelectedPlayers({});
+        setIsBulkDeleteAlertOpen(false);
+    };
 
     const confirmDelete = async () => {
         if (playerToDelete) {
@@ -1214,6 +1237,22 @@ function DistrictRosterView() {
         }
         setIsAlertOpen(false);
         setPlayerToDelete(null);
+    };
+    
+    const handleSelectPlayer = (playerId: string, checked: boolean | 'indeterminate') => {
+        setSelectedPlayers(prev => ({
+            ...prev,
+            [playerId]: !!checked
+        }));
+    };
+    
+    const handleSelectAllInSchool = (schoolName: string, isChecked: boolean) => {
+        const playersInSchool = districtPlayers.filter(p => p.school === schoolName);
+        const newSelected = { ...selectedPlayers };
+        playersInSchool.forEach(p => {
+            newSelected[p.id] = isChecked;
+        });
+        setSelectedPlayers(newSelected);
     };
 
     return (
@@ -1285,16 +1324,25 @@ function DistrictRosterView() {
                             Show only schools with players
                         </Label>
                     </div>
-                    <Button onClick={handleExportAllRosters} variant="default" size="sm">
-                        <Download className="mr-2 h-4 w-4" />
-                        Export All Rosters ({filteredPlayersForExport.length})
-                    </Button>
+                     <div className="flex gap-2">
+                        {Object.values(selectedPlayers).some(v => v) && profile?.role === 'organizer' && (
+                            <Button onClick={handleBulkDelete} variant="destructive" size="sm">
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Selected ({Object.values(selectedPlayers).filter(v => v).length})
+                            </Button>
+                        )}
+                        <Button onClick={handleExportAllRosters} variant="default" size="sm">
+                            <Download className="mr-2 h-4 w-4" />
+                            Export All Rosters ({filteredPlayersForExport.length})
+                        </Button>
+                    </div>
                 </div>
             </div>
 
             {displayedSchools.map(school => {
                 const schoolRoster = districtPlayers.filter(p => p.school === school);
                 const sortedSchoolRoster = sortedPlayersForSchool(schoolRoster);
+                const allInSchoolSelected = sortedSchoolRoster.length > 0 && sortedSchoolRoster.every(p => selectedPlayers[p.id]);
 
                 if (sortedSchoolRoster.length === 0 && showActiveOnly) return null;
                 
@@ -1312,6 +1360,9 @@ function DistrictRosterView() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
+                                            {profile?.role === 'organizer' && (
+                                                <TableHead className="w-12"><Checkbox onCheckedChange={(checked) => handleSelectAllInSchool(school, !!checked)} checked={allInSchoolSelected} /></TableHead>
+                                            )}
                                             <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('lastName')}>Player Name {getSortIcon('lastName')}</Button></TableHead>
                                             <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('teamCode')}>Team Code {getSortIcon('teamCode')}</Button></TableHead>
                                             <TableHead><Button variant="ghost" className="px-0" onClick={() => requestSort('uscfId')}>USCF ID {getSortIcon('uscfId')}</Button></TableHead>
@@ -1329,6 +1380,9 @@ function DistrictRosterView() {
                                             const displayName = (player.firstName && player.lastName) ? `${player.lastName}, ${player.firstName}` : 'Invalid Player Record';
                                             return (
                                                 <TableRow key={player.id}>
+                                                    {profile?.role === 'organizer' && (
+                                                        <TableCell><Checkbox checked={selectedPlayers[player.id] || false} onCheckedChange={(checked) => handleSelectPlayer(player.id, checked)} /></TableCell>
+                                                    )}
                                                     <TableCell>
                                                       <div className="font-medium">{displayName}</div>
                                                     </TableCell>
@@ -1449,6 +1503,20 @@ function DistrictRosterView() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <AlertDialog open={isBulkDeleteAlertOpen} onOpenChange={setIsBulkDeleteAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Selected Players?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete {Object.values(selectedPlayers).filter(v => v).length} player(s) from the database. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmBulkDelete} className="bg-destructive hover:bg-destructive/90">Delete Players</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
@@ -1467,5 +1535,5 @@ export default function RosterPage() {
 
   return <AppLayout><SponsorRosterView /></AppLayout>;
 }
-
+    
     
