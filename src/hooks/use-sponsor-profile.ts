@@ -27,6 +27,7 @@ export type SponsorProfile = {
   createdAt?: string;
   updatedAt?: string;
   migratedAt?: string;
+  studentIds?: string[]; // For individual users to track their students
 };
 
 // This hook now manages the auth user and their profile data together
