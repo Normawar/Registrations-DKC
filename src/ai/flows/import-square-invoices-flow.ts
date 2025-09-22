@@ -54,7 +54,6 @@ const importSquareInvoicesFlow = ai.defineFlow(
     
     try {
         console.log('Fetching all invoices from Square. This might take a moment...');
-        // Fixed: Pass locationId and limit as separate parameters
         const { result: { invoices } } = await squareClient.invoicesApi.listInvoices(locationId, undefined, 200);
 
         if (!invoices) {
@@ -77,6 +76,11 @@ const importSquareInvoicesFlow = ai.defineFlow(
         for (const invoice of invoicesToProcess) {
             try {
                 const invoiceData = await processSingleInvoice(squareClient, invoice, batch);
+                if (!invoiceData) {
+                    failedCount++;
+                    errors.push(`Invoice #${invoice.invoiceNumber}: Failed to process invoice data.`);
+                    continue;
+                }
                 const q = query(collection(db, 'invoices'), where('invoiceId', '==', invoice.id));
                 const querySnapshot = await getDocs(q);
 
@@ -115,34 +119,44 @@ async function processSingleInvoice(client: Client, invoice: Invoice, batch: Fir
     const { result: { order } } = await client.ordersApi.retrieveOrder(invoice.orderId);
     const { result: { customer } } = await client.customersApi.retrieveCustomer(invoice.primaryRecipient.customerId);
     
-    // Extract school and district from companyName
-    const companyParts = customer.companyName?.split(' / ');
-    const schoolName = companyParts?.[0] || customer.companyName || 'Unknown School';
-    const district = companyParts?.[1] || 'Unknown District';
+    // Improved school and district extraction
+    const companyName = customer.companyName || 'Unknown School';
+    let schoolName = 'Unknown School';
+    let district = 'Unknown District';
+    if (companyName.includes('/')) {
+        const parts = companyName.split(' / ');
+        schoolName = parts[0].trim();
+        district = parts[1] ? parts[1].trim() : 'Unknown District';
+    } else {
+        schoolName = companyName;
+        // Attempt to find district from known school data if not provided
+        // This part can be enhanced with a lookup against the schools collection
+    }
     
-    const { selections } = await parseSelectionsFromOrder(order, schoolName, district, batch);
+    const { selections, baseRegistrationFee } = await parseSelectionsFromOrder(order, schoolName, district, batch);
+
+    if (Object.keys(selections).length === 0) {
+        console.warn(`No players parsed for Invoice #${invoice.invoiceNumber}. Skipping player data creation.`);
+    }
 
     const totalInvoiced = Number(invoice.paymentRequests?.[0]?.computedAmountMoney?.amount || 0) / 100;
     
-    // Extract event name from title (e.g., "TEAMCODE @ DATE EVENT NAME")
     const titleParts = invoice.title?.split('@');
     const eventName = titleParts?.length === 2 ? titleParts[1].trim().split(' ').slice(1).join(' ') : invoice.title;
 
-    // Use nickname if available, otherwise construct from given/family name
     const purchaserName = customer.nickname || `${customer.givenName || ''} ${customer.familyName || ''}`.trim();
     
-
-    return {
+    const finalData = {
         id: invoice.id,
         invoiceId: invoice.id,
         invoiceNumber: invoice.invoiceNumber,
         invoiceTitle: invoice.title,
         submissionTimestamp: invoice.createdAt,
-        eventDate: invoice.createdAt, // Best guess from invoice creation
+        eventDate: invoice.createdAt, 
         eventName: eventName,
-        selections,
+        selections: selections,
         totalInvoiced: totalInvoiced,
-        totalAmount: totalInvoiced, // Make sure totalAmount is also set
+        totalAmount: totalInvoiced,
         invoiceUrl: invoice.publicUrl,
         invoiceStatus: invoice.status,
         status: invoice.status,
@@ -151,8 +165,14 @@ async function processSingleInvoice(client: Client, invoice: Invoice, batch: Fir
         sponsorEmail: customer.emailAddress,
         district: district,
         teamCode: generateTeamCode({ schoolName: schoolName, district: district }),
-        type: 'event', // Mark as an event type invoice
+        type: 'event',
+        baseRegistrationFee: baseRegistrationFee, // Store the calculated base fee
     };
+
+    // Remove any undefined keys before saving
+    Object.keys(finalData).forEach(key => finalData[key as keyof typeof finalData] === undefined && delete finalData[key as keyof typeof finalData]);
+
+    return finalData;
 }
 
 async function parseSelectionsFromOrder(order: Order, schoolName: string, district: string, batch: FirebaseFirestore.WriteBatch) {
@@ -161,12 +181,18 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
 
     if (!order.lineItems) return { selections, baseRegistrationFee };
   
+    // First, find the base registration fee
+    const registrationItem = order.lineItems.find(item => item.name?.toLowerCase().includes('registration'));
+    if (registrationItem) {
+        baseRegistrationFee = Number(registrationItem.basePriceMoney?.amount || 0) / 100;
+    }
+
     for (const item of order.lineItems) {
         const itemNameLower = item.name?.toLowerCase() || '';
-        if (itemNameLower.includes('registration') || itemNameLower.includes('uscf')) {
-            
-            baseRegistrationFee = Math.max(baseRegistrationFee, Number(item.basePriceMoney?.amount || 0) / 100);
-            
+        const isRegistrationItem = itemNameLower.includes('registration');
+        const isUscfItem = itemNameLower.includes('uscf');
+
+        if (isRegistrationItem || isUscfItem) {
             const playerNotes = item.note?.split('\n') || [];
             
             for (const note of playerNotes) {
@@ -174,34 +200,37 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
                 
                 if (playerInfo) {
                     const { firstName, lastName, middleName, uscfId, isNewPlayer } = playerInfo;
-                    
-                    // Generate a temporary ID for new players (you might want to adjust this logic)
-                    const playerId = uscfId || `NEW_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    const playerId = uscfId || `NEW_${Date.now()}_${firstName.charAt(0)}${lastName.charAt(0)}_${Math.random().toString(36).substr(2, 5)}`;
                     
                     const playerDoc: Partial<MasterPlayer> = {
                         id: playerId,
-                        uscfId: uscfId || undefined, // Don't set uscfId for new players
-                        firstName: firstName,
-                        lastName: lastName,
-                        middleName: middleName || undefined,
-                        school: schoolName,
-                        district: district,
+                        uscfId: uscfId || 'NEW',
+                        firstName, lastName, middleName,
+                        school: schoolName, district,
                         createdAt: order.createdAt,
                     };
                     
-                    // Remove any undefined keys before setting to Firestore
                     Object.keys(playerDoc).forEach(key => playerDoc[key as keyof typeof playerDoc] === undefined && delete playerDoc[key as keyof typeof playerDoc]);
 
                     const playerRef = doc(db, 'players', playerId);
                     batch.set(playerRef, playerDoc, { merge: true });
 
-                    selections[playerId] = {
-                        playerName: `${firstName} ${lastName}`,
-                        section: 'Unknown',
-                        uscfStatus: isNewPlayer ? 'new' : 'renewing',
-                        baseRegistrationFee,
-                        isNewPlayer: isNewPlayer,
-                    };
+                    if (!selections[playerId]) {
+                        selections[playerId] = {
+                            playerName: `${firstName} ${lastName}`,
+                            section: 'Unknown', // Default value
+                            baseRegistrationFee: baseRegistrationFee,
+                        };
+                    }
+                    
+                    if (isRegistrationItem) {
+                        selections[playerId].isRegistered = true;
+                    }
+                    if (isUscfItem) {
+                        selections[playerId].uscfStatus = isNewPlayer ? 'new' : 'renewing';
+                    } else if (isRegistrationItem && !selections[playerId].uscfStatus) {
+                        selections[playerId].uscfStatus = 'current'; // Assume current if not in USCF item
+                    }
                 }
             }
         }
@@ -211,36 +240,18 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
 }
 
 function parsePlayerFromNote(note: string): { firstName: string; lastName: string; middleName?: string; uscfId?: string; isNewPlayer: boolean } | null {
-    // Skip empty notes
     if (!note || note.trim() === '') return null;
     
-    // Remove any leading numbers/bullets (like "1. ", "2.", etc.)
     const cleanNote = note.replace(/^\s*\d+\.?\s*/, '').trim();
-    
-    // Check if this is a new player
     const isNewPlayer = cleanNote.toLowerCase().includes('new');
     
-    // Try multiple parsing patterns in order of specificity
     const patterns = [
-        // Pattern 1: Name (USCF_ID) - original format
         /^([A-Z\s,'-]+\s[A-Z\s\.'-]+)\s*\(\s*(\d{8,})\s*\)/i,
-        
-        // Pattern 2: Name USCF_ID Date - format like "Ricardo Vela Jr 30298695 12/31/24"
         /^([A-Z\s,'-]+)\s+(\d{8,})\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i,
-        
-        // Pattern 3: Name USCF_ID (without date)
         /^([A-Z\s,'-]+)\s+(\d{8,})(?:\s|$)/i,
-        
-        // Pattern 4: USCF_ID Name (reverse order)
         /^(\d{8,})\s+([A-Z\s,'-]+)(?:\s+\d{1,2}\/\d{1,2}\/\d{2,4})?/i,
-        
-        // Pattern 5: Name NEW - for new players like "Emily Requenez NEW"
         /^([A-Z][A-Za-z\s,'-]+?)\s+NEW\s*$/i,
-        
-        // Pattern 6: Just Name (for any remaining name-only cases)
         /^([A-Z][A-Za-z\s,'-]{2,})\s*$/i,
-        
-        // Pattern 7: More flexible - any 8+ digit number with surrounding text
         /([A-Z][A-Za-z\s,'-]*[A-Za-z])\s*[^\w]*(\d{8,})/i
     ];
     
@@ -248,90 +259,39 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
         const match = cleanNote.match(pattern);
         
         if (match) {
-            let name: string;
-            let uscfId: string | undefined;
+            let name: string, uscfId: string | undefined;
             
-            // Handle different capture group arrangements
-            if (pattern === patterns[3]) { // USCF_ID Name pattern
-                uscfId = match[1];
-                name = match[2];
-            } else if (pattern === patterns[4] || pattern === patterns[5]) { // Name NEW or Just Name patterns
-                name = match[1];
-                uscfId = undefined; // No USCF ID for these patterns
-            } else {
-                name = match[1];
-                uscfId = match[2];
-            }
+            if (pattern === patterns[3]) { uscfId = match[1]; name = match[2]; } 
+            else if (pattern === patterns[4] || pattern === patterns[5]) { name = match[1]; uscfId = undefined; } 
+            else { name = match[1]; uscfId = match[2]; }
             
-            // Clean and validate USCF ID if present
-            if (uscfId) {
-                uscfId = uscfId.trim();
-                if (uscfId.length < 8) {
-                    uscfId = undefined; // Invalid USCF ID
-                }
-            }
+            if (uscfId && uscfId.trim().length < 8) uscfId = undefined;
             
-            // Parse name parts
             name = name.trim().replace(/[,]+/g, ' ').replace(/\s+/g, ' ');
             const nameParts = name.split(/\s+/);
             
-            if (nameParts.length < 2) continue; // Need at least first and last name
+            if (nameParts.length < 2) continue;
             
-            // Handle names with suffixes (Jr, Sr, III, etc.)
             let firstName = nameParts[0];
             let lastName = nameParts[nameParts.length - 1];
             let middleName: string | undefined;
-            
-            // Check if last part is a suffix
             const suffixes = ['jr', 'sr', 'ii', 'iii', 'iv', 'v'];
             const lastPartLower = lastName.toLowerCase().replace(/[^a-z]/g, '');
             
             if (suffixes.includes(lastPartLower) && nameParts.length > 2) {
-                // Last part is a suffix, so actual last name is second to last
                 const suffix = lastName;
                 lastName = nameParts[nameParts.length - 2];
                 middleName = nameParts.length > 3 ? nameParts.slice(1, -2).join(' ') + ' ' + suffix : suffix;
             } else if (nameParts.length > 2) {
-                // Regular middle name case
                 middleName = nameParts.slice(1, -1).join(' ');
             }
             
-            // Validate that we have reasonable name parts
             if (firstName.length < 1 || lastName.length < 1) continue;
             
-            return {
-                firstName,
-                lastName,
-                middleName,
-                uscfId,
-                isNewPlayer
-            };
+            return { firstName, lastName, middleName, uscfId, isNewPlayer };
         }
     }
     
-    // If no patterns matched, log for debugging
     console.log(`Could not parse player info from note: "${note}"`);
     return null;
-}
-
-// Helper function to test the enhanced parser
-function testEnhancedPlayerParser() {
-    const testCases = [
-        "Ricardo Vela Jr 30298695 12/31/24",
-        "John Smith (12345678)",
-        "Emily Requenez NEW",
-        "Francisco Morales NEW",
-        "Mikayla Anzaldu NEW",
-        "1. Ricardo Vela Jr 30298695 12/31/24",
-        "2. John Smith 12345678",
-        "87654321 Jane Doe 03/20/25",
-        "Alice Johnson-Smith 11223344 12/31/24",
-        "Bob O'Connor Jr. NEW"
-    ];
-    
-    console.log("Testing enhanced player parser:");
-    testCases.forEach(testCase => {
-        const result = parsePlayerFromNote(testCase);
-        console.log(`"${testCase}" -> `, result);
-    });
 }
