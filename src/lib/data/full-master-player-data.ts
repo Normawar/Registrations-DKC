@@ -92,7 +92,7 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     { "id": "80000039", "uscfId": "80000039", "firstName": "Michelle", "lastName": "TestNelson39", "school": "", "district": "", "grade": "2nd Grade", "section": "Primary K-3", "email": "test39@example.com", "events": 0, "eventIds": [] },
     { "id": "80000040", "uscfId": "80000040", "firstName": "Joshua", "lastName": "TestCarter40", "school": "", "district": "", "grade": "3rd Grade", "section": "Primary K-3", "email": "test40@example.com", "events": 0, "eventIds": [] },
     { "id": "80000041", "uscfId": "80000041", "firstName": "Emily", "lastName": "TestMitchell41", "school": "", "district": "", "grade": "4th Grade", "section": "Elementary K-5", "email": "test41@example.com", "events": 0, "eventIds": [] },
-    { "id": "80000042", "uscfId": "80000042", "firstName": "Kevin", "lastName": "TestPerez42", "school": "", "district": "", "", "grade": "5th Grade", "section": "Elementary K-5", "email": "test42@example.com", "events": 0, "eventIds": [] },
+    { "id": "80000042", "uscfId": "80000042", "firstName": "Kevin", "lastName": "TestPerez42", "school": "", "district": "", "grade": "5th Grade", "section": "Elementary K-5", "email": "test42@example.com", "events": 0, "eventIds": [] },
     { "id": "80000043", "uscfId": "80000043", "firstName": "Amanda", "lastName": "TestRoberts43", "school": "", "district": "", "grade": "11th Grade", "section": "High School K-12", "email": "test43@example.com", "events": 0, "eventIds": [] },
     { "id": "80000044", "uscfId": "80000044", "firstName": "Brian", "lastName": "TestTurner44", "school": "", "district": "", "grade": "Kindergarten", "section": "Kinder-1st", "email": "test44@example.com", "events": 0, "eventIds": [] },
     { "id": "80000045", "uscfId": "80000045", "firstName": "Melissa", "lastName": "TestPhillips45", "school": "", "district": "", "grade": "1st Grade", "section": "Kinder-1st", "email": "test45@example.com", "events": 0, "eventIds": [] },
@@ -263,3 +263,5 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     { "id": "70000009", "uscfId": "70000009", "firstName": "Patricia", "lastName": "TestMoore9", "school": "", "district": "", "grade": "9th Grade", "section": "High School K-12", "email": "sharytest9@example.com", "events": 0, "eventIds": [] },
     { "id": "70000010", "uscfId": "70000010", "firstName": "Michael", "lastName": "TestTaylor10", "school": "", "district": "", "grade": "10th Grade", "section": "High School K-12", "email": "sharytest10@example.com", "events": 0, "eventIds": [] }
 ];
+
+    
