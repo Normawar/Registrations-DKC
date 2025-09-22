@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -196,7 +195,6 @@ const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
               Record Information
             </h3>
             
-            {/* Record Creation and Update Summary */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-md bg-muted/30">
                 <div>
                     <h4 className="font-medium text-sm text-muted-foreground mb-2">RECORD CREATED</h4>
@@ -224,7 +222,6 @@ const ChangeHistorySection = ({ player }: { player: MasterPlayer | null }) => {
                 </div>
             </div>
 
-            {/* Change History Details */}
             {player.changeHistory && player.changeHistory.length > 0 ? (
                 <div>
                     <h4 className="font-medium text-sm text-muted-foreground mb-3">CHANGE HISTORY</h4>
@@ -297,18 +294,9 @@ function DistrictRostersPageContent() {
   useEffect(() => {
     if (playerToEdit) {
       form.reset({
-        id: playerToEdit.id,
-        firstName: playerToEdit.firstName,
-        lastName: playerToEdit.lastName,
-        middleName: playerToEdit.middleName,
-        uscfId: playerToEdit.uscfId,
-        regularRating: playerToEdit.regularRating,
-        grade: playerToEdit.grade,
-        section: playerToEdit.section,
-        email: playerToEdit.email,
-        district: playerToEdit.district,
-        school: playerToEdit.school,
-        studentType: playerToEdit.studentType
+        ...playerToEdit,
+        dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
+        uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
       });
       if (playerToEdit.district) {
         setSchoolsForEditDistrict(getSchoolsForDistrict(playerToEdit.district));
@@ -488,11 +476,11 @@ function DistrictRostersPageContent() {
   const onEditSubmit = async (values: PlayerFormValues) => {
     if (!profile) return;
     
-    if (playerToEdit) { // Updating existing player
+    if (playerToEdit) {
         const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values };
         await updatePlayer(updatedPlayer, profile);
         toast({ title: "Player Updated" });
-    } else { // Creating new player
+    } else { 
         const newPlayer: MasterPlayer = {
             ...values,
             id: values.id || `temp_${Date.now()}`,
@@ -673,232 +661,232 @@ function DistrictRostersPageContent() {
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
             <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
                 <DialogHeader className="p-6 pb-4 border-b shrink-0">
-                <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
-                <DialogDescription>
+                  <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
+                  <DialogDescription>
                     {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
-                </DialogDescription>
+                  </DialogDescription>
                 </DialogHeader>
                 
                 <ScrollArea className="flex-1 overflow-y-auto">
-                <div className="p-6 space-y-6">
+                  <div className="p-6 space-y-6">
                     <Form {...form}>
-                    <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+                      <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
                         
                         <div className="space-y-4">
-                        <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField control={form.control} name="firstName" render={({ field }) => ( 
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>First Name</FormLabel>
                                 <FormControl><Input {...field} /></FormControl>
                                 <FormMessage />
-                            </FormItem> 
+                              </FormItem> 
                             )}/>
                             <FormField control={form.control} name="lastName" render={({ field }) => ( 
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>Last Name</FormLabel>
                                 <FormControl><Input {...field} /></FormControl>
                                 <FormMessage />
-                            </FormItem> 
+                              </FormItem> 
                             )}/>
                             <FormField control={form.control} name="middleName" render={({ field }) => ( 
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>Middle Name (Optional)</FormLabel>
-                                <FormControl><Input {...field} /></FormControl>
+                                <FormControl><Input {...field} value={field.value || ''} /></FormControl>
                                 <FormMessage />
-                            </FormItem> 
+                              </FormItem> 
                             )}/>
-                        </div>
+                          </div>
                         </div>
 
                         <div className="space-y-4">
-                        <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField control={form.control} name="district" render={({ field }) => (
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>District</FormLabel>
                                 <Select onValueChange={(v) => { 
-                                field.onChange(v); 
-                                setSchoolsForEditDistrict(getSchoolsForDistrict(v)); 
-                                form.setValue('school', ''); 
+                                  field.onChange(v); 
+                                  setSchoolsForEditDistrict(getSchoolsForDistrict(v)); 
+                                  form.setValue('school', ''); 
                                 }} value={field.value}>
-                                <FormControl>
+                                  <FormControl>
                                     <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
+                                  </FormControl>
+                                  <SelectContent>
                                     {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                                </SelectContent>
+                                  </SelectContent>
                                 </Select>
                                 <FormMessage />
-                            </FormItem>
+                              </FormItem>
                             )} />
                             
                             <FormField control={form.control} name="school" render={({ field }) => (
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>School</FormLabel>
                                 <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
+                                  <FormControl>
                                     <SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
+                                  </FormControl>
+                                  <SelectContent>
                                     {schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                                </SelectContent>
+                                  </SelectContent>
                                 </Select>
                                 <FormMessage />
-                            </FormItem>
+                              </FormItem>
                             )} />
-                        </div>
+                          </div>
 
-                        {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                          {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
                             <FormField
-                            control={form.control}
-                            name="studentType"
-                            render={({ field }) => (
+                              control={form.control}
+                              name="studentType"
+                              render={({ field }) => (
                                 <FormItem className="space-y-3">
-                                <FormLabel>Student Type</FormLabel>
-                                <FormControl>
+                                  <FormLabel>Student Type</FormLabel>
+                                  <FormControl>
                                     <RadioGroup 
-                                    onValueChange={field.onChange} 
-                                    value={field.value || 'independent'} 
-                                    className="flex items-center space-x-4"
+                                      onValueChange={field.onChange} 
+                                      value={field.value || 'independent'} 
+                                      className="flex items-center space-x-4"
                                     >
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                      <FormItem className="flex items-center space-x-2 space-y-0">
                                         <FormControl><RadioGroupItem value="independent" /></FormControl>
                                         <FormLabel className="font-normal">Independent</FormLabel>
-                                    </FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0">
+                                      </FormItem>
+                                      <FormItem className="flex items-center space-x-2 space-y-0">
                                         <FormControl><RadioGroupItem value="gt" /></FormControl>
                                         <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
-                                    </FormItem>
+                                      </FormItem>
                                     </RadioGroup>
-                                </FormControl>
-                                <FormMessage />
+                                  </FormControl>
+                                  <FormMessage />
                                 </FormItem>
-                            )}
+                              )}
                             />
-                        )}
+                          )}
                         </div>
 
                         <div className="space-y-4">
-                        <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField control={form.control} name="uscfId" render={({ field }) => (
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>USCF ID</FormLabel>
                                 <FormControl><Input {...field} /></FormControl>
                                 <FormDescription>Enter USCF ID number or "NEW" for new players.</FormDescription>
                                 <FormMessage />
-                            </FormItem>
+                              </FormItem>
                             )} />
                             
                             <FormField control={form.control} name="regularRating" render={({ field }) => (
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>Rating</FormLabel>
                                 <FormControl>
-                                <Input 
+                                  <Input 
                                     type="text" 
                                     placeholder="e.g., 1500, UNR, or NEW" 
                                     value={field.value?.toString() || ''} 
                                     onChange={(e) => { 
-                                    const value = e.target.value; 
-                                    if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { 
+                                      const value = e.target.value; 
+                                      if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { 
                                         field.onChange(undefined); 
-                                    } else { 
+                                      } else { 
                                         field.onChange(value); 
-                                    } 
+                                      } 
                                     }} 
-                                />
+                                  />
                                 </FormControl>
                                 <FormDescription>Enter rating, UNR, or NEW</FormDescription>
                                 <FormMessage />
-                            </FormItem>
+                              </FormItem>
                             )} />
-                        </div>
+                          </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField control={form.control} name="grade" render={({ field }) => (
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>Grade</FormLabel>
                                 <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
+                                  <FormControl>
                                     <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
+                                  </FormControl>
+                                  <SelectContent>
                                     {grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}
-                                </SelectContent>
+                                  </SelectContent>
                                 </Select>
                                 <FormMessage />
-                            </FormItem>
+                              </FormItem>
                             )} />
                             
                             <FormField control={form.control} name="section" render={({ field }) => (
-                            <FormItem>
+                              <FormItem>
                                 <FormLabel>Section</FormLabel>
                                 <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
+                                  <FormControl>
                                     <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
+                                  </FormControl>
+                                  <SelectContent>
                                     {sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}
-                                </SelectContent>
+                                  </SelectContent>
                                 </Select>
                                 <FormMessage />
-                            </FormItem>
+                              </FormItem>
                             )} />
-                        </div>
+                          </div>
                         </div>
 
                         <div className="space-y-4">
-                        <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
-                        
-                        <FormField control={form.control} name="email" render={({ field }) => (
+                          <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
+                          
+                          <FormField control={form.control} name="email" render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Email (Optional)</FormLabel>
-                            <FormControl><Input type="email" {...field} /></FormControl>
-                            <FormMessage />
+                              <FormLabel>Email</FormLabel>
+                              <FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl>
+                              <FormMessage />
                             </FormItem>
-                        )} />
+                          )} />
                         </div>
 
                         <Separator className="my-6" />
 
                         <ChangeHistorySection player={playerToEdit} />
 
-                    </form>
+                      </form>
                     </Form>
-                </div>
+                  </div>
                 </ScrollArea>
 
                 <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
-                <div className="flex justify-between">
+                  <div className="flex justify-between">
                     {playerToEdit ? (
-                    <Button 
+                      <Button 
                         type="button" 
                         variant="destructive" 
                         onClick={() => {
-                        handleDeletePlayer(playerToEdit);
-                        setIsEditOpen(false);
+                          handleDeletePlayer(playerToEdit);
+                          setIsEditOpen(false);
                         }}
-                    >
+                      >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete Player
-                    </Button>
+                      </Button>
                     ) : (
-                    <div></div>
+                      <div></div>
                     )}
                     
                     <div className="flex gap-3">
-                    <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>
+                      <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>
                         Cancel
-                    </Button>
-                    <Button type="submit" form="edit-player-form">
+                      </Button>
+                      <Button type="submit" form="edit-player-form">
                         {playerToEdit ? 'Save Changes' : 'Create Player'}
-                    </Button>
+                      </Button>
                     </div>
-                </div>
+                  </div>
                 </div>
                 
             </DialogContent>
@@ -930,11 +918,12 @@ function DistrictRostersPageContent() {
 
 function UserRosterPageContent() {
     const { profile, updateProfile } = useSponsorProfile();
-    const { database: allPlayers, isDbLoaded, addPlayer, updatePlayer } = useMasterDb();
+    const { database: allPlayers, isDbLoaded, addPlayer, updatePlayer, deletePlayer, dbDistricts, getSchoolsForDistrict } = useMasterDb();
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
     const { toast } = useToast();
+    const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
     
     const roster = useMemo(() => {
         if (!profile || !isDbLoaded) return [];
@@ -947,6 +936,31 @@ function UserRosterPageContent() {
         return [];
     }, [profile, allPlayers, isDbLoaded]);
 
+    const form = useForm<PlayerFormValues>({
+        resolver: zodResolver(playerFormSchema)
+    });
+    
+    const editDistrict = form.watch('district');
+
+    useEffect(() => {
+        if (editDistrict) {
+            setSchoolsForEditDistrict(getSchoolsForDistrict(editDistrict));
+        }
+    }, [editDistrict, getSchoolsForDistrict]);
+
+    useEffect(() => {
+        if (playerToEdit) {
+            form.reset({
+                ...playerToEdit,
+                dob: playerToEdit.dob ? new Date(playerToEdit.dob) : undefined,
+                uscfExpiration: playerToEdit.uscfExpiration ? new Date(playerToEdit.uscfExpiration) : undefined,
+            });
+             if (playerToEdit.district) {
+                setSchoolsForEditDistrict(getSchoolsForDistrict(playerToEdit.district));
+            }
+        }
+    }, [playerToEdit, form, getSchoolsForDistrict]);
+
     const handleEditPlayer = (player: MasterPlayer) => {
         setPlayerToEdit(player);
         setIsEditOpen(true);
@@ -954,6 +968,12 @@ function UserRosterPageContent() {
 
     const handleCreateNewPlayer = () => {
         setPlayerToEdit(null);
+        form.reset({
+            id: `temp_${Date.now()}`,
+            firstName: '',
+            lastName: '',
+            uscfId: 'NEW'
+        });
         setIsEditOpen(true);
     };
 
@@ -962,6 +982,28 @@ function UserRosterPageContent() {
         setIsSearchOpen(false);
     };
     
+    const onEditSubmit = async (values: PlayerFormValues) => {
+        if (!profile) return;
+        
+        if (playerToEdit) { // Updating existing player
+            const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values };
+            await updatePlayer(updatedPlayer, profile);
+            toast({ title: "Player Updated" });
+        } else { // Creating new player
+            const newPlayer: MasterPlayer = {
+                ...values,
+                id: values.id || `temp_${Date.now()}`,
+                events: 0,
+                eventIds: [],
+            } as MasterPlayer;
+            await addPlayer(newPlayer, profile);
+            toast({ title: "Player Created" });
+        }
+        
+        setIsEditOpen(false);
+        setPlayerToEdit(null);
+    };
+
     const handleSaveAndAddToRoster = async (values: PlayerFormValues) => {
       if (!profile) return;
       
@@ -984,35 +1026,13 @@ function UserRosterPageContent() {
           toast({ title: 'Player Updated' });
       }
 
-      // Add to individual roster if applicable
       if (profile.role === 'individual' && !roster.some(p => p.id === playerToSave.id)) {
         const updatedStudentIds = [...(profile.studentIds || []), playerToSave.id];
-        await updateProfile({ ...profile, studentIds: updatedStudentIds }, profile.user);
+        await updateProfile({ studentIds: updatedStudentIds }, profile.user);
         toast({ title: "Player Added to Your Roster" });
       }
 
       setIsEditOpen(false);
-    };
-
-    const handleSaveOnly = async (values: PlayerFormValues) => {
-        if (!profile) return;
-        const isNewPlayer = !playerToEdit || !allPlayers.some(p => p.id === playerToEdit.id);
-
-        if(isNewPlayer) {
-            const newPlayer = {
-                ...values,
-                id: values.id || `temp_${Date.now()}`,
-                events: 0,
-                eventIds: [],
-            } as MasterPlayer;
-            await addPlayer(newPlayer, profile);
-            toast({ title: "Player Created", description: `${values.firstName} has been added to the master database.` });
-        } else {
-            const updatedPlayer = { ...playerToEdit!, ...values };
-            await updatePlayer(updatedPlayer, profile);
-            toast({ title: "Player Updated", description: `${values.firstName}'s information has been updated.` });
-        }
-        setIsEditOpen(false);
     };
 
     return (
@@ -1066,19 +1086,215 @@ function UserRosterPageContent() {
             </Card>
             
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-              <DialogContent className="sm:max-w-xl">
-                <DialogHeader>
-                    <DialogTitle>{playerToEdit ? 'Edit Player' : 'Add Player to Roster'}</DialogTitle>
-                </DialogHeader>
-                 <p className="text-sm text-muted-foreground">Fill in the player's details to add or update them on your roster.</p>
-                <DialogFooter>
-                  <Button variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                  <Button onClick={() => handleSaveOnly(playerToEdit as any)}>Save Info</Button>
-                  <Button onClick={() => handleSaveAndAddToRoster(playerToEdit as any)}>
-                    {roster.some(p => p.id === playerToEdit?.id) ? 'Save and Update Roster' : 'Save and Add to Roster'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
+                <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
+                    <DialogHeader className="p-6 pb-4 border-b shrink-0">
+                    <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
+                    <DialogDescription>
+                        {playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}
+                    </DialogDescription>
+                    </DialogHeader>
+                    
+                    <ScrollArea className="flex-1 overflow-y-auto">
+                    <div className="p-6 space-y-6">
+                        <Form {...form}>
+                        <form id="edit-player-form-user" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
+                            
+                            <div className="space-y-4">
+                            <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <FormField control={form.control} name="firstName" render={({ field }) => ( 
+                                <FormItem>
+                                    <FormLabel>First Name</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem> 
+                                )}/>
+                                <FormField control={form.control} name="lastName" render={({ field }) => ( 
+                                <FormItem>
+                                    <FormLabel>Last Name</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem> 
+                                )}/>
+                                <FormField control={form.control} name="middleName" render={({ field }) => ( 
+                                <FormItem>
+                                    <FormLabel>Middle Name (Optional)</FormLabel>
+                                    <FormControl><Input {...field} value={field.value || ''} /></FormControl>
+                                    <FormMessage />
+                                </FormItem> 
+                                )}/>
+                            </div>
+                            </div>
+
+                            <div className="space-y-4">
+                            <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={form.control} name="district" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>District</FormLabel>
+                                    <Select onValueChange={(v) => { 
+                                    field.onChange(v); 
+                                    setSchoolsForEditDistrict(getSchoolsForDistrict(v)); 
+                                    form.setValue('school', ''); 
+                                    }} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                                    </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                                )} />
+                                
+                                <FormField control={form.control} name="school" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>School</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                    </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                                )} />
+                            </div>
+
+                            {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                                <FormField
+                                control={form.control}
+                                name="studentType"
+                                render={({ field }) => (
+                                    <FormItem className="space-y-3">
+                                    <FormLabel>Student Type</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup 
+                                        onValueChange={field.onChange} 
+                                        value={field.value || 'independent'} 
+                                        className="flex items-center space-x-4"
+                                        >
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl><RadioGroupItem value="independent" /></FormControl>
+                                            <FormLabel className="font-normal">Independent</FormLabel>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl><RadioGroupItem value="gt" /></FormControl>
+                                            <FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel>
+                                        </FormItem>
+                                        </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                                />
+                            )}
+                            </div>
+
+                            <div className="space-y-4">
+                            <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={form.control} name="uscfId" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>USCF ID</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormDescription>Enter USCF ID number or "NEW" for new players.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                                )} />
+                                
+                                <FormField control={form.control} name="regularRating" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Rating</FormLabel>
+                                    <FormControl>
+                                    <Input 
+                                        type="text" 
+                                        placeholder="e.g., 1500, UNR, or NEW" 
+                                        value={field.value?.toString() || ''} 
+                                        onChange={(e) => { 
+                                        const value = e.target.value; 
+                                        if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { 
+                                            field.onChange(undefined); 
+                                        } else { 
+                                            field.onChange(value); 
+                                        } 
+                                        }} 
+                                    />
+                                    </FormControl>
+                                    <FormDescription>Enter rating, UNR, or NEW</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                                )} />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField control={form.control} name="grade" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Grade</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Select grade" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {grades.map(grade => <SelectItem key={grade} value={grade}>{grade}</SelectItem>)}
+                                    </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                                )} />
+                                
+                                <FormField control={form.control} name="section" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Section</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Select section" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {sections.map(section => <SelectItem key={section} value={section}>{section}</SelectItem>)}
+                                    </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                                )} />
+                            </div>
+                            </div>
+
+                            <div className="space-y-4">
+                            <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
+                            
+                            <FormField control={form.control} name="email" render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl><Input type="email" {...field} value={field.value || ''}/></FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )} />
+                            </div>
+
+                            <Separator className="my-6" />
+
+                            <ChangeHistorySection player={playerToEdit} />
+
+                        </form>
+                        </Form>
+                    </div>
+                    </ScrollArea>
+
+                    <DialogFooter className="p-6 pt-4 border-t bg-muted/30 shrink-0">
+                        <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                        <Button onClick={form.handleSubmit(onEditSubmit)}>Save Info</Button>
+                        <Button onClick={form.handleSubmit(handleSaveAndAddToRoster)}>
+                            {roster.some(p => p.id === playerToEdit?.id) ? 'Save and Update Roster' : 'Save and Add to Roster'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
             </Dialog>
 
             <EnhancedPlayerSearchDialog
@@ -1116,3 +1332,5 @@ export default function RosterPage() {
     );
 }
 
+
+    
