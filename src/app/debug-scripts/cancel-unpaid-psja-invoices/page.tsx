@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import { collection, query, where, getDocs, writeBatch, doc } from 'firebase/firestore';
+import { collection, query, where, getDocs, writeBatch, doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/services/firestore-service';
 import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
