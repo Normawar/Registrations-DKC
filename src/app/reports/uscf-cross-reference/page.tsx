@@ -25,6 +25,8 @@ type UploadedPlayer = {
 type MatchedPlayer = UploadedPlayer & {
   firebaseUsdId: string;
   firebaseGrade: string;
+  firebaseSchool: string;
+  firebaseDistrict: string;
   firebaseTeam: string;
   matchStatus: 'found_by_id' | 'found_by_name' | 'not_found' | 'multiple_found';
 };
@@ -83,6 +85,8 @@ function UscfCrossReferencePageContent() {
             ...row,
             firebaseUsdId: firebasePlayer.uscfId,
             firebaseGrade: firebasePlayer.grade || 'Not Set',
+            firebaseSchool: firebasePlayer.school || 'Not Set',
+            firebaseDistrict: firebasePlayer.district || 'Not Set',
             firebaseTeam: generateTeamCode(firebasePlayer),
             matchStatus: 'found_by_id',
           };
@@ -121,6 +125,8 @@ function UscfCrossReferencePageContent() {
               ...row,
               firebaseUsdId: firebasePlayer.uscfId,
               firebaseGrade: firebasePlayer.grade || 'Not Set',
+              firebaseSchool: firebasePlayer.school || 'Not Set',
+              firebaseDistrict: firebasePlayer.district || 'Not Set',
               firebaseTeam: generateTeamCode(firebasePlayer),
               matchStatus: 'found_by_name',
             };
@@ -150,6 +156,8 @@ function UscfCrossReferencePageContent() {
                     ...row,
                     firebaseUsdId: bestMatch.uscfId,
                     firebaseGrade: bestMatch.grade || 'Not Set',
+                    firebaseSchool: bestMatch.school || 'Not Set',
+                    firebaseDistrict: bestMatch.district || 'Not Set',
                     firebaseTeam: generateTeamCode(bestMatch),
                     matchStatus: 'multiple_found', // Still flag as needing review
                 };
@@ -163,6 +171,8 @@ function UscfCrossReferencePageContent() {
         ...row,
         firebaseUsdId: 'Not Found',
         firebaseGrade: 'N/A',
+        firebaseSchool: 'N/A',
+        firebaseDistrict: 'N/A',
         firebaseTeam: 'N/A',
         matchStatus: 'not_found',
       };
@@ -192,6 +202,8 @@ function UscfCrossReferencePageContent() {
         'GRADE': p.GRADE,
         'FIREBASE USCF ID': p.firebaseUsdId,
         'FIREBASE GRADE': p.firebaseGrade,
+        'FIREBASE SCHOOL': p.firebaseSchool,
+        'FIREBASE DISTRICT': p.firebaseDistrict,
         'FIREBASE TEAM': p.firebaseTeam,
         'MATCH STATUS': p.matchStatus,
     }));
@@ -265,11 +277,11 @@ function UscfCrossReferencePageContent() {
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10">
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Name (Sheet)</TableHead>
                   <TableHead>USCF ID (Sheet)</TableHead>
-                  <TableHead>Grade (Sheet)</TableHead>
-                  <TableHead>Firebase Grade</TableHead>
-                  <TableHead>Firebase Team Code</TableHead>
+                  <TableHead>Firebase School</TableHead>
+                  <TableHead>Firebase District</TableHead>
+                  <TableHead>Firebase Team</TableHead>
                   <TableHead>Match Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -283,8 +295,8 @@ function UscfCrossReferencePageContent() {
                     <TableRow key={index} className={getStatusColor(player.matchStatus)}>
                       <TableCell>{player.Name}</TableCell>
                       <TableCell>{player.USCF}</TableCell>
-                      <TableCell>{player.GRADE}</TableCell>
-                      <TableCell className="font-medium">{player.firebaseGrade}</TableCell>
+                      <TableCell>{player.firebaseSchool}</TableCell>
+                      <TableCell>{player.firebaseDistrict}</TableCell>
                       <TableCell className="font-mono font-medium">{player.firebaseTeam}</TableCell>
                       <TableCell className="font-medium capitalize">
                         {player.matchStatus.replace(/_/g, ' ')}
