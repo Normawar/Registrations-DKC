@@ -46,13 +46,45 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
+const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
+const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
+
+const playerFormSchema = z.object({
+    id: z.string().optional(),
+    firstName: z.string().min(1, { message: "First Name is required." }),
+    lastName: z.string().min(1, { message: "Last Name is required." }),
+    uscfId: z.string().min(1, { message: "USCF ID is required." }),
+    regularRating: z.coerce.number().optional(),
+    grade: z.string().optional(),
+    section: z.string().optional(),
+    email: z.string().email({ message: "Please enter a valid email." }).optional(),
+});
+
+type PlayerFormValues = z.infer<typeof playerFormSchema>;
+
 function DistrictRostersPageContent() {
-  const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer } = useMasterDb();
+  const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, updatePlayer } = useMasterDb();
+  const { profile } = useSponsorProfile();
   const { toast } = useToast();
   
   const [rosterType, setRosterType] = useState<'real' | 'test'>('real');
@@ -66,6 +98,28 @@ function DistrictRostersPageContent() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
+
+  const form = useForm<PlayerFormValues>({
+    resolver: zodResolver(playerFormSchema)
+  });
+
+  useEffect(() => {
+    if (playerToEdit) {
+      form.reset({
+        id: playerToEdit.id,
+        firstName: playerToEdit.firstName,
+        lastName: playerToEdit.lastName,
+        uscfId: playerToEdit.uscfId,
+        regularRating: playerToEdit.regularRating,
+        grade: playerToEdit.grade,
+        section: playerToEdit.section,
+        email: playerToEdit.email,
+      });
+    }
+  }, [playerToEdit, form]);
 
   const schoolsForDistrict = useMemo(() => {
     return getSchoolsForDistrict(selectedDistrict);
@@ -176,6 +230,11 @@ function DistrictRostersPageContent() {
     link.click();
     document.body.removeChild(link);
   };
+
+  const handleEditPlayer = (player: MasterPlayer) => {
+    setPlayerToEdit(player);
+    setIsEditOpen(true);
+  };
   
   const handleDeletePlayer = (player: MasterPlayer) => {
     setPlayerToDelete(player);
@@ -218,6 +277,18 @@ function DistrictRostersPageContent() {
       } else {
           setSelectedPlayers(prev => prev.filter(id => !playerIds.includes(id)));
       }
+  };
+
+  const onEditSubmit = async (values: PlayerFormValues) => {
+    if (!playerToEdit || !profile) return;
+    const updatedPlayer: MasterPlayer = {
+      ...playerToEdit,
+      ...values
+    };
+    await updatePlayer(updatedPlayer, profile);
+    toast({ title: "Player Updated" });
+    setIsEditOpen(false);
+    setPlayerToEdit(null);
   };
 
   return (
@@ -348,11 +419,7 @@ function DistrictRostersPageContent() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={() => {
-                                        // This would open an edit dialog
-                                        // For now, we'll just log it.
-                                        console.log('Editing player:', p.id);
-                                    }}>
+                                    <DropdownMenuItem onClick={() => handleEditPlayer(p)}>
                                         <FilePenLine className="mr-2 h-4 w-4" />
                                         Edit Player
                                     </DropdownMenuItem>
@@ -373,6 +440,31 @@ function DistrictRostersPageContent() {
           ))}
         </div>
       </div>
+      
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Edit Player</DialogTitle>
+                <DialogDescription>
+                    Update the player's details below.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>
+                <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4">
+                     <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                     <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                     <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                     <FormField control={form.control} name="grade" render={({ field }) => ( <FormItem><FormLabel>Grade</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a grade" /></SelectTrigger></FormControl><SelectContent>{grades.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                     <FormField control={form.control} name="section" render={({ field }) => ( <FormItem><FormLabel>Section</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a section" /></SelectTrigger></FormControl><SelectContent>{sections.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                </form>
+            </Form>
+            <DialogFooter>
+                <DialogClose asChild><Button variant="ghost">Cancel</Button></DialogClose>
+                <Button type="submit" form="edit-player-form">Save Changes</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
        <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
