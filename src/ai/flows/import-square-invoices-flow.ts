@@ -55,11 +55,10 @@ const importSquareInvoicesFlow = ai.defineFlow(
     
     try {
         console.log('Fetching all invoices from Square. This might take a moment...');
-        const { result: { invoices } } = await squareClient.invoicesApi.listInvoices(
+        const { result: { invoices } } = await squareClient.invoicesApi.listInvoices({
             locationId,
-            undefined, // cursor for pagination
-            200 // limit
-        );
+            limit: 200
+        });
 
         if (!invoices) {
             return { created: 0, updated: 0, failed: 0, errors: ['No invoices found in Square for this location.'] };
@@ -169,55 +168,119 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
     if (!order.lineItems) return { selections, baseRegistrationFee };
   
     for (const item of order.lineItems) {
-      const itemNameLower = item.name?.toLowerCase() || '';
-      if (itemNameLower.includes('registration') || itemNameLower.includes('uscf')) {
-        
-        baseRegistrationFee = Math.max(baseRegistrationFee, Number(item.basePriceMoney?.amount || 0) / 100);
-        
-        const playerNotes = item.note?.split('\n') || [];
-        
-        for (const note of playerNotes) {
-          // New, more robust regex to capture name (with optional middle name/initial) and USCF ID
-          const match = note.match(/(?:[0-9]+\.?\s*)?([A-Z\s,'-]+\s[A-Z\s\.'-]+)\s\((\d{8,})\)/i);
-          
-          if (match) {
-            let [, rawName, uscfId] = match;
-            rawName = rawName.trim();
+        const itemNameLower = item.name?.toLowerCase() || '';
+        if (itemNameLower.includes('registration') || itemNameLower.includes('uscf')) {
             
-            const nameParts = rawName.split(/\s+/);
-            const lastName = nameParts.pop() || 'Unknown';
-            const firstName = nameParts.shift() || 'Unknown';
-            const middleName = nameParts.join(' ');
+            baseRegistrationFee = Math.max(baseRegistrationFee, Number(item.basePriceMoney?.amount || 0) / 100);
             
-            const playerDoc: Partial<MasterPlayer> = {
-                id: uscfId,
-                uscfId: uscfId,
-                firstName: firstName,
-                lastName: lastName,
-                middleName: middleName || undefined,
-                school: schoolName,
-                district: district,
-                createdAt: order.createdAt,
-            };
+            const playerNotes = item.note?.split('\n') || [];
             
-            // Remove any undefined keys before setting to Firestore
-            Object.keys(playerDoc).forEach(key => playerDoc[key as keyof typeof playerDoc] === undefined && delete playerDoc[key as keyof typeof playerDoc]);
+            for (const note of playerNotes) {
+                const playerInfo = parsePlayerFromNote(note.trim());
+                
+                if (playerInfo) {
+                    const { firstName, lastName, middleName, uscfId } = playerInfo;
+                    
+                    const playerDoc: Partial<MasterPlayer> = {
+                        id: uscfId,
+                        uscfId: uscfId,
+                        firstName: firstName,
+                        lastName: lastName,
+                        middleName: middleName || undefined,
+                        school: schoolName,
+                        district: district,
+                        createdAt: order.createdAt,
+                    };
+                    
+                    // Remove any undefined keys before setting to Firestore
+                    Object.keys(playerDoc).forEach(key => playerDoc[key as keyof typeof playerDoc] === undefined && delete playerDoc[key as keyof typeof playerDoc]);
 
-            const playerRef = doc(db, 'players', uscfId);
-            // Use merge to avoid overwriting existing data fields like grade, section, etc.
-            batch.set(playerRef, playerDoc, { merge: true });
+                    const playerRef = doc(db, 'players', uscfId);
+                    // Use merge to avoid overwriting existing data fields like grade, section, etc.
+                    batch.set(playerRef, playerDoc, { merge: true });
 
-            selections[uscfId] = {
-              playerName: `${firstName} ${lastName}`,
-              section: 'Unknown',
-              uscfStatus: 'renewing',
-              baseRegistrationFee,
-            };
-          }
+                    selections[uscfId] = {
+                        playerName: `${firstName} ${lastName}`,
+                        section: 'Unknown',
+                        uscfStatus: 'renewing',
+                        baseRegistrationFee,
+                    };
+                }
+            }
         }
-      }
     }
     
     return { selections, baseRegistrationFee };
-  }
+}
 
+function parsePlayerFromNote(note: string): { firstName: string; lastName: string; middleName?: string; uscfId: string } | null {
+    // Skip empty notes
+    if (!note || note.trim() === '') return null;
+    
+    // Remove any leading numbers/bullets (like "1. ", "2.", etc.)
+    const cleanNote = note.replace(/^\s*\d+\.?\s*/, '').trim();
+    
+    // Try multiple parsing patterns in order of specificity
+    const patterns = [
+        // Pattern 1: Name (USCF_ID) - original format
+        /^([A-Z\s,'-]+\s[A-Z\s\.'-]+)\s*\(\s*(\d{8,})\s*\)/i,
+        
+        // Pattern 2: Name USCF_ID Date - new format like "Ricardo Vela Jr 30298695 12/31/24"
+        /^([A-Z\s,'-]+)\s+(\d{8,})\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i,
+        
+        // Pattern 3: Name USCF_ID (without date)
+        /^([A-Z\s,'-]+)\s+(\d{8,})(?:\s|$)/i,
+        
+        // Pattern 4: USCF_ID Name (reverse order)
+        /^(\d{8,})\s+([A-Z\s,'-]+)(?:\s+\d{1,2}\/\d{1,2}\/\d{2,4})?/i,
+        
+        // Pattern 5: More flexible - any 8+ digit number with surrounding text
+        /([A-Z][A-Za-z\s,'-]*[A-Za-z])\s*[^\w]*(\d{8,})/i
+    ];
+    
+    for (const pattern of patterns) {
+        const match = cleanNote.match(pattern);
+        
+        if (match) {
+            let name: string;
+            let uscfId: string;
+            
+            // Handle different capture group arrangements
+            if (pattern === patterns[3]) { // USCF_ID Name pattern
+                uscfId = match[1];
+                name = match[2];
+            } else {
+                name = match[1];
+                uscfId = match[2];
+            }
+            
+            // Clean and validate USCF ID
+            uscfId = uscfId.trim();
+            if (uscfId.length < 8) continue; // Skip if USCF ID too short
+            
+            // Parse name parts
+            name = name.trim().replace(/[,]+/g, ' ').replace(/\s+/g, ' ');
+            const nameParts = name.split(/\s+/);
+            
+            if (nameParts.length < 2) continue; // Need at least first and last name
+            
+            const firstName = nameParts[0];
+            const lastName = nameParts[nameParts.length - 1];
+            const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : undefined;
+            
+            // Validate that we have reasonable name parts
+            if (firstName.length < 1 || lastName.length < 1) continue;
+            
+            return {
+                firstName,
+                lastName,
+                middleName,
+                uscfId
+            };
+        }
+    }
+    
+    // If no patterns matched, log for debugging
+    console.log(`Could not parse player info from note: "${note}"`);
+    return null;
+}
