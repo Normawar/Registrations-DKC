@@ -51,6 +51,7 @@ const baseUserFormSchema = z.object({
   isSponsor: z.boolean().default(false),
   isDistrictCoordinator: z.boolean().default(false),
   isOrganizer: z.boolean().default(false),
+  isIndividual: z.boolean().default(false), // Added Individual role
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   school: z.string().optional(),
@@ -60,14 +61,14 @@ const baseUserFormSchema = z.object({
   gtCoordinatorEmail: z.string().email({ message: 'Please enter a valid email.' }).optional().or(z.literal('')),
 });
 
-const refinedUserSchema = baseUserFormSchema.refine(data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer, {
+const refinedUserSchema = baseUserFormSchema.refine(data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer || data.isIndividual, {
     message: "A user must have at least one role.",
-    path: ["isSponsor"],
+    path: ["isSponsor"], // This path can stay, error shows under first checkbox
 });
 
 const createUserFormSchema = baseUserFormSchema.extend({
     password: z.string().min(6, 'Temporary password must be at least 6 characters.'),
-}).refine(data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer, {
+}).refine(data => data.isSponsor || data.isDistrictCoordinator || data.isOrganizer || data.isIndividual, {
     message: "A user must have at least one role.",
     path: ["isSponsor"],
 });
@@ -167,6 +168,7 @@ export default function UsersPage() {
             isSponsor: true,
             isDistrictCoordinator: false,
             isOrganizer: false,
+            isIndividual: false,
             firstName: '',
             lastName: '',
             school: '',
@@ -187,17 +189,15 @@ export default function UsersPage() {
         }
     };
     
-    // 1. FIXED useEffect - Only check the appropriate role checkbox
     useEffect(() => {
       if (isDialogOpen && editingUser) {
         const initialDistrict = editingUser.district || 'None';
         form.reset({
             email: editingUser.email || '',
-            // FIX: Only check sponsor if role is specifically 'sponsor'
             isSponsor: editingUser.role === 'sponsor',
-            // FIX: Check district coordinator if role is 'district_coordinator' OR if they have the flag
             isDistrictCoordinator: editingUser.role === 'district_coordinator' || editingUser.isDistrictCoordinator === true,
             isOrganizer: editingUser.role === 'organizer',
+            isIndividual: editingUser.role === 'individual',
             firstName: editingUser.firstName || '',
             lastName: editingUser.lastName || '',
             school: editingUser.school || '',
@@ -215,7 +215,6 @@ export default function UsersPage() {
         setIsDialogOpen(true);
     };
 
-    // 2. FIXED onSubmit - Clean up ALL temporary fields
     const onSubmit = async (values: UserFormValues) => {
         if (!editingUser || !db) return;
 
@@ -240,21 +239,18 @@ export default function UsersPage() {
                 finalRole = 'individual'; 
             }
 
-            // Create a clean object for saving
             const dataToSave: any = { 
                 ...values, 
                 role: finalRole,
-                // Ensure isDistrictCoordinator boolean field matches the role
                 isDistrictCoordinator: finalRole === 'district_coordinator' || values.isDistrictCoordinator,
-                updatedAt: new Date().toISOString() // Add timestamp
+                updatedAt: new Date().toISOString()
             };
 
-            // FIX: Delete ALL temporary role flags before saving
             delete dataToSave.isSponsor;
             delete dataToSave.isOrganizer;
-            // Note: Keep isDistrictCoordinator as it's a real field in your User type
+            delete dataToSave.isIndividual;
 
-            console.log('Updating user with data:', dataToSave); // Debug log
+            console.log('Updating user with data:', dataToSave);
 
             await setDoc(userRef, dataToSave, { merge: true });
 
@@ -271,7 +267,7 @@ export default function UsersPage() {
     const handleCreateUser = async (values: CreateUserFormValues) => {
         setIsCreatingUser(true);
         try {
-            const { password, isSponsor, isOrganizer, ...profileData } = values;
+            const { password, isSponsor, isOrganizer, isIndividual, ...profileData } = values;
 
             let finalRole: User['role'];
             if (isOrganizer) {
@@ -326,7 +322,6 @@ export default function UsersPage() {
 
         try {
             const usersRef = collection(db, 'users');
-            // Firestore 'in' queries are limited to 30 items. We need to batch this.
             const BATCH_SIZE = 30;
             let successfullyDeletedCount = 0;
             const allFoundEmails = new Set<string>();
@@ -553,6 +548,9 @@ export default function UsersPage() {
                                             <FormField control={form.control} name="isOrganizer" render={({ field }) => (
                                                 <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Organizer</FormLabel></FormItem>
                                             )} />
+                                            <FormField control={form.control} name="isIndividual" render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Individual</FormLabel></FormItem>
+                                            )} />
                                         </div>
                                         <FormMessage />
                                     </FormItem>
@@ -621,6 +619,9 @@ export default function UsersPage() {
                                             )} />
                                             <FormField control={createForm.control} name="isOrganizer" render={({ field }) => (
                                                 <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Organizer</FormLabel></FormItem>
+                                            )} />
+                                            <FormField control={createForm.control} name="isIndividual" render={({ field }) => (
+                                                <FormItem className="flex flex-row items-center space-x-3 space-y-0"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel>Individual</FormLabel></FormItem>
                                             )} />
                                         </div>
                                         <FormMessage />
