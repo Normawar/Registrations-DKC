@@ -29,7 +29,7 @@ export type UploadProgress = {
 interface MasterDbContextType {
   database: MasterPlayer[];
   schools: School[];
-  addPlayer: (player: MasterPlayer) => Promise<void>;
+  addPlayer: (player: MasterPlayer, editingProfile: SponsorProfile | null) => Promise<void>;
   updatePlayer: (player: MasterPlayer, editingProfile: SponsorProfile | null) => Promise<void>;
   deletePlayer: (playerId: string) => Promise<void>;
   addSchool: (school: Omit<School, 'id' | 'teamCode' | 'notes'>) => Promise<void>;
@@ -340,10 +340,21 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: 'Database Refreshed', description: 'Fetched the latest player and school data from the server.' });
   };
 
-  const addPlayer = async (player: MasterPlayer) => {
+  const addPlayer = async (player: MasterPlayer, editingProfile: SponsorProfile | null) => {
     if (!db) return;
     try {
-        const cleanedPlayer = removeUndefined(player);
+        const now = new Date().toISOString();
+        const creatorName = editingProfile ? `${editingProfile.firstName} ${editingProfile.lastName}`.trim() : 'Unknown User';
+
+        const newPlayer: MasterPlayer = {
+            ...player,
+            dateCreated: now,
+            createdBy: creatorName,
+            updatedAt: now, // Also set updatedAt on creation
+            dateUpdated: now,
+            updatedBy: creatorName,
+        };
+        const cleanedPlayer = removeUndefined(newPlayer);
         const playerRef = doc(db, 'players', cleanedPlayer.id);
         await setDoc(playerRef, cleanedPlayer, { merge: true });
         await loadDatabase();
@@ -360,13 +371,12 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     const oldPlayer = oldPlayerDoc.exists() ? oldPlayerDoc.data() as MasterPlayer : null;
 
     if (!oldPlayer) {
-        return addPlayer(updatedPlayer); // Fallback to add if not found
+        return addPlayer(updatedPlayer, editingProfile); // Fallback to add if not found
     }
 
     const changedFields: { field: string; oldValue: any; newValue: any }[] = [];
     (Object.keys(updatedPlayer) as Array<keyof MasterPlayer>).forEach(key => {
         if (updatedPlayer[key] !== oldPlayer[key]) {
-            // Replace undefined with null for Firestore compatibility
             const oldValue = oldPlayer[key] === undefined ? null : oldPlayer[key];
             const newValue = updatedPlayer[key] === undefined ? null : updatedPlayer[key];
             
@@ -383,17 +393,21 @@ export const MasterDbProvider = ({ children }: { children: ReactNode }) => {
     let finalPlayer = { ...updatedPlayer };
 
     if (changedFields.length > 0 && editingProfile) {
+        const now = new Date().toISOString();
+        const updaterName = `${editingProfile.firstName} ${editingProfile.lastName}`.trim();
         const newHistoryEntry = {
-            timestamp: new Date().toISOString(),
+            timestamp: now,
             userId: editingProfile?.uid || 'unknown',
-            userName: `${editingProfile?.firstName} ${editingProfile?.lastName}`.trim() || editingProfile?.email || 'Unknown User',
+            userName: updaterName || editingProfile?.email || 'Unknown User',
             changes: changedFields,
         };
 
         finalPlayer = {
             ...updatedPlayer,
             changeHistory: [...(oldPlayer.changeHistory || []), newHistoryEntry],
-            updatedAt: new Date().toISOString(),
+            updatedAt: now,
+            dateUpdated: now,
+            updatedBy: updaterName,
         };
     } else {
         return; // No changes
