@@ -1,4 +1,8 @@
-# api/uscf-lookup/route.ts - USCF ID lookup endpoint
+
+// This file is an example of what the Next.js API route might look like.
+// It was converted from a Python script and shows the intended structure.
+// The actual, functional API routes are located in `src/app/api/`.
+
 import { NextRequest, NextResponse } from 'next/server';
 
 // You'll need to implement the Python USCF lookup as a service or convert to Node.js

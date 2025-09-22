@@ -1,5 +1,4 @@
 
-
 export type MasterPlayer = {
   id: string;
   uscfId: string;
@@ -256,5 +255,3 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     { "id": "90000099", "uscfId": "90000099", "firstName": "William", "lastName": "TestRodriguez", "state": "TX", "grade": "7th Grade", "section": "Middle School K-8", "email": "teststudent99@test.com", "school": "Test School", "district": "Test District", "events": 0, "eventIds": [] },
     { "id": "90000100", "uscfId": "90000100", "firstName": "Sophia", "lastName": "TestMartinez", "state": "TX", "grade": "8th Grade", "section": "Middle School K-8", "email": "teststudent100@test.com", "school": "Test School", "district": "Test District", "events": 0, "eventIds": [] }
 ];
-
-    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback, useMemo } from 'react';
@@ -10,7 +11,7 @@ import { isValid, parse, format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { type School } from '@/lib/data/school-data';
 import { generateTeamCode } from '@/lib/school-utils';
-import { type SearchCriteria, type SearchResult } from '@/lib/data/search-types';
+import type { SearchCriteria, SearchResult } from '@/lib/data/search-types';
 
 
 // --- Types ---

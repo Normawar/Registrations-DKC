@@ -1,8 +1,11 @@
+
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useMasterDb, type SearchCriteria, type MasterPlayer } from '@/context/master-db-context';
-import { useSponsorProfile, type SponsorProfile } from './use-sponsor-profile';
+import { useMasterDb } from '@/context/master-db-context';
+import type { SearchCriteria } from '@/lib/data/search-types';
+import type { MasterPlayer } from '@/lib/data/full-master-player-data';
+import { type SponsorProfile } from './use-sponsor-profile';
 
 type UsePlayerSearchProps = {
   initialFilters?: Partial<SearchCriteria>;
@@ -77,25 +80,25 @@ export function usePlayerSearch({
     
     setIsLoading(true);
     
-    const handler = setTimeout(() => {
-        const searchCriteria: SearchCriteria = {
+    const handler = setTimeout(async () => {
+        const searchCriteria: Partial<SearchCriteria> = {
           ...filters,
           excludeIds: excludeIdsRef.current,
-          maxResults,
+          pageSize: maxResults,
           searchUnassigned: searchUnassignedRef.current,
           sponsorProfile: sponsorProfileRef.current,
           portalType: portalTypeRef.current,
         };
         
-        const results = searchPlayers(searchCriteria);
-        setSearchResults(results);
+        const results = await searchPlayers(searchCriteria);
+        setSearchResults(results.players);
         setIsLoading(false);
     }, 300);
     
     return () => {
         clearTimeout(handler);
     };
-  }, [filters, isDbLoaded, maxResults, hasActiveFilters, searchPlayers]); // searchPlayers is now stable
+  }, [filters, isDbLoaded, maxResults, hasActiveFilters, searchPlayers]);
   
   const hasResults = searchResults.length > 0;
 
