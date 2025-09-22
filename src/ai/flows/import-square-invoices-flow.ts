@@ -39,13 +39,12 @@ const importSquareInvoicesFlow = ai.defineFlow(
       return { created: 0, updated: 0, failed: 1, errors: ['Firestore is not initialized.'] };
     }
 
-    // Hard-coded Square client initialization - same as other flows
     console.log('Initializing Square client with hard-coded values...');
     const squareClient = new Client({
       accessToken: "EAAAl7QTGApQ59SrmHVdLlPWYOMIEbfl0ZjmtCWWL4_hm4r4bAl7ntqxnfKlv1dC",
       environment: Environment.Production,
     });
-    const locationId = "CTED7GVSVH5H8"; // Same locationId as other flows
+    const locationId = "CTED7GVSVH5H8";
     console.log('Square client initialized with hard-coded production credentials');
     
     let createdCount = 0;
@@ -55,6 +54,7 @@ const importSquareInvoicesFlow = ai.defineFlow(
     
     try {
         console.log('Fetching all invoices from Square. This might take a moment...');
+        // Fixed: Pass locationId and limit as separate parameters
         const { result: { invoices } } = await squareClient.invoicesApi.listInvoices(locationId, undefined, 200);
 
         if (!invoices) {
@@ -81,12 +81,10 @@ const importSquareInvoicesFlow = ai.defineFlow(
                 const querySnapshot = await getDocs(q);
 
                 if (querySnapshot.empty) {
-                    // Create new record
                     const docRef = doc(db, 'invoices', invoice.id!);
                     batch.set(docRef, invoiceData);
                     createdCount++;
                 } else {
-                    // Update existing record
                     const docRef = doc(db, 'invoices', querySnapshot.docs[0].id);
                     batch.update(docRef, invoiceData);
                     updatedCount++;
@@ -157,7 +155,6 @@ async function processSingleInvoice(client: Client, invoice: Invoice, batch: Fir
     };
 }
 
-
 async function parseSelectionsFromOrder(order: Order, schoolName: string, district: string, batch: FirebaseFirestore.WriteBatch) {
     const selections: Record<string, any> = {};
     let baseRegistrationFee = 0;
@@ -176,11 +173,14 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
                 const playerInfo = parsePlayerFromNote(note.trim());
                 
                 if (playerInfo) {
-                    const { firstName, lastName, middleName, uscfId } = playerInfo;
+                    const { firstName, lastName, middleName, uscfId, isNewPlayer } = playerInfo;
+                    
+                    // Generate a temporary ID for new players (you might want to adjust this logic)
+                    const playerId = uscfId || `NEW_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                     
                     const playerDoc: Partial<MasterPlayer> = {
-                        id: uscfId,
-                        uscfId: uscfId,
+                        id: playerId,
+                        uscfId: uscfId || undefined, // Don't set uscfId for new players
                         firstName: firstName,
                         lastName: lastName,
                         middleName: middleName || undefined,
@@ -192,15 +192,15 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
                     // Remove any undefined keys before setting to Firestore
                     Object.keys(playerDoc).forEach(key => playerDoc[key as keyof typeof playerDoc] === undefined && delete playerDoc[key as keyof typeof playerDoc]);
 
-                    const playerRef = doc(db, 'players', uscfId);
-                    // Use merge to avoid overwriting existing data fields like grade, section, etc.
+                    const playerRef = doc(db, 'players', playerId);
                     batch.set(playerRef, playerDoc, { merge: true });
 
-                    selections[uscfId] = {
+                    selections[playerId] = {
                         playerName: `${firstName} ${lastName}`,
                         section: 'Unknown',
-                        uscfStatus: 'renewing',
+                        uscfStatus: isNewPlayer ? 'new' : 'renewing',
                         baseRegistrationFee,
+                        isNewPlayer: isNewPlayer,
                     };
                 }
             }
@@ -210,19 +210,22 @@ async function parseSelectionsFromOrder(order: Order, schoolName: string, distri
     return { selections, baseRegistrationFee };
 }
 
-function parsePlayerFromNote(note: string): { firstName: string; lastName: string; middleName?: string; uscfId: string } | null {
+function parsePlayerFromNote(note: string): { firstName: string; lastName: string; middleName?: string; uscfId?: string; isNewPlayer: boolean } | null {
     // Skip empty notes
     if (!note || note.trim() === '') return null;
     
     // Remove any leading numbers/bullets (like "1. ", "2.", etc.)
     const cleanNote = note.replace(/^\s*\d+\.?\s*/, '').trim();
     
+    // Check if this is a new player
+    const isNewPlayer = cleanNote.toLowerCase().includes('new');
+    
     // Try multiple parsing patterns in order of specificity
     const patterns = [
         // Pattern 1: Name (USCF_ID) - original format
         /^([A-Z\s,'-]+\s[A-Z\s\.'-]+)\s*\(\s*(\d{8,})\s*\)/i,
         
-        // Pattern 2: Name USCF_ID Date - new format like "Ricardo Vela Jr 30298695 12/31/24"
+        // Pattern 2: Name USCF_ID Date - format like "Ricardo Vela Jr 30298695 12/31/24"
         /^([A-Z\s,'-]+)\s+(\d{8,})\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i,
         
         // Pattern 3: Name USCF_ID (without date)
@@ -231,7 +234,13 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
         // Pattern 4: USCF_ID Name (reverse order)
         /^(\d{8,})\s+([A-Z\s,'-]+)(?:\s+\d{1,2}\/\d{1,2}\/\d{2,4})?/i,
         
-        // Pattern 5: More flexible - any 8+ digit number with surrounding text
+        // Pattern 5: Name NEW - for new players like "Emily Requenez NEW"
+        /^([A-Z][A-Za-z\s,'-]+?)\s+NEW\s*$/i,
+        
+        // Pattern 6: Just Name (for any remaining name-only cases)
+        /^([A-Z][A-Za-z\s,'-]{2,})\s*$/i,
+        
+        // Pattern 7: More flexible - any 8+ digit number with surrounding text
         /([A-Z][A-Za-z\s,'-]*[A-Za-z])\s*[^\w]*(\d{8,})/i
     ];
     
@@ -240,20 +249,27 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
         
         if (match) {
             let name: string;
-            let uscfId: string;
+            let uscfId: string | undefined;
             
             // Handle different capture group arrangements
             if (pattern === patterns[3]) { // USCF_ID Name pattern
                 uscfId = match[1];
                 name = match[2];
+            } else if (pattern === patterns[4] || pattern === patterns[5]) { // Name NEW or Just Name patterns
+                name = match[1];
+                uscfId = undefined; // No USCF ID for these patterns
             } else {
                 name = match[1];
                 uscfId = match[2];
             }
             
-            // Clean and validate USCF ID
-            uscfId = uscfId.trim();
-            if (uscfId.length < 8) continue; // Skip if USCF ID too short
+            // Clean and validate USCF ID if present
+            if (uscfId) {
+                uscfId = uscfId.trim();
+                if (uscfId.length < 8) {
+                    uscfId = undefined; // Invalid USCF ID
+                }
+            }
             
             // Parse name parts
             name = name.trim().replace(/[,]+/g, ' ').replace(/\s+/g, ' ');
@@ -261,9 +277,24 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
             
             if (nameParts.length < 2) continue; // Need at least first and last name
             
-            const firstName = nameParts[0];
-            const lastName = nameParts[nameParts.length - 1];
-            const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : undefined;
+            // Handle names with suffixes (Jr, Sr, III, etc.)
+            let firstName = nameParts[0];
+            let lastName = nameParts[nameParts.length - 1];
+            let middleName: string | undefined;
+            
+            // Check if last part is a suffix
+            const suffixes = ['jr', 'sr', 'ii', 'iii', 'iv', 'v'];
+            const lastPartLower = lastName.toLowerCase().replace(/[^a-z]/g, '');
+            
+            if (suffixes.includes(lastPartLower) && nameParts.length > 2) {
+                // Last part is a suffix, so actual last name is second to last
+                const suffix = lastName;
+                lastName = nameParts[nameParts.length - 2];
+                middleName = nameParts.length > 3 ? nameParts.slice(1, -2).join(' ') + ' ' + suffix : suffix;
+            } else if (nameParts.length > 2) {
+                // Regular middle name case
+                middleName = nameParts.slice(1, -1).join(' ');
+            }
             
             // Validate that we have reasonable name parts
             if (firstName.length < 1 || lastName.length < 1) continue;
@@ -272,7 +303,8 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
                 firstName,
                 lastName,
                 middleName,
-                uscfId
+                uscfId,
+                isNewPlayer
             };
         }
     }
@@ -280,4 +312,26 @@ function parsePlayerFromNote(note: string): { firstName: string; lastName: strin
     // If no patterns matched, log for debugging
     console.log(`Could not parse player info from note: "${note}"`);
     return null;
+}
+
+// Helper function to test the enhanced parser
+function testEnhancedPlayerParser() {
+    const testCases = [
+        "Ricardo Vela Jr 30298695 12/31/24",
+        "John Smith (12345678)",
+        "Emily Requenez NEW",
+        "Francisco Morales NEW",
+        "Mikayla Anzaldu NEW",
+        "1. Ricardo Vela Jr 30298695 12/31/24",
+        "2. John Smith 12345678",
+        "87654321 Jane Doe 03/20/25",
+        "Alice Johnson-Smith 11223344 12/31/24",
+        "Bob O'Connor Jr. NEW"
+    ];
+    
+    console.log("Testing enhanced player parser:");
+    testCases.forEach(testCase => {
+        const result = parsePlayerFromNote(testCase);
+        console.log(`"${testCase}" -> `, result);
+    });
 }
