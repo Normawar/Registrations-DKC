@@ -66,28 +66,16 @@ function UscfCrossReferencePageContent() {
 
   const crossReferenceData = (data: UploadedPlayer[]) => {
     const playerMapById = new Map<string, MasterPlayer>();
-    const playerMapByName = new Map<string, MasterPlayer[]>();
-
     allPlayers.forEach(p => {
-      // Index by USCF ID
       if (p.uscfId && p.uscfId !== 'NEW') {
         playerMapById.set(p.uscfId, p);
-      }
-      
-      // Index by normalized full name
-      const normalizedName = `${p.firstName?.trim() || ''} ${p.lastName?.trim() || ''}`.toLowerCase();
-      if (normalizedName.trim()) {
-        if (!playerMapByName.has(normalizedName)) {
-          playerMapByName.set(normalizedName, []);
-        }
-        playerMapByName.get(normalizedName)!.push(p);
       }
     });
 
     const newMatchedData = data.map((row): MatchedPlayer => {
       const uscfId = row.USCF?.trim();
       
-      // 1. Try to match by USCF ID first
+      // 1. Try to match by USCF ID first (highest accuracy)
       if (uscfId) {
         const firebasePlayer = playerMapById.get(uscfId);
         if (firebasePlayer) {
@@ -101,29 +89,41 @@ function UscfCrossReferencePageContent() {
         }
       }
 
-      // 2. If no USCF ID match, try to match by name
-      const normalizedRowName = row.Name?.trim().toLowerCase();
-      const nameMatches = playerMapByName.get(normalizedRowName);
+      // 2. If no USCF ID match, try to match by name flexibly
+      const rawName = row.Name?.trim().toLowerCase();
+      if (rawName) {
+        const nameParts = rawName.split(/\s+/).filter(Boolean);
+        if (nameParts.length >= 2) {
+          const firstName = nameParts[0];
+          const lastName = nameParts[nameParts.length - 1];
 
-      if (nameMatches && nameMatches.length === 1) {
-        // Found a single, unique match by name
-        const firebasePlayer = nameMatches[0];
-        return {
-          ...row,
-          firebaseUsdId: firebasePlayer.uscfId,
-          firebaseGrade: firebasePlayer.grade || 'Not Set',
-          firebaseTeam: generateTeamCode(firebasePlayer),
-          matchStatus: 'found_by_name',
-        };
-      } else if (nameMatches && nameMatches.length > 1) {
-        // Multiple matches found for the same name
-         return {
-          ...row,
-          firebaseUsdId: 'Multiple Matches',
-          firebaseGrade: 'N/A',
-          firebaseTeam: 'N/A',
-          matchStatus: 'multiple_found',
-        };
+          // Find players where both first and last names appear in their full name
+          const potentialMatches = allPlayers.filter(p => {
+            const playerFullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase();
+            return playerFullName.includes(firstName) && playerFullName.includes(lastName);
+          });
+
+          if (potentialMatches.length === 1) {
+            // Found a single, unique match by name
+            const firebasePlayer = potentialMatches[0];
+            return {
+              ...row,
+              firebaseUsdId: firebasePlayer.uscfId,
+              firebaseGrade: firebasePlayer.grade || 'Not Set',
+              firebaseTeam: generateTeamCode(firebasePlayer),
+              matchStatus: 'found_by_name',
+            };
+          } else if (potentialMatches.length > 1) {
+            // Multiple matches found for the same name, flag for manual review
+             return {
+              ...row,
+              firebaseUsdId: 'Multiple Matches',
+              firebaseGrade: 'N/A',
+              firebaseTeam: 'N/A',
+              matchStatus: 'multiple_found',
+            };
+          }
+        }
       }
 
       // 3. If no match found by ID or name
