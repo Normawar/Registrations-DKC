@@ -129,7 +129,7 @@ function DistrictRostersPageContent() {
   const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   
-  const [isEditOpen, setIsEditOpen] = useState(true); // Changed to true to show dialog
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
   const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
 
@@ -138,14 +138,6 @@ function DistrictRostersPageContent() {
   });
   
   const editDistrict = form.watch('district');
-  
-  // Effect to pre-populate the dialog for demonstration
-  useEffect(() => {
-    if (isDbLoaded && allPlayers.length > 0) {
-      const samplePlayer = allPlayers.find(p => p.id === "90000001") || allPlayers[0];
-      setPlayerToEdit(samplePlayer);
-    }
-  }, [isDbLoaded, allPlayers]);
 
   useEffect(() => {
     if (editDistrict) {
@@ -556,6 +548,29 @@ function DistrictRostersPageContent() {
                         )}
                         <FormField control={form.control} name="uscfId" render={({ field }) => (<FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Enter USCF ID number or "NEW" for new players.</FormDescription><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="regularRating" render={({ field }) => (<FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="e.g., 1500, UNR, or NEW" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormDescription>Enter rating, UNR, or NEW</FormDescription><FormMessage /></FormItem>)} />
+                        
+                        <div className="flex justify-between pt-6 border-t">
+                          <Button 
+                            type="button" 
+                            variant="destructive" 
+                            onClick={() => {
+                              if (playerToEdit) {
+                                handleDeletePlayer(playerToEdit);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Player
+                          </Button>
+                          <div className="flex gap-3">
+                            <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button type="submit">
+                              Save Changes
+                            </Button>
+                          </div>
+                        </div>
                       </form>
                     </Form>
                   </div>
@@ -564,10 +579,6 @@ function DistrictRostersPageContent() {
                   <ChangeHistoryTab player={playerToEdit} />
                 </TabsContent>
               </div>
-              <DialogFooter className="p-6 pt-4 border-t shrink-0">
-                <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                <Button type="submit" form="edit-player-form">Save Changes</Button>
-              </DialogFooter>
             </Tabs>
           </DialogContent>
         </Dialog>
