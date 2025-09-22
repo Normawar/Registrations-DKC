@@ -25,7 +25,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Download, ArrowUpDown, ArrowUp, ArrowDown, Check } from 'lucide-react';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Papa from 'papaparse';
@@ -135,6 +135,24 @@ function DistrictRostersPageContent() {
     link.click();
     document.body.removeChild(link);
   };
+  
+  const handleExportAll = () => {
+    let allFilteredPlayers: MasterPlayer[] = [];
+    schoolRosters.forEach(roster => {
+        allFilteredPlayers = allFilteredPlayers.concat(roster.players);
+    });
+    
+    if (allFilteredPlayers.length === 0) return;
+
+    const csv = Papa.unparse(allFilteredPlayers);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `${selectedDistrict}_full_roster_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <AppLayout>
@@ -193,6 +211,10 @@ function DistrictRostersPageContent() {
                     <Checkbox id="show-with-players" checked={showOnlyWithPlayers} onCheckedChange={(checked) => setShowOnlyWithPlayers(!!checked)} />
                     <Label htmlFor="show-with-players" className="text-sm font-medium">Show only schools with players</Label>
                 </div>
+                <Button onClick={handleExportAll} disabled={schoolRosters.reduce((sum, r) => sum + r.players.length, 0) === 0}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export All Rosters ({schoolRosters.reduce((sum, r) => sum + r.players.length, 0)})
+                </Button>
             </div>
           </CardContent>
         </Card>
@@ -214,12 +236,14 @@ function DistrictRostersPageContent() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10"><Checkbox /></TableHead>
-                        <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')} className="px-0">Player Name {getSortIcon('lastName')}</Button></TableHead>
-                        <TableHead><Button variant="ghost" onClick={() => requestSort('teamCode')} className="px-0">Team Code {getSortIcon('teamCode')}</Button></TableHead>
-                        <TableHead><Button variant="ghost" onClick={() => requestSort('uscfId')} className="px-0">USCF ID {getSortIcon('uscfId')}</Button></TableHead>
-                        <TableHead><Button variant="ghost" onClick={() => requestSort('regularRating')} className="px-0">Rating {getSortIcon('regularRating')}</Button></TableHead>
-                        <TableHead><Button variant="ghost" onClick={() => requestSort('grade')} className="px-0">Grade {getSortIcon('grade')}</Button></TableHead>
-                        <TableHead><Button variant="ghost" onClick={() => requestSort('section')} className="px-0">Section {getSortIcon('section')}</Button></TableHead>
+                        <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')} className="px-0 flex items-center gap-1">Player Name {getSortIcon('lastName')}</Button></TableHead>
+                        <TableHead><Button variant="ghost" onClick={() => requestSort('teamCode')} className="px-0 flex items-center gap-1">Team Code {getSortIcon('teamCode')}</Button></TableHead>
+                        <TableHead><Button variant="ghost" onClick={() => requestSort('uscfId')} className="px-0 flex items-center gap-1">USCF ID {getSortIcon('uscfId')}</Button></TableHead>
+                        <TableHead><Button variant="ghost" onClick={() => requestSort('regularRating')} className="px-0 flex items-center gap-1">Rating {getSortIcon('regularRating')}</Button></TableHead>
+                        <TableHead><Button variant="ghost" onClick={() => requestSort('grade')} className="px-0 flex items-center gap-1">Grade {getSortIcon('grade')}</Button></TableHead>
+                        <TableHead><Button variant="ghost" onClick={() => requestSort('section')} className="px-0 flex items-center gap-1">Section {getSortIcon('section')}</Button></TableHead>
+                        <TableHead>GT</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -232,6 +256,8 @@ function DistrictRostersPageContent() {
                           <TableCell>{p.regularRating || 'N/A'}</TableCell>
                           <TableCell>{p.grade}</TableCell>
                           <TableCell>{p.section}</TableCell>
+                          <TableCell>{p.studentType === 'gt' && <Check className="text-green-600 h-5 w-5" />}</TableCell>
+                          <TableCell>...</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
