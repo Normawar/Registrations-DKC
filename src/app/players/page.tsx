@@ -177,12 +177,16 @@ function PlayersPageContent() {
 
   const handlePlayerSelected = (player: any) => {
     const isMasterPlayer = 'uscfId' in player;
+    
+    // Add a null check for player.name
+    const nameParts = player.name ? player.name.split(', ') : ['Unknown', 'Player'];
+
     const playerToEdit: MasterPlayer = isMasterPlayer ? player : {
       id: player.uscf_id,
       uscfId: player.uscf_id,
-      firstName: player.name.split(', ')[1] || '',
-      lastName: player.name.split(', ')[0] || '',
-      middleName: player.name.split(', ').length > 2 ? player.name.split(', ')[2] : '',
+      firstName: nameParts[1] || '',
+      lastName: nameParts[0] || '',
+      middleName: nameParts.length > 2 ? nameParts[2] : '',
       regularRating: player.rating_regular || undefined,
       uscfExpiration: player.expiration_date ? new Date(player.expiration_date).toISOString() : undefined,
       state: player.state || 'TX',
