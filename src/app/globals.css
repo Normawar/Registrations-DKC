@@ -80,6 +80,9 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  html {
+    scrollbar-gutter: stable;
+  }
 }
 
 @media print {
