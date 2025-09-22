@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useCallback, useEffect, Suspense } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { useMasterDb, type MasterPlayer } from '@/context/master-db-context';
@@ -59,7 +59,7 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
@@ -244,7 +244,7 @@ function DistrictRostersPageContent() {
   };
   
   const getSortIcon = (columnKey: SortableColumnKey) => {
-    if (sortConfig.key !== columnKey) return <ArrowUpDown className="h-4 w-4" />;
+    if (!sortConfig || sortConfig.key !== columnKey) return <ArrowUpDown className="h-4 w-4" />;
     return sortConfig.direction === 'ascending' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />;
   };
   
@@ -583,16 +583,14 @@ function DistrictRostersPageContent() {
   );
 }
 
-function GuardedDistrictRostersPage() {
+export default function GuardedDistrictRostersPage() {
     return (
-        <Suspense fallback={<AppLayout><div>Loading...</div></AppLayout>}>
+        <AppLayout>
             <OrganizerGuard>
                 <DistrictRostersPageContent />
             </OrganizerGuard>
-        </Suspense>
+        </AppLayout>
     )
 }
-
-export default GuardedDistrictRostersPage;
 
     
