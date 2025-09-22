@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useMasterDb } from '@/context/master-db-context';
-import type { SearchCriteria } from '@/lib/data/search-types';
+import type { SearchCriteria, SearchResult } from '@/lib/data/search-types';
 import type { MasterPlayer } from '@/lib/data/full-master-player-data';
 import { type SponsorProfile } from './use-sponsor-profile';
 
