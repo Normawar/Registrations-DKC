@@ -91,6 +91,7 @@ const organizerMenuStructure = {
     { href: "/debug-scripts/dynamic-uscf-test", icon: TestTube2, label: "Dynamic USCF Test" },
     { href: "/debug-scripts/force-delete-user", icon: Trash2, label: "Force Delete User" },
     { href: "/debug-scripts/delete-mock-invoices", icon: Trash2, label: "Delete Mock Invoices" },
+    { href: "/debug-scripts/cancel-unpaid-psja-invoices", icon: Trash2, label: "Cancel Unpaid PSJA Invoices" },
   ]
 };
 
