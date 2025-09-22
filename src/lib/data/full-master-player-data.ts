@@ -23,6 +23,10 @@ export type MasterPlayer = {
   eventIds: string[];
   createdAt?: string; // ISO date string
   updatedAt?: string; // ISO date string
+  dateCreated?: string; // For compatibility
+  createdBy?: string;
+  dateUpdated?: string; // For compatibility
+  updatedBy?: string;
   changeHistory?: {
     timestamp: string;
     userId: string;
@@ -250,18 +254,7 @@ export const fullMasterPlayerData: MasterPlayer[] = [
     { "id": "90000097", "uscfId": "90000097", "firstName": "Elijah", "lastName": "TestMiller", "state": "TX", "grade": "5th Grade", "section": "Elementary K-5", "email": "teststudent97@test.com", "school": "Test School", "district": "Test District", "events": 0, "eventIds": [] },
     { "id": "90000098", "uscfId": "90000098", "firstName": "Charlotte", "lastName": "TestDavis", "state": "TX", "grade": "6th Grade", "section": "Middle School K-8", "email": "teststudent98@test.com", "school": "Test School", "district": "Test District", "events": 0, "eventIds": [] },
     { "id": "90000099", "uscfId": "90000099", "firstName": "William", "lastName": "TestRodriguez", "state": "TX", "grade": "7th Grade", "section": "Middle School K-8", "email": "teststudent99@test.com", "school": "Test School", "district": "Test District", "events": 0, "eventIds": [] },
-    { "id": "90000100", "uscfId": "90000100", "firstName": "Sophia", "lastName": "TestMartinez", "state": "TX", "grade": "8th Grade", "section": "Middle School K-8", "email": "teststudent100@test.com", "school": "Test School", "district": "Test District", "events": 0, "eventIds": [] },
-    { "id": "70000000", "uscfId": "70000000", "firstName": "John", "lastName": "TestDoe0", "school": "", "district": "", "grade": "3rd Grade", "section": "Primary K-3", "email": "sharytest0@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000001", "uscfId": "70000001", "firstName": "Jane", "lastName": "TestSmith1", "school": "", "district": "", "grade": "4th Grade", "section": "Elementary K-5", "email": "sharytest1@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000002", "uscfId": "70000002", "firstName": "Peter", "lastName": "TestJones2", "school": "", "district": "", "grade": "7th Grade", "section": "Middle School K-8", "email": "sharytest2@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000003", "uscfId": "70000003", "firstName": "Mary", "lastName": "TestJohnson3", "school": "", "district": "", "grade": "1st Grade", "section": "Kinder-1st", "email": "sharytest3@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000004", "uscfId": "70000004", "firstName": "Paul", "lastName": "TestWilliams4", "school": "", "district": "", "grade": "8th Grade", "section": "Middle School K-8", "email": "sharytest4@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000005", "uscfId": "70000005", "firstName": "Susan", "lastName": "TestBrown5", "school": "", "district": "", "grade": "2nd Grade", "section": "Primary K-3", "email": "sharytest5@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000006", "uscfId": "70000006", "firstName": "George", "lastName": "TestDavis6", "school": "", "district": "", "grade": "5th Grade", "section": "Elementary K-5", "email": "sharytest6@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000007", "uscfId": "70000007", "firstName": "Ann", "lastName": "TestMiller7", "school": "", "district": "", "grade": "Kindergarten", "section": "Kinder-1st", "email": "sharytest7@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000008", "uscfId": "70000008", "firstName": "Robert", "lastName": "TestWilson8", "school": "", "district": "", "grade": "6th Grade", "section": "Middle School K-8", "email": "sharytest8@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000009", "uscfId": "70000009", "firstName": "Patricia", "lastName": "TestMoore9", "school": "", "district": "", "grade": "9th Grade", "section": "High School K-12", "email": "sharytest9@example.com", "events": 0, "eventIds": [] },
-    { "id": "70000010", "uscfId": "70000010", "firstName": "Michael", "lastName": "TestTaylor10", "school": "", "district": "", "grade": "10th Grade", "section": "High School K-12", "email": "sharytest10@example.com", "events": 0, "eventIds": [] }
+    { "id": "90000100", "uscfId": "90000100", "firstName": "Sophia", "lastName": "TestMartinez", "state": "TX", "grade": "8th Grade", "section": "Middle School K-8", "email": "teststudent100@test.com", "school": "Test School", "district": "Test District", "events": 0, "eventIds": [] }
 ];
 
     
