@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -594,86 +595,85 @@ function DistrictRostersPageContent() {
               <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
               <DialogDescription>{playerToEdit ? 'Modify the player\'s information below.' : 'Enter the details for the new player.'}</DialogDescription>
             </DialogHeader>
-              <ScrollArea className="flex-1 overflow-y-auto">
-                <div className='p-6'>
-                  <Form {...form}>
-                    <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                        <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                        <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField control={form.control} name="district" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>District</FormLabel>
-                            <Select onValueChange={(v) => { field.onChange(v); setSchoolsForEditDistrict(getSchoolsForDistrict(v)); form.setValue('school', ''); }} value={field.value}>
-                              <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
-                              <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                            </Select>
+            <ScrollArea className="flex-1 overflow-y-auto">
+              <div className="p-6">
+                <Form {...form}>
+                  <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                      <FormField control={form.control} name="middleName" render={({ field }) => ( <FormItem><FormLabel>Middle Name (Optional)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField control={form.control} name="district" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>District</FormLabel>
+                          <Select onValueChange={(v) => { field.onChange(v); setSchoolsForEditDistrict(getSchoolsForDistrict(v)); form.setValue('school', ''); }} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select a district" /></SelectTrigger></FormControl>
+                            <SelectContent>{dbDistricts.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name="school" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>School</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
+                            <SelectContent>{schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                    {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
+                      <FormField
+                        control={form.control}
+                        name="studentType"
+                        render={({ field }) => (
+                          <FormItem className="space-y-3">
+                            <FormLabel>Student Type</FormLabel>
+                            <FormControl>
+                              <RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel></FormItem>
+                              </RadioGroup>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
-                        )} />
-                        <FormField control={form.control} name="school" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>School</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl><SelectTrigger><SelectValue placeholder="Select a school" /></SelectTrigger></FormControl>
-                              <SelectContent>{schoolsForEditDistrict.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )} />
-                      </div>
-                      {editDistrict === 'PHARR-SAN JUAN-ALAMO ISD' && (
-                        <FormField
-                          control={form.control}
-                          name="studentType"
-                          render={({ field }) => (
-                            <FormItem className="space-y-3">
-                              <FormLabel>Student Type</FormLabel>
-                              <FormControl>
-                                <RadioGroup onValueChange={field.onChange} value={field.value || 'independent'} className="flex items-center space-x-4">
-                                  <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="independent" /></FormControl><FormLabel className="font-normal">Independent</FormLabel></FormItem>
-                                  <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="gt" /></FormControl><FormLabel className="font-normal">GT (Gifted & Talented)</FormLabel></FormItem>
-                                </RadioGroup>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                      <FormField control={form.control} name="uscfId" render={({ field }) => (<FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Enter USCF ID number or "NEW" for new players.</FormDescription><FormMessage /></FormItem>)} />
-                      <FormField control={form.control} name="regularRating" render={({ field }) => (<FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="e.g., 1500, UNR, or NEW" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormDescription>Enter rating, UNR, or NEW</FormDescription><FormMessage /></FormItem>)} />
-                      
-                      <div className="flex justify-between pt-6 border-t">
-                        <Button 
-                          type="button" 
-                          variant="destructive" 
-                          onClick={() => {
-                            if (playerToEdit) {
-                              handleDeletePlayer(playerToEdit);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete Player
+                        )}
+                      />
+                    )}
+                    <FormField control={form.control} name="uscfId" render={({ field }) => (<FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl><FormDescription>Enter USCF ID number or "NEW" for new players.</FormDescription><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="regularRating" render={({ field }) => (<FormItem><FormLabel>Rating</FormLabel><FormControl><Input type="text" placeholder="e.g., 1500, UNR, or NEW" value={field.value?.toString() || ''} onChange={(e) => { const value = e.target.value; if (value === '' || value.toUpperCase() === 'UNR' || value.toUpperCase() === 'NEW') { field.onChange(undefined); } else { field.onChange(value); } }} /></FormControl><FormDescription>Enter rating, UNR, or NEW</FormDescription><FormMessage /></FormItem>)} />
+                    <Separator />
+                    <ChangeHistoryTab player={playerToEdit} />
+                    <div className="flex justify-between pt-6 border-t">
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        onClick={() => {
+                          if (playerToEdit) {
+                            handleDeletePlayer(playerToEdit);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Player
+                      </Button>
+                      <div className="flex gap-3">
+                        <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>
+                          Cancel
                         </Button>
-                        <div className="flex gap-3">
-                          <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button type="submit">
-                            Save Changes
-                          </Button>
-                        </div>
+                        <Button type="submit">
+                          Save Changes
+                        </Button>
                       </div>
-                    </form>
-                  </Form>
-                  <Separator className="my-8" />
-                  <ChangeHistoryTab player={playerToEdit} />
-                </div>
-              </ScrollArea>
+                    </div>
+                  </form>
+                </Form>
+              </div>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
@@ -694,7 +694,7 @@ function DistrictRostersPageContent() {
         onOpenChange={setIsSearchOpen}
         onPlayerSelected={handlePlayerSelectedFromSearch}
         userProfile={profile}
-        preFilterByUserProfile={true}
+        preFilterByUserProfile={false}
       />
     </>
   );
@@ -703,15 +703,7 @@ function DistrictRostersPageContent() {
 // New component for Sponsor/Individual view
 function UserRosterPageContent() {
     const { profile } = useSponsorProfile();
-    const { database: allPlayers, updatePlayer, addPlayer, isDbLoaded } = useMasterDb();
-    const { toast } = useToast();
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [isEditOpen, setIsEditOpen] = useState(false);
-    const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
-
-    const form = useForm<PlayerFormValues>({
-        resolver: zodResolver(playerFormSchema)
-    });
+    const { database: allPlayers, isDbLoaded } = useMasterDb();
     
     const roster = useMemo(() => {
         if (!profile || !isDbLoaded) return [];
@@ -730,90 +722,12 @@ function UserRosterPageContent() {
         }
         return [];
     }, [profile, allPlayers, isDbLoaded]);
-
-    const handlePlayerSelected = async (player: any) => {
-        if (!profile) return;
-        
-        let playerToAdd: MasterPlayer;
-
-        if ('uscfId' in player) {
-            playerToAdd = player;
-        } else { 
-            const nameParts = player.name.split(', ');
-            playerToAdd = {
-                id: player.uscf_id, uscfId: player.uscf_id,
-                firstName: nameParts[1] || 'Unknown', lastName: nameParts[0] || 'Player',
-                state: player.state || 'TX', regularRating: player.rating_regular,
-                uscfExpiration: player.expiration_date,
-                grade: '', section: '', email: '', school: '', district: '', events: 0, eventIds: []
-            };
-        }
-    
-        if (profile.role === 'individual') {
-            try {
-                const key = `parent_students_${profile.email}`;
-                const existing = JSON.parse(localStorage.getItem(key) || '[]');
-                if (!existing.includes(playerToAdd.id)) {
-                    localStorage.setItem(key, JSON.stringify([...existing, playerToAdd.id]));
-                    toast({ title: "Student Added", description: `${playerToAdd.firstName} ${playerToAdd.lastName} has been added to your list.` });
-                    window.dispatchEvent(new Event('storage'));
-                } else {
-                    toast({ variant: 'destructive', title: "Student Already Added" });
-                }
-            } catch (e) {
-                console.error(e);
-                toast({ variant: 'destructive', title: "Error Saving Student" });
-            }
-        } else if (profile.role === 'sponsor' || profile.role === 'district_coordinator') {
-            const updatedPlayer = { ...playerToAdd, school: profile.school, district: profile.district };
-            await updatePlayer(updatedPlayer, profile);
-            toast({ title: "Player Added to Roster", description: `${playerToAdd.firstName} ${playerToAdd.lastName} is now on the ${profile.school} roster.` });
-        }
-        
-        setIsSearchOpen(false);
-    };
-
-    const handleCreateNewPlayer = () => {
-        setPlayerToEdit(null);
-        form.reset(); // Clear form
-        setIsEditOpen(true);
-    };
-
-    const onEditSubmit = async (values: PlayerFormValues) => {
-        if (!profile) return;
-        const playerToSave: MasterPlayer = {
-            ...(playerToEdit || {}),
-            ...values,
-            id: playerToEdit ? playerToEdit.id : values.uscfId || `temp_${Date.now()}`,
-            school: profile.school,
-            district: profile.district
-        } as MasterPlayer;
-        
-        if (playerToEdit) {
-            await updatePlayer(playerToSave, profile);
-            toast({ title: "Player Updated" });
-        } else {
-            await addPlayer(playerToSave);
-            toast({ title: "Player Created" });
-        }
-        
-        setIsEditOpen(false);
-        setPlayerToEdit(null);
-    };
     
     return (
         <div>
-            <div className="flex justify-between items-center mb-4">
-                <div>
-                    <h1 className="text-3xl font-bold font-headline">My Roster</h1>
-                    <p className="text-muted-foreground">Manage your players and students.</p>
-                </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player/Student</Button>
-                    <Button onClick={handleCreateNewPlayer}><UserPlus className="mr-2 h-4 w-4"/> Create New Player</Button>
-                </div>
-            </div>
-            
+            <h1 className="text-3xl font-bold font-headline">My Roster</h1>
+            <p className="text-muted-foreground">Manage your players and students.</p>
+            {/* You can build out the UI for sponsors/individuals here */}
             <Card className="mt-4">
                 <CardHeader>
                     <CardTitle>{profile?.role === 'individual' ? 'My Students' : 'School Roster'}</CardTitle>
@@ -845,34 +759,6 @@ function UserRosterPageContent() {
                     </Table>
                 </CardContent>
             </Card>
-
-            <EnhancedPlayerSearchDialog
-                isOpen={isSearchOpen}
-                onOpenChange={setIsSearchOpen}
-                onPlayerSelected={handlePlayerSelected}
-                userProfile={profile}
-                preFilterByUserProfile={false}
-            />
-            
-            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{playerToEdit ? 'Edit Player' : 'Create New Player'}</DialogTitle>
-                    </DialogHeader>
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-4">
-                             <FormField control={form.control} name="firstName" render={({ field }) => ( <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                             <FormField control={form.control} name="lastName" render={({ field }) => ( <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )}/>
-                             <FormField control={form.control} name="uscfId" render={({ field }) => ( <FormItem><FormLabel>USCF ID</FormLabel><FormControl><Input {...field} /></FormControl></FormItem> )}/>
-                             <DialogFooter>
-                                <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                                <Button type="submit">Save Player</Button>
-                             </DialogFooter>
-                        </form>
-                    </Form>
-                </DialogContent>
-            </Dialog>
-
         </div>
     );
 }
