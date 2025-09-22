@@ -151,3 +151,15 @@ body {
     display: none !important;
   }
 }
+
+/* Prevent layout shift by reserving scrollbar space */
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+/* Override only the problematic Radix behavior */
+body[data-scroll-locked] {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
