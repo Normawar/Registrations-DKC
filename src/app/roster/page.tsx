@@ -25,16 +25,35 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, ArrowUpDown, ArrowUp, ArrowDown, Check } from 'lucide-react';
+import { Download, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, FilePenLine, Trash2 } from 'lucide-react';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Papa from 'papaparse';
 import { format } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useToast } from '@/hooks/use-toast';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
 function DistrictRostersPageContent() {
-  const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict } = useMasterDb();
+  const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer } = useMasterDb();
+  const { toast } = useToast();
   
   const [rosterType, setRosterType] = useState<'real' | 'test'>('real');
   const [selectedDistrict, setSelectedDistrict] = useState('PHARR-SAN JUAN-ALAMO ISD');
@@ -43,6 +62,10 @@ function DistrictRostersPageContent() {
   const [showOnlyWithPlayers, setShowOnlyWithPlayers] = useState(false);
   const [openSchools, setOpenSchools] = useState<Record<string, boolean>>({});
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumnKey; direction: 'ascending' | 'descending' }>({ key: 'lastName', direction: 'ascending' });
+
+  const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [playerToDelete, setPlayerToDelete] = useState<MasterPlayer | null>(null);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const schoolsForDistrict = useMemo(() => {
     return getSchoolsForDistrict(selectedDistrict);
@@ -153,6 +176,49 @@ function DistrictRostersPageContent() {
     link.click();
     document.body.removeChild(link);
   };
+  
+  const handleDeletePlayer = (player: MasterPlayer) => {
+    setPlayerToDelete(player);
+    setIsAlertOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (playerToDelete) {
+      await deletePlayer(playerToDelete.id);
+      toast({ title: 'Player Deleted', description: `${playerToDelete.firstName} ${playerToDelete.lastName} has been removed from the database.` });
+    }
+    setIsAlertOpen(false);
+    setPlayerToDelete(null);
+  };
+
+  const handleBulkDelete = async () => {
+      if (selectedPlayers.length === 0) {
+          toast({ title: "No players selected", variant: "destructive" });
+          return;
+      }
+      if (window.confirm(`Are you sure you want to delete ${selectedPlayers.length} players? This action cannot be undone.`)) {
+          for (const playerId of selectedPlayers) {
+              await deletePlayer(playerId);
+          }
+          toast({ title: `${selectedPlayers.length} Players Deleted` });
+          setSelectedPlayers([]);
+      }
+  };
+
+  const togglePlayerSelection = (playerId: string) => {
+      setSelectedPlayers(prev => 
+          prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
+      );
+  };
+
+  const toggleSelectAllForSchool = (playersInSchool: MasterPlayer[], isChecked: boolean) => {
+      const playerIds = playersInSchool.map(p => p.id);
+      if (isChecked) {
+          setSelectedPlayers(prev => [...new Set([...prev, ...playerIds])]);
+      } else {
+          setSelectedPlayers(prev => prev.filter(id => !playerIds.includes(id)));
+      }
+  };
 
   return (
     <AppLayout>
@@ -211,10 +277,16 @@ function DistrictRostersPageContent() {
                     <Checkbox id="show-with-players" checked={showOnlyWithPlayers} onCheckedChange={(checked) => setShowOnlyWithPlayers(!!checked)} />
                     <Label htmlFor="show-with-players" className="text-sm font-medium">Show only schools with players</Label>
                 </div>
-                <Button onClick={handleExportAll} disabled={schoolRosters.reduce((sum, r) => sum + r.players.length, 0) === 0}>
-                    <Download className="h-4 w-4 mr-2" />
-                    Export All Rosters ({schoolRosters.reduce((sum, r) => sum + r.players.length, 0)})
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleExportAll} disabled={schoolRosters.reduce((sum, r) => sum + r.players.length, 0) === 0}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Export All Rosters ({schoolRosters.reduce((sum, r) => sum + r.players.length, 0)})
+                    </Button>
+                    <Button variant="destructive" onClick={handleBulkDelete} disabled={selectedPlayers.length === 0}>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Selected ({selectedPlayers.length})
+                    </Button>
+                </div>
             </div>
           </CardContent>
         </Card>
@@ -235,7 +307,12 @@ function DistrictRostersPageContent() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-10"><Checkbox /></TableHead>
+                        <TableHead className="w-12">
+                           <Checkbox
+                                onCheckedChange={(checked) => toggleSelectAllForSchool(players, !!checked)}
+                                checked={players.length > 0 && players.every(p => selectedPlayers.includes(p.id))}
+                           />
+                        </TableHead>
                         <TableHead><Button variant="ghost" onClick={() => requestSort('lastName')} className="px-0 flex items-center gap-1">Player Name {getSortIcon('lastName')}</Button></TableHead>
                         <TableHead><Button variant="ghost" onClick={() => requestSort('teamCode')} className="px-0 flex items-center gap-1">Team Code {getSortIcon('teamCode')}</Button></TableHead>
                         <TableHead><Button variant="ghost" onClick={() => requestSort('uscfId')} className="px-0 flex items-center gap-1">USCF ID {getSortIcon('uscfId')}</Button></TableHead>
@@ -249,7 +326,12 @@ function DistrictRostersPageContent() {
                     <TableBody>
                       {sortPlayers(players).map(p => (
                         <TableRow key={p.id}>
-                          <TableCell><Checkbox /></TableCell>
+                          <TableCell>
+                             <Checkbox
+                                checked={selectedPlayers.includes(p.id)}
+                                onCheckedChange={() => togglePlayerSelection(p.id)}
+                            />
+                          </TableCell>
                           <TableCell>{p.lastName}, {p.firstName} {p.middleName || ''}</TableCell>
                           <TableCell>{generateTeamCode(p)}</TableCell>
                           <TableCell>{p.uscfId}</TableCell>
@@ -257,7 +339,30 @@ function DistrictRostersPageContent() {
                           <TableCell>{p.grade}</TableCell>
                           <TableCell>{p.section}</TableCell>
                           <TableCell>{p.studentType === 'gt' && <Check className="text-green-600 h-5 w-5" />}</TableCell>
-                          <TableCell>...</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={() => {
+                                        // This would open an edit dialog
+                                        // For now, we'll just log it.
+                                        console.log('Editing player:', p.id);
+                                    }}>
+                                        <FilePenLine className="mr-2 h-4 w-4" />
+                                        Edit Player
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDeletePlayer(p)} className="text-destructive">
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete Player
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -268,6 +373,22 @@ function DistrictRostersPageContent() {
           ))}
         </div>
       </div>
+       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete {playerToDelete?.firstName} {playerToDelete?.lastName}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
