@@ -467,7 +467,7 @@ function DistrictRostersPageContent() {
             events: 0,
             eventIds: [],
         } as MasterPlayer;
-        await addPlayer(newPlayer);
+        await addPlayer(newPlayer, profile);
         toast({ title: "Player Created" });
     }
     
@@ -638,7 +638,6 @@ function DistrictRostersPageContent() {
           ))}
         </div>
         
-        {/* Updated Dialog JSX */}
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="sm:max-w-4xl max-h-[95vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-4 border-b shrink-0">
@@ -878,7 +877,7 @@ function DistrictRostersPageContent() {
             
           </DialogContent>
         </Dialog>
-
+        
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -917,14 +916,7 @@ function UserRosterPageContent() {
             return allPlayers.filter(p => p.district === profile.district && p.school === profile.school);
         }
         if (profile.role === 'individual') {
-             try {
-              const storedParentStudents = localStorage.getItem(`parent_students_${profile.email}`);
-              if (storedParentStudents) {
-                const studentIds = JSON.parse(storedParentStudents);
-                return allPlayers.filter(p => studentIds.includes(p.id));
-              }
-            } catch (e) { console.error(e); }
-            return [];
+             return allPlayers.filter(p => profile.studentIds?.includes(p.id));
         }
         return [];
     }, [profile, allPlayers, isDbLoaded]);
@@ -944,42 +936,58 @@ function UserRosterPageContent() {
         setIsSearchOpen(false);
     };
     
-    const onEditSubmit = async (values: PlayerFormValues) => {
+    const handleSaveAndAddToRoster = async (values: PlayerFormValues) => {
+      if (!profile) return;
+      
+      const isNewPlayer = !playerToEdit || !allPlayers.some(p => p.id === playerToEdit.id);
+      
+      let playerToSave: MasterPlayer;
+
+      if(isNewPlayer) {
+          playerToSave = {
+              ...values,
+              id: values.id || `temp_${Date.now()}`,
+              events: 0,
+              eventIds: [],
+          } as MasterPlayer;
+          await addPlayer(playerToSave, profile);
+          toast({ title: 'Player Created' });
+      } else {
+          playerToSave = { ...playerToEdit!, ...values };
+          await updatePlayer(playerToSave, profile);
+          toast({ title: 'Player Updated' });
+      }
+
+      // Add to individual roster if applicable
+      if (profile.role === 'individual' && !roster.some(p => p.id === playerToSave.id)) {
+        const updatedStudentIds = [...(profile.studentIds || []), playerToSave.id];
+        await updatePlayer({ ...profile, studentIds: updatedStudentIds } as MasterPlayer, profile);
+        toast({ title: "Player Added to Your Roster" });
+      }
+
+      setIsEditOpen(false);
+    };
+
+    const handleSaveOnly = async (values: PlayerFormValues) => {
         if (!profile) return;
-        
-        const isAlreadyOnRoster = playerToEdit && roster.some(p => p.id === playerToEdit.id);
+        const isNewPlayer = !playerToEdit || !allPlayers.some(p => p.id === playerToEdit.id);
 
-        if (playerToEdit && isAlreadyOnRoster) { // Updating existing player on roster
-            const updatedPlayer: MasterPlayer = { ...playerToEdit, ...values };
-            await updatePlayer(updatedPlayer, profile);
-            toast({ title: "Player Updated" });
-        } else { // Adding a new player to roster
-            const playerToAdd: MasterPlayer = {
-                ...(playerToEdit || {}), // Start with existing data if available
+        if(isNewPlayer) {
+            const newPlayer = {
                 ...values,
-                id: playerToEdit?.id || values.id || `temp_${Date.now()}`,
-                events: playerToEdit?.events || 0,
-                eventIds: playerToEdit?.eventIds || [],
+                id: values.id || `temp_${Date.now()}`,
+                events: 0,
+                eventIds: [],
             } as MasterPlayer;
-            
-            // For individual users, update local storage
-            if (profile.role === 'individual') {
-                const parentStudentsKey = `parent_students_${profile.email}`;
-                const existingIds = JSON.parse(localStorage.getItem(parentStudentsKey) || '[]');
-                if (!existingIds.includes(playerToAdd.id)) {
-                    localStorage.setItem(parentStudentsKey, JSON.stringify([...existingIds, playerToAdd.id]));
-                }
-            }
-
-            // Always update or add to the master database
-            await addPlayer(playerToAdd);
-            toast({ title: "Player Added to Roster" });
+            await addPlayer(newPlayer, profile);
+            toast({ title: "Player Created", description: `${values.firstName} has been added to the master database.` });
+        } else {
+            const updatedPlayer = { ...playerToEdit!, ...values };
+            await updatePlayer(updatedPlayer, profile);
+            toast({ title: "Player Updated", description: `${values.firstName}'s information has been updated.` });
         }
-        
         setIsEditOpen(false);
     };
-    
-    const isPlayerOnRoster = playerToEdit ? roster.some(p => p.id === playerToEdit.id) : false;
 
     return (
         <div className="space-y-6">
@@ -1034,15 +1042,14 @@ function UserRosterPageContent() {
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
               <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>{isPlayerOnRoster ? 'Edit Player' : 'Add Player to Roster'}</DialogTitle>
+                    <DialogTitle>{playerToEdit ? 'Edit Player' : 'Add Player to Roster'}</DialogTitle>
                 </DialogHeader>
                  <p className="text-sm text-muted-foreground">Fill in the player's details to add or update them on your roster.</p>
                 <DialogFooter>
                   <Button variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-                  <Button onClick={() => {
-                    onEditSubmit(playerToEdit as any);
-                  }}>
-                    {isPlayerOnRoster ? 'Update Player' : 'Add to Roster'}
+                  <Button onClick={() => handleSaveOnly(playerToEdit as any)}>Save Info</Button>
+                  <Button onClick={() => handleSaveAndAddToRoster(playerToEdit as any)}>
+                    {roster.some(p => p.id === playerToEdit?.id) ? 'Save and Update Roster' : 'Save and Add to Roster'}
                   </Button>
                 </DialogFooter>
               </DialogContent>

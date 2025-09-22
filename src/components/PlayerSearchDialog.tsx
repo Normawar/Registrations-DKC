@@ -4,11 +4,10 @@
 import React, { useState } from 'react';
 import { useMasterDb, type SearchCriteria, type SearchResult, type MasterPlayer } from '@/context/master-db-context';
 
-export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPlayerSelected, excludeIds, portalType }: {
+export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, excludeIds, portalType }: {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     onSelectPlayer: (player: MasterPlayer) => void;
-    onPlayerSelected?: (player: MasterPlayer) => void;
     excludeIds?: string[];
     portalType: 'sponsor' | 'organizer' | 'individual';
 }) {
@@ -65,11 +64,7 @@ export function PlayerSearchDialog({ isOpen, onOpenChange, onSelectPlayer, onPla
   };
   
   const handleSelect = (player: MasterPlayer) => {
-    if (onPlayerSelected) {
-        onPlayerSelected(player);
-    } else {
-        onSelectPlayer(player);
-    }
+    onSelectPlayer(player);
     onOpenChange(false);
   }
 
