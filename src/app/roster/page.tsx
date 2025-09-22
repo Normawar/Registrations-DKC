@@ -113,24 +113,32 @@ const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
     );
 };
 
-const usePreventLayoutShift = (isOpen: boolean) => {
+const useNoLayoutShift = (isOpen: boolean) => {
   useEffect(() => {
     if (isOpen) {
+      // Get current scroll position
+      const scrollY = window.scrollY;
+      
       // Calculate scrollbar width
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       
-      // Store original styles
-      const originalOverflow = document.body.style.overflow;
-      const originalPaddingRight = document.body.style.paddingRight;
-      
-      // Apply prevention styles
-      document.body.style.overflow = 'hidden';
+      // Apply fixed positioning to prevent scroll
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.left = '0';
+      document.body.style.right = '0';
       document.body.style.paddingRight = `${scrollbarWidth}px`;
       
-      // Cleanup function
       return () => {
-        document.body.style.overflow = originalOverflow;
-        document.body.style.paddingRight = originalPaddingRight;
+        // Restore original positioning
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.paddingRight = '';
+        
+        // Restore scroll position
+        window.scrollTo(0, scrollY);
       };
     }
   }, [isOpen]);
@@ -157,7 +165,7 @@ function DistrictRostersPageContent() {
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
   const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
 
-  usePreventLayoutShift(isEditOpen);
+  useNoLayoutShift(isEditOpen);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema)
