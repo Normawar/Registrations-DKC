@@ -92,6 +92,7 @@ const organizerMenuStructure = {
     { href: "/debug-scripts/force-delete-user", icon: Trash2, label: "Force Delete User" },
     { href: "/debug-scripts/delete-mock-invoices", icon: Trash2, label: "Delete Mock Invoices" },
     { href: "/debug-scripts/cancel-unpaid-psja-invoices", icon: Trash2, label: "Cancel Unpaid PSJA Invoices" },
+    { href: "/debug-scripts/delete-canceled-invoices", icon: Trash2, label: "Delete Canceled Invoices" },
   ]
 };
 
