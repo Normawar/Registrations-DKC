@@ -6,7 +6,7 @@ import { AppLayout } from '@/components/app-layout';
 import { OrganizerGuard } from '@/components/auth-guard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code, Building, FileText, Binary } from 'lucide-react';
+import { Users, Trophy, ArrowRight, ClipboardCheck, UserCog, BadgeCheck, MapPin, Code, Building, FileText, Binary, GitCompareArrows } from 'lucide-react';
 import Link from 'next/link';
 
 function ReportsPageContent() {
@@ -270,8 +270,7 @@ function ReportsPageContent() {
                 <CardTitle>USCF Data Parser</CardTitle>
                 <CardDescription>Convert USCF affiliate or tournament data into clean CSV format.</CardDescription>
               </div>
-            </div>
-          </CardHeader>
+            </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
               Parse data copied from USCF affiliate reports or upload text files to generate clean CSV exports with player information, ratings, and titles.
@@ -283,6 +282,31 @@ function ReportsPageContent() {
             </Button>
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-4">
+              <div className="bg-lime-100 p-3 rounded-full">
+                <GitCompareArrows className="h-6 w-6 text-lime-600" />
+              </div>
+              <div>
+                <CardTitle>USCF Cross-Reference Report</CardTitle>
+                <CardDescription>Upload a CSV to find matching player data from Firebase.</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Upload a list of players and this tool will find their corresponding data (like Grade and Team Code) from your master database.
+            </p>
+            <Button asChild>
+              <Link href="/reports/uscf-cross-reference">
+                View Cross-Reference Report <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   );
