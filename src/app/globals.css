@@ -4,6 +4,7 @@
 
 body {
   font-family: Arial, Helvetica, sans-serif;
+  /* Force scrollbar to always be visible */
   overflow-y: scroll !important;
 }
 
@@ -81,8 +82,53 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* LAYOUT SHIFT PREVENTION - Add this section */
+@layer utilities {
+  /* Prevent body scroll lock from causing layout shift */
+  body[data-scroll-locked] {
+    overflow-y: scroll !important;
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Ensure consistent scrollbar space */
   html {
     scrollbar-gutter: stable;
+    overflow-y: scroll;
+  }
+  
+  /* Override Radix Portal positioning */
+  [data-radix-portal] {
+    position: fixed !important;
+    inset: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  [data-radix-portal] > * {
+    pointer-events: auto !important;
+  }
+  
+  /* Dialog specific fixes */
+  [data-radix-dialog-overlay] {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 50 !important;
+  }
+  
+  [data-radix-dialog-content] {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 51 !important;
+  }
+  
+  /* Prevent any transform or position changes on body */
+  body:has([data-radix-dialog-content]) {
+    transform: none !important;
+    position: static !important;
   }
 }
 
