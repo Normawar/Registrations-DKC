@@ -98,14 +98,25 @@ function UscfCrossReferencePageContent() {
           const lastName = nameParts[nameParts.length - 1];
 
           // Find players where both first and last names appear in their full name
-          const potentialMatches = allPlayers.filter(p => {
+          const potentialMatchesByName = allPlayers.filter(p => {
             const playerFullName = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase();
             return playerFullName.includes(firstName) && playerFullName.includes(lastName);
           });
+          
+          let finalMatches = potentialMatchesByName;
 
-          if (potentialMatches.length === 1) {
-            // Found a single, unique match by name
-            const firebasePlayer = potentialMatches[0];
+          // If multiple name matches, try to refine by grade
+          if (potentialMatchesByName.length > 1 && row.GRADE) {
+            const gradeFromSheet = row.GRADE.trim();
+            const gradeMatches = potentialMatchesByName.filter(p => p.grade === gradeFromSheet);
+            if (gradeMatches.length > 0) {
+              finalMatches = gradeMatches; // Use the grade-filtered list
+            }
+          }
+
+          if (finalMatches.length === 1) {
+            // Found a single, unique match by name (and possibly grade)
+            const firebasePlayer = finalMatches[0];
             return {
               ...row,
               firebaseUsdId: firebasePlayer.uscfId,
@@ -113,8 +124,8 @@ function UscfCrossReferencePageContent() {
               firebaseTeam: generateTeamCode(firebasePlayer),
               matchStatus: 'found_by_name',
             };
-          } else if (potentialMatches.length > 1) {
-            // Multiple matches found for the same name, flag for manual review
+          } else if (finalMatches.length > 1) {
+            // Multiple matches found even after checks, flag for manual review
              return {
               ...row,
               firebaseUsdId: 'Multiple Matches',
