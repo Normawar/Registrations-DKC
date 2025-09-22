@@ -337,15 +337,13 @@ function DistrictRostersPageContent() {
   };
 
   const onEditSubmit = async (values: PlayerFormValues) => {
-    if (!profile) return;
-    const playerToSave: MasterPlayer = {
-        ...(playerToEdit || {}), // Keep existing fields like history, dob, etc.
-        ...values, // Overwrite with form values
-        id: playerToEdit ? playerToEdit.id : values.uscfId || `temp_${Date.now()}` // Use existing ID or generate new
-    } as MasterPlayer;
-    
-    await updatePlayer(playerToSave, profile);
-    toast({ title: playerToEdit ? "Player Updated" : "Player Created" });
+    if (!playerToEdit || !profile) return;
+    const updatedPlayer: MasterPlayer = {
+      ...playerToEdit,
+      ...values
+    };
+    await updatePlayer(updatedPlayer, profile);
+    toast({ title: "Player Updated" });
     setIsEditOpen(false);
     setPlayerToEdit(null);
   };
@@ -621,14 +619,14 @@ function DistrictRostersPageContent() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-        <EnhancedPlayerSearchDialog
-            isOpen={isSearchOpen}
-            onOpenChange={setIsSearchOpen}
-            onPlayerSelected={handlePlayerSelectedFromSearch}
-            userProfile={profile}
-            preFilterByUserProfile={true}
-        />
       </div>
+      <EnhancedPlayerSearchDialog
+        isOpen={isSearchOpen}
+        onOpenChange={setIsSearchOpen}
+        onPlayerSelected={handlePlayerSelectedFromSearch}
+        userProfile={profile}
+        preFilterByUserProfile={true}
+      />
     </>
   );
 }
@@ -653,9 +651,9 @@ function UserRosterPageContent() {
         }
         if (profile.role === 'individual') {
              try {
-              const storedStudentIds = localStorage.getItem(`parent_students_${profile.email}`);
-              if (storedStudentIds) {
-                const studentIds = JSON.parse(storedStudentIds);
+              const storedParentStudents = localStorage.getItem(`parent_students_${profile.email}`);
+              if (storedParentStudents) {
+                const studentIds = JSON.parse(storedParentStudents);
                 return allPlayers.filter(p => studentIds.includes(p.id));
               }
             } catch (e) { console.error(e); }
@@ -736,7 +734,7 @@ function UserRosterPageContent() {
                     <p className="text-muted-foreground">Manage your players and students.</p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add from Database</Button>
+                    <Button variant="outline" onClick={() => setIsSearchOpen(true)}><UserPlus className="mr-2 h-4 w-4"/> Add Player/Student</Button>
                     <Button onClick={handleCreateNewPlayer}><UserPlus className="mr-2 h-4 w-4"/> Create New Player</Button>
                 </div>
             </div>
