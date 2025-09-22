@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { collection, getDocs, doc, setDoc, query, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, where } from 'firebase/firestore';
 import Papa from 'papaparse';
 
 import { AppLayout } from "@/components/app-layout";
@@ -13,10 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { useToast } from '@/hooks/use-toast';
-import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download, UserPlus } from 'lucide-react';
+import { MoreHorizontal, Trash2, FilePenLine, ArrowUpDown, ArrowUp, ArrowDown, Download, UserPlus, Loader2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,6 +24,8 @@ import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/services/firestore-service';
 import { useMasterDb } from '@/context/master-db-context';
+import { Textarea } from '@/components/ui/textarea';
+import { forceDeleteUsersAction } from './actions';
 
 
 type User = {
@@ -74,6 +75,11 @@ export default function UsersPage() {
     const [schoolsForDistrict, setSchoolsForDistrict] = useState<string[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: SortableColumn; direction: 'ascending' | 'descending' } | null>({ key: 'lastName', direction: 'ascending' });
+    
+    // State for force delete
+    const [emailsToDelete, setEmailsToDelete] = useState('');
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [deleteResults, setDeleteResults] = useState<string[]>([]);
     
     const uniqueDistricts = useMemo(() => {
         return ['None', ...dbDistricts].sort();
@@ -223,6 +229,35 @@ export default function UsersPage() {
         }
     };
     
+    const handleForceDelete = async () => {
+        const emails = emailsToDelete.split(/[\n,;]+/).map(e => e.trim().toLowerCase()).filter(Boolean);
+        if (emails.length === 0) {
+            toast({ variant: 'destructive', title: 'No Emails Provided', description: 'Please enter at least one email to delete.' });
+            return;
+        }
+    
+        if (!confirm(`Are you sure you want to permanently delete ${emails.length} user(s)? This will remove their authentication record AND Firestore data. This action CANNOT be undone.`)) {
+            return;
+        }
+    
+        setIsDeleting(true);
+        setDeleteResults([]);
+        const log = (message: string) => setDeleteResults(prev => [...prev, message]);
+    
+        log(`Starting deletion for ${emails.length} user(s)...`);
+    
+        const { deleted, failed } = await forceDeleteUsersAction(emails);
+    
+        deleted.forEach(email => log(`✅ Successfully deleted user: ${email}`));
+        failed.forEach(({ email, reason }) => log(`❌ Failed to delete user: ${email}. Reason: ${reason}`));
+    
+        log(`\n🎉 Deletion process complete.`);
+        toast({ title: 'Deletion Complete', description: `Processed ${emails.length} emails. Check log for details.` });
+        
+        await loadUsers(); // Refresh user list
+        setIsDeleting(false);
+    };
+
     const handleExportPsjaUsers = () => {
         const psjaUsers = users.filter(user => user.email.toLowerCase().endsWith('@psjaisd.us'));
         if (psjaUsers.length === 0) {
@@ -340,6 +375,37 @@ export default function UsersPage() {
                         </Table>
                     </CardContent>
                 </Card>
+                
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Force Delete Users</CardTitle>
+                        <CardDescription>
+                            Permanently delete user accounts from Firebase Authentication and the Firestore database. Enter a list of emails separated by commas, spaces, or new lines. This action cannot be undone.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <Textarea
+                            placeholder="user1@example.com, user2@example.com"
+                            value={emailsToDelete}
+                            onChange={(e) => setEmailsToDelete(e.target.value)}
+                            rows={4}
+                            disabled={isDeleting}
+                        />
+                        <Button onClick={handleForceDelete} disabled={isDeleting} variant="destructive">
+                            {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                            Permanently Delete Users
+                        </Button>
+                    </CardContent>
+                    {deleteResults.length > 0 && (
+                        <CardContent>
+                            <h4 className="font-medium mb-2">Deletion Log</h4>
+                            <pre className="bg-muted p-4 rounded-md text-sm overflow-auto max-h-48 whitespace-pre-wrap">
+                                {deleteResults.join('\n')}
+                            </pre>
+                        </CardContent>
+                    )}
+                </Card>
+
             </div>
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -413,5 +479,3 @@ export default function UsersPage() {
                 </DialogContent>
             </Dialog>
         </AppLayout>
-    );
-}
