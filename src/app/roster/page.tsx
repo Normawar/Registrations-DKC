@@ -64,6 +64,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
@@ -112,6 +113,29 @@ const ChangeHistoryTab = ({ player }: { player: MasterPlayer | null }) => {
     );
 };
 
+const usePreventLayoutShift = (isOpen: boolean) => {
+  useEffect(() => {
+    if (isOpen) {
+      // Calculate scrollbar width
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      
+      // Store original styles
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      
+      // Apply prevention styles
+      document.body.style.overflow = 'hidden';
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      
+      // Cleanup function
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+      };
+    }
+  }, [isOpen]);
+};
+
 function DistrictRostersPageContent() {
   const { isDbLoaded, dbDistricts, database: allPlayers, getSchoolsForDistrict, deletePlayer, updatePlayer } = useMasterDb();
   const { profile } = useSponsorProfile();
@@ -132,6 +156,8 @@ function DistrictRostersPageContent() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [playerToEdit, setPlayerToEdit] = useState<MasterPlayer | null>(null);
   const [schoolsForEditDistrict, setSchoolsForEditDistrict] = useState<string[]>([]);
+
+  usePreventLayoutShift(isEditOpen);
 
   const form = useForm<PlayerFormValues>({
     resolver: zodResolver(playerFormSchema)
@@ -487,7 +513,7 @@ function DistrictRostersPageContent() {
         </div>
       </div>
       
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen} modal={false}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-0 border-b shrink-0">
             <DialogTitle>Edit Player</DialogTitle>
@@ -500,7 +526,6 @@ function DistrictRostersPageContent() {
               <TabsTrigger value="details">Player Details</TabsTrigger>
               <TabsTrigger value="history">Change History</TabsTrigger>
             </TabsList>
-            
             <div className="flex-1 overflow-y-auto">
               <TabsContent value="details" className="mt-0">
                 <div className='p-6'>
