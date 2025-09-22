@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -26,7 +25,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, FilePenLine, Trash2, Edit, UserPlus, History } from 'lucide-react';
+import { Download, ArrowUpDown, ArrowUp, ArrowDown, Check, MoreHorizontal, FilePenLine, Trash2, Edit, UserPlus, History, Separator } from 'lucide-react';
 import { generateTeamCode } from '@/lib/school-utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Papa from 'papaparse';
@@ -66,26 +65,59 @@ import { useToast } from '@/hooks/use-toast';
 import { useSponsorProfile } from '@/hooks/use-sponsor-profile';
 import { EnhancedPlayerSearchDialog } from '@/components/EnhancedPlayerSearchDialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 
 type SortableColumnKey = 'lastName' | 'teamCode' | 'uscfId' | 'regularRating' | 'grade' | 'section';
 
 const grades = ['Kindergarten', '1st Grade', '2nd Grade', '3rd Grade', '4th Grade', '5th Grade', '6th Grade', '7th Grade', '8th Grade', '9th Grade', '10th Grade', '11th Grade', '12th Grade'];
 const sections = ['Kinder-1st', 'Primary K-3', 'Elementary K-5', 'Middle School K-8', 'High School K-12', 'Championship'];
+const gradeToNumber: { [key: string]: number } = { 'Kindergarten': 0, '1st Grade': 1, '2nd Grade': 2, '3rd Grade': 3, '4th Grade': 4, '5th Grade': 5, '6th Grade': 6, '7th Grade': 7, '8th Grade': 8, '9th Grade': 9, '10th Grade': 10, '11th Grade': 11, '12th Grade': 12, };
+const sectionMaxGrade: { [key: string]: number } = { 'Kinder-1st': 1, 'Primary K-3': 3, 'Elementary K-5': 5, 'Middle School K-8': 8, 'High School K-12': 12, 'Championship': 12 };
 
 const playerFormSchema = z.object({
-    id: z.string().optional(),
-    firstName: z.string().min(1, { message: "First Name is required." }),
-    lastName: z.string().min(1, { message: "Last Name is required." }),
-    middleName: z.string().optional(),
-    uscfId: z.string().min(1, { message: "USCF ID is required." }),
-    regularRating: z.coerce.number().optional(),
-    grade: z.string().optional(),
-    section: z.string().optional(),
-    email: z.string().email({ message: "Please enter a valid email." }).optional(),
-    district: z.string().optional(),
-    school: z.string().optional(),
-    studentType: z.string().optional(),
+  id: z.string().optional(),
+  firstName: z.string().min(1, { message: "First Name is required." }),
+  middleName: z.string().optional().transform(val => val === '' ? undefined : val),
+  lastName: z.string().min(1, { message: "Last Name is required." }),
+  uscfId: z.string().min(1, { message: "USCF ID is required." }),
+  uscfExpiration: z.date().optional(),
+  regularRating: z.preprocess(
+    (val) => {
+      if (!val || String(val).toUpperCase() === 'UNR' || val === '') {
+        return undefined;
+      }
+      return val;
+    },
+    z.coerce.number({
+      invalid_type_error: "Rating must be a number or UNR."
+    }).optional()
+  ),
+  grade: z.string().optional().transform(val => val === '' ? undefined : val),
+  section: z.string().optional().transform(val => val === '' ? undefined : val),
+  email: z.string().min(1, { message: "Email is required for roster players." }).email({ message: "Please enter a valid email." }),
+  zipCode: z.string().min(1, { message: "Zip Code is required for roster players." }),
+  phone: z.string().optional().transform(val => val === '' ? undefined : val),
+  dob: z.date().optional(),
+  studentType: z.string().optional().transform(val => val === '' ? undefined : val),
+  state: z.string().optional().transform(val => val === '' ? undefined : val),
+  school: z.string().min(1, { message: "School name is required."}),
+  district: z.string().min(1, { message: "District name is required."}),
+}).refine(data => {
+  if (data.uscfId.toUpperCase() !== 'NEW') { 
+    return data.uscfExpiration !== undefined; 
+  }
+  return true;
+}, { 
+  message: "USCF Expiration is required unless ID is NEW.", 
+  path: ["uscfExpiration"] 
+}).refine((data) => {
+  if (!data.grade || !data.section || data.section === 'Championship') return true;
+  const playerGradeLevel = gradeToNumber[data.grade];
+  const sectionMaxLevel = sectionMaxGrade[data.section];
+  if (playerGradeLevel === undefined || sectionMaxLevel === undefined) return true;
+  return playerGradeLevel <= sectionMaxLevel;
+}, { 
+  message: "Player's grade is too high for this section.", 
+  path: ["section"] 
 });
 
 type PlayerFormValues = z.infer<typeof playerFormSchema>;
@@ -340,7 +372,7 @@ function DistrictRostersPageContent() {
         
         if (key === 'lastName') {
             aVal = `${a.lastName || ''}, ${a.firstName || ''}`;
-            bVal = `${b.lastName || ''}, ${b.firstName || ''}`;
+            bVal = `${b.lastName || ''}, ${a.firstName || ''}`;
         }
         
         if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -652,7 +684,6 @@ function DistrictRostersPageContent() {
                 <Form {...form}>
                   <form id="edit-player-form" onSubmit={form.handleSubmit(onEditSubmit)} className="space-y-6">
                     
-                    {/* Player Information Section */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">Player Information</h3>
                       
@@ -681,7 +712,6 @@ function DistrictRostersPageContent() {
                       </div>
                     </div>
 
-                    {/* School Information Section */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">School Information</h3>
                       
@@ -751,7 +781,6 @@ function DistrictRostersPageContent() {
                       )}
                     </div>
 
-                    {/* Chess Information Section */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">Chess Information</h3>
                       
@@ -822,7 +851,6 @@ function DistrictRostersPageContent() {
                       </div>
                     </div>
 
-                    {/* Contact Information Section */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold border-b pb-2">Contact Information</h3>
                       
@@ -837,7 +865,6 @@ function DistrictRostersPageContent() {
 
                     <Separator className="my-6" />
 
-                    {/* Change History Section */}
                     <ChangeHistorySection player={playerToEdit} />
 
                   </form>
@@ -845,7 +872,6 @@ function DistrictRostersPageContent() {
               </div>
             </ScrollArea>
 
-            {/* Footer with action buttons */}
             <div className="p-6 pt-4 border-t bg-muted/30 shrink-0">
               <div className="flex justify-between">
                 {playerToEdit ? (
@@ -877,7 +903,7 @@ function DistrictRostersPageContent() {
             
           </DialogContent>
         </Dialog>
-        
+
         <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -903,7 +929,7 @@ function DistrictRostersPageContent() {
 }
 
 function UserRosterPageContent() {
-    const { profile } = useSponsorProfile();
+    const { profile, updateProfile } = useSponsorProfile();
     const { database: allPlayers, isDbLoaded, addPlayer, updatePlayer } = useMasterDb();
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -961,7 +987,7 @@ function UserRosterPageContent() {
       // Add to individual roster if applicable
       if (profile.role === 'individual' && !roster.some(p => p.id === playerToSave.id)) {
         const updatedStudentIds = [...(profile.studentIds || []), playerToSave.id];
-        await updatePlayer({ ...profile, studentIds: updatedStudentIds } as MasterPlayer, profile);
+        await updateProfile({ ...profile, studentIds: updatedStudentIds } as MasterPlayer, profile.user);
         toast({ title: "Player Added to Your Roster" });
       }
 
@@ -1089,3 +1115,5 @@ export default function RosterPage() {
         </AuthGuard>
     );
 }
+
+    
