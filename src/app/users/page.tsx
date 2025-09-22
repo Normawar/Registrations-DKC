@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { collection, getDocs, doc, deleteDoc, setDoc, query, where, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, query, where, writeBatch } from 'firebase/firestore';
 import Papa from 'papaparse';
 
 import { AppLayout } from "@/components/app-layout";
@@ -24,7 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { schoolData } from '@/lib/data/school-data';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/services/firestore-service';
-import { createUserByOrganizer } from '@/app/users/actions';
+import { createUserByOrganizer, deleteAuthUserByEmail } from '@/app/users/actions';
 import { Loader2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { useMasterDb } from '@/context/master-db-context';
@@ -321,48 +321,42 @@ export default function UsersPage() {
         log(`Starting deletion for ${emails.length} user(s)...`);
 
         try {
+            // Step 1: Delete Firestore documents
             const usersRef = collection(db, 'users');
-            const BATCH_SIZE = 30;
-            let successfullyDeletedCount = 0;
-            const allFoundEmails = new Set<string>();
+            const firestoreBatch = writeBatch(db);
+            const foundUsersToDelete: {docId: string, email: string}[] = [];
 
-            for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-                const emailBatch = emails.slice(i, i + BATCH_SIZE);
-                log(`Processing batch ${i / BATCH_SIZE + 1}...`);
-                
+            for (let i = 0; i < emails.length; i += 30) {
+                const emailBatch = emails.slice(i, i + 30);
                 const q = query(usersRef, where('email', 'in', emailBatch));
                 const querySnapshot = await getDocs(q);
-
-                if (querySnapshot.empty) {
-                    emailBatch.forEach(email => log(`⚠️ Warning: No Firestore record found for ${email}.`));
-                    continue;
-                }
-
-                const firestoreBatch = writeBatch(db);
+                
                 querySnapshot.forEach(doc => {
                     const userData = doc.data();
-                    log(`🔥 Deleting Firestore record for ${userData.email} (ID: ${doc.id})`);
+                    log(`🔥 Queuing Firestore deletion for ${userData.email} (ID: ${doc.id})`);
                     firestoreBatch.delete(doc.ref);
-                    allFoundEmails.add(userData.email.toLowerCase());
-                    successfullyDeletedCount++;
+                    foundUsersToDelete.push({ docId: doc.id, email: userData.email });
                 });
-                await firestoreBatch.commit();
             }
+            await firestoreBatch.commit();
+            log(`✅ Successfully deleted ${foundUsersToDelete.length} user records from Firestore.`);
 
-            emails.forEach(email => {
-                if (!allFoundEmails.has(email)) {
-                    log(`⚠️ Warning: No Firestore record found for ${email}. You may need to delete their auth record manually in the Firebase console.`);
-                }
-            });
+            // Step 2: Delete Auth users
+            for (const userToDelete of foundUsersToDelete) {
+                log(`🔥 Attempting to delete Auth user for ${userToDelete.email}...`);
+                const result = await deleteAuthUserByEmail(userToDelete.email);
+                log(`  -> ${result.message}`);
+            }
           
-            log(`✅ Successfully deleted ${successfullyDeletedCount} user records from Firestore.`);
-            toast({ title: 'Deletion Complete', description: 'Check the log for details. Note: Auth records must be deleted from the Firebase Console manually.' });
-            loadUsers(); // Refresh user list
+            log(`✅ Deletion process complete.`);
+            toast({ title: 'Deletion Complete', description: 'Check the log for details on deleted users.' });
+            
+            await loadUsers(); // Refresh user list
             setEmailsToDelete('');
 
         } catch (error) {
             const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-            log(`❌ Error during Firestore deletion: ${message}`);
+            log(`❌ Error during deletion: ${message}`);
             toast({ variant: 'destructive', title: 'Error', description: message });
         } finally {
             setIsDeleting(false);
@@ -425,12 +419,12 @@ export default function UsersPage() {
                   <CardHeader>
                     <CardTitle>Force Delete Users</CardTitle>
                     <CardDescription>
-                      Permanently delete user accounts from the database. Enter a list of emails separated by commas, spaces, or new lines. This tool only removes Firestore records, not authentication records.
+                      Permanently delete user accounts from Firestore and Firebase Authentication. Enter emails separated by commas, spaces, or new lines.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Textarea
-                      placeholder="test1@example.com, test2@example.com"
+                      placeholder="chiskie02@gmail.com, test@example.com"
                       value={emailsToDelete}
                       onChange={(e) => setEmailsToDelete(e.target.value)}
                       rows={4}

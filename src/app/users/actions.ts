@@ -1,12 +1,57 @@
 
 'use server';
 
-import { auth, db } from '@/lib/firebase';
+import { auth as adminAuth } from 'firebase-admin';
+import { getApps, initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { doc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import type { SponsorProfile } from '@/hooks/use-sponsor-profile';
+import { auth as clientAuth, db as clientDb } from '@/lib/firebase'; // Renamed to avoid conflict
 
-// Standalone function for organizer to create users - NO RECURSION POSSIBLE
+// --- Admin SDK Initialization ---
+// This needs to be secure and should only run on the server.
+if (!getApps().length) {
+  try {
+    initializeApp({
+      credential: cert({
+        projectId: "chessmate-w17oa",
+        clientEmail: "firebase-adminsdk-fbsvc@chessmate-w17oa.iam.gserviceaccount.com",
+        // The private key is sensitive and stored securely.
+        privateKey: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+      }),
+      projectId: "chessmate-w17oa",
+    });
+    console.log('Firebase Admin SDK initialized successfully for user actions.');
+  } catch (error) {
+    console.error('Failed to initialize Firebase Admin SDK:', error);
+  }
+}
+
+const adminDb = getFirestore();
+
+/**
+ * Deletes a user from Firebase Authentication using the Admin SDK.
+ * THIS IS A DESTRUCTIVE SERVER-SIDE ACTION.
+ */
+export async function deleteAuthUserByEmail(email: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const userRecord = await adminAuth().getUserByEmail(email);
+    await adminAuth().deleteUser(userRecord.uid);
+    console.log(`Successfully deleted auth user: ${email} (UID: ${userRecord.uid})`);
+    return { success: true, message: `Successfully deleted authentication entry for ${email}.` };
+  } catch (error: any) {
+    if (error.code === 'auth/user-not-found') {
+      console.log(`No auth user found for ${email}. Nothing to delete.`);
+      return { success: true, message: `No auth entry found for ${email}, which is okay.` };
+    }
+    console.error(`Error deleting auth user ${email}:`, error);
+    return { success: false, message: `Failed to delete auth user ${email}: ${error.message}` };
+  }
+}
+
+
+// Standalone function for organizer to create users
 export async function createUserByOrganizer(
   email: string, 
   password: string, 
@@ -15,7 +60,7 @@ export async function createUserByOrganizer(
   
   console.log('🔑 Organizer creating user:', email);
   
-  if (!auth || !db) {
+  if (!clientAuth || !clientDb) {
     throw new Error('Firebase services not available.');
   }
   
@@ -32,13 +77,11 @@ export async function createUserByOrganizer(
   }
   
   try {
-    // Step 1: Create the Firebase Auth user directly
     console.log('Creating Firebase Auth user...');
-    const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, trimmedPassword);
+    const userCredential = await createUserWithEmailAndPassword(clientAuth, normalizedEmail, trimmedPassword);
     const newUser = userCredential.user;
     console.log('✅ Auth user created with UID:', newUser.uid);
     
-    // Step 2: Create the profile directly - NO COMPLEX LOGIC
     const now = new Date().toISOString();
     const profile: SponsorProfile = {
       uid: newUser.uid,
@@ -52,17 +95,15 @@ export async function createUserByOrganizer(
       isDistrictCoordinator: profileData.isDistrictCoordinator || false,
       avatarType: profileData.avatarType || 'icon',
       avatarValue: profileData.avatarValue || 'PawnIcon',
-      forceProfileUpdate: true, // New users created by organizer should complete their profile
+      forceProfileUpdate: true,
       createdAt: now,
       updatedAt: now,
     };
     
-    // Step 3: Save to Firestore directly
     console.log('Saving user profile...');
-    await setDoc(doc(db, 'users', newUser.uid), profile);
+    await setDoc(doc(clientDb, 'users', newUser.uid), profile);
     console.log('✅ User profile saved successfully');
     
-    // Step 4: Return success
     console.log('✅ Organizer user creation completed for:', normalizedEmail);
     return {
       success: true,
@@ -73,7 +114,6 @@ export async function createUserByOrganizer(
   } catch (error: any) {
     console.error('❌ Organizer user creation failed:', error);
     
-    // Handle specific errors
     if (error.code === 'auth/email-already-in-use') {
       throw new Error(`A user with email ${normalizedEmail} already exists.`);
     } else if (error.code === 'auth/weak-password') {
@@ -85,71 +125,5 @@ export async function createUserByOrganizer(
     } else {
       throw new Error(error.message || 'Failed to create user account.');
     }
-  }
-}
-
-// BATCH USER CREATION - If organizer needs to create multiple users
-export async function createMultipleUsersByOrganizer(
-  users: Array<{
-    email: string;
-    password: string;
-    profileData: Partial<SponsorProfile>;
-  }>
-): Promise<Array<{ success: boolean; email: string; user?: any; profile?: SponsorProfile; error?: string }>> {
-  
-  console.log(`🔑 Organizer creating ${users.length} users...`);
-  const results = [];
-  
-  for (const userData of users) {
-    try {
-      const result = await createUserByOrganizer(userData.email, userData.password, userData.profileData);
-      results.push({
-        success: true,
-        email: userData.email,
-        user: result.user,
-        profile: result.profile
-      });
-      
-      // Add small delay between creations to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-    } catch (error: any) {
-      console.error(`Failed to create user ${userData.email}:`, error.message);
-      results.push({
-        success: false,
-        email: userData.email,
-        error: error.message
-      });
-    }
-  }
-  
-  console.log(`✅ Batch creation completed: ${results.filter(r => r.success).length}/${users.length} successful`);
-  return results;
-}
-
-// DEBUGGING - Test the organizer creation function
-export async function testOrganizerCreation() {
-  try {
-    console.log('Testing organizer user creation...');
-    
-    const testEmail = 'test-organizer-' + Date.now() + '@example.com';
-    const result = await createUserByOrganizer(testEmail, 'testpassword123', {
-      firstName: 'Test',
-      lastName: 'OrganizerCreated',
-      role: 'sponsor',
-      district: 'Test District',
-      school: 'Test School',
-      phone: '555-0123',
-      isDistrictCoordinator: false,
-      avatarType: 'icon',
-      avatarValue: 'PawnIcon',
-    });
-    
-    console.log('✅ Organizer creation test successful:', result.profile);
-    return result;
-    
-  } catch (error) {
-    console.error('❌ Organizer creation test failed:', error);
-    throw error;
   }
 }
